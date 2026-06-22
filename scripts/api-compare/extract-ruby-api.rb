@@ -356,6 +356,8 @@ class ApiExtractor
       process_def(node)
     when :defs
       process_defs(node)
+    when :alias
+      process_alias(node)
     when :command
       process_command(node)
     when :command_call
@@ -585,6 +587,14 @@ class ApiExtractor
       process_attr(args, :accessor)
     when "alias_method"
       process_alias_method(args)
+    when "class_attribute"
+      process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
+    when "cattr_accessor", "mattr_accessor"
+      process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
+    when "cattr_reader", "mattr_reader"
+      process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
+    when "cattr_writer", "mattr_writer"
+      process_mattr(args, reader: false, writer: true, predicate: false, class_attr: false)
     when "scope"
       process_scope(args)
     when "delegate"
@@ -641,6 +651,16 @@ class ApiExtractor
         process_extend_from_arg_paren(node[2])
       when "scope"
         process_scope_from_arg_paren(node[2])
+      when "class_attribute"
+        process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
+      when "cattr_accessor", "mattr_accessor"
+        process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
+      when "cattr_reader", "mattr_reader"
+        process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)
+      when "cattr_writer", "mattr_writer"
+        process_mattr(node[2], reader: false, writer: true, predicate: false, class_attr: false)
+      when "delegate"
+        process_delegate(node[2])
       when "module_function"
         process_module_function(node[2])
       end
@@ -807,6 +827,124 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
+  # Bare `alias new old` keyword (distinct from the `alias_method` command,
+  # which is handled above). Ripper emits `[:alias, new_node, old_node]`;
+  # record the new name as a method, like a one-off `alias_method`.
+  def process_alias(node)
+    new_name = symbol_name(node[1])
+    return unless new_name
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    target[bucket] << {
+      name: new_name,
+      visibility: current_visibility.to_s,
+      params: [],
+      file: @current_file,
+      notes: "alias",
+    }
+    maybe_update_module_file(fqn, target)
+  end
+
+  # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
+  # variants) metaprogram reader/writer/predicate accessors at both the class
+  # and instance level. The static `def` walker can't see them, so their TS
+  # ports (`partialInserts`, `defaultShard`, …) look novel without this. The
+  # generated NAMES come from the leading positional symbols only
+  # (`leading_symbol_args` stops at the options hash, so `default: :foo` is
+  # never a method name); the options hash's `instance_*:` flags gate the
+  # instance-level accessors. The two macro families gate differently, so the
+  # rules below mirror each Rails source exactly:
+  #
+  # - class_attribute (activesupport core_ext/class/attribute.rb): class reader
+  #   & writer always; class `?` only `if instance_predicate`; instance reader
+  #   & writer default to `instance_accessor` (so `instance_accessor: false,
+  #   instance_reader: true` still yields the instance reader); instance `?`
+  #   only `if instance_predicate && instance_reader`. No predicate option ⇒
+  #   predicate defaults true.
+  # - cattr/mattr (activesupport core_ext/module/attribute_accessors.rb): class
+  #   reader/writer always; instance reader/writer only when BOTH
+  #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
+  #   true); no predicate.
+  #
+  # All generated methods are public — class_attribute defines them via a fresh
+  # `class_eval` string, and mattr/cattr document them as public "even if this
+  # method is called with a private or protected access modifier" — so the
+  # enclosing visibility is intentionally ignored.
+  #
+  # NOT modeled: class_attribute inside `class << self` (attribute.rb:106-108
+  # concats the delegators into `methods` unconditionally, so the instance
+  # reader/writer are always emitted and ignore the `instance_*:` options). No
+  # such call exists in the vendored lib, so the @in_sclass bucketing below is
+  # faithful in practice.
+  def process_mattr(args, reader:, writer:, predicate:, class_attr:)
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    ia = option_bool(args, "instance_accessor")
+    ia_val = ia.nil? ? true : ia
+    ir = option_bool(args, "instance_reader")
+    iw = option_bool(args, "instance_writer")
+
+    if class_attr
+      inst_reader = ir.nil? ? ia_val : ir
+      inst_writer = iw.nil? ? ia_val : iw
+      class_pred = predicate && option_bool(args, "instance_predicate") != false
+      inst_pred = class_pred && inst_reader
+    else
+      inst_reader = (ir != false) && ia_val
+      inst_writer = (iw != false) && ia_val
+      class_pred = false
+      inst_pred = false
+    end
+
+    leading_symbol_args(args).each do |name|
+      add_mattr_accessor(target, "#{name}", reader, reader && inst_reader, [])
+      add_mattr_accessor(target, "#{name}=", writer, writer && inst_writer,
+                         [{ name: "value", kind: "required" }])
+      add_mattr_accessor(target, "#{name}?", class_pred, inst_pred, [])
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  def add_mattr_accessor(target, method_name, on_class, on_instance, params)
+    return unless on_class || on_instance
+    info = {
+      name: method_name,
+      visibility: "public",
+      params: params,
+      file: @current_file,
+      notes: "class_attribute",
+    }
+    target[:classMethods] << info if on_class
+    target[:instanceMethods] << info.dup if on_instance
+  end
+
+  # Boolean value of a trailing-options-hash key (`instance_writer: false`),
+  # or nil when the key is absent or not a literal true/false.
+  def option_bool(args, key)
+    list = positional_arg_list(args)
+    return nil unless list.is_a?(Array)
+    list.each do |el|
+      next unless el.is_a?(Array) && el[0] == :bare_assoc_hash
+      (el[1] || []).each do |assoc|
+        next unless assoc.is_a?(Array) && assoc[0] == :assoc_new &&
+                    assoc[1].is_a?(Array) && assoc[1][0] == :@label &&
+                    assoc[1][1] == "#{key}:"
+        v = assoc[2]
+        if v.is_a?(Array) && v[0] == :var_ref && v[1].is_a?(Array) && v[1][0] == :@kw
+          return v[1][1] == "true"
+        end
+        return nil
+      end
+    end
+    nil
+  end
+
   def process_scope(args)
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -841,8 +979,96 @@ class ApiExtractor
     }
   end
 
+  # `delegate :a, :b, to: :all` generates instance methods `a`/`b` that forward
+  # to the target. The leading positional symbols are the generated methods; a
+  # leading splat of a symbol-array constant (`delegate(*QUERYING_METHODS, to:
+  # :all)`) is expanded via @const_symbol_arrays. Only `… to:` forms are
+  # recorded — that's the static-resolvable surface (`delegate_missing_to` and
+  # dynamic targets are skipped). `prefix:` (renames to `prefix_method`) and
+  # `private:` are NOT modeled — both appear only in doc comments across the
+  # vendored lib, so recording bare public names is faithful in practice.
   def process_delegate(args)
-    # delegate :method_name, to: :association — skip, too complex
+    list = positional_arg_list(args)
+    names = []
+    has_to = false
+
+    visit = lambda do |node|
+      return unless node.is_a?(Array)
+      case node[0]
+      when :symbol_literal, :dyna_symbol
+        nm = symbol_name(node)
+        names << nm if nm
+      when :bare_assoc_hash
+        has_to = true if assoc_has_key?(node, "to:")
+      when :args_add_star
+        # [:args_add_star, before_list, star_arg, *after_args]
+        node[1].each { |e| visit.call(e) } if node[1].is_a?(Array)
+        star = node[2]
+        if star.is_a?(Array) && star[0] == :var_ref &&
+           star[1].is_a?(Array) && star[1][0] == :@const
+          (@const_symbol_arrays.dig(current_fqn, star[1][1]) || []).each { |s| names << s }
+        end
+        node[3..].each { |e| visit.call(e) }
+      end
+    end
+
+    if list.is_a?(Array) && list[0] == :args_add_star
+      visit.call(list)
+    elsif list.is_a?(Array)
+      list.each { |el| visit.call(el) }
+    end
+
+    return unless has_to
+    return if names.empty?
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    names.each do |name|
+      target[bucket] << {
+        name: name,
+        visibility: "public",
+        params: [],
+        file: @current_file,
+        notes: "delegate",
+      }
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  # Positional arg list with `arg_paren`/`args_add_block` wrappers peeled off.
+  # Returns either the raw Array of arg nodes or an `[:args_add_star, …]` node.
+  def positional_arg_list(args)
+    node = args
+    node = node[1] if node.is_a?(Array) && node[0] == :arg_paren
+    node = node[1] if node.is_a?(Array) && node[0] == :args_add_block
+    node
+  end
+
+  # Symbol args appearing BEFORE the first options hash. `class_attribute :foo,
+  # default: :bar` must yield only `[:foo]`, not the `:bar` default value.
+  def leading_symbol_args(args)
+    list = positional_arg_list(args)
+    return [] unless list.is_a?(Array)
+    names = []
+    list.each do |el|
+      break if el.is_a?(Array) && el[0] == :bare_assoc_hash
+      next unless el.is_a?(Array) && [:symbol_literal, :dyna_symbol].include?(el[0])
+      nm = symbol_name(el)
+      names << nm if nm
+    end
+    names
+  end
+
+  def assoc_has_key?(hash_node, label)
+    assocs = hash_node[1]
+    return false unless assocs.is_a?(Array)
+    assocs.any? do |a|
+      a.is_a?(Array) && a[0] == :assoc_new &&
+        a[1].is_a?(Array) && a[1][0] == :@label && a[1][1] == label
+    end
   end
 
   # ---- Dependency detection ----
@@ -879,12 +1105,27 @@ class ApiExtractor
     return unless lhs.is_a?(Array) && lhs[0] == :var_field
     const = lhs[1]
     return unless const.is_a?(Array) && const[0] == :@const
-    return unless const[1].include?("VALID_OPTIONS")
     return unless rhs.is_a?(Array)
+    # `*VALID_OPTIONS` (assert_valid_keys expansion) records via a loose
+    # symbol traverse; a pure symbol-array constant (e.g. `QUERYING_METHODS`)
+    # additionally feeds `delegate(*CONST, to:)` expansion. Limit the general
+    # case to pure symbol arrays so a hash/struct constant can't inject
+    # phantom delegate targets.
+    unless const[1].include?("VALID_OPTIONS") || pure_symbol_array?(unwrap_freeze(rhs))
+      return
+    end
     syms = []
     traverse_for_symbols(rhs, syms)
     return if syms.empty?
     (@const_symbol_arrays[current_fqn] ||= {})[const[1]] = syms
+  end
+
+  # `[:a, :b, :c]` (optionally `.freeze`d) with every element a literal symbol.
+  def pure_symbol_array?(node)
+    return false unless node.is_a?(Array) && node[0] == :array
+    elems = node[1]
+    return false unless elems.is_a?(Array) && !elems.empty?
+    elems.all? { |e| e.is_a?(Array) && [:symbol_literal, :dyna_symbol].include?(e[0]) }
   end
 
   # Record a constant with a literal RHS, keyed file → NAME (unwrapping `.freeze`).
@@ -899,8 +1140,10 @@ class ApiExtractor
   end
 
   def unwrap_freeze(node) # `[...].freeze` → receiver node; otherwise unchanged
-    return node unless node.is_a?(Array) && node[0] == :method_add_arg
-    call = node[1]
+    return node unless node.is_a?(Array)
+    # No-paren `.freeze` parses as `[:call, recv, ., freeze]`; the paren form
+    # `.freeze()` wraps that call in `[:method_add_arg, call, args]`.
+    call = node[0] == :method_add_arg ? node[1] : node
     return node unless call.is_a?(Array) && call[0] == :call
     ident_name(call[3]) == "freeze" ? call[1] : node
   end
