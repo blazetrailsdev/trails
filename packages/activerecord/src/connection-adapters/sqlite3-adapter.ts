@@ -826,17 +826,19 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // (bare keyword expressions like CURRENT_TIMESTAMP, or an already-parenthesized
   // expression) is emitted verbatim. Non-Proc values fall through to the abstract
   // form. The Proc is invoked exactly once (Rails calls `value.call` once), so a
-  // proc with side effects or a SqlLiteral return is not double-evaluated.
+  // proc with side effects is not double-evaluated. In Rails `SqlLiteral < String`,
+  // so a SqlLiteral result runs through the same `match?` regex — unwrap to its
+  // string and apply the same paren-wrap branch rather than special-casing it.
   override quoteDefaultExpression(value: unknown, column?: unknown): string {
     if (typeof value === "function") {
       const result = (value as () => unknown)();
-      if (typeof result === "string") {
-        return /^\w+\(.*\)$/.test(result) ? ` DEFAULT (${result})` : ` DEFAULT ${result}`;
+      const str = typeof result === "string" ? result : isSqlLiteral(result) ? result.value : null;
+      if (str === null) {
+        throw new TypeError(
+          "quoteDefaultExpression expected function default to return a string or SqlLiteral",
+        );
       }
-      if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
-      throw new TypeError(
-        "quoteDefaultExpression expected function default to return a string or SqlLiteral",
-      );
+      return /^\w+\(.*\)$/.test(str) ? ` DEFAULT (${str})` : ` DEFAULT ${str}`;
     }
     return super.quoteDefaultExpression(value, column);
   }
