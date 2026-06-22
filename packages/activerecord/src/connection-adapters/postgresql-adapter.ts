@@ -14,9 +14,8 @@ import { TypeMap } from "../type/type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
 import {
-  CHECK_ALL_FOREIGN_KEYS_SQL,
-  disableReferentialIntegritySql,
-  enableReferentialIntegritySql,
+  checkAllForeignKeysValidBang,
+  disableReferentialIntegrity,
 } from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
 import { ExplainPrettyPrinter } from "./postgresql/explain-pretty-printer.js";
@@ -46,7 +45,6 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
-  ActiveRecordError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -3833,89 +3831,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this.pgSchemaStatements().foreignKeyExists(fromTable, toTable, options);
   }
 
-  // Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables
-  // every table's triggers (FK checks) inside a requires_new transaction,
-  // yields, then re-enables them. Both ALTER passes are wrapped in
-  // `requiresNew` so a missing-superuser failure rolls back to the savepoint
-  // and leaves any surrounding transaction usable. Only an InvalidForeignKey
-  // raised by the block earns the missing-privileges warning; every other
-  // error bubbles up unchanged.
-  override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    let originalException: Error | null = null;
-
-    try {
-      await this.transaction(
-        async () => {
-          await this.execute(
-            disableReferentialIntegritySql.call(this, await this.tables()).join(";"),
-          );
-        },
-        { requiresNew: true },
-      );
-    } catch (e) {
-      if (e instanceof ActiveRecordError) originalException = e as Error;
-      else throw e;
-    }
-
-    try {
-      await fn();
-    } catch (e) {
-      if (e instanceof InvalidForeignKey) {
-        console.warn(
-          `WARNING: Rails was not able to disable referential integrity.\n\n` +
-            `This is most likely caused due to missing permissions.\n` +
-            `Rails needs superuser privileges to disable referential integrity.\n\n` +
-            `    cause: ${originalException?.message ?? ""}\n`,
-        );
-      }
-      throw e;
-    }
-
-    try {
-      await this.transaction(
-        async () => {
-          await this.execute(
-            enableReferentialIntegritySql.call(this, await this.tables()).join(";"),
-          );
-        },
-        { requiresNew: true },
-      );
-    } catch (e) {
-      if (!(e instanceof ActiveRecordError)) throw e;
-    }
-  }
+  // Mirrors: ReferentialIntegrity#disable_referential_integrity. Extracted to
+  // postgresql/referential-integrity.ts (Rails houses this in the
+  // ReferentialIntegrity module, not schema_statements.rb).
+  override disableReferentialIntegrity = disableReferentialIntegrity;
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
-  // Rails uses `transaction(requires_new: true)` — a savepoint when already
-  // inside a transaction, or a fresh BEGIN otherwise.
-  async checkAllForeignKeysValidBang(): Promise<void> {
-    if (this.inTransaction || this.isTransactionOpen()) {
-      // Materialize any lazy transaction so the savepoint lands inside the
-      // real PG transaction (mirrors Rails' transaction(requires_new: true)).
-      await this.materializeTransactions();
-      // Mirror Rails' savepoint naming: "active_record_#{stack.size}" (transaction.rb:528).
-      // Using openTransactions+1 makes repeated calls in the same transaction safe.
-      const sp = `active_record_${this.openTransactions + 1}`;
-      await this.createSavepoint(sp);
-      try {
-        await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
-        await this.releaseSavepoint(sp);
-      } catch (e) {
-        await this.rollbackToSavepoint(sp);
-        await this.releaseSavepoint(sp).catch(() => {});
-        throw e;
-      }
-    } else {
-      await this.beginTransaction();
-      try {
-        await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
-        await this.commit();
-      } catch (e) {
-        await this.rollback();
-        throw e;
-      }
-    }
-  }
+  checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
 
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
     await this.pgSchemaStatements().createDatabase(name, options);
