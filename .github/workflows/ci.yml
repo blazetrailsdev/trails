@@ -150,11 +150,15 @@ jobs:
           # exercised post-merge by push-to-main.
           WEBSITE_PKGS_RE='^packages/website/'
           # comparison_affected gates the Rails API/Test Comparison job. That
-          # job is only meaningful when package source (any packages/**),
-          # the compare tooling (scripts/{api,test,fixtures}-compare/), or the
-          # vendored upstream Ruby sources changed — plus cross-cutting infra
-          # (INFRA_RE) below. A scripts/tasks-only, website-only, or other
-          # tooling-only change can't move any comparison output, so it skips.
+          # job is only meaningful when Rails-port package source, the compare
+          # tooling (scripts/{api,test,fixtures}-compare/), or the vendored
+          # upstream Ruby sources changed — plus cross-cutting infra (INFRA_RE)
+          # below. A scripts/tasks-only, website-only, or other tooling-only
+          # change can't move any comparison output, so it skips.
+          # packages/website/ is EXCLUDED: it's the SvelteKit docs site, never
+          # one of apiComparePackages() (vendor/sources.ts), so the comparison
+          # never scans it — it is filtered out of comparison_files below
+          # before the COMPARISON_RE `^packages/` clause is applied.
           # NOTE: scripts/api-compare/conventions.ts regenerates
           # docs/ruby-ts-conventions.md (checked by api:conventions --check in
           # the job); the scripts/api-compare/ clause keeps that drift check
@@ -280,7 +284,16 @@ jobs:
                   set_gate unit_tests_affected   "$UNIT_TESTS_PKGS_RE"
                   set_gate guides_affected       "$GUIDES_PKGS_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
-                  set_gate comparison_affected   "$COMPARISON_RE"
+                  # comparison_affected can't reuse set_gate: it must first
+                  # drop packages/website/ (which the comparison never scans)
+                  # so a website-only PR skips the job. INFRA_RE still applies
+                  # via infra_files (website doesn't match INFRA_RE anyway).
+                  comparison_files=$(echo "$files" | grep -vE '^packages/website/' || true)
+                  if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$comparison_files" | grep -qE "$COMPARISON_RE"; then
+                    echo "comparison_affected=true"  >> "$GITHUB_OUTPUT"
+                  else
+                    echo "comparison_affected=false" >> "$GITHUB_OUTPUT"
+                  fi
                 fi
                 ;;
             esac
