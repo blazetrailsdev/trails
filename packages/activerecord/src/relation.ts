@@ -2572,7 +2572,12 @@ export class Relation<T extends Base> {
     // matching includes to eager_load so the JOIN is present — otherwise
     // a raw where condition referring to that table would fail.
     // See ActiveRecord::Relation#references_eager_loaded_tables?
-    const promotedIncludes = this._includesToPromoteFromReferences();
+    const promotedIncludes = [
+      ...new Set([
+        ...this._includesToPromoteFromReferences(),
+        ...this._includesToPromoteFromJoins(),
+      ]),
+    ];
 
     let loadedRecords: T[];
     if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
@@ -2655,6 +2660,42 @@ export class Relation<T extends Base> {
     // nested hash and dotted-path specs, so we promote every include shape;
     // any spec it can't JOIN falls back to preload at execution time.
     return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
+  }
+
+  /**
+   * Rails `joined_includes_values = includes_values & joins_values`: an include
+   * that is ALSO present in `joins(...)` makes `eager_loading?` true, so it is
+   * satisfied by the existing INNER JOIN in a single query rather than a
+   * separate preload (e.g. `Post.includes(:comments).joins(:comments)`). We
+   * promote the intersecting string specs; `_buildEagerJoinManager` then skips
+   * re-emitting the eager OUTER JOIN for those tables (the named INNER JOIN
+   * already covers them) so the JoinDependency projection/instantiation reuses
+   * the existing join.
+   */
+  private _includesToPromoteFromJoins(): AssociationSpec[] {
+    if (this._includesAssociations.length === 0) return [];
+    if (this._namedInnerJoins.length === 0) return [];
+    const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
+    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    return this._includesAssociations.filter(
+      (spec) => typeof spec === "string" && joined.has(spec) && !alreadyEagerLoaded.has(spec),
+    );
+  }
+
+  /**
+   * Resolved table names for `joins(:assoc)` named inner joins. Used to dedup an
+   * eager-load JOIN against an association already INNER-joined via joins().
+   */
+  private _namedInnerJoinTables(): Set<string> {
+    const tables = new Set<string>();
+    for (const v of this._namedInnerJoins) {
+      if (typeof v !== "string") continue;
+      const resolved = this._resolveAssociationJoin(v);
+      if (!resolved) continue;
+      const entries = Array.isArray(resolved) ? resolved : [resolved];
+      for (const e of entries) tables.add(e.table.toLowerCase());
+    }
+    return tables;
   }
 
   /**
@@ -4683,7 +4724,17 @@ export class Relation<T extends Base> {
       selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
     const manager = table.project(...(projection as Parameters<typeof table.project>));
 
+    // Skip eager-load JOINs for tables already INNER-joined via `joins(:assoc)`
+    // (Rails joined_includes_values): `_applyJoinsToManager` emits the named
+    // INNER JOIN, and the JoinDependency projection above reads its columns by
+    // the same (unaliased) table name — so re-emitting the eager OUTER JOIN here
+    // would duplicate the join.
+    const namedInnerTables = this._namedInnerJoinTables();
     for (const node of joinNodes) {
+      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
+      if (typeof joinedTable === "string" && namedInnerTables.has(joinedTable.toLowerCase())) {
+        continue;
+      }
       manager.appendJoinNode(node);
     }
 
