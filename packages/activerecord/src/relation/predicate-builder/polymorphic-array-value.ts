@@ -9,6 +9,8 @@
  *     → (commentable_type = 'Post' AND commentable_id = 1)
  *        OR (commentable_type = 'Image' AND commentable_id = 2)
  */
+import type { Base } from "../../base.js";
+import { polymorphicName } from "../../inheritance.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
     joinForeignKey: string;
@@ -98,8 +100,9 @@ export class PolymorphicArrayValue {
 
   /** @internal */
   private polymorphicName(klass: unknown): string | null {
-    const base = (klass as any).baseClass;
-    if (base?.name) return base.name;
-    return (klass as any).name ?? null;
+    if (typeof klass === "function") {
+      return polymorphicName(klass as typeof Base);
+    }
+    return (klass as { name?: string } | null)?.name ?? null;
   }
 }

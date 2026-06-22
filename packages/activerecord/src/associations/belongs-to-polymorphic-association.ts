@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
-import { baseClass } from "../inheritance.js";
+import { baseClass, demodulize } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
 
@@ -180,15 +180,35 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       name: string;
       _registryKeys?: string[];
     };
+    // Cannot delegate to the static `polymorphicName(ctor)`: that derives the
+    // full name from `moduleName`/`_demodulizedName`, but some polymorphic
+    // targets are registered only under a `::`-qualified registry key with no
+    // matching `moduleName` (JS flattens `Access::NoticeMessage` to the bare
+    // `AccessNoticeMessage` class name). The registry key is the authoritative
+    // full name here; the static would return the un-namespaced JS name.
     const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
+    let name: string;
     if (matching.length > 0) {
       const existing = this.readForeignType();
+      // Delegated-type round-trip: a *_type already stored that matches one of
+      // this class's registry keys is a caller-configured type string — return
+      // it verbatim, which is correct regardless of `storeFullClassName` (it is
+      // the exact key the model is registered under, full `::` or bare). Fresh
+      // writes (the case the store-full-sti-class tests exercise) have
+      // `existing === null` and fall through to the demodulize path below.
       if (existing && matching.includes(existing)) return existing;
-      return matching.reduce((best, k) =>
+      name = matching.reduce((best, k) =>
         (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
       );
+    } else {
+      name = ctor.name;
     }
-    return ctor.name;
+    // `store_full_class_name` is read on `record.class` (Rails reads it on self,
+    // not base_class); as an inherited class_attribute the two agree. When off,
+    // demodulize via the same helper `polymorphic_name` uses.
+    const storeFull = (record.constructor as typeof Base & { storeFullClassName?: boolean })
+      .storeFullClassName;
+    return storeFull === false ? demodulize(name) : name;
   }
 
   private readForeignType(): string | null {

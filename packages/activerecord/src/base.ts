@@ -53,6 +53,7 @@ import {
   getStiBase,
   instantiateSti,
   stiName,
+  polymorphicName as inheritancePolymorphicName,
   computeType as inheritanceComputeType,
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
@@ -3773,6 +3774,53 @@ export class Base extends Model {
 
   static set strictLoadingMode(value: _Core.StrictLoadingMode) {
     this._strictLoadingMode = value;
+  }
+
+  // Whether the STI inheritance column stores the full namespaced class name
+  // ("Namespaced::Post") or the demodulized bare name ("Post"). Subclasses
+  // inherit via JS prototype lookup and may override per-class.
+  //
+  // Mirrors: ActiveRecord::ModelSchema — `class_attribute :store_full_sti_class,
+  // instance_writer: false, default: true`.
+  static _storeFullStiClass = true;
+
+  /** Mirrors: ActiveRecord::Base.store_full_sti_class */
+  static get storeFullStiClass(): boolean {
+    return this._storeFullStiClass;
+  }
+
+  static set storeFullStiClass(value: boolean) {
+    this._storeFullStiClass = value;
+  }
+
+  // Whether polymorphic `*_type` columns store the full namespaced class name
+  // or the demodulized bare name. Also gates `sti_name` together with
+  // `storeFullStiClass`. Subclasses inherit via JS prototype lookup.
+  //
+  // Mirrors: ActiveRecord::ModelSchema — `class_attribute
+  // :store_full_class_name, instance_writer: false, default: true`.
+  static _storeFullClassName = true;
+
+  /** Mirrors: ActiveRecord::Base.store_full_class_name */
+  static get storeFullClassName(): boolean {
+    return this._storeFullClassName;
+  }
+
+  static set storeFullClassName(value: boolean) {
+    this._storeFullClassName = value;
+  }
+
+  /** The value stored in a polymorphic `*_type` column for this class —
+   * the full namespaced name when `storeFullClassName`, else demodulized.
+   * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name */
+  static polymorphicName(): string {
+    return inheritancePolymorphicName(this);
+  }
+
+  /** The value stored in the STI inheritance column for this class.
+   * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name */
+  static stiName(): string {
+    return stiName(this);
   }
 
   /**
