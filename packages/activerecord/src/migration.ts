@@ -1158,7 +1158,7 @@ export abstract class Migration {
     return this.schema.indexes(this._pt(tableName));
   }
 
-  async primaryKey(tableName: string): Promise<string | null> {
+  async primaryKey(tableName: string): Promise<string | string[] | null> {
     return this.schema.primaryKey(this._pt(tableName));
   }
 

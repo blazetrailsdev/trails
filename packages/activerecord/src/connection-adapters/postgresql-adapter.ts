@@ -12,7 +12,7 @@ import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
-import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
+import { Utils } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
   disableReferentialIntegrity,
@@ -3170,141 +3170,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, table } = this.parseSchemaQualifiedName(tableName);
-
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
-    }
-
-    // Order by the column's position within the index key array so
-    // composite PKs come back in declaration order, not the
-    // non-deterministic order pg_attribute happens to yield rows.
-    // `array_position(i.indkey, a.attnum)` gives each column's
-    // 1-based position inside the index definition.
-    const rows = await this.schemaQuery(
-      `SELECT a.attname
-       FROM pg_index i
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       WHERE ${tableCondition}
-         AND i.indisprimary = true
-       ORDER BY array_position(i.indkey, a.attnum)`,
-      binds,
-    );
-
-    if (rows.length === 0) return null;
-    if (rows.length === 1) return rows[0].attname as string;
-    return rows.map((r) => r.attname as string);
+    return this.pgSchemaStatements().primaryKey(tableName);
   }
 
   async pkAndSequenceFor(
     tableName: string,
   ): Promise<[string, { schema: string; name: string } | null] | null> {
-    const { schema, table } = this.parseSchemaQualifiedName(tableName);
-
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
-    }
-
-    const rows = await this.schemaQuery(
-      `SELECT a.attname AS pk,
-              pg_get_serial_sequence(quote_ident(n.nspname) || '.' || quote_ident(t.relname), a.attname) AS seq,
-              pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
-              n.nspname AS schema_name
-       FROM pg_index i
-       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-       JOIN pg_class t ON t.oid = i.indrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
-       WHERE ${tableCondition}
-         AND i.indisprimary = true
-       LIMIT 1`,
-      binds,
-    );
-
-    if (rows.length === 0) return null;
-
-    const pk = rows[0].pk as string;
-    const tableSchema = rows[0].schema_name as string;
-    let seq: { schema: string; name: string } | null = null;
-
-    if (rows[0].seq) {
-      const fullSeq = rows[0].seq as string;
-      const parts = splitQuotedIdentifier(fullSeq);
-      seq =
-        parts.length > 1
-          ? { schema: parts[0], name: parts[1] }
-          : { schema: tableSchema, name: parts[0] };
-    } else {
-      const defaultExpr = rows[0].default_expr as string | null;
-      if (defaultExpr) {
-        const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
-        if (match) {
-          const seqRef = match[1];
-          const parts = splitQuotedIdentifier(seqRef);
-          seq =
-            parts.length > 1
-              ? { schema: parts[0], name: parts[1] }
-              : { schema: tableSchema, name: parts[0] };
-        }
-        // else: UUID pk with non-nextval default (e.g. gen_random_uuid()) — seq stays null
-      }
-      // else: UUID pk with no column default — seq stays null
-    }
-
-    return [pk, seq];
+    return this.pgSchemaStatements().pkAndSequenceFor(tableName);
   }
 
   async resetPkSequence(tableName: string): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [pk, seq] = result;
-    if (!seq) return;
-    const qualifiedTable = this.quoteTableName(tableName);
-    const qi = (s: string) => this.quoteIdentifier(s);
-    const seqName = `${seq.schema}.${seq.name}`;
-
-    const maxRows = await this.schemaQuery(
-      `SELECT COALESCE(MAX(${qi(pk)}), 0) AS max_val FROM ${qualifiedTable}`,
-    );
-    const maxVal = Number(maxRows[0].max_val);
-    if (maxVal === 0) {
-      await this.schemaQuery(`SELECT setval($1::regclass, 1, false)`, [
-        this.quoteTableName(seqName),
-      ]);
-    } else {
-      await this.schemaQuery(`SELECT setval($1::regclass, $2, true)`, [
-        this.quoteTableName(seqName),
-        maxVal,
-      ]);
-    }
+    await this.pgSchemaStatements().resetPkSequence(tableName);
   }
 
   async setPkSequence(tableName: string, value: number): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [, seq] = result;
-    if (!seq) return;
-    const seqName = `${seq.schema}.${seq.name}`;
-    await this.schemaQuery(`SELECT setval($1::regclass, $2)`, [
-      this.quoteTableName(seqName),
-      value,
-    ]);
+    await this.pgSchemaStatements().setPkSequence(tableName, value);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -3477,25 +3357,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
-    const maxLen = 63;
-    const { table: unqualifiedTable } = this.parseSchemaQualifiedName(tableName);
-    let overLength = unqualifiedTable.length + columnName.length + suffix.length + 2 - maxLen;
-    let col = columnName;
-    let tbl = unqualifiedTable;
-    if (overLength > 0) {
-      const colMaxLen = Math.floor((maxLen - suffix.length - 2) / 2);
-      const newColLen = Math.min(colMaxLen, col.length);
-      overLength -= col.length - newColLen;
-      // Mirrors Ruby's `column_name[0, column_name_length - [over_length, 0].min]`:
-      // when over_length is still positive the column is kept full (min → 0) and
-      // the table is truncated below instead; only a negative over_length (the
-      // column was over-truncated) adds characters back.
-      col = col.slice(0, newColLen - Math.min(overLength, 0));
-    }
-    if (overLength > 0) {
-      tbl = tbl.slice(0, tbl.length - overLength);
-    }
-    return `${tbl}_${col}_${suffix}`;
+    return this.pgSchemaStatements().sequenceNameFromParts(tableName, columnName, suffix);
   }
 
   /** @internal */
@@ -4132,37 +3994,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
-    const rows = await this.schemaQuery(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
-      tableName,
-      column,
-    ]);
-    return (rows[0]?.seq as string | null) ?? null;
+    return this.pgSchemaStatements().serialSequence(tableName, column);
   }
 
   async defaultSequenceName(
     tableName: string,
     pk: string | string[] = "id",
   ): Promise<string | null> {
-    if (Array.isArray(pk)) return null;
-    try {
-      const result = await this.serialSequence(tableName, pk);
-      if (!result) return null;
-      return Utils.extractSchemaQualifiedName(result).toString();
-    } catch {
-      return `${tableName}_${pk}_seq`;
-    }
+    return this.pgSchemaStatements().defaultSequenceName(tableName, pk);
   }
 
   async setPkSequenceBang(tableName: string, value: number): Promise<void> {
-    const result = await this.pkAndSequenceFor(tableName);
-    if (!result) return;
-    const [, seq] = result;
-    if (!seq) return;
-    const seqName = `${seq.schema}.${seq.name}`;
-    await this.schemaQuery(`SELECT setval($1::regclass, $2)`, [
-      this.quoteTableName(seqName),
-      value,
-    ]);
+    await this.pgSchemaStatements().setPkSequenceBang(tableName, value);
   }
 
   async resetPkSequenceBang(
@@ -4170,52 +4013,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     pk: string | null = null,
     sequence: string | null = null,
   ): Promise<void> {
-    if (!pk || !sequence) {
-      const result = await this.pkAndSequenceFor(tableName);
-      if (!result) return;
-      const [defaultPk, defaultSeq] = result;
-      pk = pk ?? defaultPk;
-      sequence = sequence ?? (defaultSeq ? `${defaultSeq.schema}.${defaultSeq.name}` : null);
-    }
-    if (!pk || !sequence) return;
-    const quotedSeq = this.quoteTableName(sequence);
-    const maxRows = await this.schemaQuery(
-      `SELECT MAX(${this.quoteIdentifier(pk)}) AS max_val FROM ${this.quoteTableName(tableName)}`,
-    );
-    const maxVal = maxRows[0]?.max_val;
-    if (maxVal == null) {
-      const dbVersion = await this.getDatabaseVersion();
-      const minRows =
-        dbVersion >= 100000
-          ? await this.schemaQuery(
-              `SELECT seqmin AS minvalue FROM pg_sequence WHERE seqrelid = $1::regclass`,
-              [quotedSeq],
-            )
-          : await this.schemaQuery(`SELECT min_value AS minvalue FROM ${quotedSeq}`);
-      await this.schemaQuery(`SELECT setval($1::regclass, $2, false)`, [
-        quotedSeq,
-        minRows[0]?.minvalue ?? 1,
-      ]);
-    } else {
-      await this.schemaQuery(`SELECT setval($1::regclass, $2, true)`, [quotedSeq, maxVal]);
-    }
+    await this.pgSchemaStatements().resetPkSequenceBang(tableName, pk, sequence);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT a.attname AS name
-       FROM (
-         SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
-           FROM pg_index
-          WHERE indrelid = ${this.quoteLiteral(this.quoteTableName(tableName))}::regclass
-            AND indisprimary
-       ) i
-       JOIN pg_attribute a
-         ON a.attrelid = i.indrelid
-        AND a.attnum = i.indkey[i.idx]
-       ORDER BY i.idx`,
-    );
-    return rows.map((r) => r.name as string);
+    return this.pgSchemaStatements().primaryKeys(tableName);
   }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {

@@ -1112,7 +1112,7 @@ export class SchemaStatements {
     }
   }
 
-  async primaryKey(tableName: string): Promise<string | null> {
+  async primaryKey(tableName: string): Promise<string | string[] | null> {
     switch (this.adapterName) {
       case "sqlite": {
         const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);

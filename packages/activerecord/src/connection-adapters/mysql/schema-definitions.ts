@@ -244,7 +244,7 @@ export class Table extends AbstractTable {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Table#primary_key
    */
-  override async primaryKey(): Promise<string | null> {
+  override async primaryKey(): Promise<string | string[] | null> {
     return super.primaryKey();
   }
 
