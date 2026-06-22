@@ -1423,18 +1423,17 @@ interface BecomesRecord {
   _attributes: { reverseMergeBang(target: unknown): unknown };
   _newRecord: boolean;
   _destroyed: boolean;
-  _dirty: { snapshot(attrs: unknown): void };
+  _dirty: unknown;
   errors: unknown;
-  changesApplied(): void;
 }
 
 /**
  * Returns an instance of `klass` that shares this record's attribute set,
- * new-record / destroyed flags, dirty snapshot, and errors. Useful for STI
+ * new-record / destroyed flags, dirty tracker, and errors. Useful for STI
  * where the same row should be viewed through a different subclass.
  *
  * Mirrors: ActiveRecord::Persistence#becomes — "shares the same attributes
- * hash" + copies new_record? / destroyed? / errors.
+ * hash" + copies @mutations_from_database / new_record? / destroyed? / errors.
  */
 export function becomes<
   T extends BecomesRecord,
@@ -1467,10 +1466,11 @@ export function becomes<
   target._attributes = this._attributes;
   target._newRecord = this._newRecord;
   target._destroyed = this._destroyed;
-  if (!this._newRecord) {
-    target._dirty.snapshot(target._attributes);
-    target.changesApplied();
-  }
+  // Rails: `becoming.instance_variable_set(:@mutations_from_database, ...)` —
+  // share the original's dirty tracker by reference so the became record reports
+  // the same change-set (the throwaway `new klass({})` construction-time changes,
+  // e.g. the STI `type` column, are discarded with its private attribute set).
+  target._dirty = this._dirty;
   // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
   // errors across the class swap. Noop if the errors object doesn't expose
   // a `copy` method (defensive for hosts that stub errors differently).

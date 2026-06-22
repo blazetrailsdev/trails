@@ -1878,3 +1878,23 @@ describe("PersistenceTest", () => {
     },
   );
 });
+
+// ==========================================================================
+// becomes + restricted-name dirty tracking (persistence_test.rb:473)
+// ==========================================================================
+describe("PersistenceTest", () => {
+  useHandlerFixtures(["companies"], { schema: canonicalSchema });
+  // Warm the schema cache so Company's column accessors (incl. the restricted
+  // `name` reader) are generated before `new Company(...)`, matching Rails where
+  // the connection reflects columns lazily on first use.
+  beforeAll(async () => {
+    await (Company as unknown as { loadSchema(): Promise<void> }).loadSchema();
+  });
+
+  it("becomes includes changed attributes", () => {
+    const company = new Company({ name: "37signals" }) as any;
+    const client = company.becomes(Client);
+    expect(client.name).toBe("37signals");
+    expect(client.changedAttributes).toEqual(["name"]);
+  });
+});
