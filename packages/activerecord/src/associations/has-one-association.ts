@@ -346,10 +346,17 @@ export function sameRecord(a: Base | null, b: Base | null): boolean {
  * names don't match), so we resolve the inverse by foreign-key equality instead.
  *
  * Rails seeds exactly one inverse instance (`set_inverse_instance` writes the
- * single `inverse_of` reflection), so we seed only the first FK-matching
- * belongs_to and stop — otherwise a child with two associations on the same FK
- * (e.g. `Account#firm` and `Account#unautosaved_firm`) would get the owner
- * cached onto both, a side effect Rails would not produce.
+ * single `inverse_of` reflection), so we seed exactly one belongs_to —
+ * otherwise a child with two associations on the same FK (e.g. `Account#firm`
+ * and `Account#unautosaved_firm`) would get the owner cached onto both, a side
+ * effect Rails would not produce. When several FK-equal belongs_to qualify
+ * (the owner is an instance of more than one of their target classes, as a
+ * `Firm` is of both `Company` and `Firm`), we deterministically pick the
+ * *most general* target class — the one nearest `Base` in the prototype chain.
+ * That is order-independent (unlike "first declared") and mirrors how the
+ * primary back-reference is conventionally typed to the base class
+ * (`belongs_to :firm, class_name: "Company"`), with subclass-typed variants
+ * (`unautosaved_firm` → `Firm`) treated as secondary.
  *
  * @internal
  */
@@ -360,6 +367,8 @@ function seedDestroyInverseOwner(assoc: HasOneAssociation): void {
   const targetCtor = (target as any).constructor as typeof Base;
   if (typeof (target as any).association !== "function") return;
   const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
+
+  let best: { name: string; depth: number } | null = null;
   for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
     const concrete = ref as unknown as { name: string; foreignKey: unknown; klass?: typeof Base };
     let fk: unknown;
@@ -374,14 +383,28 @@ function seedDestroyInverseOwner(assoc: HasOneAssociation): void {
     // The owner must actually be an instance of the belongs_to's target class,
     // so we don't seed an unrelated association that happens to share the FK.
     if (klass && !(owner instanceof (klass as any))) continue;
-    try {
-      (target as any).association(ref.name).inversedFrom(owner);
-    } catch {
-      // A non-invertible / unresolved belongs_to is simply left untouched.
-      continue;
-    }
-    return;
+    const depth = prototypeDepth(klass);
+    if (!best || depth < best.depth) best = { name: ref.name, depth };
   }
+
+  if (!best) return;
+  try {
+    (target as any).association(best.name).inversedFrom(owner);
+  } catch {
+    // A non-invertible / unresolved belongs_to is simply left untouched.
+  }
+}
+
+/** Number of prototype links from `klass` up to (and excluding) the root. */
+function prototypeDepth(klass: typeof Base | undefined): number {
+  if (!klass) return Number.MAX_SAFE_INTEGER;
+  let depth = 0;
+  let proto = Object.getPrototypeOf(klass);
+  while (proto) {
+    depth++;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return depth;
 }
 
 /** @internal */
