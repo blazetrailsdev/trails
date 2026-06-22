@@ -48,6 +48,12 @@ const TEST_SCHEMA: Schema = {
   awex_posts: { awex_author_id: "integer", mention: "string" },
   bt_scope_authors: { name: "string" },
   bt_scope_posts: { title: "string", bt_scope_author_id: "integer" },
+  cp_mod_comments: { body: "string", cp_mod_post_id: "integer" },
+  cp_mod_posts: { title: "string", featured: "boolean" },
+  scp_comments: { body: "string", scp_post_id: "integer" },
+  scp_posts: { title: "string" },
+  pbtu_people: { name: "string", gender: "string", primary_contact_id: "integer" },
+  phmu_people: { name: "string", gender: "string", primary_contact_id: "integer" },
   cpk_hm_items: { order_shop_id: "integer", order_id: "integer", product: "string" },
   cpk_hm_orders: {
     columns: { shop_id: "integer", id: "integer", name: "string" },
@@ -3693,16 +3699,71 @@ describe("EagerAssociationTest", () => {
     expect(devs.length).toBe(1);
     expect(devs[0].name).toBe("David");
   });
-  it.skip("scoping with a circular preload", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("scoping with a circular preload", async () => {
+    // Rails: Comment.preload(post: :comments).scoping { Comment.find(1) }
+    // The circular preload (comment -> post -> comments) must not loop or error
+    // when the relation is pushed onto the scope stack.
+    class ScpComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("scp_post_id", "integer");
+        this.belongsTo("scpPost", { className: "ScpPost", foreignKey: "scp_post_id" });
+      }
+    }
+    class ScpPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.hasMany("scpComments", { className: "ScpComment", foreignKey: "scp_post_id" });
+      }
+    }
+    registerModel("ScpComment", ScpComment);
+    registerModel("ScpPost", ScpPost);
+
+    const post = await ScpPost.create({ title: "P" });
+    const c1 = await ScpComment.create({ body: "c1", scp_post_id: post.id });
+
+    const rel = (ScpComment as any).all().preload({ scpPost: "scpComments" });
+    const found = await (ScpComment as any).scoping(rel, async () => {
+      return await (ScpComment as any).find(c1.id);
+    });
+    expect(found.id).toBe(c1.id);
   });
 
-  it.skip("circular preload does not modify unscoped", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("circular preload does not modify unscoped", async () => {
+    // Rails: FirstPost.preload(comments: :first_post).find(1) must not let the
+    // default scope leak into a subsequent unscoped lookup.
+    class CpModComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("cp_mod_post_id", "integer");
+        this.belongsTo("cpModFirstPost", {
+          className: "CpModPost",
+          foreignKey: "cp_mod_post_id",
+        });
+      }
+    }
+    class CpModPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("featured", "boolean");
+        this.hasMany("cpModComments", {
+          className: "CpModComment",
+          foreignKey: "cp_mod_post_id",
+        });
+        this.defaultScope((rel: any) => rel.where({ featured: true }));
+      }
+    }
+    registerModel("CpModComment", CpModComment);
+    registerModel("CpModPost", CpModPost);
+
+    const post1 = await (CpModPost as any).unscoped().create({ title: "P1", featured: true });
+    const post2 = await (CpModPost as any).unscoped().create({ title: "P2", featured: false });
+    await CpModComment.create({ body: "c1", cp_mod_post_id: post1.id });
+
+    const expected = await (CpModPost as any).unscoped().find(post2.id);
+    await (CpModPost as any).all().preload({ cpModComments: "cpModFirstPost" }).find(post1.id);
+    const after = await (CpModPost as any).unscoped().find(post2.id);
+    expect(after.id).toBe(expected.id);
   });
 
   it("belongs_to association ignores the scoping", async () => {
@@ -4612,15 +4673,80 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preload belongs to uses exclusive scope", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preload belongs to uses exclusive scope", async () => {
+    // Rails: Person.males.includes(:primary_contact) — the preload of
+    // primary_contact must use the association's own (exclusive) scope, not the
+    // caller's `males` scope, so non-male contacts are still loaded.
+    class PbtuPerson extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("gender", "string");
+        this.attribute("primary_contact_id", "integer");
+        this.belongsTo("primaryContact", {
+          className: "PbtuPerson",
+          foreignKey: "primary_contact_id",
+        });
+      }
+    }
+    registerModel("PbtuPerson", PbtuPerson);
+
+    const f1 = await PbtuPerson.create({ name: "F1", gender: "F" });
+    const f2 = await PbtuPerson.create({ name: "F2", gender: "F" });
+    const m1 = await PbtuPerson.create({ name: "M1", gender: "M", primary_contact_id: f1.id });
+    const m2 = await PbtuPerson.create({ name: "M2", gender: "M", primary_contact_id: f2.id });
+
+    const people = await (PbtuPerson as any)
+      .where({ gender: "M" })
+      .includes("primaryContact")
+      .toArray();
+    expect(people).toHaveLength(2);
+    for (const person of people) {
+      const contact = person._preloadedAssociations.get("primaryContact");
+      expect(contact).not.toBeNull();
+      const direct = await (PbtuPerson as any).find(person.id);
+      const directContact = await direct.primaryContact;
+      expect(contact.id).toBe(directContact.id);
+    }
+    expect(
+      people.find((p: any) => p.id === m1.id)._preloadedAssociations.get("primaryContact").id,
+    ).toBe(f1.id);
+    expect(
+      people.find((p: any) => p.id === m2.id)._preloadedAssociations.get("primaryContact").id,
+    ).toBe(f2.id);
   });
-  it.skip("preload has many uses exclusive scope", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preload has many uses exclusive scope", async () => {
+    // Rails: Person.males.includes(:agents) — the preload of agents must use the
+    // association's exclusive scope, not the caller's `males` scope, so non-male
+    // agents are still loaded.
+    class PhmuPerson extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("gender", "string");
+        this.attribute("primary_contact_id", "integer");
+        this.hasMany("agents", {
+          className: "PhmuPerson",
+          foreignKey: "primary_contact_id",
+        });
+      }
+    }
+    registerModel("PhmuPerson", PhmuPerson);
+
+    const m1 = await PhmuPerson.create({ name: "M1", gender: "M" });
+    const m2 = await PhmuPerson.create({ name: "M2", gender: "M" });
+    await PhmuPerson.create({ name: "A1", gender: "F", primary_contact_id: m1.id });
+    await PhmuPerson.create({ name: "A2", gender: "F", primary_contact_id: m2.id });
+
+    const people = await (PhmuPerson as any).where({ gender: "M" }).includes("agents").toArray();
+    expect(people).toHaveLength(2);
+    for (const person of people) {
+      const agents = person._preloadedAssociations.get("agents");
+      const direct = await (PhmuPerson as any).find(person.id);
+      const directAgents = await direct.agents.toArray();
+      expect(agents.map((a: any) => a.id).sort()).toEqual(
+        directAgents.map((a: any) => a.id).sort(),
+      );
+      expect(agents.length).toBe(1);
+    }
   });
   it.skip("preload has one using primary key", () => {
     // BLOCKED: associations — eager-loading feature gap
