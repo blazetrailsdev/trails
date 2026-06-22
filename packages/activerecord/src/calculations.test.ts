@@ -7408,17 +7408,6 @@ describe("CalculationsTest", () => {
     schema: canonicalSchema,
   });
 
-  // The first `CalculationsTest` block defines `accounts` with a different
-  // column set; recreating it here under the canonical schema changes the
-  // result type of any `accounts` query whose plan PostgreSQL still has cached,
-  // throwing "cached plan must not change result type" inside the fixtures
-  // transaction. Flush the prepared-statement cache once the canonical schema
-  // is in place. Runs after useHandlerFixtures' own beforeAll (registration
-  // order), so the table already exists.
-  beforeAll(() => {
-    (Base.connection as { clearCacheBang?: () => void }).clearCacheBang?.();
-  });
-
   // The canonical fixtures only create companies/accounts/topics tables; the
   // composite-key grouped-association test needs the CPK book/order tables.
   beforeAll(async () => {
