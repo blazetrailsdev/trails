@@ -3,7 +3,6 @@ import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import {
   singularize,
   Notifications,
-  getCrypto,
   getErrorReporter,
   runLoadHooks,
 } from "@blazetrails/activesupport";
@@ -4057,15 +4056,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName: string | string[] | null | undefined,
     options: Record<string, unknown>,
   ): Record<string, unknown> {
-    this.assertValidDeferrable(options.deferrable);
-    if (columnName && options.usingIndex) {
-      throw new Error("Cannot specify both `columnName` and `usingIndex` options.");
-    }
-    const opts = { ...options };
-    if (!opts.name) {
-      opts.name = this.uniqueConstraintName(tableName, { column: columnName, ...opts });
-    }
-    return opts;
+    return this.pgSchemaStatements().uniqueConstraintOptions(tableName, columnName, options);
   }
 
   async addUniqueConstraint(
@@ -4073,23 +4064,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnName?: string | string[] | null,
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
-    if (!columnName && !options.usingIndex) {
-      throw new Error("Either columnName or usingIndex must be provided for addUniqueConstraint.");
-    }
-    const opts = this.uniqueConstraintOptions(tableName, columnName, options);
-    const name = this.quoteIdentifier(opts.name as string);
-    const deferParts = this.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
-    let constraintSql: string;
-    if (opts.usingIndex) {
-      constraintSql = `UNIQUE USING INDEX ${this.quoteIdentifier(opts.usingIndex as string)}`;
-    } else {
-      const cols = Array.isArray(columnName) ? columnName : [columnName!];
-      const nullsNotDistinct = opts.nullsNotDistinct ? " NULLS NOT DISTINCT" : "";
-      constraintSql = `UNIQUE${nullsNotDistinct} (${cols.map((c) => this.quoteIdentifier(c)).join(", ")})`;
-    }
-    await this.exec(
-      `ALTER TABLE ${this.quoteTableName(tableName)} ADD CONSTRAINT ${name} ${constraintSql}${deferParts}`,
-    );
+    return this.pgSchemaStatements().addUniqueConstraint(tableName, columnName, options);
   }
 
   async removeUniqueConstraint(
@@ -4097,27 +4072,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const columnName =
-      columnNameOrOptions === null ||
-      typeof columnNameOrOptions === "string" ||
-      Array.isArray(columnNameOrOptions) ||
-      columnNameOrOptions === undefined
-        ? columnNameOrOptions
-        : undefined;
-    const opts =
-      typeof columnNameOrOptions === "object" &&
-      columnNameOrOptions !== null &&
-      !Array.isArray(columnNameOrOptions)
-        ? columnNameOrOptions
-        : options;
-    if (!columnName && !opts.name && !opts.usingIndex) {
-      throw new ArgumentError(
-        "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
-      );
-    }
-    const uniq = await this.uniqueConstraintForBang(tableName, columnName, opts);
-    await this.exec(
-      `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(uniq.name!)}`,
+    return this.pgSchemaStatements().removeUniqueConstraint(
+      tableName,
+      columnNameOrOptions,
+      options,
     );
   }
 
@@ -4331,36 +4289,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
-    const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(`
-      SELECT c.conname, c.conrelid, c.conkey, c.condeferrable, c.condeferred,
-             pg_get_constraintdef(c.oid) AS constraintdef
-      FROM pg_constraint c
-      JOIN pg_class t ON c.conrelid = t.oid
-      JOIN pg_namespace n ON n.oid = c.connamespace
-      WHERE c.contype = 'u'
-        AND t.relname = ${scope.name}
-        AND n.nspname = ${scope.schema}
-    `);
-    return Promise.all(
-      rows.map(async (row) => {
-        const r = row;
-        const conkey = String(r.conkey).replace(/[{}]/g, "").split(",").map(Number);
-        const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
-        const nullsNotDistinct = (r.constraintdef as string).startsWith(
-          "UNIQUE NULLS NOT DISTINCT",
-        );
-        const deferrable = this.extractConstraintDeferrable(
-          r.condeferrable as boolean,
-          r.condeferred as boolean,
-        );
-        return new UniqueConstraintDefinition(tableName, columns, {
-          name: r.conname as string,
-          nullsNotDistinct: nullsNotDistinct || undefined,
-          deferrable: deferrable || undefined,
-        });
-      }),
-    );
+    return this.pgSchemaStatements().uniqueConstraints(tableName);
   }
 
   /** @internal */
@@ -4387,17 +4316,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /** @internal */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    if (options.name) return options.name as string;
-    const columnOrIndex = Array.isArray(options.column)
-      ? (options.column as string[])
-      : options.column
-        ? [options.column as string]
-        : options.usingIndex
-          ? [options.usingIndex as string]
-          : [];
-    const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
-    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
-    return `uniq_rails_${hashed}`;
+    return this.pgSchemaStatements().uniqueConstraintName(tableName, options);
   }
 
   /** @internal */
@@ -4405,19 +4324,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = this.uniqueConstraintName(tableName, options);
-    const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(
-      `SELECT c.conname, c.conrelid, c.conkey FROM pg_constraint c
-       JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
-       WHERE c.contype = 'u' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
-      [name],
-    );
-    if (rows.length === 0) return undefined;
-    const row = rows[0];
-    const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
-    const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
-    return new UniqueConstraintDefinition(tableName, cols, { name });
+    return this.pgSchemaStatements().uniqueConstraintFor(tableName, options);
   }
 
   /** @internal */
@@ -4426,15 +4333,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     column?: string | string[] | null,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition> {
-    const result = await this.uniqueConstraintFor(tableName, {
-      ...options,
-      column: column ?? undefined,
-    });
-    if (!result)
-      throw new ArgumentError(
-        `Table '${tableName}' has no unique constraint for ${column != null ? JSON.stringify(column) : JSON.stringify(options)}`,
-      );
-    return result;
+    return this.pgSchemaStatements().uniqueConstraintForBang(tableName, column, options);
   }
 
   /** @internal */
