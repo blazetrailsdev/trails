@@ -3811,6 +3811,25 @@ export class Base extends Model {
     this._storeFullClassName = value;
   }
 
+  // When the same persisted row participates in one transaction via multiple
+  // instances, controls which instance runs the transactional commit
+  // callbacks: `true` keeps the FIRST saved instance, `false` the last.
+  // Subclasses inherit via JS prototype lookup.
+  //
+  // Mirrors: ActiveRecord::Core — `class_attribute
+  // :run_commit_callbacks_on_first_saved_instances_in_transaction,
+  // instance_accessor: false, default: true` (core.rb:96).
+  static _runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
+
+  /** Mirrors: ActiveRecord::Base.run_commit_callbacks_on_first_saved_instances_in_transaction */
+  static get runCommitCallbacksOnFirstSavedInstancesInTransaction(): boolean {
+    return this._runCommitCallbacksOnFirstSavedInstancesInTransaction;
+  }
+
+  static set runCommitCallbacksOnFirstSavedInstancesInTransaction(value: boolean) {
+    this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
+  }
+
   /** The value stored in a polymorphic `*_type` column for this class —
    * the full namespaced name when `storeFullClassName`, else demodulized.
    * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name */

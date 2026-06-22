@@ -1250,112 +1250,20 @@ describe("TransactionCallbacksTest", () => {
   }); // CallbacksOnActionAndConditionTest
 
   describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
-    it("created callback called on last to save of separate instances in a transaction", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-          this.afterCreate((record: any) => {
-            log.push("created:" + record.title);
-          });
-        }
-      }
-      await transaction(Topic, async () => {
-        await Topic.create({ title: "first" });
-        await Topic.create({ title: "second" });
-      });
-      expect(log).toContain("created:first");
-      expect(log).toContain("created:second");
-      expect(log.length).toBe(2);
-    });
-
-    it("created callback called on first to save in transaction with old configuration", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-          this.afterCreate((record: any) => {
-            log.push("created:" + record.title);
-          });
-        }
-      }
-      await transaction(Topic, async () => {
-        await Topic.create({ title: "first" });
-        await Topic.create({ title: "second" });
-      });
-      expect(log[0]).toBe("created:first");
-    });
-
-    it("updated callback called on last to save of separate instances in a transaction", async () => {
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      const log: string[] = [];
-      Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.title);
-      });
-      await transaction(Topic, async () => {
-        await t1.update({ title: "a2" });
-        await t2.update({ title: "b2" });
-      });
-      expect(log).toContain("updated:a2");
-      expect(log).toContain("updated:b2");
-      expect(log.length).toBe(2);
-    });
-
-    it("updated callback called on first to save in transaction with old configuration", async () => {
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      const log: string[] = [];
-      Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.title);
-      });
-      await transaction(Topic, async () => {
-        await t1.update({ title: "a2" });
-        await t2.update({ title: "b2" });
-      });
-      expect(log[0]).toBe("updated:a2");
-    });
-
-    it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", async () => {
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      const log: string[] = [];
-      Topic.afterDestroy((record: any) => {
-        log.push("destroyed:" + record.title);
-      });
-      Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.title);
-      });
-      await transaction(Topic, async () => {
-        await t1.update({ title: "a2" });
-        await t2.destroy();
-      });
-      expect(log).toContain("destroyed:b");
-      expect(log).toContain("updated:a2");
-    });
-
-    it("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", async () => {
-      const history: string[] = [];
+    // Mirrors Rails' TopicWithTitleHistory: after_*_commit callbacks that append
+    // to a per-class history array, used to assert which instance of a logical
+    // row runs the transactional commit callbacks. The `firstSaved` flag mirrors
+    // `run_commit_callbacks_on_first_saved_instances_in_transaction` — true keeps
+    // the first saved instance (old configuration), false the last.
+    const makeTopicWithTitleHistory = (history: string[], firstSaved: boolean) =>
       class TopicWithTitleHistory extends Base {
         static {
           this._tableName = "topics";
           this.attribute("title", "string");
-          (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
+          (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = firstSaved;
+          afterCreateCommit(this, (record: any) =>
+            history.push(`Created (title = ${JSON.stringify(record.title)})`),
+          );
           afterUpdateCommit(this, (record: any) =>
             history.push(`Updated (title = ${JSON.stringify(record.title)})`),
           );
@@ -1363,7 +1271,77 @@ describe("TransactionCallbacksTest", () => {
             history.push(`Destroyed (title = ${JSON.stringify(record.title)})`),
           );
         }
-      }
+      };
+
+    it("created callback called on last to save of separate instances in a transaction", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, false);
+
+      await transaction(TopicWithTitleHistory, async () => {
+        const topic = await TopicWithTitleHistory.create({ title: "A" });
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "B" });
+      });
+
+      expect(history).toEqual(['Created (title = "B")']);
+    });
+
+    it("created callback called on first to save in transaction with old configuration", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, true);
+
+      await transaction(TopicWithTitleHistory, async () => {
+        const topic = await TopicWithTitleHistory.create({ title: "A" });
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "B" });
+      });
+
+      expect(history).toEqual(['Created (title = "A")']);
+    });
+
+    it("updated callback called on last to save of separate instances in a transaction", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, false);
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "two" });
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "three" });
+      });
+
+      expect(history).toEqual(['Updated (title = "three")']);
+    });
+
+    it("updated callback called on first to save in transaction with old configuration", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, true);
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "two" });
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "three" });
+      });
+
+      expect(history).toEqual(['Updated (title = "two")']);
+    });
+
+    it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, false);
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).update({ title: "two" });
+        await (await TopicWithTitleHistory.find(topic.id)).destroy();
+      });
+
+      expect(history).toEqual(['Destroyed (title = "two")']);
+    });
+
+    it("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", async () => {
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, true);
       const topic = await TopicWithTitleHistory.create({ title: "one" });
       history.length = 0;
 
@@ -1376,43 +1354,22 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      const log: string[] = [];
-      Topic.afterDestroy((record: any) => {
-        log.push("destroyed:" + record.title);
+      const history: string[] = [];
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, false);
+      const topic = await TopicWithTitleHistory.create({ title: "one" });
+      history.length = 0;
+
+      await transaction(TopicWithTitleHistory, async () => {
+        await (await TopicWithTitleHistory.find(topic.id)).destroy();
+        await topic.update({ title: "two" });
       });
-      Topic.afterUpdate((record: any) => {
-        log.push("updated:" + record.title);
-      });
-      await transaction(Topic, async () => {
-        await t1.destroy();
-        await t2.update({ title: "b2" });
-      });
-      expect(log).toContain("destroyed:a");
-      expect(log).toContain("updated:b2");
+
+      expect(history).toEqual(['Destroyed (title = "one")']);
     });
 
     it("destroyed callbacks called on first saved instance in transaction with old configuration", async () => {
       const history: string[] = [];
-      class TopicWithTitleHistory extends Base {
-        static {
-          this._tableName = "topics";
-          this.attribute("title", "string");
-          (this as any).runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
-          afterUpdateCommit(this, (record: any) =>
-            history.push(`Updated (title = ${JSON.stringify(record.title)})`),
-          );
-          afterDestroyCommit(this, (record: any) =>
-            history.push(`Destroyed (title = ${JSON.stringify(record.title)})`),
-          );
-        }
-      }
+      const TopicWithTitleHistory = makeTopicWithTitleHistory(history, true);
       const topic = await TopicWithTitleHistory.create({ title: "one" });
       history.length = 0;
 

@@ -668,12 +668,10 @@ export class Transaction {
       const entry = find(record);
       const earlier = entry?.[1];
 
-      // Old configuration: keep the FIRST saved instance as the candidate.
+      // Keep the FIRST saved instance as the candidate (Rails default `true`).
       if (
         earlier &&
-        typeof (record as any).constructor?.runCommitCallbacksOnFirstSavedInstancesInTransaction !==
-          "undefined" &&
-        (record as any).constructor.runCommitCallbacksOnFirstSavedInstancesInTransaction
+        (record as any).constructor?.runCommitCallbacksOnFirstSavedInstancesInTransaction
       ) {
         continue;
       }
