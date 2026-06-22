@@ -574,17 +574,19 @@ export default defineConfig(
   // ── no-unnecessary-type-assertion: scoped typed-lint block (projectService only, not recommendedTypeChecked) ──
   {
     files: ["**/*.ts"],
-    ignores: [
-      // Files not included in any tsconfig.json — projectService rejects them.
-      "packages/actionview/types/**",
-      "packages/activerecord/scripts/**",
-      "packages/website/docs/.vitepress/**",
-      "vitest.config.ts",
-      "vitest.dx-tests.config.ts",
-    ],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // Files not included in any tsconfig.json — let projectService fall
+          // back to an inferred default project so the rule can type-check them.
+          allowDefaultProject: [
+            "packages/actionview/types/tse-modules.d.ts",
+            "packages/activerecord/scripts/materialize-model-declares.ts",
+            "packages/website/docs/.vitepress/config.ts",
+            "vitest.config.ts",
+            "vitest.dx-tests.config.ts",
+          ],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

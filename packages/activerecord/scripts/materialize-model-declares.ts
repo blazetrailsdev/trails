@@ -19,12 +19,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { virtualize } from "../src/type-virtualization/virtualize.js";
-import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
+import { walk, type ClassInfo } from "../src/type-virtualization/walker.js";
 import { resolveAssociationTarget } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
 import { TEST_SCHEMA } from "../src/test-helpers/test-schema.js";
 import { isWrappedSchema } from "../src/test-helpers/define-schema.js";
-import type { ColumnSpec, TableSchema } from "../src/test-helpers/define-schema.js";
+import type { TableSchema } from "../src/test-helpers/define-schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
@@ -52,9 +52,7 @@ function normalizeSchema(schema: Record<string, TableSchema>): SchemaColumnsByTa
     // earlier `"columns" in value && "primaryKey" in value` check missed
     // wrappers that carry `indexes` but no `primaryKey` (e.g. `books`), so it
     // fell through and emitted `columns`/`indexes` as bogus column names.
-    const cols = isWrappedSchema(value)
-      ? (value.columns as Record<string, ColumnSpec>)
-      : (value as Record<string, ColumnSpec>);
+    const cols = isWrappedSchema(value) ? value.columns : value;
     const normalized: Record<string, SchemaColumnValue> = {};
     for (const [col, spec] of Object.entries(cols)) {
       if (typeof spec === "string") {
@@ -160,9 +158,8 @@ function collectTargets(info: ClassInfo, out: Set<string>): void {
       call.kind !== "hasOne"
     )
       continue;
-    const assoc = call as AssociationCall;
-    if (call.kind === "belongsTo" && assoc.options["polymorphic"] === "true") continue;
-    out.add(resolveAssociationTarget(assoc));
+    if (call.kind === "belongsTo" && call.options["polymorphic"] === "true") continue;
+    out.add(resolveAssociationTarget(call));
   }
 }
 
