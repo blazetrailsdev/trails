@@ -180,7 +180,7 @@ export class FileStore extends Store implements CacheStore {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
     return this.instrument("increment", key, { amount }, () =>
-      this.modifyValue(key, amount, merged),
+      this.modifyValue(name, amount, merged),
     );
   }
 
@@ -188,21 +188,44 @@ export class FileStore extends Store implements CacheStore {
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
     return this.instrument("decrement", key, { amount }, () =>
-      this.modifyValue(key, -amount, merged),
+      this.modifyValue(name, -amount, merged),
     );
   }
 
-  private modifyValue(key: string, amount: number, options: StoreOptions): number | null {
+  // Mirrors Rails FileStore#modify_value (file_store.rb:222-241): on a missing,
+  // expired, or version-mismatched entry it *creates* the key set to amount
+  // through the instrumented write path and returns amount (so
+  // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
+  // the entry's expiresAt/version.
+  private modifyValue(name: string, amount: number, options: StoreOptions): number {
+    const key = this.normalizeKey(name, options);
+    const version = this.normalizeVersion(name, options) ?? null;
+    // Rails coerces `amount = Integer(amount)` once (file_store.rb:226) and uses
+    // it uniformly for the seed write, the return, and the hit-path addition.
+    const amt = Math.trunc(amount);
     const entry = this.readEntry(key, options);
-    if (!entry || entry.isExpired()) return null;
-    const num = Number(entry.value);
-    if (isNaN(num)) return null;
-    const next = num + amount;
+    if (!entry || entry.isExpired() || entry.isMismatched(version)) {
+      this.write(name, amt, options);
+      return amt;
+    }
+    const num = toI(entry.value) + amt;
     this.writeEntry(
       key,
-      new Entry(next, { expiresAt: entry.expiresAt, version: entry.version }),
+      new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
       options,
     );
-    return next;
+    return num;
   }
+}
+
+// Mirrors Ruby `#to_i`: Integer/Float truncate toward zero, a String yields its
+// leading integer (0 when none), and anything else is 0.
+function toI(value: unknown): number {
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "string") {
+    const m = value.match(/^\s*[-+]?\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  }
+  return 0;
 }
