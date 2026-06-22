@@ -26,7 +26,7 @@ import {
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
-import { currentQueryConnection } from "./connection-handling.js";
+import { threadedConnectionFor } from "./connection-handling.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import {
   getStiBase,
@@ -288,7 +288,7 @@ export async function _updateRecord(
 
   applyDefaultAndGlobalConstraints(um as any, this as any);
 
-  const adapter = currentQueryConnection() ?? (this as any).connection;
+  const adapter = threadedConnectionFor((this as any).constructor) ?? (this as any).connection;
   if (typeof adapter.update === "function") {
     return adapter.update(um);
   }
@@ -315,7 +315,7 @@ export async function _deleteRecord(
 
   applyDefaultAndGlobalConstraints(dm as any, this as any);
 
-  const adapter = currentQueryConnection() ?? (this as any).connection;
+  const adapter = threadedConnectionFor((this as any).constructor) ?? (this as any).connection;
   if (typeof adapter.delete === "function") {
     return adapter.delete(dm);
   }
@@ -649,7 +649,8 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
       .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
     // The SQL is arel-built via `connection.toSql(dm)`; the "Delete" string is
     // the operation-name label (Rails' log subscriber name), not raw SQL.
-    const adapter = currentQueryConnection() ?? ctor.connection;
+    const adapter =
+      threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) ?? ctor.connection;
     await adapter.execDelete(adapter.toSql(dm), "Delete");
   }
   this._destroyed = true;
@@ -1145,7 +1146,10 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   // scope (and any global current scope) is stacked onto the UPDATE constraints.
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
 
-  const adapter = (currentQueryConnection() as typeof ctor.connection | null) ?? ctor.connection;
+  const adapter =
+    (threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) as
+      | typeof ctor.connection
+      | null) ?? ctor.connection;
   if (typeof adapter.update === "function") {
     await adapter.update(um);
   } else {

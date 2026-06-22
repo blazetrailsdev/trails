@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
-import { withQueryConnection, currentQueryConnection } from "./connection-handling.js";
+import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -85,13 +85,13 @@ export async function transaction<T>(
 
   // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
   // runs inside `with_connection { |c| c.transaction(...) }` and threads the
-  // yielded connection. Reading `currentQueryConnection()` (the threaded
+  // yielded connection. Reading `threadedConnectionFor()` (the threaded
   // connection) instead of the deprecated `.connection` getter keeps the build/
   // callback path from flipping the lease permanent under
   // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
   // releases the connection once the transaction completes.
   return withQueryConnection(modelClass, async () => {
-    const adapter = currentQueryConnection() ?? modelClass.connection;
+    const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
 
     const result = await dbTransaction.call(
       adapter as any,
@@ -563,11 +563,11 @@ export async function withTransactionReturningStatus<T>(
   // Wrap in `with_connection` so the `ensure_finalize` connection probe and the
   // nested transaction don't permanently lease a connection under
   // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
-  // connection is threaded via `currentQueryConnection()` rather than re-read
+  // connection is threaded via `threadedConnectionFor()` rather than re-read
   // off the deprecated `.connection` getter (matching Rails' block parameter).
   await withQueryConnection(modelClass, async () => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const adapter = currentQueryConnection() ?? modelClass.connection;
+    const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
     const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
 
     await transaction(modelClass, async () => {
@@ -688,7 +688,7 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
   // We're always called from within a transaction, so the adapter IS the
   // current connection — use the threaded connection rather than the deprecated
   // `.connection` getter so we don't flip the lease permanent.
-  const adapter = currentQueryConnection() ?? ctor.connection;
+  const adapter = threadedConnectionFor(ctor) ?? ctor.connection;
   adapter?.addTransactionRecord?.(this, ensureFinalize);
 }
 

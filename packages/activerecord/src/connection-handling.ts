@@ -59,6 +59,31 @@ export function currentQueryConnection(): DatabaseAdapter | null {
   return IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY) ?? null;
 }
 
+/**
+ * The threaded {@link currentQueryConnection}, but only when it belongs to
+ * `modelClass`'s *own* pool — otherwise `null`. Internal reads use this so a
+ * statement for model B that runs while only an outer wrap for a *different-pool*
+ * model A is active (cross-database eager-load, or `update_columns` issued inside
+ * another model's `transaction` block) resolves against B's pool rather than
+ * adopting A's connection. The pool-identity check mirrors the `connection`
+ * getter's guard; it returns `null` (so callers fall back to `.connection`) for a
+ * directly-assigned adapter or a model whose `connectionPool()` throws (e.g. a
+ * HABTM join model with no registered pool), preserving those models' existing
+ * resolution — including `_resolveAdapter`'s `ConnectionNotEstablished` path.
+ *
+ * @internal
+ */
+export function threadedConnectionFor(modelClass: typeof Base): DatabaseAdapter | null {
+  const threaded = currentQueryConnection();
+  if (!threaded) return null;
+  if ((modelClass as any)._adapter) return null;
+  try {
+    return connectionPool.call(modelClass).activeConnection === threaded ? threaded : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- ConnectionHandling module methods (mixed into Base as static methods) ---
 
 // Mirrors: self == Base — own-property marker set only on the literal Base class,
@@ -425,17 +450,16 @@ const CONNECTION_DEPRECATION_MSG =
 export function connection(this: typeof Base): DatabaseAdapter {
   // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
   if ((this as any)._adapter) return (this as any)._adapter;
-  const pool = connectionPool.call(this);
   // Inside an internal `withQueryConnection` wrap, resolve to the connection it
   // threaded for *this* pool — without flipping the lease permanent. This keeps
   // schema-reflection reads on the wrapped query/transaction path (columnsHash,
   // timestamp columns, …) off the deprecated-getter lease, matching Rails, which
   // threads the `with_connection` block parameter through that code. An explicit
   // `lease_connection()` still goes straight to the pool and makes the lease
-  // permanent. The pool-identity guard ensures a cross-pool `.connection` read
-  // inside the wrap still resolves against its own pool.
-  const threaded = currentQueryConnection();
-  if (threaded && pool.activeConnection === threaded) return threaded;
+  // permanent.
+  const threaded = threadedConnectionFor(this);
+  if (threaded) return threaded;
+  const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout;
     if (setting === "deprecated") {

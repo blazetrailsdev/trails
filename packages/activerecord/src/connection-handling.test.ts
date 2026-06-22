@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
+import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { setPermanentConnectionCheckout } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
@@ -822,6 +823,51 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
 
     await Post.count();
     expect(Post.connectionPool().activeConnection).toBeNull();
+  });
+});
+
+// trails-internal mechanism (no Rails counterpart): the connection threaded by
+// `withQueryConnection` is only adopted by a model's internal reads when it
+// belongs to *that model's own pool*, so a statement for a different-pool model
+// running inside an outer wrap (cross-database eager-load, or `update_columns`
+// inside another model's `transaction` block) resolves against its own pool
+// rather than the foreign threaded connection.
+describe("threadedConnectionFor pool-identity guard", () => {
+  class Secondary extends Base {}
+
+  beforeEach(() => {
+    Base.connectionHandler.establishConnection(
+      new HashConfig("test", "primary", {
+        adapter: "sqlite3",
+        database: "secondary.db",
+        pool: 5,
+        reapingFrequency: null,
+      }),
+      { owner: "Secondary" },
+    );
+    Secondary.connectionSpecificationName = "Secondary";
+  });
+
+  afterEach(() => {
+    Base.connectionHandler.clearAllConnectionsBang();
+    Base.connectionSpecificationName = "Base";
+  });
+
+  it("adopts the threaded connection for its own pool but not a foreign pool", async () => {
+    await withQueryConnection(Base, async () => {
+      const threaded = Base.connectionPool().activeConnection;
+      expect(threaded).toBeTruthy();
+      // Same pool: the threaded connection is adopted.
+      expect(threadedConnectionFor(Base)).toBe(threaded);
+      // Foreign pool with no active connection of its own: not adopted, so the
+      // caller falls back to resolving against Secondary's own pool.
+      expect(Secondary.connectionPool().activeConnection).toBeNull();
+      expect(threadedConnectionFor(Secondary)).toBeNull();
+    });
+  });
+
+  it("returns null outside any withQueryConnection wrap", () => {
+    expect(threadedConnectionFor(Base)).toBeNull();
   });
 });
 

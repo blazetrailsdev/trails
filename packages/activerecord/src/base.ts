@@ -3072,7 +3072,7 @@ export class Base extends Model {
     // Use the connection threaded by the enclosing `withQueryConnection` wrap
     // (Rails' `with_connection` block parameter) rather than the deprecated
     // `.connection` getter, so the INSERT doesn't flip the lease permanent.
-    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
+    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     // If suppressed, skip the actual insert but update record state
     if (_isSuppressed(ctor)) {
@@ -3295,7 +3295,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     // Thread the `withQueryConnection` connection rather than the deprecated
     // `.connection` getter (see `_performInsert`).
-    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
+    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     // If suppressed, skip the actual update
     if (_isSuppressed(ctor)) {
@@ -3440,7 +3440,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     // Thread the `withQueryConnection` connection rather than the deprecated
     // `.connection` getter (see `_performInsert`).
-    const adapter = ConnectionHandling.currentQueryConnection() ?? ctor.connection;
+    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     let didDelete = false;
     const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {

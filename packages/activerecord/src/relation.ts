@@ -9,7 +9,7 @@ import {
   DeleteManager,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { withQueryConnection, currentQueryConnection } from "./connection-handling.js";
+import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
   ActiveRecordError,
@@ -4954,13 +4954,17 @@ export class Relation<T extends Base> {
 
   /**
    * The connection for internal query execution: the one threaded by the
-   * enclosing `withQueryConnection` wrap when present, else the model's public
-   * `.connection`. Mirrors Rails threading the `with_connection` block parameter
-   * so internal reads don't re-lease via the deprecated `.connection` getter.
+   * enclosing `withQueryConnection` wrap when it belongs to this model's pool,
+   * else the model's public `.connection`. Mirrors Rails threading the
+   * `with_connection` block parameter so internal reads don't re-lease via the
+   * deprecated `.connection` getter. The pool-identity guard in
+   * {@link threadedConnectionFor} prevents a cross-pool outer wrap from handing
+   * this model a foreign connection (and keeps `_resolveAdapter`'s
+   * `ConnectionNotEstablished` path reachable for unconnected HABTM join models).
    * @internal
    */
   private _conn(): DatabaseAdapter {
-    return currentQueryConnection() ?? this._modelClass.connection;
+    return threadedConnectionFor(this._modelClass) ?? this._modelClass.connection;
   }
 
   /** Resolve the connection through {@link _conn}, returning null for HABTM join models with no established connection. */
