@@ -43,6 +43,20 @@ export function groupColumnToArel(col: string, table: Table): Nodes.Node {
   return new Nodes.SqlLiteral(trimmed);
 }
 
+interface CalculationConnection {
+  adapterName: AdapterName;
+  visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
+  toSql(arel: unknown): string;
+  quote(value: unknown): string;
+  quoteTableName(name: string): string;
+  execute(sql: string): Promise<Record<string, unknown>[]>;
+  selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<import("../result.js").Result>;
+}
+
 interface CalculationRelation {
   _modelClass: {
     arelTable: any;
@@ -51,20 +65,15 @@ interface CalculationRelation {
     typeForAttribute?(name: string): ColumnType;
     _attributeDefinitions?: { has(name: string): boolean };
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
-    connection: {
-      adapterName: AdapterName;
-      visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
-      toSql(arel: unknown): string;
-      quote(value: unknown): string;
-      quoteTableName(name: string): string;
-      execute(sql: string): Promise<Record<string, unknown>[]>;
-      selectAll(
-        sql: string,
-        name?: string | null,
-        binds?: unknown[],
-      ): Promise<import("../result.js").Result>;
-    };
+    connection: CalculationConnection;
   };
+  /**
+   * The connection threaded by the enclosing `withQueryConnection` wrap, else
+   * the model's `.connection`. Mirrors `Relation#_conn`; reading it instead of
+   * `_modelClass.connection` keeps internal reads off the deprecated getter.
+   * @internal
+   */
+  _conn(): CalculationConnection;
   _limitValue: number | null;
   _offsetValue: number | null;
   _optimizerHints: string[];
@@ -237,7 +246,7 @@ function buildAggNode(rel: CalculationRelation, fn: AggFn, column: string, disti
  * Both are handled by BigIntegerType.cast without any SQL wrapping.
  */
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return rel._modelClass.connection.adapterName === "sqlite";
+  return rel._conn().adapterName === "sqlite";
 }
 
 /**
@@ -267,7 +276,7 @@ function prependCtes(
   binds: unknown[],
 ): [string, unknown[]] {
   if (rel._ctes.length === 0) return [body, binds];
-  const connection = rel._modelClass.connection;
+  const connection = rel._conn();
   const compile = (node: Nodes.Node): [string, unknown[]] => {
     if (!connection.visitor?.compileWithBinds) return [connection.toSql(node), []];
     return connection.visitor.compileWithBinds(node);
@@ -292,12 +301,12 @@ function typeCastCalcBind(b: unknown): unknown {
 }
 
 function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
-  const visitor = rel._modelClass.connection.visitor;
+  const visitor = rel._conn().visitor;
   if (visitor?.compileWithBinds) {
     const [sql, rawBinds] = visitor.compileWithBinds(manager.ast);
     return [sql, rawBinds.map(typeCastCalcBind)];
   }
-  return [rel._modelClass.connection.toSql(manager), []];
+  return [rel._conn().toSql(manager), []];
 }
 
 /**
@@ -345,11 +354,7 @@ async function singleAggregate(
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const result = await rel._modelClass.connection.selectAll(
-    sql,
-    `${rel._modelClass.name} ${opName}`,
-    ctedBinds,
-  );
+  const result = await rel._conn().selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
   const rows = result.toArray();
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
@@ -395,11 +400,9 @@ async function groupedAggregate(
       ? wrapBigintAgg(withCtes, true)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._modelClass.connection.selectAll(
-    sql,
-    `${rel._modelClass.name} ${opName}`,
-    ctedBinds,
-  );
+  const queryResult = await rel
+    ._conn()
+    .selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
   const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
@@ -497,11 +500,9 @@ async function groupedCompositeAssoc(
       ? `SELECT ${aliases.map((a) => `"${a}"`).join(", ")}, CAST("val" AS TEXT) AS "val" FROM (${withCtes}) AS "_bigint_agg"`
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._modelClass.connection.selectAll(
-    sql,
-    `${rel._modelClass.name} ${opName}`,
-    ctedBinds,
-  );
+  const queryResult = await rel
+    ._conn()
+    .selectAll(sql, `${rel._modelClass.name} ${opName}`, ctedBinds);
   const rows = queryResult.toArray();
 
   const aggOf = (val: unknown): unknown =>
@@ -653,7 +654,7 @@ export async function performCount(
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
           const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
           const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
-          const idResult = await this._modelClass.connection.selectAll(
+          const idResult = await this._conn().selectAll(
             idWithCtes,
             `${this._modelClass.name} Ids`,
             idCtedBinds,
@@ -690,7 +691,7 @@ export async function performCount(
           countManager.where(table.get(pk).in(limitedIds));
           const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
           const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
-          const limitedResult = await this._modelClass.connection.selectAll(
+          const limitedResult = await this._conn().selectAll(
             withCtes,
             `${this._modelClass.name} Count`,
             ctedBinds,
@@ -718,7 +719,7 @@ export async function performCount(
         applyFromToManager(this, manager);
         const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
         const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-        const result = await this._modelClass.connection.selectAll(
+        const result = await this._conn().selectAll(
           withCtes,
           `${this._modelClass.name} Count`,
           ctedBinds,
@@ -789,7 +790,7 @@ export async function performCount(
     if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
     const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
     const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-    const result = await this._modelClass.connection.selectAll(
+    const result = await this._conn().selectAll(
       withCtes,
       `${this._modelClass.name} Count`,
       ctedBinds,
@@ -809,7 +810,7 @@ export async function performCount(
     applyFromToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._modelClass.connection.selectAll(
+    const result = await this._conn().selectAll(
       withCtes,
       `${this._modelClass.name} Count`,
       ctedBinds,
@@ -834,7 +835,7 @@ export async function performCount(
       outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
       const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
       const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-      const result = await this._modelClass.connection.selectAll(
+      const result = await this._conn().selectAll(
         withCtes,
         `${this._modelClass.name} Count`,
         ctedBinds,
@@ -849,7 +850,7 @@ export async function performCount(
     applyFromToManager(this, manager);
     const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
     const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._modelClass.connection.selectAll(
+    const result = await this._conn().selectAll(
       withCtes,
       `${this._modelClass.name} Count`,
       ctedBinds,
@@ -865,7 +866,7 @@ export async function performCount(
   applyFromToManager(this, manager);
   const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
   const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-  const result = await this._modelClass.connection.selectAll(
+  const result = await this._conn().selectAll(
     withCtes,
     `${this._modelClass.name} Count`,
     ctedBinds,
