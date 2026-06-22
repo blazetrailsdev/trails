@@ -1061,16 +1061,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async reloadTypeMap(): Promise<void> {
     this._typeMap = null;
     await this.loadAdditionalTypes();
-    // A type-map reload signals that the database's type universe changed —
-    // an extension or user type (hstore, enum, composite) was created or
-    // dropped, reassigning OIDs. Any cached prepared statement that bound or
-    // returned one of those types embeds the now-stale OID in its server-side
-    // plan, so re-executing it raises "cache lookup failed for type <oid>".
-    // Evict the statement cache so the next query re-prepares against the fresh
-    // OIDs. (Rails relies on PG's automatic re-planning plus its
-    // cached-plan-failure retry; trails' single pinned client + node-pg's
-    // client-side name cache do not get that for free, so we clear explicitly.)
-    this.clearCacheBang();
+    // A type-map reload signals the database's type universe changed — an
+    // extension or user type (hstore, enum, composite) was created or dropped,
+    // reassigning OIDs. A cached prepared statement that bound or returned one
+    // of those types embeds the now-stale OID in its server-side plan, so
+    // re-executing it raises "cache lookup failed for type <oid>". Drop the
+    // client-side statement map (NOT clearCacheBang) so the next prepare gets a
+    // fresh monotonic name and re-parses against the current OIDs. We
+    // deliberately skip the DEALLOCATE: reloadTypeMap runs mid-DDL-transaction
+    // (e.g. createEnum), and queuing DEALLOCATEs onto the pinned client there
+    // interleaves with the in-flight statement and desyncs the pg protocol.
+    // The orphaned server statements keep their old names — never reused — and
+    // are reclaimed on session reset/close.
+    this._statementPool?.reset();
   }
 
   /**
@@ -3168,7 +3171,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
     }
     // Mirrors Rails' disable_extension, which reloads the type map after the
-    // drop; reloadTypeMap also evicts the prepared-statement cache so a later
+    // drop; reloadTypeMap also drops the prepared-statement name map so a later
     // query doesn't re-execute a plan that referenced the dropped type's OID.
     await this.reloadTypeMap();
   }
