@@ -161,11 +161,23 @@ describe("NamedScopingTest", () => {
     );
   });
 
-  // Rails' `scope_stats`/`klass_stats` mutate a passed stats hash with a sync
-  // `count` side-effect; trails scope bodies are async and the canonical Topic
-  // does not carry the stats-mutating variant.
-  it.skip("positional scope method", () => {});
-  it.skip("positional klass method", () => {});
+  // Rails' `scope_stats`/`klass_stats` mutate a passed stats hash with a `count`
+  // side-effect and return the relation/self. trails counts asynchronously, so
+  // the canonical Topic's `scopeStats` scope and `klassStats` class method are
+  // async — the lone faithful divergence from Rails' synchronous `count`.
+  it("positional scope method", async () => {
+    const stats: { count?: number } = {};
+    // scopeStats returns the relation (`self`); awaiting the async scope through
+    // the thenable relation hydrates it, so `rows.length` is the relation count.
+    const rows = await (Topic as any).all().scopeStats(stats);
+    expect(rows.length).toBe(stats.count);
+  });
+
+  it("positional klass method", async () => {
+    const stats: { count?: number } = {};
+    const topics = await (Topic as any).all().klassStats(stats);
+    expect(await topics.count()).toBe(stats.count);
+  });
 
   it("scope with object", async () => {
     const objects = await (Topic as any).withObject().toArray();
@@ -216,11 +228,25 @@ describe("NamedScopingTest", () => {
     expect(got).toEqual(expected);
   });
 
-  // Scopes capturing the relation present at definition time (Rails defines
-  // `ranked_by_comments`/`top` to honor the current association scope). The
-  // canonical models carry `rankedByComments`/`limitBy` but not the `top`
-  // current-scope-capturing variant.
-  it.skip("scopes honor current scopes from when defined", () => {});
+  // Rails: `Post.top(limit)` is `def self.top(limit); ranked_by_comments.limit_by(limit); end`,
+  // so the bare `ranked_by_comments` call honors whatever current scope is in
+  // effect — `authors(:david).posts.top(5)` ranks only david's posts. The class
+  // method delegated onto a relation/association installs the relation as the
+  // current scope for the duration of the call.
+  it("scopes honor current scopes from when defined", async () => {
+    const david = (await Author.find(authors("david").id)) as any;
+    const postRanked = await (Post as any).rankedByComments().limitBy(5).toArray();
+    const davidRanked = await david.posts.rankedByComments().limitBy(5).toArray();
+    const postTop = await (Post as any).top(5).toArray();
+    const davidTop = await david.posts.top(5).toArray();
+
+    expect(postRanked.length).toBeGreaterThan(0);
+    expect(davidRanked.length).toBeGreaterThan(0);
+    expect(ids(postRanked)).not.toEqual(ids(davidRanked));
+    expect(ids(postTop)).not.toEqual(ids(davidTop));
+    expect(sortedIds(davidRanked)).toEqual(sortedIds(davidTop));
+    expect(ids(postRanked)).toEqual(ids(postTop));
+  });
 
   it("scopes body is a callable", () => {
     const klass = class extends Post {};
@@ -542,10 +568,15 @@ describe("NamedScopingTest", () => {
     );
   });
 
-  // Rails: `Topic.rejected.nested_scoping(expected)` where `nested_scoping`
-  // wraps a `scoping { Reply.approved }` block. The canonical Topic carries no
-  // `nested_scoping` scope and trails has no `relation.scoping { }` block form.
-  it.skip("nested scoping", () => {});
+  // Rails: `Topic.rejected.nested_scoping(expected)` where
+  // `def self.nested_scoping(scope); scope.base; end`. The class method, called
+  // on the `rejected` relation, returns `scope.base` (the passed relation under
+  // its own `base`/`all` scope) — independent of the receiver's `rejected` scope.
+  it("nested scoping", async () => {
+    const expected = (Reply as any).approved();
+    const got = await (Topic as any).rejected().nestedScoping(expected).toArray();
+    expect(ids(got)).toEqual(ids(await expected.toArray()));
+  });
 
   it("scopes batch finders", async () => {
     const approvedCount = await (Topic as any).approved().count();

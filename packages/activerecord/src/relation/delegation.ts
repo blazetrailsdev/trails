@@ -11,6 +11,7 @@
 
 import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
+import { ScopeRegistry } from "../scoping.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -336,6 +337,34 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // `toArray()` forces a load and returns the rows.
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.toArray());
       if (enumerableDelegate) return enumerableDelegate;
+
+      // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
+      // a method the relation doesn't define but the model class does is
+      // delegated via `scoping { model.public_send(method, ...) }`, so the
+      // class method (and any bare scope calls inside it) honors this relation
+      // as the current scope. Sync methods (returning a Relation) restore the
+      // scope immediately so the result is directly chainable; async methods
+      // (returning a Promise) defer restoration until the promise settles,
+      // mirroring Rails' synchronous block-scoping across the full body.
+      const classMethod = (modelClass as any)[prop];
+      if (typeof classMethod === "function") {
+        return (...args: any[]) => {
+          const prev = ScopeRegistry.currentScope(modelClass);
+          ScopeRegistry.setCurrentScope(modelClass, target);
+          let result: unknown;
+          try {
+            result = classMethod.apply(modelClass, args);
+          } catch (e) {
+            ScopeRegistry.setCurrentScope(modelClass, prev);
+            throw e;
+          }
+          if (result instanceof Promise) {
+            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
+          }
+          ScopeRegistry.setCurrentScope(modelClass, prev);
+          return result;
+        };
+      }
       return value;
     },
   });

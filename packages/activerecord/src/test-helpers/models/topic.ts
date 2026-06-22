@@ -23,7 +23,7 @@ export class Topic extends Base {
   declare static scopeWithLambda: () => Relation<Topic>;
   declare static approvedAsString: () => Relation<Topic>;
   declare static anonymousExtension: () => Relation<Topic>;
-  declare static scopeStats: () => Relation<Topic>;
+  declare static scopeStats: (stats: { count?: number }) => Promise<Relation<Topic>>;
   declare static withObject: () => Relation<Topic>;
   declare static withKwargs: (approved?: boolean) => Relation<Topic>;
   declare replies: AssociationProxy<Reply>;
@@ -69,7 +69,15 @@ export class Topic extends Base {
     this.scope("scopeWithLambda", (q: any) => q.all());
     this.scope("approvedAsString", (q: any) => q.where({ approved: true }));
     this.scope("anonymousExtension", (q: any) => q, { one: () => 1 });
-    this.scope("scopeStats", (q: any) => q);
+    // Rails topic.rb: `scope :scope_stats, -> stats { stats[:count] = count; self }`.
+    // The scope body mutates the passed stats hash with the relation's count and
+    // returns the relation (`self`). trails relations count asynchronously, so the
+    // body is async — the lone faithful divergence from Rails' sync `count`.
+    this.scope("scopeStats", ((q: any, stats: { count?: number }) =>
+      q.count().then((c: number) => {
+        stats.count = c;
+        return q;
+      })) as any);
     this.scope("withObject", (q: any) => q.where({ approved: true }));
     this.scope("withKwargs", (q: any, approved = false) => q.where({ approved }));
 
@@ -129,6 +137,20 @@ export class Topic extends Base {
   afterTouchCalled = 0;
 
   static afterInitializeCalled: boolean | null = null;
+
+  // Rails topic.rb: `def self.klass_stats(stats); stats[:count] = count; self; end`.
+  // Like `scope_stats` but a plain class method; `count` honors the current scope
+  // installed when called on a relation (`Topic.all.klass_stats(stats)`). Async
+  // because trails counts asynchronously.
+  static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
+    stats.count = (await this.count()) as number;
+    return this;
+  }
+
+  // Rails topic.rb: `def self.nested_scoping(scope); scope.base; end`.
+  static nestedScoping(scope: any): Relation<Topic> {
+    return scope.base();
+  }
 
   async parent() {
     return Topic.find(this.readAttribute("parent_id") as number);
