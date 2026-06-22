@@ -102,8 +102,12 @@ describe("rails-error-parity unported allowlist", () => {
     const stale = [];
     for (const e of allowlist) {
       const ns = PKG_NS[e.package];
+      // Guard on the namespace the same way findUnported does, so an entry
+      // whose rubyFile doesn't live under its package namespace is treated as
+      // malformed (caught below) rather than silently path-mapped.
+      const inNs = ns && e.rubyFile.startsWith(ns);
       const rel = `packages/${e.package}/src/${rubyToSrcRel(e.rubyFile)}`;
-      const ported = ns && !excludeSet.has(rel) && (await fileExists(path.join(ROOT, rel)));
+      const ported = inNs && !excludeSet.has(rel) && (await fileExists(path.join(ROOT, rel)));
       if (ported) stale.push(entryKey(e));
     }
     expect(
@@ -124,6 +128,25 @@ describe("rails-error-parity unported allowlist", () => {
         0,
       );
     }
+  });
+
+  it("every allowlist entry corresponds to a real manifest error class", async () => {
+    const manifest = await readJson(manifestPath);
+    const manifestKeys = new Set();
+    for (const [pkg, classes] of Object.entries(manifest.packages ?? {})) {
+      for (const e of classes) manifestKeys.add(entryKey({ package: pkg, ...e }));
+    }
+    const allowlist = await readJson(allowlistPath);
+
+    // Without this, a typo'd name/rubyFile (or an entry under the wrong package)
+    // would persist forever: its file stays absent, so the ratchet in the
+    // "still genuinely unported" test never forces its removal.
+    const orphans = allowlist.map(entryKey).filter((k) => !manifestKeys.has(k));
+    expect(
+      orphans,
+      "Allowlist entries that match no manifest error class (package/name/rubyFile). " +
+        "Fix the typo or remove the entry from eslint/rails-error-parity-unported.json.",
+    ).toEqual([]);
   });
 
   it("findUnported honors the exclude baseline and the path mapping", async () => {
