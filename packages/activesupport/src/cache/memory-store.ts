@@ -92,8 +92,8 @@ export class MemoryStore extends Store implements CacheStore {
   override deleteMatched(pattern: string | RegExp, options?: CacheOptions): void {
     const merged = this.mergedOptions(options);
     const raw = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    this.instrument("delete_matched", String(raw), undefined, () => {
-      const matcher = this.keyMatcher(raw, merged);
+    const matcher = this.keyMatcher(raw, merged);
+    this.instrument("delete_matched", String(matcher), undefined, () => {
       for (const key of this.data.keys()) {
         if (key.match(matcher) !== null) this.deleteEntry(key, merged);
       }
