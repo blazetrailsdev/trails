@@ -704,9 +704,16 @@ export function isOne<T extends typeof Base>(this: T): Promise<boolean> {
 }
 
 /**
+ * Mirrors: ActiveRecord::Querying#none? — Rails' `none?` (no block/args) falls
+ * through to `empty?`. (Relation#isNone is the distinct null-relation predicate,
+ * so this delegates to `all().empty?` rather than to it.)
+ */
+export function isNone<T extends typeof Base>(this: T): Promise<boolean> {
+  return this.all().isEmpty();
+}
+
+/**
  * Mirrors: ActiveRecord::Querying#empty? — delegates to `all().empty?`.
- * Rails' `none?` (no block/args) falls through to `empty?`, so this
- * predicate also covers that semantic.
  */
 export function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
   return this.all().isEmpty();

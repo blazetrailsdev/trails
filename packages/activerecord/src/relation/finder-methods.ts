@@ -371,6 +371,16 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
+  // Rails: Relation#last returns from the already-loaded records (no re-query)
+  // via find_last's `loaded?` branch — `records.last` / `records.last(n)`.
+  // Ordering was applied at load time, so the tail of the loaded array is the
+  // correct answer, matching `first`'s loaded-cache read.
+  if ((this as any)._loaded) {
+    const records: any[] = (this as any)._records;
+    if (n === undefined) return records[records.length - 1] ?? null;
+    // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
+    return n === 0 ? [] : records.slice(-n);
+  }
   // orderByPk/reverseOrder resolve order matchers, which read the deprecated
   // _modelClass.connection getter; run them (and the load) inside the connection
   // shim so we don't permanently lease a connection under

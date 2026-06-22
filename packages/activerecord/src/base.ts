@@ -2432,6 +2432,7 @@ export class Base extends Model {
   declare static isAny: typeof Querying.isAny;
   declare static isMany: typeof Querying.isMany;
   declare static isOne: typeof Querying.isOne;
+  declare static isNone: typeof Querying.isNone;
   declare static isEmpty: typeof Querying.isEmpty;
   declare static firstOrCreate: typeof Querying.firstOrCreate;
   declare static firstOrCreateBang: typeof Querying.firstOrCreateBang;

@@ -23,7 +23,10 @@ export class Reply extends Topic {
     });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 
-    this.scope("ordered", (q: any) => q.order("id"));
+    // Rails: `scope :ordered, -> { Reply.order(:id) }` references the Reply
+    // class directly, so the relation is rebuilt from Reply and escapes any
+    // association scope (e.g. approved_replies' parent_id constraint).
+    this.scope("ordered", () => Reply.order("id"));
 
     this.aliasAttribute("newContent", "content");
     this.aliasAttribute("newParentId", "parent_id");
