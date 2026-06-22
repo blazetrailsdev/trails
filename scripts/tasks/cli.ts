@@ -2100,6 +2100,12 @@ evidence (error messages, grep counts, CI failure rates).
 
 The full design. Subsections as needed.
 
+## Non-goals
+
+Deliberately descoped work, each with a one-line reason.
+
+- **Name:** what it is, why it's out of scope.
+
 ## Alternatives considered
 
 - **Name:** what it is, why it was not chosen.
@@ -2111,7 +2117,13 @@ Ordered phases, referencing story IDs for each phase.
 1. Phase 1 — story IDs
 2. Phase 2 — story IDs
 
+## Verification
+
+How we'll know the RFC worked — a concrete metric, count, or burndown target.
+
 ## Open questions
+
+<!-- Resolve or explicitly defer every question before \`status: active\`. -->
 
 1. **Question.** Options and recommendation.
 
