@@ -497,22 +497,30 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
+      - id: install
+        run: pnpm install --frozen-lockfile --prefer-offline
+      # Each suite is gated on the install step succeeding rather than on the
+      # default success()-of-all-prior-steps. This preserves the old
+      # separate-job behaviour where every affected leaf ran and reported
+      # independently: a failure in one leaf no longer skips the others, so a
+      # multi-leaf PR surfaces all failures in one run instead of discovering
+      # them one re-run at a time. The job still fails if any step fails.
       - name: Rack tests
-        if: needs.changes.outputs.rack_affected == 'true'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.rack_affected == 'true' }}
         run: pnpm vitest run packages/rack
       - name: Action View tests
-        if: needs.changes.outputs.actionview_affected == 'true'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actionview_affected == 'true' }}
         run: pnpm vitest run packages/actionview
       - name: TSE Compiler tests
-        if: needs.changes.outputs.tse_compiler_affected == 'true'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.tse_compiler_affected == 'true' }}
         run: pnpm vitest run packages/tse-compiler
       # vitest.dx-tests.config.ts only declares activerecord and trailties
       # projects, so this runs when either is affected.
       - name: DX type tests
         if: >-
-          needs.changes.outputs.activerecord_affected == 'true' ||
-          needs.changes.outputs.trailties_affected == 'true'
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          (needs.changes.outputs.activerecord_affected == 'true' ||
+           needs.changes.outputs.trailties_affected == 'true') }}
         run: pnpm test:types
 
   actionpack-tests:
