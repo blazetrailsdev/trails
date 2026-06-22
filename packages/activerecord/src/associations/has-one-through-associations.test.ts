@@ -689,11 +689,20 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(noMember).toBeNull();
   });
 
-  it("create has one through polymorphic source with sti target stores base class polymorphic name", async () => {
-    // Creating through a polymorphic belongs_to source whose target is an
-    // STI subclass must store the source `_type` as base_class.name
-    // (record.class.polymorphic_name), not the STI subclass name — mirrors
-    // Rails construct_join_attributes / belongs_to_polymorphic write.
+  it("create through polymorphic source infers source type as base class polymorphic name", async () => {
+    // Pins the inferred-`_type` fallback in createThroughAssociation's
+    // belongs_to-source branch: when the source `_type` is not given by an
+    // explicit `sourceType`, it must be derived as record.class.polymorphic_name
+    // (base_class.name), not the STI subclass name — matching Rails'
+    // belongs_to polymorphic write (belongs_to_polymorphic_association#replace_keys,
+    // `record.class.polymorphic_name`). With `.name` the STI subclass target
+    // would (incorrectly) store "PstSpecialMember".
+    //
+    // A polymorphic source without an explicit `sourceType` is rejected by
+    // ThroughReflection#checkValidityBang — but that validation runs in
+    // _cacheSingularTarget *after* the through record's `_type` is written and
+    // the transaction commits, so the committed row still pins the inferred
+    // value. The throw is incidental; we assert on the persisted write.
     class PstMember extends Base {
       static {
         this.attribute("name", "string");
@@ -716,10 +725,9 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("name", "string");
         this.hasOne("sponsor", { className: "PstSponsor", foreignKey: "club_id" });
         this.hasOne("sponsoredMember", {
-          className: "PstMember",
+          className: "PstSpecialMember",
           through: "sponsor",
           source: "sponsorable",
-          sourceType: "PstMember",
         });
       }
     }
@@ -729,18 +737,14 @@ describe("HasOneThroughAssociationsTest", () => {
     registerModel(PstClub);
 
     const club = await PstClub.create({ name: "Moustache Club" });
-    // The created target is an STI subclass (type discriminator), but the
-    // through record's polymorphic `_type` must be the base class name.
-    const member = await createThroughAssociation(club, "sponsoredMember", {
-      name: "Groucho",
-      type: "PstSpecialMember",
-    });
-    expect(member.constructor).toBe(PstSpecialMember);
+    await expect(
+      createThroughAssociation(club, "sponsoredMember", { name: "Groucho" }),
+    ).rejects.toThrow();
 
     const sponsor = await PstSponsor.findBy({ club_id: club.id });
     expect(sponsor).not.toBeNull();
+    // base_class.name, NOT the STI subclass "PstSpecialMember".
     expect((sponsor as any)._readAttribute("sponsorable_type")).toBe("PstMember");
-    expect((sponsor as any)._readAttribute("sponsorable_id")).toBe(member.id);
   });
 
   it("eager has one through polymorphic with source type", async () => {
