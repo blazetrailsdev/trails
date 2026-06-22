@@ -277,34 +277,53 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   // RFC 0031 R2: Rails' `columns_hash` is purely DB-sourced (model_schema.rb);
   // `attribute()` overrides a column's type or adds a virtual attribute, it
   // never changes column membership. With the schema cache always warm (R1) a
-  // real table is recorded as an existing data source. When the per-table
-  // columnsHash entry is momentarily absent (e.g. a sibling DDL test cleared it)
-  // we still synthesize, but for a table-backed model we include ONLY
-  // schema-reflected (`source: "schema"`) defs — never user `attribute()` defs —
-  // so a user attribute that is not a real column does not leak into
-  // column_names. A genuinely tableless attribute-only model (no warm data
-  // source) keeps the full synthesize over its declared attributes.
+  // real table is recorded as an existing data source, so for a table-backed
+  // model we synthesize from ONLY schema-reflected (`source: "schema"`) defs —
+  // never user `attribute()` defs — so a user attribute that is not a real
+  // column does not leak into column_names. A genuinely tableless attribute-only
+  // model (no warm data source) keeps the full synthesize over its declared
+  // attributes.
+  //
+  // The `getCachedColumnsHash` hit above is the normal table-backed path; a
+  // `clear_data_source_cache!` clears `_columnsHash` and `_dataSourceExists`
+  // together (schema-cache.ts clearDataSourceCacheBang), so a cleared table
+  // also flips `tableBacked` false and takes the full-synthesize branch. The
+  // schema-sourced filter here therefore only guards the residual case where
+  // `dataSourceExists` was eagerly marked true (data_sources eager-load) but
+  // a particular table's columns were never loaded — `schemaSourcedFallback`
+  // below keeps it from yielding an empty `column_names` for a real table.
   const tableBacked =
     !!cache &&
     cache.dataSourcesWarm === true &&
     typeof cache.getCachedDataSourceExists === "function" &&
     cache.getCachedDataSourceExists(table) === true;
 
-  // Synthesized fallback: filter ignoredColumns and virtual attrs to match
-  // loadSchema's fallback (virtual attrs are not DB columns).
   const ignored = new Set(this.ignoredColumns ?? []);
-  const result: Record<string, ColumnLike> = {};
-  for (const [name, def] of this._attributeDefinitions) {
-    if (ignored.has(name)) continue;
-    if ((def as any).virtual) continue;
-    if (tableBacked && !isSchemaSourcedDef(def)) continue;
-    const fn = (def as any).defaultFunction ?? null;
-    result[name] = {
-      name,
-      type: def.type?.name ?? null,
-      default: def.defaultValue ?? null,
-      ...(fn != null ? { defaultFunction: fn } : {}),
-    };
+  const synthesize = (schemaOnly: boolean): Record<string, ColumnLike> => {
+    const out: Record<string, ColumnLike> = {};
+    for (const [name, def] of this._attributeDefinitions) {
+      if (ignored.has(name)) continue;
+      if ((def as any).virtual) continue;
+      if (schemaOnly && !isSchemaSourcedDef(def)) continue;
+      const fn = (def as any).defaultFunction ?? null;
+      out[name] = {
+        name,
+        type: def.type?.name ?? null,
+        default: def.defaultValue ?? null,
+        ...(fn != null ? { defaultFunction: fn } : {}),
+      };
+    }
+    return out;
+  };
+
+  const result = synthesize(tableBacked);
+  // Defensive: never report an empty columns hash for a real table just because
+  // no schema-reflected def survived the filter (e.g. a model carrying only user
+  // `attribute()` decls whose reflection was never loaded). Fall back to the
+  // full synthesize so projections stay qualified; the warm-hit path above is
+  // unaffected.
+  if (tableBacked && Object.keys(result).length === 0 && this._attributeDefinitions.size > 0) {
+    return synthesize(false);
   }
   return result;
 }
@@ -783,18 +802,6 @@ export function resetColumnInformation(this: SchemaHost): void {
 }
 
 /**
- * Mirrors: ActiveRecord::ModelSchema#load_schema
- *
- * Sync: consults the adapter's schema cache if it's already populated
- * (no I/O), and reflects columns into `_attributeDefinitions`. For
- * models without a backing table (test fixtures with only user
- * `attribute()` declarations), falls back to synthesizing `_columnsHash`
- * from existing defs so downstream readers continue to work.
- *
- * For a full async reflection (fetching from the adapter if the cache
- * isn't populated), call `Base.loadSchema()` (base.ts).
- */
-/**
  * True when an attribute definition originated from schema reflection (a real
  * DB column) rather than a user `attribute()` declaration. Schema-reflected defs
  * carry `source: "schema"` / `userProvided: false`; user defs default to user.
@@ -830,6 +837,18 @@ function isWarmTableBacked(host: SchemaHost): boolean {
   );
 }
 
+/**
+ * Mirrors: ActiveRecord::ModelSchema#load_schema
+ *
+ * Sync: consults the adapter's schema cache if it's already populated
+ * (no I/O), and reflects columns into `_attributeDefinitions`. For
+ * models without a backing table (test fixtures with only user
+ * `attribute()` declarations), falls back to synthesizing `_columnsHash`
+ * from existing defs so downstream readers continue to work.
+ *
+ * For a full async reflection (fetching from the adapter if the cache
+ * isn't populated), call `Base.loadSchema()` (base.ts).
+ */
 export function loadSchema(this: SchemaHost): void {
   if (this._schemaLoaded) return;
 
@@ -916,21 +935,29 @@ export function loadSchema(this: SchemaHost): void {
   // the full synthesize over its declared attributes.
   if (!workHost._columnsHash && workHost._attributeDefinitions.size > 0) {
     const tableBacked = isWarmTableBacked(workHost);
-    const hash: Record<string, unknown> = {};
     const ignored = new Set(workHost._ignoredColumns ?? []);
-    for (const [name, def] of workHost._attributeDefinitions) {
-      if (ignored.has(name)) continue;
-      if (def.virtual) continue;
-      if (tableBacked && !isSchemaSourcedDef(def)) continue;
-      const fn = def.defaultFunction ?? null;
-      hash[name] = {
-        name,
-        type: def.type?.name ?? null,
-        default: def.defaultValue ?? null,
-        limit: def.limit ?? null,
-        ...(fn != null ? { defaultFunction: fn } : {}),
-      };
-    }
+    const synth = (schemaOnly: boolean): Record<string, unknown> => {
+      const hash: Record<string, unknown> = {};
+      for (const [name, def] of workHost._attributeDefinitions) {
+        if (ignored.has(name)) continue;
+        if (def.virtual) continue;
+        if (schemaOnly && !isSchemaSourcedDef(def)) continue;
+        const fn = def.defaultFunction ?? null;
+        hash[name] = {
+          name,
+          type: def.type?.name ?? null,
+          default: def.defaultValue ?? null,
+          limit: def.limit ?? null,
+          ...(fn != null ? { defaultFunction: fn } : {}),
+        };
+      }
+      return hash;
+    };
+    let hash = synth(tableBacked);
+    // Defensive: never leave a real table with an empty columnsHash just because
+    // no schema-reflected def survived the filter — fall back to full synthesize
+    // so projections stay qualified (mirrors columnsHash()).
+    if (tableBacked && Object.keys(hash).length === 0) hash = synth(false);
     workHost._columnsHash = hash;
   }
   if (!pkStillMissing) workHost._schemaLoaded = true;
@@ -1366,9 +1393,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
-    const userDeclared =
-      (def.source ?? (def.userProvided === false ? "schema" : "user")) === "user";
-    if (!userDeclared) continue;
+    if (isSchemaSourcedDef(def)) continue;
     const isVirtual = !real.has(name);
     if (!!def.virtual !== isVirtual) def.virtual = isVirtual;
   }
