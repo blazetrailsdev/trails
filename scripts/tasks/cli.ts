@@ -2102,7 +2102,9 @@ The full design. Subsections as needed.
 
 ## Non-goals
 
-Deliberately descoped work, each with a one-line reason.
+Deliberately descoped work, each with a one-line reason. This is where an
+RFC-level descoping decision lives canonically — don't leave it only in
+session memory or a story comment.
 
 - **Name:** what it is, why it's out of scope.
 
@@ -2119,11 +2121,14 @@ Ordered phases, referencing story IDs for each phase.
 
 ## Verification
 
-How we'll know the RFC worked — a concrete metric, count, or burndown target.
+How we'll know the RFC worked — a concrete metric, count, or burndown target
+(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State
+the number, not a vibe.
 
 ## Open questions
 
-<!-- Resolve or explicitly defer every question before \`status: active\`. -->
+<!-- Every question here must be resolved or explicitly deferred (to a named
+     follow-up RFC/story) before this RFC moves to \`status: active\`. -->
 
 1. **Question.** Options and recommendation.
 

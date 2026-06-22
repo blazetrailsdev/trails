@@ -2218,14 +2218,14 @@ describe("buildRfcContent", () => {
       "## Rollout\n\nOrdered phases, referencing story IDs for each phase.\n\n1. Phase 1 — story IDs\n2. Phase 2 — story IDs",
     );
     expect(content).toContain(
-      "## Non-goals\n\nDeliberately descoped work, each with a one-line reason.\n\n- **Name:** what it is, why it's out of scope.",
+      "## Non-goals\n\nDeliberately descoped work, each with a one-line reason. This is where an\nRFC-level descoping decision lives canonically — don't leave it only in\nsession memory or a story comment.\n\n- **Name:** what it is, why it's out of scope.",
     );
     expect(content).toContain(
-      "## Verification\n\nHow we'll know the RFC worked — a concrete metric, count, or burndown target.",
+      '## Verification\n\nHow we\'ll know the RFC worked — a concrete metric, count, or burndown target\n(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State\nthe number, not a vibe.',
     );
     // The open-questions note must sit between the heading and the first question.
     expect(content).toContain(
-      "## Open questions\n\n<!-- Resolve or explicitly defer every question before `status: active`. -->\n\n1. **Question.** Options and recommendation.",
+      "## Open questions\n\n<!-- Every question here must be resolved or explicitly deferred (to a named\n     follow-up RFC/story) before this RFC moves to `status: active`. -->\n\n1. **Question.** Options and recommendation.",
     );
   });
 
