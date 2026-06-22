@@ -819,6 +819,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return sqliteQuoteTableNameForAssignment(table, attr);
   }
 
+  // Mirrors SQLite3::Quoting#quote_default_expression (sqlite3/quoting.rb:99):
+  // a Proc default that reads as a function call (`\A\w+\(.*\)\z`) must be
+  // wrapped in parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`); bare
+  // keyword expressions (CURRENT_TIMESTAMP / CURRENT_DATE) and non-Proc values
+  // fall through to the abstract form (which prepends ` DEFAULT `).
+  override quoteDefaultExpression(value: unknown, column?: unknown): string {
+    if (typeof value === "function") {
+      const result = (value as () => unknown)();
+      if (typeof result === "string" && /^\w+\(.*\)$/.test(result)) {
+        return ` DEFAULT (${result})`;
+      }
+    }
+    return super.quoteDefaultExpression(value, column);
+  }
+
   override quotedTrue(): string {
     return sqliteQuotedTrue();
   }

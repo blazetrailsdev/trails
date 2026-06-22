@@ -421,19 +421,114 @@ describe("DefaultStringsTest", () => {
   });
 });
 
+// Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb:148), gated to the
+// PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
+// — built here with the migration DSL (expression defaults round-trip through the
+// catalog and reflect via column.defaultFunction) and dumped via dump_table_schema.
 describeIfPg("PostgresqlDefaultExpressionTest", () => {
-  it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect PostgreSQL expression defaults (CURRENT_DATE / CURRENT_TIMESTAMP).
-    // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for PG.
-    // SCOPE: postgresql_specific_schema.rb `defaults` table (modified_date, modified_time columns).
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("defaults", { force: true }, (t: any) => {
+      t.integer("random_number", { default: () => "random() * 100" });
+      t.date("modified_date", { default: () => "CURRENT_DATE" });
+      t.date("modified_date_function", { default: () => "now()" });
+      t.date("fixed_date", { default: "2004-01-01" });
+      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+      t.datetime("modified_time_without_precision", {
+        precision: null,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_with_precision_0", {
+        precision: 0,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_function", { default: () => "now()" });
+      t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+    });
+  });
+
+  afterEach(async () => {
+    await ctx.dropTable("defaults", { ifExists: true });
+  });
+
+  it("schema dump includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "defaults",
+    );
+    expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
+    expect(output).toMatch(
+      /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(/t\.date\("modified_date_function", \{ default: \(\) => "now\(\)" \}\)/);
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_function", \{ default: \(\) => "now\(\)" \}\)/,
+    );
   });
 });
 
+// Mirrors `Sqlite3DefaultExpressionTest` (defaults_test.rb:309), gated to the
+// SQLite3Adapter. The `defaults` table comes from sqlite_specific_schema.rb —
+// built here with the migration DSL; expression defaults reflect via
+// column.defaultFunction (newColumnFromField/_extractDefaultFunction).
 describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
-  it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — schema dumper does not reflect SQLite expression defaults (CURRENT_DATE, CURRENT_TIMESTAMP, ABS(RANDOM())).
-    // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for SQLite.
-    // SCOPE: sqlite_specific_schema.rb `defaults` table with expression defaults.
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("defaults", { force: true }, (t: any) => {
+      t.integer("random_number", { default: () => "ABS(RANDOM())" });
+      t.date("modified_date", { default: () => "CURRENT_DATE" });
+      t.date("modified_date_function", { default: () => "DATE('now')" });
+      t.date("fixed_date", { default: "2004-01-01" });
+      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+      t.datetime("modified_time_without_precision", {
+        precision: null,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_with_precision_0", {
+        precision: 0,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
+      t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+    });
+  });
+
+  afterEach(async () => {
+    await ctx.dropTable("defaults", { ifExists: true });
+  });
+
+  it("schema dump includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "defaults",
+    );
+    expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
+    expect(output).toMatch(
+      /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.integer\("random_number", \{ default: \(\) => "ABS\(RANDOM\(\)\)" \}\)/,
+    );
   });
 });
 
