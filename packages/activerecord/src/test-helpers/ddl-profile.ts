@@ -105,41 +105,45 @@ function currentFile(): string {
  */
 export function classifyDdl(sqlRaw: string): { op: DdlOp; table: string | null } | null {
   const sql = sqlRaw.trimStart();
-  const upper = sql.toUpperCase();
+  // Cheap prefix gate: this runs on EVERY query (reads included), so avoid
+  // uppercasing/scanning the whole string up front — only the leading keyword
+  // can decide DDL-ness. Wider scans happen lazily inside the matched branch.
+  const head = sql.slice(0, 16).toUpperCase();
 
   const unquote = (s: string | undefined): string | null =>
     s ? s.replace(/^["'`]|["'`]$/g, "").replace(/^["'`]|["'`]$/g, "") : null;
 
-  // PG referential-integrity toggle around fixture loads/truncation. Matched
-  // before the generic ALTER branch (the combined statement starts with ALTER).
-  if (upper.includes("DISABLE TRIGGER") || upper.includes("ENABLE TRIGGER")) {
-    const m0 = sql.match(/ALTER\s+TABLE\s+([^\s(]+)/i);
-    return { op: "REFERENTIAL_INTEGRITY", table: unquote(m0?.[1]) };
-  }
-
   let m: RegExpMatchArray | null;
-  if (upper.startsWith("CREATE TABLE") || upper.startsWith("CREATE TEMPORARY TABLE")) {
+  if (head.startsWith("CREATE TABLE") || head.startsWith("CREATE TEMPORARY")) {
     m = sql.match(/CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i);
     return { op: "CREATE_TABLE", table: unquote(m?.[1]) };
   }
-  if (upper.startsWith("DROP TABLE")) {
+  if (head.startsWith("DROP TABLE")) {
     m = sql.match(/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([^\s(;]+)/i);
     return { op: "DROP_TABLE", table: unquote(m?.[1]) };
   }
-  if (upper.startsWith("CREATE INDEX") || upper.startsWith("CREATE UNIQUE INDEX")) {
+  if (head.startsWith("CREATE INDEX") || head.startsWith("CREATE UNIQUE")) {
     m = sql.match(/\bON\s+([^\s(]+)/i);
     return { op: "ADD_INDEX", table: unquote(m?.[1]) };
   }
-  if (upper.startsWith("DROP INDEX")) {
+  if (head.startsWith("DROP INDEX")) {
     m = sql.match(/\bON\s+([^\s(;]+)/i);
     return { op: "DROP_INDEX", table: unquote(m?.[1]) };
   }
-  if (upper.startsWith("ALTER TABLE")) {
+  if (head.startsWith("ALTER TABLE")) {
     m = sql.match(/ALTER\s+TABLE\s+([^\s(]+)/i);
-    return { op: "ALTER_TABLE", table: unquote(m?.[1]) };
+    const table = unquote(m?.[1]);
+    // PG's disableReferentialIntegrity wraps fixture loads/truncation in a
+    // combined `ALTER TABLE ... DISABLE/ENABLE TRIGGER ALL` over every table.
+    // Tracked separately so it doesn't masquerade as a schema-changing ALTER.
+    if (/\b(?:DISABLE|ENABLE)\s+TRIGGER\b/i.test(sql)) {
+      return { op: "REFERENTIAL_INTEGRITY", table };
+    }
+    return { op: "ALTER_TABLE", table };
   }
-  if (upper.startsWith("TRUNCATE")) {
-    m = sql.match(/TRUNCATE\s+(?:TABLE\s+)?([^\s(;]+)/i);
+  if (head.startsWith("TRUNCATE")) {
+    // Stop at comma too: TRUNCATE may list multiple tables; record the first.
+    m = sql.match(/TRUNCATE\s+(?:TABLE\s+)?([^\s(;,]+)/i);
     return { op: "TRUNCATE", table: unquote(m?.[1]) };
   }
   return null;
