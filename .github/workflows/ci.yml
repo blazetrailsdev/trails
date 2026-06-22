@@ -807,6 +807,44 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  trails-tsc-coverage:
+    name: trails-tsc Coverage (reporting-only)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      # trails-tsc is isolated in its own job: its watcher/build tests spawn
+      # subprocesses that trip vitest's worker-RPC `onTaskUpdate` timeout under
+      # load, which aborts the run and writes no report. Running alone means
+      # such a timeout can only void THIS report, never the shared non-AR
+      # coverage run. TRAILS_TSC_COVERAGE=1 scopes coverage to trails-tsc
+      # source; TRAILS_TEST_FORKS=1 removes the fork contention that triggers
+      # the timeout. --test-timeout=60000 absorbs the slower tsc compiles under
+      # v8 instrumentation. Reporting-only (no thresholds → never fails build).
+      - run: pnpm vitest run packages/trails-tsc --coverage --coverage.all --test-timeout=60000
+        env:
+          TRAILS_TSC_COVERAGE: "1"
+          TRAILS_TEST_FORKS: "1"
+      - name: Write trails-tsc coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload trails-tsc coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trails-tsc-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
   postgres-tests:
     name: Active Record PostgreSQL Tests
     needs: changes

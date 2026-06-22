@@ -226,9 +226,21 @@ const alias = {
 // source at 0%, and the AR run never counts the light packages at 0%).
 // website is excluded (built, not unit-tested here).
 const AR_COVERAGE = process.env.AR_COVERAGE === "1";
+// trails-tsc coverage runs in its own isolated CI job (story
+// trails-tsc-coverage-isolation, RFC 0028). Its watcher/build tests spawn
+// subprocesses that trip vitest's worker-RPC `onTaskUpdate` timeout under
+// load, aborting the run and writing NO report. Run alone (its own job, one
+// fork via TRAILS_TEST_FORKS=1), a timeout can only void trails-tsc's own
+// numbers, never the shared non-AR baseline. TRAILS_TSC_COVERAGE=1 scopes the
+// include/denominator to trails-tsc source, mirroring the AR_COVERAGE flip so
+// each isolated run's `--coverage.all` baseline stays honest (no cross-package
+// 0% skew).
+const TRAILS_TSC_COVERAGE = process.env.TRAILS_TSC_COVERAGE === "1";
 const COVERAGE_INCLUDE = AR_COVERAGE
   ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
-  : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
+  : TRAILS_TSC_COVERAGE
+    ? ["packages/trails-tsc/src/**/*.ts", "packages/trails-tsc/src/**/*.mts"]
+    : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
   "**/*.test.mts",
@@ -242,10 +254,11 @@ const COVERAGE_EXCLUDE = [
   // The AR run scopes COVERAGE_INCLUDE to activerecord; the light baseline run
   // excludes it (its 6-fork suite dominates CI time and isn't run there).
   ...(AR_COVERAGE ? [] : ["packages/activerecord/**", "packages/activerecord-cli/**"]),
-  // trails-tsc tests aren't run in the coverage job (their subprocess-spawning
-  // watcher/build tests trip vitest's worker-RPC timeout under load); exclude
-  // its source too so `--coverage.all` doesn't count it at 0% and skew the base.
-  "packages/trails-tsc/**",
+  // trails-tsc is covered only in its own isolated job (TRAILS_TSC_COVERAGE=1);
+  // in every other run its subprocess-spawning watcher/build tests aren't
+  // executed, so exclude its source so `--coverage.all` doesn't count it at 0%
+  // and skew the baseline.
+  ...(TRAILS_TSC_COVERAGE ? [] : ["packages/trails-tsc/**"]),
   "packages/*/dx-tests/**",
   "packages/*/virtualized-dx-tests/**",
 ];
@@ -254,6 +267,15 @@ export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
+    // In the isolated trails-tsc coverage run, the build-views/watch tests are
+    // CPU-pegged in tsc under v8 instrumentation long enough to starve vitest's
+    // reporter heartbeat, surfacing a `Timeout calling "onTaskUpdate"` worker
+    // RPC error as an UNHANDLED error — which fails the run even though every
+    // test passes and the coverage report is fully written. Ignore unhandled
+    // errors ONLY in this isolated, reporting-only run so the timeout can't
+    // redden a job whose sole purpose is to emit numbers. Never set elsewhere:
+    // in the shared runs an unhandled error is a real signal.
+    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE,
     coverage: {
       provider: "v8",
       // text-summary → CI log; json-summary → parsed into the step summary;
