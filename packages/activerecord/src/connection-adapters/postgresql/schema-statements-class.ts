@@ -890,10 +890,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#build_change_column_definition: route
     // through the table definition so PG-specific column normalization
     // (virtual/`as:` resolution, datetime/timestamp physical-type recording,
-    // aliased types) is applied — the visitor recomputes `sqlType`, so we do not
-    // set it here.
+    // aliased types) is applied rather than constructing ColumnDefinition
+    // directly. (Rails leaves sqlType for the visitor; we pre-populate it to keep
+    // the builder's standalone return value self-describing — the visitor
+    // recomputes it identically, so emitted DDL is unchanged.)
     const td = this.createTableDefinition(tableName);
     const cd = td.newColumnDefinition(columnName, type as ColumnType, options as ColumnOptions);
+    cd.sqlType = this.typeToSql(type, options);
     return new ChangeColumnDefinition(cd, columnName);
   }
 
