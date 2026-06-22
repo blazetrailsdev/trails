@@ -482,6 +482,7 @@ export {
   assertNotCalledOnInstanceOf,
 } from "./testing-helpers.js";
 export type { AssertCalledOptions, CallRecord } from "./testing-helpers.js";
+export { currentTimeInstant } from "./time-travel.js";
 
 export {
   makeRange,

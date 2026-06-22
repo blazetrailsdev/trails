@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { currentTimeInstant } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
@@ -35,14 +36,14 @@ export async function touch(
   let time: Temporal.Instant;
   let names: string[];
   if (typeof optionsOrName === "string") {
-    time = Temporal.Now.instant();
+    time = currentTimeFromProperTimezone();
     names = [optionsOrName, ...rest];
   } else if (optionsOrName?.time != null) {
     const t = optionsOrName.time;
     time = t instanceof Temporal.Instant ? t : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
     names = rest;
   } else {
-    time = Temporal.Now.instant();
+    time = currentTimeFromProperTimezone();
     names = rest;
   }
   const now = time;
@@ -258,7 +259,10 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
 }
 
 export function currentTimeFromProperTimezone(): Temporal.Instant {
-  return Temporal.Now.instant();
+  // Mirrors Rails' Timestamp#current_time_from_proper_timezone, which reads
+  // Time.now(.utc) — stubbed by ActiveSupport's TimeHelpers so it honors
+  // travel/travelTo/freezeTime. currentTimeInstant() is the trails equivalent.
+  return currentTimeInstant();
 }
 
 /** @internal */

@@ -14,7 +14,7 @@ function isTemporalDatetime(v: unknown): boolean {
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
+import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
 import {
   Base,
   RecordNotFound,
@@ -933,22 +933,18 @@ describe("PersistenceTest", () => {
     await expect(Topic.destroy(99999)).rejects.toThrow(RecordNotFound);
   });
 
-  // Rails wraps the increment! in `travel(1.second)` to force the new
-  // updated_at/written_on strictly past the captured values. trails' AR
-  // timestamp path reads `Temporal.Now.instant()` directly
-  // (timestamp.ts:261 currentTimeFromProperTimezone), NOT the travel-aware
-  // `currentTimeInstant()`, so `travel`/`travelTo` would be a no-op here —
-  // the real DB round-trip between fixture insert and the touch supplies the
-  // gap instead. Converging the timestamp path onto the travel-aware clock so
-  // this can mirror Rails exactly is tracked:
-  // converge-ar-timestamps-honor-time-travel.
   // Rails: test_increment_with_touch_an_attribute_updates_timestamps
   it("increment with touch an attribute updates timestamps", async () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
     const previouslyWrittenOn = topic.written_on;
-    await topic.incrementBang("replies_count", 1, { touch: "written_on" });
+    travel(1000);
+    try {
+      await topic.incrementBang("replies_count", 1, { touch: "written_on" });
+    } finally {
+      travelBack();
+    }
     await topic.reload();
     expect(topic.replies_count).toBe(2);
     expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
@@ -960,7 +956,12 @@ describe("PersistenceTest", () => {
     const topic = topics("first");
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
-    await topic.decrementBang("replies_count", 1, { touch: true });
+    travel(1000);
+    try {
+      await topic.decrementBang("replies_count", 1, { touch: true });
+    } finally {
+      travelBack();
+    }
     await topic.reload();
     expect(topic.replies_count).toBe(0);
     expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
@@ -1003,7 +1004,12 @@ describe("PersistenceTest", () => {
     expect(topic.replies_count).toBe(1);
     const previouslyUpdatedAt = topic.updated_at;
     const previouslyWrittenOn = topic.written_on;
-    await topic.decrementBang("replies_count", 1, { touch: "written_on" });
+    travel(1000);
+    try {
+      await topic.decrementBang("replies_count", 1, { touch: "written_on" });
+    } finally {
+      travelBack();
+    }
     await topic.reload();
     expect(topic.replies_count).toBe(0);
     expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
