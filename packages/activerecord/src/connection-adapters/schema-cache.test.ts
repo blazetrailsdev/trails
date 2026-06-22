@@ -139,6 +139,46 @@ describe("SchemaCacheTest", () => {
     expect(pk).toBeNull();
   });
 
+  it("getCachedPrimaryKeys derives custom primary key from warm columns", () => {
+    const cache = new SchemaCache();
+    // id: false table with a custom string PK — only the columns are warmed
+    // (loadSchema warms the columns hash, not the dedicated primary-keys map).
+    cache.setColumns("countries", [
+      makeColumn("country_id", "string", { primaryKey: true, null: false }),
+      makeColumn("name", "string"),
+    ]);
+    expect(cache.getCachedPrimaryKeys("countries")).toBe("country_id");
+  });
+
+  it("getCachedPrimaryKeys derives composite primary key from warm columns", () => {
+    const cache = new SchemaCache();
+    cache.setColumns("countries_treaties", [
+      makeColumn("country_id", "string", { primaryKey: true, null: false }),
+      makeColumn("treaty_id", "string", { primaryKey: true, null: false }),
+    ]);
+    expect(cache.getCachedPrimaryKeys("countries_treaties")).toEqual(["country_id", "treaty_id"]);
+  });
+
+  it("getCachedPrimaryKeys falls through (undefined) for a warm key-less table", () => {
+    // No flagged PK column: defer to the convention/async query rather than
+    // resolving `null` here, so a table that resolved "id" before still does.
+    const cache = new SchemaCache();
+    cache.setColumns("postgresql_arrays", [makeColumn("commission", "string")]);
+    expect(cache.getCachedPrimaryKeys("postgresql_arrays")).toBeUndefined();
+  });
+
+  it("getCachedPrimaryKeys is undefined for an unwarmed table", () => {
+    const cache = new SchemaCache();
+    expect(cache.getCachedPrimaryKeys("missing")).toBeUndefined();
+  });
+
+  it("getCachedPrimaryKeys prefers the explicit primary-keys map over columns", () => {
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer", { primaryKey: true })]);
+    cache.setPrimaryKeys("users", null);
+    expect(cache.getCachedPrimaryKeys("users")).toBeNull();
+  });
+
   it("columns for existent table", async () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);

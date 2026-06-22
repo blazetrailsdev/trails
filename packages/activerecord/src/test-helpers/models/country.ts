@@ -8,11 +8,6 @@ export class Country extends Base {
   declare country_id: string;
   declare name: string;
 
-  // schema.rb declares `create_table :countries, id: false` with
-  // `t.string :country_id, primary_key: true`; Rails infers the primary key
-  // from the table. trails models declare it explicitly (cf. Subscriber#nick).
-  static _primaryKey = "country_id";
-
   static {
     this.hasAndBelongsToMany("treaties");
   }
