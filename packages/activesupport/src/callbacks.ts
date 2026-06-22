@@ -628,29 +628,6 @@ export class Callback {
       s === "kind" ? String(this.kind) : String((this as Record<string, unknown>)[s]),
     );
   }
-
-  apply(target: object, block?: () => void): boolean {
-    if (!Value.check(this.options, target)) return true;
-
-    if (this.kind === "before") {
-      // Default terminator: halt only on the abort sentinel (Rails 5+).
-      try {
-        (this.filter as BeforeCallback).call(target, target);
-        return true;
-      } catch (e) {
-        if (isAbortSignal(e)) return false;
-        throw e;
-      }
-    } else if (this.kind === "after") {
-      (this.filter as AfterCallback).call(target, target);
-      return true;
-    } else if (this.kind === "around") {
-      if (!block) throw new Error("Around callbacks require a block/next function");
-      (this.filter as AroundCallback).call(target, target, block);
-      return true;
-    }
-    return true;
-  }
 }
 
 // ---------------------------------------------------------------------------
