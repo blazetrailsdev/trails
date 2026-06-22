@@ -3176,6 +3176,13 @@ export class Base extends Model {
           name: string;
           isAutoIncrementedByDb?(): boolean;
         }[];
+        // Rebuild (not union) colNames from the authoritative reflected set: the
+        // synthesized `columns()` is derived from `_attributeDefinitions`, so a
+        // model that declares an attribute with no backing DB column would leave a
+        // phantom name in colNames that the `insertPk`/`writeTargets` existence
+        // filters must not treat as real (e.g. an id-less table must not yield
+        // `insertPk="id"` → `RETURNING "id"`).
+        colNames.clear();
         for (const c of reflectedCols) colNames.add(c.name);
         autoIncColumn = reflectedCols.find((c) => c.isAutoIncrementedByDb?.())?.name;
       }
