@@ -278,7 +278,12 @@ export function lookupModuleTableNameSuffix(moduleName: string | undefined): str
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name
  */
 export function stiName(modelClass: typeof Base): string {
-  return qualifiedName(modelClass);
+  const name = qualifiedName(modelClass);
+  const klass = modelClass as typeof Base & {
+    storeFullStiClass?: boolean;
+    storeFullClassName?: boolean;
+  };
+  return klass.storeFullStiClass && klass.storeFullClassName ? name : demodulize(name);
 }
 
 /**
@@ -287,7 +292,18 @@ export function stiName(modelClass: typeof Base): string {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name
  */
 export function polymorphicName(modelClass: typeof Base): string {
-  return qualifiedName(baseClass.call(modelClass));
+  const base = baseClass.call(modelClass);
+  const name = qualifiedName(base);
+  const klass = modelClass as typeof Base & { storeFullClassName?: boolean };
+  return klass.storeFullClassName ? name : demodulize(name);
+}
+
+/** The bare constant name — the segment after the final `::`. Mirrors Ruby's
+ * `String#demodulize`, used by `sti_name`/`polymorphic_name` when the
+ * `store_full_*` flags are off. */
+function demodulize(name: string): string {
+  const idx = name.lastIndexOf("::");
+  return idx === -1 ? name : name.slice(idx + 2);
 }
 
 /**

@@ -181,14 +181,23 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       _registryKeys?: string[];
     };
     const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
+    let name: string;
     if (matching.length > 0) {
       const existing = this.readForeignType();
       if (existing && matching.includes(existing)) return existing;
-      return matching.reduce((best, k) =>
+      name = matching.reduce((best, k) =>
         (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
       );
+    } else {
+      name = ctor.name;
     }
-    return ctor.name;
+    // Rails' `polymorphic_name` demodulizes the base-class name when
+    // `store_full_class_name` is off; honor that on the inverse write path too.
+    if ((ctor as typeof Base & { storeFullClassName?: boolean }).storeFullClassName === false) {
+      const idx = name.lastIndexOf("::");
+      return idx === -1 ? name : name.slice(idx + 2);
+    }
+    return name;
   }
 
   private readForeignType(): string | null {
