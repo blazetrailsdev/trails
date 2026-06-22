@@ -228,81 +228,93 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
         ? reflection.options.inverseOf
         : null);
 
-    if (inverseName) {
-      // Mirrors Association#inversable?: only wire when the child's FK
-      // actually points at the owner. Chained queries that widen the
-      // scope (`.or(other.collection)`, `.unscope(:where)`) can return
-      // rows that belong to a *different* owner; wiring those would
-      // alias the wrong parent onto the child. Compare FK→PK via the
-      // reflection so composite-PK reflections work.
-      const fkCols = resolvedRefl
+    // Inverse wiring: mirrors Association#inversable? — only wire when the
+    // child's FK actually points at the owner. Chained queries that widen the
+    // scope (`.or(other.collection)`, `.unscope(:where)`) can return rows that
+    // belong to a *different* owner; wiring those would alias the wrong parent
+    // onto the child. Compare FK→PK via the reflection so composite-PK
+    // reflections work.
+    const fkCols =
+      inverseName && resolvedRefl
         ? Array.isArray(resolvedRefl.foreignKey)
           ? resolvedRefl.foreignKey
           : [resolvedRefl.foreignKey]
         : null;
-      const pkCols = resolvedRefl
+    const pkCols =
+      inverseName && resolvedRefl
         ? Array.isArray(resolvedRefl.activeRecordPrimaryKey)
           ? resolvedRefl.activeRecordPrimaryKey
           : [resolvedRefl.activeRecordPrimaryKey]
         : null;
-      const ownerRec = owner as unknown as {
-        isPersisted?: () => boolean;
-        _readAttribute: (n: string) => unknown;
-      };
-      const ownerPersisted = ownerRec.isPersisted?.() ?? true;
-      // Wire the inverse inside the instantiation block (mirrors Rails'
-      // `AssociationRelation#exec_queries` yielding `set_inverse_instance_from_queries`
-      // per record) so it lands BEFORE `preload_associations` runs. Wiring after
-      // the load would overwrite a nested preload: e.g. `author.posts.includes(author:
-      // :first_posts)` preloads `first_posts` onto a freshly-loaded author, then a
-      // post-load inverse pass would replace `post.author` with the bare owner, losing
-      // the preloaded `first_posts`. Wiring first makes the preloader see `post.author`
-      // already loaded (the owner) and populate `first_posts` on that same record.
-      const prevBlock = this._instantiateBlock;
-      this._instantiateBlock = (record: T): void => {
-        if (prevBlock) prevBlock(record);
-        const childRec = record as unknown as {
-          isPersisted?: () => boolean;
-          _readAttribute: (n: string) => unknown;
-        };
-        const childPersisted = childRec.isPersisted?.() ?? true;
-        let inversable = !ownerPersisted || !childPersisted;
-        if (!inversable && fkCols && pkCols && fkCols.length === pkCols.length) {
-          inversable = true;
-          for (let i = 0; i < fkCols.length; i++) {
-            if (childRec._readAttribute(fkCols[i]) !== ownerRec._readAttribute(pkCols[i])) {
-              inversable = false;
-              break;
-            }
-          }
-        } else if (!inversable && (!fkCols || !pkCols)) {
-          // No reflection metadata → preserve prior behavior and wire.
-          inversable = true;
-        }
-        if (!inversable) return;
-        _cacheSingularTarget(record as Base, inverseName, owner);
-      };
-    }
+    const ownerRec = owner as unknown as {
+      isPersisted?: () => boolean;
+      _readAttribute: (n: string) => unknown;
+    };
+    const ownerPersisted = ownerRec.isPersisted?.() ?? true;
 
-    const records = await super.toArray();
-
-    // Rails' `exec_queries` calls `set_strict_loading` for EVERY record
-    // unconditionally — it propagates the owner's mode (which may be
-    // "off") onto each child, not just when the owner is strict. Resolve
-    // the OO association off the owner (NOT `this._association`, which is
-    // the JS-Proxy-wrapped CollectionProxy whose unknown-property trap
-    // raises a strict-loading violation) so the n+1-only-vs-mode logic
-    // stays in one place.
+    // Rails' `AssociationRelation#exec_queries` yields a single per-record block
+    // that runs `set_inverse_instance_from_queries` AND `set_strict_loading`,
+    // both BEFORE `preload_associations` (association_relation.rb:43-49,
+    // relation.rb:1413-1414). We mirror that single block here. Wiring the
+    // inverse after the load (the old behavior) would overwrite a nested
+    // preload: e.g. `author.posts.includes(author: :first_posts)` preloads
+    // `first_posts` onto a freshly-loaded author, then a post-load inverse pass
+    // would replace `post.author` with the bare owner, losing the preloaded
+    // `first_posts`. Wiring first makes the preloader see `post.author` already
+    // loaded (the owner) and populate `first_posts` on that same record.
+    //
+    // Resolve the OO association off the owner (NOT `this._association`, which
+    // is the JS-Proxy-wrapped CollectionProxy whose unknown-property trap raises
+    // a strict-loading violation) so the n+1-only-vs-mode logic stays in one
+    // place. `set_strict_loading` runs for EVERY record unconditionally — it
+    // propagates the owner's mode (which may be "off") onto each child.
     const ownerAssoc = (
       owner as unknown as {
         association?: (name: string) => { setStrictLoading?: (record: unknown) => unknown };
       }
     ).association?.(reflection.name);
-    if (ownerAssoc && typeof ownerAssoc.setStrictLoading === "function") {
-      for (const r of records) ownerAssoc.setStrictLoading(r);
+    const strictLoad =
+      ownerAssoc && typeof ownerAssoc.setStrictLoading === "function"
+        ? ownerAssoc.setStrictLoading.bind(ownerAssoc)
+        : null;
+
+    // Restore the prior block after the load rather than leaving the wrapper in
+    // place: a later `reload()` / repeated `toArray()` on the same relation must
+    // not re-wrap and re-run the wiring N times.
+    const prevBlock = this._instantiateBlock;
+    if (inverseName || strictLoad) {
+      this._instantiateBlock = (record: T): void => {
+        if (prevBlock) prevBlock(record);
+        if (inverseName) {
+          const childRec = record as unknown as {
+            isPersisted?: () => boolean;
+            _readAttribute: (n: string) => unknown;
+          };
+          const childPersisted = childRec.isPersisted?.() ?? true;
+          let inversable = !ownerPersisted || !childPersisted;
+          if (!inversable && fkCols && pkCols && fkCols.length === pkCols.length) {
+            inversable = true;
+            for (let i = 0; i < fkCols.length; i++) {
+              if (childRec._readAttribute(fkCols[i]) !== ownerRec._readAttribute(pkCols[i])) {
+                inversable = false;
+                break;
+              }
+            }
+          } else if (!inversable && (!fkCols || !pkCols)) {
+            // No reflection metadata → preserve prior behavior and wire.
+            inversable = true;
+          }
+          if (inversable) _cacheSingularTarget(record as Base, inverseName, owner);
+        }
+        if (strictLoad) strictLoad(record);
+      };
     }
 
-    return records;
+    try {
+      return await super.toArray();
+    } finally {
+      this._instantiateBlock = prevBlock;
+    }
   }
 }
 
