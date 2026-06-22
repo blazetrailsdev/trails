@@ -1305,6 +1305,7 @@ export class Base extends Model {
   declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
+  declare static adapterClassSync: typeof ConnectionHandling.adapterClassSync;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
   declare static schemaCache: typeof ConnectionHandling.schemaCache;
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;

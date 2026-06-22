@@ -201,6 +201,19 @@ export class DatabaseConfig {
   }
 
   /**
+   * Synchronous, non-leasing variant of {@link adapterClass}: resolves the
+   * adapter constructor from the pre-warmed sync cache without establishing or
+   * leasing a connection. Returns `null` when the adapter hasn't been resolved
+   * yet (no prior `await adapterClass()` / `loadAdapter()`). Used by call sites
+   * that only need static adapter metadata (e.g. `column_name_with_order_matcher`)
+   * and must not lease a connection just to read it.
+   */
+  adapterClassSync(): (new (...args: any[]) => unknown) | null {
+    if (!_adapterClassResolverSync || !this.adapter) return null;
+    return _adapterClassResolverSync(this.adapter);
+  }
+
+  /**
    * Pre-warm the synchronous adapter-class cache for this configuration's
    * adapter. The returned promise resolves once {@link newConnection} can
    * succeed synchronously. Mirrors Rails' implicit autoload step — trails
