@@ -105,7 +105,9 @@ describeIfSqlite("CopyTableTest", () => {
       async (from, to) => {
         const expected = await columnValues(conn, from, "name");
         expect(await columnValues(conn, to, "person_name")).toEqual(expected);
-        expect(expected.some((v) => Boolean(v))).toBe(true);
+        // Rails `assert_predicate expected, :any?`: Ruby's blockless `any?` is
+        // truthy for everything except nil/false, so 0/"" count as present.
+        expect(expected.some((v) => v !== null && v !== undefined && v !== false)).toBe(true);
       },
     );
   });
