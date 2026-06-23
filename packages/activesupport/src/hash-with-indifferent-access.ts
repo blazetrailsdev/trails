@@ -22,9 +22,9 @@ export class HashWithIndifferentAccess<V = unknown> {
           this.data.set(String(key), value);
         }
       } else {
-        for (const key of Object.keys(obj)) {
-          this.data.set(key, obj[key] as V);
-        }
+        // Mirrors Rails HashWithIndifferentAccess#initialize, which populates
+        // via `update(constructor)` rather than inlining the copy.
+        this.update(obj);
       }
     }
   }
