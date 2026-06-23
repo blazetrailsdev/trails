@@ -723,7 +723,7 @@ describe("PersistenceTest", () => {
   });
 
   it("create columns not equal attributes", async () => {
-    const topic = Topic._instantiate({
+    const topic = Topic.instantiate({
       title: "Another New Topic",
       does_not_exist: "test",
     });
