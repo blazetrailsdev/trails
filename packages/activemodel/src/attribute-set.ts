@@ -90,24 +90,6 @@ export class AttributeSet {
     }
   }
 
-  /**
-   * Rebind `name` to a `FromDatabase` attribute whose before-type-cast value is
-   * the already-cast `value` (not a re-serialized SQL string), preserving the
-   * existing type and skipping a deserialize round-trip.
-   *
-   * Mirrors Rails' `forgetting_assignment` for a freshly created record: the new
-   * `FromDatabase` carries `value_for_database`, which for the DateTime type is
-   * the cast Time itself. trails serializes to a DB string at value_for_database
-   * time, so the create path uses this to keep the create-time timestamp's
-   * before-type-cast a Time — matching Rails' observable in cache_version.
-   */
-  rebindFromDatabaseValue(name: string, value: unknown): void {
-    this.assertNotFrozen();
-    const existing = this.attributes.get(name);
-    const type = existing ? existing.type : typeRegistry.lookup("value");
-    this.attributes.set(name, Attribute.fromDatabase(name, value, type, value));
-  }
-
   writeFromUser(name: string, value: unknown): unknown {
     this.assertNotFrozen();
     const existing = this.attributes.get(name);
@@ -190,6 +172,24 @@ export class AttributeSet {
   }
 
   /**
+   * Rebind `name` to a `FromDatabase` attribute whose before-type-cast value is
+   * the already-cast `value` (not a re-serialized SQL string), preserving the
+   * existing type and skipping a deserialize round-trip.
+   *
+   * Mirrors Rails' `forgetting_assignment` for a freshly created record: the new
+   * `FromDatabase` carries `value_for_database`, which for the DateTime type is
+   * the cast Time itself. trails serializes to a DB string at value_for_database
+   * time, so the create path uses this to keep the create-time timestamp's
+   * before-type-cast a Time — matching Rails' observable in cache_version.
+   */
+  rebindFromDatabaseValue(name: string, value: unknown): void {
+    this.assertNotFrozen();
+    const existing = this.attributes.get(name);
+    const type = existing ? existing.type : typeRegistry.lookup("value");
+    this.attributes.set(name, Attribute.fromDatabase(name, value, type, value));
+  }
+
+  /**
    * Freeze this set in place so subsequent mutations throw.
    * Matches Ruby's `Hash#freeze` semantic used by `ActiveRecord::Core#freeze`.
    */
@@ -250,6 +250,8 @@ export class AttributeSet {
    * attributes too, mirroring Rails' `@attributes.key?(name)` — the gate AR's
    * strict write path uses to tell a real (if unmaterialized) column from a
    * genuinely unknown name.
+   *
+   * @internal
    */
   includesName(name: string): boolean {
     return this.attributes.has(name);
