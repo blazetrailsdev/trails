@@ -131,7 +131,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         resolveJoinPrimaryKey(lastReflection, (lastReflection as { klass?: typeof Base }).klass),
         "joinPrimaryKey",
       );
-      let relation = this._addConstraintsDj(
+      const relation = this._addConstraintsDj(
         lastReflection,
         keyCols,
         lastJoinIds,
@@ -139,13 +139,10 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         lastOrdered,
       ) as Relation<Base>;
       // When an upstream step plucked no ids, the final step's
-      // `where(key IN [])` is a provably-empty relation. Mirror Rails'
-      // `where(id: [])` null-relation short-circuit so the final SELECT is
-      // skipped entirely (the intermediate pluck already ran), matching the
-      // query count Rails emits for an empty through chain.
-      if (lastJoinIds.length === 0) {
-        relation = (relation as unknown as { none: () => Relation<Base> }).none();
-      }
+      // `where(key IN [])` is a contradictory (null) relation: loading it
+      // short-circuits to `[]` with no SELECT (Relation#exec_main_query's
+      // `where_clause.contradiction?` guard), matching the query count Rails
+      // emits for an empty through chain. No DJAS-local `.none()` needed.
       return { relation };
     });
   }

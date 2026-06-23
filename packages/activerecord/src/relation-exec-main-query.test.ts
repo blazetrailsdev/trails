@@ -31,4 +31,26 @@ describe("RelationTest", () => {
       expect(await Author.all().where({ id: [] }).toArray()).toEqual([]);
     });
   });
+
+  it("count on contradiction where-clause issues no query", async () => {
+    // Rails `Calculations#execute_simple_calculation` returns
+    // `ActiveRecord::Result.empty` for a contradiction — count is 0, no query.
+    await assertNoQueries(false, async () => {
+      expect(await Author.all().where({ id: [] }).count()).toEqual(0);
+    });
+  });
+
+  it("pluck on contradiction where-clause issues no query", async () => {
+    // Rails `Calculations#pluck` returns `[]` for a contradiction with no SQL.
+    await assertNoQueries(false, async () => {
+      expect(await Author.all().where({ id: [] }).pluck("id")).toEqual([]);
+    });
+  });
+
+  it("exists on contradiction where-clause issues no query", async () => {
+    // Rails `FinderMethods#exists?` returns false for a contradiction with no SQL.
+    await assertNoQueries(false, async () => {
+      expect(await Author.all().where({ id: [] }).exists()).toBe(false);
+    });
+  });
 });
