@@ -10,12 +10,13 @@ describe("SqliteAdapter", () => {
     adapter = new BetterSQLite3Adapter(":memory:");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Throwaway :memory: tables; per-name IF EXISTS drops balance
     // require-table-teardown (SQLite has no multi-table DROP). Some tests close
-    // the shared adapter themselves, so only drop while it is still open.
+    // the shared adapter themselves, so only drop while it is still open and
+    // await before close so the drop can't race past it onto a closed handle.
     if (adapter.active) {
-      void adapter
+      await adapter
         .exec(
           `DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS accounts`,
         )
