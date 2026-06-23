@@ -22,6 +22,7 @@ import { unquoteIdentifier, splitQuotedIdentifier, Utils } from "./utils.js";
 import { splitPgDefault } from "../postgresql-adapter.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./schema-statements.js";
 import {
+  type AlterTable as PgAlterTable,
   ExclusionConstraintDefinition,
   type ExclusionConstraintOptions,
   UniqueConstraintDefinition,
@@ -1467,20 +1468,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     if (!columnName && !options.usingIndex) {
       throw new Error("Either columnName or usingIndex must be provided for addUniqueConstraint.");
     }
+    // Mirrors Rails postgresql/schema_statements.rb#add_unique_constraint:
+    // build the constraint through create_alter_table + schema_creation so the
+    // UNIQUE clause (NULLS NOT DISTINCT, USING INDEX, deferrable) is rendered by
+    // the schema-creation visitor rather than inline SQL.
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
-    const name = this.pg.quoteIdentifier(opts.name as string);
-    const deferParts = this.pg.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
-    let constraintSql: string;
-    if (opts.usingIndex) {
-      constraintSql = `UNIQUE USING INDEX ${this.pg.quoteIdentifier(opts.usingIndex as string)}`;
-    } else {
-      const cols = Array.isArray(columnName) ? columnName : [columnName!];
-      const nullsNotDistinct = opts.nullsNotDistinct ? " NULLS NOT DISTINCT" : "";
-      constraintSql = `UNIQUE${nullsNotDistinct} (${cols.map((c) => this.pg.quoteIdentifier(c)).join(", ")})`;
-    }
-    await this.pg.exec(
-      `ALTER TABLE ${this._qt(tableName)} ADD CONSTRAINT ${name} ${constraintSql}${deferParts}`,
-    );
+    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    at.addUniqueConstraint(columnName as string | string[], opts);
+    await this.pg.exec(this.pg.schemaCreation.accept(at));
   }
 
   async removeUniqueConstraint(
