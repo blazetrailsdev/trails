@@ -1050,7 +1050,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const def = adapter.buildChangeColumnDefinition("users", "age", "integer");
       expect(def.name).toBe("age");
       expect(def.column.name).toBe("age");
-      expect(def.column.sqlType).toBe("integer");
+      // Like Rails, the builder leaves sqlType unset — the visitor computes it
+      // on accept, so the emitted DDL carries the resolved SQL type.
+      expect(adapter.schemaCreation.accept(def)).toContain("TYPE integer");
     });
 
     it("reflects using/castAs options on the column definition", () => {
