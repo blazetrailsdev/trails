@@ -1402,6 +1402,11 @@ describe("ReflectionTest", () => {
         this.attribute("sponsorable_type", "string");
         this.attribute("sponsor_club_id", "integer");
         this.belongsTo("sponsorable", { polymorphic: true });
+        this.belongsTo("thing", {
+          polymorphic: true,
+          foreignType: "sponsorable_type",
+          foreignKey: "sponsorable_id",
+        });
         this.belongsTo("sponsorClub", {
           foreignKey: "sponsor_club_id",
         });
@@ -1410,6 +1415,8 @@ describe("ReflectionTest", () => {
     registerModel("Sponsor", Sponsor);
     const polyRef = reflectOnAssociation(Sponsor, "sponsorable");
     expect(polyRef!.foreignType).toBe("sponsorable_type");
+    const thingRef = reflectOnAssociation(Sponsor, "thing");
+    expect(thingRef!.foreignType).toBe("sponsorable_type");
     const normalRef = reflectOnAssociation(Sponsor, "sponsorClub");
     expect(normalRef!.foreignType).toBeNull();
   });

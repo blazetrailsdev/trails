@@ -31,7 +31,12 @@ const MERGED_SCHEMA: Schema = {
     published: "integer",
   },
   items: { code: "integer", name: "string" },
-  comments: { body: "string", commentable_type: "string", commentable_id: "integer" },
+  comments: {
+    body: "string",
+    commentable_type: "string",
+    commentable_kind: "string",
+    commentable_id: "integer",
+  },
   articles: { title: "string" },
   special_posts: { title: "string" },
   orders: {
@@ -302,6 +307,31 @@ describe("UniquenessValidationTest", () => {
     expect(await c2.save()).toBe(true);
     const c3 = new Comment({ body: "great", commentable_type: "Post", commentable_id: 1 });
     expect(await c3.save()).toBe(false);
+  });
+
+  it("validate uniqueness with polymorphic object scope honoring custom foreign_type", async () => {
+    class Comment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("commentable_kind", "string");
+        this.attribute("commentable_id", "integer");
+        this.belongsTo("commentable", {
+          polymorphic: true,
+          foreignType: "commentable_kind",
+          foreignKey: "commentable_id",
+        });
+        this.validatesUniqueness("body", { scope: ["commentable"] });
+      }
+    }
+    await Comment.create({ body: "great", commentable_kind: "Post", commentable_id: 1 });
+    const differentType = new Comment({
+      body: "great",
+      commentable_kind: "Note",
+      commentable_id: 1,
+    });
+    expect(await differentType.save()).toBe(true);
+    const duplicate = new Comment({ body: "great", commentable_kind: "Post", commentable_id: 1 });
+    expect(await duplicate.save()).toBe(false);
   });
 
   it("validate uniqueness with composed attribute scope", async () => {

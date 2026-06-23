@@ -871,7 +871,8 @@ export class AssociationReflection extends MacroReflection {
 
   get foreignType(): string | null {
     if (!this.options.polymorphic && !this.options.as) return null;
-    if (this.belongsTo()) return `${underscore(this.name)}_type`;
+    if (this.belongsTo())
+      return (this.options.foreignType as string | undefined) ?? `${underscore(this.name)}_type`;
     if (this.options.as) {
       return (
         (this.options.foreignType as string | undefined) ??
