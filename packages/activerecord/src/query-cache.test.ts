@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-import { adapterType, newRawTestAdapter } from "./test-adapter.js";
+import { newRawTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as CANONICAL_SCHEMA } from "./test-helpers/test-schema.js";
 import {
@@ -934,13 +934,7 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  // Rails runs this unconditionally. On SQLite trails' changeColumn emits a raw
-  // `ALTER TABLE … ALTER COLUMN` (unsupported by SQLite, which needs the
-  // table-rebuild path), so the migration step fails — a tracked trails gap, not
-  // an adapter-fidelity gate. Encoded as a runtime guard (incomparable to Rails)
-  // pending convergence story `sqlite-change-column-table-rebuild`.
-  const sqliteChangeColumnBlocked = adapterType === "sqlite";
-  it.skipIf(sqliteChangeColumnBlocked)("cache gets cleared after migration", async () => {
+  it("cache gets cleared after migration", async () => {
     const cached = rawAdapter();
     cached._queryCache = new Store();
     const { Migration } = await import("./migration.js");

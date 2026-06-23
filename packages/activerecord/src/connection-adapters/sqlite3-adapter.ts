@@ -2355,6 +2355,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
 
     this.schemaCache.clear();
+    // The rebuild issues its DDL via driver.exec (to manage savepoint nesting),
+    // bypassing the executeMutation path that dirtiesQueryCache wraps. Rails'
+    // alter_table runs each move_table statement through `execute`, which is in
+    // the dirties set, so clear the query cache here to match.
+    this.clearQueryCache();
   }
 
   // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
