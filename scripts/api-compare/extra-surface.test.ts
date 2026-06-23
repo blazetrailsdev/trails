@@ -247,9 +247,11 @@ describe("buildReport — novel vs moved classification", () => {
   });
 
   it("doesn't flag predicate-Q, column-DSL, value-method, or JS-protocol names as novel", () => {
-    // Rails foo.rb defines a `?` predicate; the column-type DSL, Relation
-    // value-method accessors, and JS-protocol methods are all generated /
-    // language-level and invisible to the static extractor.
+    // Rails foo.rb defines a `?` predicate; the column-type DSL
+    // (`define_column_methods`) and Relation value-method accessors
+    // (`VALUE_METHODS.each`) are now modeled by the Ruby extractor, so they
+    // appear in the manifest like ordinary methods. JS-protocol methods are
+    // language-level and filtered TS-side.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
@@ -259,7 +261,12 @@ describe("buildReport — novel vs moved classification", () => {
             "ActiveRecord::Foo": rubyClass({
               name: "Foo",
               file: "foo.rb",
-              instance: [method("connected_to?"), method("bar")],
+              instance: [
+                method("connected_to?"),
+                method("bar"),
+                method("integer"), // define_column_methods macro
+                method("limit_value"), // Relation::VALUE_METHODS accessor
+              ],
             }),
           },
           modules: {},
@@ -280,8 +287,8 @@ describe("buildReport — novel vs moved classification", () => {
               instanceMethods: [
                 method("bar"),
                 method("connectedToQ"), // predicate `?` → Q suffix
-                method("integer"), // define_column_methods macro
-                method("limitValue"), // Relation::VALUE_METHODS accessor
+                method("integer"), // define_column_methods macro (matched in-file)
+                method("limitValue"), // Relation::VALUE_METHODS accessor (matched in-file)
                 method("catch"), // JS Promise protocol
                 method("genuinelyNovel"), // the only real extra
               ],
