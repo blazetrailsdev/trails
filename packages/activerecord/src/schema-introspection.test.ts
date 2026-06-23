@@ -139,35 +139,33 @@ describe("introspectIndexes", () => {
     expect(idxs.some((i) => i.name === "idx_widgets_name")).toBe(true);
   });
 
-  // The fallback's `where`/`orders` are recovered from index SQL only on the
-  // sqlite arm (via sqliteIndexes); the mysql/postgres arms don't surface them,
-  // so this runtime assertion is sqlite-only.
-  it.runIf(adapterType === "sqlite")(
-    "surfaces where/orders carried by the fallback SchemaStatements.indexes()",
-    async () => {
-      const realAdapter = createTestAdapter();
-      const ctx = new MigrationContext(realAdapter);
-      await ctx.createTable("widgets", {}, (t) => {
-        t.string("name");
-        t.boolean("active");
-      });
-      await ctx.addIndex("widgets", ["name"], {
-        name: "idx_widgets_name_partial",
-        where: "active",
-        order: { name: "desc" },
-      });
+  // `orders` (per-column DESC) is recovered by all three fallback arms; `where`
+  // (partial-index predicate) only by adapters that support partial indexes
+  // (sqlite/postgres — MySQL has none).
+  it("surfaces where/orders carried by the fallback SchemaStatements.indexes()", async () => {
+    const supportsPartial = adapterType === "sqlite" || adapterType === "postgres";
+    const realAdapter = createTestAdapter();
+    const ctx = new MigrationContext(realAdapter);
+    await ctx.createTable("widgets", {}, (t) => {
+      t.string("name");
+      t.boolean("active");
+    });
+    await ctx.addIndex("widgets", ["name"], {
+      name: "idx_widgets_name_partial",
+      ...(supportsPartial ? { where: "active" } : {}),
+      order: { name: "desc" },
+    });
 
-      const stripped = withoutMethods(realAdapter, ["indexes"]);
+    const stripped = withoutMethods(realAdapter, ["indexes"]);
 
-      const idxs = await introspectIndexes(stripped, "widgets");
-      const idx = idxs.find((i) => i.name === "idx_widgets_name_partial");
+    const idxs = await introspectIndexes(stripped, "widgets");
+    const idx = idxs.find((i) => i.name === "idx_widgets_name_partial");
 
-      // `where` and `orders` are now statically visible on IntrospectedIndex,
-      // not just present at runtime under an `as`-cast.
-      expect(idx?.where).toBe("active");
-      expect(idx?.orders).toEqual({ name: "desc" });
-    },
-  );
+    // `where` and `orders` are now statically visible on IntrospectedIndex,
+    // not just present at runtime under an `as`-cast.
+    expect(idx?.orders).toEqual({ name: "desc" });
+    expect(idx?.where).toBe(supportsPartial ? "active" : undefined);
+  });
 });
 
 describe("introspectPrimaryKey", () => {

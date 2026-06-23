@@ -1115,7 +1115,8 @@ export class SchemaStatements {
         >;
       case "postgres": {
         const rows = await this.adapter.execute(
-          `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns
+          `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
+                  pg_get_indexdef(i.oid) AS definition
            FROM pg_index ix
            JOIN pg_class t ON t.oid = ix.indrelid
            JOIN pg_class i ON i.oid = ix.indexrelid
@@ -1123,31 +1124,74 @@ export class SchemaStatements {
            JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, n) ON true
            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
            WHERE t.relname = '${tableName}' AND n.nspname = 'public' AND NOT ix.indisprimary
-           GROUP BY i.relname, ix.indisunique`,
+           GROUP BY i.relname, ix.indisunique, i.oid`,
         );
-        return rows.map((row: any) => ({
-          name: row.name,
-          columns: Array.isArray(row.columns) ? row.columns : [row.columns],
-          unique: row.unique === true,
-        }));
+        return rows.map((row: any) => {
+          const columns = Array.isArray(row.columns) ? row.columns : [row.columns];
+          // Recover the partial-index WHERE predicate and per-column DESC
+          // directions from the index definition, mirroring the concrete
+          // PostgreSQLSchemaStatements#indexes parsing.
+          const def = (row.definition as string) ?? "";
+          const defMatch = def.match(
+            / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
+          );
+          const expressions = defMatch?.[1] ?? "";
+          const where = defMatch?.[4]?.trim();
+          const ordersMap: Record<string, string> = {};
+          const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+          for (const [, column, , desc, nulls] of expressions.matchAll(COL_RE)) {
+            if (nulls) {
+              ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
+            } else if (desc) {
+              ordersMap[column] = "desc";
+            }
+          }
+          let orders: Record<string, string> | string | undefined;
+          const orderVals = Object.values(ordersMap);
+          if (orderVals.length > 0) {
+            orders =
+              columns.length === orderVals.length && new Set(orderVals).size === 1
+                ? orderVals[0]
+                : ordersMap;
+          }
+          return { name: row.name, columns, unique: row.unique === true, where, orders };
+        });
       }
       case "mysql": {
         const rows = await this.adapter.execute(
           `SHOW INDEX FROM ${this._qt(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
-        const indexMap = new Map<string, { unique: boolean; seqs: [number, string][] }>();
+        const indexMap = new Map<
+          string,
+          { unique: boolean; seqs: [number, string, string | null][] }
+        >();
         for (const row of rows as any[]) {
           const name = row.Key_name;
           if (!indexMap.has(name)) {
             indexMap.set(name, { unique: row.Non_unique === 0, seqs: [] });
           }
-          indexMap.get(name)!.seqs.push([row.Seq_in_index, row.Column_name]);
+          // `Collation` is 'A' (ascending), 'D' (descending), or null (unsorted);
+          // descending columns surface in `orders`, mirroring Rails' MySQL adapter.
+          indexMap.get(name)!.seqs.push([row.Seq_in_index, row.Column_name, row.Collation ?? null]);
         }
         return Array.from(indexMap.entries())
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([name, info]) => {
             info.seqs.sort((a, b) => a[0] - b[0]);
-            return { name, columns: info.seqs.map((s) => s[1]), unique: info.unique };
+            const columns = info.seqs.map((s) => s[1]);
+            const ordersMap: Record<string, string> = {};
+            for (const [, column, collation] of info.seqs) {
+              if (collation === "D") ordersMap[column] = "desc";
+            }
+            let orders: Record<string, string> | string | undefined;
+            const orderVals = Object.values(ordersMap);
+            if (orderVals.length > 0) {
+              orders =
+                columns.length === orderVals.length && new Set(orderVals).size === 1
+                  ? orderVals[0]
+                  : ordersMap;
+            }
+            return { name, columns, unique: info.unique, orders };
           });
       }
     }
