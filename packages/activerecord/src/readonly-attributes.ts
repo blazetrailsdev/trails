@@ -181,10 +181,15 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   // `[]=` / mass-assignment paths stay strict (the heart of this story) while
   // the framework's own writes survive an incomplete set. Removed once every
   // bespoke test model declares its real columns (RFC 0046).
+  //
+  // A null/undefined name is NOT bridged: that is `id = …` on a key-less table
+  // (`setId` → `_writeAttribute(@primary_key=null, value)`), which must raise
+  // `MissingAttributeError` like Rails. The framework write-backs that rely on
+  // the bridge always target a real (string) column name.
   try {
     Model.prototype._writeAttribute.call(this, name, value);
   } catch (error) {
-    if (!(error instanceof MissingAttributeError)) throw error;
+    if (!(error instanceof MissingAttributeError) || name == null) throw error;
     this._attributes.writeCastValue(name, value);
   }
 }
