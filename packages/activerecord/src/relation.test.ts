@@ -1409,8 +1409,8 @@ describe("RelationTest", () => {
   it("#values returns a dup of the values", () => {
     const Post = makePost();
     const rel = Post.where({ title: "test" });
-    const vals1 = rel.whereValues;
-    const vals2 = rel.whereValues;
+    const vals1 = rel.whereValuesHash();
+    const vals2 = rel.whereValuesHash();
     expect(vals1).toEqual(vals2);
     expect(vals1).not.toBe(vals2); // should be a copy
   });
