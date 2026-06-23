@@ -138,9 +138,12 @@ function ownMethodNamesAbove(
 /**
  * Compute the uncacheable-method set the Rails way (delegation.rb:17-21):
  * `delegated_classes' public_instance_methods - Relation's`, which is exactly
- * the proxy-/association-relation-specific methods (`target`, `reload`, `reset`,
- * the build/create proxy methods, …) that must NOT be generated — a generated
- * copy on the per-model module would clobber the proxy subclass's own method.
+ * the methods unique to the proxy/association-relation subclasses (e.g.
+ * `target`) — those NOT also defined on Relation. Such a method must not be
+ * generated: a generated copy on the per-model module would clobber the proxy
+ * subclass's own method. (Methods the proxies override but Relation also
+ * defines — build/create/reload/records — are real methods that never reach
+ * the delegation branch anyway, so the subtraction correctly drops them.)
  */
 function computeUncacheableMethods(): Set<string> {
   const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
