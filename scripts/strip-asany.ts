@@ -211,8 +211,24 @@ async function bisectAccept(
 /**
  * Strip casts from one file using a batch-then-bisect recompile strategy:
  * remove every candidate and build once; keep all on green, else bisect to
- * isolate and revert only the load-bearing casts. Behaviour-equivalent to a
- * per-cast revert loop (same casts kept/removed) but typically ~1 build.
+ * isolate and revert only the load-bearing casts, typically ~1 build.
+ *
+ * Invariants that hold unconditionally: the final accepted set is the exact
+ * argument of the last successful `verify`, so the tree is always left green,
+ * and `removed + kept === candidates` (the recursion partitions the inputs),
+ * so the counts are always accurate.
+ *
+ * Same-casts-kept/removed equivalence to the old descending per-cast loop
+ * holds whenever `verify` is monotone in the removal set — i.e. removing more
+ * casts never turns a red build green. That is exactly the property this
+ * codemod's scope guarantees: every candidate's accessed member is already
+ * typed independent of the cast (see the file header), so removing an `as any`
+ * only ever exposes type errors, never suppresses one. Re-adding `as any`
+ * widens to `any`, which can only hide errors. The pathological inverse
+ * ("batch green but an isolated removal is red") would require a removal to
+ * *fix* a type error, which a member-already-typed cast cannot do; under that
+ * (out-of-scope) non-monotonicity the green-tree and count invariants above
+ * still hold, only the specific span chosen may differ.
  */
 export async function stripFile(file: string, verify?: VerifyText): Promise<StripResult> {
   const original = await readFile(file, "utf8");
