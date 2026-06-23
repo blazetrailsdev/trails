@@ -338,6 +338,10 @@ export function isAttributeMethodPatterns(this: AttributeMethodHost): boolean {
 }
 
 /** @internal Rails-private helper. Mirrors: #respond_to_without_attributes? (via AttributeMethods include) */
-export function isRespondToWithoutAttributes(this: object, method: string): boolean {
-  return _isRespondToWithoutAttributes.call(this, method);
+export function isRespondToWithoutAttributes(
+  this: object,
+  method: string,
+  includePrivateMethods: boolean = false,
+): boolean {
+  return _isRespondToWithoutAttributes.call(this, method, includePrivateMethods);
 }
