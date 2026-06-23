@@ -4756,18 +4756,17 @@ describe("EagerLoadingTooManyIdsTest", () => {
     expect((await Citation.preload("referenceOf").toArray()).length).toBe(await Citation.count());
   }, 120_000);
 
-  // PERMANENT-SKIP (MariaDB/MySQL perf): `eager_load(:citations)` is a 65536-row
-  // self-LEFT-JOIN; instantiating that result set via JoinDependency takes >360s
-  // on MariaDB (vs ~15s on SQLite), times out even at 120s, and poisons the
-  // shared connection — cascading into hook timeouts across the file. The
-  // bind-limit/IN-split behavior this case targets is already covered by
-  // `preloading too many ids` above; the JoinDependency instantiation cost is a
-  // separate perf concern, not an eager-loading feature gap.
-  it.skip("eager loading too many ids", async () => {
+  // `eager_load(:citations)` is a 65536-row self-LEFT-JOIN on `citation_id`.
+  // Rails' `t.references :citation` indexes that column, so the join is an
+  // indexed lookup rather than the O(n²) nested-loop scan it degrades to on the
+  // MySQL-family lanes without the index (that scan was >360s and poisoned the
+  // shared connection). With the canonical `citations` schema now carrying the
+  // Rails-faithful `index_citations_on_citation_id`, the join runs within budget.
+  it("eager loading too many ids", async () => {
     expect(await Citation.all().eagerLoad("citations").offset(0).size()).toBe(
       await Citation.count(),
     );
-  });
+  }, 120_000);
 });
 
 // ==========================================================================

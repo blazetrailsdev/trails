@@ -281,9 +281,17 @@ export const TEST_SCHEMA: Schema = {
     // citations fixture stores `book2_id: i*i` for i up to 65535
     // (4_294_836_225), overflowing a 32-bit integer column on PG/MariaDB —
     // SQLite's dynamic typing tolerated it. Widen to bigint to match Rails.
-    book1_id: "big_integer",
-    book2_id: "big_integer",
-    citation_id: "big_integer",
+    columns: {
+      book1_id: "big_integer",
+      book2_id: "big_integer",
+      citation_id: "big_integer",
+    },
+    // Rails' `t.references` defaults to `index: true`, so schema.rb emits an
+    // index per reference column. The `citation_id` index is load-bearing for
+    // `EagerLoadingTooManyIdsTest`: `eager_load(:citations)` is a self-LEFT-JOIN
+    // on `citation_id`, and over the 65536-row fixture the MySQL-family lanes
+    // fall back to an O(n²) nested-loop scan without it (>360s vs ~0.2s indexed).
+    indexes: [{ columns: "book1_id" }, { columns: "book2_id" }, { columns: "citation_id" }],
   },
 
   cpk_books: {
