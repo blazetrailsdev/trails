@@ -9,6 +9,7 @@
 
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
+import type { ThroughJoinGroup } from "../join-dependency.js";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
@@ -39,14 +40,13 @@ export abstract class JoinPart {
   nodeReflection: any | null = null;
   isThroughNode = false;
   /**
-   * True when this node's table alias was assigned at construction time (the
-   * through-association path, which uses Rails' `{candidate}_join` self-join
-   * naming) rather than deferred to emit-time `makeConstraints`. Emit-time
-   * aliasing leaves such nodes untouched and only claims their table into the
-   * shared AliasTracker so a later merged join onto the same table collides.
+   * Set on the tree nodes of a `has_many :through` chain (target + `_through_`
+   * leaves) — the shared emit-time state that resolves the whole chain's aliases
+   * against the AliasTracker and rebuilds the joins in one pass
+   * (`JoinDependency#_resolveThroughGroup`). Null for non-through nodes.
    * @internal
    */
-  aliasFixed = false;
+  throughGroup: ThroughJoinGroup | null = null;
   immediateAssocName = "";
   parentPath: string | null = null;
   effectiveSqlName = "";
