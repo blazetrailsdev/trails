@@ -53,6 +53,11 @@ import {
   resolveAliasName,
   undefineAttributeMethods,
   attributeMissing,
+  attributeAliases,
+  isAttributeAliases,
+  attributeMethodPatterns,
+  isAttributeMethodPatterns,
+  isRespondToWithoutAttributes,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1263,6 +1268,11 @@ export class Model {
   static attributeMethodSuffix = attributeMethodSuffix;
   static attributeMethodAffix = attributeMethodAffix;
   static undefineAttributeMethods = undefineAttributeMethods;
+  static attributeAliases = attributeAliases;
+  static isAttributeAliases = isAttributeAliases;
+  static attributeMethodPatterns = attributeMethodPatterns;
+  static isAttributeMethodPatterns = isAttributeMethodPatterns;
+  isRespondToWithoutAttributes = isRespondToWithoutAttributes;
 
   // -- Naming (Phase 1300) --
 
