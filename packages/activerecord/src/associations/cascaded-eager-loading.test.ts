@@ -200,11 +200,20 @@ describe("CascadedEagerLoadingTest", () => {
     const firstAccount = target(firms[0], "account") as Base;
     const firmAccount = target(target(firstAccount, "firm") as Base, "account") as Base;
     expect(firmAccount.id).toBe(firstAccount.id);
-    const firstFirmId = (companies("first_firm") as any).id;
-    const expected = (await Account.findBy({ firm_id: firstFirmId })) as Base;
+    // companies(:first_firm).account — fixture record's has_one, loaded directly.
+    const expected = (await (companies("first_firm") as Firm).loadHasOne("account")) as Base;
     await assertQueriesCount(0, false, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expected.id,
+      );
+    });
+    // companies(:first_firm).account.firm.account — same value via a deeper walk.
+    const ffAccount = (await (companies("first_firm") as Firm).loadHasOne("account")) as Account;
+    const ffFirm = (await ffAccount.loadBelongsTo("firm")) as Firm;
+    const expectedDeep = (await ffFirm.loadHasOne("account")) as Base;
+    await assertQueriesCount(0, false, () => {
+      expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
+        expectedDeep.id,
       );
     });
   });
