@@ -5,6 +5,7 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
+import { hasDefaultScopeOverride } from "./scoping/default.js";
 import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -908,13 +909,19 @@ function _builtAssociationScope(
 
 /**
  * Mirror of Rails' `Association#skip_statement_cache?`
- * (`associations/association.rb:254-263`): the singular-load statement cache
+ * (`associations/association.rb:391-396`): the singular-load statement cache
  * is bypassed when the compiled SQL/binds would not be stable across owners.
  *
  *   reflection.has_scope? ||
  *   scope.eager_loading? ||
  *   klass.scope_attributes? ||
- *   reflection.source_reflection.active_record.default_scopes.any? { |s| !s.is_a?(Proc) }
+ *   reflection.source_reflection.active_record.default_scopes.any?
+ *
+ * `scope.eager_loading?` is not a distinct check: on the singular load path the
+ * scope's eager-loading can only come from a reflection/macro scope lambda
+ * (subsumed by `reflection.has_scope?` / `options.scope`) or a target default
+ * scope carrying `includes` (subsumed by the `klass.scope_attributes?` arm
+ * below), so the remaining arms cover it.
  *
  * Deviation (tracked-pending-convergence): Rails statement-caches through
  * chains too, but we additionally treat multi-step (chain length > 1) chains
@@ -941,14 +948,20 @@ function _skipSingularStatementCache(
   if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
   // Multi-step chains: defer to the take() path (see doc comment).
   if (Array.isArray(refl.chain) && refl.chain.length > 1) return true;
-  // `klass.scope_attributes?` — a current (thread-local) scope or any default
-  // scope on the target makes the relation owner/context-dependent.
-  const klass = targetModel as unknown as {
-    currentScope?: unknown;
-    defaultScopes?: unknown[];
-  };
-  if (klass.currentScope) return true;
-  if ((klass.defaultScopes?.length ?? 0) > 0) return true;
+  // `klass.scope_attributes?` (`scoping/default.rb:55`) =
+  // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
+  // thread-local scope, any default scope, OR a method-form `default_scope`
+  // override makes the relation owner/context-dependent. Mirror all three arms
+  // (the third — `hasDefaultScopeOverride` — covers a `def self.defaultScope`
+  // that never lands in `defaultScopes`).
+  const klass = targetModel as unknown as { currentScope?: unknown; defaultScopes?: unknown[] };
+  if (
+    klass.currentScope ||
+    (klass.defaultScopes?.length ?? 0) > 0 ||
+    hasDefaultScopeOverride(targetModel)
+  ) {
+    return true;
+  }
   // `source_reflection.active_record.default_scopes.any?` (through chains).
   if ((refl.sourceReflection?.activeRecord?.defaultScopes?.length ?? 0) > 0) return true;
   return false;
