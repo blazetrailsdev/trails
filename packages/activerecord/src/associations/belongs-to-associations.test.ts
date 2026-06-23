@@ -2584,7 +2584,7 @@ describe("BelongsToAssociationsTest", () => {
       commentable_id: post.id,
       commentable_type: "Post",
     });
-    expect((savedComment as any).commentable_id).toBe(post.id);
+    expect((savedComment as any).commentable_id).toBe(Number(post.id));
   });
   it("belongs to proxy should not respond to private methods", async () => {
     class Company extends Base {
