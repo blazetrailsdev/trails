@@ -150,7 +150,7 @@ describe("BindParameterTest", () => {
 
     const cap = captureSelectSql();
     const topics = Topic.where({ id: 1 });
-    expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+    expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
     cap.stop();
 
     const key = conn.sqlKey(cap.sqls.at(-1));
@@ -170,7 +170,7 @@ describe("BindParameterTest", () => {
     try {
       const cap = captureSelectSql();
       const topics = Topic.where({ id: 1 });
-      expect((await topics.toArray()).map((t: any) => t.id)).toEqual([1]);
+      expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
       cap.stop();
 
       expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
@@ -185,7 +185,7 @@ describe("BindParameterTest", () => {
     conn.clearCache();
 
     const cap = captureSelectSql("topics");
-    expect((await Topic.find(1)).id).toBe(1);
+    expect(Number((await Topic.find(1)).id)).toBe(1);
     cap.stop();
     // Rails asserts the cached find statement is keyed into the connection pool.
     const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
@@ -210,7 +210,7 @@ describe("BindParameterTest", () => {
     conn.clearCache();
 
     const cap = captureSelectSql("topics");
-    expect((await Topic.findBy({ id: 1 }))!.id).toBe(1);
+    expect(Number((await Topic.findBy({ id: 1 }))!.id)).toBe(1);
     cap.stop();
     const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
@@ -235,7 +235,7 @@ describe("BindParameterTest", () => {
     const cap = captureSelectSql();
     const topics = Topic.where({ id: [1, 3] });
     expect(
-      (await topics.toArray()).map((t: any) => t.id).sort((a: number, b: number) => a - b),
+      (await topics.toArray()).map((t: any) => Number(t.id)).sort((a: number, b: number) => a - b),
     ).toEqual([1, 3]);
     cap.stop();
 
@@ -362,7 +362,7 @@ describe("BindParameterTest", () => {
       // stronger `binds are logged` assertion is deferred to RFC 0016 story
       // `preserve-queryattribute-binds-in-notification-payload` for that reason.)
       const message = subscriber.events.find((e) =>
-        (e.payload.binds as any[])?.some((attr) => (attr?.value ?? attr) === 1),
+        (e.payload.binds as any[])?.some((attr) => Number(attr?.value ?? attr) === 1),
       );
       expect(message).toBeTruthy();
     } finally {
