@@ -736,22 +736,29 @@ export class AssociationScope {
     // query returns all rows instead of the scoped subset. Merge its WHERE/
     // ORDER predicates here, evaluated against the source klass' table.
     //
-    // Skip when `source_type:` is set. A `source_type:` through carries any
-    // scope declared on its THROUGH/join model via a `PolymorphicReflection`
-    // chain entry already merged by the loop above (e.g. Tag's
-    // `null_taggings -> { none }` for `null_tagged_posts` flows through and
-    // empties the result) — that path is unaffected here. The piece this
-    // branch would otherwise add is the scope on the polymorphic belongsTo
-    // SOURCE itself, which (a) is not carried by any chain entry, (b) was
-    // never applied before this change either, and (c) cannot be evaluated
-    // because a polymorphic belongsTo's `klass` is uncomputable (it would
-    // raise in `_mergeReflectionScopeChain`). Source-on-`source_type` scope
-    // remains a pre-existing gap, orthogonal to this fix.
-    if (isThrough && !(head as { options?: { sourceType?: unknown } }).options?.sourceType) {
+    // For a `source_type:` through, the source reflection is a polymorphic
+    // belongsTo whose `klass` is uncomputable (it raises "Polymorphic
+    // associations do not support computing the class."). Rails' add_constraints
+    // does NOT special-case source_type — `chain.reverse_each` always folds in
+    // `source_reflection.constraints`, so a scope declared on the polymorphic
+    // belongsTo source (e.g. `belongs_to :taggable, -> { where(...) },
+    // polymorphic: true`) must still merge. The resolved source class is the
+    // runtime `klass` threaded into this call (the source_type target), so pass
+    // it as an override and avoid touching the uncomputable polymorphic `klass`.
+    // (The THROUGH/join-model scope on a source_type association is carried by a
+    // `PolymorphicReflection` chain entry already merged by the reverse_each loop
+    // above — e.g. Tag's `null_taggings -> { none }` — independent of this.)
+    if (isThrough) {
       const sourceRefl = (head as { sourceReflection?: AbstractReflection | null })
         .sourceReflection;
       if (sourceRefl) {
-        scope = this._mergeReflectionScopeChain(scope, sourceRefl, owner);
+        const sourceType = (head as { options?: { sourceType?: unknown } }).options?.sourceType;
+        scope = this._mergeReflectionScopeChain(
+          scope,
+          sourceRefl,
+          owner,
+          sourceType ? klass : undefined,
+        );
       }
     }
     return scope;
@@ -779,13 +786,18 @@ export class AssociationScope {
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
+    klassOverride?: typeof Base,
   ): unknown {
     const r = reflection as {
       scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
       scopeFor?: (rel: unknown, owner?: unknown) => unknown;
       klass?: typeof Base;
     };
-    const entryKlass = r.klass;
+    // For a polymorphic belongsTo source (source_type: through), reading
+    // `reflection.klass` raises — the caller threads the resolved source_type
+    // target class here instead. Guard the read so the polymorphic case never
+    // computes the uncomputable klass.
+    const entryKlass = klassOverride ?? r.klass;
     if (!entryKlass) return scope;
     // Iterate `reflection.constraints()` rather than special-casing
     // PolymorphicReflection via instanceof. For ordinary
@@ -805,7 +817,7 @@ export class AssociationScope {
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      const evaluated = this.evalScope(reflection, c, owner);
+      const evaluated = this.evalScope(reflection, c, owner, entryKlass);
       merged = this._pushScopeIntoRelation(merged, evaluated);
     }
     return merged;
@@ -832,8 +844,11 @@ export class AssociationScope {
     reflection: AbstractReflection | ReflectionProxy,
     scopeFn: (...args: unknown[]) => unknown,
     owner: Base,
+    klassOverride?: typeof Base,
   ): unknown {
-    const entryKlass = (reflection as { klass?: typeof Base }).klass;
+    // `klassOverride` carries the resolved source_type target for a polymorphic
+    // belongsTo source, whose `reflection.klass` would otherwise raise.
+    const entryKlass = klassOverride ?? (reflection as { klass?: typeof Base }).klass;
     if (!entryKlass) return undefined;
     // Rails: `relation = reflection.build_scope(reflection.aliased_table)`
     // (association_scope.rb:169) — the chain entry's scope lambda binds its

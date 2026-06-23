@@ -81,6 +81,36 @@ class PostWithHasOneNullify extends Base {
   }
 }
 
+// A Tagging whose polymorphic `taggable` belongsTo SOURCE carries its own
+// `-> { where(...) }` scope, and a Tag reaching Posts through it with
+// `source_type: 'Post'`. Rails' add_constraints folds the source reflection's
+// constraints into the through query even for source_type associations
+// (chain.reverse_each over source_reflection.constraints); this exercises that
+// the polymorphic-belongsTo source's OWN scope is applied — resolved via the
+// source_type target (Post) since the polymorphic `klass` is uncomputable.
+// Standalone base classes on the canonical `taggings` / `tags` tables (own base
+// class → no STI `type` filter), mirroring the `PostWithHasMany*` pattern above.
+class WelcomeOnlyTagging extends Base {
+  static {
+    this._tableName = "taggings";
+    this.belongsTo("taggable", {
+      polymorphic: true,
+      scope: (q: any) => q.where({ posts: { title: "Welcome to the weblog" } }),
+    });
+  }
+}
+class ScopedSourceTag extends Base {
+  static {
+    this._tableName = "tags";
+    this.hasMany("welcomeOnlyTaggings", { foreignKey: "tag_id", className: "WelcomeOnlyTagging" });
+    this.hasMany("welcomeTaggedPosts", {
+      through: "welcomeOnlyTaggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
+  }
+}
+
 describe("AssociationsJoinModelTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
@@ -130,6 +160,8 @@ describe("AssociationsJoinModelTest", () => {
   registerModel(PostWithHasManyNullify);
   registerModel(PostWithHasOneDestroy);
   registerModel(PostWithHasOneNullify);
+  registerModel(WelcomeOnlyTagging);
+  registerModel(ScopedSourceTag);
 
   // Mirrors Rails' `find_post_with_dependency(post_id, ...)`: set the post's
   // `type` to the dependent-variant class name, then reload through it.
@@ -579,6 +611,16 @@ describe("AssociationsJoinModelTest", () => {
     const general = await Tag.find(tags("general").id);
     expect((await (general as any).nullTaggedPosts.toArray()) as Base[]).toEqual([]);
     expect(((await (general as any).taggedPosts.toArray()) as Base[]).length).not.toBe(0);
+  });
+
+  it("has many polymorphic with source type merges source reflection scope", async () => {
+    // The general tag tags both the welcome and thinking posts; the scope on the
+    // polymorphic `taggable` source (`title = "Welcome to the weblog"`) must
+    // restrict the through query to the welcome post alone. Without merging the
+    // source reflection's scope the query would return both posts.
+    const general = await ScopedSourceTag.find(tags("general").id);
+    const scoped = (await (general as any).welcomeTaggedPosts.toArray()) as Base[];
+    expect(scoped.map((p) => p.id)).toEqual([posts("welcome").id]);
   });
 
   it("eager has many polymorphic with source type", async () => {
