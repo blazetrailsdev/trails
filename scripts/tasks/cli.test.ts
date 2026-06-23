@@ -2117,6 +2117,39 @@ describe("finalize validation paths", () => {
 const ML_BIN = join(TASKS_DIR, "node_modules", ".bin", "markdownlint-cli2");
 const PR_BIN = join(TASKS_DIR, "node_modules", ".bin", "prettier");
 
+// The canonical templates in the tasks repo. These are the source of truth the
+// scaffold generators (buildRfcContent / buildStoryContent) must mirror. They
+// are only reachable when the sibling tasks tree is present — every trails
+// worktree has a `tasks/` symlink, so dev/agent runs exercise the guard; a bare
+// CI clone without the checkout skips it (same precedent as the lint
+// integration tests above). See the byte-fidelity guard below for the
+// repo-ownership rationale.
+const RFC_TEMPLATE = join(TASKS_DIR, "rfcs", "0000-template", "README.md");
+const STORY_TEMPLATE = join(TASKS_DIR, "rfcs", "0000-template", "stories", "template-story.md");
+
+// Extract one `## Heading` section (the heading line through to the line before
+// the next `## ` heading), with trailing blank lines trimmed. Returns null when
+// the heading is absent. Assumes H2 headings are unique within a template (true
+// for both 0000-template files) — it matches the FIRST equal line, so a
+// duplicate heading would silently compare only the first occurrence's body.
+function markdownSection(md: string, heading: string): string | null {
+  const lines = md.split("\n");
+  const start = lines.indexOf(heading);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^## /.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n").replace(/\n+$/, "");
+}
+
+function markdownHeadings(md: string): string[] {
+  return [...md.matchAll(/^## .*/gm)].map((m) => m[0]);
+}
+
 // Integration test: closes the mocked-git gap. buildStoryContent output is
 // written to a real temp file and run through the tasks-repo's actual linting
 // tools — no git involved, no mock needed for the lint step.
@@ -2451,6 +2484,85 @@ describe("buildRfcContent", () => {
     expect(ml.status, `markdownlint-cli2 failed:\n${ml.stdout}${ml.stderr}`).toBe(0);
   });
 });
+
+// Byte-fidelity guard: the scaffold generators embed the 0000-template prose as
+// string literals, but the templates themselves live in the separate tasks repo
+// — trails' own cli.test.ts otherwise only pins the scaffold against itself, so
+// a drift in rfcs/0000-template/README.md or stories/template-story.md would
+// silently break the "every author is prompted for these sections" goal.
+//
+// Repo ownership: the guard is owned by *trails* and lives here in cli.test.ts.
+// It reads the canonical templates through the worktree's `tasks/` symlink, so
+// every trails dev/agent run (which always has the symlink) executes it, and a
+// bare CI clone without the sibling checkout skips it — identical to the
+// markdownlint/prettier integration tests above. The tasks repo can't own it
+// (it has no copy of the scaffold generators), and pinning it to trails CI
+// alone would require vendoring the templates; the symlink-or-skip model keeps
+// a single source of truth and still catches drift on every real run.
+describe.skipIf(!existsSync(RFC_TEMPLATE) || !existsSync(STORY_TEMPLATE))(
+  "scaffold byte-fidelity to 0000-template",
+  () => {
+    // Sections the scaffold deliberately diverges from, so they're excluded from
+    // the byte-fidelity comparison: the `## Stories` table is regenerated from
+    // story frontmatter on commit (scaffold emits a "No stories registered yet."
+    // placeholder), and `## Changelog` carries a parameterized date. Everything
+    // else — Summary, Motivation, Design, Non-goals, Alternatives considered,
+    // Rollout, Verification, Open questions — must stay byte-identical.
+    //
+    // This is DERIVED from the template, not a hardcoded allowlist: the guarded
+    // set is "every template `##` heading minus these two". So a NEW section
+    // added to the template (the exact silent-drift case this story targets)
+    // fails the test until buildRfcContent is updated to match.
+    const RFC_EXCLUDED_SECTIONS = ["## Stories", "## Changelog"];
+    const guardedRfcSections = (md: string) =>
+      markdownHeadings(md).filter((h) => !RFC_EXCLUDED_SECTIONS.includes(h));
+
+    it("buildRfcContent body is byte-identical to every guarded template README section", () => {
+      const template = readFileSync(RFC_TEMPLATE, "utf8");
+      const generated = buildRfcContent("my-rfc", { date: "2026-06-13" });
+      const guarded = guardedRfcSections(template);
+      // Sanity: the template still has sections to guard, so an accidentally
+      // empty list can't make this test vacuously pass.
+      expect(guarded.length, "no guarded sections found in the template README").toBeGreaterThan(0);
+      for (const heading of guarded) {
+        const generatedSection = markdownSection(generated, heading);
+        expect(
+          generatedSection,
+          `buildRfcContent is missing ${heading} (present in rfcs/0000-template/README.md — add it to the scaffold)`,
+        ).not.toBeNull();
+        expect(
+          generatedSection,
+          `${heading} drifted between buildRfcContent and rfcs/0000-template/README.md`,
+        ).toBe(markdownSection(template, heading));
+      }
+    });
+
+    it("buildRfcContent preserves the template guarded-section ordering", () => {
+      const template = readFileSync(RFC_TEMPLATE, "utf8");
+      const generated = buildRfcContent("my-rfc", { date: "2026-06-13" });
+      expect(guardedRfcSections(generated)).toEqual(guardedRfcSections(template));
+    });
+
+    // The story scaffold is deliberately headings-only (no placeholder prose),
+    // so byte-comparing section bodies is wrong here. Instead the guard pins the
+    // scaffold's headings to a prefix of the template's headings, in order: a new
+    // mandatory section added to the template (that authors should be prompted
+    // for) must also be added to buildStoryContent's default body.
+    it("buildStoryContent headings are an in-order prefix of the template headings", () => {
+      const template = readFileSync(STORY_TEMPLATE, "utf8");
+      const generated = buildStoryContent("0005-gaps", "my-story", { date: "2026-06-08" });
+      const generatedHeadings = markdownHeadings(generated);
+      const templateHeadings = markdownHeadings(template);
+      // Every scaffold heading must appear in the template, in the same order.
+      expect(templateHeadings.slice(0, generatedHeadings.length)).toEqual(generatedHeadings);
+      // And the scaffold must carry the mandatory sections (Notes is optional and
+      // omitted from the headings-only scaffold).
+      for (const heading of ["## Context", "## Acceptance criteria"]) {
+        expect(generatedHeadings).toContain(heading);
+      }
+    });
+  },
+);
 
 describe("newRfc", () => {
   function setupExit() {
