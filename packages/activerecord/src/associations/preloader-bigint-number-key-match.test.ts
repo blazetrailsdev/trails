@@ -68,5 +68,12 @@ describe("Preloader BigInt PK / number FK key match", () => {
     for (const post of davidPosts) {
       expect(Number(internals(post)._readAttribute("author_id"))).toBe(authors("david").id);
     }
+
+    // The still-number owner PK must also match its number FKs in the same call.
+    const maryPosts = internals(mary)._preloadedAssociations.get("posts") ?? [];
+    expect(maryPosts.length).toBeGreaterThan(0);
+    for (const post of maryPosts) {
+      expect(Number(internals(post)._readAttribute("author_id"))).toBe(authors("mary").id);
+    }
   });
 });
