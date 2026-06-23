@@ -809,6 +809,57 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Reporting-only activerecord-cli coverage (story ar-cli-coverage-reporting,
+  # RFC 0028). A SEPARATE non-blocking job from ar-sqlite-coverage: a second
+  # `pnpm vitest run` against the shared ./coverage dir would clobber the AR
+  # report, so the cli numbers get their own job + artifact. AR_CLI_COVERAGE=1
+  # scopes coverage to activerecord-cli source (see vitest.config.ts). Off the
+  # `ci` aggregator's needs-graph and `continue-on-error`, so it can never block
+  # a merge; the no-threshold vitest config means it can never fail on low
+  # coverage either.
+  ar-cli-coverage:
+    name: Active Record CLI Coverage (reporting-only)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    # TRAILS_TEST_FORKS=1 serializes the cli suite onto one worker (see below),
+    # and its trails-tsc E2E tests run heavy tsc compiles under v8 coverage on a
+    # 2-vCPU runner, so allow more wall time than the multi-fork trails-tsc job.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      # The cli suite's trails-tsc E2E tests spawn tsc subprocesses that, under
+      # v8 instrumentation, trip vitest's `onTaskUpdate` worker-RPC timeout and
+      # abort the run. Mirror the trails-tsc job: TRAILS_TEST_FORKS=1 cuts fork
+      # contention, --test-timeout=60000 absorbs the slower compiles, and a
+      # residual timeout is swallowed by dangerouslyIgnoreUnhandledErrors (gated
+      # on AR_CLI_COVERAGE in vitest.config.ts). Reporting-only (no thresholds).
+      - run: pnpm vitest run packages/activerecord-cli --coverage --coverage.all --test-timeout=60000
+        env:
+          AR_CLI_COVERAGE: "1"
+          TRAILS_TEST_FORKS: "1"
+      - name: Write AR CLI coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload AR CLI coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ar-cli-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
   trails-tsc-coverage:
     name: trails-tsc Coverage (reporting-only)
     needs: changes
