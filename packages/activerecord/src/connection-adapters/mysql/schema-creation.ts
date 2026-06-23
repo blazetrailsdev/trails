@@ -7,7 +7,6 @@
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type {
-  ReferentialAction,
   ColumnOptions,
   AddColumnOptions,
   ColumnType,
@@ -21,7 +20,6 @@ import {
   IndexDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
-import { singularize, underscore } from "@blazetrails/activesupport";
 import { mysqlSchemaQuoter, type MysqlSchemaQuoter } from "./schema-quoter.js";
 import {
   addOptionsForIndexColumns,
@@ -169,26 +167,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
         break;
     }
     if (unsigned && type !== "primary_key") sql += " unsigned";
-    return sql;
-  }
-
-  visitAddForeignKey(fromTable: string, toTable: string, options: Record<string, unknown>): string {
-    const toIdentifier = toTable.includes(".") ? toTable.split(".").pop()! : toTable;
-    const column = (options.column as string) ?? `${underscore(singularize(toIdentifier))}_id`;
-    const primaryKey = (options.primaryKey as string) ?? "id";
-    const fromIdentifier = fromTable.includes(".") ? fromTable.split(".").pop()! : fromTable;
-    const name = (options.name as string) ?? `fk_rails_${fromIdentifier}_${column}`;
-
-    let sql = `ALTER TABLE ${this.adapter.quoteTableName(fromTable)} ADD CONSTRAINT ${this.adapter.quoteIdentifier(name)} `;
-    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(column)}) REFERENCES ${this.adapter.quoteTableName(toTable)} (${this.adapter.quoteIdentifier(primaryKey)})`;
-
-    if (options.onDelete) {
-      sql += ` ${this.actionSql("DELETE", options.onDelete as ReferentialAction)}`;
-    }
-    if (options.onUpdate) {
-      sql += ` ${this.actionSql("UPDATE", options.onUpdate as ReferentialAction)}`;
-    }
-
     return sql;
   }
 
