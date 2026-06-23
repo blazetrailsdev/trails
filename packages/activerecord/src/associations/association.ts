@@ -34,6 +34,16 @@ export class Association {
    * `_cachedAssociations` write-shadow, which only ever held explicit writes.
    */
   _explicitTarget = false;
+  /**
+   * True when `target` was set by a preload / eager-load path (the standard
+   * `Preloader`, `JoinDependency`, or the preloader batch's loaded-nil default),
+   * as opposed to a lazy query load. This is the holder-resident successor to
+   * the legacy `_preloadedAssociations` shadow `Map`: readers that previously
+   * gated on `record._preloadedAssociations.has(name)` now gate on
+   * `holder.isLoaded() && holder._loadedFromPreload`, distinguishing a preloaded
+   * target (including a preloaded-nil) from a lazy load that must re-query.
+   */
+  _loadedFromPreload = false;
 
   private _staleState: unknown = undefined;
   /**
@@ -114,6 +124,7 @@ export class Association {
     this.target = null;
     this._staleState = undefined;
     this._explicitTarget = false;
+    this._loadedFromPreload = false;
   }
 
   resetNegativeCache(): void {

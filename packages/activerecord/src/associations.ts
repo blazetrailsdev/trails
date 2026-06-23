@@ -477,8 +477,29 @@ export function _loadedSingularTarget(
   if (instance?.isLoaded() && instance._explicitTarget) {
     return { value: instance.target ?? null };
   }
-  if (record._preloadedAssociations?.has(assocName)) {
-    return { value: record._preloadedAssociations.get(assocName) as Base | null };
+  return _preloadedHolderTarget(record, assocName) as { value: Base | null } | null;
+}
+
+/**
+ * Read the preloaded/eager-loaded target for `assocName` from the real holder
+ * (`record.association(name)`, Rails' `@target`) — the RFC 0022 successor to the
+ * legacy `record._preloadedAssociations` shadow `Map`. Returns a one-key box
+ * (`{ value }`) on a hit so a preloaded-nil target (the preloader stores
+ * `setTarget(null)` for a belongs_to that resolved to no record) is
+ * distinguished from a miss; gates on `_loadedFromPreload` (not bare
+ * `isLoaded()`) so a lazy query load on the holder still re-queries.
+ *
+ * @internal
+ */
+export function _preloadedHolderTarget(
+  record: Base,
+  assocName: string,
+): { value: Base | Base[] | null } | null {
+  const instance = record._associationInstances.get(assocName) as
+    | { isLoaded(): boolean; _loadedFromPreload?: boolean; target?: Base | Base[] | null }
+    | undefined;
+  if (instance?.isLoaded() && instance._loadedFromPreload) {
+    return { value: instance.target ?? null };
   }
   return null;
 }
@@ -1724,8 +1745,9 @@ export async function loadHasMany(
     ) {
       return cache.target;
     }
-    if (record._preloadedAssociations?.has(assocName)) {
-      return record._preloadedAssociations.get(assocName) as Base[];
+    const preloaded = _preloadedHolderTarget(record, assocName);
+    if (preloaded) {
+      return (preloaded.value ?? []) as Base[];
     }
   }
 
@@ -2664,8 +2686,9 @@ export async function loadHabtm(
 ): Promise<Base[]> {
   // Check preloaded cache first — an eager-loaded (preloaded) HABTM
   // association is reachable without a strict-loading violation.
-  if (record._preloadedAssociations?.has(assocName)) {
-    return record._preloadedAssociations.get(assocName) as Base[];
+  const preloaded = _preloadedHolderTarget(record, assocName);
+  if (preloaded) {
+    return (preloaded.value ?? []) as Base[];
   }
 
   // Lazily loading a HABTM on a strict-loading owner (or a reflection marked
@@ -2989,7 +3012,7 @@ export function association<T extends Base = Base>(
   if (existing) {
     // Hydrate from preloaded data if proxy was cached before preloading ran
     if (!existing.loaded) {
-      const preloaded = record._preloadedAssociations?.get(assocName);
+      const preloaded = _preloadedHolderTarget(record, assocName)?.value;
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
         existing._hydrateFromPreload(records as T[]);
@@ -3036,7 +3059,7 @@ export function association<T extends Base = Base>(
   };
 
   // Hydrate from preloaded data if available
-  const preloaded = record._preloadedAssociations?.get(assocName);
+  const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
     proxy._hydrateFromPreload(records as T[]);

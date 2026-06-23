@@ -15,6 +15,15 @@ function collection(record: Base, name: string): { load(): Promise<unknown> } & 
   return (record as unknown as Record<string, { load(): Promise<unknown> } & Iterable<Base>>)[name];
 }
 
+// Simulate an eager-preload by seeding the real association holder (RFC 0022:
+// `record.association(name).target` is the source of truth) the way the
+// `Preloader` does — `setTarget(...)` + the preload provenance flag.
+function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
+  const holder = (record as any).association(name);
+  holder.setTarget(value);
+  holder._loadedFromPreload = true;
+}
+
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 });
@@ -278,11 +287,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     const mid = await MidJ4.create({ val: "mid" });
     const deep = await DeepJ4.create({ val: "deep" });
     // This invented Top→Mid→Deep hierarchy has no fixtures to query, so the
-    // proxies are eager-loaded (Rails' `includes`) via _preloadedAssociations
+    // proxies are eager-loaded (Rails' `includes`) by seeding the real holder
     // rather than a DB read. Serialization still resolves them through the
     // real `send`/proxy reader, off each proxy's loaded target.
-    mid._preloadedAssociations.set("deeps", [deep]);
-    top._preloadedAssociations.set("mids", [mid]);
+    seedPreloadedHolder(mid, "deeps", [deep]);
+    seedPreloadedHolder(top, "mids", [mid]);
     const json = top.asJson({ include: { mids: { include: { deeps: {} } } } });
     expect((json.mids as any[])[0].deeps[0].val).toBe("deep");
   });

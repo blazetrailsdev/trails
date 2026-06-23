@@ -95,6 +95,27 @@ export class Batch {
 
     for (const record of branch.sourceRecords) {
       if (coveredRecords.has(record)) continue;
+      // Record a preloaded-nil default on the real holder so readers gating on
+      // `holder.isLoaded() && _loadedFromPreload` see it (RFC 0022). Mirror it
+      // into the legacy shadow `Map` for the not-yet-migrated writers.
+      //
+      // `association(branch.association)` throws only for a record whose class
+      // does not declare `branch.association` — exactly the
+      // `polymorphicParent && !reflection` records that `Branch#groupedRecords`
+      // skips (and so leaves uncovered) without ever resolving a holder. Those
+      // records have no reader for the association at all, so a holder-resident
+      // nil-default would be unreadable anyway; the old shadow-map entry was
+      // equally dead for them. Hence the catch is purely defensive — no reader
+      // asymmetry results from skipping the holder write here.
+      try {
+        const association = (record as any).association(branch.association);
+        if (!association.isLoaded()) {
+          association.setTarget(null);
+          association._loadedFromPreload = true;
+        }
+      } catch {
+        // Association not declared on this record's class (see above).
+      }
       if (!(record as any)._preloadedAssociations.has(branch.association)) {
         (record as any)._preloadedAssociations.set(branch.association, null);
       }

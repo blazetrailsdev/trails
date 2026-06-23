@@ -219,6 +219,7 @@ export class Association {
         try {
           const association = (owner as any).association(this.reflection.name);
           association.setTarget(record);
+          association._loadedFromPreload = true;
           if (i === 0) {
             association.setInverseInstance(record);
           }
@@ -249,10 +250,13 @@ export class Association {
       value = records[0] ?? null;
       association.setTarget(value);
     }
+    association._loadedFromPreload = true;
 
-    // Shadow-map bridge: many readers in `associations.ts` still consult
-    // `_preloadedAssociations`. Migrating them to read from the real proxy
-    // is a follow-up PR; keep the cache in sync for now.
+    // Shadow-map bridge: the `_preloadedAssociations` shadow `Map` is now
+    // write-only — every reader routes through the holder's
+    // `isLoaded()`/`_loadedFromPreload`/`target` (RFC 0022). Dropping the
+    // remaining writes and the field itself is the follow-up story
+    // `remove-preloaded-associations-shadow-map`.
     (owner as any)._preloadedAssociations.set(this.reflection.name, value);
 
     // Route through `reflection.inverseName()` so automatic inverse detection
