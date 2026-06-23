@@ -2432,20 +2432,13 @@ function createHabtmJoinModel(
     Reflection.addReflection(JoinModel, assocDef.name, ref);
   }
 
-  // Rails builds the join model's two `belongs_to` sides through the normal
-  // builder, so `belongs_to_required_by_default` (read here, while the owner's
-  // class body is still evaluating) makes them required — see
-  // Builder::BelongsTo#define_validations. We create the reflections directly
-  // above, so consult the flag explicitly and add the same FK presence checks.
-  if (
-    (JoinModel as unknown as { belongsToRequiredByDefault?: boolean }).belongsToRequiredByDefault
-  ) {
-    for (const fk of [ownerFk, targetFk]) {
-      (
-        JoinModel as unknown as { validatesPresenceOf(fk: string, opts: object): void }
-      ).validatesPresenceOf(fk, { message: "required" });
-    }
-  }
+  // No presence validations on the join model's belongs_to sides: Rails builds
+  // both with `required: false` hardcoded (Builder::HasAndBelongsToMany
+  // add_left/right_association), so define_validations always resolves
+  // `optional`/`required` to opt out — `belongs_to_required_by_default` never
+  // applies to the implicit join model. This keeps habtm usable even when the
+  // owner declares it under a true global flag (see project.rb:21-26 and the
+  // "usable with belongs to required by default" test).
 
   return JoinModel;
 }
