@@ -53,14 +53,13 @@ export class ThroughAssociation extends Association {
     const throughLoadedOnFirst =
       throughRefl != null &&
       firstOwner != null &&
-      ((firstOwner._preloadedAssociations?.has(throughRefl.name) ?? false) ||
-        (() => {
-          try {
-            return !!firstOwner.association?.(throughRefl.name)?.loaded;
-          } catch {
-            return false;
-          }
-        })());
+      (() => {
+        try {
+          return !!firstOwner.association?.(throughRefl.name)?.loaded;
+        } catch {
+          return false;
+        }
+      })();
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -279,7 +278,6 @@ export class ThroughAssociation extends Association {
 
     const throughName = throughRefl.name;
     const loadedForOwner = (owner: any): boolean => {
-      if (owner._preloadedAssociations?.has(throughName)) return true;
       try {
         return !!owner.association?.(throughName)?.loaded;
       } catch {
@@ -290,13 +288,11 @@ export class ThroughAssociation extends Association {
 
     const map = new Map<Base, Base[]>();
     for (const owner of this.owners) {
-      let recs: any = (owner as any)._preloadedAssociations?.get(throughName);
-      if (recs == null) {
-        try {
-          recs = (owner as any).association?.(throughName)?.target;
-        } catch {
-          recs = null;
-        }
+      let recs: any = null;
+      try {
+        recs = (owner as any).association?.(throughName)?.target;
+      } catch {
+        recs = null;
       }
       const arr: Base[] = Array.isArray(recs) ? [...recs] : recs != null ? [recs] : [];
       const filtered = arr.filter(

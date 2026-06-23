@@ -95,6 +95,18 @@ export class Batch {
 
     for (const record of branch.sourceRecords) {
       if (coveredRecords.has(record)) continue;
+      // Record a preloaded-nil default on the real holder so readers gating on
+      // `holder.isLoaded() && _loadedFromPreload` see it (RFC 0022). Mirror it
+      // into the legacy shadow `Map` for the not-yet-migrated writers.
+      try {
+        const association = (record as any).association(branch.association);
+        if (!association.isLoaded()) {
+          association.setTarget(null);
+          association._loadedFromPreload = true;
+        }
+      } catch {
+        // Ignore associations that can't be resolved as holders.
+      }
       if (!(record as any)._preloadedAssociations.has(branch.association)) {
         (record as any)._preloadedAssociations.set(branch.association, null);
       }

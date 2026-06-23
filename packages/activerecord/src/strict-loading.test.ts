@@ -28,6 +28,38 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Firm } from "./test-helpers/models/company.js";
 
+// Simulate an eager-preload by seeding the real association holder (RFC 0022:
+// `record.association(name).target` is the source of truth) the same way the
+// `Preloader` does — `setTarget(...)` + the preload provenance flag — so the
+// reader short-circuits without a lazy load (and thus no strict-loading raise).
+function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
+  let holder: any;
+  try {
+    holder = (record as any).association(name);
+  } catch {
+    holder = undefined;
+  }
+  if (holder) {
+    holder.setTarget(value);
+    holder._loadedFromPreload = true;
+    return;
+  }
+  // Undeclared association exercised by a direct `loadHabtm(...)` call: seed a
+  // minimal loaded holder keyed by name (mirrors `_cacheSingularTarget`'s
+  // ad-hoc-inverse holder) so `_preloadedHolderTarget` finds it.
+  (record as any)._associationInstances.set(name, {
+    target: value,
+    loaded: true,
+    _loadedFromPreload: true,
+    isLoaded() {
+      return true;
+    },
+    setTarget(this: { target: unknown }, t: unknown) {
+      this.target = t;
+    },
+  });
+}
+
 // ==========================================================================
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
@@ -162,7 +194,7 @@ describe("StrictLoadingTest", () => {
     registerModel(Book);
 
     const author = await Author.create({ name: "Dave" });
-    (author as any)._preloadedAssociations = new Map([["books", []]]);
+    seedPreloadedHolder(author, "books", []);
     author.strictLoadingBang();
 
     const books = await loadHasMany(author, "books", {});
@@ -337,7 +369,7 @@ describe("StrictLoadingTest", () => {
 
     const publisher = await Publisher.create({ name: "Press" });
     const book = await Book.create({ title: "Guide", publisher_id: publisher.id });
-    (book as any)._preloadedAssociations = new Map([["publisher", publisher]]);
+    seedPreloadedHolder(book, "publisher", publisher);
     book.strictLoadingBang();
 
     const loaded = await loadBelongsTo(book, "publisher", {});
@@ -2151,7 +2183,7 @@ describe("StrictLoadingTest", () => {
     registerModel("EbtsPublisher", EbtsPublisher);
     const publisher = await EbtsPublisher.create({ name: "Press" });
     const book = await EbtsBook.create({ title: "Guide", ebts_publisher_id: publisher.id });
-    (book as any)._preloadedAssociations = new Map([["ebtsPublisher", publisher]]);
+    seedPreloadedHolder(book, "ebtsPublisher", publisher);
     const loaded = await loadBelongsTo(book, "ebtsPublisher", {
       className: "EbtsPublisher",
       foreignKey: "ebts_publisher_id",
@@ -2180,7 +2212,7 @@ describe("StrictLoadingTest", () => {
     registerModel("EhosProfile", EhosProfile);
     const dev = await EhosDev.create({ name: "D" });
     const profile = await EhosProfile.create({ bio: "I am bio", ehos_dev_id: dev.id });
-    (dev as any)._preloadedAssociations = new Map([["ehosProfile", profile]]);
+    seedPreloadedHolder(dev, "ehosProfile", profile);
     const loaded = await loadHasOne(dev, "ehosProfile", {
       className: "EhosProfile",
       foreignKey: "ehos_dev_id",
@@ -2345,7 +2377,7 @@ describe("StrictLoadingTest", () => {
     const project = await SlhabProject.create({ name: "Rails" });
     // A preloaded (eager-loaded) HABTM is reachable even though the
     // reflection is marked strict_loading.
-    (dev as any)._preloadedAssociations = new Map([["slhabProjects", [project]]]);
+    seedPreloadedHolder(dev, "slhabProjects", [project]);
     const projects = await loadHabtm(dev, "slhabProjects", slhabHabtmOpts);
     expect(projects).toHaveLength(1);
   });
@@ -2368,7 +2400,7 @@ describe("StrictLoadingTest", () => {
       const project = await SlbhabProject.create({ name: "Rails" });
       const dev = await SlbhabDev.find(created.id);
       expect(dev.isStrictLoading()).toBe(true);
-      (dev as any)._preloadedAssociations = new Map([["slbhabProjects", [project]]]);
+      seedPreloadedHolder(dev, "slbhabProjects", [project]);
       const projects = await loadHabtm(dev, "slbhabProjects", {
         className: "SlbhabProject",
         joinTable: "slbhab_devs_projects",
