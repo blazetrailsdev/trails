@@ -71,6 +71,11 @@ import { isSourceUnported } from "./unported-files.js";
 // transaction / locking / persistence control flow) rather than idiom
 // translation. A general call-set diff is ~72% noise (Enumerable/Object
 // idioms), so we deliberately allowlist instead of denylist.
+//
+// Only names the Ruby extractor actually records are useful here: its
+// walk_for_calls (extract-ruby-api.rb) drops callees starting with `_` or not
+// matching /\A[a-z]/, so e.g. `_run_save_callbacks` can never match — the
+// non-underscore `run_callbacks` path covers callback dispatch instead.
 const SIGNIFICANT_CALLS = new Set([
   "run_callbacks",
   "with_lock",
@@ -87,10 +92,6 @@ const SIGNIFICANT_CALLS = new Set([
   "increment!",
   "decrement!",
   "becomes",
-  "_run_save_callbacks",
-  "_run_create_callbacks",
-  "_run_update_callbacks",
-  "_run_destroy_callbacks",
   "clear_attribute_changes",
   "changes_applied",
 ]);
