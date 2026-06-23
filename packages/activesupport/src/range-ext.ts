@@ -97,26 +97,40 @@ export function stringSucc(s: string): string {
     return String.fromCharCode(...codes);
   }
 
+  // Carry leftward from the rightmost alphanumeric, wrapping within a class.
+  // Ruby stops the carry rather than crossing a non-alphanumeric gap into a
+  // *different* class (digit vs letter): `"z.9".succ == "z.10"`, not `"aa.0"`.
+  const DIGIT = 1;
+  const ALPHA = 2;
   let i = lastAlnum;
   let carry = true;
   let overflowPos = lastAlnum;
   let overflowChar = 0;
+  let lastWrapClass = 0;
+  let crossedGap = false;
   while (i >= 0 && carry) {
     const c = codes[i];
     if (!isAsciiAlnum(c)) {
+      crossedGap = true;
       i--;
       continue;
     }
+    const thisClass = c >= 48 && c <= 57 ? DIGIT : ALPHA;
+    if (crossedGap && lastWrapClass !== 0 && thisClass !== lastWrapClass) break;
+    crossedGap = false;
     overflowPos = i;
     if (c === 57) {
       codes[i] = 48; // '9' → '0'
       overflowChar = 49; // insert '1'
+      lastWrapClass = DIGIT;
     } else if (c === 122) {
       codes[i] = 97; // 'z' → 'a'
       overflowChar = 97;
+      lastWrapClass = ALPHA;
     } else if (c === 90) {
       codes[i] = 65; // 'Z' → 'A'
       overflowChar = 65;
+      lastWrapClass = ALPHA;
     } else {
       codes[i] = c + 1;
       carry = false;

@@ -248,6 +248,9 @@ describe("RangeTest", () => {
     expect(stringSucc("a9")).toBe("b0");
     expect(stringSucc("1.9")).toBe("2.0");
     expect(stringSucc("<<")).toBe("<=");
+    // Carry stops at a non-alnum gap into a different class.
+    expect(stringSucc("z.9")).toBe("z.10");
+    expect(stringSucc("a.z")).toBe("b.a");
   });
 
   it("date time with step", () => {
