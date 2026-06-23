@@ -3610,6 +3610,11 @@ export class Relation<T extends Base> {
     // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
     // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
     await this._materializeDeferredDistinctPkPredicates();
+    // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
+    // an empty `IN`) returns `ActiveRecord::Result.empty` — i.e. `[]` — without
+    // issuing SQL. Checked after materialization so a deferred distinct-PK
+    // predicate that resolves to an empty id set also short-circuits.
+    if (this._whereClause.isContradiction()) return [];
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
