@@ -906,8 +906,8 @@ export class SchemaStatements {
     }
   }
 
-  async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, _tableName);
+  async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
       `ALTER INDEX ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`,
     );
