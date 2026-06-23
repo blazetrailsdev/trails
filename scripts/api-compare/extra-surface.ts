@@ -518,6 +518,9 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  *     `ClassMethods` submodule's instanceMethods into the parent's own
  *     `classMethods` — flattening still only reads `instanceMethods`, so
  *     ASC class methods become entity-level surface, not propagated mixins.
+ *   - A mixin whose source file is unported (`UNPORTED_FILES`) is skipped, so
+ *     its methods never enter `allowed` — matching the `isSourceUnported`
+ *     guard at compare.ts:507. The check uses the module's *owning* package.
  *
  * Since `allowed` is a flat name set (instance vs class collapsed on the TS
  * side anyway), we simply union both `instanceMethods` and `classMethods`
