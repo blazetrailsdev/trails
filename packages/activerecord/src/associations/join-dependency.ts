@@ -622,10 +622,17 @@ export class JoinDependency {
     }
     // Through-group resolution is idempotent within one emit but must re-run on a
     // fresh emit (new tracker); clear the per-group resolved flag so re-emit
-    // re-resolves aliases from scratch.
-    this._joinRoot.each((p) => {
-      if (p.throughGroup) p.throughGroup.resolved = false;
-    });
+    // re-resolves aliases from scratch. Cover BOTH this dependency's tree AND the
+    // `joinsToAdd` (stashed/merged) dependencies emitted below — those JD objects
+    // persist on the relation and can be re-emitted across arel builds, so a
+    // through-group on one of them would otherwise keep aliases computed against
+    // the prior tracker.
+    const resetThroughGroups = (root: JoinPart): void =>
+      root.each((p) => {
+        if (p.throughGroup) p.throughGroup.resolved = false;
+      });
+    resetThroughGroups(this._joinRoot);
+    for (const oj of joinsToAdd) resetThroughGroups(oj._joinRoot);
     this._references = new Map();
     if (references) {
       for (const tableName of references) this._references.set(tableName, tableName);
