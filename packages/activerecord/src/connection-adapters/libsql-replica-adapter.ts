@@ -18,8 +18,14 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * Construction is network-backed (initial sync), so it goes through the
  * async-open path (`AbstractSQLite3Adapter.openAsync()`). All SQLite dialect,
  * quoting, and schema logic lives in the abstract base; this subclass binds the
- * replica driver and adds the caller-driven {@link syncReplica} trigger. There
- * is no adapter-owned auto-sync timer (deliberately deferred).
+ * replica driver and adds the caller-driven {@link syncReplica} trigger.
+ *
+ * Periodic auto-sync is opt-in: pass a positive `syncPeriod` (seconds) in
+ * `driverOptions` to enable libsql's native background sync loop, which keeps
+ * the replica fresh with no explicit {@link syncReplica} call. It is off by
+ * default — without it the replica is caller-driven only — and the loop lives
+ * in the libsql handle, so it stops on `disconnect`/`close`; there is no
+ * adapter-owned JS timer to clear.
  */
 export class LibSQLReplicaAdapter extends AbstractSQLite3Adapter {
   protected override defaultSqliteDriver(): SqliteDriver {

@@ -236,21 +236,59 @@ export function isReplicaConfig(config: SqliteOpenConfig): boolean {
   return typeof syncUrl === "string" && syncUrl.length > 0;
 }
 
-/** @internal */
-function openReplicaDatabase(config: SqliteOpenConfig): Database.Database {
+/**
+ * libsql's `Database.Options` plus the embedded-replica keys the runtime
+ * accepts but the bundled TS types omit: `authToken`, and `syncPeriod` (the
+ * native background-sync interval, in seconds). `syncUrl` is already typed.
+ */
+export interface LibsqlReplicaOptions extends Database.Options {
+  authToken?: string;
+  syncPeriod?: number;
+}
+
+/**
+ * Build the libsql `Database.Options` for an embedded-replica open. A positive
+ * `syncPeriod` (seconds) turns on libsql's **native** background sync loop —
+ * opt-in periodic auto-sync that keeps the local replica fresh without an
+ * explicit {@link LibsqlConnection.sync} call. The loop is owned by the libsql
+ * handle and torn down when the connection closes, so there is no JS timer to
+ * manage. Omitting `syncPeriod` (the default) leaves the replica caller-driven,
+ * exactly as before.
+ * @internal
+ */
+export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOptions {
   if (!isReplicaConfig(config)) {
     throw new ConfigurationError(
       "libsql embedded-replica mode requires a non-empty `syncUrl` in " +
         "driverOptions (alongside the local replica path); none was provided.",
     );
   }
-  // driverOptions carries syncUrl + authToken (and any other driver keys). The
-  // local replica file is config.database, so unlike the remote driver we open
-  // a path, not a URL. Don't force readonly — replicas accept writes (which are
-  // forwarded to the primary).
-  const opts: Database.Options = { ...(config.driverOptions as Database.Options | undefined) };
+  // driverOptions carries syncUrl + authToken + optional syncPeriod (and any
+  // other driver keys). The local replica file is config.database, so unlike
+  // the remote driver we open a path, not a URL. Don't force readonly —
+  // replicas accept writes (which are forwarded to the primary).
+  const opts: LibsqlReplicaOptions = {
+    ...(config.driverOptions as LibsqlReplicaOptions | undefined),
+  };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  return new Database(config.database, opts);
+  if (opts.syncPeriod !== undefined) {
+    if (
+      typeof opts.syncPeriod !== "number" ||
+      !Number.isFinite(opts.syncPeriod) ||
+      opts.syncPeriod <= 0
+    ) {
+      throw new ConfigurationError(
+        "libsql embedded-replica `syncPeriod` must be a positive number of " +
+          `seconds (got ${String(opts.syncPeriod)}); omit it for caller-driven sync.`,
+      );
+    }
+  }
+  return opts;
+}
+
+/** @internal */
+function openReplicaDatabase(config: SqliteOpenConfig): Database.Database {
+  return new Database(config.database, buildReplicaOptions(config));
 }
 
 const replicaCapabilities: SqliteDriverCapabilities = {
@@ -273,6 +311,11 @@ const replicaCapabilities: SqliteDriverCapabilities = {
  * (`openSync` omitted, like the remote driver). `databaseExists` and
  * `restoreFromPath` are omitted — the replica file is materialized by libsql on
  * first sync, not a caller-managed local DB.
+ *
+ * Periodic auto-sync is opt-in via a positive `driverOptions.syncPeriod`
+ * (seconds): libsql's native background loop refreshes the replica without an
+ * explicit `sync()`. It is off by default and the loop is owned by the handle,
+ * so it stops when the connection closes — no JS timer to manage.
  */
 export const libsqlReplicaDriver: SqliteDriver = {
   name: "libsql-replica",

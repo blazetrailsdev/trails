@@ -8,6 +8,7 @@ import {
   libsqlReplicaDriver,
   isRemoteLibsqlUrl,
   isReplicaConfig,
+  buildReplicaOptions,
 } from "./libsql.js";
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
 import { LibSQLRemoteAdapter } from "../connection-adapters/libsql-remote-adapter.js";
@@ -437,6 +438,45 @@ describe("buildAdapterArg — syncUrl threading (replica mode)", () => {
   });
 });
 
+describe("buildReplicaOptions — auto-sync config threading", () => {
+  it("threads a positive syncPeriod into the libsql options", () => {
+    const opts = buildReplicaOptions({
+      database: "/tmp/replica.db",
+      driverOptions: { syncUrl: "libsql://primary.turso.io", authToken: "tok", syncPeriod: 30 },
+    });
+    expect(opts.syncUrl).toBe("libsql://primary.turso.io");
+    expect(opts.authToken).toBe("tok");
+    expect(opts.syncPeriod).toBe(30);
+  });
+
+  it("leaves syncPeriod absent when no auto-sync is configured", () => {
+    const opts = buildReplicaOptions({
+      database: "/tmp/replica.db",
+      driverOptions: { syncUrl: "libsql://primary.turso.io" },
+    });
+    expect(opts.syncPeriod).toBeUndefined();
+  });
+
+  it("rejects a non-positive syncPeriod", () => {
+    expect(() =>
+      buildReplicaOptions({
+        database: "/tmp/replica.db",
+        driverOptions: { syncUrl: "libsql://primary.turso.io", syncPeriod: 0 },
+      }),
+    ).toThrow(/syncPeriod/);
+    expect(() =>
+      buildReplicaOptions({
+        database: "/tmp/replica.db",
+        driverOptions: { syncUrl: "libsql://primary.turso.io", syncPeriod: -5 },
+      }),
+    ).toThrow(/syncPeriod/);
+  });
+
+  it("requires a syncUrl", () => {
+    expect(() => buildReplicaOptions({ database: "/tmp/replica.db" })).toThrow(/syncUrl/);
+  });
+});
+
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;
 const tursoToken = typeof process !== "undefined" ? process.env["TURSO_AUTH_TOKEN"] : undefined;
 const hasCredentials = Boolean(tursoUrl && tursoToken);
@@ -537,6 +577,67 @@ describe.skipIf(!hasCredentials)(
       await replica.syncReplica();
       const after = await replica.execute(`SELECT count(*) AS c FROM ${table}`);
       expect(Number((after[0] as { c: number }).c)).toBe(2);
+    });
+  },
+);
+
+describe.skipIf(!hasCredentials)(
+  "LibSQLReplicaAdapter — periodic auto-sync converges (TURSO_*)",
+  () => {
+    const replicaPath = `${getOs().tmpdir()}/libsql-autosync-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
+    const sidecars = [
+      replicaPath,
+      `${replicaPath}-wal`,
+      `${replicaPath}-shm`,
+      `${replicaPath}-info`,
+    ];
+    const removeFiles = (): void => {
+      for (const p of sidecars) {
+        try {
+          getFs().unlinkSync(p);
+        } catch {
+          /* best effort */
+        }
+      }
+    };
+    const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+    let primary: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
+    let replica: LibSQLReplicaAdapter;
+    const table = `autosync_${Date.now()}`;
+
+    beforeAll(async () => {
+      removeFiles();
+      primary = await LibSQLRemoteAdapter.openAsync(tursoUrl, {
+        driverOptions: { authToken: tursoToken },
+      });
+      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.executeMutation(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
+
+      replica = (await LibSQLReplicaAdapter.openAsync(replicaPath, {
+        driverOptions: { syncUrl: tursoUrl, authToken: tursoToken, syncPeriod: 1 },
+      })) as LibSQLReplicaAdapter;
+    });
+
+    afterAll(async () => {
+      await replica.close();
+      await primary.executeMutation(`DROP TABLE IF EXISTS ${table}`);
+      await primary.close();
+      removeFiles();
+    });
+
+    it("reflects a remote write without an explicit syncReplica()", async () => {
+      await primary.executeMutation(`INSERT INTO ${table} (id, label) VALUES (1, 'auto')`);
+
+      // Poll the replica WITHOUT calling syncReplica(): the native background
+      // loop (syncPeriod: 1s) should pull the row on its own.
+      let label: string | undefined;
+      for (let attempt = 0; attempt < 15 && label === undefined; attempt++) {
+        await delay(1000);
+        const rows = await replica.execute(`SELECT label FROM ${table} WHERE id = 1`);
+        label = (rows[0] as { label: string } | undefined)?.label;
+      }
+      expect(label).toBe("auto");
     });
   },
 );
