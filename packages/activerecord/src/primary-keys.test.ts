@@ -92,7 +92,10 @@ describe("PrimaryKeysTest", () => {
     // MissingAttributeError, even though cpk_books has a real `id` column.
     // Composite `id=` assignment uses the per-column path and is unaffected.
     const book = new CpkBook();
-    expect(() => book.writeAttribute("id", 7)).toThrow("can't write unknown attribute `id`");
+    // Rails interpolates the remapped name (the PK array) into the message.
+    expect(() => book.writeAttribute("id", 7)).toThrow(
+      'can\'t write unknown attribute `["author_id", "id"]`',
+    );
   });
 
   it("read attribute with composite primary key", () => {

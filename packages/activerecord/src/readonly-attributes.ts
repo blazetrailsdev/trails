@@ -160,7 +160,11 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     if (typeof pk === "string") {
       canonical = pk;
     } else if (!(this as { _initializingAttributes?: boolean })._initializingAttributes) {
-      throw new MissingAttributeError("can't write unknown attribute `id`");
+      // Rails calls `write_from_user(@primary_key, …)` with the PK array, so the
+      // Null attribute's name — and the interpolated message (attribute.rb:236) —
+      // is the array in Ruby `#inspect` form, e.g. `["author_id", "id"]`.
+      const arrayName = `[${pk.map((c) => `"${c}"`).join(", ")}]`;
+      throw new MissingAttributeError(`can't write unknown attribute \`${arrayName}\``);
     }
   }
   if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
