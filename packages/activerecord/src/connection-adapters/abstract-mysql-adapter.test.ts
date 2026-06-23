@@ -281,6 +281,46 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
   });
 });
 
+describe("AbstractMysqlAdapter#renameColumn wiring", () => {
+  // Drives the public renameColumn surface: it must wrap renameColumnForAlter's
+  // fragment in ALTER TABLE, clear the schema cache BEFORE mutating (RFC 0031
+  // always-warm cache), then fix up index names via renameColumnIndexes.
+  async function makeAdapter() {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype);
+    const events: string[] = [];
+    adapter.pool = {};
+    adapter.supportsRenameColumn = () => true;
+    adapter.getDatabaseVersion = async () => {};
+    adapter.quoteIdentifier = (s: string) => `\`${s}\``;
+    adapter.quoteTableName = (s: string) => `\`${s}\``;
+    adapter._schemaCache = {
+      clearDataSourceCacheBang: (_pool: unknown, tableName: string) => {
+        events.push(`clear:${tableName}`);
+      },
+    };
+    adapter._execMutation = async (sql: string) => {
+      events.push(`exec:${sql}`);
+    };
+    adapter.schemaStatements = () => ({
+      renameColumnIndexes: async (tableName: string, columnName: string, newColumnName: string) => {
+        events.push(`indexes:${tableName}:${columnName}:${newColumnName}`);
+      },
+    });
+    return { adapter, events };
+  }
+
+  it("clears the cache before issuing the ALTER TABLE RENAME COLUMN then fixes indexes", async () => {
+    const { adapter, events } = await makeAdapter();
+    await adapter.renameColumn("users", "old_name", "new_name");
+    expect(events).toEqual([
+      "clear:users",
+      "exec:ALTER TABLE `users` RENAME COLUMN `old_name` TO `new_name`",
+      "indexes:users:old_name:new_name",
+    ]);
+  });
+});
+
 describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
   function makeTextColumn(
     opts: { collation?: string | null; defaultFunction?: string | null } = {},

@@ -407,6 +407,17 @@ export class SchemaStatements {
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
+    // MySQL/MariaDB need the RENAME-COLUMN/CHANGE branch plus index fixups in
+    // AbstractMysqlAdapter#renameColumn; delegate when the adapter supplies its
+    // own implementation. The gate prevents self-recursion now that
+    // SchemaStatements is mixed into AbstractAdapter (see changeColumn).
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.renameColumn === "function" &&
+      adapter.renameColumn !== SchemaStatements.prototype.renameColumn
+    ) {
+      return adapter.renameColumn(tableName, oldName, newName);
+    }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,

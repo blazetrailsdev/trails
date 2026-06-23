@@ -901,9 +901,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
-    void tableName;
-    void columnName;
-    void newColumnName;
+    const fragment = await this.renameColumnForAlter(tableName, columnName, newColumnName);
+    // Clear before mutating (matching the other DDL methods) so a subsequent
+    // columnsHash() read re-reflects the renamed column rather than a stale entry.
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
+    await this.schemaStatements().renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
   async addIndex(
