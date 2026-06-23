@@ -32,7 +32,10 @@
  * (output/call-mismatches.json). The last is a coarse body-fidelity signal —
  * fidelity-critical Ruby body calls (see SIGNIFICANT_CALLS) absent from the
  * matched TS body's call-set; it is allowlist-gated because a general
- * missing-call diff is dominated by Ruby→JS idiom-translation noise.
+ * missing-call diff is dominated by Ruby→JS idiom-translation noise. That
+ * artifact is itself ratcheted: lint-call-mismatches.ts (CI: "Call-mismatches
+ * ratchet") fails on any mismatch not in the committed call-mismatches-exclude.json
+ * baseline, and on stale baseline entries (only-shrink) — see RFC 0044.
  *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
