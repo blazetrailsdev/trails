@@ -182,18 +182,33 @@ describe("resolveGeneratedLink", () => {
   });
 
   it("keeps an unmappable live link in a _media copy", () => {
-    const ctx = { originDir: "examples/twitter-clone", mediaEntryToRepo: () => null, repoKind: () => null };
-    expect(resolveGeneratedLink("./foo.md", "api/_media/twitter-clone", ctx, false)).toBeUndefined();
+    const ctx = {
+      originDir: "examples/twitter-clone",
+      mediaEntryToRepo: () => null,
+      repoKind: () => null,
+    };
+    expect(
+      resolveGeneratedLink("./foo.md", "api/_media/twitter-clone", ctx, false),
+    ).toBeUndefined();
   });
 
   it("strips an unmappable dead link in a _media copy", () => {
-    const ctx = { originDir: "examples/twitter-clone", mediaEntryToRepo: () => null, repoKind: () => null };
+    const ctx = {
+      originDir: "examples/twitter-clone",
+      mediaEntryToRepo: () => null,
+      repoKind: () => null,
+    };
     expect(resolveGeneratedLink("./gone.md", "api/_media/twitter-clone", ctx, true)).toBeNull();
   });
 
   it("leaves a live index-page link untouched (dead-only gate outside _media)", () => {
     expect(
-      resolveGeneratedLink("../_media/README.md", "api/@blazetrails/activerecord", twitterCtx, false),
+      resolveGeneratedLink(
+        "../_media/README.md",
+        "api/@blazetrails/activerecord",
+        twitterCtx,
+        false,
+      ),
     ).toBeUndefined();
   });
 });
