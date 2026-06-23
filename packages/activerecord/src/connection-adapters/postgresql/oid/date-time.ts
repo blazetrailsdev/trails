@@ -68,9 +68,15 @@ export class DateTime extends DateTimeType {
    * `quoted_date` / bind layer, matching Rails where the adapter does the quoting.
    */
   override serialize(value: unknown): unknown {
-    if (value === DateInfinity) return "infinity";
-    if (value === DateNegativeInfinity) return "-infinity";
-    return super.serialize(value);
+    // Cast first so the PG infinity *strings* ("infinity" / "-infinity") and
+    // the numeric ±Infinity sentinels both resolve to the sentinel before the
+    // wire-literal mapping — otherwise the string forms fall through to the
+    // base serialize, which hands back the raw ±Infinity number instead of the
+    // "infinity"/"-infinity" wire literal PG expects.
+    const cast = this.cast(value);
+    if (cast === DateInfinity) return "infinity";
+    if (cast === DateNegativeInfinity) return "-infinity";
+    return super.serializeCastValue(cast);
   }
 
   override typeCastForSchema(value: unknown): string {
