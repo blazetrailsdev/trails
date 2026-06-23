@@ -112,14 +112,14 @@ describe("NullRelationTest", () => {
 
   it("null relation sum", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().sum("id")).toBe(0);
+      expect(Number(await Comment.none().sum("id"))).toBe(0);
       expect(await Comment.none().group("post_id").sum("id")).toEqual({});
     });
   });
 
   it("null relation sum async", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().asyncSum("id")).toBe(0);
+      expect(Number(await Comment.none().asyncSum("id"))).toBe(0);
       expect(await Comment.none().group("post_id").asyncSum("id")).toEqual({});
     });
   });

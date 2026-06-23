@@ -542,6 +542,18 @@ function cacheNotificationInfoResult(
   return payload;
 }
 
+/**
+ * Build the query-cache key. `JSON.stringify` throws on `BigInt`, and under the
+ * PG bigserial default-PK flip a default-PK bind casts to a JS `BigInt`, so
+ * stringify the binds with a replacer that renders BigInt losslessly.
+ * @internal
+ */
+function sqlCacheKey(sql: string, binds: unknown[]): string {
+  return binds && binds.length > 0
+    ? JSON.stringify([sql, binds], (_k, v) => (typeof v === "bigint" ? `${v}n` : v))
+    : sql;
+}
+
 /** @internal */
 function lookupSqlCache(
   this: QueryCacheHost,
@@ -551,7 +563,7 @@ function lookupSqlCache(
 ): Record<string, unknown>[] | undefined {
   const qc = this._queryCache;
   if (!qc) return undefined;
-  const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
+  const key = sqlCacheKey(sql, binds);
   const result = qc.get(key);
   if (result !== undefined) {
     Notifications.instrument(
@@ -572,7 +584,7 @@ function cacheSql(
 ): Promise<Record<string, unknown>[]> {
   const qc = this._queryCache;
   if (!qc) return execute();
-  const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
+  const key = sqlCacheKey(sql, binds);
   return qc.computeIfAbsent(key, execute);
 }
 

@@ -179,7 +179,7 @@ describe("ReservedWordTest", () => {
     await createTestFixtures("group", "values");
     const g = await Group.find(1);
     const v = (await g.association("values").loadTarget()) as Values;
-    expect(v.id).toBe(2);
+    expect(Number(v.id)).toBe(2);
   });
 
   it("belongs to associations", async () => {
@@ -187,7 +187,7 @@ describe("ReservedWordTest", () => {
     const s = await Select.find(2);
     const gs = await (s as unknown as { groups: { toArray(): Promise<Group[]> } }).groups.toArray();
     expect(gs.length).toBe(2);
-    expect(gs.map((g) => g.id).sort((a, b) => Number(a) - Number(b))).toEqual([2, 3]);
+    expect(gs.map((g) => Number(g.id)).sort((a, b) => a - b)).toEqual([2, 3]);
   });
 
   it("has and belongs to many", async () => {
@@ -197,7 +197,7 @@ describe("ReservedWordTest", () => {
       d as unknown as { selects: { toArray(): Promise<Select[]> } }
     ).selects.toArray();
     expect(selects.length).toBe(2);
-    expect(selects.map((s) => s.id).sort((a, b) => Number(a) - Number(b))).toEqual([1, 2]);
+    expect(selects.map((s) => Number(s.id)).sort((a, b) => a - b)).toEqual([1, 2]);
   });
 
   it("activerecord introspection", async () => {
