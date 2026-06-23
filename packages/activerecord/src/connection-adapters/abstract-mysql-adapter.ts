@@ -676,6 +676,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.getDatabaseVersion();
     this.schemaStatements().validateIndexLengthBang(tableName, newName);
     if (!this.supportsRenameIndex()) {

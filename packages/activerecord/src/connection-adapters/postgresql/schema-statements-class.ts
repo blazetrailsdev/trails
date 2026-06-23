@@ -953,6 +953,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
     // cache, rename, then fix up index names that embed the column name.
     this.pg.clearCacheBang();
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );

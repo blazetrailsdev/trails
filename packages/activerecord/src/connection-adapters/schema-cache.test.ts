@@ -787,6 +787,54 @@ describe("DDL cache-invalidation safety-net", () => {
 
     expect(cache.isCached("posts")).toBe(false);
   });
+
+  it("renameColumn clears schema cache entry before RENAME SQL", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+    expect(cache.isCached("posts")).toBe(true);
+
+    const order: string[] = [];
+    const adapter = makeMockAdapter(cache);
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
+      order.push(`clear:${name}`);
+      origClear(pool, name);
+    });
+    adapter.executeMutation.mockImplementation(async () => {
+      order.push("sql");
+      return 0;
+    });
+
+    const ss = new SchemaStatements(adapter as any);
+    await ss.renameColumn("posts", "title", "headline");
+
+    expect(cache.isCached("posts")).toBe(false);
+    expect(order).toEqual(["clear:posts", "sql"]);
+  });
+
+  it("renameIndex clears schema cache entry before RENAME SQL", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+    expect(cache.isCached("posts")).toBe(true);
+
+    const order: string[] = [];
+    const adapter = makeMockAdapter(cache);
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
+      order.push(`clear:${name}`);
+      origClear(pool, name);
+    });
+    adapter.executeMutation.mockImplementation(async () => {
+      order.push("sql");
+      return 0;
+    });
+
+    const ss = new SchemaStatements(adapter as any);
+    await ss.renameIndex("posts", "index_posts_on_title", "index_posts_on_headline");
+
+    expect(cache.isCached("posts")).toBe(false);
+    expect(order).toEqual(["clear:posts", "sql"]);
+  });
 });
 
 describe("SchemaCache DDL invalidation", () => {
@@ -821,5 +869,21 @@ describe("SchemaCache DDL invalidation", () => {
     await adapter.renameTable("things", "stuff");
     expect(adapter.schemaCache.isCached("things")).toBe(false);
     expect(adapter.schemaCache.isCached("stuff")).toBe(false);
+  });
+
+  it("renameColumn re-reflects the new column name through the warm cache", async () => {
+    // Drop the fake beforeEach seed and warm the real reflection so columnsHash
+    // mirrors the DB. The pool argument is the adapter itself: SchemaCache's
+    // withConnection falls through to calling the column reader on it directly.
+    adapter.schemaCache.clearDataSourceCacheBang(adapter.pool, "things");
+    const before = await adapter.schemaCache.columnsHash(adapter, "things");
+    expect(Object.keys(before!)).toContain("name");
+
+    await adapter.renameColumn("things", "name", "title");
+
+    // Without the clear in renameColumn this still reports the stale "name".
+    const after = await adapter.schemaCache.columnsHash(adapter, "things");
+    expect(Object.keys(after!)).toContain("title");
+    expect(Object.keys(after!)).not.toContain("name");
   });
 });
