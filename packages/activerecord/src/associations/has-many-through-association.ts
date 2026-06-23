@@ -10,6 +10,7 @@ import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass } from "../associations.js";
 import { throughTargetScope } from "./through-association.js";
+import { associationKeysEqual } from "./key-normalization.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -582,7 +583,9 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
         typeof (c as any).readAttribute === "function"
           ? (c as any).readAttribute(fk)
           : (c as any)[fk];
-      return actual === val;
+      // A BigInt PK (int8 default under PG bigserial) and a number FK of equal
+      // value must match here as Ruby's `Integer ==` does.
+      return associationKeysEqual(actual, val);
     }),
   );
 }

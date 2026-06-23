@@ -42,7 +42,7 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
 
     const reader = await Reader.findBy({ person_id: person.id });
     expect(reader).not.toBeNull();
-    expect(reader!.post_id).toBe(post.id);
+    expect(Number(reader!.post_id)).toBe(Number(post.id));
     expect((reader as unknown as Record<string, unknown>).special_post_id).toBeUndefined();
   });
 
@@ -56,6 +56,6 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
 
     const reader = await Reader.findBy({ person_id: person.id });
     expect(reader).not.toBeNull();
-    expect(reader!.post_id).toBe(post.id);
+    expect(Number(reader!.post_id)).toBe(Number(post.id));
   });
 });

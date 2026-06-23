@@ -5,6 +5,7 @@ import { _setAssociationRelationCtor } from "./associations/collection-proxy.js"
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
+import { associationKeysEqual } from "./associations/key-normalization.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -296,7 +297,15 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
           if (!inversable && fkCols && pkCols && fkCols.length === pkCols.length) {
             inversable = true;
             for (let i = 0; i < fkCols.length; i++) {
-              if (childRec._readAttribute(fkCols[i]) !== ownerRec._readAttribute(pkCols[i])) {
+              // A child FK (int4 number) and the owner PK (int8 BigInt default
+              // under PG bigserial) must match here as Ruby's `Integer ==` does,
+              // or the inverse never wires and the cached target reads back nil.
+              if (
+                !associationKeysEqual(
+                  childRec._readAttribute(fkCols[i]),
+                  ownerRec._readAttribute(pkCols[i]),
+                )
+              ) {
                 inversable = false;
                 break;
               }

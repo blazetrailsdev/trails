@@ -363,12 +363,14 @@ describe("DelegationTest", () => {
       expect(target.loaded).toBe(false);
       // Calling sort on an unloaded proxy loads the association and returns
       // a sorted copy — mirrors Rails' records → load_target → Array#sort.
-      const sorted = await target.sort((a: any, b: any) => a.id - b.id);
+      const sorted = await target.sort((a: any, b: any) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+      );
       expect(target.loaded).toBe(true);
       expect(Array.isArray(sorted)).toBe(true);
       expect(sorted.length).toBeGreaterThan(0);
       const ids = sorted.map((c: any) => c.id);
-      expect(ids).toEqual([...ids].sort((a, b) => a - b));
+      expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
   }); // DelegationAssociationTest
 
@@ -403,11 +405,13 @@ describe("DelegationTest", () => {
     it("delegates sort to Array loading records on call", async () => {
       const target = Comment.all();
       // sort on an unloaded relation loads via toArray() and returns a sorted copy.
-      const sorted = await (target as any).sort((a: any, b: any) => a.id - b.id);
+      const sorted = await (target as any).sort((a: any, b: any) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+      );
       expect(Array.isArray(sorted)).toBe(true);
       expect(sorted.length).toBeGreaterThan(0);
       const ids = sorted.map((c: any) => c.id);
-      expect(ids).toEqual([...ids].sort((a, b) => a - b));
+      expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
   }); // DelegationRelationTest
 });

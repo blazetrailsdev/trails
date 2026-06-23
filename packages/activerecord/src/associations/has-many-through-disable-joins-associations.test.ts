@@ -342,10 +342,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it("pluck on disable joins through", async () => {
     const { author } = await setupData();
     const normalIds = (await association(author, "djComments").pluck("id")).sort(
-      (a: any, b: any) => a - b,
+      (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0),
     );
     const noJoinsIds = (await association(author, "noJoinsDjComments").pluck("id")).sort(
-      (a: any, b: any) => a - b,
+      (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0),
     );
     expect(noJoinsIds).toEqual(normalIds);
   });
@@ -353,11 +353,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it("pluck on disable joins through using custom foreign key", async () => {
     const { author } = await setupData();
     const normalIds = (await association(author, "djCommentsWithForeignKey").pluck("id")).sort(
-      (a: any, b: any) => a - b,
+      (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0),
     );
     const noJoinsIds = (
       await association(author, "noJoinsDjCommentsWithForeignKey").pluck("id")
-    ).sort((a: any, b: any) => a - b);
+    ).sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
     expect(noJoinsIds).toEqual(normalIds);
   });
 
@@ -381,8 +381,12 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const { author } = await setupData();
     const normalComments = await association(author, "djComments").toArray();
     const noJoinsComments = await association(author, "noJoinsDjComments").toArray();
-    const normalIds = normalComments.map((c: any) => c.id).sort((a: any, b: any) => a - b);
-    const noJoinsIds = noJoinsComments.map((c: any) => c.id).sort((a: any, b: any) => a - b);
+    const normalIds = normalComments
+      .map((c: any) => c.id)
+      .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
+    const noJoinsIds = noJoinsComments
+      .map((c: any) => c.id)
+      .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
     expect(noJoinsIds).toEqual(normalIds);
   });
 
@@ -427,14 +431,16 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("pluck on disable joins through a through", async () => {
     const { author, rating1, rating2 } = await setupData();
-    const normalIds = (await association(author, "djRatings").pluck("id")).sort(
-      (a: any, b: any) => a - b,
+    const normalIds = (await association(author, "djRatings").pluck("id")).sort((a: any, b: any) =>
+      a < b ? -1 : a > b ? 1 : 0,
     );
     const noJoinsIds = (await association(author, "noJoinsDjRatings").pluck("id")).sort(
-      (a: any, b: any) => a - b,
+      (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0),
     );
     expect(noJoinsIds).toEqual(normalIds);
-    expect(normalIds).toEqual([rating1.id, rating2.id].sort((a: any, b: any) => a - b));
+    expect(normalIds).toEqual(
+      [rating1.id, rating2.id].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
   });
 
   it("count on disable joins through a through", async () => {
@@ -461,7 +467,9 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     await DjRating.create({ dj_comment_id: comment.id, value: 2 });
     const normalRatings = await association(author, "djGoodRatings").toArray();
     const noJoinsRatings = await association(author, "noJoinsDjGoodRatings").toArray();
-    const expectedIds = [rating1.id, rating2.id].sort((a: any, b: any) => a - b);
+    const expectedIds = [rating1.id, rating2.id].sort((a: any, b: any) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
     expect(normalRatings.map((r: any) => r.id)).toEqual(expectedIds);
     expect(noJoinsRatings.map((r: any) => r.id)).toEqual(expectedIds);
   });
@@ -469,14 +477,18 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const { author, comment, rating1, rating2 } = await setupData();
     // Add a low-value rating to prove preload also applies the scope (value > 5 excludes it)
     await DjRating.create({ dj_comment_id: comment.id, value: 1 });
-    const expectedIds = [rating1.id, rating2.id].sort((a: any, b: any) => a - b);
+    const expectedIds = [rating1.id, rating2.id].sort((a: any, b: any) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
 
     const authors = await DjAuthor.all().preload("djGoodRatings").toArray();
     const preloadedAuthor = authors.find((a: any) => a.id === author.id) as any;
     expect(preloadedAuthor).toBeDefined();
     const goodRatings = preloadedAuthor._preloadedAssociations.get("djGoodRatings") as any[];
     expect(goodRatings).toBeDefined();
-    expect(goodRatings.map((r: any) => r.id).sort((a: any, b: any) => a - b)).toEqual(expectedIds);
+    expect(
+      goodRatings.map((r: any) => r.id).sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual(expectedIds);
 
     const authors2 = await DjAuthor.all().preload("noJoinsDjGoodRatings").toArray();
     const preloadedAuthor2 = authors2.find((a: any) => a.id === author.id) as any;
@@ -485,9 +497,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       "noJoinsDjGoodRatings",
     ) as any[];
     expect(noJoinsGoodRatings).toBeDefined();
-    expect(noJoinsGoodRatings.map((r: any) => r.id).sort((a: any, b: any) => a - b)).toEqual(
-      expectedIds,
-    );
+    expect(
+      noJoinsGoodRatings
+        .map((r: any) => r.id)
+        .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual(expectedIds);
   });
 
   it("polymophic disable joins through counting", async () => {

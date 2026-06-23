@@ -400,7 +400,7 @@ describe("NestedThroughAssociationsTest", () => {
       foreignKey: "taggable_id",
     });
     expect(tagging).not.toBeNull();
-    expect(tagging!.tag_id).toBe(tag.id);
+    expect(Number(tagging!.tag_id)).toBe(Number(tag.id));
   });
 
   it("has many through has one with has one through source reflection preload", async () => {
@@ -2838,7 +2838,9 @@ describe("NestedThroughAssociationsTest", () => {
     });
     const originalIds = original.map((c: any) => c.id);
     expect(preloadedIds).toEqual(originalIds);
-    expect(preloadedIds).toEqual([...originalIds].sort((a, b) => b - a));
+    expect(preloadedIds).toEqual(
+      [...originalIds].sort((a: any, b: any) => (a < b ? 1 : a > b ? -1 : 0)),
+    );
   });
 });
 

@@ -900,7 +900,7 @@ describe("DefaultScopingTest", () => {
     await (SpecialComment as any).unscoped(async () => {
       // CollectionProxy#build (_buildRaw)
       const built = post.specialComments.build({ body: "built sti comment" });
-      expect(built._readAttribute("post_id")).toBe(post.id);
+      expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
 
       // CollectionAssociation#setOwnerAttributes → foreignKeyColumns. Exercise
       // it on a record built outside the association so no scope_for_create FK
@@ -908,7 +908,7 @@ describe("DefaultScopingTest", () => {
       const assoc = post.association("specialComments");
       const fresh = new SpecialComment({ body: "fresh sti comment" });
       assoc.setOwnerAttributes(fresh);
-      expect(fresh._readAttribute("post_id")).toBe(post.id);
+      expect(Number(fresh._readAttribute("post_id"))).toBe(Number(post.id));
 
       // The nullify update (computeNullifiedOwnerAttributes) keys the
       // declaring-class FK, not `special_post_id`.
@@ -917,7 +917,7 @@ describe("DefaultScopingTest", () => {
       // CollectionProxy#push (insert_record)
       const pushed = new SpecialComment({ body: "pushed sti comment" });
       await post.specialComments.push(pushed);
-      expect(pushed._readAttribute("post_id")).toBe(post.id);
+      expect(Number(pushed._readAttribute("post_id"))).toBe(Number(post.id));
       expect(pushed.isNewRecord()).toBe(false);
     });
   });
@@ -947,11 +947,11 @@ describe("DefaultScopingTest", () => {
       // setHasOne writes the declaring-class FK onto a freshly assigned target.
       const assigned = new VerySpecialComment({ body: "assigned sti has_one" });
       await setHasOne(post, "verySpecialComment", assigned);
-      expect(assigned._readAttribute("post_id")).toBe(post.id);
+      expect(Number(assigned._readAttribute("post_id"))).toBe(Number(post.id));
 
       // buildHasOne sets the declaring-class FK on the built target.
       const built = buildHasOne(post, "verySpecialComment", {}, { body: "built sti has_one" });
-      expect(built._readAttribute("post_id")).toBe(post.id);
+      expect(Number(built._readAttribute("post_id"))).toBe(Number(post.id));
     });
   });
 

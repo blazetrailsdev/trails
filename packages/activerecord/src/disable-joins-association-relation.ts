@@ -1,6 +1,7 @@
 import { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import type { Base } from "./base.js";
 
 /**
@@ -65,12 +66,20 @@ export type DjarIds = unknown[] | unknown[][];
  * plausible scalar passed through this helper.
  */
 function serializeKey(v: unknown, composite: boolean): unknown {
-  if (!composite) return v;
+  // Scalars: fold a BigInt PK (int8 default under PG bigserial) to a number so
+  // it collides with a number-typed FK plucked from the upstream chain step —
+  // `1n` and `1` are otherwise distinct Map keys and the reorder drops every
+  // row (Ruby's width-agnostic `Integer ==` matches them).
+  if (!composite) return normalizeAssociationKey(v);
   return (
     "\u0000T" +
-    JSON.stringify(v, (_k, value) =>
-      typeof value === "bigint" ? `\u0000B${value.toString()}` : value,
-    )
+    JSON.stringify(v, (_k, value) => {
+      if (typeof value !== "bigint") return value;
+      // Same number/BigInt fold inside a tuple component, so a BigInt PK and a
+      // number FK in the same position serialize identically.
+      const normalized = normalizeAssociationKey(value);
+      return typeof normalized === "bigint" ? `\u0000B${normalized.toString()}` : normalized;
+    })
   );
 }
 
@@ -538,7 +547,10 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       }
     } else {
       for (const id of this._storedIds) {
-        const bucket = byKey.get(id);
+        // Normalize the looked-up id the same way `serializeKey` normalized the
+        // record-side key, so a number FK from the upstream pluck matches a
+        // BigInt PK on the loaded record (and vice versa).
+        const bucket = byKey.get(normalizeAssociationKey(id));
         if (bucket) ordered.push(...bucket);
       }
     }

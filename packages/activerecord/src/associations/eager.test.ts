@@ -4746,7 +4746,7 @@ describe("EagerAssociationTest", () => {
     const membership = m._preloadedAssociations.get("pstaCurrentMembership");
     expect(membership).toBeDefined();
     expect(membership).not.toBeNull();
-    expect(membership.psta_club_id).toBe(club.id);
+    expect(Number(membership.psta_club_id)).toBe(Number(club.id));
   });
 });
 
@@ -5133,7 +5133,7 @@ describe("EagerAssociationTest", () => {
         .order("posts.id")
         .toArray();
     });
-    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
+    expect(loaded.map((p) => Number(p.id))).toEqual([Number(posts("welcome").id)]);
     await assertNoQueries(false, () => {
       expect((loaded[0].association("author").target as Base).id).toBe(authors("david").id);
     });
@@ -5146,7 +5146,10 @@ describe("EagerAssociationTest", () => {
         .order("posts.id")
         .toArray();
     });
-    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id, posts("thinking").id]);
+    expect(loaded.map((p) => Number(p.id))).toEqual([
+      Number(posts("welcome").id),
+      Number(posts("thinking").id),
+    ]);
 
     await assertQueriesCount(2, false, async () => {
       loaded = await Post.all()
@@ -5156,7 +5159,10 @@ describe("EagerAssociationTest", () => {
         .order("posts.id")
         .toArray();
     });
-    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id, posts("thinking").id]);
+    expect(loaded.map((p) => Number(p.id))).toEqual([
+      Number(posts("welcome").id),
+      Number(posts("thinking").id),
+    ]);
   });
 
   it("eager loading with select on joined table preloads", async () => {
@@ -5484,7 +5490,7 @@ describe("EagerAssociationTest", () => {
   it("eager association loading with belongs to and limit", async () => {
     const loaded = await Comment.all().includes("post").limit(5).order("comments.id").toArray();
     expect(loaded).toHaveLength(5);
-    expect(loaded.map((c) => c.id)).toEqual([1, 2, 3, 5, 6]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([1, 2, 3, 5, 6]);
   });
 
   it("eager association loading with belongs to and limit and conditions", async () => {
@@ -5495,7 +5501,7 @@ describe("EagerAssociationTest", () => {
       .order("comments.id")
       .toArray();
     expect(loaded).toHaveLength(3);
-    expect(loaded.map((c) => c.id)).toEqual([5, 6, 7]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([5, 6, 7]);
   });
 
   it("eager association loading with belongs to and limit and offset", async () => {
@@ -5506,7 +5512,7 @@ describe("EagerAssociationTest", () => {
       .order("comments.id")
       .toArray();
     expect(loaded).toHaveLength(3);
-    expect(loaded.map((c) => c.id)).toEqual([3, 5, 6]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([3, 5, 6]);
   });
 
   it("eager association loading with belongs to and limit and offset and conditions", async () => {
@@ -5518,7 +5524,7 @@ describe("EagerAssociationTest", () => {
       .order("comments.id")
       .toArray();
     expect(loaded).toHaveLength(3);
-    expect(loaded.map((c) => c.id)).toEqual([6, 7, 8]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([6, 7, 8]);
   });
 
   it("eager association loading with belongs to and limit and offset and conditions array", async () => {
@@ -5530,7 +5536,7 @@ describe("EagerAssociationTest", () => {
       .order("comments.id")
       .toArray();
     expect(loaded).toHaveLength(3);
-    expect(loaded.map((c) => c.id)).toEqual([6, 7, 8]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([6, 7, 8]);
   });
 
   it("eager association loading with belongs to and conditions string with unquoted table name", async () => {
@@ -5578,7 +5584,7 @@ describe("EagerAssociationTest", () => {
       .order("posts.id")
       .toArray();
     expect(loaded).toHaveLength(1);
-    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
+    expect(loaded.map((p) => Number(p.id))).toEqual([Number(posts("welcome").id)]);
   });
 
   it("eager association loading with belongs to and limit and offset and multiple associations", async () => {
@@ -5589,7 +5595,7 @@ describe("EagerAssociationTest", () => {
       .order("posts.id")
       .toArray();
     expect(loaded).toHaveLength(1);
-    expect(loaded.map((p) => p.id)).toEqual([posts("thinking").id]);
+    expect(loaded.map((p) => Number(p.id))).toEqual([Number(posts("thinking").id)]);
   });
 
   it("eager association loading with belongs to and conditions hash", async () => {
@@ -5600,7 +5606,7 @@ describe("EagerAssociationTest", () => {
       .order("comments.id")
       .toArray();
     expect(loaded).toHaveLength(3);
-    expect(loaded.map((c) => c.id)).toEqual([5, 6, 7]);
+    expect(loaded.map((c) => Number(c.id))).toEqual([5, 6, 7]);
     await assertNoQueries(false, () => {
       expect(loaded[0].association("post").target).toBeDefined();
     });
@@ -5628,7 +5634,7 @@ describe("EagerAssociationTest", () => {
       .order("posts.id")
       .toArray();
     expect(loaded).toHaveLength(2);
-    expect(loaded.map((post) => post.id)).toEqual([4, 5]);
+    expect(loaded.map((post) => Number(post.id))).toEqual([4, 5]);
   });
 
   it("eager with has many and limit and conditions array", async () => {
@@ -5639,7 +5645,7 @@ describe("EagerAssociationTest", () => {
       .order("posts.id")
       .toArray();
     expect(loaded).toHaveLength(2);
-    expect(loaded.map((post) => post.id)).toEqual([4, 5]);
+    expect(loaded.map((post) => Number(post.id))).toEqual([4, 5]);
   });
 
   it("eager with has many and limit and conditions array on the eagers", async () => {
@@ -5726,7 +5732,7 @@ describe("EagerAssociationTest", () => {
 
     expect(comment.id).toBe(parent.id);
     const children = (await (comment as any).children.toArray()) as Base[];
-    expect(children.map((c) => c.id)).toEqual([child.id]);
+    expect(children.map((c) => Number(c.id))).toEqual([Number(child.id)]);
   });
 });
 
@@ -5820,7 +5826,7 @@ describe("EagerAssociationTest", () => {
       .last()) as Firm;
     expect(firm.id).toBe(companies("first_firm").id);
     const clients = (await (firm as any).clients.toArray()) as Base[];
-    expect(clients.map((c) => c.id)).toEqual([companies("first_client").id]);
+    expect(clients.map((c) => Number(c.id))).toEqual([Number(companies("first_client").id)]);
   });
 });
 
@@ -5865,7 +5871,7 @@ describe("EagerAssociationTest", () => {
       .includes("accountUsingPrimaryKey")
       .order("accounts.id")
       .toArray();
-    const firm = firms.find((f) => f.id === 1)!;
+    const firm = firms.find((f) => Number(f.id) === 1)!;
     await assertNoQueries(false, async () => {
       const account = (firm as any).accountUsingPrimaryKey;
       expect(account.id).toBe(expected.id);
@@ -6051,7 +6057,9 @@ describe("EagerAssociationTest", () => {
 
     const blogPost = blogPosts.find((p) => p.id === expectedPost.id);
     const loadedTags = blogPost._preloadedAssociations.get("tags") as any[];
-    expect(loadedTags.map((t) => t.id).sort()).toEqual(expectedTagIds.sort());
+    expect(loadedTags.map((t) => Number(t.id)).sort((a, b) => a - b)).toEqual(
+      expectedTagIds.map(Number).sort((a, b) => a - b),
+    );
   });
 
   it("preloading belongs_to CPK model with one of the keys being shared between models", async () => {
