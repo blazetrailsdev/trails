@@ -102,12 +102,19 @@ export class CTEJoin {
 
 /**
  * A single eager-loading specification: either a plain association name string
- * or a nested hash mirroring Rails' `includes(author: :posts)` syntax.
+ * or a nested hash mirroring Rails' `includes(author: :posts)` syntax. `null` /
+ * `undefined` entries (and `null` hash values) are tolerated and ignored,
+ * mirroring Rails' `Array(nil)` handling in `includes(nil)` / `includes(posts: nil)`.
  *
  * Mirrors: the argument accepted by ActiveRecord::QueryMethods#includes,
  * #preload, and #eager_load.
  */
-export type AssociationSpec = string | { [assoc: string]: AssociationSpec | AssociationSpec[] };
+export type AssociationSpec =
+  | string
+  | null
+  | undefined
+  | AssociationSpec[]
+  | { [assoc: string]: AssociationSpec | AssociationSpec[] };
 
 type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
 
