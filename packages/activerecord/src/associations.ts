@@ -6,7 +6,11 @@ import type { CollectionProxy, AssociationProxy } from "./associations/collectio
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
-import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
+import {
+  delegateArrayMethod,
+  delegateEnumerableMethod,
+  guardBaseMethodDelegation,
+} from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
 // Re-export the slot's setter so the package entry and other internal
@@ -3115,6 +3119,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
         return (...args: any[]) => {
+          guardBaseMethodDelegation(modelClass, prop);
           const prev = ScopeRegistry.currentScope(modelClass);
           ScopeRegistry.setCurrentScope(modelClass, scope);
           let result: unknown;

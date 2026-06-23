@@ -12,6 +12,7 @@
 import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
+import { NotImplementedError } from "../errors.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -69,6 +70,17 @@ export class GeneratedRelationMethods {
  * Mirrors: ActiveRecord::Delegation::DelegateCache
  */
 export class DelegateCache {
+  /**
+   * Whether relation/collection-proxy `method_missing` may delegate into
+   * `ActiveRecord::Base` class methods. Rails defaults this to `true`
+   * (delegation.rb:25) so normal `Post.where(...).create` chains work, but its
+   * own test suite sets it `false` (test/cases/helper.rb:29) to ban AR-internal
+   * code from relying on delegation that silently mutates the global scope.
+   *
+   * Mirrors: ActiveRecord::Delegation::DelegateCache.delegate_base_methods
+   */
+  static delegateBaseMethods = true;
+
   private _cache: Map<typeof Base, Set<string>> = new Map();
 
   initialize(modelClass: typeof Base): void {
@@ -104,6 +116,38 @@ export function delegatedClasses(): Set<typeof Base> {
 
 export function uncacheableMethods(): Set<string> {
   return _uncacheableMethods;
+}
+
+/**
+ * Guard mirroring Rails' `delegate_base_methods` ban (delegation.rb:120-126):
+ * when `DelegateCache.delegateBaseMethods` is `false`, delegating a relation /
+ * collection-proxy `method_missing` into a method `ActiveRecord::Base` itself
+ * responds to raises rather than silently scoping the call. Methods defined on
+ * the model subclass (named scopes, custom class methods) are unaffected — only
+ * methods reachable on the root `Base` class are banned. No-op while the flag is
+ * `true` (the default), so ordinary `Post.where(...).find`-style chains work.
+ *
+ * Mirrors: ActiveRecord::Delegation::ClassSpecificRelation#method_missing
+ */
+export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string): void {
+  if (DelegateCache.delegateBaseMethods) return;
+  // Resolve `ActiveRecord::Base.respond_to?(method)` without importing `Base`
+  // at runtime (that creates a module cycle): walk the model's static prototype
+  // chain to the `Base` class itself (class names are preserved at runtime — the
+  // codebase already relies on them for table inference) and check whether the
+  // method is reachable from there up. Methods defined only on a model subclass
+  // (named scopes, custom class methods) live below `Base` in the chain, so they
+  // stay delegable; methods on `Base` or its ancestors are banned.
+  let base: unknown = modelClass;
+  while (typeof base === "function" && (base as { name?: string }).name !== "Base") {
+    base = Object.getPrototypeOf(base);
+  }
+  if (typeof base === "function" && prop in (base as object)) {
+    // @nie disposition=TODO
+    throw new NotImplementedError(
+      "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
+    );
+  }
 }
 
 export function delegateBaseMethods(klass: typeof Base): void {
@@ -349,6 +393,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
         return (...args: any[]) => {
+          guardBaseMethodDelegation(modelClass, prop);
           const prev = ScopeRegistry.currentScope(modelClass);
           ScopeRegistry.setCurrentScope(modelClass, target);
           let result: unknown;
