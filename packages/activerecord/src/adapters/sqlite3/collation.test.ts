@@ -20,8 +20,8 @@ beforeEach(() => {
   )`);
 });
 
-afterEach(() => {
-  adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`);
+afterEach(async () => {
+  await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
   adapter.close();
 });
 

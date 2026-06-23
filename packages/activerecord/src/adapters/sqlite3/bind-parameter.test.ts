@@ -12,8 +12,8 @@ beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
 });
 
-afterEach(() => {
-  adapter.exec(`DROP TABLE IF EXISTS "topics"`);
+afterEach(async () => {
+  await adapter.exec(`DROP TABLE IF EXISTS "topics"`).catch(() => undefined);
   adapter.close();
 });
 

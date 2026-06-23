@@ -14,8 +14,8 @@ beforeEach(() => {
   adapter.exec(`CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`);
 });
 
-afterEach(() => {
-  adapter.exec(`DROP TABLE IF EXISTS "subscribers"`);
+afterEach(async () => {
+  await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`).catch(() => undefined);
   adapter.close();
 });
 
