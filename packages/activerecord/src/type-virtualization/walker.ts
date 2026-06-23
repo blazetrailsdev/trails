@@ -109,6 +109,18 @@ export interface ClassInfo {
 export interface WalkOptions {
   /** Class names counted as roots. Defaults to `["Base"]`. */
   baseNames?: readonly string[];
+  /**
+   * When supplied, decides per class-declaration NODE whether it is a model
+   * to virtualize, REPLACING the name-based `baseNames` heritage match.
+   *
+   * The name-based match is ambiguous once classes are visited at any
+   * nesting depth: two `class Foo extends Bar` in sibling `describe`/`it`
+   * scopes share the name `Foo` but may have different `Bar`s, so a flat
+   * name allow-list can mis-classify a sibling-scope subclass. Callers that
+   * resolve inheritance lexically (or via a `ts.Program` checker) pass this
+   * predicate so the decision is made on the actual node, not its name.
+   */
+  isModelClass?: (cls: ts.ClassDeclaration) => boolean;
 }
 
 export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassInfo[] {
@@ -119,8 +131,9 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   // statements. AR test files routinely declare their model classes inside
   // `describe`/`it`/helper-function bodies, and those classes carry the
   // same `static { this.hasMany(...) }` association calls we materialize.
+  const isModel = opts.isModelClass ?? ((cls: ts.ClassDeclaration) => extendsOneOf(cls, baseNames));
   const visit = (node: ts.Node): void => {
-    if (ts.isClassDeclaration(node) && node.name && extendsOneOf(node, baseNames)) {
+    if (ts.isClassDeclaration(node) && node.name && isModel(node)) {
       out.push(buildClassInfo(node, sourceFile));
     }
     ts.forEachChild(node, visit);

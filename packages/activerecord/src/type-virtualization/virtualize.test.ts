@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import ts from "typescript";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -476,6 +477,44 @@ describe("virtualize — multiple classes", () => {
     const { text } = virtualize(src, "file.ts");
     // Exactly one isDraft declare — bound to the first Post only.
     expect(text.match(/isDraft/g)?.length).toBe(1);
+  });
+
+  test("isModelClass predicate overrides name-based baseNames matching", () => {
+    // Two same-named `Client extends Company` in sibling scopes: only the
+    // first scope's Company roots at Base. A name-based allow-list cannot
+    // tell them apart; the per-node `isModelClass` predicate can, so only
+    // the first Client is virtualized.
+    const src =
+      'describe("d", () => {\n' +
+      '  it("a", () => {\n' +
+      "    class Company extends Base {}\n" +
+      "    class Client extends Company {\n" +
+      '      static { this.attribute("rating", "integer"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      '  it("b", () => {\n' +
+      "    class Company {}\n" +
+      "    class Client extends Company {\n" +
+      '      static { this.attribute("rating", "integer"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      "});\n";
+    const sf = ts.createSourceFile("file.ts", src, ts.ScriptTarget.ES2022, true);
+    // Mark only the FIRST `class Client` (the one whose Company roots at
+    // Base) as a model, by source span.
+    const baseRooted = new Set<string>();
+    const visit = (node: ts.Node): void => {
+      if (ts.isClassDeclaration(node) && node.name?.text === "Client" && baseRooted.size === 0) {
+        baseRooted.add(`${node.pos}:${node.end}`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    const { text } = virtualize(src, "file.ts", {
+      isModelClass: (cls) => baseRooted.has(`${cls.pos}:${cls.end}`),
+    });
+    // Exactly one `declare rating` — injected into the first Client only.
+    expect(text.match(/declare rating: number;/g)?.length).toBe(1);
   });
 });
 

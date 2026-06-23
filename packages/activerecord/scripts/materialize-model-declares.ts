@@ -90,36 +90,75 @@ function buildModelRegistry(): Map<string, string> {
 }
 
 /**
- * Compute the virtualizer `baseNames` allow-list for a single file by
- * walking its in-file `extends` chains to a fixpoint rooted at `Base`.
- * The pilot models keep every subclass (e.g. `SpecialComment extends
- * Comment`) in the same file, so no cross-file resolution is needed.
+ * Compute the set of class-declaration NODES in a file that transitively
+ * extend `Base`, resolving each `extends X` to the lexically-nearest
+ * in-scope `class X` — the source-walker analogue of the CLI's
+ * checker-backed `collectBaseDescendants`.
+ *
+ * Per-node (rather than per-name) is required because classes are visited
+ * at every nesting depth: two `class Foo extends Bar` in sibling
+ * `describe`/`it` scopes share the name `Foo` but may resolve `Bar` to
+ * different declarations, so a flat name allow-list would let a
+ * sibling-scope subclass contaminate another model's inheritance chain.
+ * Lexical resolution mirrors how Ruby constant lookup would scope each
+ * superclass reference.
  */
-function computeBaseNames(sf: ts.SourceFile): string[] {
-  const parentOf = new Map<string, string>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isClassDeclaration(node) && node.name) {
-      for (const hc of node.heritageClauses ?? []) {
-        if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
-        const expr = hc.types[0]?.expression;
-        if (expr && ts.isIdentifier(expr)) parentOf.set(node.name.text, expr.text);
+function collectModelClassNodes(sf: ts.SourceFile): Set<ts.ClassDeclaration> {
+  const rootNames = new Set(["Base"]);
+  const memo = new Map<ts.ClassDeclaration, boolean>();
+  const all: ts.ClassDeclaration[] = [];
+  const collect = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name) all.push(node);
+    ts.forEachChild(node, collect);
+  };
+  collect(sf);
+
+  const isBaseDescendant = (cls: ts.ClassDeclaration): boolean => {
+    const cached = memo.get(cls);
+    if (cached !== undefined) return cached;
+    memo.set(cls, false); // tentative, breaks cycles
+    for (const hc of cls.heritageClauses ?? []) {
+      if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
+      for (const t of hc.types) {
+        const expr = t.expression;
+        if (!ts.isIdentifier(expr)) continue;
+        if (rootNames.has(expr.text)) {
+          memo.set(cls, true);
+          return true;
+        }
+        const parent = resolveLexicalClass(cls, expr.text);
+        if (parent && isBaseDescendant(parent)) {
+          memo.set(cls, true);
+          return true;
+        }
       }
     }
-    ts.forEachChild(node, visit);
+    return false;
   };
-  visit(sf);
-  const names = new Set<string>(["Base"]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const [child, parent] of parentOf) {
-      if (names.has(parent) && !names.has(child)) {
-        names.add(child);
-        grew = true;
-      }
+
+  const out = new Set<ts.ClassDeclaration>();
+  for (const cls of all) if (isBaseDescendant(cls)) out.add(cls);
+  return out;
+}
+
+/**
+ * The class declaration named `name` that is lexically visible from `from`:
+ * declared in the same block/source file or an enclosing block/function
+ * body. Returns the nearest match, mirroring constant scoping.
+ */
+function resolveLexicalClass(from: ts.Node, name: string): ts.ClassDeclaration | undefined {
+  for (let n: ts.Node | undefined = from.parent; n; n = n.parent) {
+    const statements = ts.isSourceFile(n)
+      ? n.statements
+      : ts.isBlock(n) || ts.isModuleBlock(n)
+        ? n.statements
+        : undefined;
+    if (!statements) continue;
+    for (const stmt of statements) {
+      if (ts.isClassDeclaration(stmt) && stmt.name?.text === name) return stmt;
     }
   }
-  return [...names];
+  return undefined;
 }
 
 /**
@@ -132,9 +171,9 @@ function resolveAutoImports(
   sf: ts.SourceFile,
   fileName: string,
   registry: ReadonlyMap<string, string>,
-  baseNames: readonly string[],
+  isModelClass: (cls: ts.ClassDeclaration) => boolean,
 ): string[] {
-  const classes = walk(sf, { baseNames });
+  const classes = walk(sf, { isModelClass });
   const moduleScope = collectNamesInScope(sf);
   const imports = new Map<string, string>();
   for (const info of classes) {
@@ -314,8 +353,15 @@ function main(): void {
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
-    const baseNames = computeBaseNames(sf);
-    const prependImports = resolveAutoImports(sf, file, registry, baseNames);
+    // `virtualize` re-parses `source` into its own AST, so a predicate
+    // keyed on node identity would never match there. Key on the node's
+    // source span instead — identical text re-parses to identical
+    // `pos`/`end`, so the predicate is stable across both parses.
+    const modelSpans = new Set<string>();
+    for (const cls of collectModelClassNodes(sf)) modelSpans.add(`${cls.pos}:${cls.end}`);
+    const isModelClass = (cls: ts.ClassDeclaration): boolean =>
+      modelSpans.has(`${cls.pos}:${cls.end}`);
+    const prependImports = resolveAutoImports(sf, file, registry, isModelClass);
     // The schema-column merge maps each model to a table by `tableName` (or
     // `pluralize(underscore(className))` when unset) and bakes that table's
     // canonical columns into the declares. That is correct for the canonical
@@ -328,7 +374,7 @@ function main(): void {
     // `attribute()` / association / enum calls — exactly its real surface.
     const underModelsDir = file.startsWith(modelsDirPrefix);
     const { text: virtualized } = virtualize(source, file, {
-      baseNames,
+      isModelClass,
       prependImports,
       schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
     });
