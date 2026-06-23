@@ -137,14 +137,17 @@ describe("AssociationRelation", () => {
       declare ar_blog_id: number | null;
       declare title: string;
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("ar_blog_id", "integer");
+        this.attribute("ar_validated_blog_id", "integer");
         this.validates("title", { presence: true });
       }
     }
     class ArValidatedBlog extends Base {
       declare name: string;
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
@@ -165,6 +168,7 @@ describe("AssociationRelation", () => {
     class ArInvBlog extends Base {
       declare name: string;
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
@@ -172,6 +176,7 @@ describe("AssociationRelation", () => {
       declare ar_inv_blog_id: number | null;
       declare title: string;
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("ar_inv_blog_id", "integer");
         this.belongsTo("arInvBlog", { className: "ArInvBlog" });

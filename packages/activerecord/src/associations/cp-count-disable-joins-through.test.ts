@@ -32,12 +32,14 @@ describe("CollectionProxy#count — disable_joins through", () => {
   class CdAuthor extends Base {
     static {
       this._tableName = "cd_authors";
+      this.attribute("id", "integer");
       this.attribute("name", "string");
     }
   }
   class CdPost extends Base {
     static {
       this._tableName = "cd_posts";
+      this.attribute("id", "integer");
       this.attribute("cd_author_id", "integer");
       this.attribute("title", "string");
     }
@@ -45,6 +47,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
   class CdComment extends Base {
     static {
       this._tableName = "cd_comments";
+      this.attribute("id", "integer");
       this.attribute("cd_post_id", "integer");
       this.attribute("body", "string");
     }
@@ -130,6 +133,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
     class CdRating extends Base {
       static {
         this._tableName = "cd_ratings";
+        this.attribute("id", "integer");
         this.attribute("cd_comment_id", "integer");
         this.attribute("value", "integer");
       }

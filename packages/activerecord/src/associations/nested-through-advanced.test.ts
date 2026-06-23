@@ -44,12 +44,14 @@ describe("HMT Slot E — nested-through advanced", () => {
   class NtaAuthor extends Base {
     static {
       this._tableName = "nta_authors";
+      this.attribute("id", "integer");
       this.attribute("name", "string");
     }
   }
   class NtaPost extends Base {
     static {
       this._tableName = "nta_posts";
+      this.attribute("id", "integer");
       this.attribute("nta_author_id", "integer");
       this.attribute("title", "string");
     }
@@ -57,6 +59,7 @@ describe("HMT Slot E — nested-through advanced", () => {
   class NtaTagging extends Base {
     static {
       this._tableName = "nta_taggings";
+      this.attribute("id", "integer");
       this.attribute("taggable_id", "integer");
       this.attribute("taggable_type", "string");
       this.attribute("nta_tag_id", "integer");
@@ -65,6 +68,7 @@ describe("HMT Slot E — nested-through advanced", () => {
   class NtaTag extends Base {
     static {
       this._tableName = "nta_tags";
+      this.attribute("id", "integer");
       this.attribute("name", "string");
     }
   }
@@ -211,12 +215,14 @@ describe("HMT Slot E — nested-through advanced", () => {
     class NseHotel extends Base {
       static {
         this._tableName = "nse_hotels";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
     class NseChef extends Base {
       static {
         this._tableName = "nse_chefs";
+        this.attribute("id", "integer");
         this.attribute("nse_hotel_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
@@ -225,12 +231,14 @@ describe("HMT Slot E — nested-through advanced", () => {
     class NseCakeDesigner extends Base {
       static {
         this._tableName = "nse_cake_designers";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
     class NseDrinkDesigner extends Base {
       static {
         this._tableName = "nse_drink_designers";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }

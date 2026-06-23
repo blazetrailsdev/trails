@@ -365,6 +365,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         this.attribute("id", "integer");
         this.attribute("state", "json");
         this.attribute("long_state", "json");
+        // Raw adapter (schema cache not warmed): declare the timestamp columns
+        // the create-time callbacks write, for strict writeFromUser.
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
       }
     } as any;
     new EncryptedFirstTrafficLight();
