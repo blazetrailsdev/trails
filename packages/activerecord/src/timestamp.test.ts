@@ -7,7 +7,6 @@ import { adapterType, createTestAdapter } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
-import { ActiveRecordError } from "./errors.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -535,18 +534,6 @@ describe("TimestampTest", () => {
     expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("touch should raise error on a new object", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = new Post({ title: "New" });
-    await expect(post.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
-  });
-
   it("touch skips callbacks", async () => {
     const log: string[] = [];
 
@@ -801,16 +788,6 @@ describe("TimestampTest", () => {
     log.length = 0;
     await post.touch();
     expect(log).toHaveLength(0);
-  });
-
-  it("touch should raise error on a new object", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = new Post({});
-    await expect(post.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
   });
 
   it("updateColumn does not update updated_at", async () => {

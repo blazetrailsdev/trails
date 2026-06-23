@@ -25,6 +25,13 @@ export async function touch(
   optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
   ...rest: string[]
 ): Promise<boolean> {
+  // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
+  // prepended ahead of Persistence#touch: a no_touching block short-circuits
+  // the whole method — including the persisted?/readonly? guards below — so a
+  // new or destroyed record inside one returns falsy rather than raising.
+  const ctor = this.constructor as typeof Base;
+  if (isNoTouchingApplied(ctor)) return false;
+
   // Mirrors Rails Persistence#touch: a non-persisted (new or destroyed) record
   // raises ActiveRecordError via _raise_record_not_touched_error — it does not
   // return false. The persisted? check runs before the readonly check, matching
@@ -33,9 +40,6 @@ export async function touch(
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
-
-  const ctor = this.constructor as typeof Base;
-  if (isNoTouchingApplied(ctor)) return false;
 
   let time: Temporal.Instant;
   let names: string[];
