@@ -1116,6 +1116,10 @@ export class SchemaStatements {
           }>
         >;
       case "postgres": {
+        // The LEFT JOIN on pg_attribute (below) is deliberate: an expression
+        // key has attnum 0 with no pg_attribute row, so an inner join would drop
+        // the entire index. LEFT JOIN keeps the row (attname NULL) so the
+        // has_expressions arm can substitute the raw pg_get_indexdef expression.
         const rows = await this.adapter.execute(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
                   bool_or(ix.indexprs IS NOT NULL) AS has_expressions,
@@ -1125,12 +1129,11 @@ export class SchemaStatements {
            JOIN pg_class i ON i.oid = ix.indexrelid
            JOIN pg_namespace n ON n.oid = t.relnamespace
            JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, n) ON true
-           JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+           LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
            WHERE t.relname = '${tableName}' AND n.nspname = 'public' AND NOT ix.indisprimary
            GROUP BY i.relname, ix.indisunique, i.oid`,
         );
         return rows.map((row: any) => {
-          const columns = Array.isArray(row.columns) ? row.columns : [row.columns];
           // Recover the partial-index WHERE predicate and per-column DESC
           // directions from the index definition, mirroring the concrete
           // PostgreSQLSchemaStatements#indexes parsing.
@@ -1140,12 +1143,18 @@ export class SchemaStatements {
           );
           const expressions = defMatch?.[1] ?? "";
           const where = defMatch?.[4]?.trim();
-          const ordersMap: Record<string, string> = {};
-          // Mirrors the concrete adapter: only plain (non-expression) indexes
-          // parse orders. Expression columns are already dropped from `columns`
-          // by the `pg_attribute` join (attnum 0), so this fallback does not
-          // surface expression-index columns/orders.
+          // Mirrors Rails (postgresql/schema_statements.rb:117) and the concrete
+          // adapter: an expression index stores `columns` as the raw expression
+          // string parsed from pg_get_indexdef, since the LEFT JOIN on
+          // `pg_attribute` yields NULL for expression keys (attnum 0). Plain
+          // indexes keep the column array and parse orders.
           const hasExpressions = row.has_expressions === true;
+          const columns: string | string[] = hasExpressions
+            ? expressions
+            : Array.isArray(row.columns)
+              ? row.columns
+              : [row.columns];
+          const ordersMap: Record<string, string> = {};
           const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
           if (!hasExpressions) {
             for (const [, column, , desc, nulls] of expressions.matchAll(COL_RE)) {
