@@ -61,7 +61,7 @@ export async function initializeAssociations(): Promise<void> {
 }
 import { ConfigurationError, NameError, Rollback } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { strictLoadingViolationBang, cachedFindByStatement } from "./core.js";
+import { strictLoadingViolationBang } from "./core.js";
 import { StatementCache } from "./statement-cache.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
@@ -916,11 +916,13 @@ function _builtAssociationScope(
  *   klass.scope_attributes? ||
  *   reflection.source_reflection.active_record.default_scopes.any? { |s| !s.is_a?(Proc) }
  *
- * We additionally treat multi-step (through) chains as skip: the statement
- * cache for those depends on `get_bind_values` / scope-build bind ordering
- * agreeing across two independent code paths, so we keep the proven
- * per-load `take()` path there and only cache the direct (chain length 1)
- * has_one / belongs_to loads.
+ * Deviation (tracked-pending-convergence): Rails statement-caches through
+ * chains too, but we additionally treat multi-step (chain length > 1) chains
+ * as skip and keep the proven per-load `take()` path. `get_bind_values`
+ * (chain order) and the `params.bind` scope-build bind order currently
+ * disagree for through/enum chains (wrong target returned), so caching them
+ * is unsafe until that converges — story
+ * `through-singular-association-statement-cache` (RFC 0023).
  */
 function _skipSingularStatementCache(
   reflection: ReflectionLike,
@@ -972,7 +974,6 @@ async function _loadSingularViaStatementCache(
   reflection: ReflectionLike,
   targetModel: typeof Base,
 ): Promise<Base | null> {
-  const ownerCtor = record.constructor as typeof Base;
   // Materialize the Association instance (as `_builtAssociationScope` does on
   // the take() path) so the post-load `syncToAssociationInstance` finds a
   // holder to `setTarget`/`loadedBang` — otherwise the cached target is never
@@ -987,11 +988,15 @@ async function _loadSingularViaStatementCache(
     }
   }
   const connection = (targetModel as unknown as { connection: unknown }).connection;
-  // Key by owner class + association name. The statement is stored on the
-  // target class' own cache, so polymorphic belongs_to (resolved to distinct
-  // targetModels per `_type`) already get independent entries.
-  const key = `assocScope:${ownerCtor.name}#${assocName}`;
-  const statement = cachedFindByStatement.call(targetModel as never, connection, key, () =>
+  // Rails: `sc = reflection.association_scope_cache(klass, owner) { |params|
+  // target_scope.merge!(AssociationScope.create { params.bind }.scope(self)) }`.
+  // `associationScopeCache` memoizes the compiled StatementCache on the target
+  // class (keyed by reflection + polymorphic owner type).
+  const sc = (
+    reflection as unknown as {
+      associationScopeCache(klass: typeof Base, owner: Base, block: () => unknown): unknown;
+    }
+  ).associationScopeCache(targetModel, record, () =>
     StatementCache.create(connection as never, (params) => {
       const as = AssociationScope.create(() => params.bind());
       const built = as.scope({
@@ -1001,10 +1006,10 @@ async function _loadSingularViaStatementCache(
       }) as Relation<Base>;
       return _scopeForAssociation(targetModel).merge(built) as never;
     }),
-  );
+  ) as StatementCache;
   const chain = (reflection as unknown as { chain: never[] }).chain;
   const binds = AssociationScope.getBindValues(record, chain);
-  const records = (await statement.execute(binds, connection, { allowRetry: true })) as Base[];
+  const records = await sc.execute(binds, connection, { allowRetry: true });
   return records[0] ?? null;
 }
 

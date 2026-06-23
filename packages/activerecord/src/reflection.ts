@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, UnknownPrimaryKey } from "./errors.js";
+import { cachedFindByStatement } from "./core.js";
 import {
   underscore,
   pluralize,
@@ -1083,8 +1084,18 @@ export class AssociationReflection extends MacroReflection {
     return pk;
   }
 
-  associationScopeCache(klass: typeof Base, _owner: any, block: () => any): any {
-    return block();
+  associationScopeCache(klass: typeof Base, owner: any, block: () => any): any {
+    // Rails (`reflection.rb` AssociationReflection#association_scope_cache):
+    //   key = self
+    //   key = [key, owner._read_attribute(@foreign_type)] if polymorphic?
+    //   klass.cached_find_by_statement(key, &block)
+    // The compiled statement is memoized on the *target* class, keyed by this
+    // reflection (plus the owner's polymorphic type when applicable).
+    let key = `assocScope:${this.activeRecord.name}#${this.name}`;
+    if (this.isPolymorphic()) {
+      key += `:${owner?._readAttribute?.(this.foreignType)}`;
+    }
+    return cachedFindByStatement.call(klass as any, (klass as any).connection, key, block);
   }
 
   checkValidityBang(): void {
