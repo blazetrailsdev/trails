@@ -127,32 +127,74 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   };
   visit(sourceFile);
 
-  // Top-level `defineEnum(ClassName, ...)` calls. Supports both the array
-  // form (`["draft", "published"]`) and the object form
-  // (`{ draft: 0, published: 1 }`).
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isExpressionStatement(stmt)) continue;
-    const call = stmt.expression;
-    if (!ts.isCallExpression(call)) continue;
-    if (!ts.isIdentifier(call.expression) || call.expression.text !== "defineEnum") continue;
-    const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
-    if (!targetArg || !attrArg || !mapArg) continue;
-    if (!ts.isStringLiteralLike(attrArg)) continue;
-    const values = readEnumValues(mapArg);
-    if (!values) continue;
-    const targetName = ts.isIdentifier(targetArg) ? targetArg.text : null;
-    if (!targetName) continue;
-    const info = out.find((c) => c.name === targetName);
-    if (!info) continue;
-    info.calls.push({
-      kind: "defineEnum",
-      attr: attrArg.text,
-      values,
-      options: readRecordLiteral(optsArg),
-    });
-  }
+  // Standalone `defineEnum(ClassName, ...)` calls — at any nesting depth,
+  // mirroring the class traversal above so nested test models authored as
+  // `defineEnum(Post, "status", ...)` inside an `it`/helper body get the
+  // same enum predicate/bang/scope declares as top-level ones. Supports
+  // both the array form (`["draft", "published"]`) and the object form
+  // (`{ draft: 0, published: 1 }`). The target is resolved lexically (the
+  // nearest in-scope `class ClassName`) so a `defineEnum(Post, ...)` in one
+  // callback attaches to that callback's `Post`, not a same-named class in
+  // a sibling scope.
+  const visitDefineEnum = (node: ts.Node): void => {
+    if (ts.isExpressionStatement(node)) {
+      const call = node.expression;
+      if (
+        ts.isCallExpression(call) &&
+        ts.isIdentifier(call.expression) &&
+        call.expression.text === "defineEnum"
+      ) {
+        const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
+        const targetName = targetArg && ts.isIdentifier(targetArg) ? targetArg.text : null;
+        const values = mapArg ? readEnumValues(mapArg) : null;
+        if (targetName && attrArg && ts.isStringLiteralLike(attrArg) && values) {
+          const info = resolveLexicalClassInfo(out, node, targetName);
+          if (info) {
+            info.calls.push({
+              kind: "defineEnum",
+              attr: attrArg.text,
+              values,
+              options: readRecordLiteral(optsArg),
+            });
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visitDefineEnum);
+  };
+  visitDefineEnum(sourceFile);
 
   return out;
+}
+
+/**
+ * Resolve `name` to the `ClassInfo` whose declaration is lexically visible
+ * from `usage`, preferring the nearest enclosing scope — so a
+ * `defineEnum(Post, ...)` binds to the `Post` declared in the same
+ * `describe`/`it`/function body rather than a same-named class elsewhere in
+ * the file. Falls back to the first `ClassInfo` with a matching name (the
+ * historical top-level behavior) when no enclosing-scope class matches.
+ */
+function resolveLexicalClassInfo(
+  out: readonly ClassInfo[],
+  usage: ts.Node,
+  name: string,
+): ClassInfo | undefined {
+  for (let node: ts.Node | undefined = usage.parent; node; node = node.parent) {
+    const statements = ts.isSourceFile(node)
+      ? node.statements
+      : ts.isBlock(node) || ts.isModuleBlock(node)
+        ? node.statements
+        : undefined;
+    if (!statements) continue;
+    for (const stmt of statements) {
+      if (ts.isClassDeclaration(stmt) && stmt.name?.text === name) {
+        const info = out.find((c) => c.classDecl === stmt);
+        if (info) return info;
+      }
+    }
+  }
+  return out.find((c) => c.name === name);
 }
 
 function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): ClassInfo {

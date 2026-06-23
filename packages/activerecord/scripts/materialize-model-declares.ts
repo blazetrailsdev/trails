@@ -135,37 +135,53 @@ function resolveAutoImports(
   baseNames: readonly string[],
 ): string[] {
   const classes = walk(sf, { baseNames });
-  const needed = new Set<string>();
-  for (const info of classes) collectTargets(info, needed);
-  if (needed.size === 0) return [];
-  const inScope = collectNamesInScope(sf);
-  // Model classes declared inline inside `describe`/`it`/helper-function
-  // bodies are referenceable from the declares we splice into their
-  // siblings, but `collectNamesInScope` only sees top-level statements —
-  // so without this an in-file nested target would get a dead
-  // `import type { X }` line (unused: TS resolves the bare reference to the
-  // nested class). Treat every in-file class declaration, at any nesting
-  // depth, as already in scope.
-  collectNestedClassNames(sf, inScope);
-  const imports: string[] = [];
-  for (const name of needed) {
-    if (inScope.has(name)) continue;
-    const target = registry.get(name);
-    if (!target) continue;
-    let rel = path.relative(path.dirname(fileName), target).replace(/\\/g, "/");
-    if (!rel.startsWith(".")) rel = "./" + rel;
-    rel = rel.replace(/\.tsx?$/, ".js");
-    imports.push(`import type { ${name} } from "${rel}";`);
+  const moduleScope = collectNamesInScope(sf);
+  const imports = new Map<string, string>();
+  for (const info of classes) {
+    const needed = new Set<string>();
+    collectTargets(info, needed);
+    if (needed.size === 0) continue;
+    // A declare spliced into THIS class can only reference a bare
+    // `Target` that is lexically visible from the class — module-scope
+    // imports/decls plus in-file classes declared in the same or an
+    // enclosing `describe`/`it`/function body. A same-named class in a
+    // sibling callback is NOT visible, so we must still emit the
+    // model-registry `import type` for it (and conversely, never emit a
+    // dead import for a target that IS visible). `collectNamesInScope`
+    // covers only module scope, so add the lexically-visible classes.
+    const visible = new Set(moduleScope);
+    collectVisibleClassNames(info.classDecl, visible);
+    for (const name of needed) {
+      if (visible.has(name)) continue;
+      const target = registry.get(name);
+      if (!target) continue;
+      let rel = path.relative(path.dirname(fileName), target).replace(/\\/g, "/");
+      if (!rel.startsWith(".")) rel = "./" + rel;
+      rel = rel.replace(/\.tsx?$/, ".js");
+      imports.set(name, `import type { ${name} } from "${rel}";`);
+    }
   }
-  return imports.sort((a, b) => a.localeCompare(b));
+  return [...imports.values()].sort((a, b) => a.localeCompare(b));
 }
 
-function collectNestedClassNames(sf: ts.SourceFile, out: Set<string>): void {
-  const visit = (node: ts.Node): void => {
-    if (ts.isClassDeclaration(node) && node.name) out.add(node.name.text);
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
+/**
+ * Add the names of every class declaration lexically visible from `node`:
+ * those declared in the same block/source file and in each enclosing
+ * block/function body. This is the scope from which a `declare` spliced
+ * into `node`'s class body can reference a bare class name.
+ */
+function collectVisibleClassNames(node: ts.Node, out: Set<string>): void {
+  for (let n: ts.Node | undefined = node.parent; n; n = n.parent) {
+    const statements = ts.isSourceFile(n)
+      ? n.statements
+      : ts.isBlock(n) || ts.isModuleBlock(n)
+        ? n.statements
+        : undefined;
+    if (!statements) continue;
+    for (const stmt of statements) {
+      if (ts.isClassDeclaration(stmt) && stmt.name) out.add(stmt.name.text);
+    }
+  }
 }
 
 function collectTargets(info: ClassInfo, out: Set<string>): void {

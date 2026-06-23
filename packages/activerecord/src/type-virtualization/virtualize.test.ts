@@ -435,6 +435,48 @@ describe("virtualize — multiple classes", () => {
     expect(text).toContain("declare title: string;");
     expect(text).toContain("declare gadgets:");
   });
+
+  test("materializes standalone defineEnum(Model, ...) nested in a function body", () => {
+    // Rails `enum` defines predicate/bang instance methods and scopes for
+    // every declaration; the walker must pick up the standalone
+    // `defineEnum(ClassName, ...)` form at nested depths, not just at the
+    // top level, so nested test models get those enum declares too.
+    const src =
+      'describe("nested enum", () => {\n' +
+      '  it("works", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("status", "integer"); }\n' +
+      "    }\n" +
+      '    defineEnum(Post, "status", { draft: 0, published: 1 });\n' +
+      "  });\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("isDraft");
+    expect(text).toContain("isPublished");
+  });
+
+  test("nested defineEnum binds to the same-scope class, not a sibling-scope namesake", () => {
+    // Two `class Post` in sibling `it` callbacks; only the first carries a
+    // defineEnum. The enum declares must land on the first Post's body and
+    // not leak into the second.
+    const src =
+      'describe("d", () => {\n' +
+      '  it("a", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("status", "integer"); }\n' +
+      "    }\n" +
+      '    defineEnum(Post, "status", { draft: 0 });\n' +
+      "  });\n" +
+      '  it("b", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("title", "string"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    // Exactly one isDraft declare — bound to the first Post only.
+    expect(text.match(/isDraft/g)?.length).toBe(1);
+  });
 });
 
 function indexOfNthNewline(text: string, n: number): number {
