@@ -5238,6 +5238,26 @@ describe("EagerAssociationTest", () => {
       expect((post!.association("comments").target as Base[]).length).not.toBe(0);
     });
   });
+
+  // trails-only regression: extends Rails' single-include
+  // test_joins_with_includes_should_preload_via_joins (eager_test.rb:1373) to the
+  // multi-include fan-out branch — `comments` collapses onto the INNER join from
+  // joins(...) while the non-intersecting `author` is join-loaded as a deduped
+  // OUTER join, all in one query. No upstream Rails test exercises this path.
+  it("joins with multiple includes should preload via joins", async () => {
+    let post: Post | undefined;
+    await assertQueriesCount(1, false, async () => {
+      const loaded = await Post.includes("comments", "author")
+        .joins("comments")
+        .order("posts.id desc")
+        .toArray();
+      post = loaded[0];
+    });
+    await assertNoQueries(false, () => {
+      expect((post!.association("comments").target as Base[]).length).not.toBe(0);
+      expect(post!.association("author").target as Base).toBeTruthy();
+    });
+  });
 });
 
 // ==========================================================================
