@@ -456,6 +456,14 @@ const StrictLoadingScope = {
  */
 type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown };
 
+/**
+ * A normalized association forest: each key is an association name and its value
+ * is the forest of its nested children. Built from the mixed string/dotted/
+ * array/hash spec shapes so the eager-load and manual-`joins` trees can be
+ * walked in parallel (Rails `JoinDependency#walk`).
+ */
+type SpecForest = Map<string, SpecForest>;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
@@ -2718,51 +2726,111 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Root association names of the eager-load JoinDependency — `eager_load(...)`
-   * plus `includes` promoted via `references` (the same set fed to the eager JD
-   * in `_buildEagerOperandManager` / `_executeEagerLoad`). A nested hash spec
-   * (`{posts: :comments}`) contributes its key (`posts`); an array contributes
-   * each element's roots; a string contributes itself.
+   * Normalize a mixed association-spec list (strings, dotted paths, arrays,
+   * nested hashes) into a {@link SpecForest}. `"posts.comments"` and
+   * `{posts: :comments}` both nest `posts → comments`; arrays merge siblings.
    */
-  private _eagerRootNames(): string[] {
-    const roots = [...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()];
-    return roots.flatMap((spec) => this._specRootNames(spec));
+  private _specForest(specs: AssociationSpec[]): SpecForest {
+    const forest: SpecForest = new Map();
+    for (const spec of specs) this._addSpecToForest(spec, forest);
+    return forest;
   }
 
-  private _specRootNames(spec: AssociationSpec): string[] {
-    // A dotted path (`"posts.comments"`) roots at its first segment (`posts`).
-    if (typeof spec === "string") return [spec.split(".")[0]];
-    if (Array.isArray(spec)) return spec.flatMap((s) => this._specRootNames(s));
-    if (spec && typeof spec === "object") return Object.keys(spec);
-    return [];
+  private _addSpecToForest(spec: AssociationSpec, forest: SpecForest): void {
+    if (typeof spec === "string") {
+      const [head, ...rest] = spec.split(".");
+      let child = forest.get(head);
+      if (!child) forest.set(head, (child = new Map()));
+      if (rest.length > 0) this._addSpecToForest(rest.join("."), child);
+      return;
+    }
+    if (Array.isArray(spec)) {
+      for (const s of spec) this._addSpecToForest(s, forest);
+      return;
+    }
+    if (spec && typeof spec === "object") {
+      for (const [key, value] of Object.entries(spec)) {
+        let child = forest.get(key);
+        if (!child) forest.set(key, (child = new Map()));
+        if (value != null) this._addSpecToForest(value as AssociationSpec, child);
+      }
+    }
   }
 
   /**
-   * Eager-load ROOTS that coincide with a manual `joins(...)` of the SAME
-   * association — Rails' `walk` dedup (`r.table = l.table`, join_dependency.rb)
-   * collapses a join shared by `joins_values` and the eager JoinDependency to a
-   * single un-aliased join. trails emits the two passes separately, so the eager
-   * root would otherwise duplicate the manual INNER JOIN (ambiguous column).
-   * Matched by association NAME (not bare table) so an eager root that merely
-   * shares a table with an unrelated `joins(...)` via a different reflection is
-   * NOT dropped — mirroring `walk`'s `isMatch` association check.
+   * Resolve the target TABLE and model of an association NAME on a given model
+   * class, so a spec forest can be walked level by level. Plain
+   * belongsTo/hasOne/hasMany (and through, whose final target resolves the same
+   * way) map name → target via `className` or the camelized (singularized for
+   * collections) name. When the target model isn't registered, fall back to the
+   * lowercased association name as the table — mirroring `_resolveAssocTables`,
+   * so the #3990 string-root dedup is preserved for an unregistered target — but
+   * with a null `klass`, since the walk cannot descend without the child model.
    */
-  private _joinedEagerValues(): string[] {
-    if (this._namedInnerJoins.length === 0) return [];
-    const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
-    return this._eagerRootNames().filter((name) => joined.has(name));
+  private _assocTargetModel(modelClass: any, name: string): { table: string; klass: any } | null {
+    const assoc = (modelClass?._associations ?? []).find((a: any) => a.name === name);
+    if (!assoc) return null;
+    const isPlural =
+      assoc.type === "hasMany" ||
+      assoc.type === "hasAndBelongsToMany" ||
+      (assoc.type as string) === "hasManyThrough";
+    const className = assoc.options?.className ?? _camelize(isPlural ? _singularize(name) : name);
+    const klass = modelRegistry.get(className) ?? null;
+    return { table: String(klass?.tableName ?? name).toLowerCase(), klass };
+  }
+
+  /**
+   * Tables shared by the eager-load tree and a manual `joins(...)` tree at the
+   * SAME association path — Rails' `JoinDependency#walk` recurses and dedups a
+   * coinciding join at EVERY level (join_dependency.rb:214-219), not just the
+   * root. So a nested or hash-form manual join (`joins(posts: :comments)`)
+   * collapses both `posts` AND `comments` against `eager_load(posts: :comments)`:
+   * the manual INNER JOIN wins and `_buildEagerJoinManager` skips the eager OUTER
+   * JOIN. Matching is by reflection NAME (mirroring `walk`'s `match?`), so an
+   * eager node that merely shares a table with an unrelated `joins(...)` via a
+   * different reflection is NOT dropped.
+   */
+  private _walkSharedManualEagerTables(): Set<string> {
+    const out = new Set<string>();
+    if (this._namedInnerJoins.length === 0) return out;
+    const eager = this._specForest([
+      ...this._eagerLoadAssociations,
+      ...this._includesToPromoteFromReferences(),
+    ]);
+    const manual = this._specForest(this._namedInnerJoins);
+    this._collectSharedTables(this._modelClass, eager, manual, out);
+    return out;
+  }
+
+  private _collectSharedTables(
+    modelClass: any,
+    eager: SpecForest,
+    manual: SpecForest,
+    out: Set<string>,
+  ): void {
+    for (const [name, eagerChild] of eager) {
+      const manualChild = manual.get(name);
+      if (manualChild === undefined) continue;
+      const target = this._assocTargetModel(modelClass, name);
+      if (!target) continue;
+      out.add(target.table);
+      // Descend only when the child model is known; an unregistered target still
+      // dedups this level (name-as-table fallback) but cannot resolve deeper.
+      if (target.klass) this._collectSharedTables(target.klass, eagerChild, manualChild, out);
+    }
   }
 
   /**
    * Tables whose eager-load OUTER JOIN is redundant because a manual
    * `joins(...)` INNER JOIN already covers them: the `includes ∩ joins`
-   * intersection plus `eager_load`/promoted roots that coincide with a manual
-   * join. `_buildEagerJoinManager` skips re-emitting the eager join for these,
-   * leaving nested children (e.g. `comments`) to hang off the manual join.
+   * intersection plus every level of an `eager_load`/promoted spec that
+   * coincides with a manual join (`_walkSharedManualEagerTables`).
+   * `_buildEagerJoinManager` skips re-emitting the eager join for these, leaving
+   * nested children to hang off the manual join.
    */
   private _dedupedManualJoinTables(): Set<string> {
     const tables = this._joinedIncludesTables();
-    for (const t of this._resolveAssocTables(this._joinedEagerValues())) tables.add(t);
+    for (const t of this._walkSharedManualEagerTables()) tables.add(t);
     return tables;
   }
 
@@ -4975,7 +5043,7 @@ export class Relation<T extends Base> {
     // child (e.g. `comments` under a deduped `posts`) joins ON the manual table,
     // so the manual join must be emitted FIRST — otherwise the child's ON
     // forward-references a not-yet-joined table (PostgreSQL/MySQL reject it).
-    const manualJoinsFirst = this._joinedEagerValues().length > 0;
+    const manualJoinsFirst = this._walkSharedManualEagerTables().size > 0;
     if (manualJoinsFirst) this._applyJoinsToManager(manager);
     for (const node of joinNodes) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
@@ -5059,7 +5127,7 @@ export class Relation<T extends Base> {
     const joinedIncludesTables = this._dedupedManualJoinTables();
     // A deduped eager root's nested child joins ON the manual table, so the
     // manual join must precede it (see `_buildEagerJoinManager`).
-    const manualJoinsFirst = this._joinedEagerValues().length > 0;
+    const manualJoinsFirst = this._walkSharedManualEagerTables().size > 0;
     if (manualJoinsFirst) this._applyJoinsToManager(idSubquery);
     for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;

@@ -162,6 +162,27 @@ describe("CascadedEagerLoadingTest", () => {
     expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
   });
 
+  it("eager association loading dedups a nested hash-form manual join and eager spec", async () => {
+    // Author.joins(posts: :comments).eager_load(posts: :comments): a HASH-form
+    // manual join coincides with the eager spec at EVERY level. Rails' `walk`
+    // recurses (join_dependency.rb:219), so both `posts` AND `comments` dedup to
+    // their manual INNER JOINs — no duplicate `posts`/`comments`, no ambiguous
+    // column. Mirrors the root-only string dedup but down the whole nested path.
+    const loaded = await Author.all()
+      .joins({ posts: "comments" })
+      .eagerLoad({ posts: "comments" })
+      .order("authors.id")
+      .toArray();
+    // INNER JOIN semantics (manual join wins): only authors with a post that has
+    // a comment, only posts that have comments. The eager hydration reads the
+    // single deduped `posts`/`comments` joins with no fan-out duplication.
+    expect(loaded).toHaveLength(2);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(4);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(1);
+    expect(commentCount(targetArr(loaded[1], "posts"))).toBe(1);
+  });
+
   it("eager association loading grafts stashed associations to correct parent", async () => {
     const person = await Person.all()
       .eagerLoad({ primaryContact: "primaryContact" })
