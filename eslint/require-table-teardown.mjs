@@ -69,9 +69,10 @@
  * subject under test, like `test-helpers/**` does for the helpers; the DDL
  * string is an assertion target, not an argument to a sink, so it's ignored.
  *
- * Only statically-knowable names count: a `CREATE TABLE ${name}` whose name
- * sits in an interpolation is invisible, like a computed helper name, and SQL
- * built in a variable and executed later (`exec(sql)`) is not seen. Files with
+ * Only statically-knowable names count: a name that sits in (or runs up to) an
+ * interpolation — `CREATE TABLE ${name}`, or the `tmp_` prefix of `CREATE TABLE
+ * tmp_${suffix}` — is invisible, like a computed helper name, and SQL built in a
+ * variable and executed later (`exec(sql)`) is not seen. Files with
  * a backlog of un-torn-down raw creates are grandfathered via the
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
@@ -120,16 +121,18 @@ function droppedTableNames(call) {
 }
 
 /**
- * `CREATE TABLE [IF NOT EXISTS] <name>` and `DROP TABLE [IF EXISTS] <name>`
- * extracted from a raw SQL fragment. The optional opening quote (`` ` ``, `"`,
- * `'`) is matched and stripped via a backreference so a quoted name balances an
- * unquoted helper name (`CREATE TABLE "items"` ↔ `dropTable("items")`). A name
- * that begins with an interpolation has no leading identifier here and simply
- * doesn't match — statically unknowable, so skipped like a computed helper name.
+ * The leading `CREATE [GLOBAL|LOCAL] [TEMP[ORARY]|UNLOGGED] TABLE [IF NOT
+ * EXISTS]` clause, up to and including the table name. The optional opening
+ * quote (`` ` ``, `"`, `'`) is matched and stripped via a backreference so a
+ * quoted name balances an unquoted helper name (`CREATE TABLE "items"` ↔
+ * `dropTable("items")`); `\1?` tolerates an unmatched (no-quote) group.
  */
 const CREATE_TABLE_RE =
-  /\bcreate\s+(?:temporary\s+)?table\s+(?:if\s+not\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
-const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+  /\bcreate\s+(?:(?:global|local)\s+)?(?:temp(?:orary)?\s+|unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+/** The `DROP TABLE [IF EXISTS]` keyword prefix; the name list follows. */
+const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?/gi;
+/** A single (optionally quoted) table name at the start of `rest`. */
+const NAME_RE = /^\s*(`|"|')?([\w.]+)\1?/;
 
 /**
  * Call names that execute a raw SQL string against the database. A `CREATE
@@ -146,25 +149,46 @@ const SQL_SINKS = new Set([
   "query",
 ]);
 
-function rawSqlTableNames(text, re) {
+/**
+ * Statically-knowable `CREATE TABLE` names in `text`. When `endIsDynamic` (this
+ * is a template quasi immediately followed by an interpolation), a name that
+ * runs to the very end of the text is a static *prefix* of a dynamic name
+ * (`CREATE TABLE tmp_${suffix}` → `"CREATE TABLE tmp_"`) — it can't be matched,
+ * so it's dropped rather than recorded as a phantom table.
+ */
+function rawCreateNames(text, endIsDynamic) {
   const names = [];
-  re.lastIndex = 0;
+  CREATE_TABLE_RE.lastIndex = 0;
   let m;
-  while ((m = re.exec(text)) !== null) names.push(m[2]);
+  while ((m = CREATE_TABLE_RE.exec(text)) !== null) {
+    if (endIsDynamic && m.index + m[0].length === text.length) continue;
+    names.push(m[2]);
+  }
   return names;
 }
 
-/** The static SQL texts an argument carries (per quasi for templates). */
-function staticSqlTexts(node) {
-  if (node.type === "Literal") {
-    return typeof node.value === "string" ? [node.value] : [];
+/**
+ * Statically-knowable `DROP TABLE` names in `text`. A single statement may drop
+ * several tables (`DROP TABLE a, b`); each comma-separated name counts, stopping
+ * at a trailing `CASCADE`/`RESTRICT`, statement terminator, or a non-static
+ * (interpolated) name.
+ */
+function rawDropNames(text) {
+  const names = [];
+  DROP_TABLE_RE.lastIndex = 0;
+  let m;
+  while ((m = DROP_TABLE_RE.exec(text)) !== null) {
+    let rest = text.slice(m.index + m[0].length);
+    let nm;
+    while ((nm = NAME_RE.exec(rest)) !== null) {
+      if (/^(?:cascade|restrict)$/i.test(nm[2])) break;
+      names.push(nm[2]);
+      rest = rest.slice(nm[0].length).replace(/^\s+/, "");
+      if (rest[0] !== ",") break;
+      rest = rest.slice(1);
+    }
   }
-  if (node.type === "TemplateLiteral") {
-    // Each quasi is static text between interpolations; an interpolated table
-    // name lands at a quasi boundary and simply doesn't match the regex.
-    return node.quasis.map((q) => q.value.cooked).filter((t) => t);
-  }
-  return [];
+  return names;
 }
 
 const rule = {
@@ -204,15 +228,24 @@ const rule = {
 
     // Scan an execution sink's string/template arguments for raw CREATE/DROP
     // TABLE statements, folding their names into the same create/drop balance.
+    function recordText(text, node, endIsDynamic) {
+      for (const table of rawCreateNames(text, endIsDynamic)) {
+        if (!created.has(table)) created.set(table, node);
+      }
+      for (const table of rawDropNames(text)) dropped.add(table);
+    }
+
     function recordSinkSql(call) {
       for (const arg of call.arguments) {
-        for (const text of staticSqlTexts(arg)) {
-          for (const table of rawSqlTableNames(text, CREATE_TABLE_RE)) {
-            if (!created.has(table)) created.set(table, arg);
-          }
-          for (const table of rawSqlTableNames(text, DROP_TABLE_RE)) {
-            dropped.add(table);
-          }
+        if (arg.type === "Literal") {
+          if (typeof arg.value === "string") recordText(arg.value, arg, false);
+        } else if (arg.type === "TemplateLiteral") {
+          // Each quasi is static text between interpolations; a quasi that is
+          // followed by an interpolation has a dynamic end (see rawCreateNames).
+          const last = arg.quasis.length - 1;
+          arg.quasis.forEach((q, i) => {
+            if (q.value.cooked) recordText(q.value.cooked, arg, i < last);
+          });
         }
       }
     }

@@ -6,7 +6,6 @@
   "packages/activerecord/src/adapters/postgresql/postgresql-adapter.test.ts",
   "packages/activerecord/src/adapters/postgresql/referential-integrity.test.ts",
   "packages/activerecord/src/adapters/postgresql/schema.test.ts",
-  "packages/activerecord/src/adapters/postgresql/transaction-nested.test.ts",
   "packages/activerecord/src/adapters/sqlite3-adapter.test.ts",
   "packages/activerecord/src/adapters/sqlite3/bigint-roundtrip.test.ts",
   "packages/activerecord/src/adapters/sqlite3/bind-parameter.test.ts",

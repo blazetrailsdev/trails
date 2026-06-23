@@ -49,6 +49,14 @@ tester.run("require-table-teardown", rule, {
     'await c.exec("CREATE TABLE IF NOT EXISTS tmp_x (id int)");\nawait c.exec("DROP TABLE IF EXISTS tmp_x CASCADE");',
     // Interpolated raw-SQL table name is unknowable — neither create nor drop.
     "await adapter.exec(`CREATE TABLE ${name} (id int)`);",
+    // Static prefix flush against an interpolation is a dynamic-name prefix,
+    // not a real table — not flagged (no phantom `tmp_`).
+    "await adapter.exec(`CREATE TABLE tmp_${suffix} (id int)`);",
+    // CREATE TEMP TABLE (SQLite shorthand) is matched and balanced.
+    'await adapter.exec("CREATE TEMP TABLE scratch (id int)");\nawait adapter.exec("DROP TABLE scratch");',
+    // A single raw DROP TABLE balances several created tables.
+    'await adapter.exec("CREATE TABLE a (id int)");\nawait adapter.exec("CREATE TABLE b (id int)");\n' +
+      'await adapter.exec("DROP TABLE a, b");',
     // A CREATE TABLE string NOT handed to a sink (asserted on, as a schema
     // dumper / SchemaCreation test does) is not a leak and is not flagged.
     'expect(sql).toContain("CREATE TABLE widgets");',
@@ -125,6 +133,18 @@ tester.run("require-table-teardown", rule, {
     {
       code: 'await adapter.exec("CREATE TABLE widgets (id int)");\nawait adapter.exec("DROP TABLE gadgets");',
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // Multi-table DROP balances only the names it lists — the omitted one flags.
+    {
+      code:
+        'await adapter.exec("CREATE TABLE a (id int)");\nawait adapter.exec("CREATE TABLE b (id int)");\n' +
+        'await adapter.exec("CREATE TABLE c (id int)");\nawait adapter.exec("DROP TABLE a, b");',
+      errors: [{ messageId: "missingTeardown", data: { table: "c" } }],
+    },
+    // CREATE TEMP TABLE with no drop is flagged like a plain CREATE TABLE.
+    {
+      code: 'await adapter.exec("CREATE TEMP TABLE scratch (id int)");',
+      errors: [{ messageId: "missingTeardown", data: { table: "scratch" } }],
     },
     // With rawSql:false the raw create is ignored, but a helper create still flags.
     {
