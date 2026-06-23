@@ -244,6 +244,18 @@ export class AttributeSet {
   }
 
   /**
+   * Whether `name` is present in the internal map (initialized or not).
+   *
+   * Unlike {@link has}, this reports schema-seeded but still-uninitialized
+   * attributes too, mirroring Rails' `@attributes.key?(name)` — the gate AR's
+   * strict write path uses to tell a real (if unmaterialized) column from a
+   * genuinely unknown name.
+   */
+  includesName(name: string): boolean {
+    return this.attributes.has(name);
+  }
+
+  /**
    * Narrow the set to the given attribute names, resetting every other
    * attribute to its uninitialized state (type preserved).
    *

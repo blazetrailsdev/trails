@@ -1326,6 +1326,7 @@ export class Base extends Model {
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
+  declare static reflectedColumnNamesIfWarm: typeof ModelSchema.reflectedColumnNamesIfWarm;
   declare static hasAttributeDefinition: typeof ModelSchema.hasAttributeDefinition;
   declare static columnsHash: typeof ModelSchema.columnsHash;
   declare static contentColumns: typeof ModelSchema.contentColumns;

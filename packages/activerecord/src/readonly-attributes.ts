@@ -1,6 +1,38 @@
 import type { Base } from "./base.js";
-import { Model, resolveAliasName } from "@blazetrails/activemodel";
+import { Model, MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
+
+/**
+ * Rails' `write_from_user` raises `MissingAttributeError` for any name that is
+ * not in the (schema-complete) attribute set — e.g. `topic[:no_column_exists] =
+ * …`. trails populates the set lazily, so map-absence alone cannot stand in for
+ * "unknown column": a real but not-yet-materialized/unselected column (an
+ * unselected `title`, a reflected-only counter-cache column, a composite-PK
+ * member) is also absent, and Rails does NOT raise for those ("write_attribute
+ * does not raise when the attribute isn't selected").
+ *
+ * The safe discriminator is the warm schema cache: when the table's real
+ * columns are known ({@link reflectedColumnNamesIfWarm}), an absent name not
+ * among them is definitively unknown and raises, while every real column —
+ * selected or not — is in that set and passes. When the cache is cold trails
+ * cannot yet list reflected-only columns, so we stay lenient there; closing
+ * that gap (and widening `AttributeSet#writeFromUser` itself to the Rails
+ * one-liner) is gated on RFC 0031 schema-cache-always-warm.
+ */
+function ensureWritableAttribute(record: Base, ctor: typeof Base, name: string): void {
+  if ((record as { _initializingAttributes?: boolean })._initializingAttributes) return;
+  if (record._attributes.includesName(name)) return;
+  if ((ctor as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.has(name))
+    return;
+  // A counter-cache column is registered as part of the model's writable schema
+  // (Rails' `counter_cache_column`), so it is a legitimate write target even
+  // when it isn't reflected as a plain column on a partially-loaded record.
+  if ((ctor as { _counterCacheColumns?: Set<string> })._counterCacheColumns?.has(name)) return;
+  const realColumns = ctor.reflectedColumnNamesIfWarm();
+  if (realColumns && !realColumns.has(name)) {
+    throw new MissingAttributeError(`can't write unknown attribute \`${name}\``);
+  }
+}
 
 /**
  * Raised when a persisted record attempts to write to a column declared
@@ -118,6 +150,11 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     }
     return; // silently skip — mirrors Rails' non-raising mode
   }
+  // Mirrors Rails `write_attribute` → `write_from_user`: writing an unknown
+  // attribute raises MissingAttributeError. Mass assignment routes through here
+  // too but rescues this (attribute-assignment.ts), so `new X({unknown: 1})`
+  // stays lenient.
+  ensureWritableAttribute(this, ctor, canonical);
   // `super` — route through Model's _writeAttribute with the already-resolved
   // canonical name, matching Rails' `super` into the underscore path.
   Model.prototype._writeAttribute.call(this, canonical, value);

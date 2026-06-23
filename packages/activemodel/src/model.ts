@@ -1310,6 +1310,21 @@ export class Model {
   _dirty!: DirtyTracker;
 
   /**
+   * True only while the constructor is assigning its initial attribute bag.
+   * trails' constructor writes every key through `writeAttribute` directly
+   * (rather than Rails' `assign_attributes` → per-key setter dispatch), and
+   * leans on its lenient handling of not-yet-modeled names to stash
+   * nested-attribute keys (`commentsAttributes`), composite-PK strings, and
+   * unknown keys for later processing. The strict unknown-attribute raise on
+   * the AR write path therefore stands down during this window — matching the
+   * effect of Rails routing construction through `assign_attributes`, which
+   * rescues the unknown-writer case.
+   *
+   * @internal
+   */
+  _initializingAttributes = false;
+
+  /**
    * Per-instance reset hook. Mirrors the Rails chain
    * `ActiveModel::{Validations,Dirty}#init_internals`
    * (validations.rb:467-471, dirty.rb:372-376). The Trails
@@ -1384,8 +1399,13 @@ export class Model {
 
     // API#initialize — assign through writeAttribute (casting, normalization).
     // Dispatches through this (so subclass overrides apply), matching Rails.
-    for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
+    this._initializingAttributes = true;
+    try {
+      for (const [key, value] of Object.entries(attrs)) {
+        this.writeAttribute(key, value);
+      }
+    } finally {
+      this._initializingAttributes = false;
     }
 
     // Snapshot after construction — the initial state is "clean"

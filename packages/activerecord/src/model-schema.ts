@@ -210,6 +210,48 @@ export function hasAttributeDefinition(this: typeof Base, name: string): boolean
 }
 
 /**
+ * The set of real DB column names for this model's table when the schema cache
+ * is warm, or `null` when it is cold (or the model has no reflectable table).
+ *
+ * Unlike {@link columnNames}, this never falls back to the synthesized
+ * (attribute-derived) column list: a `null` return positively signals "the real
+ * columns are not yet known", which the strict write path needs to avoid
+ * mistaking a reflected-only column for an unknown one before the cache warms.
+ * Mirrors reading `schema_cache.columns_hash(table)` without a DB round-trip.
+ *
+ * @internal
+ */
+export function reflectedColumnNamesIfWarm(this: typeof Base): Set<string> | null {
+  if (this.abstractClass) return null;
+  let tableName: string;
+  try {
+    const stiTarget = isStiSubclass(this) ? getStiBase(this) : this;
+    tableName = stiTarget.tableName;
+    const candidates = stiTarget === this ? [this] : [stiTarget, this];
+    let cache:
+      | { getCachedColumnsHash?: (t: string) => Record<string, unknown> | undefined }
+      | undefined;
+    for (const cand of candidates) {
+      let adapter: { schemaCache?: unknown } | null = null;
+      try {
+        adapter = cand.connection as { schemaCache?: unknown };
+      } catch {
+        adapter = null;
+      }
+      cache = adapter?.schemaCache as typeof cache;
+      if (cache) break;
+    }
+    if (!cache || typeof cache.getCachedColumnsHash !== "function") return null;
+    const cached = cache.getCachedColumnsHash(tableName);
+    if (!cached) return null;
+    const ignored = new Set(this.ignoredColumns ?? []);
+    return new Set(Object.keys(cached).filter((k) => !ignored.has(k)));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Column-like shape returned by `columnsHash`. When the schema cache is
  * populated, entries are the adapter's full Column objects (`sqlType`,
  * `collation`, `comment`, nullable `type`, ...); otherwise a synthesized
@@ -1375,6 +1417,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
 export const ClassMethods = {
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   columnNames,
+  reflectedColumnNamesIfWarm,
   hasAttributeDefinition,
   columnsHash,
   contentColumns,
