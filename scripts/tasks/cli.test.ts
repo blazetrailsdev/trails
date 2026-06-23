@@ -2129,7 +2129,9 @@ const STORY_TEMPLATE = join(TASKS_DIR, "rfcs", "0000-template", "stories", "temp
 
 // Extract one `## Heading` section (the heading line through to the line before
 // the next `## ` heading), with trailing blank lines trimmed. Returns null when
-// the heading is absent.
+// the heading is absent. Assumes H2 headings are unique within a template (true
+// for both 0000-template files) — it matches the FIRST equal line, so a
+// duplicate heading would silently compare only the first occurrence's body.
 function markdownSection(md: string, heading: string): string | null {
   const lines = md.split("\n");
   const start = lines.indexOf(heading);
