@@ -557,6 +557,11 @@ export async function performCount(
   column?: string,
 ): Promise<number | Record<string, number> | Map<unknown, number>> {
   if (this._limitValue === 0) return 0;
+  // Safe to test contradiction here: every calc method is wrapped by
+  // `inQueryConnection`, which awaits `_materializeDeferredDistinctPkPredicates()`
+  // before invoking this perform fn — so a deferred distinct-PK marker that
+  // resolves to an empty id set is already an empty `IN` (contradiction) by now,
+  // same as pluck/exists which materialize inside their own inner functions.
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : 0;
 
   // Mirrors calculations.rb:231: has_include? check precedes the grouped branch.
