@@ -143,12 +143,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   // dynamically-defined / STI models. A genuinely tableless model reflects
   // nothing and falls through to the attribute-synthesized view as before.
   //
-  // Done before the cache check (not only on miss): when the cache warms between
-  // a cold first build and a later read, the reflection here re-reconciles the
-  // definitions and invalidates the stale set, so the rebuilt one carries the
-  // real columns. `columnsHash` is a cache read once reflected, so the per-call
-  // cost is negligible.
-  if (!this.abstractClass && this.tableName) {
+  // Gated on `!_schemaLoaded`: once the schema has been reflected the real
+  // columns are already in `_attributeDefinitions`, so skipping avoids both the
+  // redundant work and — importantly — the `.connection` access inside
+  // `columnsHash`, which would otherwise permanently check out a connection on
+  // every construction under `permanent_connection_checkout` = disallowed.
+  if (!this._schemaLoaded && !this.abstractClass && this.tableName) {
     try {
       this.columnsHash();
     } catch {
