@@ -8,6 +8,8 @@ import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { dumpAllTableSchema } from "../../test-helpers/schema-dumping-helper.js";
+import type { SchemaSource } from "../../schema-dumper.js";
 import { Base } from "../../index.js";
 
 beforeAll(() => {
@@ -660,9 +662,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dumping schemas", async () => {
-      // Must use adapter.createSchemaDumper() to get PgSchemaDumper so schemas()
-      // override runs. SchemaDumper.dump(adapter) uses the base class and skips it.
-      const output = await adapter.createSchemaDumper(adapter).dump();
+      // Rails passes `/./` as the ignore filter (dump_all_table_schema(/./)),
+      // which matches every table name, so the dump emits only the createSchema
+      // lines and skips all per-table introspection. dumpAllTableSchema routes
+      // through SchemaDumper.dump(adapter), which dispatches to the PG dumper so
+      // the schemas() override still runs.
+      const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/./]);
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
