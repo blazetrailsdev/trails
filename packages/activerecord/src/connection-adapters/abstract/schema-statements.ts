@@ -1085,7 +1085,19 @@ export class SchemaStatements {
     tableName: string,
     // `columns` is a string for expression indexes (the raw expression) and an
     // array of column names otherwise, mirroring Rails' IndexDefinition#columns.
-  ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
+    // `where` (partial-index predicate) and `orders` (per-column sort
+    // directions, or a single direction for the whole index) are carried at
+    // runtime by the SQLite/PostgreSQL arms, so the static type surfaces them
+    // as optional rather than `as`-casting them away.
+  ): Promise<
+    Array<{
+      name: string;
+      columns: string | string[];
+      unique: boolean;
+      where?: string;
+      orders?: Record<string, string> | string;
+    }>
+  > {
     switch (this.adapterName) {
       case "sqlite":
         // Share the concrete SQLite3 introspection so this fallback arm
@@ -1093,7 +1105,13 @@ export class SchemaStatements {
         // recovers partial-index WHERE clauses and expression/DESC columns
         // from the index SQL) rather than a lower-fidelity subset.
         return sqliteIndexes(this.adapter, tableName) as Promise<
-          Array<{ name: string; columns: string | string[]; unique: boolean }>
+          Array<{
+            name: string;
+            columns: string | string[];
+            unique: boolean;
+            where?: string;
+            orders?: Record<string, string> | string;
+          }>
         >;
       case "postgres": {
         const rows = await this.adapter.execute(
