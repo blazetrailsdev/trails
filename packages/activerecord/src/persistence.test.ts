@@ -680,6 +680,9 @@ describe("PersistenceTest", () => {
       [{ title: "1 duplicated" }, { title: "1 updated" }, { title: "2 updated" }],
     );
     expect(updated.map((t) => t.id)).toEqual([1, 1, 2]);
+    // Rails' `id.map { find }` returns a distinct instance per requested id, so
+    // the two occurrences of id=1 are separate objects (each updated once).
+    expect(updated[0]).not.toBe(updated[1]);
     expect((await Topic.find(1)).title).toBe("1 updated");
     expect((await Topic.find(2)).title).toBe("2 updated");
   });
