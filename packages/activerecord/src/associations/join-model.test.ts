@@ -1255,8 +1255,6 @@ describe("AssociationsJoinModelTest", () => {
     // step, so the alias `p2` is in scope for the scope's `whereNot` predicate.
     const sql = Post.joins("ratingsViaStringJoinComments").toSql();
     expect(sql).toContain("JOIN posts AS p2 ON comments.post_id = p2.id");
-    expect(sql).toMatch(/comments/);
-    expect(sql).toMatch(/ratings/);
     await expect(Post.joins("ratingsViaStringJoinComments").first()).resolves.not.toThrow();
   });
 

@@ -1496,7 +1496,11 @@ export class JoinDependency {
       // joinConstraints returns its joins and `joinSourcesByJoin` in the same
       // order, so index `i` lines up — each step's sources attach to its own node
       // (Rails' per-step `joins.concat arel.join_sources`), not all after the
-      // first join.
+      // first join. Unlike the ON-predicate rebind above, these sources are
+      // opaque SQL strings: a self-join-aliased carrying table is NOT rewritten in
+      // them, so their unqualified column refs go stale if that step's table
+      // collides and is aliased. This matches Rails (string join_sources are
+      // opaque there too) and the single-step path's behavior — a known limitation.
       const stepJoinSources = joinAssoc.joinSourcesByJoin[i] ?? [];
 
       this._aliasTracker.aliases.set(
