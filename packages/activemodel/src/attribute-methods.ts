@@ -144,11 +144,18 @@ export function matchedAttributeMethod(
   return matches.find((m) => isAttributeMethod.call(this, m.attrName)) ?? null;
 }
 
-/** @internal Rails-private helper. Mirrors: #missing_attribute */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  throw new MissingAttributeError(
+/**
+ * @internal Rails-private helper. Mirrors: #missing_attribute
+ * Rails passes `stack` (a `caller` backtrace) so `raise` reports the call site
+ * rather than this helper; JS `Error` captures its own stack, so when a `stack`
+ * string is supplied we overwrite the error's stack to match Rails' intent.
+ */
+export function missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
+  const err = new MissingAttributeError(
     `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
   );
+  if (stack !== undefined) err.stack = stack;
+  throw err;
 }
 
 /**

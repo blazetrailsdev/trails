@@ -5,6 +5,8 @@ import {
   rubyFileToTs,
   SKIP,
   SKIP_GROUPS,
+  ARITY_OVERRIDE_GROUPS,
+  isArityOverridden,
   ALREADY_PREDICATE_PREFIXES,
   explainConventions,
 } from "./conventions.js";
@@ -187,6 +189,31 @@ describe("SKIP_GROUPS", () => {
   });
 });
 
+describe("ARITY_OVERRIDE_GROUPS", () => {
+  it("has no duplicate names across groups", () => {
+    const all = ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names);
+    expect(all.length).toBe(new Set(all).size);
+  });
+
+  it("requires a non-empty reason, name, and file scope per group", () => {
+    for (const g of ARITY_OVERRIDE_GROUPS) {
+      expect(g.reason.trim().length).toBeGreaterThan(0);
+      expect(g.names.length).toBeGreaterThan(0);
+      expect(g.rubyFiles.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("suppresses each name only in its scoped Ruby files, never globally", () => {
+    for (const g of ARITY_OVERRIDE_GROUPS) {
+      for (const name of g.names) {
+        for (const file of g.rubyFiles) expect(isArityOverridden(name, file)).toBe(true);
+        // A name scoped to specific files is NOT overridden in an unrelated file.
+        expect(isArityOverridden(name, "some/other/unrelated.rb")).toBe(false);
+      }
+    }
+  });
+});
+
 describe("ALREADY_PREDICATE_PREFIXES", () => {
   it("drives the matcher: every prefix keeps the camel form + is* fallback", () => {
     for (const prefix of ALREADY_PREDICATE_PREFIXES) {
@@ -214,6 +241,9 @@ describe("explainConventions", () => {
     expect(md).toContain("`table_name=` → `tableName`");
     expect(md).not.toContain("`tableName()`");
     for (const g of SKIP_GROUPS) {
+      expect(md).toContain(g.reason);
+    }
+    for (const g of ARITY_OVERRIDE_GROUPS) {
       expect(md).toContain(g.reason);
     }
   });

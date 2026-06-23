@@ -590,8 +590,8 @@ export function matchedAttributeMethod(
 }
 
 /** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  return _missingAttribute.call(this, attrName);
+export function missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
+  return _missingAttribute.call(this, attrName, stack);
 }
 
 /** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */

@@ -78,6 +78,8 @@ export function _writeAttribute(
  *
  * Model.attribute() delegates here. This is the canonical implementation
  * of the class-level `attribute` declaration.
+ *
+ * @internal
  */
 export function attribute(
   this: {
@@ -295,8 +297,8 @@ export function matchedAttributeMethod(
 type AttributeInstanceHost = { _attributes: AttributeSet };
 
 /** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  return _missingAttribute.call(this, attrName);
+export function missingAttribute(this: InstanceHost, attrName: string, stack?: string): never {
+  return _missingAttribute.call(this, attrName, stack);
 }
 
 /** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */

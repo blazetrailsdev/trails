@@ -1,7 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { missingAttribute } from "./attribute-methods.js";
 
 describe("AttributeMethodsTest", () => {
+  it("#missing_attribute applies the supplied stack to the raised error", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({ name: "test" });
+    const stack = "custom backtrace line";
+    const call = () =>
+      (missingAttribute as (this: unknown, attrName: string, stack?: string) => never).call(
+        p,
+        "title",
+        stack,
+      );
+    let caught: Error | undefined;
+    try {
+      call();
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught?.message).toContain("missing attribute 'title'");
+    expect(caught?.stack).toBe(stack);
+  });
+
   it("#define_attribute_method does not generate attribute method if already defined in attribute module", () => {
     class Person extends Model {
       static {
