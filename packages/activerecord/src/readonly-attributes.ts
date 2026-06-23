@@ -143,7 +143,18 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
   // Rails' `write_attribute` resolves `attribute_aliases[name]` before the
   // chain runs, so HasReadonlyAttributes' check sees the canonical name and
   // writing via an alias cannot bypass readonly enforcement.
-  const canonical = resolveAliasName(ctor, String(name));
+  let canonical = resolveAliasName(ctor, String(name));
+  // Rails `write_attribute` remaps the `id` literal to the primary key before
+  // `write_from_user` (write.rb:34: `name = @primary_key if name == "id" &&
+  // @primary_key`). Mirror it for a scalar custom PK so `writeAttribute("id")`
+  // lands on the real PK column instead of being rejected as unknown. A
+  // composite PK keeps the `id` name and is rejected below exactly as Rails'
+  // `write_from_user(array)` raises (the array key resolves to a Null
+  // attribute) — and a standard `id` PK remaps to itself (a no-op).
+  const pk = ctor.primaryKey;
+  if (canonical === "id" && typeof pk === "string" && pk) {
+    canonical = pk;
+  }
   if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
     if (_raiseOnAssignToAttrReadonly) {
       throw new ReadonlyAttributeError(canonical);
@@ -175,6 +186,18 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   }
   // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the
   // public `write_attribute` path above.
+  //
+  // The strict unknown-attribute raise is deliberately NOT applied here. Rails'
+  // `_write_attribute` does reach `write_from_user` and so raises (write.rb:42),
+  // but trails routes its low-level/internal writes through this path —
+  // store-accessor fallbacks, composite-PK seeding in `_applyCompositePrimaryKey`
+  // (which runs after the constructor's lenient `_initializingAttributes`
+  // window), and other framework writers — some of which target names that are
+  // not plain reflected columns or run before the schema cache is warm. Gating
+  // here would regress those; the public `writeAttribute` carries the Rails
+  // strictness, which is where user `[]=` / `write_attribute` lands. Closing this
+  // is part of the same RFC 0031 warm-cache convergence that lets
+  // `AttributeSet#writeFromUser` raise directly.
   Model.prototype._writeAttribute.call(this, name, value);
 }
 

@@ -77,6 +77,23 @@ describe("PrimaryKeysTest", () => {
     expect(keyboard.readAttribute("id")).toBeNull();
   });
 
+  it("write_attribute id remaps to a scalar custom primary key", async () => {
+    // Rails write.rb:34 — `name = @primary_key if name == "id" && @primary_key`.
+    // The strict unknown-attribute guard must not reject `id` here: it remaps to
+    // the real `key_number` column rather than raising.
+    const keyboard = await Keyboard.createBang();
+    keyboard.writeAttribute("id", 42);
+    expect(keyboard.readAttribute("key_number")).toBe(42);
+  });
+
+  it("write_attribute id on a composite primary key with a real id column", () => {
+    // cpk_books has a real `id` column (part of the ["author_id", "id"] PK), so a
+    // warm-schema `writeAttribute("id")` writes it rather than raising.
+    const book = new CpkBook();
+    book.writeAttribute("id", 7);
+    expect(book.readAttribute("id")).toBe(7);
+  });
+
   it("read attribute with composite primary key", () => {
     const book = new CpkBook();
     book.id = [1, 2]; // sets author_id=1, id=2 (pk is ["author_id", "id"])
