@@ -32,13 +32,18 @@ import {
   templatePathFor,
   unlinkDbFiles,
 } from "./sqlite-template.js";
+import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+// Provision one slot DB per advisory-lock slot. The pool is sized with headroom
+// over the worker count (see ar-db-slots.ts), so workers recycling between files
+// always find a free slot. Single-worker runs don't slot, so they need only the
+// base DB.
 function slotCount(): number {
-  return Math.max(1, parseInt(process.env.AR_DB_FORKS ?? "1", 10));
+  return workerForkCount() <= 1 ? 1 : slotPoolSize();
 }
 
 async function buildTemplateSchema(

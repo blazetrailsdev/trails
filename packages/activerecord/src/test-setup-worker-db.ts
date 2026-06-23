@@ -4,9 +4,11 @@
  * or import runs.
  *
  * Opens a bootstrap connection to the base DB and tries an advisory lock for
- * slot N=1..AR_DB_FORKS. Claims the first free slot, rewrites the URL to that
- * slot's DB, and holds the bootstrap connection for the life of the process
- * (lock released automatically on disconnect).
+ * slot N=1..slotPoolSize(). The pool is sized with headroom over the worker
+ * count (see test-helpers/ar-db-slots.ts), so a worker recycling in between
+ * files always finds a free slot. Claims the first free slot, rewrites the URL
+ * to that slot's DB, and holds the bootstrap connection for the life of the
+ * process (lock released automatically on disconnect).
  *
  *   PG:      pg_try_advisory_lock(N)
  *   MariaDB: GET_LOCK('ar_test_slot_N', 0)  — 0-second timeout = non-blocking
@@ -15,7 +17,9 @@
  * (e.g. hot-module reloading in vitest watch mode) returns the same slot
  * without opening a second connection or consuming an additional lock.
  *
- * AR_DB_FORKS: number of parallel DB slots provisioned in CI (default: 1).
+ * AR_DB_FORKS: vitest worker count (default: 1). The advisory-slot pool is
+ * sized separately with headroom — see test-helpers/ar-db-slots.ts (override
+ * with AR_DB_SLOTS).
  */
 
 import pg from "pg";
@@ -26,6 +30,7 @@ import mysql from "mysql2/promise";
 // file.
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
+import { slotPoolSize, workerForkCount } from "./test-helpers/ar-db-slots.js";
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
@@ -53,8 +58,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
-  const forks = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
-  if (!Number.isFinite(forks) || forks <= 1) return baseUrl;
+  if (workerForkCount() <= 1) return baseUrl;
+  // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
+  const slots = slotPoolSize();
 
   // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotPg !== undefined) {
@@ -65,7 +71,7 @@ async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
   await client.connect();
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
-    for (let slot = 1; slot <= forks; slot++) {
+    for (let slot = 1; slot <= slots; slot++) {
       const res = await client.query<{ locked: boolean }>(
         "SELECT pg_try_advisory_lock($1) AS locked",
         [slot],
@@ -83,15 +89,16 @@ async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
 
   await client.end();
   throw new Error(
-    `acquireAdvisorySlotPg: all ${forks} advisory lock slots are held after ` +
+    `acquireAdvisorySlotPg: all ${slots} advisory lock slots are held after ` +
       `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s). ` +
-      `Increase AR_DB_FORKS or check for stuck workers.`,
+      `Increase AR_DB_SLOTS or check for stuck workers.`,
   );
 }
 
 async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
-  const forks = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
-  if (!Number.isFinite(forks) || forks <= 1) return baseUrl;
+  if (workerForkCount() <= 1) return baseUrl;
+  // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
+  const slots = slotPoolSize();
 
   // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotMysql !== undefined) {
@@ -109,7 +116,7 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
   });
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
-    for (let slot = 1; slot <= forks; slot++) {
+    for (let slot = 1; slot <= slots; slot++) {
       const lockName = `ar_test_slot_${slot}`;
       // GET_LOCK returns 1 when acquired, 0 when timeout (0 s = non-blocking).
       const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [
@@ -127,9 +134,9 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
 
   await conn.end();
   throw new Error(
-    `acquireAdvisorySlotMysql: all ${forks} GET_LOCK slots are held after ` +
+    `acquireAdvisorySlotMysql: all ${slots} GET_LOCK slots are held after ` +
       `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s). ` +
-      `Increase AR_DB_FORKS or check for stuck workers.`,
+      `Increase AR_DB_SLOTS or check for stuck workers.`,
   );
 }
 
