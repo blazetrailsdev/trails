@@ -259,7 +259,7 @@ describe("HasOneThroughAssociationsTest", () => {
     // Verify the membership was created
     const memberships = await Membership.all().where({ member_id: member.id }).toArray();
     expect(memberships.length).toBe(1);
-    expect(memberships[0].readAttribute("club_id")).toBe(club.id);
+    expect(memberships[0].readAttribute("club_id")).toBe(Number(club.id));
   });
 
   it("association create constructor creates through record", async () => {
@@ -276,7 +276,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(target.isNewRecord()).toBe(true);
     expect(target.name).toBe("Built Club");
     expect(through.isNewRecord()).toBe(true);
-    expect(through.readAttribute("member_id")).toBe(member.id);
+    expect(through.readAttribute("member_id")).toBe(Number(member.id));
   });
 
   it("association build constructor builds through record", async () => {
@@ -387,8 +387,8 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = await Member.create({ name: "DHH" });
     const club = await createThroughAssociation(member, "club", { name: "FK Test" });
     const membership = (await Membership.all().where({ member_id: member.id }).toArray())[0];
-    expect(membership.readAttribute("member_id")).toBe(member.id);
-    expect(membership.readAttribute("club_id")).toBe(club.id);
+    expect(membership.readAttribute("member_id")).toBe(Number(member.id));
+    expect(membership.readAttribute("club_id")).toBe(Number(club.id));
   });
 
   it("replace target record", async () => {
@@ -1068,7 +1068,7 @@ describe("HasOneThroughAssociationsTest", () => {
       className: "Membership",
       foreignKey: "member_id",
     });
-    expect(reloaded!.club_id).toBe(club2.id);
+    expect(reloaded!.club_id).toBe(Number(club2.id));
     const loadedClub = await loadHasOne(reloaded!, "club", {
       className: "Club",
       foreignKey: "id",
@@ -1455,7 +1455,7 @@ describe("HasOneThroughAssociationsTest", () => {
       foreignKey: "member_id",
     });
     expect(loadedMembership).not.toBeNull();
-    expect(loadedMembership!.club_id).toBe(club.id);
+    expect(loadedMembership!.club_id).toBe(Number(club.id));
   });
 
   it("assigning has one through belongs to with new record owner", async () => {
@@ -1468,7 +1468,7 @@ describe("HasOneThroughAssociationsTest", () => {
     // After save, membership should be created linking member to club
     const memberships = await Membership.all().where({ member_id: member.id }).toArray();
     expect(memberships.length).toBe(1);
-    expect(memberships[0].readAttribute("club_id")).toBe(club.id);
+    expect(memberships[0].readAttribute("club_id")).toBe(Number(club.id));
   });
 
   it("has one through with custom select on join model default scope", async () => {
@@ -1653,7 +1653,7 @@ describe("HasOneThroughAssociationsTest", () => {
     // A fresh membership should exist in the DB
     const memberships = await Membership.all().where({ member_id: member.id }).toArray();
     expect(memberships.length).toBe(1);
-    expect(memberships[0].club_id).toBe(newClub.id);
+    expect(memberships[0].club_id).toBe(Number(newClub.id));
   });
 
   it("set record after delete association", async () => {

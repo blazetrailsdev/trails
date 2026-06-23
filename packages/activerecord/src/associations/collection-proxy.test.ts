@@ -453,7 +453,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     // The transaction wrapping remove_records rolled the nullify back, so the
     // child FK is still set in the DB.
     const reloaded = await Post.find(post.id as number);
-    expect((reloaded as any).author_id).toBe(author.id);
+    expect((reloaded as any).author_id).toBe(Number(author.id));
   });
 
   it("does not open a transaction for new-record-only deletes", async () => {

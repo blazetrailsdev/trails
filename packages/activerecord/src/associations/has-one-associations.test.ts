@@ -182,7 +182,7 @@ describe("HasOneAssociationsTest", () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Account.create({ credit_limit: 10 });
     (apple as any).account = citibank;
-    expect((citibank as any).firm_id).toBe(apple.id);
+    expect((citibank as any).firm_id).toBe(Number(apple.id));
   });
 
   it("natural assignment to nil", async () => {
@@ -565,31 +565,31 @@ describe("HasOneAssociationsTest", () => {
     const car = (await Car.create({ name: "honda" })) as any;
 
     let bulb = car.association("bulb").build();
-    expect(bulb.car_id).toBe(car.id);
+    expect(bulb.car_id).toBe(Number(car.id));
 
-    bulb = car.association("bulb").build({ car_id: car.id + 1 });
-    expect(bulb.car_id).toBe(car.id);
+    bulb = car.association("bulb").build({ car_id: Number(car.id) + 1 });
+    expect(bulb.car_id).toBe(Number(car.id));
 
     bulb = await car.association("bulb").create();
-    expect(bulb.car_id).toBe(car.id);
+    expect(bulb.car_id).toBe(Number(car.id));
 
-    bulb = await car.association("bulb").create({ car_id: car.id + 1 });
-    expect(bulb.car_id).toBe(car.id);
+    bulb = await car.association("bulb").create({ car_id: Number(car.id) + 1 });
+    expect(bulb.car_id).toBe(Number(car.id));
   });
 
   it("association protect foreign key", async () => {
     const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
     let ship = (pirate.association("ship") as any).build();
-    expect(ship.pirate_id).toBe(pirate.id);
-    ship = (pirate.association("ship") as any).build({ pirate_id: (pirate.id as number) + 1 });
-    expect(ship.pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(Number(pirate.id));
+    ship = (pirate.association("ship") as any).build({ pirate_id: Number(pirate.id) + 1 });
+    expect(ship.pirate_id).toBe(Number(pirate.id));
     ship = await (pirate.association("ship") as any).create({ name: "s1" });
-    expect(ship.pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(Number(pirate.id));
     ship = await (pirate.association("ship") as any).create({
       name: "s2",
-      pirate_id: (pirate.id as number) + 1,
+      pirate_id: Number(pirate.id) + 1,
     });
-    expect(ship.pirate_id).toBe(pirate.id);
+    expect(ship.pirate_id).toBe(Number(pirate.id));
   });
 
   it.skip("build with block", () => {
