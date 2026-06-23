@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { delegateArrayMethod, DelegateCache } from "./delegation.js";
+import { delegateArrayMethod, DelegateCache, guardBaseMethodDelegation } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -52,6 +52,21 @@ describe("DelegationTest", () => {
       // `belongsTo` is an ActiveRecord::Base class method not defined on
       // Relation, so it reaches the class-method delegation path.
       expect(() => relation.belongsTo("author")).toThrow(NotImplementedError);
+    });
+
+    it("does not ban Function.prototype builtins when banned", () => {
+      DelegateCache.delegateBaseMethods = false;
+      // `call`/`apply`/`bind`/`constructor` are Function.prototype builtins, not
+      // ActiveRecord::Base methods (`Base.respond_to?(:call)` is false in Ruby),
+      // so the guard must not raise on them even though `modelClass.call` is a
+      // function. A real Base method (`belongsTo`) still raises.
+      for (const builtin of ["call", "apply", "bind", "constructor"]) {
+        expect(() => guardBaseMethodDelegation(Post as any, builtin)).not.toThrow();
+      }
+      expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
+        NotImplementedError,
+      );
+      expect(() => guardBaseMethodDelegation(Post as any, "publishedScopeOnly")).not.toThrow();
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {

@@ -134,19 +134,32 @@ export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string)
   // Resolve `ActiveRecord::Base.respond_to?(method)` without importing `Base`
   // at runtime (that creates a module cycle): walk the model's static prototype
   // chain to the `Base` class itself (class names are preserved at runtime — the
-  // codebase already relies on them for table inference) and check whether the
-  // method is reachable from there up. Methods defined only on a model subclass
-  // (named scopes, custom class methods) live below `Base` in the chain, so they
-  // stay delegable; methods on `Base` or its ancestors are banned.
+  // codebase already relies on them for table inference). Methods defined only on
+  // a model subclass (named scopes, custom class methods) live below `Base` in
+  // the chain, so they stay delegable; methods on `Base` or its ancestors are
+  // banned.
   let base: unknown = modelClass;
   while (typeof base === "function" && (base as { name?: string }).name !== "Base") {
     base = Object.getPrototypeOf(base);
   }
-  if (typeof base === "function" && prop in (base as object)) {
-    // @nie disposition=TODO
-    throw new NotImplementedError(
-      "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
-    );
+  // No class named `Base` in the chain (e.g. an unexpected hierarchy) — don't
+  // ban; better to under-enforce than to mis-fire on a non-AR class.
+  if (typeof base !== "function") return;
+  // Reachability check restricted to the static chain at/above `Base`, stopping
+  // before `Function.prototype` so its builtins (`call`, `apply`, `bind`, `name`,
+  // `length`, …) are NOT treated as Base methods — `ActiveRecord::Base` doesn't
+  // `respond_to?` those, and `relation.call(...)` must not wrongly raise.
+  for (
+    let ctor: unknown = base;
+    typeof ctor === "function" && ctor !== Function.prototype;
+    ctor = Object.getPrototypeOf(ctor)
+  ) {
+    if (Object.prototype.hasOwnProperty.call(ctor, prop)) {
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",
+      );
+    }
   }
 }
 
