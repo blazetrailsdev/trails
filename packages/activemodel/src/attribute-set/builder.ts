@@ -138,6 +138,56 @@ export class LazyAttributeHash {
     return [...allKeys];
   }
 
+  /**
+   * Return a new map applying `fn` to each materialized Attribute.
+   *
+   * Mirrors: `delegate :transform_values, to: :materialize` — Hash#transform_values.
+   */
+  transformValues(fn: (attr: Attribute) => Attribute): Map<string, Attribute> {
+    const result = new Map<string, Attribute>();
+    for (const [name, attr] of this.materialize()) result.set(name, fn(attr));
+    return result;
+  }
+
+  /**
+   * Yield each materialized Attribute value.
+   *
+   * Mirrors: `delegate :each_value, to: :materialize` — Hash#each_value.
+   */
+  eachValue(fn: (attr: Attribute) => void): void {
+    for (const attr of this.materialize().values()) fn(attr);
+  }
+
+  /**
+   * Fetch the materialized Attribute under `name`. Absent key throws
+   * (Ruby `Hash#fetch` raises KeyError); a block supplies the fallback.
+   *
+   * Mirrors: `delegate :fetch, to: :materialize`.
+   */
+  fetch(name: string, block?: (name: string) => Attribute): Attribute {
+    const materialized = this.materialize();
+    const attr = materialized.get(name);
+    if (attr !== undefined) return attr;
+    if (block) return block(name);
+    const err = new Error(`key not found: ${JSON.stringify(name)}`);
+    err.name = "KeyError";
+    throw err;
+  }
+
+  /**
+   * Return a copy of the materialized hash with `names` removed.
+   *
+   * Mirrors: `delegate :except, to: :materialize` — Hash#except.
+   */
+  except(...names: string[]): Map<string, Attribute> {
+    const drop = new Set(names);
+    const result = new Map<string, Attribute>();
+    for (const [name, attr] of this.materialize()) {
+      if (!drop.has(name)) result.set(name, attr);
+    }
+    return result;
+  }
+
   deepDup(): LazyAttributeHash {
     const copy = new LazyAttributeHash(
       this.types,
@@ -181,6 +231,21 @@ export class LazyAttributeHash {
     ],
   ): LazyAttributeHash {
     return new LazyAttributeHash(data[0], data[1], data[2], data[3], data[4]);
+  }
+
+  /**
+   * Force every value/type key into the delegate hash and return it.
+   *
+   * Mirrors: LazyAttributeHash#materialize (protected) — `values.each_key`
+   * and `types.each_key` resolve through `self[key]`, then `delegate_hash`
+   * is returned.
+   *
+   * @internal Rails-private helper.
+   */
+  protected materialize(): Map<string, Attribute> {
+    for (const key of Object.keys(this.values)) this.get(key);
+    for (const key of this.types.keys()) this.get(key);
+    return this.delegate;
   }
 
   /** @internal Rails-private helper. Mirrors: LazyAttributeHash#delegate_hash (attr_reader) */

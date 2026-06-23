@@ -413,4 +413,55 @@ describe("AttributeSetTest", () => {
     expect(set.has("name")).toBe(true);
     expect(set.fetchValue("name")).toBe("Alice");
   });
+
+  it("fetch returns the attribute for the given name", () => {
+    const intType = typeRegistry.lookup("integer");
+    const foo = Attribute.fromDatabase("foo", 1, intType);
+    const set = new AttributeSet(new Map([["foo", foo]]));
+    expect(set.fetch("foo")).toBe(foo);
+  });
+
+  it("fetch raises for an unknown name without a block", () => {
+    const set = new AttributeSet(new Map());
+    expect(() => set.fetch("wibble")).toThrow();
+  });
+
+  it("fetch uses the given block for an unknown name", () => {
+    const set = new AttributeSet(new Map());
+    const fallback = Attribute.null("wibble");
+    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+  });
+
+  it("except returns a copy without the given names", () => {
+    const intType = typeRegistry.lookup("integer");
+    const set = new AttributeSet(
+      new Map([
+        ["foo", Attribute.fromDatabase("foo", 1, intType)],
+        ["bar", Attribute.fromDatabase("bar", 2, intType)],
+      ]),
+    );
+    const rest = set.except("foo");
+    expect(rest.has("foo")).toBe(false);
+    expect(rest.has("bar")).toBe(true);
+  });
+
+  it("each_value yields every attribute", () => {
+    const intType = typeRegistry.lookup("integer");
+    const set = new AttributeSet(
+      new Map([
+        ["foo", Attribute.fromDatabase("foo", 1, intType)],
+        ["bar", Attribute.fromDatabase("bar", 2, intType)],
+      ]),
+    );
+    const seen: unknown[] = [];
+    set.eachValue((attr) => seen.push(attr.value));
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it("include? returns true for initialized attributes", () => {
+    const intType = typeRegistry.lookup("integer");
+    const set = new AttributeSet(new Map([["foo", Attribute.fromDatabase("foo", 1, intType)]]));
+    expect(set.isInclude("foo")).toBe(true);
+    expect(set.isInclude("bar")).toBe(false);
+  });
 });

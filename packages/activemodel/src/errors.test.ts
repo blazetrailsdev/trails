@@ -110,14 +110,25 @@ describe("ErrorsTest", () => {
 
   it("key?", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.include("name")).toBe(true);
+    errors.add("foo", "omg");
+    expect(errors.isKey("foo")).toBe(true);
   });
 
   it("no key", () => {
     const errors = new Errors({});
     errors.add("name", "blank");
-    expect(errors.include("age")).toBe(false);
+    expect(errors.isKey("age")).toBe(false);
+  });
+
+  it("has_key?", () => {
+    const errors = new Errors({});
+    errors.add("foo", "omg");
+    expect(errors.hasKey("foo")).toBe(true);
+  });
+
+  it("has_no_key", () => {
+    const errors = new Errors({});
+    expect(errors.hasKey("name")).toBe(false);
   });
 
   it("error access is indifferent", () => {
