@@ -18,43 +18,49 @@ OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 # `vendor/fetch.ts --print-lib-paths`. This Ruby script no longer carries
 # a parallel package table that drifts from the registry; adding a source
 # with compareApi !== false in vendor/sources.ts feeds through automatically.
-LIB_PATHS_JSON = ENV.fetch("LIB_PATHS_JSON") do
-  abort "extract-ruby-api.rb: LIB_PATHS_JSON env var not set. Caller must export " \
-        "it via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
-end
-PACKAGE_DIRS =
-  begin
-    parsed = JSON.parse(LIB_PATHS_JSON)
-    unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
-      abort "extract-ruby-api.rb: LIB_PATHS_JSON must be a JSON object of " \
-            "{string: string}; got #{parsed.class}. Re-run vendor:fetch --print-lib-paths."
-    end
-    parsed
-  rescue JSON::ParserError => e
-    abort "extract-ruby-api.rb: LIB_PATHS_JSON is not valid JSON (#{e.message}). " \
-          "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+# The env-dependent setup and the auto-run at the bottom are guarded by
+# `__FILE__ == $PROGRAM_NAME` so the file can be `require`d from a unit test
+# (extract-ruby-api.test.ts) to exercise ApiExtractor directly without the
+# LIB_PATHS_JSON/LOCKFILE_PATH env vars or kicking off a full manifest build.
+if __FILE__ == $PROGRAM_NAME
+  LIB_PATHS_JSON = ENV.fetch("LIB_PATHS_JSON") do
+    abort "extract-ruby-api.rb: LIB_PATHS_JSON env var not set. Caller must export " \
+          "it via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
   end
+  PACKAGE_DIRS =
+    begin
+      parsed = JSON.parse(LIB_PATHS_JSON)
+      unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+        abort "extract-ruby-api.rb: LIB_PATHS_JSON must be a JSON object of " \
+              "{string: string}; got #{parsed.class}. Re-run vendor:fetch --print-lib-paths."
+      end
+      parsed
+    rescue JSON::ParserError => e
+      abort "extract-ruby-api.rb: LIB_PATHS_JSON is not valid JSON (#{e.message}). " \
+            "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+    end
 
-# Cache gate: invalidate on (a) a re-fetch (lockfile mtime bumped), (b) a
-# registry edit (sources.ts mtime bumped — covers compareApi flips, libPath
-# edits, source add/remove), or (c) an extractor edit (this script's mtime
-# bumped — a `git pull` that changes the output shape, e.g. emitting new param
-# kinds, sets its mtime past a stale manifest). This is the Ruby counterpart of
-# the TS extractor's SCHEMA_VERSION bump. The output is current only when it's
-# newer than ALL THREE signals; `API_COMPARE_FORCE=1` always regenerates.
-output_path = File.join(OUTPUT_DIR, "rails-api.json")
-lockfile_path = ENV.fetch("LOCKFILE_PATH") do
-  abort "extract-ruby-api.rb: LOCKFILE_PATH env var not set. Caller must export " \
-        "it (e.g. LOCKFILE_PATH=\"$ROOT/vendor/sources.lock.json\")."
-end
-sources_ts_path = File.join(File.dirname(lockfile_path), "sources.ts")
-if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
-   File.exist?(lockfile_path) && File.exist?(sources_ts_path) &&
-   File.mtime(output_path) >= File.mtime(lockfile_path) &&
-   File.mtime(output_path) >= File.mtime(sources_ts_path) &&
-   File.mtime(output_path) >= File.mtime(__FILE__)
-  puts "Rails manifest #{output_path} is up to date (set API_COMPARE_FORCE=1 to regenerate)"
-  exit 0
+  # Cache gate: invalidate on (a) a re-fetch (lockfile mtime bumped), (b) a
+  # registry edit (sources.ts mtime bumped — covers compareApi flips, libPath
+  # edits, source add/remove), or (c) an extractor edit (this script's mtime
+  # bumped — a `git pull` that changes the output shape, e.g. emitting new param
+  # kinds, sets its mtime past a stale manifest). This is the Ruby counterpart of
+  # the TS extractor's SCHEMA_VERSION bump. The output is current only when it's
+  # newer than ALL THREE signals; `API_COMPARE_FORCE=1` always regenerates.
+  output_path = File.join(OUTPUT_DIR, "rails-api.json")
+  lockfile_path = ENV.fetch("LOCKFILE_PATH") do
+    abort "extract-ruby-api.rb: LOCKFILE_PATH env var not set. Caller must export " \
+          "it (e.g. LOCKFILE_PATH=\"$ROOT/vendor/sources.lock.json\")."
+  end
+  sources_ts_path = File.join(File.dirname(lockfile_path), "sources.ts")
+  if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
+     File.exist?(lockfile_path) && File.exist?(sources_ts_path) &&
+     File.mtime(output_path) >= File.mtime(lockfile_path) &&
+     File.mtime(output_path) >= File.mtime(sources_ts_path) &&
+     File.mtime(output_path) >= File.mtime(__FILE__)
+    puts "Rails manifest #{output_path} is up to date (set API_COMPARE_FORCE=1 to regenerate)"
+    exit 0
+  end
 end
 
 # ---- Param extraction from Ripper AST ----
@@ -1545,6 +1551,11 @@ class ApiExtractor
     when :command_call
       name = ident_name(node[3]) if node[3]
       calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+    when :super, :zsuper
+      # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
+      # the parent method; record as "super" so calls-parity can flag a ported
+      # override that drops the super call.
+      calls << "super"
     end
 
     node.each { |child| walk_for_calls(child, calls) if child.is_a?(Array) }
@@ -1821,4 +1832,4 @@ def normalize_class_info(info)
   }
 end
 
-run
+run if __FILE__ == $PROGRAM_NAME

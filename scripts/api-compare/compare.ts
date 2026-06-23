@@ -94,6 +94,19 @@ const SIGNIFICANT_CALLS = new Set([
   "becomes",
   "clear_attribute_changes",
   "changes_applied",
+  // NOTE: "super" is captured by both extractors (extract-ruby-api.rb records
+  // super/zsuper; extract-ts-api.ts records a bare super(...) callee) and
+  // significantMissingCalls() has a dedicated, asymmetry-aware branch for it,
+  // but it is deliberately NOT in this default allowlist. With super enabled
+  // on activerecord it floods: 195 of 218 calls-mismatches become super-only,
+  // most of them module methods. Rails mixes modules with `include` (Ruby's
+  // super walks the ancestor chain into the included module), but trails ports
+  // modules as `this`-typed functions assigned to the class (see CLAUDE.md
+  // "Module mixins") — there is no class-inheritance `super` to chain to, so
+  // the omission is structural, not a fidelity gap. Enabling super here would
+  // bury the ~20 genuine missing-call signals under that noise. The capability
+  // is retained for an opt-in, curated caller (e.g. constructor-only) via the
+  // `significant` parameter.
 ]);
 
 /**
@@ -122,6 +135,20 @@ export function significantMissingCalls(
   for (const rc of rubyCalls) {
     if (rc === rubyName) continue; // self/recursive call
     if (!significant.has(rc)) continue;
+    if (rc === "super") {
+      // super bypasses the ported-with-args gate (it isn't a ported method
+      // that takes args), and matches either TS spelling of a super-chain:
+      //   - bare `super(...)` (constructor) → extractor records "super";
+      //   - `super.<method>()` (a non-constructor override) → extractor
+      //     records the method name, and Ruby's bare `super` in method `m`
+      //     chains to the parent `m`, so `super.<m>()` (mapped to its camelCase
+      //     TS name) is the faithful port.
+      // Flag only when the TS body does NEITHER — a genuinely dropped chain.
+      const selfTs = mapCall(rubyName) ?? [];
+      const chained = tsCalls.has("super") || selfTs.some((c) => tsCalls.has(c));
+      if (!chained) missing.push(`super → super|${[...selfTs].join("|")}`);
+      continue;
+    }
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (!mapped.some(isPortedWithArgs)) continue;

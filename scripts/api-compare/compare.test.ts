@@ -104,6 +104,48 @@ describe("significantMissingCalls", () => {
     const missing = significantMissingCalls("save", ["save"], new Set(), () => true, map, sig);
     expect(missing).toEqual([]);
   });
+
+  it("flags a dropped super-chain, bypassing the ported-with-args gate", () => {
+    const sigSuper = new Set(["super"]);
+    // isPortedWithArgs always false: super still flags because it bypasses the gate.
+    const missing = significantMissingCalls(
+      "save",
+      ["super"],
+      new Set(),
+      () => false,
+      map,
+      sigSuper,
+    );
+    expect(missing).toEqual(["super → super|save"]);
+  });
+
+  it("does not flag super when the TS body chains bare super(...)", () => {
+    const sigSuper = new Set(["super"]);
+    const missing = significantMissingCalls(
+      "save",
+      ["super"],
+      new Set(["super"]),
+      () => false,
+      map,
+      sigSuper,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("does not flag super when the TS body chains super.<sameMethod>()", () => {
+    // Ruby bare `super` in `save` ≡ TS `super.save()`, which the extractor
+    // records as the method name "save", not "super".
+    const sigSuper = new Set(["super"]);
+    const missing = significantMissingCalls(
+      "save",
+      ["super"],
+      new Set(["save"]),
+      () => false,
+      map,
+      sigSuper,
+    );
+    expect(missing).toEqual([]);
+  });
 });
 
 describe("nameMatches", () => {

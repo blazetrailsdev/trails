@@ -118,6 +118,29 @@ describe("body call capture", () => {
     expect(id.calls).toBeUndefined();
   });
 
+  it('records a bare super(...) call as "super"', () => {
+    const cls = extractFromSource(
+      `class Foo extends Bar {
+        constructor() {
+          super(1, 2);
+          this.init();
+        }
+      }`,
+    );
+    const ctor = cls.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.calls).toEqual(["init", "super"]);
+  });
+
+  it('records super.foo() as the property name, not "super"', () => {
+    const cls = extractFromSource(
+      `class Foo extends Bar {
+        save() { super.save(); }
+      }`,
+    );
+    const save = cls.instanceMethods.find((m) => m.name === "save")!;
+    expect(save.calls).toEqual(["save"]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
