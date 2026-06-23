@@ -231,10 +231,6 @@ export const fixtureRegistry = {
     model: () => import("./models/computer.js").then((m) => m.Computer),
     data: FixtureData.computerFixtureData,
   },
-  computersDevelopers: {
-    joinTable: "computers_developers",
-    data: FixtureData.computersDevelopersFixtureData,
-  },
   content: {
     model: () => import("./models/content.js").then((m) => m.Content),
     data: FixtureData.contentFixtureData,
@@ -284,7 +280,17 @@ export const fixtureRegistry = {
     data: FixtureData.deadParrotFixtureData,
   },
   developers: {
-    model: () => import("./models/developer.js").then((m) => m.Developer),
+    // Register Computer (the `sharedComputers` HABTM target) so its join-table
+    // reflection resolves when `useFixtures` slices the schema — the loader
+    // materializes `computers_developers` rows from the owner's `sharedComputers`
+    // association label, so that table must be created even when the join set
+    // isn't requested by name.
+    model: () =>
+      import("./models/developer.js").then(async (m) => {
+        const { Computer } = await import("./models/computer.js");
+        registerModel(Computer);
+        return m.Developer;
+      }),
     data: FixtureData.developerFixtureData,
   },
   developersProjects: {

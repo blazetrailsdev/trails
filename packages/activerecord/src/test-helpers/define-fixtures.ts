@@ -283,6 +283,99 @@ function detectHabtmParts(
   return null;
 }
 
+// --- HABTM association-label join-row materialization ---
+
+/**
+ * A HABTM association declared on the owner model, resolved into the column
+ * names of its join table. Mirrors the data Rails' `FixtureSet::TableRow`
+ * reads off a `has_and_belongs_to_many` reflection when it materializes join
+ * rows from an association label (`developers.yml`'s `david: { shared_computers: laptop }`):
+ * `joinTable` is the join table, `lhsKey` the owner's foreign key in it, `rhsKey`
+ * the target's foreign key, and `targetTable` the associated model's table (used
+ * to resolve a target label to its fixture id, falling back to CRC32).
+ */
+interface HabtmLabelAssoc {
+  joinTable: string;
+  lhsKey: string;
+  rhsKey: string;
+  targetTable: string | undefined;
+}
+
+/**
+ * Builds a map of HABTM association name → join-table coordinates for every
+ * `has_and_belongs_to_many` reflection on the model, so a fixture row that names
+ * one of them (e.g. `sharedComputers: ["laptop"]`) can be expanded into join
+ * rows. Mirrors Rails' `TableRow#resolve_sti_reflections` HABTM arm. Reflection
+ * getters that resolve the target class (`joinTable`, `klass`) can throw when the
+ * associated model isn't registered yet; such associations are skipped rather
+ * than failing the whole fixture load — only those a row actually references matter.
+ */
+export function habtmLabelAssociations(ModelClass: BaseClass): Map<string, HabtmLabelAssoc> {
+  const out = new Map<string, HabtmLabelAssoc>();
+  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
+  for (const [name, refl] of Object.entries(reflections)) {
+    const r = refl as {
+      macro?: string;
+      joinTable?: string;
+      foreignKey?: string | string[];
+      associationForeignKey?: string;
+      klass?: { tableName?: string };
+      isThroughReflection?: () => boolean;
+      throughReflection?: { foreignKey?: string | string[] };
+      sourceReflection?: { foreignKey?: string | string[] };
+    };
+    if (r.macro !== "hasAndBelongsToMany") continue;
+    try {
+      const joinTable = r.joinTable;
+      // trails models HABTM as a has_many:through over an anonymous join model,
+      // so the owner-side FK lives on the through reflection and the target-side
+      // FK on the source reflection (Rails reads them off the HABTM reflection's
+      // `foreign_key` / `association_foreign_key` directly). Prefer the through
+      // shape; fall back to the plain-HABTM getters for a non-through reflection.
+      const lhsKey = r.isThroughReflection?.() ? r.throughReflection?.foreignKey : r.foreignKey;
+      const rhsKey = r.isThroughReflection?.()
+        ? (r.sourceReflection?.foreignKey ?? r.associationForeignKey)
+        : r.associationForeignKey;
+      if (
+        typeof joinTable !== "string" ||
+        typeof lhsKey !== "string" ||
+        typeof rhsKey !== "string"
+      ) {
+        continue;
+      }
+      out.set(name, { joinTable, lhsKey, rhsKey, targetTable: r.klass?.tableName });
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+/** The join-table names for every resolvable HABTM association on the model. */
+export function habtmJoinTableNames(ModelClass: BaseClass): string[] {
+  return Array.from(habtmLabelAssociations(ModelClass).values(), (a) => a.joinTable);
+}
+
+/**
+ * Normalizes a HABTM association-label fixture value into a list of target
+ * labels. Mirrors Rails' `targets.is_a?(Array) ? targets : targets.split(...)`
+ * (the Ruby split is on commas with surrounding whitespace): an array is taken
+ * as-is; a string is split on commas. Each label resolves to a target fixture id
+ * when the join rows are built.
+ */
+function normalizeHabtmTargets(
+  tableName: string,
+  label: string,
+  col: string,
+  val: unknown,
+): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  if (typeof val === "string") return val.split(/\s*,\s*/).filter((s) => s.length > 0);
+  throw new Error(
+    `defineFixtures: ${tableName}.${label} HABTM association "${col}" expects a label string or array of labels, got ${typeof val}`,
+  );
+}
+
 // --- Phase 1b: polymorphic belongs_to detection ---
 
 interface PolymorphicBelongsTo {
@@ -517,6 +610,12 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       ])
     : null;
 
+  // HABTM association labels declared on owner rows (e.g. `sharedComputers: ["laptop"]`)
+  // materialize into join-table rows, mirroring Rails' FixtureSet::TableRow HABTM arm.
+  // Accumulated across all rows and inserted after the model's own rows land.
+  const habtmLabelAssocs = habtmLabelAssociations(ModelClass);
+  const joinTableRows = new Map<string, FixtureAttrs[]>();
+
   const labels = Object.keys(fixtures) as K[];
 
   // Pre-pass: build this table's label→id map locally, then swap it in atomically
@@ -563,6 +662,32 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 
     for (const [col, val] of Object.entries(attrs)) {
       if (typeof pkCol === "string" && col === pkCol) continue; // PK already set above
+
+      // HABTM association label: not a real column. Expand into join-table rows
+      // (Rails' TableRow#resolve_sti_reflections HABTM arm) and consume the key.
+      const labelAssoc = habtmLabelAssocs.get(col);
+      if (labelAssoc) {
+        if (typeof pkCol !== "string") {
+          throw new Error(
+            `defineFixtures: ${tableName}.${label} declares HABTM association "${col}" but the owner table has no single primary key to join on`,
+          );
+        }
+        const ownerId = row[pkCol];
+        const targets = normalizeHabtmTargets(tableName, label, col, val);
+        if (targets.length > 0) {
+          const accum = joinTableRows.get(labelAssoc.joinTable) ?? [];
+          for (const target of targets) {
+            accum.push({
+              [labelAssoc.lhsKey]: ownerId,
+              [labelAssoc.rhsKey]: labelAssoc.targetTable
+                ? resolveFixtureId(adapter, labelAssoc.targetTable, target)
+                : fixtureId(target),
+            });
+          }
+          joinTableRows.set(labelAssoc.joinTable, accum);
+        }
+        continue;
+      }
 
       // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
@@ -776,6 +901,18 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       adapterIds.set(tableName, priorTableIds);
     }
     throw err;
+  }
+
+  // Insert any HABTM join rows materialized from owner association labels. Each
+  // join table is delete-before-insert (tablesToDelete) so a reseed replaces the
+  // prior set's rows, exactly like the model-row insert above. These tables have
+  // no model class — seeded straight against their FK columns, like the explicit
+  // join-table fixtures (`developers-projects.ts`) loaded via defineJoinTableFixtures.
+  for (const [joinTable, jrows] of joinTableRows) {
+    if (jrows.length === 0) continue;
+    await insertFixturesSet.call(adapter as unknown as InsertHost, { [joinTable]: jrows }, [
+      joinTable,
+    ]);
   }
 
   // Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
