@@ -115,9 +115,17 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // First call is index_list; surface one index whose name has a quote.
     const sqlite = new SqliteCapturingAdapter([{ name: 'idx"x', unique: 1 }]);
     await sqlite.indexes("things");
-    // Converged with SQLite3Adapter: index_info quotes the index name as an
-    // identifier (quoteColumnName), so embedded `"` is doubled.
-    expect(sqlite.allSql).toEqual(['PRAGMA index_list("things")', 'PRAGMA index_info("idx""x")']);
+    // Converged with SQLite3Adapter: between index_list and index_info the
+    // shared impl reads the index SQL (to recover WHERE/expression indexes),
+    // and index_info quotes the index name as an identifier (quoteColumnName),
+    // so embedded `"` is doubled.
+    expect(sqlite.allSql).toEqual([
+      'PRAGMA index_list("things")',
+      `SELECT sql FROM sqlite_master WHERE name = 'idx"x' AND type = 'index' ` +
+        `UNION ALL ` +
+        `SELECT sql FROM sqlite_temp_master WHERE name = 'idx"x' AND type = 'index'`,
+      'PRAGMA index_info("idx""x")',
+    ]);
   });
 
   it("indexes() sqlite arm carries the schema prefix into the index_info PRAGMA", async () => {
@@ -127,6 +135,9 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await sqlite.indexes("aux.widgets");
     expect(sqlite.allSql).toEqual([
       'PRAGMA "aux".index_list("widgets")',
+      `SELECT sql FROM "aux".sqlite_master WHERE name = 'idx_widgets_name' AND type = 'index' ` +
+        `UNION ALL ` +
+        `SELECT sql FROM sqlite_temp_master WHERE name = 'idx_widgets_name' AND type = 'index'`,
       'PRAGMA "aux".index_info("idx_widgets_name")',
     ]);
   });
