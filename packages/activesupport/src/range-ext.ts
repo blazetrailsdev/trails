@@ -154,22 +154,16 @@ const lexCmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
  * is false (`succ` mixes no character classes, so `"a1"` is never produced)
  * — unlike a `(length, lex)` window, which would wrongly admit `"a1"`.
  *
- * Beginless/endless string ranges can't be enumerated, so they fall back to
- * succ-order bound checks (`(length, then lexicographic)`); both-bounded
- * ranges — the inputs Rails string ranges are used with — enumerate exactly.
+ * Beginless/endless string ranges have no enumerable sequence; Ruby raises
+ * `TypeError: cannot determine inclusion in beginless/endless ranges` from
+ * `Range#include?` (range.c `range_include_internal`), so this throws to match
+ * rather than inventing an answer Ruby never produces.
  */
 export function rangeIncludesStringValue(range: Range<string>, value: string): boolean {
   const { begin, end, excludeEnd } = range;
 
   if (begin === null || end === null) {
-    const succCmp = (a: string, b: string): number =>
-      a.length !== b.length ? a.length - b.length : lexCmp(a, b);
-    if (begin !== null && succCmp(value, begin) < 0) return false;
-    if (end !== null) {
-      const c = succCmp(value, end);
-      if (excludeEnd ? c >= 0 : c > 0) return false;
-    }
-    return true;
+    throw new TypeError("cannot determine inclusion in beginless/endless ranges");
   }
 
   // Faithful `str_upto_each`: enumerate begin..end via succ, stopping at
@@ -188,7 +182,12 @@ export function rangeIncludesStringValue(range: Range<string>, value: string): b
     current = next;
     if (excludeEnd && current === end) break;
     if (current.length > end.length || current.length === 0) break;
-    if (++guard > 5_000_000) break;
+    // The length guard above bounds enumeration to strings no longer than
+    // `end`, so this only trips for spans wider than ~26^5. Ruby would keep
+    // iterating (slow but correct); throw rather than return a wrong `false`.
+    if (++guard > 5_000_000) {
+      throw new RangeError("string range too large to enumerate for include?");
+    }
   }
   return false;
 }

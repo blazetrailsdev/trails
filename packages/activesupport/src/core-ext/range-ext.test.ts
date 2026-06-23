@@ -238,6 +238,13 @@ describe("RangeTest", () => {
     expect(rangeIncludesStringValue(makeRange("a", "bbb"), "a1")).toBe(false);
   });
 
+  it("string include raises on beginless/endless ranges", () => {
+    // Ruby's Range#include? raises TypeError on beginless/endless string
+    // ranges ("cannot determine inclusion in beginless/endless ranges").
+    expect(() => rangeIncludesStringValue(makeRange(null, "bbb"), "z")).toThrow(TypeError);
+    expect(() => rangeIncludesStringValue(makeRange("a", null), "z")).toThrow(TypeError);
+  });
+
   it("string succ carries within character classes", () => {
     // Mirrors Ruby String#succ.
     expect(stringSucc("abcd")).toBe("abce");
