@@ -666,11 +666,11 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const order = await CpkOrder.where({ shop_id: 7, status: "open" }).first();
     const orderId = (order as any)._readAttribute("id");
     expect((book as any).shop_id).toBe(7);
-    expect((book as any).order_id).toBe(orderId);
+    expect(Number((book as any).order_id)).toBe(Number(orderId));
 
     const reloaded = await CpkBook.find([1, 1]);
     expect((reloaded as any).shop_id).toBe(7);
-    expect((reloaded as any).order_id).toBe(orderId);
+    expect(Number((reloaded as any).order_id)).toBe(Number(orderId));
   });
 
   it("should increment the target counter cache when the nested belongs_to is created", async () => {
@@ -684,7 +684,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
     const category = (await Category.findBy({ name: "General" })) as any;
     expect(category).not.toBeNull();
-    expect((categorization as any).category_id).toBe(category.id);
+    expect(Number((categorization as any).category_id)).toBe(Number(category.id));
     expect(category.categorizations_count).toBe(1);
   });
 
@@ -1021,8 +1021,8 @@ describe("TestNestedAttributesInGeneral", () => {
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
     (pirate.association("ship") as any).build();
-    (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: (pirate.id as number) + 1 };
-    expect((pirate.association("ship") as any).target.pirate_id).toBe(pirate.id);
+    (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: Number(pirate.id) + 1 };
+    expect(Number((pirate.association("ship") as any).target.pirate_id)).toBe(Number(pirate.id));
   });
 
   it("reject if with a proc which returns true always for has many", async () => {

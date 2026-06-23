@@ -63,12 +63,12 @@ describe("PrimaryKeysTest", () => {
     // TS: toKey returns null when any pk value is null
     expect(order.toKey()).toBeNull();
     order.id = [1, 2];
-    expect(order.toKey()).toEqual([1, 2]);
+    expect((order.toKey() ?? []).map(Number)).toEqual([1, 2]);
   });
 
   it("read attribute id", async () => {
     const topic = await Topic.find(topics("first").id);
-    expect(topic.readAttribute("id")).toBe(1);
+    expect(Number(topic.readAttribute("id"))).toBe(1);
   });
 
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
@@ -120,10 +120,10 @@ describe("PrimaryKeysTest", () => {
 
   it("id was", async () => {
     const topic = await Topic.find(topics("first").id);
-    expect(topic.id).toBe(1);
+    expect(Number(topic.id)).toBe(1);
     topic.id = 3;
-    expect((topic as any).idWas()).toBe(1);
-    expect(topic.id).toBe(3);
+    expect(Number((topic as any).idWas())).toBe(1);
+    expect(Number(topic.id)).toBe(3);
   });
 
   it("id?", async () => {

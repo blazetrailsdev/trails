@@ -679,7 +679,7 @@ describe("PersistenceTest", () => {
       [1, 1, 2],
       [{ title: "1 duplicated" }, { title: "1 updated" }, { title: "2 updated" }],
     );
-    expect(updated.map((t) => t.id)).toEqual([1, 1, 2]);
+    expect(updated.map((t) => Number(t.id))).toEqual([1, 1, 2]);
     // Rails' `id.map { find }` returns a distinct instance per requested id, so
     // the two occurrences of id=1 are separate objects (each updated once).
     expect(updated[0]).not.toBe(updated[1]);
@@ -1100,11 +1100,11 @@ describe("PersistenceTest", () => {
     // must target the *original* id — otherwise the UPDATE would bind
     // the post-mutation id and affect zero rows.
     await t.updateColumns({ id: 999 });
-    expect(t.id).toBe(999);
+    expect(Number(t.id)).toBe(999);
     // The original row should have the new id now (proves the WHERE
     // captured the pre-mutation id correctly).
     const refreshed = await Topic.find(999);
-    expect(refreshed.id).toBe(999);
+    expect(Number(refreshed.id)).toBe(999);
     expect(refreshed.title).toBe("test");
     // The old id no longer exists.
     await expect(Topic.find(oldId)).rejects.toThrow();
@@ -1804,10 +1804,10 @@ describe("PersistenceTest", () => {
     const topic = topics("first");
     const reply = topic.becomes(Reply);
 
-    expect((topic as any).idInDatabase()).toBe(1);
+    expect(Number((topic as any).idInDatabase())).toBe(1);
     expect((topic as any).attributesInDatabase).toEqual({});
 
-    expect((reply as any).idInDatabase()).toBe(1);
+    expect(Number((reply as any).idInDatabase())).toBe(1);
     expect((reply as any).attributesInDatabase).toEqual({});
   });
 

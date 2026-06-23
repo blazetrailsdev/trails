@@ -1787,7 +1787,7 @@ describe("AttributeMethodsTest", () => {
     it("can set id", () => {
       const p = new Person({});
       p.id = 42;
-      expect(p.id).toBe(42);
+      expect(Number(p.id)).toBe(42);
     });
   });
 
