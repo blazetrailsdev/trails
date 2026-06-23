@@ -178,6 +178,29 @@ describe("introspectIndexes", () => {
     expect(idx?.orders).toEqual(expectedOrders);
     expect(idx?.where).toBe(supportsPartial ? "active" : undefined);
   });
+
+  // The postgres fallback arm builds `columns` from a `pg_attribute` join that
+  // drops expression columns (attnum 0), so it must instead surface the raw
+  // expression string parsed from pg_get_indexdef, mirroring the concrete
+  // PostgreSQLSchemaStatements#indexes / Rails (schema_statements.rb:117).
+  it.skipIf(adapterType !== "postgres")(
+    "surfaces expression-index columns from the fallback SchemaStatements.indexes()",
+    async () => {
+      const realAdapter = createTestAdapter();
+      const ctx = new MigrationContext(realAdapter);
+      await ctx.createTable("widgets", {}, (t) => {
+        t.string("name");
+      });
+      await ctx.addIndex("widgets", "lower(name)", { name: "idx_widgets_lower_name" });
+
+      const stripped = withoutMethods(realAdapter, ["indexes"]);
+
+      const idxs = await introspectIndexes(stripped, "widgets");
+      const idx = idxs.find((i) => i.name === "idx_widgets_lower_name");
+
+      expect(idx?.columns).toBe("lower((name)::text)");
+    },
+  );
 });
 
 describe("introspectPrimaryKey", () => {
