@@ -3200,6 +3200,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     this.pgSchemaStatements().validateIndexLengthBang(tableName, newName);
     const { schema } = this.parseSchemaQualifiedName(tableName);
     const qualifiedOld = schema

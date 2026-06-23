@@ -1538,6 +1538,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.executeMutation(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME COLUMN ${quoteColumnName(columnName)} TO ${quoteColumnName(newColumnName)}`,
     );

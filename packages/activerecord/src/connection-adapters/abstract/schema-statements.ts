@@ -407,6 +407,7 @@ export class SchemaStatements {
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,
     );
@@ -906,6 +907,7 @@ export class SchemaStatements {
   }
 
   async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, _tableName);
     await this.adapter.executeMutation(
       `ALTER INDEX ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`,
     );
