@@ -560,10 +560,43 @@ describe("PreloaderTest", () => {
     // caches the wrong class permanently — surfacing here as
     // `HasManyThroughSourceAssociationNotFoundError` on Post.tags. The registry
     // entries above are already corrected to the canonical models; drop the stale
-    // klass/through/source caches so resolution re-runs against them. (FK/PK
-    // caches are intentionally left intact — they don't depend on cross-model
-    // name resolution and resetting them mid-suite regresses unrelated tests.)
-    for (const M of [Author, Post, Comment, Tag, Tagging, Category, Book]) {
+    // klass/through/source caches so resolution re-runs against them. Covers every
+    // model this beforeEach re-registers (not just the Post→taggings→tag chain that
+    // fails today) so a future file-size reschedule poisoning a different canonical
+    // name — Sharded*, Cpk*, Essay, … — is hardened too. (FK/PK caches are
+    // intentionally left intact — they don't depend on cross-model name resolution
+    // and resetting them mid-suite regresses unrelated tests.)
+    const preloaderModels = [
+      Author,
+      AuthorFavorite,
+      Post,
+      CategoryPost,
+      Comment,
+      Book,
+      Category,
+      SpecialCategory,
+      Tag,
+      Tagging,
+      Essay,
+      Invoice,
+      LineItem,
+      LineItemDiscountApplication,
+      ShippingLine,
+      ShippingLineDiscountApplication,
+      Discount,
+      ShardedBlogPL,
+      ShardedBlogPostPL,
+      ShardedCommentPL,
+      ShardedTagPL,
+      ShardedBlogPostTagPL,
+      CpkOrderPL,
+      CpkOrderAgreementPL,
+      Dog,
+      EssaySpecial,
+      PostesquePL,
+      AuthorAddress,
+    ];
+    for (const M of preloaderModels) {
       const reflections = (M as { _reflections?: Record<string, unknown> })._reflections ?? {};
       for (const reflection of Object.values(reflections) as Record<string, unknown>[]) {
         reflection._klassCache = null;
