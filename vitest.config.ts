@@ -226,6 +226,13 @@ const alias = {
 // source at 0%, and the AR run never counts the light packages at 0%).
 // website is excluded (built, not unit-tested here).
 const AR_COVERAGE = process.env.AR_COVERAGE === "1";
+// activerecord-cli coverage runs in its own non-blocking job (story
+// ar-cli-coverage-reporting, RFC 0028), separate from the AR_COVERAGE run so a
+// second vitest invocation against the shared ./coverage dir can't clobber the
+// activerecord report. AR_CLI_COVERAGE=1 scopes the include/denominator to
+// activerecord-cli source, mirroring the AR_COVERAGE flip so its `--coverage.all`
+// baseline stays honest (no cross-package 0% skew).
+const AR_CLI_COVERAGE = process.env.AR_CLI_COVERAGE === "1";
 // trails-tsc coverage runs in its own isolated CI job (story
 // trails-tsc-coverage-isolation, RFC 0028). Its watcher/build tests spawn
 // subprocesses that trip vitest's worker-RPC `onTaskUpdate` timeout under
@@ -238,9 +245,11 @@ const AR_COVERAGE = process.env.AR_COVERAGE === "1";
 const TRAILS_TSC_COVERAGE = process.env.TRAILS_TSC_COVERAGE === "1";
 const COVERAGE_INCLUDE = AR_COVERAGE
   ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
-  : TRAILS_TSC_COVERAGE
-    ? ["packages/trails-tsc/src/**/*.ts", "packages/trails-tsc/src/**/*.mts"]
-    : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
+  : AR_CLI_COVERAGE
+    ? ["packages/activerecord-cli/src/**/*.ts", "packages/activerecord-cli/src/**/*.mts"]
+    : TRAILS_TSC_COVERAGE
+      ? ["packages/trails-tsc/src/**/*.ts", "packages/trails-tsc/src/**/*.mts"]
+      : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
   "**/*.test.mts",
@@ -251,9 +260,15 @@ const COVERAGE_EXCLUDE = [
   "**/test-support/**",
   "**/*.config.ts",
   "packages/website/**",
-  // The AR run scopes COVERAGE_INCLUDE to activerecord; the light baseline run
-  // excludes it (its 6-fork suite dominates CI time and isn't run there).
-  ...(AR_COVERAGE ? [] : ["packages/activerecord/**", "packages/activerecord-cli/**"]),
+  // The AR run scopes COVERAGE_INCLUDE to activerecord; the AR_CLI run scopes it
+  // to activerecord-cli; the light baseline run excludes both (the 6-fork AR
+  // suite dominates CI time and isn't run there). Each run excludes the sibling
+  // package so its `--coverage.all` denominator never counts it at 0%.
+  ...(AR_COVERAGE ? ["packages/activerecord-cli/**"] : []),
+  ...(AR_CLI_COVERAGE ? ["packages/activerecord/**"] : []),
+  ...(!AR_COVERAGE && !AR_CLI_COVERAGE
+    ? ["packages/activerecord/**", "packages/activerecord-cli/**"]
+    : []),
   // trails-tsc is covered only in its own isolated job (TRAILS_TSC_COVERAGE=1);
   // in every other run its subprocess-spawning watcher/build tests aren't
   // executed, so exclude its source so `--coverage.all` doesn't count it at 0%
@@ -275,7 +290,12 @@ export default defineConfig({
     // errors ONLY in this isolated, reporting-only run so the timeout can't
     // redden a job whose sole purpose is to emit numbers. Never set elsewhere:
     // in the shared runs an unhandled error is a real signal.
-    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE,
+    // AR_CLI_COVERAGE is included here for the same reason as TRAILS_TSC_COVERAGE:
+    // the cli suite's trails-tsc E2E tests spawn tsc subprocesses that, under v8
+    // instrumentation, peg a worker long enough to trip the `onTaskUpdate` RPC
+    // timeout (an unhandled error) even when every test passes and the report is
+    // written. Ignore it ONLY in these isolated, reporting-only runs.
+    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE,
     coverage: {
       provider: "v8",
       // text-summary → CI log; json-summary → parsed into the step summary;
