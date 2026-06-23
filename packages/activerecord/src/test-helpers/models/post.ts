@@ -184,6 +184,20 @@ export class Post extends Base {
         q.joins("JOIN posts AS p1 ON comments.post_id = p1.id").whereNot({ p1: { id: 999999 } }),
       className: "VerySpecialComment",
     });
+    // trails-authored: a through chain whose intermediate (`through`) reflection
+    // scope contributes a raw-string `joins(...)`. Exercises the through-path
+    // analogue of `verySpecialCommentWithStringJoins` — the string-join source
+    // must attach to the intermediate chain step, not be dropped.
+    this.hasMany("commentsWithStringJoins", {
+      scope: (q: any) =>
+        q.joins("JOIN posts AS p2 ON comments.post_id = p2.id").whereNot({ p2: { id: 999999 } }),
+      className: "Comment",
+      foreignKey: "post_id",
+    });
+    this.hasMany("ratingsViaStringJoinComments", {
+      through: "commentsWithStringJoins",
+      source: "ratings",
+    });
     this.hasMany("specialComments");
     this.hasMany("nonexistentComments", {
       scope: (q: any) => q.where("comments.id < 0"),

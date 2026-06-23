@@ -1492,6 +1492,12 @@ export class JoinDependency {
       const entry = chainTables[chainIdx];
       const isTarget = chainIdx === 0;
       const arelJoin = joins[i] as Nodes.Join;
+      // Raw-string `joins(...)` sources contributed by this chain step's scope.
+      // joinConstraints returns its joins and `joinSourcesByJoin` in the same
+      // order, so index `i` lines up — each step's sources attach to its own node
+      // (Rails' per-step `joins.concat arel.join_sources`), not all after the
+      // first join.
+      const stepJoinSources = joinAssoc.joinSourcesByJoin[i] ?? [];
 
       this._aliasTracker.aliases.set(
         entry.tableName,
@@ -1519,6 +1525,7 @@ export class JoinDependency {
         treePart.nodeReflection = reflection;
         treePart.isThroughNode = false;
         treePart.aliasFixed = true;
+        treePart.scopeJoinSources = stepJoinSources;
         this._insertTreeNode(treePart);
         targetNode = treePart;
       } else {
@@ -1539,6 +1546,7 @@ export class JoinDependency {
         treePart.assocType = (refl._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
         treePart.arelJoin = arelJoin;
         treePart.isThroughNode = true;
+        treePart.scopeJoinSources = stepJoinSources;
         this._insertTreeNode(treePart);
       }
     }

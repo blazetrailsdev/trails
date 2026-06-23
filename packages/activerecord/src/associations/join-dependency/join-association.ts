@@ -32,6 +32,15 @@ export class JoinAssociation extends JoinPart {
    * @internal
    */
   readonly joinSources: Nodes.Node[] = [];
+  /**
+   * Scope join sources bucketed by their emitted constraint-join index (aligned
+   * 1:1 with the array `joinConstraints` returns). The single-step path reads the
+   * flat `joinSources`; the through path reads this so each chain step's string
+   * joins attach to that step's tree node — Rails' per-step
+   * `joins.concat arel.join_sources` inside `chain.reverse_each`.
+   * @internal
+   */
+  readonly joinSourcesByJoin: Nodes.Node[][] = [];
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
@@ -163,6 +172,7 @@ export class JoinAssociation extends JoinPart {
       }
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
+      this.joinSourcesByJoin.push([]);
 
       // Rails, gated on `unless others.empty?`:
       //   joins.concat arel.join_sources
@@ -180,17 +190,16 @@ export class JoinAssociation extends JoinPart {
         // `Nodes.StringJoin`, association-name join sources become real join
         // nodes). `arel()` builds the manager off the scope's join values.
         const sources: Nodes.Node[] = scope?.arel ? (scope.arel().joinSources as Nodes.Node[]) : [];
-        // NOTE: `this.joinSources` accumulates across the chain but is only
-        // consumed by the single-step `has_one`/`has_many` join path
-        // (JoinDependency#addAssociation), whose reflection chain is length 1, so
-        // each source maps to its own join step. A through association whose
-        // intermediate scope also contributes string joins is not wired to
-        // capture `joinSources` at all yet — a separate fidelity gap, not a
-        // mis-ordering of this path.
+        // `this.joinSources` accumulates flat across the chain (consumed by the
+        // single-step `has_one`/`has_many` path, whose chain is length 1). The
+        // through path instead reads `joinSourcesByJoin`, which buckets each
+        // step's sources against that step's emitted join index — Rails' per-step
+        // `joins.concat arel.join_sources` inside `chain.reverse_each`.
         if (sources.length > 0) {
           const lastIdx = sources.length - 1;
           sources[lastIdx] = appendConstraints(sources[lastIdx], others) ?? sources[lastIdx];
           this.joinSources.push(...sources);
+          this.joinSourcesByJoin[joins.length - 1] = sources;
         } else {
           const lastIdx = joins.length - 1;
           joins[lastIdx] = (appendConstraints(joins[lastIdx], others) ??
