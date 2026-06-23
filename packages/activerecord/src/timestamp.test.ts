@@ -7,6 +7,7 @@ import { adapterType, createTestAdapter } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
+import { ActiveRecordError } from "./errors.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -534,7 +535,7 @@ describe("TimestampTest", () => {
     expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("touch returns false on new record", async () => {
+  it("touch should raise error on a new object", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -543,7 +544,7 @@ describe("TimestampTest", () => {
     }
 
     const post = new Post({ title: "New" });
-    expect(await post.touch()).toBe(false);
+    await expect(post.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
   });
 
   it("touch skips callbacks", async () => {
@@ -610,7 +611,7 @@ describe("TimestampTest", () => {
     expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("touch on model without updated_at returns false", async () => {
+  it("touching a record without timestamps is unexceptional", async () => {
     class Simple extends Base {
       static {
         this.attribute("name", "string");
@@ -618,7 +619,8 @@ describe("TimestampTest", () => {
     }
 
     const s = await Simple.create({ name: "test" });
-    expect(await s.touch()).toBe(false);
+    // Mirrors Rails: with no timestamp columns and no names, touch returns true.
+    expect(await s.touch()).toBe(true);
   });
 });
 
@@ -801,14 +803,14 @@ describe("TimestampTest", () => {
     expect(log).toHaveLength(0);
   });
 
-  it("touch returns false on new record", async () => {
+  it("touch should raise error on a new object", async () => {
     class Post extends Base {
       static {
         this.attribute("updated_at", "datetime");
       }
     }
     const post = new Post({});
-    expect(await post.touch()).toBe(false);
+    await expect(post.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
   });
 
   it("updateColumn does not update updated_at", async () => {
