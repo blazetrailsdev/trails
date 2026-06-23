@@ -1,5 +1,6 @@
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { UnknownAttributeError } from "./errors.js";
+import { MissingAttributeError } from "./attribute-methods.js";
 
 interface PermittedAttributes {
   permitted?(): boolean;
@@ -59,6 +60,11 @@ export function _assignAttribute(model: AttributeAssignment, key: string, value:
       } else {
         attributeWriterMissing(model, key, value);
       }
+    } else if (error instanceof MissingAttributeError) {
+      // The strict write path (AR `write_attribute`) raises for an unknown
+      // column, but with no setter for `key` this is mass assignment of a key
+      // the model doesn't model — trails keeps that lenient (a no-op) rather
+      // than surfacing it, preserving relaxed mass assignment.
     } else {
       throw error;
     }

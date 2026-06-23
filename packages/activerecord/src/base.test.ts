@@ -760,15 +760,20 @@ describe("BasicsTest", () => {
     class BlogPost extends Base {}
     expect(BlogPost.tableName).toBe("blog_posts");
   });
-  it("attribute names are protected from injection", () => {
+  it("attribute names are protected from injection", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    const u = new User();
-    u.writeAttribute("name; DROP TABLE users", "val");
-    expect(u.readAttribute("name")).toBe(null);
+    const u = (await User.create({ name: "real" })) as any;
+    // An injection-shaped name is not a real column; against a warm schema the
+    // strict write path rejects it (Rails `write_from_user` →
+    // MissingAttributeError) rather than letting it reach SQL.
+    expect(() => u.writeAttribute("name; DROP TABLE users", "val")).toThrow(
+      "can't write unknown attribute `name; DROP TABLE users`",
+    );
+    expect(u.readAttribute("name")).toBe("real");
   });
 
   it("type cast attribute from select to false", async () => {

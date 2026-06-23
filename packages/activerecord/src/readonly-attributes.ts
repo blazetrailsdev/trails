@@ -1,6 +1,38 @@
 import type { Base } from "./base.js";
-import { Model, resolveAliasName } from "@blazetrails/activemodel";
+import { Model, MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
+
+/**
+ * Rails' `write_from_user` raises `MissingAttributeError` for any name that is
+ * not in the (schema-complete) attribute set — e.g. `topic[:no_column_exists] =
+ * …`. trails populates the set lazily, so map-absence alone cannot stand in for
+ * "unknown column": a real but not-yet-materialized/unselected column (an
+ * unselected `title`, a reflected-only counter-cache column, a composite-PK
+ * member) is also absent, and Rails does NOT raise for those ("write_attribute
+ * does not raise when the attribute isn't selected").
+ *
+ * The safe discriminator is the warm schema cache: when the table's real
+ * columns are known ({@link reflectedColumnNamesIfWarm}), an absent name not
+ * among them is definitively unknown and raises, while every real column —
+ * selected or not — is in that set and passes. When the cache is cold trails
+ * cannot yet list reflected-only columns, so we stay lenient there; closing
+ * that gap (and widening `AttributeSet#writeFromUser` itself to the Rails
+ * one-liner) is gated on RFC 0031 schema-cache-always-warm.
+ */
+function ensureWritableAttribute(record: Base, ctor: typeof Base, name: string): void {
+  if ((record as { _initializingAttributes?: boolean })._initializingAttributes) return;
+  if (record._attributes.includesName(name)) return;
+  if ((ctor as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.has(name))
+    return;
+  // A counter-cache column is registered as part of the model's writable schema
+  // (Rails' `counter_cache_column`), so it is a legitimate write target even
+  // when it isn't reflected as a plain column on a partially-loaded record.
+  if ((ctor as { _counterCacheColumns?: Set<string> })._counterCacheColumns?.has(name)) return;
+  const realColumns = ctor.reflectedColumnNamesIfWarm();
+  if (realColumns && !realColumns.has(name)) {
+    throw new MissingAttributeError(`can't write unknown attribute \`${name}\``);
+  }
+}
 
 /**
  * Raised when a persisted record attempts to write to a column declared
@@ -111,13 +143,41 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
   // Rails' `write_attribute` resolves `attribute_aliases[name]` before the
   // chain runs, so HasReadonlyAttributes' check sees the canonical name and
   // writing via an alias cannot bypass readonly enforcement.
-  const canonical = resolveAliasName(ctor, String(name));
+  let canonical = resolveAliasName(ctor, String(name));
+  // Rails `write_attribute` remaps the `id` literal to the primary key before
+  // `write_from_user` (write.rb:35: `name = @primary_key if name == "id" &&
+  // @primary_key`), where `@primary_key` is `klass.primary_key` (core.rb:844).
+  // - Scalar custom PK: `@primary_key` is a string, so `id` remaps to the real
+  //   PK column (a standard `id` PK remaps to itself, a no-op).
+  // - Composite PK: `@primary_key` is the array, so Rails calls
+  //   `write_from_user([...], v)`; the array key misses the attribute hash and
+  //   resolves to a `Null` attribute → `MissingAttributeError` — even when the
+  //   table has a real `id` column (e.g. cpk_books). Mirror that raise here
+  //   rather than writing the scalar `id`. (Composite `id=` assignment flows
+  //   through the per-column `_writeAttribute` path, not this one.)
+  const pk = ctor.primaryKey;
+  if (canonical === "id" && pk != null) {
+    if (typeof pk === "string") {
+      canonical = pk;
+    } else if (!(this as { _initializingAttributes?: boolean })._initializingAttributes) {
+      // Rails calls `write_from_user(@primary_key, …)` with the PK array, so the
+      // Null attribute's name — and the interpolated message (attribute.rb:236) —
+      // is the array in Ruby `#inspect` form, e.g. `["author_id", "id"]`.
+      const arrayName = `[${pk.map((c) => `"${c}"`).join(", ")}]`;
+      throw new MissingAttributeError(`can't write unknown attribute \`${arrayName}\``);
+    }
+  }
   if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
     if (_raiseOnAssignToAttrReadonly) {
       throw new ReadonlyAttributeError(canonical);
     }
     return; // silently skip — mirrors Rails' non-raising mode
   }
+  // Mirrors Rails `write_attribute` → `write_from_user`: writing an unknown
+  // attribute raises MissingAttributeError. Mass assignment routes through here
+  // too but rescues this (attribute-assignment.ts), so `new X({unknown: 1})`
+  // stays lenient.
+  ensureWritableAttribute(this, ctor, canonical);
   // `super` — route through Model's _writeAttribute with the already-resolved
   // canonical name, matching Rails' `super` into the underscore path.
   Model.prototype._writeAttribute.call(this, canonical, value);
@@ -138,6 +198,18 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   }
   // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the
   // public `write_attribute` path above.
+  //
+  // The strict unknown-attribute raise is deliberately NOT applied here. Rails'
+  // `_write_attribute` does reach `write_from_user` and so raises (write.rb:42),
+  // but trails routes its low-level/internal writes through this path —
+  // store-accessor fallbacks, composite-PK seeding in `_applyCompositePrimaryKey`
+  // (which runs after the constructor's lenient `_initializingAttributes`
+  // window), and other framework writers — some of which target names that are
+  // not plain reflected columns or run before the schema cache is warm. Gating
+  // here would regress those; the public `writeAttribute` carries the Rails
+  // strictness, which is where user `[]=` / `write_attribute` lands. Closing this
+  // is part of the same RFC 0031 warm-cache convergence that lets
+  // `AttributeSet#writeFromUser` raise directly.
   Model.prototype._writeAttribute.call(this, name, value);
 }
 

@@ -77,6 +77,27 @@ describe("PrimaryKeysTest", () => {
     expect(keyboard.readAttribute("id")).toBeNull();
   });
 
+  it("write_attribute id remaps to a scalar custom primary key", async () => {
+    // Rails write.rb:34 — `name = @primary_key if name == "id" && @primary_key`.
+    // The strict unknown-attribute guard must not reject `id` here: it remaps to
+    // the real `key_number` column rather than raising.
+    const keyboard = await Keyboard.createBang();
+    keyboard.writeAttribute("id", 42);
+    expect(keyboard.readAttribute("key_number")).toBe(42);
+  });
+
+  it("write_attribute id on a composite primary key raises", () => {
+    // Rails write.rb:35 remaps `id` → the PK array (`@primary_key`), then
+    // `write_from_user([...], v)` misses the attribute hash → Null attribute →
+    // MissingAttributeError, even though cpk_books has a real `id` column.
+    // Composite `id=` assignment uses the per-column path and is unaffected.
+    const book = new CpkBook();
+    // Rails interpolates the remapped name (the PK array) into the message.
+    expect(() => book.writeAttribute("id", 7)).toThrow(
+      'can\'t write unknown attribute `["author_id", "id"]`',
+    );
+  });
+
   it("read attribute with composite primary key", () => {
     const book = new CpkBook();
     book.id = [1, 2]; // sets author_id=1, id=2 (pk is ["author_id", "id"])

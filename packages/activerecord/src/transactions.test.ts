@@ -1171,13 +1171,14 @@ describe("TransactionTest", () => {
   it("restore composite id after rollback", async () => {
     const { CpkBook } = makeSQLiteCpkBook();
     // Rails: Cpk::Book.create!(id: [1, 2]) — id: [1, 2] distributes across the
-    // composite [author_id, id] key columns. We assign the key columns directly
-    // (the id= setter path has a separate dirty-tracking gap under rollback).
-    const book = (await CpkBook.create({ author_id: 1, id: 2 })) as any;
+    // composite [author_id, id] key columns via the `id=` setter (which
+    // update! also dispatches through, matching Rails' assign_attributes →
+    // public_send("id=")).
+    const book = (await CpkBook.create({ id: [1, 2] })) as any;
     expect(book.id).toEqual([1, 2]);
 
     await CpkBook.transaction(async () => {
-      await book.updateBang({ author_id: 42, id: 42 });
+      await book.updateBang({ id: [42, 42] });
       // Guard against a silent no-op: the in-TX write must take effect, so the
       // post-rollback assertion genuinely proves restoration (not that nothing
       // ever changed).

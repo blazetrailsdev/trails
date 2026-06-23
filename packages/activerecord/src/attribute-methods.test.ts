@@ -1487,10 +1487,17 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    const t = Topic.new({}) as any;
+    // Mirrors Rails `topic = Topic.first`: a persisted record whose schema is
+    // warm, so the real columns are known and an unknown name is detectable.
+    await Topic.create({ title: "orig" });
+    const t = (await Topic.first()) as any;
     // known attributes can be written
     t.writeAttribute("title", "known");
     expect(t.readAttribute("title")).toBe("known");
+    // Mirrors: topic[:no_column_exists] = "Hello!" → assert_raises MissingAttributeError
+    expect(() => t.writeAttribute("no_column_exists", "Hello!")).toThrow(
+      "can't write unknown attribute `no_column_exists`",
+    );
   });
 });
 
