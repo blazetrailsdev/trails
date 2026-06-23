@@ -3,6 +3,7 @@ import { Relation } from "../relation.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
+import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
 // (association-relation.ts extends Relation, which would otherwise
@@ -3751,6 +3752,13 @@ applyThenable(CollectionProxy.prototype, "load");
 // value-import CP at module init without re-entering the cycle).
 _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
+);
+
+// Register for Delegation.uncacheableMethods (delegation.rb:17-21): CollectionProxy's
+// own methods (not on Relation) must never be cached as generated relation methods.
+_registerRelationFamily(
+  "collectionProxy",
+  CollectionProxy as unknown as new (...a: never[]) => unknown,
 );
 
 /**

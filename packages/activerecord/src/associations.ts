@@ -4,12 +4,14 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
-import { ScopeRegistry } from "./scoping.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,
   delegateEnumerableMethod,
-  guardBaseMethodDelegation,
+  classMethodDelegator,
+  generateRelationMethod,
+  lookupGeneratedRelationMethod,
+  uncacheableMethods,
 } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -3085,6 +3087,17 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
+      // Cached class-method delegation (delegation.rb:127-129) resolves like a
+      // real method — ahead of the scope/array `method_missing` fallbacks — to
+      // match `wrapWithScopeProxy`'s generated-method lookup ordering. The cache
+      // only ever holds non-scope, non-array class-method delegations (scopes
+      // and array methods are intercepted below and never reach the branch that
+      // populates it), so this ordering can't shadow them.
+      const generated = lookupGeneratedRelationMethod(target.model, prop);
+      if (generated) {
+        return (...args: any[]) => generated.apply(target.scope(), args);
+      }
+
       // Array-method delegation (sync fast-path) — when already loaded, delegate
       // synchronously against `target.target` (the hydrated records array).
       // Checked before scope lookup so it matches `wrapWithScopeProxy`'s pattern
@@ -3132,23 +3145,11 @@ function wrapCollectionProxy<T extends Base = Base>(
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        return (...args: any[]) => {
-          guardBaseMethodDelegation(modelClass, prop);
-          const prev = ScopeRegistry.currentScope(modelClass);
-          ScopeRegistry.setCurrentScope(modelClass, scope);
-          let result: unknown;
-          try {
-            result = classMethod.apply(modelClass, args);
-          } catch (e) {
-            ScopeRegistry.setCurrentScope(modelClass, prev);
-            throw e;
-          }
-          if (result instanceof Promise) {
-            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
-          }
-          ScopeRegistry.setCurrentScope(modelClass, prev);
-          return result;
-        };
+        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        if (!uncacheableMethods().has(prop)) {
+          generateRelationMethod(modelClass, prop, delegator);
+        }
+        return (...args: any[]) => delegator.apply(scope, args);
       }
 
       return scopeVal;

@@ -1,5 +1,6 @@
 import { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
+import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import type { Base } from "./base.js";
 
 /**
@@ -595,3 +596,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return limit === undefined ? (records[0] ?? null) : records.slice(0, limit);
   }
 }
+
+_registerRelationFamily(
+  "disableJoinsAssociationRelation",
+  DisableJoinsAssociationRelation as unknown as new (...a: never[]) => unknown,
+);

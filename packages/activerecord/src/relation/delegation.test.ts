@@ -5,13 +5,20 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { delegateArrayMethod, DelegateCache, guardBaseMethodDelegation } from "./delegation.js";
+import {
+  delegateArrayMethod,
+  DelegateCache,
+  guardBaseMethodDelegation,
+  uncacheableMethods,
+} from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Project } from "../test-helpers/models/project.js";
+import { Developer } from "../test-helpers/models/developer.js";
 
 describe("DelegationTest", () => {
   // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
@@ -403,4 +410,38 @@ describe("DelegationTest", () => {
       expect(ids).toEqual([...ids].sort((a, b) => a - b));
     });
   }); // DelegationRelationTest
+});
+
+describe("DelegationCachingTest", () => {
+  const { projects } = useHandlerFixtures(["projects", "developers", "developersProjects"], {
+    schema: canonicalSchema,
+  });
+
+  registerModel(Project);
+  registerModel(Developer);
+
+  it("delegation doesn't override methods defined in other relation subclasses", async () => {
+    // precondition: `target` is defined on CollectionProxy subclasses but not on
+    // Relation itself (mirrors Rails' Relation.method_defined?(:target) checks).
+    expect("target" in Relation.prototype).toBe(false);
+    expect("target" in CollectionProxy.prototype).toBe(true);
+
+    // `target` is therefore uncacheable (delegation.rb:17-21): a generated copy
+    // on the shared per-model module would clobber CollectionProxy#target.
+    expect(uncacheableMethods().has("target")).toBe(true);
+
+    // Delegating Developer.target through the relation caches a generated
+    // relation method (delegation.rb:127-129) so subsequent calls skip the
+    // proxy miss path.
+    expect(await (Developer.all() as any).target()).toBe("__target__");
+
+    // The cache must not override CollectionProxy#target: a Developer-typed
+    // collection proxy still resolves its own loaded target accessor, never the
+    // cached "__target__" delegation.
+    const project = projects("active_record");
+    const proxy = (project as any).developersWithCallbacks;
+    await proxy.load();
+    expect(proxy.target).not.toBe("__target__");
+    expect(Array.isArray(proxy.target)).toBe(true);
+  });
 });

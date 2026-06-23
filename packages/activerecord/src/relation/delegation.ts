@@ -13,6 +13,7 @@ import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
+import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -107,15 +108,78 @@ export class DelegateCache {
  * internal access uses `any` casts.
  */
 const _delegatedClasses = new Set<typeof Base>();
-const _uncacheableMethods = new Set<string>(["to_a", "to_ary", "records", "inspect"]);
 const _delegateCache = new DelegateCache();
 
 export function delegatedClasses(): Set<typeof Base> {
   return _delegatedClasses;
 }
 
+/**
+ * Collect a class's own public instance method/accessor names down to (but not
+ * including) `boundary` in its prototype chain — i.e. everything it adds on top
+ * of the boundary class. Mirrors `klass.public_instance_methods(false)` summed
+ * over the subclass chain above `Relation`.
+ */
+function ownMethodNamesAbove(
+  ctor: new (...args: never[]) => unknown,
+  boundary: object | null,
+): Set<string> {
+  const names = new Set<string>();
+  let proto: object | null = ctor.prototype as object;
+  while (proto && proto !== boundary && proto !== Object.prototype) {
+    for (const n of Object.getOwnPropertyNames(proto)) {
+      if (n !== "constructor") names.add(n);
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return names;
+}
+
+/**
+ * Compute the uncacheable-method set the Rails way (delegation.rb:17-21):
+ * `delegated_classes' public_instance_methods - Relation's`, which is exactly
+ * the methods unique to the proxy/association-relation subclasses (e.g.
+ * `target`) — those NOT also defined on Relation. Such a method must not be
+ * generated: a generated copy on the per-model module would clobber the proxy
+ * subclass's own method. (Methods the proxies override but Relation also
+ * defines — build/create/reload/records — are real methods that never reach
+ * the delegation branch anyway, so the subtraction correctly drops them.)
+ */
+function computeUncacheableMethods(): Set<string> {
+  const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
+    _relationFamilySlot;
+  const relationProto = relation ? (relation.prototype as object) : null;
+  const result = new Set<string>();
+  for (const sub of [collectionProxy, associationRelation, disableJoinsAssociationRelation]) {
+    if (!sub) continue;
+    for (const n of ownMethodNamesAbove(sub, relationProto)) result.add(n);
+  }
+  // Rails subtracts `Relation.public_instance_methods` (delegation.rb:19): a
+  // proxy method that *overrides* a Relation method is not uncacheable. Mirror
+  // the exact set difference by removing every name reachable on Relation's own
+  // prototype chain.
+  if (relation) {
+    for (const n of ownMethodNamesAbove(relation, null)) result.delete(n);
+  }
+  return result;
+}
+
+let _uncacheableMethodsCache: Set<string> | undefined;
+let _uncacheableMethodsCacheVersion = -1;
+
 export function uncacheableMethods(): Set<string> {
-  return _uncacheableMethods;
+  // Recompute only when a relation-family class registers (import-time only);
+  // the version stamp stabilizes before any delegation runs, so this memoizes
+  // permanently without depending on which/how many classes have loaded.
+  if (
+    _uncacheableMethodsCache &&
+    _uncacheableMethodsCacheVersion === _relationFamilyState.version
+  ) {
+    return _uncacheableMethodsCache;
+  }
+  _uncacheableMethodsCache = computeUncacheableMethods();
+  _uncacheableMethodsCacheVersion = _relationFamilyState.version;
+  return _uncacheableMethodsCache;
 }
 
 /**
@@ -196,6 +260,55 @@ export function generateRelationMethod(
   fn: AnyCallable,
 ): void {
   generatedMethodsFor(modelClass).generate(name, fn);
+}
+
+/**
+ * Look up a previously generated relation method for `modelClass`, or
+ * `undefined` if none has been cached. Lets `wrapCollectionProxy`
+ * (associations.ts) resolve cached delegations without reaching into the
+ * module-private WeakMap.
+ */
+export function lookupGeneratedRelationMethod(
+  modelClass: typeof Base,
+  name: string,
+): AnyCallable | undefined {
+  return _generatedMethodsByModel.get(modelClass)?.get(name);
+}
+
+/**
+ * Build the function that delegates a model class method through a relation /
+ * collection-proxy scope — Rails' `ClassSpecificRelation#method_missing`
+ * `scoping { @klass.public_send(method, ...) }` (delegation.rb:118-131). The
+ * `this` it's invoked with becomes the current scope for the call's duration:
+ * sync results (a Relation) restore the prior scope immediately so the result
+ * is directly chainable; async results (a Promise) defer restoration until the
+ * promise settles, mirroring Rails' synchronous block-scoping across the body.
+ *
+ * This is also what `generateRelationMethod` caches (delegation.rb:127-129) so
+ * subsequent calls skip the proxy miss path.
+ */
+export function classMethodDelegator(
+  modelClass: typeof Base,
+  prop: string,
+  classMethod: AnyCallable,
+): AnyCallable {
+  return function (this: any, ...args: any[]) {
+    guardBaseMethodDelegation(modelClass, prop);
+    const prev = ScopeRegistry.currentScope(modelClass);
+    ScopeRegistry.setCurrentScope(modelClass, this);
+    let result: unknown;
+    try {
+      result = classMethod.apply(modelClass, args);
+    } catch (e) {
+      ScopeRegistry.setCurrentScope(modelClass, prev);
+      throw e;
+    }
+    if (result instanceof Promise) {
+      return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
+    }
+    ScopeRegistry.setCurrentScope(modelClass, prev);
+    return result;
+  };
 }
 
 export function generateMethod(name: string): AnyCallable {
@@ -405,23 +518,15 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // mirroring Rails' synchronous block-scoping across the full body.
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
-        return (...args: any[]) => {
-          guardBaseMethodDelegation(modelClass, prop);
-          const prev = ScopeRegistry.currentScope(modelClass);
-          ScopeRegistry.setCurrentScope(modelClass, target);
-          let result: unknown;
-          try {
-            result = classMethod.apply(modelClass, args);
-          } catch (e) {
-            ScopeRegistry.setCurrentScope(modelClass, prev);
-            throw e;
-          }
-          if (result instanceof Promise) {
-            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
-          }
-          ScopeRegistry.setCurrentScope(modelClass, prev);
-          return result;
-        };
+        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        // Cache the delegation so subsequent calls resolve through the
+        // generated method above rather than re-running this proxy miss path
+        // (delegation.rb:127-129) — except uncacheable methods (to_a/records/
+        // inspect) which Rails never generates.
+        if (!uncacheableMethods().has(prop)) {
+          generateRelationMethod(modelClass, prop, delegator);
+        }
+        return (...args: any[]) => delegator.apply(target, args);
       }
       return value;
     },

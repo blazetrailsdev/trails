@@ -80,6 +80,7 @@ import {
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
+import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import type { Result } from "./result.js";
@@ -7095,6 +7096,8 @@ export class Relation<T extends Base> {
     return _sm.relationWith(this as any, values as any);
   }
 }
+
+_registerRelationFamily("relation", Relation);
 
 // ---------------------------------------------------------------------------
 // Mixin: mirrors Rails' include QueryMethods, FinderMethods, Calculations, SpawnMethods
