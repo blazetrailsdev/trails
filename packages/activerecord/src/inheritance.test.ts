@@ -2024,6 +2024,42 @@ describe("STI read of a demodulized namespaced type", () => {
     const found = await CatalogItem.find(book.id);
     expect(found).toBeInstanceOf(CatalogBook);
   });
+
+  it("hydrates a namespaced STI subclass registered only under its namespaced key", async () => {
+    // The subclass is NOT a tracked descendant (registered via the string form,
+    // which sets only the registry — no registerSubclass), so the row-path
+    // findStiClassInHierarchy walk misses. With explicit enableSti the base
+    // defers to findStiClass, which (routing through sti_class_for) resolves the
+    // demodulized "Magazine" namespace-relative to the base's module nesting —
+    // matching Rails' find_sti_class → sti_class_for → compute_type. A bare
+    // modelRegistry.get("Magazine") would have missed entirely.
+    class CatalogShelfItem extends Base {
+      static moduleName = "Catalog";
+      static _demodulizedName = "ShelfItem";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+      static {
+        this._tableName = "catalog_items";
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        enableSti(this);
+      }
+    }
+    class CatalogMagazine extends CatalogShelfItem {
+      static moduleName = "Catalog";
+      static _demodulizedName = "Magazine";
+    }
+    registerModel(CatalogShelfItem);
+    // Registered ONLY under the namespaced key — not a tracked descendant and the
+    // bare "Magazine" is not a registry key.
+    registerModel("Catalog::Magazine", CatalogMagazine);
+    expect(CatalogShelfItem.descendants).not.toContain(CatalogMagazine);
+
+    const mag = await CatalogMagazine.create({ name: "Wired" });
+    expect(mag.type).toBe("Magazine");
+    const found = await CatalogShelfItem.find(mag.id);
+    expect(found).toBeInstanceOf(CatalogMagazine);
+  });
 });
 
 describe("polymorphic belongs_to namespace-relative type resolution", () => {

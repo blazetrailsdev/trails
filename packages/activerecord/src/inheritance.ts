@@ -541,19 +541,16 @@ export function getStiBase(modelClass: object): typeof Base {
  * @internal
  */
 export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
-  const klass = modelRegistry.get(typeName);
-  if (!klass) {
-    throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
-    );
-  }
-  // Verify it's actually a subclass (or the base itself)
-  if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
-    throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
-    );
-  }
-  return klass;
+  // Rails' find_sti_class delegates the constant resolution to sti_class_for,
+  // which branches on the store_full_* flags: constantize when storing the full
+  // STI class name, else namespace-relative compute_type. Routing through
+  // {@link stiClassFor} (rather than a bare registry lookup) is what lets an
+  // explicitly-STI-enabled hierarchy resolve a namespaced subclass from its
+  // demodulized stored type when `store_full_sti_class = false` — the registered
+  // candidate is found via the model's own module nesting rather than the bare
+  // (unregistered) demodulized name. With the default flags on, sti_class_for
+  // falls back to the bare registry lookup, preserving the prior behavior.
+  return stiClassFor(baseClass, typeName);
 }
 
 /**
