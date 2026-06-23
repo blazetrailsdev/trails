@@ -72,6 +72,8 @@ export {
   runAllCallbacks,
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
+  snapshotCallbacksOnProto,
+  restoreCallbacksOnProto,
 } from "./callbacks.js";
 export type { CallbackConditions, TransactionalCallbackConditions } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";

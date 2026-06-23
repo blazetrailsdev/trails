@@ -117,6 +117,7 @@ export {
   withTransactionReturningStatus,
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
+export { resetCallbacks } from "./callbacks.js";
 export { delegate } from "./delegate.js";
 export {
   indexNestedAttributeErrors,
