@@ -140,4 +140,35 @@ describe("stripFile (batch-then-bisect)", () => {
       expect(final).toContain("sink(d.three);");
     });
   });
+
+  it("isolates multiple non-adjacent load-bearing casts in one file", async () => {
+    // `.keep` (idx 1) and `.hold` (idx 4) are both load-bearing and sit in
+    // different bisect halves, so the recursion must split both ways.
+    const text = [
+      "sink((a as any).one);",
+      "sink((b as any).keep);",
+      "sink((c as any).two);",
+      "sink((d as any).three);",
+      "sink((e as any).hold);",
+      "sink((f as any).four);",
+      "",
+    ].join("\n");
+    await withTempFile(text, async (file) => {
+      const verify: (t: string) => Promise<boolean> = async (t) => {
+        await writeFile(file, t);
+        return t.includes("(b as any).keep") && t.includes("(e as any).hold");
+      };
+      const result = await stripFile(file, verify);
+      expect(result.candidates).toBe(6);
+      expect(result.removed).toBe(4);
+      expect(result.kept).toBe(2);
+
+      const final = await readFile(file, "utf8");
+      expect(final).toContain("(b as any).keep");
+      expect(final).toContain("(e as any).hold");
+      for (const removed of ["a.one", "c.two", "d.three", "f.four"]) {
+        expect(final).toContain(`sink(${removed});`);
+      }
+    });
+  });
 });
