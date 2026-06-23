@@ -38,6 +38,7 @@ import {
   resolveAliasedColumn,
 } from "./reflection.js";
 import { Table } from "@blazetrails/arel";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
 import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { UnknownPrimaryKey } from "./errors.js";
@@ -1412,6 +1413,22 @@ describe("ReflectionTest", () => {
     const normalRef = reflectOnAssociation(Sponsor, "sponsorClub");
     expect(normalRef!.foreignType).toBeNull();
   });
+  it("through reflection type honors source foreign_type option", () => {
+    class Hub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("posts", { className: "Post", foreignKey: "hub_id" });
+        this.hasMany("hubImages", { through: "posts", source: "images" });
+      }
+    }
+    registerModel("Post", CanonicalPost);
+    registerModel("Hub", Hub);
+    const through = reflectOnAssociation(Hub, "hubImages") as ThroughReflection;
+    // images declares `foreignType: "imageable_class"`, so the through-chain
+    // type predicate must surface it rather than `imageable_type`.
+    expect(through.foreignType).toBe("imageable_class");
+    expect(through.type).toBe("imageable_class");
+  });
   it("default association validation", () => {
     class Owner extends Base {
       static {
@@ -2103,19 +2120,11 @@ describe("ReflectionTest", () => {
   });
 
   it("type", () => {
-    class Comment extends Base {
-      static {
-        this.attribute("post_id", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        Associations.hasMany.call(this, "comments", { className: "Comment" });
-      }
-    }
-    const reflection = reflectOnAssociation(Post, "comments");
-    expect(reflection!.macro).toBe("hasMany");
+    expect(reflectOnAssociation(CanonicalPost, "taggings")!.type).toBe("taggable_type");
+    // images declares `foreignType: "imageable_class"` on its `as:` option, so
+    // the reflection type must honor it rather than deriving `imageable_type`.
+    expect(reflectOnAssociation(CanonicalPost, "images")!.type).toBe("imageable_class");
+    expect(reflectOnAssociation(CanonicalPost, "readers")!.type).toBeNull();
   });
 
   it("collection association", () => {
