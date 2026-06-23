@@ -13,7 +13,7 @@ import {
   getRaiseOnAssignToAttrReadonly,
   setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
-import { SubclassNotFound, NameError, TableNotSpecified } from "./errors.js";
+import { SubclassNotFound, NameError, TableNotSpecified, ActiveRecordError } from "./errors.js";
 import { quoteSqlValue } from "./base.js";
 
 import { createSidecarTestAdapter, adapterType } from "./test-adapter.js";
@@ -3117,9 +3117,7 @@ describe("BasicsTest", () => {
 
   it("touch should raise error on a new object", async () => {
     const p = new Post({ title: "unsaved" });
-    // new records are not persisted; touch is a no-op or returns false
-    const result = await p.touch();
-    expect(result === false || result === true || result === undefined).toBe(true);
+    await expect(p.touch("updated_at")).rejects.toBeInstanceOf(ActiveRecordError);
   });
 
   it("default values are deeply dupped", () => {

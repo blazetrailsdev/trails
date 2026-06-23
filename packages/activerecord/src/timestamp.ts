@@ -25,13 +25,21 @@ export async function touch(
   optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
   ...rest: string[]
 ): Promise<boolean> {
+  // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
+  // prepended ahead of Persistence#touch: a no_touching block short-circuits
+  // the whole method — including the persisted?/readonly? guards below — so a
+  // new or destroyed record inside one returns falsy rather than raising.
+  const ctor = this.constructor as typeof Base;
+  if (isNoTouchingApplied(ctor)) return false;
+
+  // Mirrors Rails Persistence#touch: a non-persisted (new or destroyed) record
+  // raises ActiveRecordError via _raise_record_not_touched_error — it does not
+  // return false. The persisted? check runs before the readonly check, matching
+  // persistence.rb:794-795.
+  if (!this.isPersisted()) raiseRecordNotTouchedError();
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
-  if (!this.isPersisted()) return false;
-
-  const ctor = this.constructor as typeof Base;
-  if (isNoTouchingApplied(ctor)) return false;
 
   let time: Temporal.Instant;
   let names: string[];
@@ -74,7 +82,10 @@ export async function touch(
   const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
   const touchCols = Array.from(touchColSet);
 
-  if (touchCols.length === 0) return false;
+  // Mirrors Rails Persistence#touch (persistence.rb:805-810): when there are no
+  // timestamp columns and no caller-supplied names, the `else true end` branch
+  // returns true — touch is a successful no-op, not a failure.
+  if (touchCols.length === 0) return true;
 
   // Mirrors Rails: ActiveRecord::Transactions#touch wraps the persistence-layer
   // touch in `with_transaction_returning_status`, so the record is enrolled in
@@ -85,6 +96,17 @@ export async function touch(
   return withTransactionReturningStatus.call(this, async () => {
     return touchRow.call(this, touchCols, now);
   }) as Promise<boolean>;
+}
+
+/**
+ * Mirrors Rails Persistence#_raise_record_not_touched_error (persistence.rb:961).
+ * The message matches Rails' squished heredoc verbatim.
+ */
+function raiseRecordNotTouchedError(): never {
+  throw new ActiveRecordError(
+    "Cannot touch on a new or destroyed record object. Consider using " +
+      "persisted?, new_record?, or destroyed? before touching.",
+  );
 }
 
 /**

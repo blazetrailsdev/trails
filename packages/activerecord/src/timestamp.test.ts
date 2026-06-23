@@ -534,18 +534,6 @@ describe("TimestampTest", () => {
     expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("touch returns false on new record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = new Post({ title: "New" });
-    expect(await post.touch()).toBe(false);
-  });
-
   it("touch skips callbacks", async () => {
     const log: string[] = [];
 
@@ -610,7 +598,7 @@ describe("TimestampTest", () => {
     expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("touch on model without updated_at returns false", async () => {
+  it("touching a record without timestamps is unexceptional", async () => {
     class Simple extends Base {
       static {
         this.attribute("name", "string");
@@ -618,7 +606,8 @@ describe("TimestampTest", () => {
     }
 
     const s = await Simple.create({ name: "test" });
-    expect(await s.touch()).toBe(false);
+    // Mirrors Rails: with no timestamp columns and no names, touch returns true.
+    expect(await s.touch()).toBe(true);
   });
 });
 
@@ -799,16 +788,6 @@ describe("TimestampTest", () => {
     log.length = 0;
     await post.touch();
     expect(log).toHaveLength(0);
-  });
-
-  it("touch returns false on new record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = new Post({});
-    expect(await post.touch()).toBe(false);
   });
 
   it("updateColumn does not update updated_at", async () => {
