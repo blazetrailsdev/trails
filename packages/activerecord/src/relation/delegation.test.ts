@@ -5,7 +5,12 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { delegateArrayMethod, DelegateCache, guardBaseMethodDelegation } from "./delegation.js";
+import {
+  delegateArrayMethod,
+  DelegateCache,
+  guardBaseMethodDelegation,
+  uncacheableMethods,
+} from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -414,6 +419,10 @@ describe("DelegationCachingTest", () => {
     // Relation itself (mirrors Rails' Relation.method_defined?(:target) checks).
     expect("target" in Relation.prototype).toBe(false);
     expect("target" in CollectionProxy.prototype).toBe(true);
+
+    // `target` is therefore uncacheable (delegation.rb:17-21): a generated copy
+    // on the shared per-model module would clobber CollectionProxy#target.
+    expect(uncacheableMethods().has("target")).toBe(true);
 
     // Delegating Developer.target through the relation caches a generated
     // relation method (delegation.rb:127-129) so subsequent calls skip the

@@ -3087,6 +3087,17 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
+      // Cached class-method delegation (delegation.rb:127-129) resolves like a
+      // real method — ahead of the scope/array `method_missing` fallbacks — to
+      // match `wrapWithScopeProxy`'s generated-method lookup ordering. The cache
+      // only ever holds non-scope, non-array class-method delegations (scopes
+      // and array methods are intercepted below and never reach the branch that
+      // populates it), so this ordering can't shadow them.
+      const generated = lookupGeneratedRelationMethod(target.model, prop);
+      if (generated) {
+        return (...args: any[]) => generated.apply(target.scope(), args);
+      }
+
       // Array-method delegation (sync fast-path) — when already loaded, delegate
       // synchronously against `target.target` (the hydrated records array).
       // Checked before scope lookup so it matches `wrapWithScopeProxy`'s pattern
@@ -3132,13 +3143,6 @@ function wrapCollectionProxy<T extends Base = Base>(
       // Promise) defer restoration until the promise settles — mirrors Rails'
       // synchronous block-scoping across the full method body.
       const modelClass = target.model;
-      // Cached delegation (delegation.rb:127-129): once a class method has been
-      // delegated, resolve through the generated method bound to the scope
-      // rather than re-running the miss path below.
-      const generated = lookupGeneratedRelationMethod(modelClass, prop);
-      if (generated) {
-        return (...args: any[]) => generated.apply(scope, args);
-      }
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
         const delegator = classMethodDelegator(modelClass, prop, classMethod);

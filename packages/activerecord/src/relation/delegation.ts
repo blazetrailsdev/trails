@@ -13,6 +13,7 @@ import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
+import { _relationFamilySlot } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -107,15 +108,67 @@ export class DelegateCache {
  * internal access uses `any` casts.
  */
 const _delegatedClasses = new Set<typeof Base>();
-const _uncacheableMethods = new Set<string>(["to_a", "to_ary", "records", "inspect"]);
 const _delegateCache = new DelegateCache();
 
 export function delegatedClasses(): Set<typeof Base> {
   return _delegatedClasses;
 }
 
+/**
+ * Collect a class's own public instance method/accessor names down to (but not
+ * including) `boundary` in its prototype chain — i.e. everything it adds on top
+ * of the boundary class. Mirrors `klass.public_instance_methods(false)` summed
+ * over the subclass chain above `Relation`.
+ */
+function ownMethodNamesAbove(
+  ctor: new (...args: never[]) => unknown,
+  boundary: object | null,
+): Set<string> {
+  const names = new Set<string>();
+  let proto: object | null = ctor.prototype as object;
+  while (proto && proto !== boundary && proto !== Object.prototype) {
+    for (const n of Object.getOwnPropertyNames(proto)) {
+      if (n !== "constructor") names.add(n);
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return names;
+}
+
+/**
+ * Compute the uncacheable-method set the Rails way (delegation.rb:17-21):
+ * `delegated_classes' public_instance_methods - Relation's`, which is exactly
+ * the proxy-/association-relation-specific methods (`target`, `reload`, `reset`,
+ * the build/create proxy methods, …) that must NOT be generated — a generated
+ * copy on the per-model module would clobber the proxy subclass's own method.
+ */
+function computeUncacheableMethods(): Set<string> {
+  const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
+    _relationFamilySlot;
+  const boundary = relation ? (relation.prototype as object) : null;
+  const result = new Set<string>();
+  for (const sub of [collectionProxy, associationRelation, disableJoinsAssociationRelation]) {
+    if (!sub) continue;
+    for (const n of ownMethodNamesAbove(sub, boundary)) result.add(n);
+  }
+  return result;
+}
+
+let _uncacheableMethodsCache: Set<string> | undefined;
+
 export function uncacheableMethods(): Set<string> {
-  return _uncacheableMethods;
+  const slot = _relationFamilySlot;
+  const ready =
+    slot.relation &&
+    slot.collectionProxy &&
+    slot.associationRelation &&
+    slot.disableJoinsAssociationRelation;
+  // Freeze the memoized set only once every relation-family class has loaded
+  // (module init can call this before they all register). Delegation runs at
+  // query time, well after init, so the live recompute path is a startup-only
+  // fallback.
+  if (ready) return (_uncacheableMethodsCache ??= computeUncacheableMethods());
+  return computeUncacheableMethods();
 }
 
 /**
@@ -459,7 +512,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         // generated method above rather than re-running this proxy miss path
         // (delegation.rb:127-129) — except uncacheable methods (to_a/records/
         // inspect) which Rails never generates.
-        if (!_uncacheableMethods.has(prop)) {
+        if (!uncacheableMethods().has(prop)) {
           generateRelationMethod(modelClass, prop, delegator);
         }
         return (...args: any[]) => delegator.apply(target, args);

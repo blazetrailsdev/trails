@@ -5,6 +5,7 @@ import { _setAssociationRelationCtor } from "./associations/collection-proxy.js"
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
+import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
@@ -319,6 +320,10 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
 }
 
 _setAssociationRelationCtor(AssociationRelation);
+_registerRelationFamily(
+  "associationRelation",
+  AssociationRelation as unknown as new (...a: never[]) => unknown,
+);
 setAssociationRelationFactory(
   (klass, assoc) => new AssociationRelation(klass as typeof Base, assoc as Association),
 );
