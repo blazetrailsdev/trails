@@ -21,14 +21,18 @@ import { Vertex } from "../test-helpers/models/vertex.js";
 import { Edge } from "../test-helpers/models/edge.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, SillyReply } from "../test-helpers/models/reply.js";
+import { Company, Firm, Client } from "../test-helpers/models/company.js";
+import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices } = useHandlerFixtures(
+  const { authors, topics, vertices, companies } = useHandlerFixtures(
     [
       "authors",
       "posts",
       "topics",
+      "companies",
+      "accounts",
       "comments",
       "categorizations",
       "categories",
@@ -54,6 +58,10 @@ describe("CascadedEagerLoadingTest", () => {
   registerSubclass(SillyReply);
   registerModel(Vertex);
   registerModel(Edge);
+  registerModel(Company);
+  registerModel(Firm);
+  registerModel(Client);
+  registerModel(Account);
 
   const targetArr = (rec: Base, name: string): Base[] =>
     (rec.association(name).target as Base[]) ?? [];
@@ -183,11 +191,31 @@ describe("CascadedEagerLoadingTest", () => {
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
   });
 
-  it.skip("eager association loading with cascaded three levels by ping pong", () => {
-    // BLOCKED: canonical Company model lacks enableSti.
-    // ROOT-CAUSE: Firm.all returns all 12 companies because
-    //   test-helpers/models/company.ts never calls enableSti, so STI type
-    //   scoping is absent. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  it("eager association loading with cascaded three levels by ping pong", async () => {
+    const firms = await Firm.all()
+      .includes({ account: { firm: "account" } })
+      .order("companies.id")
+      .toArray();
+    expect(firms).toHaveLength(3);
+    const firstAccount = target(firms[0], "account") as Base;
+    const firmAccount = target(target(firstAccount, "firm") as Base, "account") as Base;
+    expect(firmAccount.id).toBe(firstAccount.id);
+    // companies(:first_firm).account — fixture record's has_one, loaded directly.
+    const expected = (await (companies("first_firm") as Firm).loadHasOne("account")) as Base;
+    await assertQueriesCount(0, false, () => {
+      expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
+        expected.id,
+      );
+    });
+    // companies(:first_firm).account.firm.account — same value via a deeper walk.
+    const ffAccount = (await (companies("first_firm") as Firm).loadHasOne("account")) as Account;
+    const ffFirm = (await ffAccount.loadBelongsTo("firm")) as Firm;
+    const expectedDeep = (await ffFirm.loadHasOne("account")) as Base;
+    await assertQueriesCount(0, false, () => {
+      expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
+        expectedDeep.id,
+      );
+    });
   });
 
   it("eager association loading with has many sti", async () => {
