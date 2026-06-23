@@ -145,15 +145,23 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
   // writing via an alias cannot bypass readonly enforcement.
   let canonical = resolveAliasName(ctor, String(name));
   // Rails `write_attribute` remaps the `id` literal to the primary key before
-  // `write_from_user` (write.rb:34: `name = @primary_key if name == "id" &&
-  // @primary_key`). Mirror it for a scalar custom PK so `writeAttribute("id")`
-  // lands on the real PK column instead of being rejected as unknown. A
-  // composite PK keeps the `id` name and is rejected below exactly as Rails'
-  // `write_from_user(array)` raises (the array key resolves to a Null
-  // attribute) — and a standard `id` PK remaps to itself (a no-op).
+  // `write_from_user` (write.rb:35: `name = @primary_key if name == "id" &&
+  // @primary_key`), where `@primary_key` is `klass.primary_key` (core.rb:844).
+  // - Scalar custom PK: `@primary_key` is a string, so `id` remaps to the real
+  //   PK column (a standard `id` PK remaps to itself, a no-op).
+  // - Composite PK: `@primary_key` is the array, so Rails calls
+  //   `write_from_user([...], v)`; the array key misses the attribute hash and
+  //   resolves to a `Null` attribute → `MissingAttributeError` — even when the
+  //   table has a real `id` column (e.g. cpk_books). Mirror that raise here
+  //   rather than writing the scalar `id`. (Composite `id=` assignment flows
+  //   through the per-column `_writeAttribute` path, not this one.)
   const pk = ctor.primaryKey;
-  if (canonical === "id" && typeof pk === "string" && pk) {
-    canonical = pk;
+  if (canonical === "id" && pk != null) {
+    if (typeof pk === "string") {
+      canonical = pk;
+    } else if (!(this as { _initializingAttributes?: boolean })._initializingAttributes) {
+      throw new MissingAttributeError("can't write unknown attribute `id`");
+    }
   }
   if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
     if (_raiseOnAssignToAttrReadonly) {

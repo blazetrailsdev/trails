@@ -86,12 +86,13 @@ describe("PrimaryKeysTest", () => {
     expect(keyboard.readAttribute("key_number")).toBe(42);
   });
 
-  it("write_attribute id on a composite primary key with a real id column", () => {
-    // cpk_books has a real `id` column (part of the ["author_id", "id"] PK), so a
-    // warm-schema `writeAttribute("id")` writes it rather than raising.
+  it("write_attribute id on a composite primary key raises", () => {
+    // Rails write.rb:35 remaps `id` → the PK array (`@primary_key`), then
+    // `write_from_user([...], v)` misses the attribute hash → Null attribute →
+    // MissingAttributeError, even though cpk_books has a real `id` column.
+    // Composite `id=` assignment uses the per-column path and is unaffected.
     const book = new CpkBook();
-    book.writeAttribute("id", 7);
-    expect(book.readAttribute("id")).toBe(7);
+    expect(() => book.writeAttribute("id", 7)).toThrow("can't write unknown attribute `id`");
   });
 
   it("read attribute with composite primary key", () => {
