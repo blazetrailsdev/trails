@@ -520,7 +520,38 @@ function predicateReferencesTable(node: any, tableName: string): boolean {
   if (!found && node instanceof Nodes.Not) {
     return predicateReferencesTable((node as any).expr, tableName);
   }
+  // Raw-SQL predicates (e.g. `where("memberships.favorite = ?", true)`) carry no
+  // Arel Attribute nodes, so `fetchAttribute` never visits them. Inspect the raw
+  // SQL text for a `<table>.` reference so a string condition on the through
+  // table is relocated to the through query just like a hash/Arel condition.
+  if (!found && rawSqlReferencesTable(node, tableName)) {
+    found = true;
+  }
   return found;
+}
+
+/**
+ * True when a raw-SQL predicate node's text qualifies a column with `tableName.`.
+ * Handles SqlLiteral / BoundSqlLiteral and a single Grouping wrapper.
+ *
+ * Heuristic: this scans the raw SQL for a `<table>.` qualifier token; it does
+ * NOT parse the SQL, so a qualifier appearing inside a string literal (e.g.
+ * `where("note = 'see memberships.x'")`) would be a false positive and relocate
+ * a source-table predicate onto the through query. No current scope hits this;
+ * raw-SQL through conditions are simple table-qualified comparisons. Arel/hash
+ * predicates take the precise `fetchAttribute` path above and never reach here.
+ * @internal
+ */
+function rawSqlReferencesTable(node: any, tableName: string): boolean {
+  if (node instanceof Nodes.Grouping) {
+    return rawSqlReferencesTable((node as any).expr, tableName);
+  }
+  let sql: string | undefined;
+  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
+  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
+  if (typeof sql !== "string") return false;
+  const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w.])${escaped}\\.`).test(sql);
 }
 
 /** @internal */
