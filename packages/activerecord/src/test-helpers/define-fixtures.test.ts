@@ -285,7 +285,7 @@ describe("defineFixtures", () => {
     class Post extends Base {
       static {
         this._tableName = "posts";
-      this.attribute("id", "integer");
+        this.attribute("id", "integer");
       }
     }
     const postInstance = new Post();
