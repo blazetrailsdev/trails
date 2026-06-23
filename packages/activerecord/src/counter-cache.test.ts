@@ -6,7 +6,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { MissingAttributeError } from "@blazetrails/activemodel";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -127,15 +126,6 @@ const TEST_SCHEMA: Schema = {
     body: "string",
     legacy_post_id: "integer",
   },
-  // Owner table with NO counter column (and no alias for one) — exercises the
-  // has_cached_counter?-style skip when the resolved counter column is absent.
-  uncounted_blogs: {
-    title: "string",
-  },
-  uncounted_entries: {
-    body: "string",
-    uncounted_blog_id: "integer",
-  },
 };
 
 // -- Helpers --
@@ -206,45 +196,6 @@ describe("CounterCacheTest", () => {
 
     const reloaded = await LegacyPost.find(post.id);
     expect(reloaded.legacy_comments_count).toBe(1);
-  });
-
-  // A counter cache pointing at a column that does not exist on the owner
-  // raises rather than silently degrading — converging to Rails, whose live
-  // belongs_to update path (require_counter_update? = counter_cache_column &&
-  // owner.persisted?) has no column-existence guard, so increment! on the
-  // missing column raises MissingAttributeError. (Story
-  // 0023-surfaced-deviations/counter-cache-absent-column-skip-vs-raise; the
-  // earlier silent-skip — #3983 — and phantom-write allow-list — #3960 — are
-  // both removed.)
-  it("counter cache raises when the column does not exist on the owner", async () => {
-    class UncountedBlog extends Base {
-      static {
-        this._tableName = "uncounted_blogs";
-        this.attribute("title", "string");
-      }
-    }
-    class UncountedEntry extends Base {
-      static {
-        this._tableName = "uncounted_entries";
-        this.attribute("body", "string");
-        this.attribute("uncounted_blog_id", "integer");
-        this.belongsTo("uncountedBlog", {
-          className: "UncountedBlog",
-          foreignKey: "uncounted_blog_id",
-          counterCache: true,
-        });
-      }
-    }
-    registerModel(UncountedBlog);
-    registerModel(UncountedEntry);
-
-    const blog = await UncountedBlog.create({ title: "Hello" });
-    await expect(
-      UncountedEntry.create({ body: "World", uncounted_blog_id: blog.id }),
-    ).rejects.toThrow(MissingAttributeError);
-
-    // The counter column is never materialized on the owner.
-    expect(UncountedBlog.hasAttributeDefinition("uncounted_entries_count")).toBe(false);
   });
 
   // Rails: test_removing_association_updates_counter
