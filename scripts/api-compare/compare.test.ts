@@ -104,6 +104,33 @@ describe("significantMissingCalls", () => {
     const missing = significantMissingCalls("save", ["save"], new Set(), () => true, map, sig);
     expect(missing).toEqual([]);
   });
+
+  it("flags a dropped super-chain, bypassing the ported-with-args gate", () => {
+    const sigSuper = new Set(["super"]);
+    // isPortedWithArgs always false: super still flags because it maps 1:1.
+    const missing = significantMissingCalls(
+      "save",
+      ["super"],
+      new Set(),
+      () => false,
+      map,
+      sigSuper,
+    );
+    expect(missing).toEqual(["super → super"]);
+  });
+
+  it("does not flag super when the TS body chains super", () => {
+    const sigSuper = new Set(["super"]);
+    const missing = significantMissingCalls(
+      "save",
+      ["super"],
+      new Set(["super"]),
+      () => false,
+      map,
+      sigSuper,
+    );
+    expect(missing).toEqual([]);
+  });
 });
 
 describe("nameMatches", () => {

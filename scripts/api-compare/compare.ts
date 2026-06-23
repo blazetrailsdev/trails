@@ -94,6 +94,19 @@ const SIGNIFICANT_CALLS = new Set([
   "becomes",
   "clear_attribute_changes",
   "changes_applied",
+  // NOTE: "super" is captured by both extractors (extract-ruby-api.rb records
+  // super/zsuper; extract-ts-api.ts records a bare super(...) callee) and
+  // significantMissingCalls() has a dedicated branch for it, but it is
+  // deliberately NOT in this default allowlist. On activerecord it floods:
+  // 218 of 241 calls-mismatches are super-only, and ~134 of those are module
+  // methods. Rails mixes modules with `include` (Ruby's super walks the
+  // ancestor chain into the included module), but trails ports modules as
+  // `this`-typed functions assigned to the class (see CLAUDE.md "Module
+  // mixins") — there is no class-inheritance `super` to chain to, so the
+  // omission is structural, not a fidelity gap. Enabling super here would bury
+  // the 20 genuine missing-call signals under that noise. The capability is
+  // retained for an opt-in, curated caller (e.g. constructor-only) via the
+  // `significant` parameter.
 ]);
 
 /**
@@ -122,6 +135,13 @@ export function significantMissingCalls(
   for (const rc of rubyCalls) {
     if (rc === rubyName) continue; // self/recursive call
     if (!significant.has(rc)) continue;
+    if (rc === "super") {
+      // super maps 1:1 across extractors (both record the literal "super"), so
+      // it bypasses the ported-with-args gate that filters zero-arg readers —
+      // a dropped super-chain is the signal regardless of the override's args.
+      if (!tsCalls.has("super")) missing.push("super → super");
+      continue;
+    }
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (!mapped.some(isPortedWithArgs)) continue;

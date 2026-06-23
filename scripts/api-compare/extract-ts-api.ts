@@ -1326,6 +1326,9 @@ export function extractClass(
       }
     } else if (ts.isConstructorDeclaration(member)) {
       const params = extractParameters(member.parameters);
+      // Constructor bodies are the home of bare `super(...)` chains — capture
+      // calls here so calls-parity can flag a ported constructor that drops it.
+      const calls = extractCalls(member.body);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -1333,6 +1336,7 @@ export function extractClass(
         line,
         file,
         ...(internal ? { internal: true } : {}),
+        ...(calls !== undefined ? { calls } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
       const method: MethodInfo = {
@@ -1607,6 +1611,11 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
         names.add(callee.text);
       } else if (ts.isPropertyAccessExpression(callee)) {
         names.add(callee.name.text);
+      } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
+        // Bare `super(...)` (constructor chain) — `super.foo()` is already
+        // captured as `foo` by the property-access branch. Record as "super"
+        // so calls-parity can flag a ported override that drops the super call.
+        names.add("super");
       }
     }
     ts.forEachChild(n, visit);
