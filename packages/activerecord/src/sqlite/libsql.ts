@@ -13,6 +13,7 @@ import {
   type SyncSqliteConnection,
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
+import { resolveUriDatabasePath } from "./sqlite-uri.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -111,49 +112,6 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
  */
 export interface SyncableSqliteConnection extends SqliteConnection {
   sync(): Promise<void>;
-}
-
-/**
- * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
- * query strings) and `:memory:` aliases. Returns `null` for memory databases,
- * otherwise the decoded filesystem path.
- *
- * Unlike better-sqlite3 (whose build doesn't set `SQLITE_OPEN_URI`, so it
- * treats the string literally), libsql is URI-aware and opens a rootless
- * `file:foo.db` relative to the cwd. So this resolver preserves relative
- * `file:` paths (returning `foo.db`, not `/foo.db`) so `databaseExists()`
- * checks the path libsql actually opens; only `file:/...` / `file://host/...`
- * is absolute.
- * @internal
- */
-function resolveDatabasePath(database: string): string | null {
-  if (database === ":memory:") return null;
-  if (!database.startsWith("file:")) return database;
-  if (database.startsWith("file::memory:")) return null;
-  let url: URL;
-  try {
-    url = new URL(database, "file:///");
-  } catch {
-    return database;
-  }
-  if (url.searchParams.get("mode") === "memory") return null;
-  const decode = (s: string): string => {
-    try {
-      return decodeURIComponent(s);
-    } catch {
-      // Malformed escapes (e.g. lone "%") keep databaseExists() total.
-      return s;
-    }
-  };
-  // `new URL` anchors a rootless path at "/", losing relativity. A `file:` body
-  // that doesn't start with "/" (e.g. `file:foo.db`, `file:./foo.db`) is a
-  // cwd-relative SQLite URI; strip any `?query`/`#frag` and return it as-is.
-  const body = database.slice("file:".length);
-  if (!body.startsWith("/")) {
-    const sep = body.search(/[?#]/);
-    return decode(sep === -1 ? body : body.slice(0, sep));
-  }
-  return decode(url.pathname);
 }
 
 /** @internal */
@@ -349,7 +307,7 @@ export const libsqlDriver: SqliteDriver = {
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {
-    const path = resolveDatabasePath(config.database);
+    const path = resolveUriDatabasePath(config.database);
     if (path === null) return true; // memory database
     try {
       return getFs().existsSync(path);
@@ -377,7 +335,7 @@ export const libsqlDriver: SqliteDriver = {
     // SQLITE_OPEN_URI and resolves the destination), a raw file write needs a
     // real path: decode `file:` URIs, and reject in-memory destination URIs
     // since a clone cannot populate the held shared-cache memory DB.
-    const destPath = resolveDatabasePath(destination);
+    const destPath = resolveUriDatabasePath(destination);
     if (destPath === null) {
       throw new ConfigurationError(
         "libsql restoreFromPath cannot populate an in-memory destination " +
@@ -392,7 +350,7 @@ export const libsqlDriver: SqliteDriver = {
           "the configured fs adapter provides neither.",
       );
     }
-    const bytes = await fs.readFile(resolveDatabasePath(sourcePath) ?? sourcePath);
+    const bytes = await fs.readFile(resolveUriDatabasePath(sourcePath) ?? sourcePath);
     await fs.writeFile(destPath, bytes);
   },
 };
