@@ -93,6 +93,32 @@ describe("harvestObjectLiteralMethods", () => {
   });
 });
 
+describe("body call capture", () => {
+  it("records the call-set of a method body, sorted and de-duplicated", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        save() {
+          this.runCallbacks("save");
+          this.runCallbacks("commit");
+          helper();
+          obj.nested.touch();
+          return 1 + 2;
+        }
+      }`,
+    );
+    const save = cls.instanceMethods.find((m) => m.name === "save")!;
+    // PropertyAccess callee → final identifier; bare call → identifier;
+    // sorted + de-duped (runCallbacks appears twice, recorded once).
+    expect(save.calls).toEqual(["helper", "runCallbacks", "touch"]);
+  });
+
+  it("omits calls entirely for a body that invokes nothing", () => {
+    const cls = extractFromSource(`class Foo { id() { return this._id; } }`);
+    const id = cls.instanceMethods.find((m) => m.name === "id")!;
+    expect(id.calls).toBeUndefined();
+  });
+});
+
 describe("extractFileConstants", () => {
   it("captures exported const + public static readonly literals, excludes the rest", () => {
     const src = `export const BATCH = 1000; export let MUTABLE = 1; const PRIVATE = 2;

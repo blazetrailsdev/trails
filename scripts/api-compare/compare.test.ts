@@ -11,6 +11,7 @@ import {
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
   buildEntitiesByName,
+  significantMissingCalls,
 } from "./compare.js";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -42,6 +43,68 @@ function makeManifest(
   }
   return result;
 }
+
+describe("significantMissingCalls", () => {
+  // mapCall: snake → camel for the cases we test; withArgs: every ported name.
+  const map = (rc: string): string[] | null => {
+    const camel = rc.replace(/_(\w)/g, (_, c: string) => c.toUpperCase()).replace(/!$/, "Bang");
+    return [camel];
+  };
+  const sig = new Set(["run_callbacks", "save", "transaction"]);
+
+  it("flags a significant Ruby call the TS body omits", () => {
+    const missing = significantMissingCalls(
+      "update",
+      ["save", "assign_attributes"],
+      new Set(["assignAttributes"]),
+      () => true,
+      map,
+      sig,
+    );
+    expect(missing).toEqual(["save → save"]);
+  });
+
+  it("ignores idiom calls outside the allowlist (the noise the gate exists for)", () => {
+    const missing = significantMissingCalls(
+      "build",
+      ["each", "map", "new", "to_s"],
+      new Set(),
+      () => true,
+      map,
+      sig,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("does not flag when the TS body already makes the call", () => {
+    const missing = significantMissingCalls(
+      "save",
+      ["run_callbacks"],
+      new Set(["runCallbacks"]),
+      () => true,
+      map,
+      sig,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("skips zero-arg readers (callee not a ported method with args)", () => {
+    const missing = significantMissingCalls(
+      "save",
+      ["run_callbacks"],
+      new Set(),
+      () => false,
+      map,
+      sig,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("skips self/recursive calls", () => {
+    const missing = significantMissingCalls("save", ["save"], new Set(), () => true, map, sig);
+    expect(missing).toEqual([]);
+  });
+});
 
 describe("nameMatches", () => {
   it("matches identical names", () => {
