@@ -2956,6 +2956,16 @@ export class Relation<T extends Base> {
 
     this._records = parents as T[];
 
+    // Fire `_instantiateBlock` on the JoinDependency path, which instantiates via
+    // `jd.instantiateFromRows` and so bypasses `_instrumentInstantiation` (where
+    // the block otherwise runs). The bypass / degrade-to-preload sub-paths above
+    // already instantiate through `_instrumentInstantiation`, so firing here only
+    // — not in `_toArrayInner` — keeps the block once-per-record like Rails'
+    // `instantiate_records(rows, &block)`. Runs before the residual preload below
+    // (and the `_toArrayInner` preload), matching Rails' ordering.
+    const block = this._instantiateBlock;
+    if (block) for (const record of this._records) block(record);
+
     if (fallbackAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
     }

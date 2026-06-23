@@ -9,17 +9,6 @@ import type { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
 import type { ColumnOptions } from "../abstract/schema-definitions.js";
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  visitAddForeignKey(
-    _fromTable: string,
-    _toTable: string,
-    _options: Record<string, unknown>,
-  ): string {
-    throw new Error(
-      "SQLite3 does not support adding foreign keys after table creation. " +
-        "Use `foreignKey: true` on references when creating the table.",
-    );
-  }
-
   /** @internal */
   protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
     let sql = super.visitForeignKeyDefinition(o);

@@ -163,9 +163,14 @@ export class HasAndBelongsToMany {
       deps.defaultJoinTableName(model, name, {
         className: options.className as string | undefined,
       });
+    // Rails derives the owner join key from the demodulized class name, so a
+    // namespaced owner like `Publisher::Article` yields `article_id`, not
+    // `publisher_article_id`. `_demodulizedName` carries the Ruby leaf name for
+    // models whose flattened JS class name differs; fall back to `model.name`.
+    const ownerLeafName = model._demodulizedName ?? model.name;
     const ownerFk = deps.singleFk(
       options.foreignKey as string | string[] | undefined,
-      `${underscore(model.name)}_id`,
+      `${underscore(demodulize(ownerLeafName))}_id`,
     );
     const targetFk = habtmTargetFk(name, options);
 

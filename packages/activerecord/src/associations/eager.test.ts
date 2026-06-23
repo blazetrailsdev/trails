@@ -4201,26 +4201,6 @@ describe("EagerAssociationTest", () => {
       /Association named 'fistComment' was not found on SgPost; perhaps you misspelled it\?/,
     );
   });
-  it.skip("preloading belongs_to association associated by a composite query_constraints", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preloading has_many association associated by a composite query_constraints", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preloading has_many through association associated by a composite query_constraints", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it("preloading belongs_to with cpk", async () => {
     class CpkOrder extends Base {
       static {
@@ -5962,6 +5942,116 @@ describe("EagerAssociationTest", () => {
   it("eager-loading a polymorphic association with references to the associated table", async () => {
     const post = (await Post.eagerLoad("tags").where("tags.name = ?", "General").first()) as Post;
     expect(post.id).toBe(posts("welcome").id);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest — composite query_constraints / CPK preloading.
+// Canonical Sharded::* and Cpk::* models + fixtures; mirrors eager_test.rb's
+// composite-key preloading cases.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { shardedBlogs, shardedBlogPosts, shardedComments } = useHandlerFixtures(
+    ["shardedBlogs", "shardedBlogPosts", "shardedComments", "shardedTags", "shardedBlogPostsTags"],
+    { schema: canonicalSchema },
+  );
+
+  // useHandlerFixtures loads the rows but does not register the models under the
+  // class names the associations resolve by; register them here (dynamic import
+  // keeps these out of the file's top-level scope).
+  beforeAll(async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    registerModel("ShardedBlog", sharded.ShardedBlog);
+    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
+    registerModel("ShardedComment", sharded.ShardedComment);
+    registerModel("ShardedTag", sharded.ShardedTag);
+    registerModel("ShardedBlogPostTag", sharded.ShardedBlogPostTag);
+    const cpk = await import("../test-helpers/models/cpk.js");
+    registerModel("CpkPost", cpk.CpkPost);
+    registerModel("CpkComment", cpk.CpkComment);
+  });
+
+  it("preloading belongs_to association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const posts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds })
+      .includes("comments")
+      .toArray()) as any[];
+    expect(posts.every((post) => post._preloadedAssociations.has("comments"))).toBe(true);
+
+    const greatPostId = shardedBlogPosts("great_post_blog_one").id;
+    const post = posts.find((p) => p.id === greatPostId);
+    const expectedComments = (await sharded.ShardedComment.where({
+      blog_id: post.blog_id,
+      blog_post_id: post.id,
+    }).toArray()) as any[];
+    const loaded = post._preloadedAssociations.get("comments") as any[];
+    expect(loaded.map((c) => c.id).sort()).toEqual(expectedComments.map((c) => c.id).sort());
+  });
+
+  it("preloading has_many association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const comments = (await sharded.ShardedComment.where({ blog_id: blogIds })
+      .includes("blogPost")
+      .toArray()) as any[];
+    expect(comments.every((comment) => comment._preloadedAssociations.has("blogPost"))).toBe(true);
+
+    const greatCommentId = shardedComments("great_comment_blog_post_one").id;
+    const comment = comments.find((c) => c.id === greatCommentId);
+    const blogPost = comment._preloadedAssociations.get("blogPost");
+    expect(blogPost.id).toBe(shardedBlogPosts("great_post_blog_one").id);
+  });
+
+  it("preloading has_many through association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const blogPosts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds })
+      .includes("tags")
+      .toArray()) as any[];
+    expect(blogPosts.every((post) => post._preloadedAssociations.has("tags"))).toBe(true);
+
+    const expectedPost = shardedBlogPosts("great_post_blog_one");
+    const expectedTags = (await sharded.ShardedBlogPostTag.where({
+      blog_id: expectedPost.blog_id,
+      blog_post_id: expectedPost.id,
+    }).toArray()) as any[];
+    const expectedTagIds = expectedTags.map((t) => t.tag_id);
+    expect(expectedTagIds.length).toBeGreaterThan(0);
+
+    const blogPost = blogPosts.find((p) => p.id === expectedPost.id);
+    const loadedTags = blogPost._preloadedAssociations.get("tags") as any[];
+    expect(loadedTags.map((t) => t.id).sort()).toEqual(expectedTagIds.sort());
+  });
+
+  it("preloading belongs_to CPK model with one of the keys being shared between models", async () => {
+    const cpk = await import("../test-helpers/models/cpk.js");
+    const post1 = (await cpk.CpkPost.create({
+      title: "post1",
+      author: "the_same_author",
+    })) as any;
+    await cpk.CpkComment.create({
+      commentable_title: post1.title,
+      commentable_author: post1.author,
+      text: "great post1!",
+    });
+
+    const post2 = (await cpk.CpkPost.create({
+      title: "post2",
+      author: "the_same_author",
+    })) as any;
+    await cpk.CpkComment.create({
+      commentable_title: post2.title,
+      commentable_author: post2.author,
+      text: "great post2!",
+    });
+
+    const comments = (await cpk.CpkComment.all().eagerLoad("post").toArray()) as any[];
+    const actual: Record<string, string> = {};
+    for (const comment of comments) {
+      actual[comment.text] = comment._preloadedAssociations.get("post").title;
+    }
+    expect(actual).toEqual({ "great post1!": "post1", "great post2!": "post2" });
   });
 });
 

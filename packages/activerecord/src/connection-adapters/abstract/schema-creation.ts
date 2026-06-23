@@ -168,7 +168,7 @@ export class SchemaCreation {
       parts.push(this.visitAddColumnDefinition(add));
     }
     for (const fk of o.foreignKeyAdds) {
-      parts.push(visitAddForeignKey.call(this, fk));
+      parts.push(this.visitAddForeignKey(fk));
     }
     for (const name of o.foreignKeyDrops) {
       parts.push(this.visitDropConstraint(name));
@@ -194,6 +194,11 @@ export class SchemaCreation {
     }
 
     return `ALTER TABLE ${table} ${parts.join(", ")}`;
+  }
+
+  /** @internal */
+  protected visitAddForeignKey(o: ForeignKeyDefinition): string {
+    return `ADD ${this.visitForeignKeyDefinition(o)}`;
   }
 
   protected visitCreateIndexDefinition(o: CreateIndexDefinition): string {
@@ -496,9 +501,4 @@ export class SchemaCreation {
         );
     }
   }
-}
-
-/** @internal */
-function visitAddForeignKey(this: SchemaCreation, o: ForeignKeyDefinition): string {
-  return `ADD ${this.visitForeignKeyDefinition(o)}`;
 }

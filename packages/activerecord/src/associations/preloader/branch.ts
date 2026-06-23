@@ -254,6 +254,10 @@ export class Branch {
 
     const arr = Array.isArray(children) ? children : [children];
     return arr.flatMap((assoc) => {
+      // `Array(nil)` is `[]` in Ruby, so nil entries inside an includes/preload
+      // spec are silently dropped (e.g. `includes(nil)`, `includes([:posts, nil])`).
+      if (assoc == null) return [];
+
       // Flatten nested arrays, mirroring Rails' `Array.wrap` + `Array(...)`.
       if (Array.isArray(assoc)) {
         return this._buildChildren(assoc);
