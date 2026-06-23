@@ -171,14 +171,15 @@ export class HasOneAssociation extends SingularAssociation {
             !sameRecord(displaced, record)
           ) {
             // The previously-pending record was persisted independently (e.g.
-            // built then saved directly), so it is now the real associated
-            // record being displaced and must have its FK nullified. This case
-            // arises because our `setNewRecord` calls `replace(record)` with the
-            // default `save=true` (Rails passes `false`), so `build` leaves a
-            // `_pendingReplace` with `previousTarget: null`; a later `writer`
-            // for a different record must promote the now-persisted built record
-            // to `previousTarget`. Exercised by "has one assignment triggers
-            // save on change on replacing object".
+            // assigned via `writer` then saved directly), so it is now the real
+            // associated record being displaced and must have its FK nullified.
+            // This arises on the writer path: assign A to a persisted owner
+            // (queues `_pendingReplace` with `previousTarget: null`), persist A
+            // directly, then assign B — a later `writer` for a different record
+            // must promote the now-persisted record A to `previousTarget`.
+            // (Note: `setNewRecord` now calls `replace(record, false)`, so the
+            // build/create paths queue nothing here.) Exercised by "has one
+            // assignment triggers save on change on replacing object".
             this._pendingReplace = { record, previousTarget: displaced };
           } else {
             this._pendingReplace.record = record;
