@@ -49,6 +49,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("markForDestruction and isMarkedForDestruction", () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
@@ -62,6 +63,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("isDestroyable returns false for new records", () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
@@ -74,6 +76,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("isDestroyable returns true for persisted records marked for destruction", async () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
@@ -86,11 +89,13 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("no validation when autosave is not enabled (associated record not saved)", async () => {
     class Author extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
     class Book extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }
@@ -114,11 +119,13 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave_association_on_a_has_many_association saves children", async () => {
     class Author extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
     class Book extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }
@@ -249,6 +256,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   class Post extends Base {
     static {
+      this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("author_id", "integer");
     }
@@ -256,6 +264,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   class Author extends Base {
     static {
+      this.attribute("id", "integer");
       this.attribute("name", "string");
     }
   }
@@ -451,11 +460,13 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it("destroy has_one marked for destruction", async () => {
     class Pirate extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("catchphrase", "string");
       }
     }
     class PirateShip extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
       }

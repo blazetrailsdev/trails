@@ -179,6 +179,7 @@ describe("AssociationsExtensionsTest", () => {
     class ExtComment extends Base {
       static {
         this._tableName = "ext_comments";
+        this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("ext_post_id", "integer");
         this.adapter = extAdapter;
@@ -187,6 +188,7 @@ describe("AssociationsExtensionsTest", () => {
     class ExtPost extends Base {
       static {
         this._tableName = "ext_posts";
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.adapter = extAdapter;
         this.hasMany("extComments", {

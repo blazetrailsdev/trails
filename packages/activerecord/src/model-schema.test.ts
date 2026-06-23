@@ -31,6 +31,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
   it("populates the shared schema cache when reconciling on a cold cache", async () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "text");
         this.attribute("virtual_field", "string", { default: "v" });
@@ -49,6 +50,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
   it("a second save on a cold-cache virtual-attribute model issues no schema-introspection query", async () => {
     class Post extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "text");
         this.attribute("virtual_field", "string", { default: "v" });

@@ -133,9 +133,35 @@ export function defineAttribute(
  * 0 instead of null for new records that have no lock column default.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
-  // For STI subclasses, delegate to the STI base so cache invalidation
-  // from Base.attribute/defineAttribute (always routed to the base) is coherent.
-  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as AnyClass) : this;
+  // Reflect the (always-warm, RFC 0031) schema cache into `_attributeDefinitions`
+  // before building, so real columns — notably the `id` PK — are seeded even
+  // when the model is first constructed without a query (e.g. `new Car({name})`,
+  // where no STI `type` key drives the usual reflect-on-`new` path). Without
+  // this the strict `writeFromUser` raises on the post-INSERT `id` write-back.
+  // `columnsHash` reads the warm cache directly (and reconciles the definitions),
+  // which the bare `loadSchema` cache-sync path does not reliably do for
+  // dynamically-defined / STI models. A genuinely tableless model reflects
+  // nothing and falls through to the attribute-synthesized view as before.
+  //
+  // Gated on `!_schemaLoaded`: once the schema has been reflected the real
+  // columns are already in `_attributeDefinitions`, so skipping avoids both the
+  // redundant work and — importantly — the `.connection` access inside
+  // `columnsHash`, which would otherwise permanently check out a connection on
+  // every construction under `permanent_connection_checkout` = disallowed.
+  if (!this._schemaLoaded && !this.abstractClass && this.tableName) {
+    try {
+      this.columnsHash();
+    } catch {
+      // TableNotSpecified / no cache entry — keep the synthesized view.
+    }
+  }
+
+  // For STI subclasses, seed the shared (schema-reflected) set on the STI base
+  // so cache invalidation from Base.attribute/defineAttribute (routed to the
+  // base) stays coherent across siblings. The subclass's own declarations are
+  // layered on afterwards (see below).
+  const stiSubclass = isStiSubclass(this);
+  const cacheHost = stiSubclass ? (getStiBase(this) as AnyClass) : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
     // Register cacheHost with its superclass so resetDefaultAttributes()
@@ -177,7 +203,51 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
 
     cacheHost._cachedDefaultAttributes = attributeSet;
   }
-  return cacheHost._cachedDefaultAttributes;
+
+  const baseSet = cacheHost._cachedDefaultAttributes;
+  if (!stiSubclass) return baseSet;
+
+  // STI subclass: Rails memoizes `_default_attributes` per class, walking the
+  // full superclass chain of pending modifications — so a subclass-only
+  // `attribute :extra_size` is present in that subclass's default set even
+  // though it isn't a column on the shared table. trails shares the base's
+  // schema-reflected set; when this subclass declares nothing extra (the common
+  // STI case — `class Reply < Topic`) we return that set unchanged. Otherwise we
+  // layer the subclass's own declarations onto a per-subclass copy.
+  //
+  // The copy is keyed on the base set's identity so it is transparently rebuilt
+  // whenever the base set is reset/re-warmed — caching a cold snapshot would
+  // otherwise survive schema load and drop real columns.
+  if (collectSubclassPendingCount(this, cacheHost) === 0) return baseSet;
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_cachedDefaultAttributesBase") &&
+    this._cachedDefaultAttributesBase === baseSet &&
+    this._cachedDefaultAttributes
+  ) {
+    return this._cachedDefaultAttributes;
+  }
+  const subclassSet = baseSet.deepDup();
+  applyPendingAttributeModifications(this, subclassSet);
+  this._cachedDefaultAttributes = subclassSet;
+  this._cachedDefaultAttributesBase = baseSet;
+  return subclassSet;
+}
+
+/**
+ * Count pending attribute modifications declared on the STI subclass chain
+ * strictly below the STI base (i.e. modifications the base's shared default
+ * set does not already carry).
+ */
+function collectSubclassPendingCount(sub: AnyClass, stiBase: AnyClass): number {
+  let count = 0;
+  let cls: AnyClass | null = sub;
+  while (cls && cls !== stiBase) {
+    if (Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) {
+      count += (cls._pendingAttributeModifications as unknown[] | undefined)?.length ?? 0;
+    }
+    cls = Object.getPrototypeOf(cls);
+  }
+  return count;
 }
 
 const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");

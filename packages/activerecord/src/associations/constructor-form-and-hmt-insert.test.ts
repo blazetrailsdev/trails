@@ -35,6 +35,7 @@ describe("constructor-form association writer", () => {
     class B30Item extends Base {
       static {
         this._tableName = "b30_items";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
         this.adapter = _adapter;
@@ -43,6 +44,7 @@ describe("constructor-form association writer", () => {
     class B30Owner extends Base {
       static {
         this._tableName = "b30_owners";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = _adapter;
         this.hasMany("items", { className: "B30Item", foreignKey: "owner_id" });
@@ -93,6 +95,7 @@ describe("constructor-form association writer", () => {
     class B30Profile extends Base {
       static {
         this._tableName = "b30_profiles";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
         this.adapter = _adapter;
@@ -101,6 +104,7 @@ describe("constructor-form association writer", () => {
     class B30Owner2 extends Base {
       static {
         this._tableName = "b30_owners";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = _adapter;
         this.hasOne("profile", {
@@ -123,6 +127,7 @@ describe("HABTM insert_record two-step", () => {
     class B30Post extends Base {
       static {
         this._tableName = "b30_posts";
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.adapter = _adapter;
         this.hasAndBelongsToMany("tags", { className: "B30Tag" });
@@ -131,6 +136,7 @@ describe("HABTM insert_record two-step", () => {
     class B30Tag extends Base {
       static {
         this._tableName = "b30_tags";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = _adapter;
       }
@@ -163,6 +169,7 @@ describe("resetScope on owner save", () => {
     class B30Item2 extends Base {
       static {
         this._tableName = "b30_items";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
         this.adapter = _adapter;
@@ -171,6 +178,7 @@ describe("resetScope on owner save", () => {
     class B30Owner3 extends Base {
       static {
         this._tableName = "b30_owners";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = _adapter;
         this.hasMany("items", {

@@ -406,6 +406,7 @@ describe("StatementCacheTest", () => {
         static {
           this.tableName = "molecules";
           this.adapter = conn;
+          this.attribute("id", "integer");
           this.attribute("liquid_id", "integer");
           this.belongsTo("liquid");
         }

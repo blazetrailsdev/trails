@@ -58,6 +58,7 @@ import {
   attributeMethodPatterns,
   isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
+  MissingAttributeError,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1322,13 +1323,11 @@ export class Model {
   /**
    * True only while the constructor is assigning its initial attribute bag.
    * trails' constructor writes every key through `writeAttribute` directly
-   * (rather than Rails' `assign_attributes` → per-key setter dispatch), and
-   * leans on its lenient handling of not-yet-modeled names to stash
-   * nested-attribute keys (`commentsAttributes`), composite-PK strings, and
-   * unknown keys for later processing. The strict unknown-attribute raise on
-   * the AR write path therefore stands down during this window — matching the
-   * effect of Rails routing construction through `assign_attributes`, which
-   * rescues the unknown-writer case.
+   * (rather than Rails' `assign_attributes` → per-key setter dispatch). The
+   * loop swallows the strict `MissingAttributeError` `writeFromUser` now raises
+   * so construction stays lenient for not-yet-modeled names; this flag lets the
+   * AR write path detect the window (e.g. composite-PK `id=` remap) without
+   * re-raising mid-construction.
    *
    * @internal
    */
@@ -1412,7 +1411,29 @@ export class Model {
     this._initializingAttributes = true;
     try {
       for (const [key, value] of Object.entries(attrs)) {
-        this.writeAttribute(key, value);
+        try {
+          this.writeAttribute(key, value);
+        } catch (error) {
+          // trails' constructor writes every key through `writeAttribute`
+          // directly, rather than Rails' `assign_attributes` → `_assign_attribute`
+          // (api.rb:80-82, attribute_assignment.rb:67-75), which dispatches a key
+          // with a writer and routes a writer-less key to `attribute_writer_missing`
+          // (→ `UnknownAttributeError`). The loop relies on construction staying
+          // lenient for not-yet-modeled names: nested-attribute keys
+          // (`commentsAttributes`, re-applied by `_reapplyNestedAttrSetters`),
+          // composite-PK string keys, and — pre-existing trails behavior, NOT a
+          // regression of this PR (origin/main's lazy `write_from_user` stored
+          // them rather than raising) — genuinely unknown keys.
+          //
+          // Converging this window to Rails (raise `UnknownAttributeError` for a
+          // writer-less key) is a distinct, broad convergence: it requires the
+          // constructor to setter-dispatch like `assign_attributes`, and it
+          // surfaces a cluster of tests that ratified the leniency
+          // (base `initialize with invalid attribute`, the cpk-string nested
+          // path, etc.). Tracked as RFC 0046 story
+          // `converge-construction-unknown-attribute-strict`.
+          if (!(error instanceof MissingAttributeError)) throw error;
+        }
       }
     } finally {
       this._initializingAttributes = false;

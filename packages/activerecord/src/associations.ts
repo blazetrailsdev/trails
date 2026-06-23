@@ -3286,7 +3286,7 @@ export async function updateCounterCaches(
     // suppress the write here. We therefore let the absent-column increment fall
     // through and raise rather than silently degrading. loadSchema() warms the
     // cache first so the raise is a clean MissingAttributeError from
-    // ensureWritableAttribute (which needs reflectedColumnNamesIfWarm) rather
+    // `writeFromUser` (an absent name resolves to the Null attribute) rather
     // than a deeper StatementInvalid on a cold cache.
     await targetModel.loadSchema();
     const resolvedCounterCol = Reflection.resolveAliasedColumn(

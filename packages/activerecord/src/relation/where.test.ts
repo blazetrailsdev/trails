@@ -1271,6 +1271,7 @@ describe("WhereTest", () => {
     class PssTreasure extends Base {
       static {
         this._tableName = "pss_treasures";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
@@ -1343,6 +1344,7 @@ describe("WhereTest", () => {
     class PsnTreasure extends Base {
       static {
         this._tableName = "psn_treasures";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.hasMany("price_estimates", {
           className: "PsnPriceEstimate",
@@ -1415,6 +1417,9 @@ describe("WhereTest", () => {
     class DpwTreasure extends Base {
       static {
         this._tableName = "dpw_treasures";
+        // Tableless model (no schema entry); declare id so the fake `.id = 1`
+        // below is writable under strict writeFromUser.
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
@@ -2501,6 +2506,7 @@ describe("WhereTest", () => {
     class PnaTreasure extends Base {
       static {
         this._tableName = "pna_treasures";
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }

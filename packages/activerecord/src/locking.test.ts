@@ -165,6 +165,7 @@ describe("OptimisticLockingTest", () => {
     // association dependent destroy resolves its source class.
     class LockPerson extends Base {
       static {
+        this.attribute("id", "integer");
         this._tableName = "people";
         this.attribute("first_name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
@@ -753,6 +754,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     // Uses inline classes to avoid counterCache on the canonical PersonalLegacyThing.
     class LockPerson extends Base {
       static {
+        this.attribute("id", "integer");
         this._tableName = "people";
         this.attribute("first_name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
@@ -762,9 +764,14 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     }
     class LockPersonalLegacyThing extends Base {
       static {
+        this.attribute("id", "integer");
         this._tableName = "personal_legacy_things";
         this.lockingColumn = "version";
         this.attribute("person_id", "integer");
+        // Custom locking column written on insert; declare it for strict
+        // writeFromUser (the table's cache may be cold after a sibling
+        // schema-change test in this file).
+        this.attribute("version", "integer", { default: 0 });
       }
     }
     registerModel("LockPerson", LockPerson);

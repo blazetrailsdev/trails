@@ -44,8 +44,33 @@ export function hasSecurePassword(
     modelClass.attribute(digestAttr, "string");
   }
 
+  // The confirmation is virtual (no DB column) but is genuinely stored in the
+  // attribute set (read back via `readAttribute`), so declare it as a known
+  // name — `AttributeSet#writeFromUser` raises for any name not in the set.
+  if (!modelClass._attributeDefinitions.has(confirmationAttr)) {
+    modelClass.attribute(confirmationAttr, "string");
+  }
+
   const passwordCache = new WeakMap<object, string | null>();
   const challengeCache = new WeakMap<object, string | null>();
+
+  // Route writes to the plaintext `password` through the hashing setter rather
+  // than the attribute store. The attribute is virtual (no column), so under
+  // strict `writeFromUser` it has no slot to write to; intercepting here mirrors
+  // Rails dispatching `password=` during assign_attributes, and the constructor
+  // (which assigns every key via `writeAttribute`) hashes it at build time.
+  const baseWriteAttribute = modelClass.prototype.writeAttribute;
+  Object.defineProperty(modelClass.prototype, "writeAttribute", {
+    value(this: Model, name: string, value: unknown): void {
+      if (name === attribute) {
+        setPassword(this, value, attribute, digestAttr, passwordCache);
+        return;
+      }
+      baseWriteAttribute.call(this, name, value);
+    },
+    configurable: true,
+    writable: true,
+  });
 
   Object.defineProperty(modelClass.prototype, attribute, {
     get(this: Model) {

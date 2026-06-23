@@ -142,23 +142,14 @@ export class AttributeSet {
 
   writeFromUser(name: string, value: unknown): unknown {
     this.assertNotFrozen();
-    const existing = this.attributes.get(name);
-    if (existing) {
-      this.attributes.set(name, existing.withValueFromUser(value));
-    } else if (name == null) {
-      // Mirrors Rails `@attributes[name] = self[name].with_value_from_user(value)`:
-      // an absent name falls through to the Null attribute, whose
-      // `withValueFromUser` raises MissingAttributeError. This is what lets a
-      // key-less model's `id=` raise without a bespoke guard (the nil primary
-      // key reaches here as a null name). A non-null unknown name still
-      // materializes a fresh attribute below, because trails populates the set
-      // lazily rather than from a complete schema like Rails — so map-absence
-      // does not yet imply "unknown column" for a real name.
-      this.attributes.set(name, this.getAttribute(name).withValueFromUser(value));
-    } else {
-      // New attribute not previously declared — create a FromUser with default type
-      this.attributes.set(name, Attribute.fromUser(name, value, typeRegistry.lookup("value")));
-    }
+    // Rails one-liner (attribute_set.rb:58-61):
+    //   @attributes[name] = self[name].with_value_from_user(value)
+    // An absent name resolves to the `Null` default attribute, whose
+    // `withValueFromUser` raises MissingAttributeError. With the schema cache
+    // always warm at construction (RFC 0031), every real column — selected or
+    // not — is already in the set, so map-absence now reliably means "unknown
+    // column" and the Null fallthrough raises exactly like Rails.
+    this.attributes.set(name, this.getAttribute(name).withValueFromUser(value));
     return value;
   }
 
@@ -301,20 +292,6 @@ export class AttributeSet {
   has(name: string): boolean {
     const attr = this.attributes.get(name);
     return attr !== undefined && attr.isInitialized();
-  }
-
-  /**
-   * Whether `name` is present in the internal map (initialized or not).
-   *
-   * Unlike {@link has}, this reports schema-seeded but still-uninitialized
-   * attributes too, mirroring Rails' `@attributes.key?(name)` — the gate AR's
-   * strict write path uses to tell a real (if unmaterialized) column from a
-   * genuinely unknown name.
-   *
-   * @internal
-   */
-  includesName(name: string): boolean {
-    return this.attributes.has(name);
   }
 
   /**

@@ -54,17 +54,18 @@ export function _assignAttribute(model: AttributeAssignment, key: string, value:
   try {
     model.writeAttribute(key, value);
   } catch (error) {
-    if (error instanceof UnknownAttributeError) {
+    // Rails `_assign_attribute` only writes through a setter; a key with no
+    // setter goes straight to `attribute_writer_missing` → UnknownAttributeError.
+    // trails routes the write through `writeAttribute`, which now raises
+    // `MissingAttributeError` for an unknown name (the strict `write_from_user`
+    // path). Either way — an explicit UnknownAttributeError or a strict
+    // MissingAttributeError with no setter — surface it as Rails does.
+    if (error instanceof UnknownAttributeError || error instanceof MissingAttributeError) {
       if (typeof model.attributeWriterMissing === "function") {
         model.attributeWriterMissing(key, value);
       } else {
         attributeWriterMissing(model, key, value);
       }
-    } else if (error instanceof MissingAttributeError) {
-      // The strict write path (AR `write_attribute`) raises for an unknown
-      // column, but with no setter for `key` this is mass assignment of a key
-      // the model doesn't model — trails keeps that lenient (a no-op) rather
-      // than surfacing it, preserving relaxed mass assignment.
     } else {
       throw error;
     }

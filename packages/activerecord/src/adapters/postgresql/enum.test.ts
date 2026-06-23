@@ -13,6 +13,8 @@ import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 class PostgresqlEnum extends Base {
   static {
     this.tableName = "postgresql_enums";
+    // Declare the PK for strict writeFromUser (raw-created table, not warmed).
+    this.attribute("id", "integer");
     this.enum(
       "current_mood",
       { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" },

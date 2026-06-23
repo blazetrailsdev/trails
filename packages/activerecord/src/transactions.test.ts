@@ -50,6 +50,11 @@ function makeSQLiteTopic() {
   );
   class Topic extends Base {
     static {
+      // Declare the PK so it is a known name under strict writeFromUser — this
+      // model is built on a raw-created table whose schema cache is never warmed
+      // (no defineSchema), mirroring the movieid/id declarations in
+      // makeSQLiteMovie / makeSQLiteCpkBook below.
+      this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("approved", "boolean");
       this.adapter = adp;
@@ -1123,6 +1128,9 @@ describe("TransactionTest", () => {
     class FrozenTopic extends Base {
       static {
         this._tableName = "topics";
+        // Declare the PK so it is a known name under strict writeFromUser (raw
+        // table, schema cache never warmed).
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("parent_id", "integer");
         // Rails Topic declares: has_many :replies, dependent: :destroy,
@@ -2936,6 +2944,7 @@ describe("SchemaAdapter TM delegation", () => {
     const spy = vi.spyOn(realAdapter as any, "withinNewTransaction");
     class Item extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = testAdapter;
       }
@@ -2954,6 +2963,7 @@ describe("SchemaAdapter TM delegation", () => {
     await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = testAdapter;
       }
@@ -2993,6 +3003,7 @@ describe("SchemaAdapter TM delegation", () => {
     await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = testAdapter;
       }
@@ -3047,6 +3058,7 @@ describe("SchemaAdapter TM delegation", () => {
     await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = testAdapter;
       }

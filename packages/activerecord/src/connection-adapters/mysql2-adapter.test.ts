@@ -292,6 +292,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("Base integration", () => {
     class User extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
         this.attribute("age", "integer");
@@ -381,6 +382,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("null string column INSERT (#2783)", () => {
     class Member extends Base {
       static {
+        this.attribute("id", "integer");
         this._tableName = "members";
         this.attribute("name", "string");
       }
@@ -413,6 +415,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("Relation integration", () => {
     class Product extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("price", "integer");
         this.attribute("category", "string");
@@ -468,6 +471,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("transaction integration", () => {
     class Account extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("balance", "integer", { default: 0 });
       }
@@ -515,12 +519,14 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("associations integration", () => {
     class Author extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
 
     class Book extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }

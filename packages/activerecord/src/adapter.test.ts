@@ -671,6 +671,10 @@ describe("AdapterForeignKeyTest", () => {
     class KlassHasFk extends Base {
       static {
         this.tableName = "fk_test_has_fk";
+        // Declare fk_id so the constructor assignment is a known name under
+        // strict writeFromUser (the raw-created FK table is not schema-warmed);
+        // otherwise the value is dropped and the INSERT hits NOT NULL before FK.
+        this.attribute("fk_id", "integer");
       }
     }
     const hasFk = new KlassHasFk({ fk_id: 1231231231 });

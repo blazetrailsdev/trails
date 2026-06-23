@@ -757,6 +757,11 @@ describe("MultiParameterAttributeTest", () => {
     class Meeting extends Base {
       static {
         this.attribute("title", "string");
+        // The aggregation maps onto these columns; declare them so they are
+        // known names under strict writeFromUser (this bespoke model has no
+        // backing table to reflect them from).
+        this.attribute("duration_start", "string");
+        this.attribute("duration_end", "string");
         composedOf(this, "duration", {
           className: Timespan,
           mapping: [

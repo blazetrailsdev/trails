@@ -48,7 +48,11 @@ function makeTopic(adp: DatabaseAdapter) {
   class TransactionTopic extends Base {
     static _tableName = "topics";
     static {
+      // Declare the PK so it is a known name under strict writeFromUser (raw
+      // adapter, schema cache not warmed).
+      this.attribute("id", "integer");
       this.attribute("title", "string");
+      this.attribute("created_at", "datetime");
       this.attribute("updated_at", "datetime");
       this.adapter = adp;
     }

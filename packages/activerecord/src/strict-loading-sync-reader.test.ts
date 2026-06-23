@@ -113,6 +113,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
       declare title: string;
       declare srAuthorId: number | null;
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("sr_author_id", "integer");
       }
