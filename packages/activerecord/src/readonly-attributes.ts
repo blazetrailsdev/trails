@@ -164,13 +164,29 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
     }
     return;
   }
-  // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the
-  // public `write_attribute` path above. Like Rails (write.rb:42) this reaches
-  // `write_from_user`, which now raises `MissingAttributeError` for an unknown
-  // name — internal writers (counter caches, timestamps, locking, composite-PK
-  // seeding) all target real columns present in the always-warm schema cache,
-  // so they no longer depend on the former lenience.
-  Model.prototype._writeAttribute.call(this, name, value);
+  // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the public
+  // `write_attribute` path above. Rails (write.rb:42) reaches `write_from_user`
+  // and raises for an unknown name, because in Rails the PK/timestamp/locking
+  // columns these internal writers target are always in the attribute set.
+  //
+  // trails' set is NOT always complete: a model on a raw-created table whose
+  // schema cache was never warmed (e.g. the PG/MySQL adapter test suites, which
+  // `adapter.exec("CREATE TABLE …")` then use immediately) cannot reflect its
+  // columns synchronously on an async driver, so the post-INSERT PK write-back
+  // (and timestamp writes) would hit the strict `writeFromUser` and raise.
+  //
+  // BRIDGE (RFC 0046, story remove-internal-write-bridge-converge-write-attribute-strict):
+  // keep the low-level internal path lenient — seed the unreflected real column
+  // directly when `writeFromUser` raises — so the public `writeAttribute` /
+  // `[]=` / mass-assignment paths stay strict (the heart of this story) while
+  // the framework's own writes survive an incomplete set. Removed once every
+  // bespoke test model declares its real columns (RFC 0046).
+  try {
+    Model.prototype._writeAttribute.call(this, name, value);
+  } catch (error) {
+    if (!(error instanceof MissingAttributeError)) throw error;
+    this._attributes.writeCastValue(name, value);
+  }
 }
 
 /**

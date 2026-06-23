@@ -248,6 +248,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("Base integration", () => {
     class User extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
         this.attribute("age", "integer");
@@ -337,6 +338,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("Relation integration", () => {
     class Product extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("price", "integer");
         this.attribute("category", "string");
@@ -431,6 +433,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("transaction integration", () => {
     class Account extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("balance", "integer", { default: 0 });
       }
@@ -502,12 +505,14 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("associations integration", () => {
     class Author extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
       }
     }
 
     class Book extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }

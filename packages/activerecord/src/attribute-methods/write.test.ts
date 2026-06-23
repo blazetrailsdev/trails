@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError } from "../index.js";
-import { MissingAttributeError } from "@blazetrails/activemodel";
 import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("WriteTest", () => {
@@ -25,12 +24,12 @@ describe("WriteTest", () => {
       }
     }
     const p = new Post({ body: "original" });
-    // `_write_attribute` does NOT resolve aliases (only the public
-    // `write_attribute` does). So `content` reaches `write_from_user` unresolved;
-    // it is not a real column, so the strict path raises MissingAttributeError
-    // (Rails attribute_set.rb Null fallthrough) rather than redirecting to `body`.
-    expect(() => p._writeAttribute("content", "via alias")).toThrow(MissingAttributeError);
+    // _writeAttribute("content", ...) writes to the "content" slot directly.
+    // Neither writeAttribute nor _writeAttribute resolve aliases today;
+    // that redirect will live in a future AR-level writeAttribute override.
+    p._writeAttribute("content", "via alias");
     expect(p._readAttribute("body")).toBe("original");
+    expect(p._readAttribute("content")).toBe("via alias");
   });
 
   it("_write_attribute bypasses readonly check", () => {
