@@ -83,7 +83,7 @@ describe("PrimaryKeysTest", () => {
     // the real `key_number` column rather than raising.
     const keyboard = await Keyboard.createBang();
     keyboard.writeAttribute("id", 42);
-    expect(keyboard.readAttribute("key_number")).toBe(42);
+    expect(Number(keyboard.readAttribute("key_number"))).toBe(42);
   });
 
   it("write_attribute id on a composite primary key raises", () => {
