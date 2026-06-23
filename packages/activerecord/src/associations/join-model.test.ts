@@ -738,8 +738,13 @@ describe("AssociationsJoinModelTest", () => {
     // the preloader must fold that source scope just like the direct query, leaving
     // the eager-loaded through target empty.
     const author = (await Author.all().includes("nonexistentComments").first()) as any;
+    // Assert the association was actually preloaded — a fresh collection proxy's
+    // `target` is `[]`, so an empty target alone can't distinguish a preloaded
+    // empty result from one that never loaded. With it loaded, read through the
+    // public reader under assertNoQueries (mirrors Rails' eager tests).
+    expect(author.association("nonexistentComments").loaded).toBe(true);
     await assertNoQueries(false, async () => {
-      expect((author.association("nonexistentComments").target as Base[]).length).toBe(0);
+      expect(((await author.nonexistentComments.toArray()) as Base[]).length).toBe(0);
     });
   });
 
