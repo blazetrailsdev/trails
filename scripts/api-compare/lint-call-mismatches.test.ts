@@ -24,24 +24,43 @@ describe("flattenArtifact", () => {
   it("emits one key per missing call, splitting multi-call records", () => {
     const keys = flattenArtifact({
       mismatches: [
-        { tsFile: "a.ts", rubyName: "foo", missing: ["save → save", "destroy → destroy"] },
-        { tsFile: "b.ts", rubyName: "bar", missing: ["touch → touch"] },
+        {
+          package: "ar",
+          tsFile: "a.ts",
+          rubyName: "foo",
+          missing: ["save → save", "destroy → destroy"],
+        },
+        { package: "ar", tsFile: "b.ts", rubyName: "bar", missing: ["touch → touch"] },
       ],
     });
-    expect(keys.map(keyOf)).toEqual(["a.ts foo save", "a.ts foo destroy", "b.ts bar touch"]);
+    expect(keys.map(keyOf)).toEqual([
+      "ar a.ts foo save",
+      "ar a.ts foo destroy",
+      "ar b.ts bar touch",
+    ]);
+  });
+
+  it("keeps same tsFile+rubyName+call distinct across packages (package is in the key)", () => {
+    const keys = flattenArtifact({
+      mismatches: [
+        { package: "ar", tsFile: "a.ts", rubyName: "foo", missing: ["save → save"] },
+        { package: "am", tsFile: "a.ts", rubyName: "foo", missing: ["save → save"] },
+      ],
+    });
+    expect(new Set(keys.map(keyOf)).size).toBe(2);
   });
 });
 
 const baseline: ExcludeEntry[] = [
-  { tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
-  { tsFile: "b.ts", rubyName: "bar", call: "touch", reason: "known" },
+  { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
+  { package: "ar", tsFile: "b.ts", rubyName: "bar", call: "touch", reason: "known" },
 ];
 
 describe("diffAgainstBaseline", () => {
   it("passes when current exactly equals the baseline", () => {
     const current = [
-      { tsFile: "a.ts", rubyName: "foo", call: "save" },
-      { tsFile: "b.ts", rubyName: "bar", call: "touch" },
+      { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" },
+      { package: "ar", tsFile: "b.ts", rubyName: "bar", call: "touch" },
     ];
     const { added, stale } = diffAgainstBaseline(current, baseline);
     expect(added).toEqual([]);
@@ -50,20 +69,20 @@ describe("diffAgainstBaseline", () => {
 
   it("reports a NEW mismatch absent from the baseline (the ratchet)", () => {
     const current = [
-      { tsFile: "a.ts", rubyName: "foo", call: "save" },
-      { tsFile: "b.ts", rubyName: "bar", call: "touch" },
-      { tsFile: "c.ts", rubyName: "baz", call: "update" },
+      { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" },
+      { package: "ar", tsFile: "b.ts", rubyName: "bar", call: "touch" },
+      { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update" },
     ];
     const { added, stale } = diffAgainstBaseline(current, baseline);
-    expect(added.map(keyOf)).toEqual(["c.ts baz update"]);
+    expect(added.map(keyOf)).toEqual(["ar c.ts baz update"]);
     expect(stale).toEqual([]);
   });
 
   it("reports a STALE baseline entry that no longer flags (only-shrink)", () => {
-    const current = [{ tsFile: "a.ts", rubyName: "foo", call: "save" }];
+    const current = [{ package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" }];
     const { added, stale } = diffAgainstBaseline(current, baseline);
     expect(added).toEqual([]);
-    expect(stale.map(keyOf)).toEqual(["b.ts bar touch"]);
+    expect(stale.map(keyOf)).toEqual(["ar b.ts bar touch"]);
   });
 });
 
@@ -72,21 +91,22 @@ describe("findDuplicateKeys", () => {
     expect(findDuplicateKeys(baseline)).toEqual([]);
   });
 
-  it("flags a (tsFile, rubyName, call) repeated across rows", () => {
+  it("flags a (package, tsFile, rubyName, call) repeated across rows", () => {
     expect(
       findDuplicateKeys([
         ...baseline,
-        { tsFile: "a.ts", rubyName: "foo", call: "save", reason: "dup" },
+        { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "dup" },
       ]),
-    ).toEqual(["a.ts foo save"]);
+    ).toEqual(["ar a.ts foo save"]);
   });
 });
 
 describe("committed baseline", () => {
-  it("is well-formed: no duplicate keys, every entry has a reason", async () => {
+  it("is well-formed: no duplicate keys, every entry has a package and reason", async () => {
     const committed = await loadBaseline();
     expect(findDuplicateKeys(committed)).toEqual([]);
     for (const e of committed) {
+      expect(e.package.trim().length).toBeGreaterThan(0);
       expect(e.reason.trim().length).toBeGreaterThan(0);
     }
   });
@@ -95,13 +115,14 @@ describe("committed baseline", () => {
 describe("reseed", () => {
   it("preserves reasons for surviving entries and drops stale ones", () => {
     const current = [
-      { tsFile: "a.ts", rubyName: "foo", call: "save" },
-      { tsFile: "c.ts", rubyName: "baz", call: "update" },
+      { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" },
+      { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update" },
     ];
     const next = reseed(current, baseline);
     expect(next).toEqual([
-      { tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
+      { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
       {
+        package: "ar",
         tsFile: "c.ts",
         rubyName: "baz",
         call: "update",

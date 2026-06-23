@@ -42,6 +42,11 @@ const BASELINE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "call-mismatches-exclude.json",
 );
+// Ratchets the full-surface artifact only. compare.ts also writes a
+// `-privates-only` variant under `--privates`, but private-method body-call
+// fidelity is intentionally NOT gated — privates are advisory-only throughout
+// the compare tooling, and gating them would ratchet internal-method bodies
+// that have no Rails public-contract obligation.
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 
 const DEFAULT_REASON =
@@ -49,9 +54,13 @@ const DEFAULT_REASON =
   "landed; pending per-cluster burndown review.";
 
 // One flagged Ruby body call on a matched pair. The artifact groups several
-// `missing` calls under one (rubyName, tsFile) record; the baseline is keyed at
-// the individual-call grain so burndown stories converge one call at a time.
+// `missing` calls under one (package, rubyName, tsFile) record; the baseline is
+// keyed at the individual-call grain so burndown stories converge one call at a
+// time. `package` is part of the key because two packages can share a relative
+// `tsFile` + `rubyName` + `call` (today the artifact is all-activerecord, but
+// keying without it would silently collapse such rows into one).
 export interface CallMismatchKey {
+  package: string;
   tsFile: string;
   rubyName: string;
   call: string;
@@ -62,6 +71,7 @@ export interface ExcludeEntry extends CallMismatchKey {
 }
 
 interface ArtifactMismatch {
+  package: string;
   tsFile: string;
   rubyName: string;
   missing: string[];
@@ -72,7 +82,7 @@ interface Artifact {
 }
 
 export function keyOf(k: CallMismatchKey): string {
-  return `${k.tsFile} ${k.rubyName} ${k.call}`;
+  return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call}`;
 }
 
 // A `missing` string reads "ruby_call → tsCand|tsCand"; the ratchet keys on the
@@ -86,7 +96,12 @@ export function flattenArtifact(artifact: Artifact): CallMismatchKey[] {
   const keys: CallMismatchKey[] = [];
   for (const m of artifact.mismatches) {
     for (const missing of m.missing) {
-      keys.push({ tsFile: m.tsFile, rubyName: m.rubyName, call: callOf(missing) });
+      keys.push({
+        package: m.package,
+        tsFile: m.tsFile,
+        rubyName: m.rubyName,
+        call: callOf(missing),
+      });
     }
   }
   return keys;
@@ -196,7 +211,7 @@ async function main(write: boolean): Promise<number> {
         `${path.relative(ROOT_DIR, BASELINE_PATH)} with a one-line reason.\n`,
     );
     for (const k of sortEntries(added)) {
-      console.error(`  + ${k.tsFile}  ${k.rubyName}  ${k.call}`);
+      console.error(`  + ${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call}`);
     }
   }
 
@@ -209,7 +224,7 @@ async function main(write: boolean): Promise<number> {
         "`--write` to reseed):\n",
     );
     for (const e of sortEntries(stale)) {
-      console.error(`  - ${e.tsFile}  ${e.rubyName}  ${e.call}`);
+      console.error(`  - ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`);
     }
   }
 
