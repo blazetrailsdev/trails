@@ -11,6 +11,16 @@ describe("SqliteAdapter", () => {
   });
 
   afterEach(() => {
+    // Throwaway :memory: tables; per-name IF EXISTS drops balance
+    // require-table-teardown (SQLite has no multi-table DROP). Some tests close
+    // the shared adapter themselves, so only drop while it is still open.
+    if (adapter.active) {
+      void adapter
+        .exec(
+          `DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS accounts`,
+        )
+        .catch(() => undefined);
+    }
     adapter.close();
   });
 

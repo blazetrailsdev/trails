@@ -94,8 +94,19 @@ function makeSQLiteCpkBook() {
 }
 
 // Close all SQLite adapters after every test regardless of which describe block.
-afterEach(() => {
+afterEach(async () => {
   for (const a of openAdapters.splice(0)) {
+    // Each isolated :memory: adapter owns one of these raw-created tables;
+    // per-name IF EXISTS drops balance require-table-teardown (the others are
+    // no-ops on a given adapter). Some tests disconnect their adapter first, so
+    // swallow "connection not open" here.
+    try {
+      await a.exec(
+        "DROP TABLE IF EXISTS topics; DROP TABLE IF EXISTS movies; DROP TABLE IF EXISTS cpk_books; DROP TABLE IF EXISTS transaction_without_primary_keys",
+      );
+    } catch {
+      /* adapter may already be closed */
+    }
     a.close();
   }
 });

@@ -133,6 +133,7 @@ describe("SQLite3 StatementPool integration", () => {
       // db.prepare should have been called once for the SELECT, not twice
       const selectCalls = prepareSpy.mock.calls.filter((c) => c[0] === selectSql);
       expect(selectCalls).toHaveLength(1);
+      await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');
     } finally {
       prepareSpy.mockRestore();
       adapter.disconnectBang();

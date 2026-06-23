@@ -23,6 +23,7 @@ describe("SQLite3Adapter transaction control", () => {
   });
 
   afterEach(async () => {
+    await adapter.executeMutation("DROP TABLE IF EXISTS items");
     await adapter.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

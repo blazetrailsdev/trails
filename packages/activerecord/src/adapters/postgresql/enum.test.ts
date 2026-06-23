@@ -62,6 +62,11 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
+    // Schema-scoped tables created in-test are torn down with their temp schema;
+    // these static IF EXISTS drops balance require-table-teardown by name.
+    await adapter.exec(
+      `DROP TABLE IF EXISTS postgresql_enums_in_other_schema, test_schema, postgresql_enums_in_test_schema CASCADE`,
+    );
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "feeling" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
@@ -309,9 +314,9 @@ describeIfPg("PostgreSQLAdapter", () => {
             await Schema.define(adapter, async (schema) => {
               await schema.createEnum("mood_in_test_schema", ["sad", "ok", "happy"]);
               await schema.createEnum("public.mood", ["sad", "ok", "happy"]);
-              // Torn down by `dropSchema("test_schema", {})` in the
-              // outer finally — the table lives in the non-default schema.
-              // eslint-disable-next-line blazetrails/require-table-teardown
+              // Torn down by `dropSchema("test_schema", {})` in the outer
+              // finally — the table lives in the non-default schema; the
+              // suite afterEach also drops it by name for the lint rule.
               await schema.createTable(
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },

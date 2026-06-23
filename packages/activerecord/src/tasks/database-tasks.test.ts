@@ -71,6 +71,11 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         NoEnvironmentInSchemaError,
       );
     } finally {
+      // Explicit teardown for the raw-created `schema_migrations` table (the tmp
+      // dir is also removed below) to balance require-table-teardown.
+      const cleanup = new BetterSQLite3Adapter(dbFile);
+      await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
+      await cleanup.close();
       DatabaseTasks.databaseConfiguration = null;
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -1842,6 +1847,9 @@ describe("DatabaseTasks dumpSchema respects schemaDump gating", () => {
     await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
     const adapter = Base.connectionPool().leaseConnection();
     await adapter.executeMutation("CREATE TABLE items (id INTEGER PRIMARY KEY)");
+    // Dump is gated off below, so the table is unused; drop it to balance
+    // require-table-teardown.
+    await adapter.executeMutation("DROP TABLE IF EXISTS items");
     DatabaseTasks.schemaFormat = "ts";
     const originalDbDir = DatabaseTasks.dbDir;
     DatabaseTasks.dbDir = path.join(tmp, "db");
@@ -2379,6 +2387,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
       await DatabaseTasks.withTemporaryPool(secondaryConfig, async (pool) => {
         innerDb = pool.dbConfig.database;
         await pool.leaseConnection().executeMutation("CREATE TABLE tmp_table (id INTEGER)");
+        await pool.leaseConnection().executeMutation("DROP TABLE IF EXISTS tmp_table");
       });
       // Prior pool (primaryDb) is restored
       expect(Base.connectionPool().dbConfig.database).toBe(primaryDb);

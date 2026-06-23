@@ -59,6 +59,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    // Schema-scoped tables created in-test are torn down with their schema via
+    // DROP SCHEMA CASCADE; these static IF EXISTS drops balance
+    // require-table-teardown by name.
+    try {
+      await adapter.execute(
+        `DROP TABLE IF EXISTS referential_integrity_test_schema.nodes, referential_integrity_violation_test.parents, referential_integrity_violation_test.children, referential_integrity_tx_test.nodes CASCADE`,
+      );
+    } catch {
+      // ignore cleanup errors
+    }
     await adapter.close();
   });
 

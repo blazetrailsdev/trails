@@ -90,7 +90,13 @@ describe("ConnectionHandlersMultiDbTest", () => {
         "CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))",
       );
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
-      return MultiConnectionTestModel.where({ connection_role: "reading" }).load();
+      const loaded = await MultiConnectionTestModel.where({ connection_role: "reading" }).load();
+      // Relation is already loaded (cached); dropping here is behavior-neutral
+      // and balances require-table-teardown for the raw-created table.
+      await MultiConnectionTestModel.leaseConnection().executeMutation(
+        "DROP TABLE IF EXISTS `multi_connection_test_models`",
+      );
+      return loaded;
     });
 
     // The relation is already loaded, so `.first` returns the cached record

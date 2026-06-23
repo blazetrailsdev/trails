@@ -13,6 +13,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Throwaway :memory: tables; per-name IF EXISTS drops balance
+  // require-table-teardown (SQLite has no multi-table DROP).
+  adapter.exec(
+    `DROP TABLE IF EXISTS quote_test; DROP TABLE IF EXISTS q; DROP TABLE IF EXISTS my; DROP TABLE IF EXISTS bin_enc; DROP TABLE IF EXISTS bool_test; DROP TABLE IF EXISTS bool_test2; DROP TABLE IF EXISTS bd_test; DROP TABLE IF EXISTS bin_quote; DROP TABLE IF EXISTS time_test; DROP TABLE IF EXISTS time_norm; DROP TABLE IF EXISTS time_utc; DROP TABLE IF EXISTS time_local; DROP TABLE IF EXISTS inf_test; DROP TABLE IF EXISTS nan_test`,
+  );
   adapter.close();
 });
 

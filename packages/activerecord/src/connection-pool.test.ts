@@ -1348,6 +1348,11 @@ describe("ConnectionPool schema cache", () => {
       expect(pool.schemaCache.isCached("sprockets")).toBe(false);
     } finally {
       await closePoolConnections(pool);
+      // Explicit teardown for the raw-created `sprockets` table (also removed
+      // with tmp below) to balance require-table-teardown.
+      const cleanup = new BetterSQLite3Adapter(dbFile);
+      await cleanup.executeMutation("DROP TABLE IF EXISTS sprockets");
+      await cleanup.close();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -1391,6 +1396,11 @@ describe("ConnectionPool schema cache", () => {
       expect(Object.keys(parsed.columns)).toContain("gizmos");
     } finally {
       await closePoolConnections(pool);
+      // Explicit teardown for the raw-created `gizmos` table (also removed with
+      // tmp below) to balance require-table-teardown.
+      const cleanup = new BetterSQLite3Adapter(dbFile);
+      await cleanup.executeMutation("DROP TABLE IF EXISTS gizmos");
+      await cleanup.close();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });

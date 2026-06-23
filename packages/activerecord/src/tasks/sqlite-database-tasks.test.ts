@@ -119,6 +119,12 @@ describe("SQLiteDatabaseTasks", () => {
     expect(dumped).toMatch(/index_widgets_on_name/);
     expect(dumped).toMatch(/CREATE TRIGGER touch_widgets/);
 
+    // Explicit teardown for the raw-created `widgets` table (the dbPath file is
+    // also unlinked in afterEach) to balance require-table-teardown.
+    const cleanupAdapter = new BetterSQLite3Adapter(dbPath);
+    await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
+    await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
+
     const targetConfig = new HashConfig("development", "primary", {
       adapter: "sqlite3",
       database: loadDbPath,

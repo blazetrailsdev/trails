@@ -100,6 +100,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Clean up test tables
     try {
       await adapter.exec(`DROP TABLE IF EXISTS "Items" CASCADE`);
+      // Explicit teardown for every table this file creates via raw CREATE TABLE
+      // (the dynamic `LIKE 'ex_%'` sweep below also drops them, but the static
+      // list is what require-table-teardown balances against). IF EXISTS keeps
+      // this idempotent and behavior-neutral.
+      await adapter.exec(
+        `DROP TABLE IF EXISTS pk_test, no_pk_test, ex_partial, ex_expr, ex_idx_opts, ex_opclass, ex_serial, ex_bigserial, ex_custom_seqt, ex_class, ex_uniq, ex_notnull, ex_parent, ex_child, ex_long, ex_lock, ex_dl, ex_num, ex_cast, ex_ser, ex_bool, ex_float, ex_int, ex_bigint, ex_numeric, ex_json, ex_jsonb, ex_backslash, ex_hs, ex_arr, ex_uuid, ex_xml, ex_cidr, ex_inet, ex_mac, ex_point, ex_bit, ex_rng, ex_custom_pk, ex_insert_ret, ex_insert_ret2, ex_insert_ret3, ex_insert_ret5, ex_serial_seq, ex_def_seq, ex_ns_pk, ex_no_seq, ex_no_pk, ex_keyword, ex_include, ex_include2, ex_incl_kw, ex_incl_esc, ex_invalid_idx, ex_nulls_nd, ex_unparsed_defaults, ex_dates, ex_insert_ret4, ex_pk_seq, ex_txn, ex_txn_rb, ex_txn_sp, ex_ret, ex_upd, ex_del, ex_ret2, ex_multi, ex_null, test_no_returning CASCADE`,
+      );
       const tables = await adapter.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'ex_insert_ret', 'ex_insert_ret2', 'ex_insert_ret3', 'ex_insert_ret4', 'ex_insert_ret5'))`,
       );

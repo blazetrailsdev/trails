@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  adapter.exec(`DROP TABLE IF EXISTS "subscribers"`);
   adapter.close();
 });
 

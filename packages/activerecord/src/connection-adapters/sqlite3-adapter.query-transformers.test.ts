@@ -22,6 +22,11 @@ describe("SQLite3Adapter queryTransformers wiring", () => {
   afterEach(async () => {
     queryTransformers.length = 0;
     queryTransformers.push(...savedTransformers);
+    // Throwaway :memory: tables; per-name IF EXISTS drops balance
+    // require-table-teardown (SQLite has no multi-table DROP).
+    await adapter
+      .exec("DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS t")
+      .catch(() => undefined);
     await adapter.close().catch(() => undefined);
   });
 

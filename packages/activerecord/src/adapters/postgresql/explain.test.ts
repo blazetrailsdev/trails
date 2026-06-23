@@ -29,6 +29,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await defineSchema({});
   });
+  afterAll(async () => {
+    // The `ex_*`/`op_*` tables are built in-test and rolled back by the
+    // transactional fixtures; this static IF EXISTS drop balances
+    // require-table-teardown by name.
+    await adapter.exec(
+      `DROP TABLE IF EXISTS ex_relations, ex_authors, ex_books, ex_explain, op_authors, op_posts CASCADE`,
+    );
+  });
   describe("PostgresqlExplainTest", () => {
     it("explain for one query", async () => {
       const result = await adapter.explain("SELECT 1");

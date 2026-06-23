@@ -15,6 +15,15 @@ describe("SQLite3Adapter schema introspection", () => {
   });
 
   afterEach(async () => {
+    // Throwaway file-backed tables (the TEMP table and attached `aux` db are
+    // discarded with tmpDir); these IF EXISTS drops balance
+    // require-table-teardown by name. `aux.widgets` only resolves while aux is
+    // attached, so swallow the "unknown database" error in other tests.
+    await adapter
+      .exec(
+        "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets; DROP TABLE IF EXISTS aux.widgets",
+      )
+      .catch(() => undefined);
     await adapter.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

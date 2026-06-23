@@ -22,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  adapter.exec(`DROP TABLE IF EXISTS "big_items"`);
   adapter.close();
 });
 

@@ -21,6 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`);
   adapter.close();
 });
 

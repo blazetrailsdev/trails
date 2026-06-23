@@ -14,6 +14,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Throwaway :memory: tables; per-name IF EXISTS drops balance
+  // require-table-teardown (SQLite has no multi-table DROP).
+  adapter.exec(
+    `DROP TABLE IF EXISTS stored_gen; DROP TABLE IF EXISTS virt_gen; DROP TABLE IF EXISTS impl_virt; DROP TABLE IF EXISTS virt_comma; DROP TABLE IF EXISTS chg_stored; DROP TABLE IF EXISTS chg_virt; DROP TABLE IF EXISTS chg_impl`,
+  );
   adapter.close();
 });
 

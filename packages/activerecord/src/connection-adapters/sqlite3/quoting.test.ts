@@ -312,6 +312,7 @@ describe("SQLite3::Quoting", () => {
     });
 
     afterEach(() => {
+      adapter.exec(`DROP TABLE IF EXISTS "events"`);
       adapter.close();
     });
 

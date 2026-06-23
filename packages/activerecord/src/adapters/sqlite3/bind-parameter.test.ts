@@ -13,6 +13,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  adapter.exec(`DROP TABLE IF EXISTS "topics"`);
   adapter.close();
 });
 

@@ -63,5 +63,6 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     await adapter.execute("SELECT * FROM t WHERE id = ?", [1]);
     adapter.clearCacheBang();
     await adapter.execute("SELECT * FROM t WHERE id = ?", [2]);
+    adapter.exec(`DROP TABLE IF EXISTS t`);
   });
 });

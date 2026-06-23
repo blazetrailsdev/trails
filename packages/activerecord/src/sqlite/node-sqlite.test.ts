@@ -115,6 +115,7 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     try {
       const conn = await nodeSqliteDriver.open({ database: `file:${relName}` });
       await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
       expect(getFs().existsSync(relName)).toBe(true);
       expect(getFs().existsSync(`/${relName}`)).toBe(false);
