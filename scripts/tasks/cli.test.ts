@@ -2500,47 +2500,45 @@ describe("buildRfcContent", () => {
 describe.skipIf(!existsSync(RFC_TEMPLATE) || !existsSync(STORY_TEMPLATE))(
   "scaffold byte-fidelity to 0000-template",
   () => {
-    // Structural RFC sections that must stay byte-identical between the template
-    // README and buildRfcContent's default body. Summary..Open questions carry
-    // placeholder prose authors edit; Stories/Changelog deliberately differ (the
-    // table is regenerated on commit, the scaffold emits a placeholder) and the
-    // H1 / frontmatter are parameterized, so they are excluded here.
-    const RFC_FIDELITY_SECTIONS = [
-      "## Summary",
-      "## Motivation",
-      "## Design",
-      "## Non-goals",
-      "## Alternatives considered",
-      "## Rollout",
-      "## Verification",
-      "## Open questions",
-    ];
+    // Sections the scaffold deliberately diverges from, so they're excluded from
+    // the byte-fidelity comparison: the `## Stories` table is regenerated from
+    // story frontmatter on commit (scaffold emits a "No stories registered yet."
+    // placeholder), and `## Changelog` carries a parameterized date. Everything
+    // else — Summary, Motivation, Design, Non-goals, Alternatives considered,
+    // Rollout, Verification, Open questions — must stay byte-identical.
+    //
+    // This is DERIVED from the template, not a hardcoded allowlist: the guarded
+    // set is "every template `##` heading minus these two". So a NEW section
+    // added to the template (the exact silent-drift case this story targets)
+    // fails the test until buildRfcContent is updated to match.
+    const RFC_EXCLUDED_SECTIONS = ["## Stories", "## Changelog"];
+    const guardedRfcSections = (md: string) =>
+      markdownHeadings(md).filter((h) => !RFC_EXCLUDED_SECTIONS.includes(h));
 
-    it("buildRfcContent body is byte-identical to the template README sections", () => {
+    it("buildRfcContent body is byte-identical to every guarded template README section", () => {
       const template = readFileSync(RFC_TEMPLATE, "utf8");
       const generated = buildRfcContent("my-rfc", { date: "2026-06-13" });
-      for (const heading of RFC_FIDELITY_SECTIONS) {
-        const templateSection = markdownSection(template, heading);
+      const guarded = guardedRfcSections(template);
+      // Sanity: the template still has sections to guard, so an accidentally
+      // empty list can't make this test vacuously pass.
+      expect(guarded.length, "no guarded sections found in the template README").toBeGreaterThan(0);
+      for (const heading of guarded) {
         const generatedSection = markdownSection(generated, heading);
-        expect(templateSection, `template is missing ${heading}`).not.toBeNull();
-        expect(generatedSection, `buildRfcContent output is missing ${heading}`).not.toBeNull();
+        expect(
+          generatedSection,
+          `buildRfcContent is missing ${heading} (present in rfcs/0000-template/README.md — add it to the scaffold)`,
+        ).not.toBeNull();
         expect(
           generatedSection,
           `${heading} drifted between buildRfcContent and rfcs/0000-template/README.md`,
-        ).toBe(templateSection);
+        ).toBe(markdownSection(template, heading));
       }
     });
 
-    it("buildRfcContent preserves the template section ordering", () => {
+    it("buildRfcContent preserves the template guarded-section ordering", () => {
       const template = readFileSync(RFC_TEMPLATE, "utf8");
       const generated = buildRfcContent("my-rfc", { date: "2026-06-13" });
-      const templateOrder = markdownHeadings(template).filter((h) =>
-        RFC_FIDELITY_SECTIONS.includes(h),
-      );
-      const generatedOrder = markdownHeadings(generated).filter((h) =>
-        RFC_FIDELITY_SECTIONS.includes(h),
-      );
-      expect(generatedOrder).toEqual(templateOrder);
+      expect(guardedRfcSections(generated)).toEqual(guardedRfcSections(template));
     });
 
     // The story scaffold is deliberately headings-only (no placeholder prose),
