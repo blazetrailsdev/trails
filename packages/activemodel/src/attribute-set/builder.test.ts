@@ -124,4 +124,59 @@ describe("LazyAttributeHash", () => {
     const attr = hash.assignDefaultValue("missing");
     expect(attr.value).toBeNull();
   });
+
+  it("transform_values materializes and maps every attribute", () => {
+    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
+    const result = hash.transformValues((attr) => attr);
+    expect(result.get("age")!.value).toBe(42);
+  });
+
+  it("transform_values is generic over the block result", () => {
+    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
+    const result: Map<string, unknown> = hash.transformValues((attr) => attr.type);
+    expect(result.get("age")).toBe(intType);
+  });
+
+  it("each_value yields every materialized attribute", () => {
+    const hash = new LazyAttributeHash(
+      new Map([
+        ["age", intType],
+        ["name", strType],
+      ]),
+      { age: "42", name: "Alice" },
+    );
+    const seen: unknown[] = [];
+    hash.eachValue((attr) => seen.push(attr.value));
+    expect(seen).toContain(42);
+    expect(seen).toContain("Alice");
+  });
+
+  it("fetch returns the materialized attribute for the given name", () => {
+    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
+    expect(hash.fetch("age").value).toBe(42);
+  });
+
+  it("fetch raises for an unknown name without a block", () => {
+    const hash = new LazyAttributeHash(new Map(), {});
+    expect(() => hash.fetch("missing")).toThrow();
+  });
+
+  it("fetch returns the given default value for an unknown name", () => {
+    const hash = new LazyAttributeHash(new Map(), {});
+    const fallback = Attribute.null("missing");
+    expect(hash.fetch("missing", fallback)).toBe(fallback);
+  });
+
+  it("except returns a copy without the given names", () => {
+    const hash = new LazyAttributeHash(
+      new Map([
+        ["age", intType],
+        ["name", strType],
+      ]),
+      { age: "42", name: "Alice" },
+    );
+    const rest = hash.except("age");
+    expect(rest.has("age")).toBe(false);
+    expect(rest.has("name")).toBe(true);
+  });
 });

@@ -16,6 +16,47 @@ export class AttributeSet {
     this.attributes = attributes;
   }
 
+  /**
+   * Yield each underlying Attribute value.
+   *
+   * Mirrors: `delegate :each_value, to: :attributes` — Hash#each_value over the
+   * backing attribute map (every entry, initialized or not).
+   */
+  eachValue(fn: (attr: Attribute) => void): void {
+    for (const attr of this.attributes.values()) fn(attr);
+  }
+
+  /**
+   * Fetch the Attribute stored under `name`. Mirrors Ruby `Hash#fetch`: with a
+   * block (function) the block result is the fallback; with a plain default
+   * value that value is returned; with neither, an absent key throws KeyError.
+   *
+   * Mirrors: `delegate :fetch, to: :attributes`.
+   */
+  fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
+    const attr = this.attributes.get(name);
+    if (attr !== undefined) return attr;
+    if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
+    if (defaultOrBlock !== undefined) return defaultOrBlock;
+    const err = new Error(`key not found: ${JSON.stringify(name)}`);
+    err.name = "KeyError";
+    throw err;
+  }
+
+  /**
+   * Return a copy of the backing attribute map with `names` removed.
+   *
+   * Mirrors: `delegate :except, to: :attributes` — Hash#except.
+   */
+  except(...names: string[]): Map<string, Attribute> {
+    const drop = new Set(names);
+    const result = new Map<string, Attribute>();
+    for (const [name, attr] of this.attributes) {
+      if (!drop.has(name)) result.set(name, attr);
+    }
+    return result;
+  }
+
   castTypes(): Record<string, import("./type/value.js").Type> {
     const result: Record<string, import("./type/value.js").Type> = {};
     for (const [name, attr] of this.attributes) {
@@ -47,6 +88,15 @@ export class AttributeSet {
   isKey(name: string): boolean {
     const attr = this.attributes.get(name);
     return attr !== undefined && attr.isInitialized();
+  }
+
+  /**
+   * Whether `name` is an initialized key. Alias of {@link isKey}.
+   *
+   * Mirrors: `alias :include? :key?`.
+   */
+  isInclude(name: string): boolean {
+    return this.isKey(name);
   }
 
   keys(): string[] {
@@ -238,6 +288,16 @@ export class AttributeSet {
     }
   }
 
+  /**
+   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
+   * with code that iterates `for (const [k, v] of _attributes)`.
+   */
+  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
+    for (const name of this.keys()) {
+      yield [name, this.fetchValue(name)];
+    }
+  }
+
   has(name: string): boolean {
     const attr = this.attributes.get(name);
     return attr !== undefined && attr.isInitialized();
@@ -281,16 +341,6 @@ export class AttributeSet {
       result[name] = this.fetchValue(name);
     }
     return result;
-  }
-
-  /**
-   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
-   * with code that iterates `for (const [k, v] of _attributes)`.
-   */
-  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
-    for (const name of this.keys()) {
-      yield [name, this.fetchValue(name)];
-    }
   }
 
   /**

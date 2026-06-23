@@ -32,6 +32,15 @@ export class Errors<TBase extends object = object> {
   }
 
   /**
+   * The actual array of `Error` objects, exposed as a plain array. Mirrors
+   * Rails' `attr_reader :errors` + `alias :objects :errors` where `objects`
+   * returns `@errors` directly (activemodel/lib/active_model/errors.rb:107-108).
+   */
+  get objects(): ActiveModelError[] {
+    return this._errors;
+  }
+
+  /**
    * Replace this collection's errors with a deep-duped copy of `other`'s,
    * rebinding each error's `base` to this collection's base. Mirrors
    * Rails' `ActiveModel::Errors#copy!`
@@ -98,6 +107,24 @@ export class Errors<TBase extends object = object> {
 
   include(attribute: string): boolean {
     return this._errors.some((e) => e.attribute === attribute);
+  }
+
+  /**
+   * Whether an error exists for `attribute`. Alias of {@link include}.
+   *
+   * Mirrors: `alias :has_key? :include?` (errors.rb).
+   */
+  hasKey(attribute: string): boolean {
+    return this.include(attribute);
+  }
+
+  /**
+   * Whether an error exists for `attribute`. Alias of {@link include}.
+   *
+   * Mirrors: `alias :key? :include?` (errors.rb).
+   */
+  isKey(attribute: string): boolean {
+    return this.include(attribute);
   }
 
   /**
@@ -311,10 +338,6 @@ export class Errors<TBase extends object = object> {
     return this._base;
   }
 
-  get(attribute: string): string[] {
-    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
-  }
-
   /**
    * Makes `Errors` iterable so `for (const e of errors)`, `[...errors]`,
    * and `Array.from(errors)` all work. Mirrors Rails' `include Enumerable`
@@ -325,6 +348,10 @@ export class Errors<TBase extends object = object> {
    */
   [Symbol.iterator](): IterableIterator<ActiveModelError> {
     return this._errors[Symbol.iterator]();
+  }
+
+  get(attribute: string): string[] {
+    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
   }
 
   on(attribute: string): string[] {
@@ -349,15 +376,6 @@ export class Errors<TBase extends object = object> {
 
   clear(): void {
     this._errors = [];
-  }
-
-  /**
-   * The actual array of `Error` objects, exposed as a plain array. Mirrors
-   * Rails' `attr_reader :errors` + `alias :objects :errors` where `objects`
-   * returns `@errors` directly (activemodel/lib/active_model/errors.rb:107-108).
-   */
-  get objects(): ActiveModelError[] {
-    return this._errors;
   }
 
   /**
