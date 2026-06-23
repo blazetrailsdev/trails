@@ -97,6 +97,20 @@ export const SKIP_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   binaries: new Set<string>(["data"]),
 };
 
+// Per-table HABTM / has_many:through association labels the TS fixture declares
+// directly (e.g. `david: { sharedComputers: ["laptop"] }`). Rails carries the
+// same label in YAML (`shared_computers: laptop`); the fixture loader
+// materializes it into a join table rather than a column on this row, so the
+// key is neither a schema column nor an FK-shorthand. canonicalizeRailsRow
+// already drops the Rails-side snake form (it's not a column with no `<k>_id`
+// form); this registry lets the TS-side schema check and attr-diff drop the
+// camelCase equivalent symmetrically, instead of flagging it as a phantom
+// column. Keep this precise (real association names only) — a generic
+// "non-column key" skip would also mask genuinely-unported columns.
+export const HABTM_LABEL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
+  developers: new Set<string>(["sharedComputers"]),
+};
+
 // prettier-ignore
 interface FileResult { yamlPath: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; attrsSkipped: number; schemaPorted: boolean; schemaExtras: number; notes: string[]; }
 
@@ -544,6 +558,7 @@ export function schemaCheck(
   const shape = tableShape(table);
   const declared = new Set(Object.keys(shape.columns));
   if (shape.hasImplicitId) declared.add("id");
+  const labelAttrs = HABTM_LABEL_ATTRS[snake];
   let extras = 0;
   for (const [rowName, row] of Object.entries(tsRows)) {
     // Skip non-object rows (null/undefined/scalar). compareFile's own row-
@@ -551,10 +566,12 @@ export function schemaCheck(
     // shouldn't promote a malformed-fixture soft DIFF to a runtime crash.
     if (!row || typeof row !== "object") continue;
     for (const attr of Object.keys(row)) {
-      if (!declared.has(attr)) {
-        notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
-        extras++;
-      }
+      if (declared.has(attr)) continue;
+      // A declared HABTM / has_many:through association label isn't a column —
+      // the fixture loader materializes it into a join table (see HABTM_LABEL_ATTRS).
+      if (labelAttrs?.has(attr)) continue;
+      notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
+      extras++;
     }
   }
   return { ported: true, extras };
@@ -685,11 +702,16 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
       anyDiff = true;
     }
     const skipAttrs = SKIP_ATTRS[snake];
+    // A declared HABTM / has_many:through label (`sharedComputers`) is TS-only:
+    // canonicalizeRailsRow already dropped its snake form from the Rails side, so
+    // it would otherwise read as extra-in-ts. Skip it symmetrically.
+    const labelAttrs = HABTM_LABEL_ATTRS[tableSnake];
     for (const attr of new Set([...Object.keys(railsRow), ...Object.keys(tsRow)])) {
       // Intentionally-unmirrored columns (binary blobs) are soft skips, even
       // when the TS row drops them entirely — so the presence check below
       // doesn't flag them as missing-in-ts.
       if (skipAttrs?.has(attr)) { r.attrsSkipped++; continue; } // prettier-ignore
+      if (labelAttrs?.has(attr)) { r.attrsSkipped++; continue; } // prettier-ignore
       r.attrsTotal++;
       if (!(attr in tsRow) || !(attr in railsRow)) {
         r.notes.push(`${attr in tsRow ? "extra" : "missing"}-in-ts: ${rowName}.${attr}`);
