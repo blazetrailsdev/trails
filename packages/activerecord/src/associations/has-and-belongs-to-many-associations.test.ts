@@ -864,16 +864,40 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(proxy.loaded).toBe(false);
   });
 
-  it.skip("assign ids", async () => {
-    // BLOCKED: transactions — savepoint lifecycle leak on PG/MySQL
-    // ROOT-CAUSE: HABTM idsWriter→persistReplace SAVEPOINT lifecycle leaks across
-    //   error boundaries (PG 25P02, MariaDB orphan RELEASE). Passes on SQLite which
-    //   tolerates aborted savepoints.
+  it("assign ids", async () => {
+    const activeRecord = projects("active_record");
+    const actionController = projects("action_controller");
+    const developer = new Developer({ name: "Joe" });
+    await association<Project>(developer, "projects").setIds([
+      activeRecord.id,
+      actionController.id,
+    ] as any);
+    await (developer as any).save();
+    await developer.reload();
+    expect((await association<Project>(developer, "projects").toArray()).length).toBe(2);
+    const ids = [...((await (developer as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
   });
 
-  it.skip("assign ids ignoring blanks", async () => {
-    // BLOCKED: transactions — fallback path savepoint lifecycle leak on PG/MySQL
-    // ROOT-CAUSE: see "assign ids" above
+  it("assign ids ignoring blanks", async () => {
+    const activeRecord = projects("active_record");
+    const actionController = projects("action_controller");
+    const developer = new Developer({ name: "Joe" });
+    await association<Project>(developer, "projects").setIds([
+      activeRecord.id,
+      null,
+      actionController.id,
+      "",
+    ] as any);
+    await (developer as any).save();
+    await developer.reload();
+    expect((await association<Project>(developer, "projects").toArray()).length).toBe(2);
+    const ids = [...((await (developer as any).projectIds) as number[])]
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
   });
 
   it("singular ids are reloaded after collection concat", async () => {
