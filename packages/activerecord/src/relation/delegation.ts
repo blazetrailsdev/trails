@@ -13,7 +13,7 @@ import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
-import { _relationFamilySlot } from "./uncacheable-methods-slot.js";
+import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -145,30 +145,38 @@ function ownMethodNamesAbove(
 function computeUncacheableMethods(): Set<string> {
   const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
     _relationFamilySlot;
-  const boundary = relation ? (relation.prototype as object) : null;
+  const relationProto = relation ? (relation.prototype as object) : null;
   const result = new Set<string>();
   for (const sub of [collectionProxy, associationRelation, disableJoinsAssociationRelation]) {
     if (!sub) continue;
-    for (const n of ownMethodNamesAbove(sub, boundary)) result.add(n);
+    for (const n of ownMethodNamesAbove(sub, relationProto)) result.add(n);
+  }
+  // Rails subtracts `Relation.public_instance_methods` (delegation.rb:19): a
+  // proxy method that *overrides* a Relation method is not uncacheable. Mirror
+  // the exact set difference by removing every name reachable on Relation's own
+  // prototype chain.
+  if (relation) {
+    for (const n of ownMethodNamesAbove(relation, null)) result.delete(n);
   }
   return result;
 }
 
 let _uncacheableMethodsCache: Set<string> | undefined;
+let _uncacheableMethodsCacheVersion = -1;
 
 export function uncacheableMethods(): Set<string> {
-  const slot = _relationFamilySlot;
-  const ready =
-    slot.relation &&
-    slot.collectionProxy &&
-    slot.associationRelation &&
-    slot.disableJoinsAssociationRelation;
-  // Freeze the memoized set only once every relation-family class has loaded
-  // (module init can call this before they all register). Delegation runs at
-  // query time, well after init, so the live recompute path is a startup-only
-  // fallback.
-  if (ready) return (_uncacheableMethodsCache ??= computeUncacheableMethods());
-  return computeUncacheableMethods();
+  // Recompute only when a relation-family class registers (import-time only);
+  // the version stamp stabilizes before any delegation runs, so this memoizes
+  // permanently without depending on which/how many classes have loaded.
+  if (
+    _uncacheableMethodsCache &&
+    _uncacheableMethodsCacheVersion === _relationFamilyState.version
+  ) {
+    return _uncacheableMethodsCache;
+  }
+  _uncacheableMethodsCache = computeUncacheableMethods();
+  _uncacheableMethodsCacheVersion = _relationFamilyState.version;
+  return _uncacheableMethodsCache;
 }
 
 /**
