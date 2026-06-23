@@ -21,6 +21,15 @@ import { Categorization } from "../test-helpers/models/categorization.js";
 // paint_textures, non_poly_ones, non_poly_twos, shape_expressions) are canonical
 // TEST_SCHEMA tables.
 class ShapeExpression extends Base {
+  declare shape_type: string;
+  declare shape_id: number;
+  declare paint_type: string;
+  declare paint_id: number;
+  declare shape: Base | null;
+  declare paint: Base | null;
+  declare loadBelongsTo: ((name: "shape") => Promise<Base | null>) &
+    ((name: "paint") => Promise<Base | null>);
+
   static {
     this._tableName = "shape_expressions";
     this.attribute("shape_type", "string");
@@ -47,6 +56,10 @@ class Triangle extends Base {
   }
 }
 class PaintColor extends Base {
+  declare non_poly_one_id: number;
+  declare nonPoly: NonPolyOne | null;
+  declare loadBelongsTo: (name: "nonPoly") => Promise<NonPolyOne | null>;
+
   static {
     this._tableName = "paint_colors";
     this.attribute("non_poly_one_id", "integer");
@@ -57,6 +70,10 @@ class PaintColor extends Base {
   }
 }
 class PaintTexture extends Base {
+  declare non_poly_two_id: number;
+  declare nonPoly: NonPolyTwo | null;
+  declare loadBelongsTo: (name: "nonPoly") => Promise<NonPolyTwo | null>;
+
   static {
     this._tableName = "paint_textures";
     this.attribute("non_poly_two_id", "integer");

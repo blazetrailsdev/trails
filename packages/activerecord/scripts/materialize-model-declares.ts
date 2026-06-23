@@ -200,20 +200,36 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 // model declares use, to match convention; anything else keeps its
 // original module specifier.
 const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)/g;
-const BUILTIN_IMPORT_SPECIFIER: Record<string, string> = {
+// AR built-ins, keyed by symbol → the source module relative to MODELS_DIR
+// (the same paths the hand-written model declares under that dir use). The
+// specifier is recomputed relative to each materialized file's directory in
+// `hoistInlineImports`, so files outside MODELS_DIR (e.g. test files) get a
+// correct relative path rather than the model-dir-relative one.
+const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   AssociationProxy: "../../associations/collection-proxy.js",
   Relation: "../../relation.js",
   IPAddr: "../../connection-adapters/postgresql/oid/cidr.js",
 };
 
+/** Builtin specifier recomputed relative to `fileDir`. */
+function builtinSpecifierFor(sym: string, fileDir: string): string | undefined {
+  const fromModels = BUILTIN_IMPORT_FROM_MODELS_DIR[sym];
+  if (!fromModels) return undefined;
+  const abs = path.resolve(MODELS_DIR, fromModels);
+  let rel = path.relative(fileDir, abs).replace(/\\/g, "/");
+  if (!rel.startsWith(".")) rel = "./" + rel;
+  return rel;
+}
+
 function hoistInlineImports(
   text: string,
   inScope: ReadonlySet<string>,
+  fileDir: string,
 ): { text: string; importLines: string[] } {
   const bySpecifier = new Map<string, Set<string>>();
   const rewritten = text.replace(INLINE_IMPORT_RE, (_match, mod: string, sym: string) => {
     if (!inScope.has(sym)) {
-      const specifier = BUILTIN_IMPORT_SPECIFIER[sym] ?? mod;
+      const specifier = builtinSpecifierFor(sym, fileDir) ?? mod;
       (bySpecifier.get(specifier) ?? bySpecifier.set(specifier, new Set()).get(specifier)!).add(
         sym,
       );
@@ -230,9 +246,19 @@ function hoistInlineImports(
 
 function main(): void {
   const args = process.argv.slice(2);
-  const targets = (args.length > 0 ? args.map((a) => path.basename(a)) : PILOT).map((f) =>
-    path.join(MODELS_DIR, f),
-  );
+  // With no args, process the canonical pilot set under MODELS_DIR. With args,
+  // accept either a bare model filename (resolved against MODELS_DIR, the
+  // historical behavior) or a path that resolves to an existing file relative
+  // to the cwd / absolute — so the generator can materialize declares into test
+  // files outside the canonical models dir.
+  const targets =
+    args.length > 0
+      ? args.map((a) => {
+          const direct = path.resolve(a);
+          if (fs.existsSync(direct)) return direct;
+          return path.join(MODELS_DIR, path.basename(a));
+        })
+      : PILOT.map((f) => path.join(MODELS_DIR, f));
   const schemaColumnsByTable = normalizeSchema(TEST_SCHEMA);
   const registry = buildModelRegistry();
 
@@ -252,7 +278,11 @@ function main(): void {
     }
     // Rewrite the virtualizer's inline `import("…").X` type expressions
     // into bare references + hoisted top-level `import type` lines.
-    const { text: hoisted, importLines } = hoistInlineImports(virtualized, collectNamesInScope(sf));
+    const { text: hoisted, importLines } = hoistInlineImports(
+      virtualized,
+      collectNamesInScope(sf),
+      path.dirname(file),
+    );
     const text = importLines.length > 0 ? importLines.join("\n") + "\n" + hoisted : hoisted;
     fs.writeFileSync(file, text);
     const added = text.split("\n").length - source.split("\n").length;

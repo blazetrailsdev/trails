@@ -403,17 +403,29 @@ const TEST_SCHEMA: Schema = {
 };
 // Shared models for the polymorphic-preload guard tests (Rails' Sponsor → sponsorable fixtures).
 class SgAuthor extends Base {
+  declare name: string;
+
   static {
     this.attribute("name", "string");
   }
 }
 class SgComment extends Base {
+  declare body: string;
+  declare sg_post_id: number;
+
   static {
     this.attribute("body", "string");
     this.attribute("sg_post_id", "integer");
   }
 }
 class SgPost extends Base {
+  declare title: string;
+  declare sg_author_id: number;
+  declare author: SgAuthor | null;
+  declare firstComment: SgComment | null;
+  declare loadBelongsTo: (name: "author") => Promise<SgAuthor | null>;
+  declare loadHasOne: (name: "firstComment") => Promise<SgComment | null>;
+
   static {
     this.attribute("title", "string");
     this.attribute("sg_author_id", "integer");
@@ -428,11 +440,18 @@ class SgPost extends Base {
   }
 }
 class SgMembership extends Base {
+  declare kind: string;
+
   static {
     this.attribute("kind", "string");
   }
 }
 class SgMember extends Base {
+  declare name: string;
+  declare sg_post_id: number;
+  declare post: SgPost | null;
+  declare loadBelongsTo: (name: "post") => Promise<SgPost | null>;
+
   static {
     this.attribute("name", "string");
     this.attribute("sg_post_id", "integer");
@@ -440,6 +459,11 @@ class SgMember extends Base {
   }
 }
 class SgOrganization extends Base {
+  declare name: string;
+  declare sg_membership_id: number;
+  declare membership: SgMembership | null;
+  declare loadBelongsTo: (name: "membership") => Promise<SgMembership | null>;
+
   static {
     this.attribute("name", "string");
     this.attribute("sg_membership_id", "integer");
@@ -450,6 +474,11 @@ class SgOrganization extends Base {
   }
 }
 class SgSponsor extends Base {
+  declare sponsorable_id: number;
+  declare sponsorable_type: string;
+  declare sponsorable: Base | null;
+  declare loadBelongsTo: (name: "sponsorable") => Promise<Base | null>;
+
   static {
     this.attribute("sponsorable_id", "integer");
     this.attribute("sponsorable_type", "string");

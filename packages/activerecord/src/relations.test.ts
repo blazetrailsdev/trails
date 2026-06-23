@@ -27,6 +27,23 @@ afterEach(() => {
 // ─── Shared model setup ───
 
 class Post extends Base {
+  declare title: string;
+  declare body: string;
+  declare author: string;
+  declare status: string;
+  declare views: number;
+  declare category: string;
+  declare published: boolean;
+  declare author_id: number;
+  declare indestructible_tags_count: number | null;
+  declare legacy_comments_count: number | null;
+  declare taggings_with_delete_all_count: number | null;
+  declare taggings_with_destroy_count: number | null;
+  declare tags_count: number | null;
+  declare tags_with_destroy_count: number | null;
+  declare tags_with_nullify_count: number | null;
+  declare "type": string;
+
   static {
     this.attribute("title", "string");
     this.attribute("body", "string");
@@ -893,7 +910,7 @@ describe("RelationTest", () => {
     it("supports for-await-of", async () => {
       const titles: string[] = [];
       for await (const post of Post.all()) {
-        titles.push(post.title as string);
+        titles.push(post.title);
       }
       expect(titles).toHaveLength(5);
     });

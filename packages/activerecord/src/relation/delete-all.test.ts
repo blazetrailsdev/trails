@@ -1,3 +1,4 @@
+import type { AssociationProxy } from "../associations/collection-proxy.js";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -72,6 +73,13 @@ describe("DeleteAllTest", () => {
 });
 
 class Pet extends Base {
+  declare name: string;
+  declare toys: AssociationProxy<Toy>;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare owner_id: number;
+  declare pet_id: number;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
   static {
     this.tableName = "da_pets";
     this.attribute("name", "string");
@@ -79,6 +87,14 @@ class Pet extends Base {
   }
 }
 class Toy extends Base {
+  declare name: string;
+  declare pet_id: number;
+  declare pet: Pet | null;
+  declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare toy_id: number;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
   static {
     this.tableName = "da_toys";
     this.attribute("name", "string");
