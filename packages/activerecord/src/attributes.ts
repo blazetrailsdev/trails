@@ -133,6 +133,23 @@ export function defineAttribute(
  * 0 instead of null for new records that have no lock column default.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
+  // Reflect the (always-warm, RFC 0031) schema cache into `_attributeDefinitions`
+  // before building, so real columns — notably the `id` PK — are seeded even
+  // when the model is first constructed without a query (e.g. `new Car({name})`,
+  // where no STI `type` key drives the usual reflect-on-`new` path). Without
+  // this the strict `writeFromUser` raises on the post-INSERT `id` write-back.
+  // `columnsHash` reads the warm cache directly (and reconciles the definitions),
+  // which the bare `loadSchema` cache-sync path does not reliably do for
+  // dynamically-defined / STI models. A genuinely tableless model reflects
+  // nothing and falls through to the attribute-synthesized view as before.
+  if (!this._schemaLoaded && !this.abstractClass && this.tableName) {
+    try {
+      this.columnsHash();
+    } catch {
+      // TableNotSpecified / no cache entry — keep the synthesized view.
+    }
+  }
+
   // For STI subclasses, seed the shared (schema-reflected) set on the STI base
   // so cache invalidation from Base.attribute/defineAttribute (routed to the
   // base) stays coherent across siblings. The subclass's own declarations are
