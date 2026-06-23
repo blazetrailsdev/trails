@@ -180,6 +180,12 @@ const tscVerifier =
  * recursing down to singletons. A singleton that still fails is load-bearing
  * and stays in `kept`. This is O(1) builds when nothing is load-bearing and
  * O(k·log n) when k casts are, versus O(n) for the per-cast loop.
+ *
+ * `group` must be ordered descending by offset, matching the old per-cast
+ * loop's iteration order. When two casts are individually removable but fail
+ * together, greedy keeps whichever it processes *later*; preserving the
+ * descending order means batch-bisect reverts the same cast the per-cast loop
+ * did (the earlier/lower-offset one), so the kept/removed set is identical.
  */
 async function bisectAccept(
   base: string,
@@ -210,7 +216,9 @@ async function bisectAccept(
  */
 export async function stripFile(file: string, verify?: VerifyText): Promise<StripResult> {
   const original = await readFile(file, "utf8");
-  const candidates = findCandidateCasts(original);
+  // Descending by offset to match the old per-cast loop's iteration order, so
+  // a mutually-exclusive pair reverts the same span the per-cast loop did.
+  const candidates = findCandidateCasts(original).sort((a, b) => b.start - a.start);
   const check = verify ?? tscVerifier(file);
 
   const accepted: CastSpan[] = [];

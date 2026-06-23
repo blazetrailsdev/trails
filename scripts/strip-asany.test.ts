@@ -171,4 +171,26 @@ describe("stripFile (batch-then-bisect)", () => {
       }
     });
   });
+
+  it("reverts the same span the per-cast loop would for a mutually-exclusive pair", async () => {
+    // Two casts that are each individually removable but fail together (green
+    // iff at least one `as any` survives). The old descending per-cast loop
+    // processes the higher-offset span first and keeps it, reverting the
+    // lower-offset one; batch-bisect must make the identical choice.
+    const text = ["sink((a as any).id);", "sink((b as any).id);", ""].join("\n");
+    await withTempFile(text, async (file) => {
+      const verify: (t: string) => Promise<boolean> = async (t) => {
+        await writeFile(file, t);
+        return t.includes("as any");
+      };
+      const result = await stripFile(file, verify);
+      expect(result.removed).toBe(1);
+      expect(result.kept).toBe(1);
+
+      const final = await readFile(file, "utf8");
+      // Lower-offset span (line 1) reverted; higher-offset span (line 2) removed.
+      expect(final).toContain("sink((a as any).id);");
+      expect(final).toContain("sink(b.id);");
+    });
+  });
 });
