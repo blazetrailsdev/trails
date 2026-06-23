@@ -34,15 +34,6 @@ class Post extends Base {
   declare views: number;
   declare category: string;
   declare published: boolean;
-  declare author_id: number;
-  declare indestructible_tags_count: number | null;
-  declare legacy_comments_count: number | null;
-  declare taggings_with_delete_all_count: number | null;
-  declare taggings_with_destroy_count: number | null;
-  declare tags_count: number | null;
-  declare tags_with_destroy_count: number | null;
-  declare tags_with_nullify_count: number | null;
-  declare "type": string;
 
   static {
     this.attribute("title", "string");

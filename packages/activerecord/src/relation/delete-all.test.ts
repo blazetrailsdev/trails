@@ -1,8 +1,8 @@
-import type { AssociationProxy } from "../associations/collection-proxy.js";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "../associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -75,10 +75,6 @@ describe("DeleteAllTest", () => {
 class Pet extends Base {
   declare name: string;
   declare toys: AssociationProxy<Toy>;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare owner_id: number;
-  declare pet_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
     this.tableName = "da_pets";
@@ -91,9 +87,6 @@ class Toy extends Base {
   declare pet_id: number;
   declare pet: Pet | null;
   declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare toy_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
     this.tableName = "da_toys";

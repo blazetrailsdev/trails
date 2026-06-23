@@ -244,6 +244,19 @@ function hoistInlineImports(
   return { text: rewritten, importLines };
 }
 
+/**
+ * Splice hoisted `import type` lines into `text` just before the first
+ * existing top-level `import` statement, so they group with the file's
+ * import block rather than landing above a leading header docstring. Files
+ * with no import statement (rare for a model) get the lines prepended.
+ */
+function insertHoistedImports(text: string, importLines: readonly string[]): string {
+  const block = importLines.join("\n") + "\n";
+  const match = /^import\s/m.exec(text);
+  if (!match) return block + text;
+  return text.slice(0, match.index) + block + text.slice(match.index);
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   // With no args, process the canonical pilot set under MODELS_DIR. With args,
@@ -262,15 +275,27 @@ function main(): void {
   const schemaColumnsByTable = normalizeSchema(TEST_SCHEMA);
   const registry = buildModelRegistry();
 
+  const modelsDirPrefix = MODELS_DIR + path.sep;
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const baseNames = computeBaseNames(sf);
     const prependImports = resolveAutoImports(sf, file, registry, baseNames);
+    // The schema-column merge maps each model to a table by `tableName` (or
+    // `pluralize(underscore(className))` when unset) and bakes that table's
+    // canonical columns into the declares. That is correct for the canonical
+    // models under MODELS_DIR, but test-local model classes elsewhere define
+    // their own bespoke schemas — a class named `Post` (or one assigning
+    // `this.tableName` in a static block, which the walker does not capture)
+    // would otherwise pull phantom columns off the canonical `posts` table
+    // that its runtime table lacks. For files outside MODELS_DIR we therefore
+    // omit the schema map: declares then reflect only the class's explicit
+    // `attribute()` / association / enum calls — exactly its real surface.
+    const underModelsDir = file.startsWith(modelsDirPrefix);
     const { text: virtualized } = virtualize(source, file, {
       baseNames,
       prependImports,
-      schemaColumnsByTable,
+      schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
     });
     if (virtualized === source) {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);
@@ -283,7 +308,7 @@ function main(): void {
       collectNamesInScope(sf),
       path.dirname(file),
     );
-    const text = importLines.length > 0 ? importLines.join("\n") + "\n" + hoisted : hoisted;
+    const text = importLines.length > 0 ? insertHoistedImports(hoisted, importLines) : hoisted;
     fs.writeFileSync(file, text);
     const added = text.split("\n").length - source.split("\n").length;
     process.stdout.write(`  materialized ${path.basename(file)} (+${added} lines)\n`);
