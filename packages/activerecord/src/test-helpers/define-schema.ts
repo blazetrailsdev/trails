@@ -483,6 +483,29 @@ export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
   }
 }
 
+/**
+ * Reconcile the signature cache against the set of tables a caller actually
+ * dropped: delete only those table entries, leaving the rest of the cache
+ * intact. This is the surgical alternative to {@link clearAppliedSchemaSignatures}
+ * for `dropAllTables` — a blanket wipe forces the next file's `defineSchema`
+ * down the Path-C signature-mismatch drop for every table (re-dropping +
+ * recreating tables whose shape never changed), whereas deleting only the
+ * dropped tables' entries keeps cache hits for any table left untouched.
+ *
+ * No-op for tables that have no cache entry, and a no-op overall when no cache
+ * exists for the adapter's database yet.
+ *
+ * @internal
+ */
+export function clearAppliedSchemaSignaturesForTables(
+  adapter: DatabaseAdapter,
+  tables: Iterable<string>,
+): void {
+  const cache = _cacheFor(adapter, false);
+  if (!cache) return;
+  for (const table of tables) cache.delete(table);
+}
+
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {
   return _cacheFor(adapter, true)!;

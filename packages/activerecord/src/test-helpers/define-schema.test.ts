@@ -3,6 +3,7 @@ import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../tes
 import type { DatabaseAdapter } from "../adapter.js";
 import {
   clearAppliedSchemaSignatures,
+  clearAppliedSchemaSignaturesForTables,
   defineSchema,
   seedSchemaSignatures,
   type ColumnSpec,
@@ -407,6 +408,37 @@ describe("defineSchema", () => {
       await expect(
         raw.executeMutation(`INSERT INTO gizmos (name) VALUES ('ok')`),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe("clearAppliedSchemaSignaturesForTables", () => {
+    // Reconcile path: dropAllTables deletes only the cache entries for tables
+    // it actually dropped, leaving entries for untouched tables intact so the
+    // next defineSchema(sameSpec) is a cache hit (no Path-C re-drop).
+    it("removes only the named entries, preserving cache hits for the rest", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      const spec = {
+        widgets: { name: "string" as ColumnSpec },
+        gadgets: { name: "string" as ColumnSpec },
+      };
+      await defineSchema(raw, spec);
+
+      // Both tables exist physically; drop only `widgets` from the cache.
+      clearAppliedSchemaSignaturesForTables(raw, ["widgets"]);
+
+      const spy = vi.spyOn(raw, "executeMutation");
+      await defineSchema(raw, spec);
+      const ddl = spy.mock.calls
+        .map((c) => String(c[0]))
+        .filter((sql) => /CREATE TABLE|DROP TABLE/i.test(sql));
+      // widgets lost its signature → drop+recreate; gadgets stayed cached → none.
+      expect(ddl.some((sql) => /widgets/i.test(sql))).toBe(true);
+      expect(ddl.some((sql) => /gadgets/i.test(sql))).toBe(false);
+    });
+
+    it("is a no-op when the adapter has no cache yet", () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      expect(() => clearAppliedSchemaSignaturesForTables(raw, ["widgets"])).not.toThrow();
     });
   });
 

@@ -1,28 +1,34 @@
 import type { DatabaseAdapter } from "../adapter.js";
-import { clearAppliedSchemaSignatures } from "./define-schema.js";
+import { clearAppliedSchemaSignaturesForTables } from "./define-schema.js";
 
 /**
- * Drops every user table/view/matview in the database and clears the
- * `defineSchema` signature cache for this adapter so a subsequent
- * `defineSchema(sameSpec)` re-creates the tables instead of no-oping
- * over missing ones. Idempotent; per-DROP errors are swallowed so
- * teardown noise never aborts the sequence.
+ * Drops every user table/view/matview in the database and reconciles the
+ * `defineSchema` signature cache for this adapter against the tables it
+ * actually dropped — deleting only those entries rather than wiping the
+ * whole cache. A blanket wipe forced the next file's `defineSchema` down
+ * the Path-C signature-mismatch drop for every table (re-dropping +
+ * recreating tables whose shape never changed); reconciling keeps cache
+ * hits for any table left untouched. Idempotent; per-DROP errors are
+ * swallowed so teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
  * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
-  clearAppliedSchemaSignatures(adapter);
+  let dropped: string[];
   switch (adapter.adapterName) {
     case "postgres":
-      await dropAllPgTables(adapter);
+      dropped = await dropAllPgTables(adapter);
       break;
     case "mysql":
-      await dropAllMysqlTables(adapter);
+      dropped = await dropAllMysqlTables(adapter);
       break;
     case "sqlite":
-      await dropAllSqliteTables(adapter);
+      dropped = await dropAllSqliteTables(adapter);
       break;
+    default:
+      dropped = [];
   }
+  clearAppliedSchemaSignaturesForTables(adapter, dropped);
 }
 
 function _isPgConnectionError(e: unknown): boolean {
@@ -38,23 +44,23 @@ function _isPgConnectionError(e: unknown): boolean {
   );
 }
 
-async function dropAllPgTables(adapter: DatabaseAdapter): Promise<void> {
+async function dropAllPgTables(adapter: DatabaseAdapter): Promise<string[]> {
   try {
-    await _dropAllPgTablesOnce(adapter);
+    return await _dropAllPgTablesOnce(adapter);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      await _dropAllPgTablesOnce(adapter);
-    } else {
-      throw e;
+      return await _dropAllPgTablesOnce(adapter);
     }
+    throw e;
   }
 }
 
-async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<void> {
+async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<string[]> {
+  const dropped: string[] = [];
   const schema = `ANY(current_schemas(false))`;
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
@@ -79,16 +85,19 @@ async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<void> {
   )) as { schemaname: string; tablename: string }[]) {
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
+      dropped.push(t);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
   }
+  return dropped;
 }
 
-async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<void> {
+async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<string[]> {
   // Works with both the legacy pool model (_driverPool) and the current
   // single-connection model (_client). Falls back to adapter.execute /
   // adapter.executeMutation so both paths share one implementation.
+  const dropped: string[] = [];
   try {
     await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
     const tableRows = await adapter.execute(
@@ -109,6 +118,7 @@ async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<void> {
       if (name)
         try {
           await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
+          dropped.push(name);
         } catch {}
     }
   } finally {
@@ -116,9 +126,11 @@ async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<void> {
       await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
     } catch {}
   }
+  return dropped;
 }
 
-async function dropAllSqliteTables(adapter: DatabaseAdapter): Promise<void> {
+async function dropAllSqliteTables(adapter: DatabaseAdapter): Promise<string[]> {
+  const dropped: string[] = [];
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
@@ -131,6 +143,8 @@ async function dropAllSqliteTables(adapter: DatabaseAdapter): Promise<void> {
   )) as { name: string }[]) {
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+      dropped.push(name);
     } catch {}
   }
+  return dropped;
 }
