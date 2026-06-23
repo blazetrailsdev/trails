@@ -2828,6 +2828,34 @@ export class Relation<T extends Base> {
     specs: AssociationSpec[],
     references: string[] = [],
   ): AssociationSpec[] {
+    // Seed the JoinDependency's construction alias tracker with the tables the
+    // manual `joins(...)` buckets emit (excluding the includes ∩ joins
+    // intersection, which intentionally shares one un-aliased table). Mirrors
+    // Rails' single `build_joins` alias_tracker: a through-association
+    // intermediate landing on a manually-joined table then collides at
+    // construction and aliases to its `alias_candidate`
+    // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`),
+    // instead of emitting a second un-aliased `posts` (ambiguous column).
+    // The `includes ∩ joins` intersection is excluded: that table is genuinely
+    // deduped — `_buildEagerJoinManager` skips re-emitting the eager OUTER JOIN
+    // and the projection reads the manual INNER JOIN's un-aliased table
+    // (Rails `joined_includes_values`). Every other manual-join table is seeded.
+    //
+    // NB: an `eager_load`/promoted root that coincides with a manual join of the
+    // SAME association (`joins(:posts).eager_load(posts: :comments)`) is NOT in
+    // that intersection, so it is seeded and the eager root aliases to
+    // `posts_authors` — an extra (valid, correctly-scoped) OUTER JOIN rather than
+    // Rails' single `walk`-deduped join. trails emits the eager and manual join
+    // passes separately with no cross-pass `walk`, so seeding yields valid SQL
+    // where omitting it would emit two un-aliased `posts` (ambiguous column).
+    // True cross-pass dedup is tracked by `eager-load-joins-walk-dedup`.
+    const joinedIncludes = this._joinedIncludesTables();
+    const seedTables = [
+      ...this._resolveAssocTables(this._namedInnerJoins),
+      ...this._joinClauses.map((j) => j.table.toLowerCase()),
+    ].filter((t) => !joinedIncludes.has(t));
+    if (seedTables.length > 0) jd.seedConstructionTables(seedTables);
+
     const fallbackAssocs: AssociationSpec[] = [];
     for (const spec of specs) {
       if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);

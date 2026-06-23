@@ -167,6 +167,25 @@ export class JoinDependency {
     return this._joinRoot;
   }
 
+  /**
+   * Pre-claim sibling-join tables in the construction AliasTracker, mirroring
+   * Rails' single `build_joins` alias_tracker shared across the joins_values and
+   * eager join_dependencies. Seeding the manual `joins(...)` tables here makes a
+   * through-association intermediate that lands on one of them collide at
+   * construction (`_addThroughViaJoinAssociation`), so it is aliased to its
+   * `alias_candidate` (`Author.joins(:posts).eager_load(:comments)` →
+   * `posts` + `posts_authors`) with all chain ON predicates rebound in one pass —
+   * no separate emit-time cross-node rebind. Idempotent; only first-use claims.
+   * @internal
+   */
+  seedConstructionTables(tableNames: Iterable<string>): void {
+    for (const t of tableNames) {
+      if (t && (this._aliasTracker.aliases.get(t) ?? 0) === 0) {
+        this._aliasTracker.aliases.set(t, 1);
+      }
+    }
+  }
+
   get nodes(): JoinPart[] {
     const result: JoinPart[] = [];
     this._joinRoot.each((part) => {

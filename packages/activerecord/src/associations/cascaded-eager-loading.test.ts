@@ -15,7 +15,12 @@ import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Post, SpecialPost, FirstPost } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import {
+  Comment,
+  SpecialComment,
+  SubSpecialComment,
+  VerySpecialComment,
+} from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Vertex } from "../test-helpers/models/vertex.js";
@@ -51,7 +56,14 @@ describe("CascadedEagerLoadingTest", () => {
   registerModel(Post);
   registerModel(SpecialPost);
   registerModel(FirstPost);
+  enableSti(Comment);
   registerModel(Comment);
+  registerModel(SpecialComment);
+  registerSubclass(SpecialComment);
+  registerModel(SubSpecialComment);
+  registerSubclass(SubSpecialComment);
+  registerModel(VerySpecialComment);
+  registerSubclass(VerySpecialComment);
   registerModel(Categorization);
   registerModel(Category);
   registerModel(Topic);
@@ -94,16 +106,18 @@ describe("CascadedEagerLoadingTest", () => {
     expect(targetArr(loaded[1], "categorizations")).toHaveLength(2);
   });
 
-  it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
-    // BLOCKED: join-dependency cross-JD emit-time aliasing gap.
-    // ROOT-CAUSE: Author.joins(:posts).eager_load(:comments) (comments is
-    //   has_many :through :posts) emits a second un-aliased `posts` join and
-    //   raises `ambiguous column name: posts.id`. The explicit joins(:posts) and
-    //   the eager through-posts intermediate are separate JoinDependencies; the
-    //   collision is only visible against the shared build_joins AliasTracker at
-    //   emit time, and the manual/eager emission order prevents the eager
-    //   intermediate from aliasing to Rails' `posts_authors`.
-    //   Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
+  it("eager association loading with hmt does not table name collide when joining associations", async () => {
+    const authors = await Author.joins("posts")
+      .eagerLoad("comments")
+      .where({ posts: { tags_count: 1 } })
+      .order("id")
+      .toArray();
+    await assertQueriesCount(0, false, () => {
+      expect(authors).toHaveLength(3);
+    });
+    await assertQueriesCount(0, false, () => {
+      expect(targetArr(authors[0], "comments")).toHaveLength(11);
+    });
   });
 
   it("eager association loading grafts stashed associations to correct parent", async () => {
@@ -260,12 +274,18 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
-  it.skip("eager association loading with multiple stis and order", () => {
-    // BLOCKED: join-dependency eager-load alias ordering gap (same root cause as
-    //   `hmt does not table name collide`).
-    // ROOT-CAUSE: includes + order on eager-load aliases
-    //   (`very_special_comments_posts.body`) needs the cross-JD emit-time
-    //   aliasing fidelity. Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
+  it("eager association loading with multiple stis and order", async () => {
+    const author = await Author.all()
+      .includes({ posts: ["specialComments", "verySpecialComment"] })
+      .order(["authors.name", "comments.body", "very_special_comments_posts.body"])
+      .where("posts.id = 4")
+      .first();
+    expect(author!.id).toBe((authors("david") as any).id);
+    await assertQueriesCount(0, false, () => {
+      const post = targetArr(author!, "posts")[0];
+      targetArr(post, "specialComments");
+      target(post, "verySpecialComment");
+    });
   });
 
   it.skip("eager association loading of stis with multiple references", () => {
