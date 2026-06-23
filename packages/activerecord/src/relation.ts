@@ -2758,17 +2758,25 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve the target model of an association NAME on a given model class, so a
-   * spec forest can be walked level by level. Plain belongsTo/hasOne/hasMany
-   * (and through, whose final target resolves the same way) map name → target
-   * model via `className` or the camelized (singularized for collections) name.
+   * Resolve the target TABLE and model of an association NAME on a given model
+   * class, so a spec forest can be walked level by level. Plain
+   * belongsTo/hasOne/hasMany (and through, whose final target resolves the same
+   * way) map name → target via `className` or the camelized (singularized for
+   * collections) name. When the target model isn't registered, fall back to the
+   * lowercased association name as the table — mirroring `_resolveAssocTables`,
+   * so the #3990 string-root dedup is preserved for an unregistered target — but
+   * with a null `klass`, since the walk cannot descend without the child model.
    */
-  private _assocTargetModel(modelClass: any, name: string): any {
+  private _assocTargetModel(modelClass: any, name: string): { table: string; klass: any } | null {
     const assoc = (modelClass?._associations ?? []).find((a: any) => a.name === name);
     if (!assoc) return null;
-    const isPlural = assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany";
+    const isPlural =
+      assoc.type === "hasMany" ||
+      assoc.type === "hasAndBelongsToMany" ||
+      (assoc.type as string) === "hasManyThrough";
     const className = assoc.options?.className ?? _camelize(isPlural ? _singularize(name) : name);
-    return modelRegistry.get(className) ?? null;
+    const klass = modelRegistry.get(className) ?? null;
+    return { table: String(klass?.tableName ?? name).toLowerCase(), klass };
   }
 
   /**
@@ -2805,8 +2813,10 @@ export class Relation<T extends Base> {
       if (manualChild === undefined) continue;
       const target = this._assocTargetModel(modelClass, name);
       if (!target) continue;
-      out.add(String(target.tableName).toLowerCase());
-      this._collectSharedTables(target, eagerChild, manualChild, out);
+      out.add(target.table);
+      // Descend only when the child model is known; an unregistered target still
+      // dedups this level (name-as-table fallback) but cannot resolve deeper.
+      if (target.klass) this._collectSharedTables(target.klass, eagerChild, manualChild, out);
     }
   }
 
