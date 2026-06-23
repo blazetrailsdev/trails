@@ -945,7 +945,7 @@ export class SchemaStatements {
   async columns(tableName: string): Promise<Column[]> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(`PRAGMA table_info(${this._qi(tableName)})`);
+        const rows = await this.adapter.execute(`PRAGMA table_info(${this._qt(tableName)})`);
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
           return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
@@ -1060,10 +1060,12 @@ export class SchemaStatements {
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(`PRAGMA index_list(${this._qi(tableName)})`);
+        const rows = await this.adapter.execute(`PRAGMA index_list(${this._qt(tableName)})`);
         const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
         for (const row of rows as any[]) {
-          const cols = await this.adapter.execute(`PRAGMA index_info(${this._qi(row.name)})`);
+          const cols = await this.adapter.execute(
+            `PRAGMA index_info(${this.adapter.quote(row.name)})`,
+          );
           result.push({
             name: row.name,
             columns: (cols as any[]).map((c: any) => c.name),
@@ -1115,7 +1117,7 @@ export class SchemaStatements {
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(`PRAGMA table_info(${this._qi(tableName)})`);
+        const rows = await this.adapter.execute(`PRAGMA table_info(${this._qt(tableName)})`);
         const pk = (rows as any[]).find((r: any) => r.pk > 0);
         return pk ? pk.name : null;
       }
