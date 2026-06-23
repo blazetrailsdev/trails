@@ -763,18 +763,11 @@ describe("PrimaryKeyIntegerTest", () => {
   );
 
   // Rails gates this on current_adapter?(:Mysql2, :PostgreSQL) (primary_keys_test.rb).
-  it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", (ctx) => {
-    ctx.skip();
-    // BLOCKED (PG only): on PG @pk_type is :serial and Rails emits `id: :serial`. The
-    // root cause is upstream of the dumper: TS PG createTable emits SERIAL (int4) for the
-    // *default* primary key (NATIVE_DATABASE_TYPES says bigserial, but schema-creation
-    // overrides to SERIAL), so an explicit `id: :serial` is byte-identical to the default
-    // PK in the database — there is no introspection signal to tell them apart. The PG
-    // dumper's isDefaultPrimaryKey is deliberately widened to treat serial as default so
-    // every default-PK table round-trips; narrowing it to bigserial-only (matching Rails)
-    // would emit `id: :serial` on every default PG table. Converging requires changing the
-    // PG default PK to BIGSERIAL (a fixture-wide change). Tracked: RFC 0030
-    // cc-pg-default-pk-bigserial. (MySQL @pk_type is :integer and already passes.)
+  it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", async () => {
+    // Rails: assert_match %r{create_table "widgets", id: :#{pk_type}, }
+    await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
+    const schema = await SchemaDumper.dumpTableSchema(Base.connection as any, "widgets");
+    expect(schema).toMatch(new RegExp(`createTable\\("widgets", \\{ id: "${pkType}", `));
   });
 
   it.skipIf(adapterType !== "mysql")("primary key column type with options", async () => {

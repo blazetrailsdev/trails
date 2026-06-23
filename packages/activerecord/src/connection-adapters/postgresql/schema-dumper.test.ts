@@ -75,10 +75,10 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
     });
 
-    it("returns true for serial (recognized as default PK alongside bigserial)", () => {
+    it("returns false for serial (only bigserial is the default PK)", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
+      expect(dumper.isDefaultPrimaryKey(col)).toBe(false);
     });
   });
 
