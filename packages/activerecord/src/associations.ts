@@ -3221,6 +3221,23 @@ export async function updateCounterCaches(
         ? assoc.options.counterCache
         : `${pluralize(underscore(ctor.name))}_count`);
 
+    // Mirrors Rails' `has_cached_counter?`
+    // (associations/builder/belongs_to.rb): the counter cache is only updated
+    // when the counter column is a real attribute on the owner's class. When
+    // it is absent the increment/decrement is silently skipped — no in-memory
+    // write, no SQL UPDATE. Example: the canonical Comment#post counter cache
+    // resolves to `comments_count`, but the `posts` table has only
+    // `legacy_comments_count`, so the write is skipped. Loading the owner's
+    // schema first so a cold cache doesn't spuriously report the column absent,
+    // and resolve attribute aliases (Rails' has_attribute? resolves
+    // attribute_aliases) so an aliased counter column still updates.
+    await targetModel.loadSchema();
+    const resolvedCounterCol = Reflection.resolveAliasedColumn(
+      targetModel as { _attributeAliases?: Record<string, string> },
+      counterCol,
+    );
+    if (!targetModel.hasAttributeDefinition(resolvedCounterCol)) continue;
+
     // Mirrors Rails' BelongsToAssociation#update_counters: if the target owner
     // is already loaded in memory (wired via inverse-of from a collection proxy
     // create/push), update it directly so the caller sees the new count without
@@ -3254,9 +3271,9 @@ export async function updateCounterCaches(
     const touch = assoc.options.touch;
     const opts = touch != null ? { touch } : undefined;
     if (direction === "increment") {
-      await parent.incrementBang(counterCol, 1, opts);
+      await parent.incrementBang(resolvedCounterCol, 1, opts);
     } else {
-      await parent.decrementBang(counterCol, 1, opts);
+      await parent.decrementBang(resolvedCounterCol, 1, opts);
     }
     // The counter UPDATE bumps the parent's lock_version in the DB (via the
     // Locking::Optimistic#update_counters override). When the parent is the
