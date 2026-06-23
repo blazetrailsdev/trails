@@ -262,6 +262,33 @@ const RAILS_DSL_GENERATED = new Set([
 ]);
 
 /**
+ * Mixins (and methods) a host class gains at *runtime* via a gem's railtie
+ * `ActiveSupport.on_load(:active_record)` block rather than a lexical `include`
+ * in the host's own source. The static Ruby extractor only sees `include`s
+ * written inside the class/module body, so a railtie-injected mixin never
+ * lands in the host's `includes` array and its faithful TS ports look novel.
+ *
+ * `includes` are resolved against the *cross-package* module map (every
+ * package's extracted modules), so a mixin defined in a different gem —
+ * e.g. `GlobalID::Identification` (globalid package) included into
+ * `ActiveRecord::Base` (activerecord package) by globalid's railtie — still
+ * contributes its instance methods to the host's allowed set.
+ *
+ * `methods` are raw Ruby method names the railtie surface implies but which
+ * have no static `def` anywhere (so they can't be reached via a module): the
+ * trails-side ergonomic finders that the globalid `wire` side-effect module
+ * registers onto `Base` (`find_global_id` → `GlobalID::Locator.locate`,
+ * `find_signed_global_id[!]` → `locateSigned`). Rails apps call
+ * `GlobalID::Locator.locate` directly; trails surfaces the model-side form.
+ */
+const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: string[] }> = {
+  "ActiveRecord::Base": {
+    includes: ["GlobalID::Identification"],
+    methods: ["find_global_id", "find_signed_global_id", "find_signed_global_id!"],
+  },
+};
+
+/**
  * `rubyMethodToTs` for any method, plus the trails `Q`-suffix predicate form.
  * trails encodes a Ruby `?` predicate with a trailing `Q` in TS
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
@@ -504,6 +531,7 @@ function collectAllowedNames(
   entities: RubyEntity[],
   rubyModules: Record<string, ClassInfo>,
   moduleFqnByShort: Map<string, string[]>,
+  crossPackageModules: Record<string, ClassInfo>,
 ): Set<string> {
   const allowed = new Set<string>();
   const visited = new Set<string>();
@@ -520,12 +548,21 @@ function collectAllowedNames(
     }
   };
 
+  const addRubyName = (rubyName: string): void => {
+    const candidates = rubyMethodCandidates(rubyName);
+    if (!candidates) return;
+    for (const c of candidates) allowed.add(c);
+  };
+
   const walkMixin = (incName: string, contextFqn: string): void => {
     const fqns = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     for (const fqn of fqns) {
       if (visited.has(fqn)) continue;
       visited.add(fqn);
-      const mod = rubyModules[fqn];
+      // Fall back to the cross-package map: a railtie-injected mixin (see
+      // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
+      // in another package's modules, not this package's.
+      const mod = rubyModules[fqn] ?? crossPackageModules[fqn];
       if (!mod) continue;
       // Only the module's instance methods cross into the host. Class
       // methods on the module itself stay on the module (Ruby `include`
@@ -542,6 +579,12 @@ function collectAllowedNames(
     addMethods(info.classMethods);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
     for (const ext of info.extends ?? []) walkMixin(ext, fqn);
+
+    const ambient = AMBIENT_RAILTIE_MIXINS[fqn];
+    if (ambient) {
+      for (const inc of ambient.includes ?? []) walkMixin(inc, fqn);
+      for (const name of ambient.methods ?? []) addRubyName(name);
+    }
   }
   return allowed;
 }
@@ -571,12 +614,32 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
   return all;
 }
 
+/**
+ * Flatten every package's extracted modules into one `FQN → ClassInfo` map so
+ * `collectAllowedNames` can resolve a cross-package / railtie-injected mixin
+ * (e.g. `GlobalID::Identification` from the globalid package included into
+ * `ActiveRecord::Base`) that the per-package module map can't reach. Module
+ * FQNs are globally unique across Rails-land, so a flat merge is safe; on the
+ * rare collision last-writer-wins, which only affects the foreign-mixin
+ * fallback path (the local package map still takes precedence).
+ */
+export function buildCrossPackageModules(ruby: ApiManifest): Record<string, ClassInfo> {
+  const out: Record<string, ClassInfo> = {};
+  for (const pkg of Object.values(ruby.packages)) {
+    for (const [fqn, info] of Object.entries(pkg.modules) as [string, ClassInfo][]) {
+      out[fqn] = info;
+    }
+  }
+  return out;
+}
+
 function buildPackageReport(
   pkg: string,
   ruby: ApiManifest,
   ts: ApiManifest,
   excludeGlobs: string[],
   globalRubyCandidates: Set<string>,
+  crossPackageModules: Record<string, ClassInfo>,
   novelOnly: boolean,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
@@ -660,6 +723,7 @@ function buildPackageReport(
       entities,
       rubyPkg.modules as Record<string, ClassInfo>,
       moduleFqnByShort,
+      crossPackageModules,
     );
 
     const extras: ExtraName[] = [];
@@ -832,13 +896,22 @@ export function buildReport(
   },
 ): Report {
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
+  const crossPackageModules = buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
   for (const pkg of Object.keys(ruby.packages)) {
     if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
     packages.push(
-      buildPackageReport(pkg, ruby, ts, opts.excludeGlobs, globalRubyCandidates, opts.novelOnly),
+      buildPackageReport(
+        pkg,
+        ruby,
+        ts,
+        opts.excludeGlobs,
+        globalRubyCandidates,
+        crossPackageModules,
+        opts.novelOnly,
+      ),
     );
   }
   packages.sort((a, b) => b.totalNovel - a.totalNovel || b.totalExtras - a.totalExtras);
