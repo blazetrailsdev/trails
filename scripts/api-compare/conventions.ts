@@ -207,7 +207,41 @@ export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
  * TS port; the advisory arity check (arity.ts) suppresses these. For documented
  * deliberate differences only, NOT to silence real gaps. Seeded empty.
  */
-export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [];
+export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
+  {
+    reason:
+      "Rails aliases/delegates the method, so the Ruby extractor records it with " +
+      "zero positional params (the alias/delegate definition carries no signature) " +
+      "while the TS port spells the real signature it forwards to: " +
+      "`validates_size_of` is `alias_method :validates_size_of, :validates_length_of`; " +
+      "`match?` is `delegate :match?, to: :@name` (forwards to String#match?).",
+    names: ["validates_size_of", "match?"],
+  },
+  {
+    reason:
+      "Rails AttributeMethods compiles attribute accessors via a CodeGenerator that " +
+      "evals method-body strings; trails has no eval/code generation, so the port " +
+      "drops the `code_generator`/`parameters`/`call_args` and keyword args these " +
+      "helpers thread into the generated source and defines the method directly.",
+    names: ["define_proxy_call", "define_call"],
+  },
+  {
+    reason:
+      "Static-host porting pattern (CLAUDE.md): these Rails instance/class methods " +
+      "are ported as free functions taking the host class explicitly as a leading " +
+      "`cls` param, so the TS arity is one higher than Rails. The receiver is the " +
+      "definitional self, not a real extra argument.",
+    names: ["apply_pending_attribute_modifications", "reset_default_attributes"],
+  },
+  {
+    reason:
+      "The real `parse_float` port is `parseFloatRails(num, precision, scale?)`, " +
+      "bound to the validator via prototype assignment plus a `declare parseFloat` " +
+      "type member; the by-name candidate pool only sees the zero-arg `declare` " +
+      "form, not the implementation's arity.",
+    names: ["parse_float"],
+  },
+];
 
 export const ARITY_OVERRIDES = new Set<string>(ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names));
 
@@ -343,6 +377,11 @@ export function explainConventions(): string {
     return `- ${g.reason}\n  - ${names}`;
   }).join("\n");
 
+  const arityOverrideSections = ARITY_OVERRIDE_GROUPS.map((g) => {
+    const names = g.names.map((n) => `\`${n}\``).join(", ");
+    return `- ${g.reason}\n  - ${names}`;
+  }).join("\n");
+
   return `# Ruby → TypeScript naming conventions
 
 <!-- GENERATED FILE — do not edit by hand.
@@ -411,5 +450,14 @@ ${pathAliasRows}
 api:compare never expects a TS counterpart for these Ruby methods:
 
 ${skipSections}
+
+## Arity overrides
+
+The advisory arity check (arity.ts) suppresses these Ruby methods — their
+positional-arg ranges diverge from the TS port for a documented reason (a Ruby
+alias/delegate the extractor reads as zero-arg, a porting-pattern artifact),
+not a real signature gap:
+
+${arityOverrideSections}
 `;
 }

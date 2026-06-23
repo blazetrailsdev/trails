@@ -5,6 +5,8 @@ import {
   rubyFileToTs,
   SKIP,
   SKIP_GROUPS,
+  ARITY_OVERRIDE_GROUPS,
+  ARITY_OVERRIDES,
   ALREADY_PREDICATE_PREFIXES,
   explainConventions,
 } from "./conventions.js";
@@ -187,6 +189,26 @@ describe("SKIP_GROUPS", () => {
   });
 });
 
+describe("ARITY_OVERRIDE_GROUPS", () => {
+  it("has no duplicate names across groups", () => {
+    const all = ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names);
+    expect(all.length).toBe(new Set(all).size);
+  });
+
+  it("requires a non-empty reason and at least one name per group", () => {
+    for (const g of ARITY_OVERRIDE_GROUPS) {
+      expect(g.reason.trim().length).toBeGreaterThan(0);
+      expect(g.names.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("flattens every grouped name into the ARITY_OVERRIDES lookup set", () => {
+    for (const g of ARITY_OVERRIDE_GROUPS) {
+      for (const name of g.names) expect(ARITY_OVERRIDES.has(name)).toBe(true);
+    }
+  });
+});
+
 describe("ALREADY_PREDICATE_PREFIXES", () => {
   it("drives the matcher: every prefix keeps the camel form + is* fallback", () => {
     for (const prefix of ALREADY_PREDICATE_PREFIXES) {
@@ -214,6 +236,9 @@ describe("explainConventions", () => {
     expect(md).toContain("`table_name=` → `tableName`");
     expect(md).not.toContain("`tableName()`");
     for (const g of SKIP_GROUPS) {
+      expect(md).toContain(g.reason);
+    }
+    for (const g of ARITY_OVERRIDE_GROUPS) {
       expect(md).toContain(g.reason);
     }
   });

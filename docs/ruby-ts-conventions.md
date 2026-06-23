@@ -82,3 +82,19 @@ api:compare never expects a TS counterpart for these Ruby methods:
   - `any_schema_needs_update?`, `db_configs_in_current_env`, `load_schema!`
 - Migrator internal index helpers — Rails stores @target_version / @direction as instance variables; our TS Migrator passes them as method parameters instead, so these zero-arg helpers can't be faithfully ported.
   - `target`, `start`, `finish`
+
+## Arity overrides
+
+The advisory arity check (arity.ts) suppresses these Ruby methods — their
+positional-arg ranges diverge from the TS port for a documented reason (a Ruby
+alias/delegate the extractor reads as zero-arg, a porting-pattern artifact),
+not a real signature gap:
+
+- Rails aliases/delegates the method, so the Ruby extractor records it with zero positional params (the alias/delegate definition carries no signature) while the TS port spells the real signature it forwards to: `validates_size_of` is `alias_method :validates_size_of, :validates_length_of`; `match?` is `delegate :match?, to: :@name` (forwards to String#match?).
+  - `validates_size_of`, `match?`
+- Rails AttributeMethods compiles attribute accessors via a CodeGenerator that evals method-body strings; trails has no eval/code generation, so the port drops the `code_generator`/`parameters`/`call_args` and keyword args these helpers thread into the generated source and defines the method directly.
+  - `define_proxy_call`, `define_call`
+- Static-host porting pattern (CLAUDE.md): these Rails instance/class methods are ported as free functions taking the host class explicitly as a leading `cls` param, so the TS arity is one higher than Rails. The receiver is the definitional self, not a real extra argument.
+  - `apply_pending_attribute_modifications`, `reset_default_attributes`
+- The real `parse_float` port is `parseFloatRails(num, precision, scale?)`, bound to the validator via prototype assignment plus a `declare parseFloat` type member; the by-name candidate pool only sees the zero-arg `declare` form, not the implementation's arity.
+  - `parse_float`
