@@ -11,6 +11,47 @@
  *
  * @internal
  */
+import { AdapterNotFound } from "../errors.js";
+
+/**
+ * Best-effort adapter inference from a connection URL or scheme-less SQLite
+ * shorthand. Returns the canonical adapter name, or `undefined` when the URL
+ * carries no recognizable scheme/extension (e.g. a bare filesystem path or an
+ * opaque `jdbc:` string). Used at config-build time so a scheme-less `:memory:`
+ * shorthand already names its adapter on the resolved configuration hash.
+ */
+export function inferAdapterNameFromUrl(url: string): string | undefined {
+  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+    return "postgresql";
+  }
+  if (url.startsWith("mysql://") || url.startsWith("mysql2://")) {
+    return "mysql";
+  }
+  if (
+    url.startsWith("sqlite://") ||
+    url.startsWith("sqlite3://") ||
+    url.endsWith(".sqlite3") ||
+    url.endsWith(".db") ||
+    url === ":memory:"
+  ) {
+    return "sqlite";
+  }
+  return undefined;
+}
+
+/**
+ * Like {@link inferAdapterNameFromUrl} but raises `AdapterNotFound` when the
+ * URL carries no recognizable adapter, for connect-time paths that require one.
+ */
+export function adapterNameFromUrl(url: string): string {
+  const inferred = inferAdapterNameFromUrl(url);
+  if (inferred !== undefined) return inferred;
+  throw new AdapterNotFound(
+    `Cannot detect database adapter from URL "${url}". ` +
+      `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
+      `or pass { adapter: "postgresql", url: "..." }`,
+  );
+}
 
 /**
  * Returns true for URL schemes that identify a remote libsql/Turso endpoint.

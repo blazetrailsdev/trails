@@ -7,6 +7,7 @@
 import { HashConfig } from "./hash-config.js";
 import type { DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
+import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js";
 
 export class UrlConfig extends HashConfig {
   readonly url: string;
@@ -107,7 +108,14 @@ function buildUrlHash(url: string): DatabaseConfigOptions {
     if (/^[A-Za-z0-9_-]+$/.test(url)) {
       return { database: url };
     }
-    return { url };
+    // Scheme-less SQLite shorthand (`:memory:`, bare `.sqlite3`/`.db` paths).
+    // Rails' URL configs always parse a scheme, so their configuration_hash
+    // always carries an adapter; trails' scheme-less shorthand otherwise
+    // wouldn't. Infer it here at build time so the resolved config already
+    // names its adapter and the handler's resolvePoolConfig doesn't have to
+    // raise AdapterNotSpecified (no connect-time backfill needed).
+    const adapter = inferAdapterNameFromUrl(url);
+    return adapter ? { url, adapter } : { url };
   }
   return new ConnectionUrlResolver(url).toHash();
 }

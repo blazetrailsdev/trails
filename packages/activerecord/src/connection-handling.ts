@@ -12,12 +12,12 @@ import {
   resolveSync as resolveConnectionAdapterSync,
 } from "./connection-adapters.js";
 import {
+  adapterNameFromUrl,
   buildAdapterArg,
   normalizeAdapterName,
   parseSqliteUrl,
 } from "./connection-adapters/adapter-args.js";
 import {
-  AdapterNotFound,
   AdapterNotSpecified,
   ConnectionNotEstablished,
   ConfigurationError,
@@ -803,12 +803,11 @@ async function establishWithDbConfig(
   }
 
   // The handler reads the adapter off the resolved config (resolvePoolConfig).
-  // When it was inferred from a bare URL — e.g. the `:memory:` shorthand a
-  // DATABASE_URL carries with no scheme — rather than present in the hash,
-  // surface it on the config so the verbatim object the pool stores still
-  // names its adapter. Rails' URL configs always parse a scheme, so their
-  // configuration_hash always carries an adapter; this restores that invariant
-  // for the scheme-less shorthand the old rebuild path used to backfill.
+  // UrlConfig now infers the adapter for scheme-less shorthands (e.g. the bare
+  // `:memory:` a DATABASE_URL carries with no scheme) at build time, so the
+  // config already names its adapter — matching Rails, whose URL configs always
+  // parse a scheme. Defensively backfill should a non-UrlConfig path ever hand
+  // us an adapter-less hash with a derivable URL.
   if (!dbConfig.adapter) {
     (config as { adapter?: string }).adapter = adapterName;
   }
@@ -1014,29 +1013,8 @@ export {
   parseSqliteUrl,
   buildAdapterArg,
 } from "./connection-adapters/adapter-args.js";
-
-export function adapterNameFromUrl(url: string): string {
-  if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
-    return "postgresql";
-  }
-  if (url.startsWith("mysql://") || url.startsWith("mysql2://")) {
-    return "mysql";
-  }
-  if (
-    url.startsWith("sqlite://") ||
-    url.startsWith("sqlite3://") ||
-    url.endsWith(".sqlite3") ||
-    url.endsWith(".db") ||
-    url === ":memory:"
-  ) {
-    return "sqlite";
-  }
-  throw new AdapterNotFound(
-    `Cannot detect database adapter from URL "${url}". ` +
-      `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
-      `or pass { adapter: "postgresql", url: "..." }`,
-  );
-}
+// Re-exported for backward compat: adapterNameFromUrl now lives in adapter-args.
+export { adapterNameFromUrl };
 
 /**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
