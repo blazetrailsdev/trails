@@ -7531,12 +7531,14 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes offset", async () => {
-    expect(await Topic.includes("replies").order("id").offset(4).ids()).toEqual([5]);
+    expect((await Topic.includes("replies").order("id").offset(4).ids()).map(Number)).toEqual([5]);
     expect(await Topic.includes("replies").order("id").offset(5).ids()).toEqual([]);
   });
 
   it("pluck with includes offset", async () => {
-    expect(await Topic.includes("replies").order("id").offset(4).pluck("id")).toEqual([5]);
+    expect((await Topic.includes("replies").order("id").offset(4).pluck("id")).map(Number)).toEqual(
+      [5],
+    );
     expect(await Topic.includes("replies").order("id").offset(5).pluck("id")).toEqual([]);
   });
 

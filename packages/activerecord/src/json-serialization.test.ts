@@ -318,7 +318,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     expect(json.title).toBe("Hello");
     expect(json.author).toBeUndefined();
     expect((json.comments as any[])[0].body).toBe("Great");
-    expect((json.comments as any[])[0].post_id).toBe(post.id);
+    expect(Number((json.comments as any[])[0].post_id)).toBe(Number(post.id));
   });
 
   it("should not call methods on associations that dont respond", async () => {

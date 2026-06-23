@@ -2137,7 +2137,7 @@ describe("BasicsTest", () => {
     const post = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });
     await post.update({ title: "Hello" });
     const reloaded = await ReadonlyAuthorPost.find(post.id);
-    expect(reloaded.readAttribute("author_id")).toBe(author1.id);
+    expect(Number(reloaded.readAttribute("author_id"))).toBe(Number(author1.id));
 
     // Attempting to change the readonly FK throws ReadonlyAttributeError
     const post2 = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });

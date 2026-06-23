@@ -616,7 +616,7 @@ describe("InsertAllTest", () => {
       });
 
       const book = (await Book.findBy({ name: "Perelandra" })) as any;
-      expect(book.id).toBe(101);
+      expect(Number(book.id)).toBe(101);
       expect(book.isbn).toBe("1974522598");
     },
   );

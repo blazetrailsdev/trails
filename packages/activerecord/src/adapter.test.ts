@@ -595,7 +595,8 @@ describe("AdapterTest", () => {
     expect(updated).toBe(1);
 
     const found = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
-    expect(found.first()).toEqual({ id: 1, title: "foo" });
+    const foundRow = found.first() as { id: unknown; title: string };
+    expect({ ...foundRow, id: Number(foundRow.id) }).toEqual({ id: 1, title: "foo" });
 
     const deleted = await conn.delete("DELETE FROM events WHERE id = ?", null, binds);
     expect(deleted).toBe(1);

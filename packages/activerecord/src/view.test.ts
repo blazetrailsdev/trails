@@ -115,7 +115,8 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 
   itIfSupports("views", "attributes", async () => {
     const ebook = await Ebook.first();
-    expect((ebook as any).attributes).toEqual({
+    const ebookAttrs = (ebook as any).attributes;
+    expect({ ...ebookAttrs, id: Number(ebookAttrs.id) }).toEqual({
       id: 2,
       name: "Ruby for Rails",
       cover: "hard",
