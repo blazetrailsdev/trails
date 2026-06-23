@@ -162,10 +162,19 @@ describe("introspectIndexes", () => {
     const idx = idxs.find((i) => i.name === "idx_widgets_name_partial");
 
     // `where` and `orders` are now statically visible on IntrospectedIndex,
-    // not just present at runtime under an `as`-cast.
+    // not just present at runtime under an `as`-cast. `orders` is only stored
+    // when the backend honors index sort order (MariaDB < 10.8 silently drops
+    // DESC, so the index is ascending and `orders` is undefined). When stored,
     // PostgreSQL collapses single-direction orders to a scalar (Rails'
     // concise_options); sqlite/mysql carry the per-column map.
-    const expectedOrders = adapterType === "postgres" ? "desc" : { name: "desc" };
+    const supportsIndexSortOrder = (
+      realAdapter as unknown as { supportsIndexSortOrder(): boolean }
+    ).supportsIndexSortOrder();
+    const expectedOrders = !supportsIndexSortOrder
+      ? undefined
+      : adapterType === "postgres"
+        ? "desc"
+        : { name: "desc" };
     expect(idx?.orders).toEqual(expectedOrders);
     expect(idx?.where).toBe(supportsPartial ? "active" : undefined);
   });

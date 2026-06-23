@@ -1116,7 +1116,7 @@ export class SchemaStatements {
       case "postgres": {
         const rows = await this.adapter.execute(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
-                  (ix.indexprs IS NOT NULL) AS has_expressions,
+                  bool_or(ix.indexprs IS NOT NULL) AS has_expressions,
                   pg_get_indexdef(i.oid) AS definition
            FROM pg_index ix
            JOIN pg_class t ON t.oid = ix.indrelid
