@@ -3221,16 +3221,29 @@ export async function updateCounterCaches(
         ? assoc.options.counterCache
         : `${pluralize(underscore(ctor.name))}_count`);
 
-    // Mirrors Rails' `has_cached_counter?`
-    // (associations/builder/belongs_to.rb): the counter cache is only updated
-    // when the counter column is a real attribute on the owner's class. When
-    // it is absent the increment/decrement is silently skipped — no in-memory
-    // write, no SQL UPDATE. Example: the canonical Comment#post counter cache
-    // resolves to `comments_count`, but the `posts` table has only
-    // `legacy_comments_count`, so the write is skipped. Loading the owner's
-    // schema first so a cold cache doesn't spuriously report the column absent,
-    // and resolve attribute aliases (Rails' has_attribute? resolves
-    // attribute_aliases) so an aliased counter column still updates.
+    // Only touch the counter when its column actually exists on the owner.
+    // First resolve attribute aliases the same way the SQL write path does
+    // (Relation#updateCounters → resolveAliasedColumn, which mirrors Rails'
+    // Arel::Table#[] alias resolution): the canonical Comment#post counter cache
+    // resolves to `comments_count`, which Post aliases to `legacy_comments_count`
+    // (test-helpers/models/post.ts:45, mirroring Rails' Post#comments_count
+    // `alias_attribute`), so that case resolves to a real column and DOES update.
+    // The guard below therefore only fires for a genuinely-absent column.
+    //
+    // Deviation from Rails (intentional): Rails' live belongs_to update path has
+    // no column-existence guard — `require_counter_update?` is just
+    // `counter_cache_column && owner.persisted?` (belongs_to_association.rb:128),
+    // so a truly-missing column makes Rails *raise* MissingAttributeError on
+    // `increment!`. trails skips silently instead. This is the inverse of the
+    // `has_attribute?` check in `has_cached_counter?` (reflection.rb:307), which
+    // Rails uses only on the has_many/`size` read side and against the declaring
+    // class; we apply it to the target class (where the SQL write lands, the
+    // pragmatically correct side) and turn the raise into a no-op so a counter
+    // cache pointing at a non-existent column degrades gracefully rather than
+    // breaking every create/destroy of the child.
+    //
+    // loadSchema() warms the cache first so a cold cache doesn't spuriously
+    // report a real column as absent.
     await targetModel.loadSchema();
     const resolvedCounterCol = Reflection.resolveAliasedColumn(
       targetModel as { _attributeAliases?: Record<string, string> },

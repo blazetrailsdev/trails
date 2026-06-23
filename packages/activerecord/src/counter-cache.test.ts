@@ -126,6 +126,15 @@ const TEST_SCHEMA: Schema = {
     body: "string",
     legacy_post_id: "integer",
   },
+  // Owner table with NO counter column (and no alias for one) — exercises the
+  // has_cached_counter?-style skip when the resolved counter column is absent.
+  uncounted_blogs: {
+    title: "string",
+  },
+  uncounted_entries: {
+    body: "string",
+    uncounted_blog_id: "integer",
+  },
 };
 
 // -- Helpers --
@@ -196,6 +205,45 @@ describe("CounterCacheTest", () => {
 
     const reloaded = await LegacyPost.find(post.id);
     expect(reloaded.legacy_comments_count).toBe(1);
+  });
+
+  // Skip the counter-cache update when the resolved column does not exist on
+  // the owner (Rails' has_cached_counter? has_attribute? check). Unlike Rails —
+  // which raises MissingAttributeError on the increment! — trails skips
+  // silently so a counter cache pointing at a non-existent column degrades
+  // gracefully (no in-memory write, no SQL UPDATE) rather than breaking every
+  // child create.
+  it("counter cache is skipped when the column does not exist on the owner", async () => {
+    class UncountedBlog extends Base {
+      static {
+        this._tableName = "uncounted_blogs";
+        this.attribute("title", "string");
+      }
+    }
+    class UncountedEntry extends Base {
+      static {
+        this._tableName = "uncounted_entries";
+        this.attribute("body", "string");
+        this.attribute("uncounted_blog_id", "integer");
+        this.belongsTo("uncountedBlog", {
+          className: "UncountedBlog",
+          foreignKey: "uncounted_blog_id",
+          counterCache: true,
+        });
+      }
+    }
+    registerModel(UncountedBlog);
+    registerModel(UncountedEntry);
+
+    const blog = await UncountedBlog.create({ title: "Hello" });
+    // The create must not raise (pre-#3960 a phantom write materialized the
+    // column; #3960 allow-listed it; the skip means it's never attempted).
+    await UncountedEntry.create({ body: "World", uncounted_blog_id: blog.id });
+
+    // The counter column was never materialized on the owner.
+    expect(UncountedBlog.hasAttributeDefinition("uncounted_entries_count")).toBe(false);
+    const reloaded = await UncountedBlog.find(blog.id);
+    expect(reloaded._readAttribute("uncounted_entries_count")).toBeNull();
   });
 
   // Rails: test_removing_association_updates_counter
