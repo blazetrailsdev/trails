@@ -563,6 +563,12 @@ class ApiExtractor
 
     args = node[0] == :command ? node[2] : node[4]
 
+    # `singleton_class.attr_accessor :foo` declares singleton (class) accessors
+    # on the enclosing module/class, the same as `class << self; attr_accessor`.
+    # Top-level Rails module config (writing_role, reading_role, …) uses this
+    # form; without forcing the class bucket they leak as instance methods.
+    on_singleton = node[0] == :command_call && singleton_class_receiver?(node[1])
+
     case cmd_name
     when "private", "protected", "public"
       # No-args form (`private`) flips the default visibility for the scope.
@@ -580,11 +586,11 @@ class ApiExtractor
     when "extend"
       process_extend(args)
     when "attr_reader"
-      process_attr(args, :reader)
+      process_attr(args, :reader, force_class: on_singleton)
     when "attr_writer"
-      process_attr(args, :writer)
+      process_attr(args, :writer, force_class: on_singleton)
     when "attr_accessor"
-      process_attr(args, :accessor)
+      process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
     when "class_attribute"
@@ -740,7 +746,24 @@ class ApiExtractor
     end
   end
 
-  def process_attr(args, kind)
+  # Is `recv` a `singleton_class` receiver — either the bare
+  # `singleton_class.attr_accessor` (vcall) or the explicit
+  # `self.singleton_class.attr_accessor` (a `:call` whose method is
+  # `singleton_class`)?
+  def singleton_class_receiver?(recv)
+    return false unless recv.is_a?(Array)
+    case recv[0]
+    when :vcall, :var_ref, :fcall
+      ident_name(recv[1]) == "singleton_class"
+    when :call
+      # [:call, <receiver>, :".", method_ident]
+      ident_name(recv[3]) == "singleton_class"
+    else
+      false
+    end
+  end
+
+  def process_attr(args, kind, force_class: false)
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
@@ -749,8 +772,9 @@ class ApiExtractor
     names = extract_symbol_args(args)
     # `class << self; attr_accessor :foo; end` declares singleton accessors;
     # without bucketing into classMethods these would leak as instance methods
-    # of every includer.
-    bucket = @in_sclass ? :classMethods : :instanceMethods
+    # of every includer. `force_class` covers the `singleton_class.attr_accessor`
+    # command form, which has the same singleton effect.
+    bucket = (@in_sclass || force_class) ? :classMethods : :instanceMethods
     names.each do |name|
       if kind == :reader || kind == :accessor
         target[bucket] << {

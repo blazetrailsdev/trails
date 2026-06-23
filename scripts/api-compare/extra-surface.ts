@@ -289,6 +289,59 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: st
 };
 
 /**
+ * Top-level `ActiveRecord` module config declared via `singleton_class.attr_accessor`
+ * in the umbrella file `lib/active_record.rb` (`writing_role`, `reading_role`,
+ * `schema_format`, `queues`, …). trails ports this module-level config as
+ * `Base` statics (`writingRole`, `readingRole`, …), but the umbrella file sits
+ * one level above the extractor's libPath (`lib/active_record/`) and is never
+ * scanned — so these have no Ruby counterpart in the manifest and their Base
+ * ports look novel. Admitted to `ActiveRecord::Base`'s allowed set in
+ * {@link collectAllowedNames}, the same way {@link RAILS_DSL_GENERATED} admits
+ * macro-generated column methods the static extractor can't see.
+ *
+ * This is the camelized reader name of every `singleton_class.attr_accessor`
+ * in active_record.rb; the `=` writer ports collapse onto the same TS name.
+ * The `attr_reader`-only module config (`default_timezone`,
+ * `db_warnings_action`, `permanent_connection_checkout`) is deliberately
+ * omitted — none is currently a `Base` static. If one gets ported later, add
+ * it here (it would otherwise resurface as novel).
+ */
+const RAILS_AR_MODULE_CONFIG = new Set([
+  "disablePreparedStatements",
+  "lazilyLoadSchemaCache",
+  "schemaCacheIgnoredTables",
+  "databaseCli",
+  "dbWarningsIgnore",
+  "writingRole",
+  "readingRole",
+  "asyncQueryExecutor",
+  "indexNestedAttributeErrors",
+  "verboseQueryLogs",
+  "queues",
+  "maintainTestSchema",
+  "raiseOnAssignToAttrReadonly",
+  "belongsToRequiredValidatesForeignKey",
+  "beforeCommittedOnAllRecords",
+  "runAfterTransactionCallbacksInOrderDefined",
+  "applicationRecordClass",
+  "actionOnStrictLoadingViolation",
+  "schemaFormat",
+  "errorOnIgnoredOrder",
+  "timestampedMigrations",
+  "validateMigrationTimestamps",
+  "migrationStrategy",
+  "dumpSchemaAfterMigration",
+  "dumpSchemas",
+  "verifyForeignKeysForFixtures",
+  "queryTransformers",
+  "useYamlUnsafeLoad",
+  "raiseIntWiderThan64bit",
+  "yamlColumnPermittedClasses",
+  "generateSecureTokenOn",
+  "protocolAdapters",
+]);
+
+/**
  * `rubyMethodToTs` for any method, plus the trails `Q`-suffix predicate form.
  * trails encodes a Ruby `?` predicate with a trailing `Q` in TS
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
@@ -584,6 +637,17 @@ function collectAllowedNames(
     if (ambient) {
       for (const inc of ambient.includes ?? []) walkMixin(inc, fqn);
       for (const name of ambient.methods ?? []) addRubyName(name);
+    }
+
+    // The top-level `ActiveRecord` module's singleton config
+    // (`singleton_class.attr_accessor :writing_role`, `:reading_role`, … in
+    // active_record.rb) is ported as `Base` statics in trails (base.ts) —
+    // `writingRole`/`readingRole`/etc. That surface lives on the `ActiveRecord`
+    // *module* in the umbrella file, which sits one level above the extractor's
+    // libPath (`lib/active_record/`) and so is never scanned — see
+    // {@link RAILS_AR_MODULE_CONFIG}. Admit it to Base's allowed set.
+    if (fqn === "ActiveRecord::Base") {
+      for (const name of RAILS_AR_MODULE_CONFIG) allowed.add(name);
     }
   }
   return allowed;

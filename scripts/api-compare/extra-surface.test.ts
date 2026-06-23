@@ -467,6 +467,60 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["nestedHelper"]);
   });
 
+  it("admits the top-level ActiveRecord module config to ActiveRecord::Base's allowed set", () => {
+    // `singleton_class.attr_accessor :writing_role` / `:reading_role` lives in
+    // the umbrella file `lib/active_record.rb`, which sits above the extractor's
+    // libPath and is never scanned — so it has no Ruby counterpart in the
+    // manifest. trails ports it as `Base` statics; without the curated
+    // admission (RAILS_AR_MODULE_CONFIG) the ports look novel.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": rubyClass({
+              name: "Base",
+              file: "base.rb",
+              instance: [method("save")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("save")],
+              classMethods: [method("writingRole"), method("readingRole"), method("trulyNovel")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
+    expect(f).toBeDefined();
+    // writingRole/readingRole admitted via the module-config mapping; only the
+    // genuinely-extra static is flagged.
+    expect(f!.extras.map((e) => e.name)).toEqual(["trulyNovel"]);
+  });
+
   it("folds ASC ::ClassMethods submodules into parent's classMethods", () => {
     // host `include Foo` — Rails runtime gives Host the methods on
     // Foo::ClassMethods. The fold puts ascHelper on Foo.classMethods so
