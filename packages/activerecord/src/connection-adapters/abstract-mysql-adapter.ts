@@ -96,7 +96,7 @@ import {
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 import { Date as DateType } from "../type/date.js";
-import { DateTime as MysqlDateTimeType } from "./mysql/date-time.js";
+import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Time as TimeType } from "../type/time.js";
 import { Text as TextType } from "../type/text.js";
 import { Json as JsonType } from "../type/json.js";
@@ -1772,7 +1772,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(
       /^datetime/i,
       undefined,
-      (sqlType) => new MysqlDateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
+      (sqlType) => new DateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
     );
     // Mirrors AbstractAdapter#initialize_type_map's decimal registration
     // (abstract_adapter.rb:906) — MySQL inherits it in Rails, so extract
@@ -1810,7 +1810,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(
       /^timestamp/i,
       undefined,
-      (sqlType) => new MysqlDateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
+      (sqlType) => new DateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
     );
   }
 
