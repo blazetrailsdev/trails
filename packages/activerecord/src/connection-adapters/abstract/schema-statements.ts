@@ -1179,18 +1179,13 @@ export class SchemaStatements {
           .map(([name, info]) => {
             info.seqs.sort((a, b) => a[0] - b[0]);
             const columns = info.seqs.map((s) => s[1]);
+            // Mirrors Rails' MySQL adapter: `orders[col] = :desc if Collation == "D"`,
+            // kept as a plain map (no concise-options collapse, unlike PostgreSQL).
             const ordersMap: Record<string, string> = {};
             for (const [, column, collation] of info.seqs) {
               if (collation === "D") ordersMap[column] = "desc";
             }
-            let orders: Record<string, string> | string | undefined;
-            const orderVals = Object.values(ordersMap);
-            if (orderVals.length > 0) {
-              orders =
-                columns.length === orderVals.length && new Set(orderVals).size === 1
-                  ? orderVals[0]
-                  : ordersMap;
-            }
+            const orders = Object.keys(ordersMap).length > 0 ? ordersMap : undefined;
             return { name, columns, unique: info.unique, orders };
           });
       }

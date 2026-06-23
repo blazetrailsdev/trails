@@ -163,7 +163,10 @@ describe("introspectIndexes", () => {
 
     // `where` and `orders` are now statically visible on IntrospectedIndex,
     // not just present at runtime under an `as`-cast.
-    expect(idx?.orders).toEqual({ name: "desc" });
+    // PostgreSQL collapses single-direction orders to a scalar (Rails'
+    // concise_options); sqlite/mysql carry the per-column map.
+    const expectedOrders = adapterType === "postgres" ? "desc" : { name: "desc" };
+    expect(idx?.orders).toEqual(expectedOrders);
     expect(idx?.where).toBe(supportsPartial ? "active" : undefined);
   });
 });
