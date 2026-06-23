@@ -825,7 +825,10 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # TRAILS_TEST_FORKS=1 serializes the cli suite onto one worker (see below),
+    # and its trails-tsc E2E tests run heavy tsc compiles under v8 coverage on a
+    # 2-vCPU runner, so allow more wall time than the multi-fork trails-tsc job.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
