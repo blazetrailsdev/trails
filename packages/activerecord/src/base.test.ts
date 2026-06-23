@@ -3566,6 +3566,27 @@ describe("quoteSqlValue", () => {
     expect(() => quoteSqlValue(circ)).not.toThrow();
     expect(quoteSqlValue(circ)).toBe("NULL");
   });
+
+  it("quotes a Temporal.Instant as a SQL datetime literal", () => {
+    // value_for_database yields the cast Temporal; the inline insert_all VALUES
+    // path renders the dialect-correct literal. Default (no dialect) uses the
+    // trimmed abstract formatter.
+    expect(quoteSqlValue(Temporal.Instant.from("2026-04-26T14:23:55Z"))).toBe(
+      "'2026-04-26 14:23:55'",
+    );
+  });
+
+  it("renders the PG BC literal for a proleptic-year Instant (insert_all VALUES)", () => {
+    // Regression guard: the PG inline VALUES path must carry the " BC" suffix
+    // and fixed-6 microseconds, matching the adapter's quoted_date.
+    const instant = Temporal.Instant.from("-000043-03-15T12:34:56.123456Z");
+    expect(quoteSqlValue(instant, false, "postgres")).toBe("'0044-03-15 12:34:56.123456 BC'");
+  });
+
+  it("caps PG datetime literal fractional seconds at microseconds", () => {
+    const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
+    expect(quoteSqlValue(instant, false, "postgres")).toBe("'2026-04-26 14:23:55.123456'");
+  });
 });
 
 // ==========================================================================

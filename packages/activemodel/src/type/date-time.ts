@@ -187,28 +187,23 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return ns - roundedOff;
   }
 
-  serialize(value: unknown): string | null {
-    const cast = this.cast(value);
-    // Sentinels are Postgres-specific; base type returns null. The Postgres
-    // OID::DateTime subclass overrides serialize() to emit 'infinity'/'-infinity'.
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
-    const temporal = cast as Temporal.Instant;
-    const p = this.precision ?? -1;
-    const digits = (Number.isInteger(p) && p >= 0 && p <= 9 ? p : 6) as
-      | 0
-      | 1
-      | 2
-      | 3
-      | 4
-      | 5
-      | 6
-      | 7
-      | 8
-      | 9;
-    return temporal.toString({ fractionalSecondDigits: digits });
+  /**
+   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
+   * returns the cast Temporal value — NOT a SQL string. The connection adapter's
+   * quoting/bind layer converts it to a SQL literal at quote/type_cast time, matching
+   * Rails where `value_for_database` for a datetime yields the cast Time and the
+   * adapter does the quoting. Sub-second precision is already applied in `castValue`.
+   */
+  // Return type is `unknown` (matching ActiveModel::Type::Value#serialize) so
+  // adapter subclasses can widen it — e.g. PostgreSQL's OID::DateTime emits the
+  // "infinity" wire string for the infinity sentinels.
+  serialize(value: unknown): unknown {
+    return this.serializeCastValue(this.cast(value));
   }
 
-  serializeCastValue(value: DateTimeCastResult | null): string | null {
-    return this.serialize(value);
+  // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
+  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null {
+    if (value === null || value === DateInfinity || value === DateNegativeInfinity) return value;
+    return this._applySecondsPrecision(value as Temporal.Instant);
   }
 }

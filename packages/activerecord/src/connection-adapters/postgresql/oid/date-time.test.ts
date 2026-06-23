@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { DateTime } from "./date-time.js";
 import { Timestamp } from "./timestamp.js";
 import { TimestampWithTimeZone } from "./timestamp-with-time-zone.js";
+import { quotedDate } from "../quoting.js";
 
 describe("PostgreSQL::OID::DateTime", () => {
   const type = new DateTime();
@@ -33,27 +34,35 @@ describe("PostgreSQL::OID::DateTime", () => {
     expect(zdt.day).toBe(15);
   });
 
-  it("serialize converts BC Temporal.Instant to PG BC format", () => {
+  it("serialize returns the cast Instant (quoting renders the SQL literal)", () => {
+    // value_for_database is now the cast Temporal.Instant; the adapter's
+    // quoted_date renders the SQL literal (incl. the " BC" suffix) downstream.
+    const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
+    expect(type.serialize(instant)).toBe(instant);
+  });
+
+  it("quoted_date converts BC Temporal.Instant to PG BC format", () => {
     // 44 BC = ISO year -43; round-trip via castValue to create the Instant
     const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
-    expect(type.serialize(instant)).toBe("0044-01-01 00:00:00 BC");
+    expect(quotedDate(instant)).toBe("0044-01-01 00:00:00 BC");
   });
 
-  it("serialize converts ISO year 0 to 1 BC", () => {
+  it("quoted_date converts ISO year 0 to 1 BC", () => {
     const instant = type.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
-    expect(type.serialize(instant)).toBe("0001-04-07 00:00:00 BC");
+    expect(quotedDate(instant)).toBe("0001-04-07 00:00:00 BC");
   });
 
-  it("serialize preserves microseconds in BC format", () => {
+  it("quoted_date preserves microseconds in BC format", () => {
     const instant = type.castValue("0005-02-29 12:34:56.123456 BC") as Temporal.Instant;
-    expect(type.serialize(instant)).toBe("0005-02-29 12:34:56.123456 BC");
+    expect(quotedDate(instant)).toBe("0005-02-29 12:34:56.123456 BC");
   });
 
-  it("serialize leaves AD dates unchanged", () => {
+  it("quoted_date leaves AD dates unchanged", () => {
     const instant = Temporal.Instant.from("2023-06-15T12:00:00Z");
-    expect(type.serialize(instant)).toBe("2023-06-15 12:00:00.000000");
+    // Rails' quoted_date appends fractional seconds only when usec > 0.
+    expect(quotedDate(instant)).toBe("2023-06-15 12:00:00");
   });
 
   it("serialize returns 'infinity' / '-infinity' for sentinels", () => {

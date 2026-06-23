@@ -377,7 +377,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0002-12-25 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(-1);
-      const serialized = oidType.serialize(instant) as string;
+      const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0002-12-25 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;
@@ -389,7 +389,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0005-02-29 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(-4);
-      const serialized = oidType.serialize(instant) as string;
+      const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0005-02-29 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;
@@ -401,7 +401,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const oidType = new OidDateTime();
       const instant = oidType.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
       expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
-      const serialized = oidType.serialize(instant) as string;
+      const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0001-04-07 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;

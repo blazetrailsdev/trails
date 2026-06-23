@@ -14,6 +14,11 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import {
+  formatInstantForSqlPostgres,
+  formatPlainDateTimeForSqlPostgres,
+  formatPlainDateForSqlPostgres,
+} from "../abstract/sql-datetime.js";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
@@ -357,9 +362,9 @@ export function checkIntegerRange(value: bigint | number): void {
 }
 
 /**
- * Mirrors: PostgreSQL::Quoting#quoted_date. Appends " BC" for years ≤ 0
- * (where year 0 in Temporal corresponds to 1 BC in the proleptic Gregorian
- * calendar, matching Ruby's Date#year behaviour).
+ * Mirrors: PostgreSQL::Quoting#quoted_date. Emits a microsecond-precision SQL
+ * literal (fixed 6 fractional digits when usec > 0, per Rails' `sprintf("%06d",
+ * usec)`), appending " BC" for proleptic years ≤ 0 (Temporal year 0 → 1 BC).
  * @internal
  */
 export function quotedDate(
@@ -370,17 +375,14 @@ export function quotedDate(
     | Temporal.PlainDate
     | Temporal.PlainTime,
 ): string {
-  const year =
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.ZonedDateTime
-      ? value.year
-      : null;
-  if (year !== null && year <= 0) {
-    const bceYear = String(-year + 1).padStart(4, "0");
-    const base = abstractQuotedDate(value);
-    return base.replace(/^-?\d+/, bceYear) + " BC";
-  }
+  if (value instanceof Temporal.Instant) return formatInstantForSqlPostgres(value);
+  if (value instanceof Temporal.ZonedDateTime)
+    return formatInstantForSqlPostgres(value.toInstant());
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSqlPostgres(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSqlPostgres(value);
+  // PlainTime carries no date/year — no BC bias applies. The abstract formatter
+  // handles it (and `quoted_time` strips the date prefix off the PlainDateTime
+  // form callers route through here).
   return abstractQuotedDate(value);
 }
 

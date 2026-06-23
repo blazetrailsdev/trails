@@ -54,6 +54,71 @@ export function formatPlainDateForSql(value: Temporal.PlainDate): string {
 }
 
 /**
+ * PostgreSQL literal formatters, faithful to `PostgreSQL::Quoting#quoted_date`
+ * (and the abstract `quoted_date` it builds on, abstract/quoting.rb:188-197):
+ *
+ *   result = value.to_fs(:db)                       # "YYYY-MM-DD HH:MM:SS"
+ *   if value.respond_to?(:usec) && value.usec > 0   # append microseconds only
+ *     "#{result}.#{sprintf("%06d", value.usec)}"    # when non-zero, fixed 6 digits
+ *   ...
+ *   # PG#quoted_date then suffixes " BC" for proleptic years <= 0.
+ *
+ * Differs from {@link formatInstantForSql} in two Rails-faithful ways: the
+ * fractional part is a fixed 6-digit microsecond field (not a trimmed 3/6/9 group)
+ * and is capped at microseconds — matching PG's `timestamp` resolution — so a
+ * nil-precision nanosecond value never reaches the wire as 7–9 digits. The " BC"
+ * suffix is what the abstract formatters omit.
+ */
+function pgDateTimeLiteral(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  min: number,
+  sec: number,
+  usec: number,
+): string {
+  const isBc = year <= 0;
+  const yyyy = String(isBc ? -year + 1 : year).padStart(4, "0");
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  let s = `${yyyy}-${p2(month)}-${p2(day)} ${p2(hour)}:${p2(min)}:${p2(sec)}`;
+  if (usec > 0) s += `.${String(usec).padStart(6, "0")}`;
+  return isBc ? `${s} BC` : s;
+}
+
+export function formatInstantForSqlPostgres(value: Temporal.Instant): string {
+  const z = value.toZonedDateTimeISO(defaultSqlTimezone());
+  return pgDateTimeLiteral(
+    z.year,
+    z.month,
+    z.day,
+    z.hour,
+    z.minute,
+    z.second,
+    z.millisecond * 1000 + z.microsecond,
+  );
+}
+
+export function formatPlainDateTimeForSqlPostgres(value: Temporal.PlainDateTime): string {
+  return pgDateTimeLiteral(
+    value.year,
+    value.month,
+    value.day,
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond * 1000 + value.microsecond,
+  );
+}
+
+export function formatPlainDateForSqlPostgres(value: Temporal.PlainDate): string {
+  const isBc = value.year <= 0;
+  const yyyy = String(isBc ? -value.year + 1 : value.year).padStart(4, "0");
+  const s = `${yyyy}-${String(value.month).padStart(2, "0")}-${String(value.day).padStart(2, "0")}`;
+  return isBc ? `${s} BC` : s;
+}
+
+/**
  * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.fffffffff]`.
  * Fractional digits are trimmed to the smallest non-zero 3-digit group.
  */

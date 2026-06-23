@@ -50,7 +50,12 @@ export class Date extends DateType {
     return super.castValue(value);
   }
 
-  override serialize(value: unknown): string | null {
+  /**
+   * `infinity` sentinels serialize to their wire strings; every other value
+   * returns the cast Temporal.PlainDate. The adapter's quoting/bind layer renders
+   * the SQL literal (incl. the " BC" suffix) downstream, matching Rails.
+   */
+  override serialize(value: unknown): unknown {
     if (value === DateInfinity) return "infinity";
     if (value === DateNegativeInfinity) return "-infinity";
     return super.serialize(value);

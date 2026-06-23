@@ -25,6 +25,12 @@ import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
+  formatInstantForSqlMysql,
+  formatPlainDateTimeForSqlMysql,
+  formatPlainTimeForSqlMysql,
+  formatInstantForSqlPostgres,
+  formatPlainDateTimeForSqlPostgres,
+  formatPlainDateForSqlPostgres,
 } from "./sql-datetime.js";
 import type { Quoting } from "./quoting-interface.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
@@ -1194,16 +1200,39 @@ export function temporalToBindString(
   // fixed ("F") form (Rails' `type_cast`: `when BigDecimal then value.to_s("F")`)
   // rather than letting the driver JSON-stringify the object.
   if (value instanceof BigDecimal) return value.toString("F");
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  // Adapter-specific datetime literals:
+  //   - MySQL/MariaDB DATETIME(6) caps fractional at 6 digits (strict mode rejects 7–9).
+  //   - PostgreSQL uses quoted_date semantics: fixed-6 microseconds + " BC" for years ≤ 0.
+  // This keeps the inline insert_all VALUES path (quoteSqlValue → here) consistent
+  // with the bind path (the adapter's quotedDate) for both dialects.
+  const mysql = adapter === "mysql";
+  const postgres = adapter === "postgres";
+  if (value instanceof Temporal.Instant)
+    return mysql
+      ? formatInstantForSqlMysql(value)
+      : postgres
+        ? formatInstantForSqlPostgres(value)
+        : formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime)
+    return mysql
+      ? formatPlainDateTimeForSqlMysql(value)
+      : postgres
+        ? formatPlainDateTimeForSqlPostgres(value)
+        : formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate)
+    return postgres ? formatPlainDateForSqlPostgres(value) : formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) {
     // SQLite stores time with a fixed 2000-01-01 date prefix so it can be
     // read back as a datetime string by the cast layer.
-    const t = formatPlainTimeForSql(value);
+    const t = mysql ? formatPlainTimeForSqlMysql(value) : formatPlainTimeForSql(value);
     return adapter === "sqlite" ? `2000-01-01 ${t}` : t;
   }
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  if (value instanceof Temporal.ZonedDateTime)
+    return mysql
+      ? formatInstantForSqlMysql(value.toInstant())
+      : postgres
+        ? formatInstantForSqlPostgres(value.toInstant())
+        : formatInstantForSql(value.toInstant());
   return value;
 }
 

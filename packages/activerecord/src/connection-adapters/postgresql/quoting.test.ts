@@ -245,6 +245,40 @@ describe("PostgreSQL quoting", () => {
     expect(quotedDate(Temporal.PlainDate.from("-000043-03-15"))).toBe("0044-03-15 BC");
   });
 
+  it("quoted_date emits fixed 6-digit microseconds when usec > 0", () => {
+    // Rails abstract/quoting.rb:194-195 — sprintf("%06d", usec), never a trimmed group.
+    expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55.5Z"))).toBe(
+      "2026-04-26 14:23:55.500000",
+    );
+    expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55.123Z"))).toBe(
+      "2026-04-26 14:23:55.123000",
+    );
+  });
+
+  it("quoted_date omits the fractional field when usec == 0", () => {
+    expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55Z"))).toBe("2026-04-26 14:23:55");
+  });
+
+  it("quoted_date caps fractional seconds at microseconds (drops nanos)", () => {
+    // Nil-precision nanosecond value must not reach the PG wire as 7–9 digits.
+    expect(quotedDate(Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"))).toBe(
+      "2026-04-26 14:23:55.123456",
+    );
+  });
+
+  it("quoted_date suffixes BC for an Instant with proleptic year <= 0", () => {
+    // 44 BC = ISO year -43; usec 0 → no fractional field.
+    const instant = Temporal.Instant.from("-000043-03-15T12:34:56Z");
+    expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
+    expect(quotedDate(instant)).toBe("0044-03-15 12:34:56 BC");
+  });
+
+  it("quoted_date suffixes BC for a PlainDateTime with proleptic year <= 0", () => {
+    expect(quotedDate(Temporal.PlainDateTime.from("-000043-03-15T12:34:56.123456"))).toBe(
+      "0044-03-15 12:34:56.123456 BC",
+    );
+  });
+
   it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
     // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
     // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.

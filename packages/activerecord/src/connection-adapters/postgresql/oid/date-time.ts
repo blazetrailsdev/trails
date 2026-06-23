@@ -26,7 +26,6 @@ import {
   parsePostgresTimestampAsInstant,
   parsePostgresInstant,
 } from "../../abstract/temporal-wire.js";
-import { defaultSqlTimezone, formatInstantForSql } from "../../abstract/sql-datetime.js";
 
 type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
@@ -61,26 +60,17 @@ export class DateTime extends DateTimeType {
     return super.castValue(value);
   }
 
-  override serialize(value: unknown): string | null {
+  /**
+   * Mirrors: PostgreSQL::OID::DateTime#serialize. `infinity` sentinels serialize
+   * to their wire strings (Rails' `value_for_database` for infinity is the string);
+   * every other value returns the cast Temporal.Instant. SQL-string quoting —
+   * including the " BC" suffix for proleptic years ≤ 0 — happens in the adapter's
+   * `quoted_date` / bind layer, matching Rails where the adapter does the quoting.
+   */
+  override serialize(value: unknown): unknown {
     if (value === DateInfinity) return "infinity";
     if (value === DateNegativeInfinity) return "-infinity";
-    const cast = this.cast(value);
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
-    const instant = cast as Temporal.Instant;
-    // Detect BC directly from the Temporal year. PostgreSQL rejects ISO 8601
-    // negative-year timestamps; emit "YYYY-MM-DD HH:MM:SS[.frac] BC" instead.
-    // ISO year -43 → 44 BC; ISO year 0 → 1 BC.
-    const year = instant.toZonedDateTimeISO(defaultSqlTimezone()).year;
-    if (year <= 0) {
-      const bcYear = String(-year + 1).padStart(4, "0");
-      // formatInstantForSql emits "±YYYY-MM-DD HH:MM:SS[.frac]" (space-separated, no Z).
-      const formatted = formatInstantForSql(instant);
-      const dashIdx = formatted.indexOf("-", year < 0 ? 1 : 0);
-      return bcYear + formatted.slice(dashIdx) + " BC";
-    }
-    // AD dates: delegate to activemodel for precision, then reformat to SQL space-separated.
-    const iso = super.serialize(value);
-    return iso === null ? null : iso.replace("T", " ").replace(/Z$/, "");
+    return super.serialize(value);
   }
 
   override typeCastForSchema(value: unknown): string {

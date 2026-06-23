@@ -39,7 +39,11 @@ import {
   type Mysql2FieldDescriptor,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
+import {
+  typeCastedBinds,
+  temporalToBindString,
+  transactionIsolationLevels,
+} from "./abstract/database-statements.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -692,6 +696,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       if (v && typeof v === "object" && "valueForDatabase" in v) {
         v = (v as { valueForDatabase: unknown }).valueForDatabase;
       }
+      // `value_for_database` now yields cast Temporal values; convert to the SQL
+      // wire string the mysql2 driver expects (matching Rails' type_casted_binds).
+      v = temporalToBindString(v, "mysql");
       return v === true ? 1 : v === false ? 0 : v;
     });
   }

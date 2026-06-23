@@ -128,20 +128,21 @@ describe("TimeZoneConverterTest", () => {
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const eastern = TimeZone.find("Eastern Time (US & Canada)");
     const twz = new TimeWithZone(instant, eastern);
-    // 14:00 UTC displayed as 10:00 EDT; serialize must produce the UTC SQL string
+    // 14:00 UTC displayed as 10:00 EDT; serialize (value_for_database) returns the
+    // cast UTC Temporal.Instant — the adapter renders the SQL literal downstream.
     const result = converter.serialize(twz);
-    expect(typeof result).toBe("string");
-    expect(result).toContain("2024-06-15");
-    expect(result).toContain("14:00:00");
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect((result as Temporal.Instant).toString()).toBe("2024-06-15T14:00:00Z");
   });
 
-  it("serialize round-trips: deserialize then serialize returns UTC SQL string", () => {
+  it("serialize round-trips: deserialize then serialize returns the cast UTC value", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
     const deserialized = converter.deserialize("2024-06-15 14:00:00");
     expect(deserialized).toBeInstanceOf(TimeWithZone);
     const serialized = converter.serialize(deserialized);
-    // UTC, space-separated SQL format (default precision 6 adds .000000)
-    expect(serialized).toMatch(/^2024-06-15 14:00:00/);
+    // value_for_database is the cast UTC Temporal.Instant, not a SQL string.
+    expect(serialized).toBeInstanceOf(Temporal.Instant);
+    expect((serialized as Temporal.Instant).toString()).toBe("2024-06-15T14:00:00Z");
   });
 });

@@ -521,7 +521,7 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     const limitType = baseType === "float" ? this.lookupCastType(baseType) : castType;
     const typeMapLimit = charLimitVal == null ? (limitType.limit ?? null) : null;
     // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
-    // MysqlDateTimeType.name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
+    // The DateTime type's name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
     const castName = castType.name;
     const semanticType = (castName === "value" ? baseType : castName).toLowerCase();
     // information_schema.numeric_precision is NULL for date/time/datetime/timestamp.

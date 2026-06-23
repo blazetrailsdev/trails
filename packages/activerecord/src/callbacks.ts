@@ -235,21 +235,17 @@ export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor;
   return runAllCallbacks(ctor.prototype, "create", this, async () => {
-    // Columns the timestamp callback writes at create time. Rails' _create_record
-    // writes these via _write_attribute; after the insert, changes_applied →
-    // forget_attribute_assignments rebinds each to value_for_database, which for the
-    // DateTime type is the Time itself (not a SQL string). So a freshly created
-    // record's timestamp before-type-cast is a Time, and cache_version takes the slow
-    // (reader) path rather than the raw-string fast path. trails serializes to a DB
-    // string at value_for_database time, so after changesApplied we rebind these
-    // columns to their cast Time, preserving Rails' observable.
-    const userWrittenTimestamps: string[] = [];
+    // Rails' _create_record writes the create-time timestamp columns via
+    // _write_attribute; after the insert, changes_applied → forget_attribute_assignments
+    // rebinds each to value_for_database, which for the DateTime type is the cast Time
+    // itself (not a SQL string). value_for_database now returns the cast Temporal, so
+    // forgettingAssignment yields a FromDatabase whose before-type-cast is that Time on
+    // every path — no post-hoc rebind needed.
     if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
       const time = currentTimeFromProperTimezone();
       for (const col of allTimestampAttributesInModel.call(ctor)) {
         if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
           this._writeAttribute?.(col, time);
-          userWrittenTimestamps.push(col);
         }
       }
     }
@@ -279,15 +275,6 @@ export async function _createRecord(this: any): Promise<boolean> {
     this._previouslyNewRecord = true;
     this._newRecord = false;
     this.changesApplied();
-    // Rebind the create-time timestamps so their before-type-cast is the cast Time
-    // (as Rails' value_for_database yields for DateTime) rather than the serialized
-    // DB string. This keeps the attribute a stable FromDatabase value (identity holds
-    // across later saves) while ensuring cache_version skips the raw-string fast path
-    // and calls the updated_at reader at create time.
-    for (const col of userWrittenTimestamps) {
-      this._attributes?.rebindFromDatabaseValue?.(col, this._readAttribute?.(col));
-      this.clearAttributeChange?.(col);
-    }
   });
 }
 

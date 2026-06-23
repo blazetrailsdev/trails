@@ -39,9 +39,9 @@ describe("DateTest", () => {
     expect(type.cast("not-a-date")).toBe(null);
   });
 
-  it("serialize returns ISO date string", () => {
+  it("serialize returns the cast PlainDate (not a SQL string)", () => {
     const d = plainDate("2024-01-15");
-    expect(type.serialize(d)).toBe("2024-01-15");
+    expect((type.serialize(d) as Temporal.PlainDate).toString()).toBe("2024-01-15");
   });
 
   it("serialize null returns null", () => {

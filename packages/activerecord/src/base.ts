@@ -103,6 +103,8 @@ import {
   createAssociationCache,
 } from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import { temporalToBindString } from "./connection-adapters/abstract/database-statements.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
@@ -322,10 +324,22 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 
 /** @internal */
-export function quoteSqlValue(v: unknown, asArray = false): string {
+export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName): string {
   if (v === null || v === undefined) return "NULL";
   if (typeof v === "number" || typeof v === "bigint") return String(v);
   if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  // Temporal date/time values reach here because value_for_database now yields
+  // the cast Temporal (not a pre-quoted SQL string). Render the dialect-correct
+  // literal via the same formatter the bind path uses, then SQL-quote it.
+  if (
+    v instanceof Temporal.Instant ||
+    v instanceof Temporal.PlainDateTime ||
+    v instanceof Temporal.PlainDate ||
+    v instanceof Temporal.PlainTime ||
+    v instanceof Temporal.ZonedDateTime
+  ) {
+    return `'${String(temporalToBindString(v, dialect)).replace(/'/g, "''")}'`;
+  }
   // boundary: defensive SQL literal quoting fallback for legacy callers.
   // Invalid (NaN) Date short-circuits to SQL NULL — toISOString() would throw
   // a RangeError, and the generic object fallthrough would JSON-stringify it

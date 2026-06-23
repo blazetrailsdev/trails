@@ -21,11 +21,11 @@ export class Time extends ActiveModelTime {
     return isUtc(this._timezone);
   }
 
-  override serialize(value: unknown): string | null {
+  override serialize(value: unknown): Temporal.PlainTime | null {
     return super.serialize(value);
   }
 
-  override serializeCastValue(value: Temporal.PlainTime | null): string | null {
+  override serializeCastValue(value: Temporal.PlainTime | null): Temporal.PlainTime | null {
     return super.serializeCastValue(value);
   }
 

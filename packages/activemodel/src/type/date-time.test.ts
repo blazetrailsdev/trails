@@ -83,14 +83,16 @@ describe("DateTimeTest", () => {
     expect(type.cast("not-a-date")).toBe(null);
   });
 
-  it("serialize returns microsecond ISO string for Instant", () => {
+  it("serialize returns the cast Instant (not a SQL string)", () => {
     const i = instant("2026-04-26T14:23:55.123456Z");
-    expect(type.serialize(i)).toBe("2026-04-26T14:23:55.123456Z");
+    expect((type.serialize(i) as Temporal.Instant).toString()).toBe("2026-04-26T14:23:55.123456Z");
   });
 
-  it("serialize returns UTC ISO string for PlainDateTime (cast to Instant first)", () => {
+  it("serialize returns the cast Instant for PlainDateTime (cast to Instant first)", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    expect(type.serialize(pdt)).toBe("2026-04-26T14:23:55.123456Z");
+    expect((type.serialize(pdt) as Temporal.Instant).toString()).toBe(
+      "2026-04-26T14:23:55.123456Z",
+    );
   });
 
   it("serialize null returns null", () => {
@@ -100,7 +102,7 @@ describe("DateTimeTest", () => {
   it("serialize respects column precision", () => {
     const t = new Types.DateTimeType({ precision: 3 });
     const i = instant("2026-04-26T14:23:55.123456Z");
-    expect(t.serialize(i)).toBe("2026-04-26T14:23:55.123Z");
+    expect((t.serialize(i) as Temporal.Instant).toString()).toBe("2026-04-26T14:23:55.123Z");
   });
 
   it("PlainDateTime input is converted to Instant (multiparameter support)", () => {
