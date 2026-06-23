@@ -66,6 +66,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.internalExecute("INSERT INTO async_t (name) VALUES ('async')", "SQL");
     const rows = await adapter.execute("SELECT name FROM async_t");
     expect(rows).toEqual([{ name: "async" }]);
+    await adapter.internalExecute("DROP TABLE IF EXISTS async_t", "SCHEMA");
     adapter.disconnectBang();
   });
 
@@ -188,6 +189,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.internalExecute("INSERT INTO sync_checkout (name) VALUES ('lazy')", "SQL");
     const rows = await adapter.execute("SELECT name FROM sync_checkout");
     expect(rows).toEqual([{ name: "lazy" }]);
+    await adapter.internalExecute("DROP TABLE IF EXISTS sync_checkout", "SCHEMA");
     adapter.disconnectBang();
   });
 
@@ -198,6 +200,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.exec("CREATE TABLE schema_first (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
     const cols = await adapter.columns("schema_first");
     expect(cols.map((c) => c.name)).toEqual(["id", "name"]);
+    await adapter.exec("DROP TABLE IF EXISTS schema_first");
     adapter.disconnectBang();
   });
 
@@ -246,6 +249,7 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("INSERT INTO pool_t (name) VALUES ('pooled')", "SQL");
     const rows = await conn.execute("SELECT name FROM pool_t");
     expect(rows).toEqual([{ name: "pooled" }]);
+    await conn.internalExecute("DROP TABLE IF EXISTS pool_t", "SCHEMA");
     pool.disconnectBang();
   });
 
@@ -288,6 +292,7 @@ describe("SQLite adapter driver binding", () => {
     const pool = new ConnectionPool(poolConfig);
     const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+    await conn.internalExecute("DROP TABLE IF EXISTS drain_t", "SCHEMA");
 
     const draining = pool.disconnectAsync();
     expect(closed).toBe(false);
@@ -315,6 +320,7 @@ describe("SQLite adapter driver binding", () => {
     const pool = new ConnectionPool(poolConfig);
     const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE sync_drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
+    await conn.internalExecute("DROP TABLE IF EXISTS sync_drain_t", "SCHEMA");
     await expect(pool.disconnectAsync()).resolves.toBeUndefined();
     expect(conn.active).toBe(false);
   });

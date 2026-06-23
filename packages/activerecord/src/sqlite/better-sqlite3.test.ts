@@ -117,6 +117,7 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     try {
       const conn = await betterSqlite3Driver.open({ database: literal });
       await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
       expect(getFs().existsSync(literal)).toBe(true);
       expect(getFs().existsSync(`/${relName}`)).toBe(false);

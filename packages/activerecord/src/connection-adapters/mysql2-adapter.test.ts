@@ -96,6 +96,15 @@ describeIfMysql("Mysql2Adapter", () => {
     const conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
     try {
       await conn.query("SET FOREIGN_KEY_CHECKS = 0");
+      // Static multi-table DROP mirroring the dynamic TRACKED_TABLES sweep below,
+      // so require-table-teardown can balance these raw-created names by name.
+      try {
+        await conn.query(
+          "DROP TABLE IF EXISTS `books`, `authors`, `users`, `members`, `items`, `accounts`, `products`",
+        );
+      } catch {
+        /* ignore */
+      }
       for (const view of TRACKED_VIEWS) {
         try {
           await conn.query(`DROP VIEW IF EXISTS \`${view}\``);

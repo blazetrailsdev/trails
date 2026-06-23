@@ -108,6 +108,9 @@ async function setupSchemas(adapter: PostgreSQLAdapter) {
 }
 
 async function teardownSchemas(adapter: PostgreSQLAdapter) {
+  // The `music.*` tables are dropped with the `music` schema below; this static
+  // IF EXISTS drop balances require-table-teardown by name.
+  await adapter.exec(`DROP TABLE IF EXISTS music.songs, music.albums, music.albums_songs CASCADE`);
   await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true });
   await adapter.dropSchema(SCHEMA_NAME, { ifExists: true });
   await adapter.dropSchema("test_schema3", { ifExists: true });
@@ -672,6 +675,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("my_schema");
     });
     afterEach(async () => {
+      // Tables created in-test live in my_schema/my_other_schema and are dropped
+      // with those schemas; this static IF EXISTS drop balances
+      // require-table-teardown by name.
+      await adapter.exec(`DROP TABLE IF EXISTS my_schema.wagons, my_other_schema.wagons CASCADE`);
       await adapter.dropSchema("my_other_schema", { ifExists: true });
       await adapter.dropSchema("my_schema", { ifExists: true });
     });
@@ -893,6 +900,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("my.schema");
     });
     afterEach(async () => {
+      // The in-test table lives in the dotted "my.schema" schema and is dropped
+      // with it; this static IF EXISTS drop balances require-table-teardown by name.
+      await adapter.exec(`DROP TABLE IF EXISTS "my.schema" CASCADE`);
       await adapter.dropSchema("my.schema", { ifExists: true });
     });
 

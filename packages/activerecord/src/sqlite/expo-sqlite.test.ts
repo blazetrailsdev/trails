@@ -22,6 +22,7 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
   });
 
   afterAll(async () => {
+    await conn.exec("DROP TABLE IF EXISTS widgets");
     await conn.close();
   });
 
@@ -108,6 +109,8 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     );
     const insert = await conn.prepare("INSERT INTO fk_child (id, parent_id) VALUES (?, ?)");
     await expect(insert.run([1, 999])).rejects.toThrow();
+    await conn.exec("DROP TABLE IF EXISTS fk_child");
+    await conn.exec("DROP TABLE IF EXISTS fk_parent");
   });
 
   it("columns() returns empty array (expo-sqlite has no column metadata API)", async () => {

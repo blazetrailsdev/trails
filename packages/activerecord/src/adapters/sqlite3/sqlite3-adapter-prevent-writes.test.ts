@@ -13,7 +13,14 @@ beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Throwaway :memory: tables; per-name IF EXISTS drops balance
+  // require-table-teardown (SQLite has no multi-table DROP).
+  await adapter
+    .exec(
+      `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
+    )
+    .catch(() => undefined);
   adapter.close();
 });
 

@@ -26,6 +26,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     await defineSchema(adapter, {});
   });
   afterAll(async () => {
+    // `ex` is created in-test and rolled back by withTransactionalFixtures;
+    // this static IF EXISTS drop balances require-table-teardown.
+    await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
     await adapter.close();
   });
   withTransactionalFixtures(() => adapter);

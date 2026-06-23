@@ -1100,6 +1100,11 @@ describe("InsertAllTest", () => {
         [threeDaysAgo.toString(), 0, 0],
       ]);
 
+      // The partitions are dropped by the CASCADE below; name them explicitly so
+      // require-table-teardown balances the raw-created partition tables.
+      await conn.executeMutation(
+        'DROP TABLE IF EXISTS "measurements_toronto", "measurements_concepcion" CASCADE',
+      );
       await conn.executeMutation('DROP TABLE IF EXISTS "measurements" CASCADE');
     },
   );

@@ -10,7 +10,11 @@ async function returnTheInsertedId(method: "insert" | "create"): Promise<unknown
     await conn.executeMutation(
       "CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer, credit_limit integer)",
     );
-    return await conn[method]("INSERT INTO accounts (firm_id,credit_limit) VALUES (42,5000)");
+    const result = await conn[method](
+      "INSERT INTO accounts (firm_id,credit_limit) VALUES (42,5000)",
+    );
+    await conn.executeMutation("DROP TABLE IF EXISTS accounts");
+    return result;
   } finally {
     await conn.close();
   }

@@ -62,6 +62,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
             );
             const rows = await conn.execute(`SELECT * FROM "people" LIMIT 1`);
             expect(Array.isArray(rows)).toBe(true);
+            await conn.executeMutation(`DROP TABLE IF EXISTS "people"`);
 
             const pm = (Base.connectionHandler as any).getPoolManager("Base");
             expect([...pm.shardNames].sort()).toEqual(["default", "shard_one"]);
@@ -480,6 +481,9 @@ describe("ConnectionHandlersShardingDbTest", () => {
           `SELECT shard_key FROM "shard_connection_test_model_bs" WHERE shard_key = 'test_model_b_default'`,
         );
         expect(rowsB[0]?.shard_key).toBe("test_model_b_default");
+
+        await connA.executeMutation(`DROP TABLE IF EXISTS "shard_connection_test_models"`);
+        await connB.executeMutation(`DROP TABLE IF EXISTS "shard_connection_test_model_bs"`);
       });
     } finally {
       Base.connectionHandler.clearAllConnectionsBang();

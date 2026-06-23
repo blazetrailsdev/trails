@@ -93,6 +93,8 @@ describe("PostgreSQLAdapter#execQuery", () => {
     const result = await adapter.execQuery("CREATE TABLE x (id int)");
     expect(result).toBeInstanceOf(Result);
     expect(result.length).toBe(0);
+    // Balances require-table-teardown; the mock driver makes this a no-op.
+    await adapter.execQuery("DROP TABLE IF EXISTS x");
   });
 
   it("selectAll delegates through execQuery so the PG override wins", async () => {

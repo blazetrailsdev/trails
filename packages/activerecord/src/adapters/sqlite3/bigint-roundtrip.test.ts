@@ -21,7 +21,8 @@ beforeEach(() => {
   `);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
   adapter.close();
 });
 

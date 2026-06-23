@@ -10,6 +10,11 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   afterEach(async () => {
+    // Throwaway :memory: tables; per-name IF EXISTS drops balance
+    // require-table-teardown (SQLite has no multi-table DROP).
+    await db.exec(
+      `DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS src; DROP TABLE IF EXISTS dst`,
+    );
     await db.close();
   });
 

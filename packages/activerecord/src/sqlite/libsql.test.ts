@@ -131,6 +131,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
       await probe.prepare("SELECT label FROM gadgets WHERE id = ?")
     ).get([1])) as { label: string };
     expect(row.label).toBe("alpha");
+    await probe.exec("DROP TABLE IF EXISTS gadgets");
     await probe.close();
   });
 
@@ -145,6 +146,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
     try {
       const conn = await libsqlDriver.open({ database: `file:${relName}` });
       await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
       expect(libsqlDriver.databaseExists?.({ database: `file:${relName}` })).toBe(true);
     } finally {
@@ -183,6 +185,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
   });
 
   afterAll(async () => {
+    await adapter.executeMutation("DROP TABLE IF EXISTS items");
     await adapter.close();
     removeFiles();
   });

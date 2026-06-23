@@ -213,6 +213,7 @@ describe("MigratorTest", () => {
     const status = await migrator.migrationsStatus();
     expect(status[0]).toEqual({ status: "down", version: "20230101000000", name: "OldMigration" });
     expect(status[1]).toEqual({ status: "up", version: "20240101000000", name: "NewMigration" });
+    await adapter.executeMutation(`DROP TABLE IF EXISTS "schema_migrations"`);
   });
 
   it("migrations status in subdirectories", async () => {

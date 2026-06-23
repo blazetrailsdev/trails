@@ -91,6 +91,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     await conn2.rollbackDbTransaction();
 
     await conn1.rollbackDbTransaction();
+    await conn1.exec(`DROP TABLE IF EXISTS "zines"`);
   });
 
   it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
