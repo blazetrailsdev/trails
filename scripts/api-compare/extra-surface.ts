@@ -59,6 +59,7 @@ import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
+import { isSourceUnported } from "./unported-files.js";
 
 /**
  * Track the FQN alongside the entity so namespace-scoped include resolution
@@ -367,6 +368,9 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  *     `ClassMethods` submodule's instanceMethods into the parent's own
  *     `classMethods` — flattening still only reads `instanceMethods`, so
  *     ASC class methods become entity-level surface, not propagated mixins.
+ *   - A mixin whose source file is unported (`UNPORTED_FILES`) is skipped, so
+ *     its methods never enter `allowed` — matching the `isSourceUnported`
+ *     guard at compare.ts:507. The check uses the module's *owning* package.
  *
  * Since `allowed` is a flat name set (instance vs class collapsed on the TS
  * side anyway), we simply union both `instanceMethods` and `classMethods`
@@ -379,9 +383,11 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  */
 function collectAllowedNames(
   entities: RubyEntity[],
+  pkg: string,
   rubyModules: Record<string, ClassInfo>,
   moduleFqnByShort: Map<string, string[]>,
   crossPackageModules: Record<string, ClassInfo>,
+  crossPackagePkgByFqn: Record<string, string>,
 ): Set<string> {
   const allowed = new Set<string>();
   const visited = new Set<string>();
@@ -412,8 +418,19 @@ function collectAllowedNames(
       // Fall back to the cross-package map: a railtie-injected mixin (see
       // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
       // in another package's modules, not this package's.
-      const mod = rubyModules[fqn] ?? crossPackageModules[fqn];
+      const localMod = rubyModules[fqn];
+      const mod = localMod ?? crossPackageModules[fqn];
       if (!mod) continue;
+      // A module whose source file we've explicitly declined to port should
+      // not contribute its methods to the host's allowed set — otherwise an
+      // unported mixin still flips its TS ports from extra surface to allowed.
+      // Mirrors compare.flattenIncludedMethodInfos (compare.ts:507). Resolve
+      // `isSourceUnported` against the module's *owning* package: a local
+      // module's owner is the host `pkg`, a cross-package module's owner is
+      // the package it was extracted from (package-scoped unported patterns
+      // key off the owner, not the host).
+      const ownerPkg = localMod ? pkg : (crossPackagePkgByFqn[fqn] ?? pkg);
+      if (mod.file && isSourceUnported(mod.file, ownerPkg)) continue;
       // Only the module's instance methods cross into the host. Class
       // methods on the module itself stay on the module (Ruby `include`
       // semantics; matches compare.flattenIncludedMethodInfos).
@@ -472,15 +489,25 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
  * FQNs are globally unique across Rails-land, so a flat merge is safe; on the
  * rare collision last-writer-wins, which only affects the foreign-mixin
  * fallback path (the local package map still takes precedence).
+ *
+ * `pkgByFqn` records the owning package of each module so the unported-source
+ * guard in `collectAllowedNames` can resolve `isSourceUnported` against the
+ * package the module was extracted from (package-scoped unported patterns key
+ * off the owner, not the host).
  */
-export function buildCrossPackageModules(ruby: ApiManifest): Record<string, ClassInfo> {
-  const out: Record<string, ClassInfo> = {};
-  for (const pkg of Object.values(ruby.packages)) {
+export function buildCrossPackageModules(ruby: ApiManifest): {
+  modules: Record<string, ClassInfo>;
+  pkgByFqn: Record<string, string>;
+} {
+  const modules: Record<string, ClassInfo> = {};
+  const pkgByFqn: Record<string, string> = {};
+  for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
     for (const [fqn, info] of Object.entries(pkg.modules) as [string, ClassInfo][]) {
-      out[fqn] = info;
+      modules[fqn] = info;
+      pkgByFqn[fqn] = pkgName;
     }
   }
-  return out;
+  return { modules, pkgByFqn };
 }
 
 function buildPackageReport(
@@ -490,6 +517,7 @@ function buildPackageReport(
   excludeGlobs: string[],
   globalRubyCandidates: Set<string>,
   crossPackageModules: Record<string, ClassInfo>,
+  crossPackagePkgByFqn: Record<string, string>,
   novelOnly: boolean,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
@@ -571,9 +599,11 @@ function buildPackageReport(
 
     const allowed = collectAllowedNames(
       entities,
+      pkg,
       rubyPkg.modules as Record<string, ClassInfo>,
       moduleFqnByShort,
       crossPackageModules,
+      crossPackagePkgByFqn,
     );
 
     const extras: ExtraName[] = [];
@@ -746,7 +776,8 @@ export function buildReport(
   },
 ): Report {
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
-  const crossPackageModules = buildCrossPackageModules(ruby);
+  const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
+    buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
   for (const pkg of Object.keys(ruby.packages)) {
@@ -760,6 +791,7 @@ export function buildReport(
         opts.excludeGlobs,
         globalRubyCandidates,
         crossPackageModules,
+        crossPackagePkgByFqn,
         opts.novelOnly,
       ),
     );
