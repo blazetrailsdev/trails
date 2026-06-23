@@ -90,8 +90,10 @@ positional-arg ranges diverge from the TS port for a documented reason (a Ruby
 alias/delegate the extractor reads as zero-arg, a porting-pattern artifact),
 not a real signature gap:
 
-- Rails aliases/delegates the method, so the Ruby extractor records it with zero positional params (the alias/delegate definition carries no signature) while the TS port spells the real signature it forwards to: `validates_size_of` is `alias_method :validates_size_of, :validates_length_of`; `match?` is `delegate :match?, to: :@name` (forwards to String#match?).
-  - `validates_size_of`, `match?`
+- `validates_size_of` is `alias_method :validates_size_of, :validates_length_of`, so the Ruby extractor records the alias with zero positional params (the alias definition carries no signature) while the TS port spells the real `(attribute, options)` signature it forwards to.
+  - `validates_size_of`
+- `match?` is `delegate :match?, to: :@name` (forwards to String#match?), so the Ruby extractor records the delegation with zero positional params while the TS port spells the real `(pattern)` signature.
+  - `match?`
 - Rails AttributeMethods compiles attribute accessors via a CodeGenerator that evals method-body strings; trails has no eval/code generation, so the port drops the `code_generator`/`parameters`/`call_args` and keyword args these helpers thread into the generated source and defines the method directly.
   - `define_proxy_call`, `define_call`
 - Static-host porting pattern (CLAUDE.md): these Rails instance/class methods are ported as free functions taking the host class explicitly as a leading `cls` param, so the TS arity is one higher than Rails. The receiver is the definitional self, not a real extra argument.

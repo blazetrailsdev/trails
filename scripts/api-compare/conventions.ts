@@ -224,13 +224,20 @@ export interface ArityOverrideGroup {
 export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
   {
     reason:
-      "Rails aliases/delegates the method, so the Ruby extractor records it with " +
-      "zero positional params (the alias/delegate definition carries no signature) " +
-      "while the TS port spells the real signature it forwards to: " +
-      "`validates_size_of` is `alias_method :validates_size_of, :validates_length_of`; " +
-      "`match?` is `delegate :match?, to: :@name` (forwards to String#match?).",
-    names: ["validates_size_of", "match?"],
-    rubyFiles: ["api.rb", "model.rb", "validations.rb", "validations/absence.rb", "naming.rb"],
+      "`validates_size_of` is `alias_method :validates_size_of, :validates_length_of`, " +
+      "so the Ruby extractor records the alias with zero positional params (the " +
+      "alias definition carries no signature) while the TS port spells the real " +
+      "`(attribute, options)` signature it forwards to.",
+    names: ["validates_size_of"],
+    rubyFiles: ["api.rb", "model.rb", "validations.rb", "validations/absence.rb"],
+  },
+  {
+    reason:
+      "`match?` is `delegate :match?, to: :@name` (forwards to String#match?), so the " +
+      "Ruby extractor records the delegation with zero positional params while the TS " +
+      "port spells the real `(pattern)` signature.",
+    names: ["match?"],
+    rubyFiles: ["naming.rb"],
   },
   {
     reason:
