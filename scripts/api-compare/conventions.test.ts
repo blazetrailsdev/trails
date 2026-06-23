@@ -6,7 +6,7 @@ import {
   SKIP,
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
-  ARITY_OVERRIDES,
+  isArityOverridden,
   ALREADY_PREDICATE_PREFIXES,
   explainConventions,
 } from "./conventions.js";
@@ -195,16 +195,21 @@ describe("ARITY_OVERRIDE_GROUPS", () => {
     expect(all.length).toBe(new Set(all).size);
   });
 
-  it("requires a non-empty reason and at least one name per group", () => {
+  it("requires a non-empty reason, name, and file scope per group", () => {
     for (const g of ARITY_OVERRIDE_GROUPS) {
       expect(g.reason.trim().length).toBeGreaterThan(0);
       expect(g.names.length).toBeGreaterThan(0);
+      expect(g.rubyFiles.length).toBeGreaterThan(0);
     }
   });
 
-  it("flattens every grouped name into the ARITY_OVERRIDES lookup set", () => {
+  it("suppresses each name only in its scoped Ruby files, never globally", () => {
     for (const g of ARITY_OVERRIDE_GROUPS) {
-      for (const name of g.names) expect(ARITY_OVERRIDES.has(name)).toBe(true);
+      for (const name of g.names) {
+        for (const file of g.rubyFiles) expect(isArityOverridden(name, file)).toBe(true);
+        // A name scoped to specific files is NOT overridden in an unrelated file.
+        expect(isArityOverridden(name, "some/other/unrelated.rb")).toBe(false);
+      }
     }
   });
 });

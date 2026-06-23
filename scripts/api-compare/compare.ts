@@ -58,7 +58,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
-import { ARITY_OVERRIDES, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { isArityOverridden, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
@@ -1314,7 +1314,7 @@ export function main() {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         checkCalls(rubyName, tsName, tsFile);
-        if (ARITY_OVERRIDES.has(rubyName)) return;
+        if (isArityOverridden(rubyName, rubyFile)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
         // match already confirms it exists and arity isn't meaningful here.
         if (rubyName.endsWith("=")) return;

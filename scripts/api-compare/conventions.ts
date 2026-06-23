@@ -203,11 +203,25 @@ export const SKIP_GROUPS: SkipGroup[] = [
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
 
 /**
- * Ruby method names whose arity is *intentionally* allowed to diverge from the
- * TS port; the advisory arity check (arity.ts) suppresses these. For documented
- * deliberate differences only, NOT to silence real gaps. Seeded empty.
+ * A group of Ruby method names whose arity is *intentionally* allowed to diverge
+ * from the TS port. Like {@link SkipGroup} but scoped: `rubyFiles` restricts the
+ * override to the Ruby source files (path relative to the package lib root, as
+ * emitted in arity-mismatches.json) where the divergence is documented. Scoping
+ * is mandatory so a generic name (`match?`, `parse_float`) suppressed for one
+ * package can't silence a real gap in another that happens to share the name.
  */
-export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
+export interface ArityOverrideGroup {
+  reason: string;
+  names: string[];
+  rubyFiles: string[];
+}
+
+/**
+ * Ruby method+file pairs whose arity is *intentionally* allowed to diverge from
+ * the TS port; the advisory arity check (compare.ts) suppresses these. For
+ * documented deliberate differences only, NOT to silence real gaps.
+ */
+export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
   {
     reason:
       "Rails aliases/delegates the method, so the Ruby extractor records it with " +
@@ -216,6 +230,7 @@ export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
       "`validates_size_of` is `alias_method :validates_size_of, :validates_length_of`; " +
       "`match?` is `delegate :match?, to: :@name` (forwards to String#match?).",
     names: ["validates_size_of", "match?"],
+    rubyFiles: ["api.rb", "model.rb", "validations.rb", "validations/absence.rb", "naming.rb"],
   },
   {
     reason:
@@ -224,6 +239,7 @@ export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
       "drops the `code_generator`/`parameters`/`call_args` and keyword args these " +
       "helpers thread into the generated source and defines the method directly.",
     names: ["define_proxy_call", "define_call"],
+    rubyFiles: ["attribute_methods.rb"],
   },
   {
     reason:
@@ -232,6 +248,7 @@ export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
       "`cls` param, so the TS arity is one higher than Rails. The receiver is the " +
       "definitional self, not a real extra argument.",
     names: ["apply_pending_attribute_modifications", "reset_default_attributes"],
+    rubyFiles: ["attribute_registration.rb"],
   },
   {
     reason:
@@ -240,10 +257,24 @@ export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [
       "type member; the by-name candidate pool only sees the zero-arg `declare` " +
       "form, not the implementation's arity.",
     names: ["parse_float"],
+    rubyFiles: ["validations/numericality.rb"],
   },
 ];
 
-export const ARITY_OVERRIDES = new Set<string>(ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names));
+/** Map of overridden Ruby method name → the set of Ruby files it's overridden in. */
+const ARITY_OVERRIDE_FILES = new Map<string, Set<string>>();
+for (const g of ARITY_OVERRIDE_GROUPS) {
+  for (const name of g.names) {
+    const files = ARITY_OVERRIDE_FILES.get(name) ?? new Set<string>();
+    for (const f of g.rubyFiles) files.add(f);
+    ARITY_OVERRIDE_FILES.set(name, files);
+  }
+}
+
+/** True when the advisory arity check should skip this Ruby method in this file. */
+export function isArityOverridden(rubyName: string, rubyFile: string): boolean {
+  return ARITY_OVERRIDE_FILES.get(rubyName)?.has(rubyFile) ?? false;
+}
 
 /**
  * Camel-prefixes that are *already* predicates, so the bare camel form is the
