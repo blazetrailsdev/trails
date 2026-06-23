@@ -142,7 +142,13 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   // which the bare `loadSchema` cache-sync path does not reliably do for
   // dynamically-defined / STI models. A genuinely tableless model reflects
   // nothing and falls through to the attribute-synthesized view as before.
-  if (!this._schemaLoaded && !this.abstractClass && this.tableName) {
+  //
+  // Done before the cache check (not only on miss): when the cache warms between
+  // a cold first build and a later read, the reflection here re-reconciles the
+  // definitions and invalidates the stale set, so the rebuilt one carries the
+  // real columns. `columnsHash` is a cache read once reflected, so the per-call
+  // cost is negligible.
+  if (!this.abstractClass && this.tableName) {
     try {
       this.columnsHash();
     } catch {
