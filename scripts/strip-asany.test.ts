@@ -6,8 +6,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { findCandidateCasts, removeCast } from "./strip-asany.js";
+import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
+import { findCandidateCasts, removeCast, applyCasts, stripFile } from "./strip-asany.js";
 
 const FIXTURE = resolve(import.meta.dirname, "__fixtures__", "strip-asany-fixture.ts");
 const fixtureText = readFileSync(FIXTURE, "utf8");
@@ -68,10 +70,7 @@ describe("removeCast", () => {
 
   it("removes only the targeted casts when applied end-to-start", () => {
     const spans = findCandidateCasts(fixtureText).sort((a, b) => b.start - a.start);
-    let out = fixtureText;
-    for (const span of spans) {
-      out = removeCast(out, span);
-    }
+    const out = applyCasts(fixtureText, spans);
     expect(out).toContain("sink(thing.id);");
     expect(out).toContain("sink(getThing().name);");
     expect(out).toContain("sink((a + b).toFixed);");
@@ -80,5 +79,118 @@ describe("removeCast", () => {
     expect(out).toContain("sink((thing as any)._privateField);");
     expect(out).toContain("sink((thing as any[]).length);");
     expect(out).toContain("sink(thing as any);");
+  });
+});
+
+describe("stripFile (batch-then-bisect)", () => {
+  // Four `(x as any).m` casts; the verifier rejects any text in which the
+  // load-bearing `.keep` cast was removed, accepting every other combination.
+  // The .keep removal turns `(x as any).keep` into `x.keep`.
+  const source = [
+    "sink((a as any).one);",
+    "sink((b as any).keep);",
+    "sink((c as any).two);",
+    "sink((d as any).three);",
+    "",
+  ].join("\n");
+
+  async function withTempFile<T>(text: string, fn: (file: string) => Promise<T>): Promise<T> {
+    const dir = await mkdtemp(join(tmpdir(), "strip-asany-"));
+    const file = join(dir, "input.ts");
+    await writeFile(file, text);
+    try {
+      return await fn(file);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("removes every candidate in one build when all are gratuitous", async () => {
+    await withTempFile(source, async (file) => {
+      let builds = 0;
+      const verify: (text: string) => Promise<boolean> = async (text) => {
+        builds += 1;
+        await writeFile(file, text);
+        return true;
+      };
+      const result = await stripFile(file, verify);
+      expect(result.candidates).toBe(4);
+      expect(result.removed).toBe(4);
+      expect(result.kept).toBe(0);
+      expect(builds).toBe(1);
+      expect(await readFile(file, "utf8")).not.toContain("as any");
+    });
+  });
+
+  it("bisects a failing batch to isolate and revert the load-bearing cast", async () => {
+    await withTempFile(source, async (file) => {
+      const verify: (text: string) => Promise<boolean> = async (text) => {
+        await writeFile(file, text);
+        return text.includes("(b as any).keep");
+      };
+      const result = await stripFile(file, verify);
+      expect(result.candidates).toBe(4);
+      expect(result.removed).toBe(3);
+      expect(result.kept).toBe(1);
+
+      const final = await readFile(file, "utf8");
+      expect(final).toContain("(b as any).keep");
+      expect(final).toContain("sink(a.one);");
+      expect(final).toContain("sink(c.two);");
+      expect(final).toContain("sink(d.three);");
+    });
+  });
+
+  it("isolates multiple non-adjacent load-bearing casts in one file", async () => {
+    // `.keep` (idx 1) and `.hold` (idx 4) are both load-bearing and sit in
+    // different bisect halves, so the recursion must split both ways.
+    const text = [
+      "sink((a as any).one);",
+      "sink((b as any).keep);",
+      "sink((c as any).two);",
+      "sink((d as any).three);",
+      "sink((e as any).hold);",
+      "sink((f as any).four);",
+      "",
+    ].join("\n");
+    await withTempFile(text, async (file) => {
+      const verify: (t: string) => Promise<boolean> = async (t) => {
+        await writeFile(file, t);
+        return t.includes("(b as any).keep") && t.includes("(e as any).hold");
+      };
+      const result = await stripFile(file, verify);
+      expect(result.candidates).toBe(6);
+      expect(result.removed).toBe(4);
+      expect(result.kept).toBe(2);
+
+      const final = await readFile(file, "utf8");
+      expect(final).toContain("(b as any).keep");
+      expect(final).toContain("(e as any).hold");
+      for (const removed of ["a.one", "c.two", "d.three", "f.four"]) {
+        expect(final).toContain(`sink(${removed});`);
+      }
+    });
+  });
+
+  it("reverts the same span the per-cast loop would for a mutually-exclusive pair", async () => {
+    // Two casts that are each individually removable but fail together (green
+    // iff at least one `as any` survives). The old descending per-cast loop
+    // processes the higher-offset span first and keeps it, reverting the
+    // lower-offset one; batch-bisect must make the identical choice.
+    const text = ["sink((a as any).id);", "sink((b as any).id);", ""].join("\n");
+    await withTempFile(text, async (file) => {
+      const verify: (t: string) => Promise<boolean> = async (t) => {
+        await writeFile(file, t);
+        return t.includes("as any");
+      };
+      const result = await stripFile(file, verify);
+      expect(result.removed).toBe(1);
+      expect(result.kept).toBe(1);
+
+      const final = await readFile(file, "utf8");
+      // Lower-offset span (line 1) reverted; higher-offset span (line 2) removed.
+      expect(final).toContain("sink((a as any).id);");
+      expect(final).toContain("sink(b.id);");
+    });
   });
 });
