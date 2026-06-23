@@ -3608,7 +3608,7 @@ describe("RelationTest", () => {
     expect(User.where({}).distinct().distinctValue).toBe(true);
   });
 
-  it("whereValues returns where clause hashes", () => {
+  it("whereClause returns the WhereClause", () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -3616,7 +3616,7 @@ describe("RelationTest", () => {
       }
     }
     const rel = User.where({ name: "Alice" });
-    expect(rel.whereValues).toEqual([{ name: "Alice" }]);
+    expect(rel.whereClause.toH("users")).toEqual({ name: "Alice" });
   });
 });
 

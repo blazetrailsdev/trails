@@ -4285,13 +4285,15 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return the WHERE clause hashes.
+   * Return the WHERE clause.
    *
-   * Mirrors: ActiveRecord::Relation#where_clause
+   * Mirrors: ActiveRecord::Relation#where_clause — `query_methods.rb` defines
+   * this via `VALUE_METHODS.each` over `CLAUSE_METHODS`, so it reads the stored
+   * `WhereClause` object (not a `*_values` array). Use `whereValuesHash` for
+   * the equality-condition hash.
    */
-  get whereValues(): Array<Record<string, unknown>> {
-    const h = this._whereClause.toH(this._modelClass.tableName);
-    return Object.keys(h).length > 0 ? [h] : [];
+  get whereClause(): WhereClause {
+    return this._whereClause;
   }
 
   // -- Collection convenience methods --
