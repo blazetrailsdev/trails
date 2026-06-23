@@ -3198,37 +3198,9 @@ export class Base extends Model {
         isAutoIncrementedByDb?(): boolean;
       }[];
       const colNames = new Set(insertCols.map((c) => c.name));
-      let autoIncColumn = insertCols.find(
+      const autoIncColumn = insertCols.find(
         (c) => typeof c.isAutoIncrementedByDb === "function" && c.isAutoIncrementedByDb(),
       )?.name;
-      // The sync `columns()` returns synthesized plain shapes (no
-      // `isAutoIncrementedByDb`) on a cold schema cache — common when a sibling
-      // test invalidated it (RFC 0031 schema-warm). Reflect READ-ONLY from the
-      // adapter to recover the auto-increment column. We deliberately do NOT call
-      // `loadSchemaFromAdapter`/`loadSchema`: those run `applyColumnsHash`, which
-      // reconciles reflected columns into the model's attribute definitions and
-      // would clobber reflection-typed attributes (e.g. a float `temperature`
-      // would lose its cast type mid-suite). `connection.columns` only queries the
-      // DB and returns Column objects, with no attribute-definition side effects.
-      if (
-        autoIncColumn === undefined &&
-        !insertCols.some((c) => typeof c.isAutoIncrementedByDb === "function") &&
-        typeof (adapter as any).columns === "function"
-      ) {
-        const reflectedCols = (await (adapter as any).columns(ctor.tableName)) as {
-          name: string;
-          isAutoIncrementedByDb?(): boolean;
-        }[];
-        // Rebuild (not union) colNames from the authoritative reflected set: the
-        // synthesized `columns()` is derived from `_attributeDefinitions`, so a
-        // model that declares an attribute with no backing DB column would leave a
-        // phantom name in colNames that the `insertPk`/`writeTargets` existence
-        // filters must not treat as real (e.g. an id-less table must not yield
-        // `insertPk="id"` → `RETURNING "id"`).
-        colNames.clear();
-        for (const c of reflectedCols) colNames.add(c.name);
-        autoIncColumn = reflectedCols.find((c) => c.isAutoIncrementedByDb?.())?.name;
-      }
       const pkArr = Array.isArray(ctor.primaryKey)
         ? ctor.primaryKey
         : ctor.primaryKey
