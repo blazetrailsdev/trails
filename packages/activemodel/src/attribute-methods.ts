@@ -40,11 +40,13 @@ export class MissingAttributeError extends globalThis.Error {
 // `:attribute_method_patterns` in the `included do` block, which surfaces a
 // reader / `=` writer / `?` predicate triple. trails already holds this state
 // under `_attributeAliases` (a `{ alias => original }` hash) and
-// `_attributeMethodPatterns` (an array seeded with a bare AttributeMethodPattern,
-// mirroring the `[ AttributeMethodPattern.new ]` default); these accessors
-// expose it under the Rails names. The reader and writer share a tsName, so a
-// single live-state reader satisfies both — assigning through the returned
-// reference mutates the same class state the writer would.
+// `_attributeMethodPatterns` (an array), maintained subclass-locally by the
+// existing copy-on-write helpers (`ensureOwnAliases` / `ensureOwnPatterns`).
+// These accessors expose that state under the Rails names. The write path is
+// the public `alias_attribute` / `attribute_method_*` API (which Rails itself
+// uses — `attribute_aliases=` is never called by user code); the bare `=`
+// writers have no caller, so we expose only the reader and predicate rather
+// than a dead bespoke setter.
 // ---------------------------------------------------------------------------
 
 /** Mirrors: ClassMethods#attribute_aliases (class_attribute reader/writer). */
@@ -166,13 +168,22 @@ export function attributeMissing(
 
 /**
  * Mirrors: #respond_to_without_attributes? — the alias Rails captures for the
- * pre-attribute-methods `respond_to?` (attribute_methods.rb aliases
- * `respond_to_without_attributes?` to the original `respond_to?`). trails has no
- * `method_missing`, so generated attribute methods are real prototype
- * properties; the "without attributes" view is therefore plain method presence.
+ * original `respond_to?` before overriding it (attribute_methods.rb:527-528,
+ * `alias :respond_to_without_attributes? :respond_to?`). It keeps the
+ * `respond_to?(method, include_private_methods = false)` signature and answers
+ * whether the receiver responds to `method` at all — including attribute
+ * accessors exposed as getter/setter properties, not just plain functions. The
+ * `in` check mirrors Ruby `respond_to?` across the prototype chain; trails has
+ * no Ruby-private methods, so `includePrivateMethods` is accepted for signature
+ * fidelity but does not change the answer.
  */
-export function isRespondToWithoutAttributes(this: object, method: string): boolean {
-  return typeof (this as Record<string, unknown>)[method] === "function";
+export function isRespondToWithoutAttributes(
+  this: object,
+  method: string,
+  includePrivateMethods: boolean = false,
+): boolean {
+  void includePrivateMethods;
+  return method in (this as Record<string, unknown>);
 }
 
 /** @internal Rails-private helper. Mirrors: #attribute_method? */
