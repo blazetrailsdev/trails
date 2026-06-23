@@ -3064,7 +3064,7 @@ export class Base extends Model {
     this._instanceRecordTimestamps = value;
   }
 
-  private _performInsert(): void {
+  private _performInsert(attributeNames?: string[]): void {
     const ctor = this.constructor as typeof Base;
 
     // If suppressed, skip the actual insert but update record state
@@ -3097,8 +3097,9 @@ export class Base extends Model {
     // Initialize the locking column from its schema default so a new record's
     // lock value is never nil at insert time. Rails reflects the column
     // (default 0) into every new record's attributes at class load, so the
-    // unconditional union in attributesForCreate (Locking::Optimistic#_create_record,
-    // optimistic.rb:78-82, added by #3788) always carries a concrete value.
+    // unconditional union threaded by LockingOptimistic._createRecord
+    // (Locking::Optimistic#_create_record, optimistic.rb:78-82) below always
+    // carries a concrete value.
     // trails loads schema lazily, so a record built before the column was
     // reflected (e.g. a model `new`'d before its first schema load) has no
     // locking attribute at all — the union would then add the column name but
@@ -3116,9 +3117,40 @@ export class Base extends Model {
     }
 
     const attrs = this._attributes.valuesForDatabase();
-    // Rails: attribute_names = attributes_for_create(self.attribute_names)
-    const allNames = Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
-    const columns = _attributesForCreate.call(this, allNames);
+    // Rails create super chain, threading attribute_names down to
+    // attributes_for_create. The default (self.attribute_names) is the set of
+    // declared columns present in the value map; an explicit `attributeNames`
+    // arg overrides it (Persistence#_create_record(attribute_names)).
+    const selfNames =
+      attributeNames ?? Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
+    // Rails AttributeMethods::Dirty#_create_record default arg:
+    // attribute_names_for_partial_inserts (dirty.rb). The dirty set is populated
+    // before the INSERT by reinstateNewRecordChanges (callbacks.ts _createRecord),
+    // so for a new record changedAttributeNamesToSave holds the attrs assigned
+    // away from their schema defaults — exactly as Rails' construction-time dirty.
+    let names: string[];
+    if (ctor.partialInserts) {
+      const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
+      names = changed ?? selfNames;
+    } else {
+      names = selfNames.filter((name) => {
+        const col = (ctor as any).columnForAttribute?.(name);
+        const autoPopulated = col?.isAutoPopulated?.() ?? col?.defaultFunction != null;
+        return !(autoPopulated && !(this as any).attributeChanged?.(name));
+      });
+    }
+    // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
+    // — "We always want to persist the locking version, even if we don't detect a
+    // change from the default, since the database might have no default." Threaded
+    // through the dead-no-longer mirror so the union lives in the locking layer
+    // (optimistic.rb), not in the generic attributes_for_create.
+    names = LockingOptimistic._createRecord.call(
+      this as any,
+      names,
+      (n: string[]) => n,
+    ) as string[];
+    // Rails Persistence#attributes_for_create: & column_names, drop nil pk, drop virtual.
+    const columns = _attributesForCreate.call(this, names);
     const values: unknown[] = columns.map((k) => attrs[k]);
 
     let sql: string;
