@@ -1,6 +1,4 @@
 [
-  "packages/activerecord/src/associations.test.ts::Post::belongsTo::author",
-  "packages/activerecord/src/associations.test.ts::Post::belongsTo::tag",
   "packages/activerecord/src/associations/association-scope-alias-tracker.test.ts::AtUser::hasMany::children",
   "packages/activerecord/src/associations/association-scope-alias-tracker.test.ts::AtUser::hasMany::grandchildren",
   "packages/activerecord/src/associations/association-scope-cache.test.ts::CacheAuthor::hasMany::cacheCommentsDj",
