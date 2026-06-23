@@ -1824,7 +1824,13 @@ function symbolToName(s: symbol): string {
 export function columnReferences(orderArgs: unknown[]): string[] {
   const refs: string[] = [];
   for (const arg of orderArgs) {
-    if (typeof arg === "string" || typeof arg === "symbol") {
+    if (Array.isArray(arg)) {
+      // `order([...])` passes a single array; Rails splats order args, so flatten
+      // here too — otherwise a qualified column inside the array (e.g.
+      // `order(["comments.body", ...])`) never registers its table reference and
+      // an `includes` it names is not promoted to `eager_load`.
+      refs.push(...columnReferences(arg));
+    } else if (typeof arg === "string" || typeof arg === "symbol") {
       const term = typeof arg === "symbol" ? symbolToName(arg) : arg;
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);

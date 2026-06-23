@@ -2828,6 +2828,29 @@ export class Relation<T extends Base> {
     specs: AssociationSpec[],
     references: string[] = [],
   ): AssociationSpec[] {
+    // Seed the JoinDependency's construction alias tracker with the tables the
+    // manual `joins(...)` buckets emit (excluding the includes ∩ joins
+    // intersection, which intentionally shares one un-aliased table). Mirrors
+    // Rails' single `build_joins` alias_tracker: a through-association
+    // intermediate landing on a manually-joined table then collides at
+    // construction and aliases to its `alias_candidate`
+    // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`),
+    // instead of emitting a second un-aliased `posts` (ambiguous column).
+    // Exclude a manual join whose association is itself eager-loaded by the same
+    // path: `joins(:x).eager_load(:x)` is deduped to a single join (Rails `walk`),
+    // not aliased, so it must not be seeded as a collision. Compared by
+    // association name (not table) so a through-association's intermediate tables
+    // — which legitimately collide with a manual join — are still seeded.
+    const eagerNames = new Set(specs.filter((s): s is string => typeof s === "string"));
+    const joinedIncludes = this._joinedIncludesTables();
+    const seedTables = [
+      ...this._namedInnerJoins
+        .filter((v): v is string => typeof v === "string" && !eagerNames.has(v))
+        .flatMap((v) => this._resolveAssocTables([v])),
+      ...this._joinClauses.map((j) => j.table.toLowerCase()),
+    ].filter((t) => !joinedIncludes.has(t));
+    if (seedTables.length > 0) jd.seedConstructionTables(seedTables);
+
     const fallbackAssocs: AssociationSpec[] = [];
     for (const spec of specs) {
       if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);
