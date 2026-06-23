@@ -706,12 +706,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Exposed as a static so tests and external callers can build their
    * own type_map without instantiating the adapter.
    *
-   * Param is typed as the base `TypeMap` to keep the static override sound
-   * (a narrower `HashLookupTypeMap` param would be a contravariant violation);
-   * runtime callers always pass a HashLookupTypeMap, which the PG seeder needs.
+   * Param is the base `TypeMap`, matching the override target
+   * `AbstractAdapter.initializeTypeMap`. In Rails `HashLookupTypeMap` and
+   * `TypeMap` are deliberately-duplicated standalone classes (neither extends
+   * the other — see type/hash_lookup_type_map.rb), so they are nominally
+   * unrelated here too and the seeder needs the `HashLookupTypeMap` surface
+   * (string|number keys + `(fmod, sql_type)` varargs fetch). An `instanceof`
+   * guard narrows soundly to that type — no cast — mirroring Ruby's implicit
+   * assumption that PG always builds its type_map as a HashLookupTypeMap.
    */
   static initializeTypeMap(m: TypeMap): void {
-    staticInitializeTypeMap(m as unknown as HashLookupTypeMap);
+    if (!(m instanceof HashLookupTypeMap)) {
+      throw new TypeError("initializeTypeMap expects a HashLookupTypeMap");
+    }
+    staticInitializeTypeMap(m);
   }
 
   /**
