@@ -2,25 +2,23 @@ import { describe, expect, it } from "vitest";
 import { createAssociationCache } from "./association-cache.js";
 
 describe("association cache fold", () => {
-  it("exposes three independent facets over one backing store", () => {
+  it("exposes independent facets over one backing store", () => {
     const cache = createAssociationCache();
     cache.instances.set("posts", { kind: "instance" });
     cache.proxies.set("posts", { kind: "proxy" });
-    cache.preloaded.set("posts", { kind: "preloaded" });
 
     // One backing slot per name.
     expect(cache.store.size).toBe(1);
     expect(cache.instances.get("posts")).toEqual({ kind: "instance" });
     expect(cache.proxies.get("posts")).toEqual({ kind: "proxy" });
-    expect(cache.preloaded.get("posts")).toEqual({ kind: "preloaded" });
   });
 
-  it("distinguishes a preloaded-nil from absent", () => {
+  it("distinguishes a nil facet value from absent", () => {
     const cache = createAssociationCache();
-    cache.preloaded.set("author", null);
-    expect(cache.preloaded.has("author")).toBe(true);
-    expect(cache.preloaded.get("author")).toBeNull();
-    expect(cache.preloaded.has("editor")).toBe(false);
+    cache.instances.set("author", null);
+    expect(cache.instances.has("author")).toBe(true);
+    expect(cache.instances.get("author")).toBeNull();
+    expect(cache.instances.has("editor")).toBe(false);
   });
 
   it("facet has/get/delete scope to that facet only", () => {
@@ -38,12 +36,10 @@ describe("association cache fold", () => {
     const cache = createAssociationCache();
     cache.instances.set("a", 1);
     cache.proxies.set("b", 2);
-    cache.preloaded.set("c", null);
     cache.clear();
     expect(cache.store.size).toBe(0);
     expect(cache.instances.has("a")).toBe(false);
     expect(cache.proxies.has("b")).toBe(false);
-    expect(cache.preloaded.has("c")).toBe(false);
   });
 
   it("iterates keys/entries/values for its facet", () => {

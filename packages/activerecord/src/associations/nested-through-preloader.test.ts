@@ -155,7 +155,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const loaded = (await NtdAuthor.all().includes("ntdAllRatings").toArray()) as any[];
     const author = loaded.find((row) => row.id === a.id);
     expect(author).toBeDefined();
-    const preloaded = author._preloadedAssociations?.get("ntdAllRatings") as any[];
+    const preloaded = author.association("ntdAllRatings").target as any[];
     expect(preloaded).toBeDefined();
     expect(preloaded.map((r: any) => r.id).sort()).toEqual([r1.id, r2.id, r3.id].sort());
   });
@@ -164,7 +164,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const { a, c1, c2, c3 } = await seed();
     const loaded = (await NtdAuthor.all().includes("ntdAllComments").toArray()) as any[];
     const author = loaded.find((row) => row.id === a.id);
-    const preloaded = author._preloadedAssociations?.get("ntdAllComments") as any[];
+    const preloaded = author.association("ntdAllComments").target as any[];
     expect(preloaded.map((c: any) => c.id).sort()).toEqual([c1.id, c2.id, c3.id].sort());
   });
 
@@ -176,7 +176,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
       .toArray()) as any[];
     const author = loaded.find((row) => row.id === a.id);
     expect(author).toBeDefined();
-    const preloaded = author._preloadedAssociations?.get("ntdAllRatings") as any[];
+    const preloaded = author.association("ntdAllRatings").target as any[];
     // Filtering the outer relation must not silently drop preloaded
     // targets, introduce duplicates, or leak stray rows.
     expect(preloaded.map((r: any) => r.id).sort()).toEqual([r1.id, r2.id, r3.id].sort());
@@ -233,7 +233,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
       .includes("ntdAllRatings")
       .where({ id: a.id })
       .toArray()) as any[];
-    const preloaded = loaded[0]._preloadedAssociations?.get("ntdAllRatings") as any[];
+    const preloaded = loaded[0].association("ntdAllRatings").target as any[];
     expect(preloaded.length).toBe(1);
     expect(preloaded[0].constructor).toBe(NtdHighRating);
   });

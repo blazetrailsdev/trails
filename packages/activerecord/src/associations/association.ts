@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { resolveModel } from "../associations.js";
+import { resolveModel, _preloadedHolderTarget } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
@@ -424,8 +424,9 @@ export class Association {
     if (cached !== undefined) {
       return cached.target as Base | Base[] | null;
     }
-    if (owner._preloadedAssociations.has(name)) {
-      return owner._preloadedAssociations.get(name) as Base | Base[] | null;
+    const preloaded = _preloadedHolderTarget(owner, name);
+    if (preloaded) {
+      return preloaded.value;
     }
     return undefined;
   }

@@ -223,7 +223,6 @@ export class Association {
           if (i === 0) {
             association.setInverseInstance(record);
           }
-          (owner as any)._preloadedAssociations.set(this.reflection.name, record);
         } catch {
           // Ignore
         }
@@ -251,13 +250,6 @@ export class Association {
       association.setTarget(value);
     }
     association._loadedFromPreload = true;
-
-    // Shadow-map bridge: the `_preloadedAssociations` shadow `Map` is now
-    // write-only — every reader routes through the holder's
-    // `isLoaded()`/`_loadedFromPreload`/`target` (RFC 0022). Dropping the
-    // remaining writes and the field itself is the follow-up story
-    // `remove-preloaded-associations-shadow-map`.
-    (owner as any)._preloadedAssociations.set(this.reflection.name, value);
 
     // Route through `reflection.inverseName()` so automatic inverse detection
     // (via `automaticInverseOf()`, made functional by C1) fires for non-rich

@@ -499,7 +499,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await Membership.create({ member_id: member.id, club_id: club.id });
     const members = await Member.all().includes("club").toArray();
     expect(members).toHaveLength(1);
-    const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
+    const preloaded = (members[0] as any).association("club").target;
     expect(preloaded).not.toBeNull();
     expect(preloaded?.name).toBe("Eager Club");
   });
@@ -549,7 +549,7 @@ describe("HasOneThroughAssociationsTest", () => {
     });
     const members = await HotepMember.all().includes("sponsorClub").toArray();
     expect(members).toHaveLength(1);
-    const preloaded = (members[0] as any)._preloadedAssociations?.get("sponsorClub");
+    const preloaded = (members[0] as any).association("sponsorClub").target;
     expect(preloaded).not.toBeNull();
     expect(preloaded?.name).toBe("Polymorphic Eager Club");
   });
@@ -805,14 +805,14 @@ describe("HasOneThroughAssociationsTest", () => {
     const memberClubLoaded = byId.get(memberClub.id);
     const orgClubLoaded = byId.get(orgClub.id);
 
-    const preloaded = memberClubLoaded._preloadedAssociations?.get("sponsoredMember");
+    const preloaded = memberClubLoaded.association("sponsoredMember").target;
     expect(preloaded).toBeDefined();
     expect(preloaded).not.toBeNull();
     expect(preloaded.name).toBe("Groucho");
 
     // org-sponsored club must have a nil preloaded entry (key present, value null)
-    expect(orgClubLoaded._preloadedAssociations?.has("sponsoredMember")).toBe(true);
-    expect(orgClubLoaded._preloadedAssociations?.get("sponsoredMember")).toBeNull();
+    expect(orgClubLoaded.association("sponsoredMember").isLoaded()).toBe(true);
+    expect(orgClubLoaded.association("sponsoredMember").target).toBeNull();
   });
 
   it("has one through nonpreload eagerloading", async () => {
@@ -1094,7 +1094,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await Membership.create({ member_id: member.id, club_id: club.id });
     const members = await Member.all().includes("club").toArray();
     expect(members).toHaveLength(1);
-    const preloaded = (members[0] as any)._preloadedAssociations?.get("club");
+    const preloaded = (members[0] as any).association("club").target;
     expect(preloaded).not.toBeNull();
     expect(preloaded?.name).toBe("Preload Club");
   });

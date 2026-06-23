@@ -96,8 +96,7 @@ export class Batch {
     for (const record of branch.sourceRecords) {
       if (coveredRecords.has(record)) continue;
       // Record a preloaded-nil default on the real holder so readers gating on
-      // `holder.isLoaded() && _loadedFromPreload` see it (RFC 0022). Mirror it
-      // into the legacy shadow `Map` for the not-yet-migrated writers.
+      // `holder.isLoaded() && _loadedFromPreload` see it (RFC 0022).
       //
       // `association(branch.association)` throws only for a record whose class
       // does not declare `branch.association` — exactly the
@@ -115,9 +114,6 @@ export class Batch {
         }
       } catch {
         // Association not declared on this record's class (see above).
-      }
-      if (!(record as any)._preloadedAssociations.has(branch.association)) {
-        (record as any)._preloadedAssociations.set(branch.association, null);
       }
     }
   }

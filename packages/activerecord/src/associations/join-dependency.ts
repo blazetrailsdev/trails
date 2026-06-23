@@ -1315,18 +1315,6 @@ export class JoinDependency {
       if (id != null) nodeCache.set(id, model);
     }
 
-    const isCollection = node.assocType === "hasMany";
-    if (!record._preloadedAssociations) {
-      record._preloadedAssociations = new Map();
-    }
-    if (isCollection) {
-      if (!record._preloadedAssociations.has(node.immediateAssocName)) {
-        record._preloadedAssociations.set(node.immediateAssocName, []);
-      }
-    } else {
-      record._preloadedAssociations.set(node.immediateAssocName, model);
-    }
-
     this._wireAssociationProxy(record, node, model);
 
     if (node.isReadonly()) model._readonly = true;
@@ -1400,12 +1388,6 @@ export class JoinDependency {
       proxy.target = [];
       proxy.loadedBang?.();
       proxy._loadedFromPreload = true;
-      if (!parent._preloadedAssociations) {
-        parent._preloadedAssociations = new Map();
-      }
-      if (!parent._preloadedAssociations.has(node.immediateAssocName)) {
-        parent._preloadedAssociations.set(node.immediateAssocName, []);
-      }
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }

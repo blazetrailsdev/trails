@@ -868,7 +868,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await PsCurrentMembership.create({ ps_club_id: club.id, ps_member_id: member2.id });
 
     const clubs = await PsClub.all().includes("members").toArray();
-    const members = (clubs[0] as any)._preloadedAssociations.get("members");
+    const members = (clubs[0] as any).association("members").target;
     expect(members).toHaveLength(2);
     const names = members.map((m: any) => m.name).sort();
     expect(names).toEqual(["Aaron", "Cat"]);
@@ -911,8 +911,8 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(parents).toHaveLength(2);
     const pa = parents.find((p: any) => p.name === "A")!;
     const pb = parents.find((p: any) => p.name === "B")!;
-    expect((pa as any)._preloadedAssociations.get("preloadMultiChildren")).toHaveLength(2);
-    expect((pb as any)._preloadedAssociations.get("preloadMultiChildren")).toHaveLength(1);
+    expect((pa as any).association("preloadMultiChildren").target).toHaveLength(2);
+    expect((pb as any).association("preloadMultiChildren").target).toHaveLength(1);
   });
   it("singleton has many through", async () => {
     class HmtSingletonOwner extends Base {
@@ -3662,8 +3662,8 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     const ids = items.map((i: any) => i.id);
     expect(ids).toHaveLength(2);
-    // Verify _preloadedAssociations was not set on owner
-    expect((owner as any)._preloadedAssociations?.get("hmtIdsCondItems")).toBeUndefined();
+    // Verify the holder was not populated on owner
+    expect((owner as any).association("hmtIdsCondItems").isLoaded()).toBe(false);
   });
 
   it("get ids for loaded associations", async () => {
@@ -3715,7 +3715,7 @@ describe("HasManyThroughAssociationsTest", () => {
       hmt_unload_group_id: group.id,
     });
 
-    // Loading via loadHasMany should return the members without pre-populating _preloadedAssociations
+    // Loading via loadHasMany should return the members without pre-populating the holder
     const members = await loadHasMany(group, "hmtUnloadMembers", {
       className: "HmtUnloadMember",
       foreignKey: "hmt_unload_group_id",

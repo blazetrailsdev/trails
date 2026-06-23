@@ -1580,7 +1580,7 @@ describe("BelongsToAssociationsTest", () => {
     await EagerPkAccount.create({ company_id: company.id });
     const accounts = await EagerPkAccount.all().includes("eagerPkCompany").toArray();
     expect(accounts).toHaveLength(1);
-    const preloaded = (accounts[0] as any)._preloadedAssociations?.get("eagerPkCompany");
+    const preloaded = (accounts[0] as any).association("eagerPkCompany").target;
     expect(preloaded).not.toBeNull();
     expect(preloaded?.name).toBe("Eager Co");
   });
@@ -1605,7 +1605,7 @@ describe("BelongsToAssociationsTest", () => {
     await EagerSymAccount.create({ company_id: company.id });
     const accounts = await EagerSymAccount.all().includes("eagerSymCompany").toArray();
     expect(accounts).toHaveLength(1);
-    const preloaded = (accounts[0] as any)._preloadedAssociations?.get("eagerSymCompany");
+    const preloaded = (accounts[0] as any).association("eagerSymCompany").target;
     expect(preloaded).not.toBeNull();
   });
   it("creating the belonging object with primary key", async () => {

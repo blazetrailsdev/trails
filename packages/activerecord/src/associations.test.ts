@@ -618,7 +618,7 @@ describe("PreloaderTest", () => {
       associations: ["comments"],
       scope: Comment.where({ body: "Thank you for the welcome" }),
     }).call();
-    const loaded = (post as any)._preloadedAssociations.get("comments");
+    const loaded = (post as any).association("comments").target;
     expect(loaded).toHaveLength(1);
     expect(loaded[0].body).toBe("Thank you for the welcome");
   });
@@ -646,7 +646,7 @@ describe("PreloaderTest", () => {
     );
     const preloaded = (relation as any)._records;
     expect(preloaded).toHaveLength(1);
-    expect(preloaded[0]._preloadedAssociations.has("comments")).toBe(true);
+    expect(preloaded[0].association("comments").isLoaded()).toBe(true);
     expect(sqls).toHaveLength(2);
   });
 
@@ -677,7 +677,7 @@ describe("PreloaderTest", () => {
     await new Preloader({ records: [post], associations: ["comments"] }).call();
     // Preload again on the same record — a naive concat-on-top would double the count
     await new Preloader({ records: [post], associations: ["comments"] }).call();
-    const loaded = (post as any)._preloadedAssociations.get("comments");
+    const loaded = (post as any).association("comments").target;
     expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
   });
 
@@ -694,7 +694,7 @@ describe("PreloaderTest", () => {
     const specialCat = await SpecialCategory.create({ name: "Special" });
     await CategoryPost.create({ category_id: specialCat.id, post_id: post.id });
     await new Preloader({ records: [post], associations: ["hmtSpecialCategories"] }).call();
-    const loaded = (post as any)._preloadedAssociations.get("hmtSpecialCategories");
+    const loaded = (post as any).association("hmtSpecialCategories").target;
     expect(loaded).toHaveLength(1);
     expect(loaded[0].id).toBe(specialCat.id);
   });
@@ -708,12 +708,12 @@ describe("PreloaderTest", () => {
     });
     expect(sqls).toHaveLength(1);
     const noQueriesAfter = await captureSql(async () => {
-      void (book as any)._preloadedAssociations.get("author");
-      void (post as any)._preloadedAssociations.get("author");
+      void (book as any).association("author").target;
+      void (post as any).association("author").target;
     });
     expect(noQueriesAfter).toHaveLength(0);
-    expect((book as any)._preloadedAssociations.get("author").id).toBe(author.id);
-    expect((post as any)._preloadedAssociations.get("author").id).toBe(author.id);
+    expect((book as any).association("author").target.id).toBe(author.id);
+    expect((post as any).association("author").target.id).toBe(author.id);
   });
 
   it("preload grouped queries with already loaded records", async () => {
@@ -726,12 +726,12 @@ describe("PreloaderTest", () => {
     // the Preloader finds the key in alreadyLoadedByKey and issues 0 DB queries
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [bookLoaded, postFresh], associations: ["author"] }).call();
-      void (bookLoaded as any)._preloadedAssociations.get("author");
-      void (postFresh as any)._preloadedAssociations.get("author");
+      void (bookLoaded as any).association("author").target;
+      void (postFresh as any).association("author").target;
     });
     expect(sqls).toHaveLength(0);
-    expect((bookLoaded as any)._preloadedAssociations.get("author").id).toBe(author.id);
-    expect((postFresh as any)._preloadedAssociations.get("author").id).toBe(author.id);
+    expect((bookLoaded as any).association("author").target.id).toBe(author.id);
+    expect((postFresh as any).association("author").target.id).toBe(author.id);
   });
   it("preload grouped queries of middle records", async () => {
     const post1 = await Post.create({ title: "P1", body: "b1" });
@@ -749,12 +749,8 @@ describe("PreloaderTest", () => {
     // 3 batch calls: grouped taggings loaders, grouped tag loaders, and the
     // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope.
     expect(spy).toHaveBeenCalledTimes(3);
-    expect((post1 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
-      "ruby",
-    ]);
-    expect((post2 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
-      "rails",
-    ]);
+    expect((post1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["ruby"]);
+    expect((post2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["rails"]);
   });
   it("preload grouped queries of through records", async () => {
     const post1 = await Post.create({ title: "P1", body: "b1" });
@@ -771,12 +767,8 @@ describe("PreloaderTest", () => {
       .includes("tags")
       .toArray();
     expect(spy).toHaveBeenCalledTimes(3);
-    const p1tags = (posts.find((p: any) => p.title === "P1") as any)._preloadedAssociations.get(
-      "tags",
-    );
-    const p2tags = (posts.find((p: any) => p.title === "P2") as any)._preloadedAssociations.get(
-      "tags",
-    );
+    const p1tags = (posts.find((p: any) => p.title === "P1") as any).association("tags").target;
+    const p2tags = (posts.find((p: any) => p.title === "P2") as any).association("tags").target;
     expect(p1tags[0].name).toBe("ruby");
     expect(p2tags[0].name).toBe("rails");
   });
@@ -797,12 +789,8 @@ describe("PreloaderTest", () => {
     // First call is for taggings: only p2's key goes to DB (p1's already loaded)
     const taggingKeys = spy.mock.calls[0]?.[0];
     expect(taggingKeys).toHaveLength(1);
-    expect((p1 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
-      "ruby",
-    ]);
-    expect((p2 as any)._preloadedAssociations.get("tags").map((t: any) => t.name)).toEqual([
-      "rails",
-    ]);
+    expect((p1 as any).association("tags").target.map((t: any) => t.name)).toEqual(["ruby"]);
+    expect((p2 as any).association("tags").target.map((t: any) => t.name)).toEqual(["rails"]);
   });
   it("preload with instance dependent scope", async () => {
     const david = await Author.create({ name: "David" });
@@ -816,11 +804,9 @@ describe("PreloaderTest", () => {
       associations: ["postsMentioningAuthor"],
     }).call();
 
-    const davidPosts = (david as any)._preloadedAssociations.get("postsMentioningAuthor") as any[];
-    const david2Posts = (david2 as any)._preloadedAssociations.get(
-      "postsMentioningAuthor",
-    ) as any[];
-    const bobPosts = (bob as any)._preloadedAssociations.get("postsMentioningAuthor") as any[];
+    const davidPosts = (david as any).association("postsMentioningAuthor").target as any[];
+    const david2Posts = (david2 as any).association("postsMentioningAuthor").target as any[];
+    const bobPosts = (bob as any).association("postsMentioningAuthor").target as any[];
 
     expect(davidPosts.map((p: any) => p.id).sort()).toEqual([post1.id, post2.id].sort());
     expect(david2Posts).toEqual([]);
@@ -843,15 +829,9 @@ describe("PreloaderTest", () => {
       associations: ["commentsMentioningAuthor"],
     }).call();
 
-    const davidComments = (david as any)._preloadedAssociations.get(
-      "commentsMentioningAuthor",
-    ) as any[];
-    const david2Comments = (david2 as any)._preloadedAssociations.get(
-      "commentsMentioningAuthor",
-    ) as any[];
-    const bobComments = (bob as any)._preloadedAssociations.get(
-      "commentsMentioningAuthor",
-    ) as any[];
+    const davidComments = (david as any).association("commentsMentioningAuthor").target as any[];
+    const david2Comments = (david2 as any).association("commentsMentioningAuthor").target as any[];
+    const bobComments = (bob as any).association("commentsMentioningAuthor").target as any[];
 
     expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
     expect(david2Comments).toEqual([]);
@@ -888,15 +868,11 @@ describe("PreloaderTest", () => {
       associations: ["commentsOnPostsMentioningAuthor"],
     }).call();
 
-    const davidComments = (david as any)._preloadedAssociations.get(
-      "commentsOnPostsMentioningAuthor",
-    ) as any[];
-    const david2Comments = (david2 as any)._preloadedAssociations.get(
-      "commentsOnPostsMentioningAuthor",
-    ) as any[];
-    const bobComments = (bob as any)._preloadedAssociations.get(
-      "commentsOnPostsMentioningAuthor",
-    ) as any[];
+    const davidComments = (david as any).association("commentsOnPostsMentioningAuthor")
+      .target as any[];
+    const david2Comments = (david2 as any).association("commentsOnPostsMentioningAuthor")
+      .target as any[];
+    const bobComments = (bob as any).association("commentsOnPostsMentioningAuthor").target as any[];
 
     expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
     expect(david2Comments).toEqual([]);
@@ -962,7 +938,7 @@ describe("PreloaderTest", () => {
 
     const posts = await Post.where({ id: post.id }).includes("taggings").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("taggings");
+    const preloaded = (posts[0] as any).association("taggings").target;
     expect(preloaded).toHaveLength(2);
   });
 
@@ -1009,8 +985,8 @@ describe("PreloaderTest", () => {
     // coalesced into 1 batched query.
     expect(spy).toHaveBeenCalledTimes(1);
     const fav = favorites[0] as any;
-    expect(fav._preloadedAssociations.get("author").name).toBe("Mary");
-    expect(fav._preloadedAssociations.get("favoriteAuthor").name).toBe("Bob");
+    expect(fav.association("author").target.name).toBe("Mary");
+    expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
     // Mirrors Rails `test_preload_with_grouping_sets_inverse_association`
     // (associations_test.rb:1120): after the coalesced preload, both belongs_to
     // targets are reachable with no further queries. The has_many inverse
@@ -1081,17 +1057,17 @@ describe("PreloaderTest", () => {
 
     // assert_no_queries: every level is now preloaded, so re-walking the whole
     // ping-pong chain reads from the cache without issuing further loads.
-    const marySimilar = (mary as any)._preloadedAssociations.get("similarPosts");
+    const marySimilar = (mary as any).association("similarPosts").target;
     expect(marySimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
     for (const post of marySimilar) {
-      expect(post._preloadedAssociations.get("comments").length).toBe(1);
+      expect(post.association("comments").target.length).toBe(1);
     }
-    const maryFavs = (mary as any)._preloadedAssociations.get("favoriteAuthors");
+    const maryFavs = (mary as any).association("favoriteAuthors").target;
     expect(maryFavs.map((a: any) => a.id)).toEqual([bob.id]);
-    const bobSimilar = maryFavs[0]._preloadedAssociations.get("similarPosts");
+    const bobSimilar = maryFavs[0].association("similarPosts").target;
     expect(bobSimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
     for (const post of bobSimilar) {
-      expect(post._preloadedAssociations.get("comments").length).toBe(1);
+      expect(post.association("comments").target.length).toBe(1);
     }
     // Walking the cached graph above triggered no new batched loads.
     expect(spy.mock.calls.length).toBe(preloadCalls);
@@ -1296,8 +1272,14 @@ describe("PreloaderTest", () => {
     expect(queryCalls).toHaveLength(1);
     expect(association(author, "essayCategory").loaded).toBe(true);
     // Mirrors Rails' __id__ check: the preloaded category is the *same instance*
-    // taken from availableRecords, not a freshly-loaded row.
-    const preloaded = (author as any)._preloadedAssociations.get("essayCategory");
+    // taken from availableRecords, not a freshly-loaded row. Read off the real
+    // holder (RFC 0022). On this preload-with-availableRecords path the
+    // has-one-through holder currently exposes its target as a 1-element array
+    // (a pre-existing reader divergence — Rails stores the single record;
+    // tracked by `converge-has-one-through-preloaded-reader-arity`), so unwrap
+    // to the single record the singular reader should return.
+    const holderTarget = (author as any).association("essayCategory").target;
+    const preloaded = Array.isArray(holderTarget) ? holderTarget[0] : holderTarget;
     expect(categories).toContain(preloaded);
   });
 
@@ -1472,7 +1454,7 @@ describe("PreloaderTest", () => {
     expect(blogPosts).toHaveLength(2);
     const byTitle = new Map(blogPosts.map((bp) => [(bp as any).title, bp]));
     expect(byTitle.get("Post1")!.association("comments").isLoaded()).toBe(true);
-    const preloaded = (byTitle.get("Post1") as any)._preloadedAssociations.get("comments");
+    const preloaded = (byTitle.get("Post1") as any).association("comments").target;
     expect(preloaded).toHaveLength(1);
     expect(preloaded[0].id).toBe(comment.id);
   });
@@ -1488,8 +1470,8 @@ describe("PreloaderTest", () => {
     expect(comments).toHaveLength(2);
     const byBody = new Map(comments.map((c) => [(c as any).body, c]));
     expect(byBody.get("C1")!.association("blogPost").isLoaded()).toBe(true);
-    expect((byBody.get("C1") as any)._preloadedAssociations.get("blogPost").title).toBe("Post1");
-    expect((byBody.get("C2") as any)._preloadedAssociations.get("blogPost").title).toBe("Post2");
+    expect((byBody.get("C1") as any).association("blogPost").target.title).toBe("Post1");
+    expect((byBody.get("C2") as any).association("blogPost").target.title).toBe("Post2");
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
@@ -1534,7 +1516,7 @@ describe("PreloaderTest", () => {
       .toArray()
       .then((rows) => rows.map((r) => Number((r as any).blog_post_id)).sort());
     expect(expectedBlogPostIds).not.toHaveLength(0);
-    const preloaded = (tag1 as any)._preloadedAssociations.get("blogPosts");
+    const preloaded = (tag1 as any).association("blogPosts").target;
     expect(preloaded.map((p: any) => Number(p.id)).sort()).toEqual(expectedBlogPostIds);
   });
 
@@ -1552,7 +1534,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_order_agreements.order_id", { inWhere: true });
     expect(orders![0].association("orderAgreements").isLoaded()).toBe(true);
-    const loaded = orders![0]._preloadedAssociations.get("orderAgreements");
+    const loaded = orders![0].association("orderAgreements").target;
     expect(loaded.map((a: any) => a.signature).sort()).toEqual(["abc", "def"]);
   });
 
@@ -1569,7 +1551,7 @@ describe("PreloaderTest", () => {
     const preloadSql = sqls[1];
     expectQuotedColumnInSql(preloadSql, "cpk_orders.id", { inWhere: true });
     expect(agreements![0].association("order").isLoaded()).toBe(true);
-    const loadedOrder = agreements![0]._preloadedAssociations.get("order");
+    const loadedOrder = agreements![0].association("order").target;
     expect(loadedOrder).not.toBeNull();
     expect((loadedOrder.id as [number, number])[1]).toBe(orderId);
   });
@@ -1594,7 +1576,7 @@ describe("PreloaderTest", () => {
 
     const authors = await PKAuthor.all().includes("pkPosts").toArray();
     expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any)._preloadedAssociations.get("pkPosts");
+    const preloaded = (authors[0] as any).association("pkPosts").target;
     expect(preloaded).toHaveLength(1);
     expect(preloaded[0].title).toBe("P1");
   });
@@ -1620,7 +1602,7 @@ describe("PreloaderTest", () => {
 
     const authors = await PKQAuthor.all().includes("pkqPosts").toArray();
     expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any)._preloadedAssociations.get("pkqPosts");
+    const preloaded = (authors[0] as any).association("pkqPosts").target;
     expect(preloaded).toHaveLength(2);
   });
 
@@ -1644,7 +1626,7 @@ describe("PreloaderTest", () => {
 
     const posts = await PKBPost.all().includes("pkbAuthor").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any)._preloadedAssociations.get("pkbAuthor");
+    const preloaded = (posts[0] as any).association("pkbAuthor").target;
     expect(preloaded).toBeDefined();
     expect(preloaded.name).toBe("Auth");
   });
@@ -1672,7 +1654,7 @@ describe("PreloaderTest", () => {
     const posts = await PKBAPost.all().includes("pkbaAuthor").toArray();
     expect(posts).toHaveLength(2);
     for (const p of posts) {
-      expect((p as any)._preloadedAssociations.has("pkbaAuthor")).toBe(true);
+      expect((p as any).association("pkbaAuthor").isLoaded()).toBe(true);
     }
   });
 
@@ -2348,7 +2330,7 @@ describe("AssociationsTest", () => {
     // Rails reads `comment.blog_post_by_id` from the preloaded cache and compares
     // it to the directly-loaded `comment.blog_post`; read the preloaded record
     // rather than re-querying so the preload path is what gets verified.
-    const preloaded = (loaded as any)._preloadedAssociations.get("blogPostById");
+    const preloaded = (loaded as any).association("blogPostById").target;
     expect(preloaded).toBeDefined();
     const byCompositeKey = await (loaded as any).loadBelongsTo("blogPost");
     expect(preloaded.id).toBe(byCompositeKey.id);

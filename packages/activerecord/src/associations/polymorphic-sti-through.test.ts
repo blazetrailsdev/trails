@@ -208,7 +208,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const { hotel, cake1, cake2 } = await seed();
     const loaded = (await PsHotel.all().includes("cakeDesigners").toArray()) as any[];
     const h = loaded.find((row) => row.id === hotel.id);
-    const preloaded = h._preloadedAssociations?.get("cakeDesigners") as any[];
+    const preloaded = h.association("cakeDesigners").target as any[];
     expect(preloaded).toBeDefined();
     expect(preloaded.map((d: any) => d.id).sort()).toEqual([cake1.id, cake2.id].sort());
     expect(preloaded.every((d: any) => d instanceof PsCakeDesigner)).toBe(true);
@@ -235,8 +235,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("drinkDesigners")
       .toArray()) as any[];
     const h = loaded.find((row) => row.id === hotel.id);
-    const cakes = h._preloadedAssociations?.get("cakeDesigners") as any[];
-    const drinks = h._preloadedAssociations?.get("drinkDesigners") as any[];
+    const cakes = h.association("cakeDesigners").target as any[];
+    const drinks = h.association("drinkDesigners").target as any[];
     expect(cakes.map((d: any) => d.id).sort()).toEqual([cake1.id, cake2.id].sort());
     expect(drinks.map((d: any) => d.id).sort()).toEqual([drink.id].sort());
     // Class assertions matter: drink.id collides with strayCake.id
@@ -275,7 +275,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .where({ id: hotel.id })
       .toArray()) as any[];
-    const preloaded = loaded[0]._preloadedAssociations?.get("cakeDesigners") as any[];
+    const preloaded = loaded[0].association("cakeDesigners").target as any[];
     expect(preloaded.length).toBe(1);
     expect(preloaded[0].constructor).toBe(PsSpecialCakeDesigner);
   });
@@ -287,7 +287,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .where({ id: hotel.id })
       .toArray()) as any[];
     const h = loaded[0];
-    const preloaded = h._preloadedAssociations?.get("cakeDesigners") as any[];
+    const preloaded = h.association("cakeDesigners").target as any[];
     // Filtering the outer relation must not silently drop preloaded
     // targets — a JOIN-collapsed cardinality bug here would surface
     // as 1-of-2 rather than the full set.
@@ -307,7 +307,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .where({ id: h1.id })
       .toArray()) as any[];
-    const firstIds = (first[0]._preloadedAssociations?.get("cakeDesigners") as any[])
+    const firstIds = (first[0].association("cakeDesigners").target as any[])
       .map((d) => d.id)
       .sort();
     expect(firstIds).toEqual([cake1.id, cake2.id].sort());
@@ -322,7 +322,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .where({ id: h2.id })
       .toArray()) as any[];
-    const secondIds = (second[0]._preloadedAssociations?.get("cakeDesigners") as any[])
+    const secondIds = (second[0].association("cakeDesigners").target as any[])
       .map((d) => d.id)
       .sort();
     expect(secondIds).toEqual([h2cake1.id, h2cake2.id].sort());

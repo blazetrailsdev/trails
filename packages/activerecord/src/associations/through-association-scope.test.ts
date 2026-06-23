@@ -100,7 +100,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     expect(scope.toSql()).toContain("preload-through");
 
     const authors = await TsaAuthor.all().preload("annotatedComments").toArray();
-    const comments = (authors[0] as any)._preloadedAssociations?.get("annotatedComments") ?? [];
+    const comments = (authors[0] as any).association("annotatedComments").target ?? [];
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("C");
   });
