@@ -77,9 +77,13 @@ describe("normalizeFindArgs — simple primary key", () => {
     }
   });
 
-  it("find([]) → RecordNotFound with empty-list shape", () => {
-    expect(() => normalizeFindArgs("Post", pk, [[]])).toThrow(RecordNotFound);
-    expect(() => normalizeFindArgs("Post", pk, [[]])).toThrow(/empty list of ids/);
+  it("find([]) → empty-array short-circuit (no RecordNotFound)", () => {
+    expect(normalizeFindArgs("Post", pk, [[]])).toEqual({
+      ids: [],
+      wantArray: true,
+      tuples: null,
+      emptyArray: true,
+    });
   });
 });
 

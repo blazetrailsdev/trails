@@ -112,15 +112,6 @@ describe("FinderTest", () => {
     expect(await Topic.exists()).toBe(false);
   });
 
-  it("find an empty array raises RecordNotFound", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.find([])).rejects.toThrow();
-  });
-
   it("take", async () => {
     class Topic extends Base {
       static {
@@ -621,15 +612,6 @@ describe("FinderTest", () => {
     const p = await Topic.create({ title: "a" });
     const found = await Topic.find(p.id);
     expect(found).not.toBeNull();
-  });
-
-  it("find by empty ids raises RecordNotFound", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.find([])).rejects.toThrow();
   });
 
   it("exists returns true with one record and no args", async () => {
@@ -1942,7 +1924,7 @@ describe("FinderTest", () => {
 
   it("find with ids with no id passed", async () => {
     const { Post } = makeModel();
-    await expect(Post.find([])).rejects.toThrow();
+    expect(await Post.find([])).toEqual([]);
   });
 
   it("find with ids with id out of range", async () => {
@@ -2257,12 +2239,15 @@ describe("FinderTest", () => {
 
   it("find by empty ids", async () => {
     const Topic = makeTopic();
-    await expect(Topic.find([])).rejects.toThrow();
+    expect(await Topic.find([])).toEqual([]);
   });
 
   it("find an empty array", async () => {
     const Topic = makeTopic();
-    await expect(Topic.find([])).rejects.toThrow();
+    const emptyArray: number[] = [];
+    const result = await Topic.find(emptyArray);
+    expect(result).toEqual([]);
+    expect(result).not.toBe(emptyArray);
   });
 
   it("exists returns false with false arg", async () => {
@@ -3102,8 +3087,8 @@ describe("FinderTest", () => {
     expect(found[1].name).toBe("Charlie");
   });
 
-  it("find with empty array raises RecordNotFound", async () => {
-    await expect(User.find([])).rejects.toThrow();
+  it("find an empty array", async () => {
+    expect(await User.find([])).toEqual([]);
   });
 
   it("find raises RecordNotFound for missing ID", async () => {
@@ -3552,13 +3537,13 @@ describe("FinderTest", () => {
     expect(found[1].name).toBe("Charlie");
   });
 
-  it("find with empty array raises RecordNotFound", async () => {
+  it("find an empty array", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    await expect(User.find([])).rejects.toThrow();
+    expect(await User.find([])).toEqual([]);
   });
 
   it("find with missing IDs throws", async () => {

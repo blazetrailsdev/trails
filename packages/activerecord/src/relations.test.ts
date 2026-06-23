@@ -938,8 +938,8 @@ describe("RelationTest", () => {
       await expect(Post.find([first!.id, 999999])).rejects.toThrow(RecordNotFound);
     });
 
-    it("raises RecordNotFound for empty id array", async () => {
-      await expect(Post.find([])).rejects.toThrow();
+    it("find an empty array", async () => {
+      expect(await Post.find([])).toEqual([]);
     });
   });
 
@@ -1912,10 +1912,6 @@ describe("RelationTest", () => {
     const apple = await Item.findBy({ name: "Apple" });
     const item = await Item.find(apple!.id);
     expect(item.name).toBe("Apple");
-  });
-
-  it("find in empty array", async () => {
-    await expect(Item.find([])).rejects.toThrow(RecordNotFound);
   });
 
   it("where with ar relation", async () => {
