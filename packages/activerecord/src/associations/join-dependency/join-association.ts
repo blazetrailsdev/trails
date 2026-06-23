@@ -9,7 +9,7 @@
  */
 
 import type { Base } from "../../base.js";
-import { Table, Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
@@ -175,17 +175,11 @@ export class JoinAssociation extends JoinPart {
       // join source, `joins.last` is this association's own join, so `others`
       // fold back into its ON (Rails' behaviour for a plain cross-table scope).
       if (others.length > 0) {
-        const sources: Nodes.Node[] = [];
-        // TODO: replace `scope._joinValues` with `scope.arel().join_sources` once
-        // Relation#arel() exists. Rails reads the materialized arel join sources
-        // (always proper Arel join nodes); reading `_joinValues` directly only
-        // handles raw-SQL strings and pre-built Nodes.Join — an association-name
-        // join source (Rails `.joins(:posts)`) would be mishandled here.
-        for (const jv of (scope?._joinValues ?? []) as (string | Nodes.Node)[]) {
-          sources.push(
-            typeof jv === "string" ? new Nodes.StringJoin(arelSql(jv.trim()) as any) : jv,
-          );
-        }
+        // Rails reads `arel.join_sources` — the fully-materialized Arel manager
+        // output, always proper Arel join nodes (raw-SQL strings become
+        // `Nodes.StringJoin`, association-name join sources become real join
+        // nodes). `arel()` builds the manager off the scope's join values.
+        const sources: Nodes.Node[] = scope?.arel ? (scope.arel().joinSources as Nodes.Node[]) : [];
         // NOTE: `this.joinSources` accumulates across the chain but is only
         // consumed by the single-step `has_one`/`has_many` join path
         // (JoinDependency#addAssociation), whose reflection chain is length 1, so
