@@ -976,6 +976,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
+    // Single-arg `(N)` only — limit/precision. Multi-arg types (`decimal(10,2)`)
+    // deliberately don't match: `baseSqlType` keeps the parens and resolves via
+    // `lookupCastType`'s `/decimal|numeric/i` regex registration (→ type
+    // "decimal"). So the DSL type still resolves; only the scalar limit/precision
+    // hints are scoped to single-arg forms.
     const paramMatch = /\((\d+)\)/.exec(raw);
     const isDtPrec = /^(datetime|timestamp|time)\b/i.test(raw);
     const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
