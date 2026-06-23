@@ -1,5 +1,5 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
-import { QueryAttribute } from "../relation/query-attribute.js";
+import { PredicateBuilder } from "../relation/predicate-builder.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
@@ -15,14 +15,6 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
  * attribute reads.
  */
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
-
-/**
- * Fallback cast/serialize used when a qualified WHERE column has no
- * resolvable type caster (e.g. a bare Arel table built from a name) —
- * passes the value through unchanged, matching `buildBindAttribute`'s
- * default in the predicate builder.
- */
-const IDENTITY_CAST = { cast: (v: unknown) => v, serialize: (v: unknown) => v };
 
 /**
  * Invoke a scope lambda using this port's calling convention:
@@ -348,20 +340,25 @@ export class AssociationScope {
     };
     if (table && w.table && !arelTableEql(w.table, table)) {
       // Table-qualified WHERE for through chains where the FK lives on
-      // an intermediate joined-in table. Use Arel so identifier quoting
-      // and value escaping go through the same path as the rest of the
-      // query — no manual interpolation. Wrap the value in a QueryAttribute
-      // bind keyed by the qualified column's type (mirroring the
-      // predicate builder's `buildBindAttribute`) so the owner key is
-      // type-cast to the FK column's DB type — e.g. an integer owner id
-      // bound against a string FK column (`editorships.publication_id`)
-      // serializes as a string, instead of emitting `varchar = integer`
-      // and tripping PostgreSQL's strict operator resolution. The
-      // unqualified branch already gets this via `where({ key: value })`.
-      const castType = (table as { typeForAttribute?: (n: string) => unknown }).typeForAttribute?.(
+      // an intermediate joined-in table. We keep the Arel-for-aliasing
+      // node (so the alias, not a bare name, qualifies the column) but
+      // produce the type-cast bind through the SAME predicate-builder
+      // path the unqualified `where({ key: value })` branch uses:
+      // `PredicateBuilder#buildBindAttribute` (= what BasicObjectHandler
+      // calls). A fresh PredicateBuilder over the qualified `table`
+      // resolves `typeForAttribute(key)` off the alias' delegated type
+      // caster (with the predicate builder's own identity fallback), so
+      // the owner key is type-cast to the FK column's DB type — e.g. an
+      // integer owner id bound against a string FK column
+      // (`editorships.publication_id`) serializes as a string instead of
+      // emitting `varchar = integer` and tripping PostgreSQL's strict
+      // operator resolution. This replaces the previous hand-rolled
+      // QueryAttribute re-derivation with the native predicate-builder
+      // bind (apply_scope convergence, RFC 0022).
+      const bind = new PredicateBuilder(table as unknown as ArelTable).buildBindAttribute(
         key,
-      ) as { cast(v: unknown): unknown; serialize(v: unknown): unknown } | undefined;
-      const bind = new QueryAttribute(key, value, castType ?? IDENTITY_CAST);
+        value,
+      );
       const node = table.get(key).eq(bind);
       return w.where(node);
     }
