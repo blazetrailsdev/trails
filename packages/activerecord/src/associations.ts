@@ -2912,11 +2912,14 @@ export async function createThroughAssociation(
         );
       }
       through._writeAttribute(sourceFk, target._readAttribute(targetPk));
-      if (sourceAssocDef?.options?.polymorphic) {
+      // Mirrors `ThroughAssociation#construct_join_attributes`: the source
+      // foreign_type is written only when `options[:source_type]` is set, and
+      // the configured value is written verbatim (no inference from the
+      // record's class). A polymorphic source without `source_type` is an
+      // invalid config rejected by `ThroughReflection#checkValidityBang`.
+      if (assocDef.options.sourceType) {
         const typeCol = `${underscore(sourceName)}_type`;
-        const typeValue =
-          assocDef.options.sourceType ?? polymorphicName(target.constructor as typeof Base);
-        through._writeAttribute(typeCol, typeValue);
+        through._writeAttribute(typeCol, assocDef.options.sourceType);
       }
 
       const throughSaved = await through.save();

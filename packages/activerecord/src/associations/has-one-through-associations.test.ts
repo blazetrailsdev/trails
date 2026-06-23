@@ -689,20 +689,18 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(noMember).toBeNull();
   });
 
-  it("create through polymorphic source infers source type as base class polymorphic name", async () => {
-    // Pins the inferred-`_type` fallback in createThroughAssociation's
-    // belongs_to-source branch: when the source `_type` is not given by an
-    // explicit `sourceType`, it must be derived as record.class.polymorphic_name
-    // (base_class.name), not the STI subclass name — matching Rails'
-    // belongs_to polymorphic write (belongs_to_polymorphic_association#replace_keys,
-    // `record.class.polymorphic_name`). With `.name` the STI subclass target
-    // would (incorrectly) store "PstSpecialMember".
+  it("create through polymorphic source without source type does not write source type", async () => {
+    // Mirrors `ThroughAssociation#construct_join_attributes`: the source
+    // foreign_type is written *only* when `options[:source_type]` is set. There
+    // is no inference from the record's class (the `polymorphic_name` write lives
+    // in `belongs_to_polymorphic_association#replace_keys`, the direct assignment
+    // path — not this through-create path).
     //
-    // A polymorphic source without an explicit `sourceType` is rejected by
-    // ThroughReflection#checkValidityBang — but that validation runs in
-    // _cacheSingularTarget *after* the through record's `_type` is written and
-    // the transaction commits, so the committed row still pins the inferred
-    // value. The throw is incidental; we assert on the persisted write.
+    // A polymorphic source without an explicit `sourceType` is an invalid config
+    // rejected by ThroughReflection#checkValidityBang — that validation runs in
+    // _cacheSingularTarget *after* the transaction commits, so the through row
+    // still persists, but its `_type` column must be left unwritten (null), not
+    // pinned to an inferred value.
     class PstMember extends Base {
       static {
         this.attribute("name", "string");
@@ -743,8 +741,8 @@ describe("HasOneThroughAssociationsTest", () => {
 
     const sponsor = await PstSponsor.findBy({ club_id: club.id });
     expect(sponsor).not.toBeNull();
-    // base_class.name, NOT the STI subclass "PstSpecialMember".
-    expect((sponsor as any)._readAttribute("sponsorable_type")).toBe("PstMember");
+    // No `source_type` → no inferred `_type` write; the column is left null.
+    expect((sponsor as any)._readAttribute("sponsorable_type")).toBeNull();
   });
 
   it("eager has one through polymorphic with source type", async () => {
