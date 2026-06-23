@@ -698,7 +698,7 @@ export class Builder implements InsertBuilder {
       } else {
         value = SerializeCastValue.serializeCastValue(castValue);
       }
-      return new Nodes.SqlLiteral(quoteSqlValue(value, arrayCols.has(key)));
+      return new Nodes.SqlLiteral(quoteSqlValue(value, arrayCols.has(key), this._dialect));
     });
     return new Nodes.ValuesList(rows);
   }

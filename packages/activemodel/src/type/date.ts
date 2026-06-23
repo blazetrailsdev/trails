@@ -148,16 +148,19 @@ export class DateType extends ValueType<DateCastResult> {
     return this.newDate(values[1], values[2], values[3]);
   }
 
-  serialize(value: unknown): string | null {
-    const cast = this.cast(value);
-    // Sentinels are Postgres-specific; base type returns null. The Postgres
-    // OID::Date subclass overrides serialize() to emit 'infinity'/'-infinity'.
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
-    return cast.toString();
+  /**
+   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
+   * returns the cast Temporal.PlainDate — NOT a SQL string; the adapter quotes it later.
+   */
+  // Return type is `unknown` (matching ActiveModel::Type::Value#serialize) so
+  // adapter subclasses can widen it — e.g. PostgreSQL's OID::Date emits the
+  // "infinity" wire string for the infinity sentinels.
+  serialize(value: unknown): unknown {
+    return this.cast(value);
   }
 
-  serializeCastValue(value: DateCastResult | null): string | null {
-    return this.serialize(value);
+  serializeCastValue(value: DateCastResult | null): DateCastResult | null {
+    return value;
   }
 }
 

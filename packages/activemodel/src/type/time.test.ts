@@ -45,9 +45,9 @@ describe("TimeTest", () => {
     expect(type.cast(undefined)).toBe(null);
   });
 
-  it("serialize returns microsecond ISO string", () => {
+  it("serialize returns the cast PlainTime (not a SQL string)", () => {
     const t = plainTime("14:23:55.123456");
-    expect(type.serialize(t)).toBe("14:23:55.123456");
+    expect((type.serialize(t) as Temporal.PlainTime).toString()).toBe("14:23:55.123456");
   });
 
   it("serialize null returns null", () => {
@@ -57,7 +57,7 @@ describe("TimeTest", () => {
   it("serialize respects column precision", () => {
     const t = new Types.TimeType({ precision: 3 });
     const pt = plainTime("14:23:55.123456");
-    expect(t.serialize(pt)).toBe("14:23:55.123");
+    expect((t.serialize(pt) as Temporal.PlainTime).toString()).toBe("14:23:55.123");
   });
 
   it("PlainDateTime input extracts time (multiparameter support)", () => {

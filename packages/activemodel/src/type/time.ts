@@ -87,26 +87,17 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     });
   }
 
-  serialize(value: unknown): string | null {
-    const cast = this.cast(value);
-    if (cast === null) return null;
-    const p = this.precision ?? -1;
-    const digits = (Number.isInteger(p) && p >= 0 && p <= 9 ? p : 6) as
-      | 0
-      | 1
-      | 2
-      | 3
-      | 4
-      | 5
-      | 6
-      | 7
-      | 8
-      | 9;
-    return cast.toString({ fractionalSecondDigits: digits });
+  /**
+   * Mirrors: ActiveModel::Type::Value#serialize (near-identity). `value_for_database`
+   * returns the cast Temporal.PlainTime — NOT a SQL string; the adapter quotes it later.
+   */
+  serialize(value: unknown): Temporal.PlainTime | null {
+    return this.serializeCastValue(this.cast(value));
   }
 
-  serializeCastValue(value: Temporal.PlainTime | null): string | null {
-    return this.serialize(value);
+  // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
+  serializeCastValue(value: Temporal.PlainTime | null): Temporal.PlainTime | null {
+    return value === null ? null : this._applySecondsPrecision(value);
   }
 
   /**

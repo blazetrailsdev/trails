@@ -25,6 +25,9 @@ import {
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
+  formatInstantForSqlMysql,
+  formatPlainDateTimeForSqlMysql,
+  formatPlainTimeForSqlMysql,
 } from "./sql-datetime.js";
 import type { Quoting } from "./quoting-interface.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
@@ -1194,16 +1197,24 @@ export function temporalToBindString(
   // fixed ("F") form (Rails' `type_cast`: `when BigDecimal then value.to_s("F")`)
   // rather than letting the driver JSON-stringify the object.
   if (value instanceof BigDecimal) return value.toString("F");
-  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  // MySQL/MariaDB DATETIME(6) caps fractional seconds at 6 digits; strict mode
+  // rejects the 7–9 nanosecond digits the default formatters can emit.
+  const mysql = adapter === "mysql";
+  if (value instanceof Temporal.Instant)
+    return mysql ? formatInstantForSqlMysql(value) : formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime)
+    return mysql ? formatPlainDateTimeForSqlMysql(value) : formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) {
     // SQLite stores time with a fixed 2000-01-01 date prefix so it can be
     // read back as a datetime string by the cast layer.
-    const t = formatPlainTimeForSql(value);
+    const t = mysql ? formatPlainTimeForSqlMysql(value) : formatPlainTimeForSql(value);
     return adapter === "sqlite" ? `2000-01-01 ${t}` : t;
   }
-  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  if (value instanceof Temporal.ZonedDateTime)
+    return mysql
+      ? formatInstantForSqlMysql(value.toInstant())
+      : formatInstantForSql(value.toInstant());
   return value;
 }
 

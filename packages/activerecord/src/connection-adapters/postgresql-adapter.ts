@@ -1,4 +1,5 @@
 import pg from "pg";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import {
   singularize,
@@ -3024,6 +3025,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     ) {
       const u8 = (value as { bytes: Uint8Array }).bytes;
       return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
+    }
+    // Date/time Temporal values bind through the adapter's BC-aware `quotedDate`
+    // (proleptic years ≤ 0 get the " BC" suffix); `value_for_database` now yields
+    // the cast Temporal rather than a pre-quoted string. PlainTime keeps the
+    // abstract path's 2000-01-01-stripped form via temporalToBindString below.
+    if (
+      value instanceof Temporal.Instant ||
+      value instanceof Temporal.PlainDate ||
+      value instanceof Temporal.PlainDateTime ||
+      value instanceof Temporal.ZonedDateTime
+    ) {
+      return this.quotedDate(value);
     }
     return temporalToBindString(value, "postgres");
   }

@@ -14,6 +14,7 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
@@ -375,7 +376,11 @@ export function quotedDate(
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.ZonedDateTime
       ? value.year
-      : null;
+      : value instanceof Temporal.Instant
+        ? // Proleptic year as rendered in the SQL output zone, so the BC bias
+          // matches the formatted "YYYY-MM-DD" prefix (Instants carry no year field).
+          value.toZonedDateTimeISO(defaultSqlTimezone()).year
+        : null;
   if (year !== null && year <= 0) {
     const bceYear = String(-year + 1).padStart(4, "0");
     const base = abstractQuotedDate(value);
