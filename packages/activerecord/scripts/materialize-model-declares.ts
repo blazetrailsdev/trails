@@ -200,20 +200,36 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 // model declares use, to match convention; anything else keeps its
 // original module specifier.
 const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)/g;
-const BUILTIN_IMPORT_SPECIFIER: Record<string, string> = {
+// AR built-ins, keyed by symbol → the source module relative to MODELS_DIR
+// (the same paths the hand-written model declares under that dir use). The
+// specifier is recomputed relative to each materialized file's directory in
+// `hoistInlineImports`, so files outside MODELS_DIR (e.g. test files) get a
+// correct relative path rather than the model-dir-relative one.
+const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   AssociationProxy: "../../associations/collection-proxy.js",
   Relation: "../../relation.js",
   IPAddr: "../../connection-adapters/postgresql/oid/cidr.js",
 };
 
+/** Builtin specifier recomputed relative to `fileDir`. */
+function builtinSpecifierFor(sym: string, fileDir: string): string | undefined {
+  const fromModels = BUILTIN_IMPORT_FROM_MODELS_DIR[sym];
+  if (!fromModels) return undefined;
+  const abs = path.resolve(MODELS_DIR, fromModels);
+  let rel = path.relative(fileDir, abs).replace(/\\/g, "/");
+  if (!rel.startsWith(".")) rel = "./" + rel;
+  return rel;
+}
+
 function hoistInlineImports(
   text: string,
   inScope: ReadonlySet<string>,
+  fileDir: string,
 ): { text: string; importLines: string[] } {
   const bySpecifier = new Map<string, Set<string>>();
   const rewritten = text.replace(INLINE_IMPORT_RE, (_match, mod: string, sym: string) => {
     if (!inScope.has(sym)) {
-      const specifier = BUILTIN_IMPORT_SPECIFIER[sym] ?? mod;
+      const specifier = builtinSpecifierFor(sym, fileDir) ?? mod;
       (bySpecifier.get(specifier) ?? bySpecifier.set(specifier, new Set()).get(specifier)!).add(
         sym,
       );
@@ -228,23 +244,58 @@ function hoistInlineImports(
   return { text: rewritten, importLines };
 }
 
+/**
+ * Splice hoisted `import type` lines into `text` just before the first
+ * existing top-level `import` statement, so they group with the file's
+ * import block rather than landing above a leading header docstring. Files
+ * with no import statement (rare for a model) get the lines prepended.
+ */
+function insertHoistedImports(text: string, importLines: readonly string[]): string {
+  const block = importLines.join("\n") + "\n";
+  const match = /^import\s/m.exec(text);
+  if (!match) return block + text;
+  return text.slice(0, match.index) + block + text.slice(match.index);
+}
+
 function main(): void {
   const args = process.argv.slice(2);
-  const targets = (args.length > 0 ? args.map((a) => path.basename(a)) : PILOT).map((f) =>
-    path.join(MODELS_DIR, f),
-  );
+  // With no args, process the canonical pilot set under MODELS_DIR. With args,
+  // accept either a bare model filename (resolved against MODELS_DIR, the
+  // historical behavior) or a path that resolves to an existing file relative
+  // to the cwd / absolute — so the generator can materialize declares into test
+  // files outside the canonical models dir.
+  const targets =
+    args.length > 0
+      ? args.map((a) => {
+          const direct = path.resolve(a);
+          if (fs.existsSync(direct)) return direct;
+          return path.join(MODELS_DIR, path.basename(a));
+        })
+      : PILOT.map((f) => path.join(MODELS_DIR, f));
   const schemaColumnsByTable = normalizeSchema(TEST_SCHEMA);
   const registry = buildModelRegistry();
 
+  const modelsDirPrefix = MODELS_DIR + path.sep;
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const baseNames = computeBaseNames(sf);
     const prependImports = resolveAutoImports(sf, file, registry, baseNames);
+    // The schema-column merge maps each model to a table by `tableName` (or
+    // `pluralize(underscore(className))` when unset) and bakes that table's
+    // canonical columns into the declares. That is correct for the canonical
+    // models under MODELS_DIR, but test-local model classes elsewhere define
+    // their own bespoke schemas — a class named `Post` (or one assigning
+    // `this.tableName` in a static block, which the walker does not capture)
+    // would otherwise pull phantom columns off the canonical `posts` table
+    // that its runtime table lacks. For files outside MODELS_DIR we therefore
+    // omit the schema map: declares then reflect only the class's explicit
+    // `attribute()` / association / enum calls — exactly its real surface.
+    const underModelsDir = file.startsWith(modelsDirPrefix);
     const { text: virtualized } = virtualize(source, file, {
       baseNames,
       prependImports,
-      schemaColumnsByTable,
+      schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
     });
     if (virtualized === source) {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);
@@ -252,8 +303,12 @@ function main(): void {
     }
     // Rewrite the virtualizer's inline `import("…").X` type expressions
     // into bare references + hoisted top-level `import type` lines.
-    const { text: hoisted, importLines } = hoistInlineImports(virtualized, collectNamesInScope(sf));
-    const text = importLines.length > 0 ? importLines.join("\n") + "\n" + hoisted : hoisted;
+    const { text: hoisted, importLines } = hoistInlineImports(
+      virtualized,
+      collectNamesInScope(sf),
+      path.dirname(file),
+    );
+    const text = importLines.length > 0 ? insertHoistedImports(hoisted, importLines) : hoisted;
     fs.writeFileSync(file, text);
     const added = text.split("\n").length - source.split("\n").length;
     process.stdout.write(`  materialized ${path.basename(file)} (+${added} lines)\n`);

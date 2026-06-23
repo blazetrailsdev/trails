@@ -27,6 +27,14 @@ afterEach(() => {
 // ─── Shared model setup ───
 
 class Post extends Base {
+  declare title: string;
+  declare body: string;
+  declare author: string;
+  declare status: string;
+  declare views: number;
+  declare category: string;
+  declare published: boolean;
+
   static {
     this.attribute("title", "string");
     this.attribute("body", "string");
@@ -893,7 +901,7 @@ describe("RelationTest", () => {
     it("supports for-await-of", async () => {
       const titles: string[] = [];
       for await (const post of Post.all()) {
-        titles.push(post.title as string);
+        titles.push(post.title);
       }
       expect(titles).toHaveLength(5);
     });
