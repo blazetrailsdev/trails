@@ -2,6 +2,8 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "../associations/collection-proxy.js";
+import type { Relation } from "../relation.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
@@ -52,12 +54,17 @@ beforeAll(async () => {
 
 describe("WhereChainTest", () => {
   class Post extends Base {
+    declare title: string;
+    declare author_id: number;
+
     static {
       this.attribute("title", "string");
       this.attribute("author_id", "integer");
     }
   }
   class Author extends Base {
+    declare name: string;
+
     static {
       this.attribute("name", "string");
     }
@@ -75,11 +82,29 @@ describe("WhereChainTest", () => {
   // the scope's enum-cast predicate (`last_read = 2`) into the JOIN ON, so only
   // an author with a *reading* book is associated.
   class WcAuthor extends Base {
+    declare name: string;
+
     static {
       this.attribute("name", "string");
     }
   }
   class WcBook extends Base {
+    declare name: string;
+    declare last_read: number;
+    declare wc_author_id: number;
+    declare isUnread: () => boolean;
+    declare unreadBang: () => Promise<true>;
+    declare static unread: () => Relation<WcBook>;
+    declare static notUnread: () => Relation<WcBook>;
+    declare isReading: () => boolean;
+    declare readingBang: () => Promise<true>;
+    declare static reading: () => Relation<WcBook>;
+    declare static notReading: () => Relation<WcBook>;
+    declare isRead: () => boolean;
+    declare readBang: () => Promise<true>;
+    declare static read: () => Relation<WcBook>;
+    declare static notRead: () => Relation<WcBook>;
+
     static {
       this.attribute("name", "string");
       this.attribute("last_read", "integer");
@@ -256,6 +281,9 @@ describe("WhereChainTest", () => {
   });
   it("associated with add joins before", async () => {
     class JbAuthor extends Base {
+      declare name: string;
+      declare jbPosts: AssociationProxy<JbPost>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("jbPosts", {
@@ -265,6 +293,9 @@ describe("WhereChainTest", () => {
       }
     }
     class JbPost extends Base {
+      declare title: string;
+      declare jb_author_id: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("jb_author_id", "integer");
@@ -283,6 +314,9 @@ describe("WhereChainTest", () => {
 
   it("associated with add left joins before", async () => {
     class LjAuthor extends Base {
+      declare name: string;
+      declare ljPosts: AssociationProxy<LjPost>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("ljPosts", {
@@ -292,6 +326,9 @@ describe("WhereChainTest", () => {
       }
     }
     class LjPost extends Base {
+      declare title: string;
+      declare lj_author_id: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("lj_author_id", "integer");
@@ -310,6 +347,9 @@ describe("WhereChainTest", () => {
 
   it("associated with add left outer joins before", async () => {
     class LoAuthor extends Base {
+      declare name: string;
+      declare loPosts: AssociationProxy<LoPost>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("loPosts", {
@@ -319,6 +359,9 @@ describe("WhereChainTest", () => {
       }
     }
     class LoPost extends Base {
+      declare title: string;
+      declare lo_author_id: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("lo_author_id", "integer");
@@ -337,11 +380,19 @@ describe("WhereChainTest", () => {
 
   it("associated with composite primary key", async () => {
     class CpkShop extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
     }
     class CpkOrder extends Base {
+      declare shop_id: number;
+      declare order_id: number;
+      declare cpk_shop_id: number;
+      declare cpkShop: CpkShop | null;
+      declare loadBelongsTo: (name: "cpkShop") => Promise<CpkShop | null>;
+
       static {
         this.primaryKey = ["shop_id", "order_id"];
         this.attribute("shop_id", "integer");
@@ -374,6 +425,14 @@ describe("WhereChainTest", () => {
   });
   it("missing with multiple association", () => {
     class Article extends Base {
+      declare title: string;
+      declare author_id: number;
+      declare category_id: number;
+      declare artAuthor: ArtAuthor | null;
+      declare artCategory: ArtCategory | null;
+      declare loadBelongsTo: ((name: "artAuthor") => Promise<ArtAuthor | null>) &
+        ((name: "artCategory") => Promise<ArtCategory | null>);
+
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
@@ -383,11 +442,15 @@ describe("WhereChainTest", () => {
       }
     }
     class ArtAuthor extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
     }
     class ArtCategory extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
@@ -531,11 +594,19 @@ describe("WhereChainTest", () => {
   });
   it("missing with composite primary key", async () => {
     class CpkAuthor extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
     }
     class CpkShelfBook extends Base {
+      declare author_id: number;
+      declare book_id: number;
+      declare cpk_author_id: number;
+      declare author: CpkAuthor | null;
+      declare loadBelongsTo: (name: "author") => Promise<CpkAuthor | null>;
+
       static {
         this.primaryKey = ["author_id", "book_id"];
         this.attribute("author_id", "integer");
@@ -603,6 +674,9 @@ describe("WhereChainTest", () => {
 describe("WhereChainTest", () => {
   function makePost() {
     class Post extends Base {
+      declare title: string;
+      declare author_id: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
@@ -716,16 +790,28 @@ describe("WhereChainTest", () => {
 
   it("associated with multiple associations", async () => {
     class MaAuthor extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
     }
     class MaCategory extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
     }
     class MaPost extends Base {
+      declare title: string;
+      declare author_id: number;
+      declare category_id: number;
+      declare maAuthor: MaAuthor | null;
+      declare maCategory: MaCategory | null;
+      declare loadBelongsTo: ((name: "maAuthor") => Promise<MaAuthor | null>) &
+        ((name: "maCategory") => Promise<MaCategory | null>);
+
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
@@ -758,18 +844,28 @@ describe("WhereChainTest", () => {
     // Mirrors Rails Essay (belongs_to :writer, polymorphic: true, primary_key: :name)
     // with Author and Human writers.
     class RwpAuthor extends Base {
+      declare name: string;
+
       static {
         this._tableName = "rwp_authors";
         this.attribute("name", "string");
       }
     }
     class RwpHuman extends Base {
+      declare name: string;
+
       static {
         this._tableName = "rwp_humans";
         this.attribute("name", "string");
       }
     }
     class RwpEssay extends Base {
+      declare name: string;
+      declare writer_type: string;
+      declare writer_id: string;
+      declare writer: Base | null;
+      declare loadBelongsTo: (name: "writer") => Promise<Base | null>;
+
       static {
         this._tableName = "rwp_essays";
         this.attribute("name", "string");
@@ -805,6 +901,9 @@ describe("WhereChainTest", () => {
 
   it("rewhere with range", async () => {
     class RrPost extends Base {
+      declare title: string;
+      declare score: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");

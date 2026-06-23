@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
@@ -33,18 +34,27 @@ describe("InnerJoinAssociationTest", () => {
 
   function makeModels() {
     class Author extends Base {
+      declare name: string;
+      declare posts: AssociationProxy<Post>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("posts", {});
       }
     }
     class Post extends Base {
+      declare title: string;
+      declare author_id: number;
+
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }
     }
     class Comment extends Base {
+      declare body: string;
+      declare post_id: number;
+
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
@@ -232,6 +242,10 @@ describe("InnerJoinAssociationTest", () => {
 
   it("find with sti join", async () => {
     class Comment extends Base {
+      declare body: string;
+      declare "type": string;
+      declare post_id: number;
+
       static {
         this.attribute("body", "string");
         this.attribute("type", "string");
@@ -244,6 +258,8 @@ describe("InnerJoinAssociationTest", () => {
     class SubSpecialComment extends SpecialComment {}
     registerSubclass(SubSpecialComment);
     class Post extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -283,6 +299,10 @@ describe("InnerJoinAssociationTest", () => {
 
   it("find with conditions on through reflection", async () => {
     class ThrAuthor extends Base {
+      declare name: string;
+      declare thrPosts: AssociationProxy<ThrPost>;
+      declare thrTags: AssociationProxy<ThrTag>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("thrPosts", { foreignKey: "thr_author_id" });
@@ -294,6 +314,11 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     class ThrPost extends Base {
+      declare title: string;
+      declare thr_author_id: number;
+      declare thrTaggings: AssociationProxy<ThrTagging>;
+      declare thrTags: AssociationProxy<ThrTag>;
+
       static {
         this.attribute("title", "string");
         this.attribute("thr_author_id", "integer");
@@ -306,6 +331,11 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     class ThrTagging extends Base {
+      declare thr_post_id: number;
+      declare thr_tag_id: number;
+      declare thrTag: ThrTag | null;
+      declare loadBelongsTo: (name: "thrTag") => Promise<ThrTag | null>;
+
       static {
         this.attribute("thr_post_id", "integer");
         this.attribute("thr_tag_id", "integer");
@@ -316,6 +346,8 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     class ThrTag extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
@@ -407,6 +439,9 @@ describe("InnerJoinAssociationTest", () => {
 
   it("joins a has_and_belongs_to_many association", async () => {
     class HabtmPost extends Base {
+      declare title: string;
+      declare habtmTags: AssociationProxy<HabtmTag>;
+
       static {
         this.attribute("title", "string");
         this.hasAndBelongsToMany("habtmTags", {
@@ -416,6 +451,8 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     class HabtmTag extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }

@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
@@ -177,6 +178,9 @@ describe("AssociationsExtensionsTest", () => {
 
   function setupExtModels() {
     class ExtComment extends Base {
+      declare body: string;
+      declare ext_post_id: number;
+
       static {
         this._tableName = "ext_comments";
         this.attribute("id", "integer");
@@ -186,6 +190,9 @@ describe("AssociationsExtensionsTest", () => {
       }
     }
     class ExtPost extends Base {
+      declare title: string;
+      declare extComments: AssociationProxy<ExtComment>;
+
       static {
         this._tableName = "ext_posts";
         this.attribute("id", "integer");

@@ -1,3 +1,4 @@
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, Rollback } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -22,6 +23,9 @@ beforeAll(async () => {
 describe("HabtmDestroyOrderTest", () => {
   function makeModels() {
     class Student extends Base {
+      declare name: string;
+      declare lessons: AssociationProxy<Lesson>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("lessons", {
@@ -31,6 +35,9 @@ describe("HabtmDestroyOrderTest", () => {
       }
     }
     class Lesson extends Base {
+      declare name: string;
+      declare students: AssociationProxy<Student>;
+
       static {
         this.attribute("name", "string");
         // Mirrors models/lesson.rb: before_destroy :ensure_no_students,

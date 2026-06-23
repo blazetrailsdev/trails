@@ -1,7 +1,9 @@
 // Syntactic walker for model source files.
 //
-// Finds top-level class declarations that extend a name in the allow-list
-// (default: ["Base"]) and collects the runtime calls inside each class's
+// Finds class declarations that extend a name in the allow-list
+// (default: ["Base"]) — anywhere in the file, including classes nested in
+// `describe`/`it`/helper-function bodies — and collects the runtime calls
+// inside each class's
 // static blocks — `this.attribute(...)`, `this.hasMany(...)`,
 // `this.belongsTo(...)`, `this.hasOne(...)`, `this.hasAndBelongsToMany(...)`,
 // `this.scope(...)`, `this.enum(...)` — plus top-level `defineEnum(this, ...)`
@@ -107,81 +109,141 @@ export interface ClassInfo {
 export interface WalkOptions {
   /** Class names counted as roots. Defaults to `["Base"]`. */
   baseNames?: readonly string[];
+  /**
+   * When supplied, decides per class-declaration NODE whether it is a model
+   * to virtualize, REPLACING the name-based `baseNames` heritage match.
+   *
+   * The name-based match is ambiguous once classes are visited at any
+   * nesting depth: two `class Foo extends Bar` in sibling `describe`/`it`
+   * scopes share the name `Foo` but may have different `Bar`s, so a flat
+   * name allow-list can mis-classify a sibling-scope subclass. Callers that
+   * resolve inheritance lexically (or via a `ts.Program` checker) pass this
+   * predicate so the decision is made on the actual node, not its name.
+   */
+  isModelClass?: (cls: ts.ClassDeclaration) => boolean;
 }
 
 export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassInfo[] {
   const baseNames = new Set(opts.baseNames ?? ["Base"]);
   const out: ClassInfo[] = [];
 
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isClassDeclaration(stmt)) continue;
-    if (!stmt.name) continue;
-    if (!extendsOneOf(stmt, baseNames)) continue;
-
-    const info: ClassInfo = {
-      name: stmt.name.text,
-      classDecl: stmt,
-      openBracePos: findOpenBrace(sourceFile.text, stmt),
-      calls: [],
-      existingMembers: new Set(),
-      existingStaticMembers: new Set(),
-      skip: hasSkipMarker(stmt, sourceFile),
-    };
-
-    if (info.skip) {
-      out.push(info);
-      continue;
+  // Visit class declarations anywhere in the tree — not just top-level
+  // statements. AR test files routinely declare their model classes inside
+  // `describe`/`it`/helper-function bodies, and those classes carry the
+  // same `static { this.hasMany(...) }` association calls we materialize.
+  const isModel = opts.isModelClass ?? ((cls: ts.ClassDeclaration) => extendsOneOf(cls, baseNames));
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name && isModel(node)) {
+      out.push(buildClassInfo(node, sourceFile));
     }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 
-    for (const member of stmt.members) {
-      recordExistingMember(member, info);
-      if (ts.isClassStaticBlockDeclaration(member)) {
-        for (const s of member.body.statements) {
-          const call = readThisCall(s);
-          if (call) {
-            info.calls.push(call);
-            continue;
+  // Standalone `defineEnum(ClassName, ...)` calls — at any nesting depth,
+  // mirroring the class traversal above so nested test models authored as
+  // `defineEnum(Post, "status", ...)` inside an `it`/helper body get the
+  // same enum predicate/bang/scope declares as top-level ones. Supports
+  // both the array form (`["draft", "published"]`) and the object form
+  // (`{ draft: 0, published: 1 }`). The target is resolved lexically (the
+  // nearest in-scope `class ClassName`) so a `defineEnum(Post, ...)` in one
+  // callback attaches to that callback's `Post`, not a same-named class in
+  // a sibling scope.
+  const visitDefineEnum = (node: ts.Node): void => {
+    if (ts.isExpressionStatement(node)) {
+      const call = node.expression;
+      if (
+        ts.isCallExpression(call) &&
+        ts.isIdentifier(call.expression) &&
+        call.expression.text === "defineEnum"
+      ) {
+        const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
+        const targetName = targetArg && ts.isIdentifier(targetArg) ? targetArg.text : null;
+        const values = mapArg ? readEnumValues(mapArg) : null;
+        if (targetName && attrArg && ts.isStringLiteralLike(attrArg) && values) {
+          const info = resolveLexicalClassInfo(out, node, targetName);
+          if (info) {
+            info.calls.push({
+              kind: "defineEnum",
+              attr: attrArg.text,
+              values,
+              options: readRecordLiteral(optsArg),
+            });
           }
-          // Static-block `defineEnum(this, "status", { ... })` —
-          // Rails-idiomatic authoring form (matches Ruby's
-          // `enum :status, ...` inside the class body). Walker also
-          // supports the top-level `defineEnum(ClassName, ...)` form
-          // below.
-          const defineEnumCall = readDefineEnumThisCall(s);
-          if (defineEnumCall) info.calls.push(defineEnumCall);
         }
       }
     }
-
-    out.push(info);
-  }
-
-  // Top-level `defineEnum(ClassName, ...)` calls. Supports both the array
-  // form (`["draft", "published"]`) and the object form
-  // (`{ draft: 0, published: 1 }`).
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isExpressionStatement(stmt)) continue;
-    const call = stmt.expression;
-    if (!ts.isCallExpression(call)) continue;
-    if (!ts.isIdentifier(call.expression) || call.expression.text !== "defineEnum") continue;
-    const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
-    if (!targetArg || !attrArg || !mapArg) continue;
-    if (!ts.isStringLiteralLike(attrArg)) continue;
-    const values = readEnumValues(mapArg);
-    if (!values) continue;
-    const targetName = ts.isIdentifier(targetArg) ? targetArg.text : null;
-    if (!targetName) continue;
-    const info = out.find((c) => c.name === targetName);
-    if (!info) continue;
-    info.calls.push({
-      kind: "defineEnum",
-      attr: attrArg.text,
-      values,
-      options: readRecordLiteral(optsArg),
-    });
-  }
+    ts.forEachChild(node, visitDefineEnum);
+  };
+  visitDefineEnum(sourceFile);
 
   return out;
+}
+
+/**
+ * Resolve `name` to the `ClassInfo` whose declaration is lexically visible
+ * from `usage`, preferring the nearest enclosing scope — so a
+ * `defineEnum(Post, ...)` binds to the `Post` declared in the same
+ * `describe`/`it`/function body rather than a same-named class elsewhere in
+ * the file. Falls back to the first `ClassInfo` with a matching name (the
+ * historical top-level behavior) when no enclosing-scope class matches.
+ */
+function resolveLexicalClassInfo(
+  out: readonly ClassInfo[],
+  usage: ts.Node,
+  name: string,
+): ClassInfo | undefined {
+  for (let node: ts.Node | undefined = usage.parent; node; node = node.parent) {
+    const statements = ts.isSourceFile(node)
+      ? node.statements
+      : ts.isBlock(node) || ts.isModuleBlock(node)
+        ? node.statements
+        : undefined;
+    if (!statements) continue;
+    for (const stmt of statements) {
+      if (ts.isClassDeclaration(stmt) && stmt.name?.text === name) {
+        const info = out.find((c) => c.classDecl === stmt);
+        if (info) return info;
+      }
+    }
+  }
+  return out.find((c) => c.name === name);
+}
+
+function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): ClassInfo {
+  const info: ClassInfo = {
+    name: cls.name!.text,
+    classDecl: cls,
+    openBracePos: findOpenBrace(sourceFile.text, cls),
+    calls: [],
+    existingMembers: new Set(),
+    existingStaticMembers: new Set(),
+    skip: hasSkipMarker(cls, sourceFile),
+  };
+
+  if (info.skip) return info;
+
+  for (const member of cls.members) {
+    recordExistingMember(member, info);
+    if (ts.isClassStaticBlockDeclaration(member)) {
+      for (const s of member.body.statements) {
+        const call = readThisCall(s);
+        if (call) {
+          info.calls.push(call);
+          continue;
+        }
+        // Static-block `defineEnum(this, "status", { ... })` —
+        // Rails-idiomatic authoring form (matches Ruby's
+        // `enum :status, ...` inside the class body). Walker also
+        // supports the top-level `defineEnum(ClassName, ...)` form
+        // below.
+        const defineEnumCall = readDefineEnumThisCall(s);
+        if (defineEnumCall) info.calls.push(defineEnumCall);
+      }
+    }
+  }
+
+  return info;
 }
 
 function extendsOneOf(cls: ts.ClassDeclaration, names: Set<string>): boolean {

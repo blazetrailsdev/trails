@@ -3,6 +3,7 @@
  * Each factory builds fresh subclasses so tests are isolated from each other
  * and from the global model registry.
  */
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base, registerModel, modelRegistry } from "../../index.js";
 import type { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
@@ -80,6 +81,8 @@ export function makeSongAlbumModels(): {
   cleanup: () => void;
 } {
   class Song extends Base {
+    declare albums: AssociationProxy<Album>;
+
     static {
       this.tableName = "music.songs";
       this.hasAndBelongsToMany("albums", { joinTable: "music.albums_songs" });
