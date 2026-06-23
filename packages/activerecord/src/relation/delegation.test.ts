@@ -66,7 +66,11 @@ describe("DelegationTest", () => {
       expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
         NotImplementedError,
       );
-      expect(() => guardBaseMethodDelegation(Post as any, "publishedScopeOnly")).not.toThrow();
+      // `namedExtension` is a real own static defined on `Post` itself (below
+      // `Base` in the static chain), so it is exempt — proving subclass-defined
+      // class members stay delegable.
+      expect(Object.prototype.hasOwnProperty.call(Post, "namedExtension")).toBe(true);
+      expect(() => guardBaseMethodDelegation(Post as any, "namedExtension")).not.toThrow();
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {
