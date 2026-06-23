@@ -552,6 +552,15 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): void {
     self[key] = value;
     return;
   }
+  // Rails' #update → assign_attributes dispatches `id` through `public_send("id=")`,
+  // which for a composite-PK model distributes the value across the key columns.
+  // Route it through the `id=` setter here too: the raw `writeAttribute` path
+  // remaps `id` to the PK and rejects a composite PK (write.rb:35), so a direct
+  // write would wrongly raise for `update(id: [...])`.
+  if (key === "id") {
+    self.id = value;
+    return;
+  }
   self.writeAttribute(key, value);
 }
 
