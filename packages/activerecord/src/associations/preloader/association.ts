@@ -6,6 +6,9 @@ import { _wireInverseAssociation } from "../../associations.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+
 /**
  * Handles preloading a single association for a group of records.
  * Queries the database, maps results to owners by key, and associates
@@ -286,7 +289,16 @@ export class Association {
 
   private _convertKey(key: unknown): unknown {
     if (key == null) return key;
-    return this._isKeyConversionRequired() ? String(key) : key;
+    if (this._isKeyConversionRequired()) return String(key);
+    // node-postgres parses int8 (a bigserial PK) to BigInt and int4 (an
+    // integer/references FK) to number, so an owner PK `1n` and a child FK `1`
+    // are distinct JS Map keys even though Ruby compares them equal (Integer ==
+    // is width-agnostic). Normalize both sides to a number when the value fits,
+    // so the owner/child lookup keys collide as they do in Rails.
+    if (typeof key === "bigint") {
+      return key >= MIN_SAFE_BIGINT && key <= MAX_SAFE_BIGINT ? Number(key) : key.toString();
+    }
+    return key;
   }
 
   private _isKeyConversionRequired(): boolean {
