@@ -228,6 +228,17 @@ export class HasOneAssociation extends SingularAssociation {
         // owner's PK was unknown when `replace` ran, so set it now that the
         // owner has been persisted.
         this.setOwnerAttributes(pending.record);
+        // Re-seed the inverse now the FK is finalized. This deferred new-owner
+        // flush is trails' analog of Rails' `save_has_one_association`
+        // (autosave_association.rb:489-497), which — `unless through_reflection`
+        // — writes the FK then calls `association.set_inverse_instance(record)`.
+        // It recaptures the child belongs_to's stale state from the just-written
+        // FK (via `inversedFrom` → replaceKeys → loadedBang) so its reader sees
+        // `stale_target? == false` and keeps the inversed instance rather than
+        // reloading. The `through_reflection` guard is structural here:
+        // HasOneThroughAssociation overrides `persistReplace` and never reaches
+        // this base path.
+        this.setInverseInstance(pending.record);
         const saved = await (pending.record as any).save();
         if (!saved) {
           this.nullifyOwnerAttributes(pending.record);

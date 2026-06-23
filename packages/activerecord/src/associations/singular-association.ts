@@ -74,7 +74,21 @@ export class SingularAssociation extends Association {
    *                    lazy loads through.
    */
   get reader(): Base | null | Promise<Base | null> {
-    if (this.loaded) return this.target;
+    if (this.loaded) {
+      // Rails (singular_association.rb:10-13) reloads a loaded target when it
+      // has gone stale — the owner's FK / key changed after the target was
+      // loaded (`if !loaded? || stale_target?; reload`). `reload` resets the
+      // cached target first so the subsequent `loadTarget` re-queries instead
+      // of returning the stale cache. The reload requires DB I/O in Node, so
+      // return a Promise resolving to the refreshed target, consistent with
+      // the lazy-load path below. An inversed target stays non-stale because
+      // its stale state is recaptured when the FK is seeded (BelongsTo
+      // `inversedFrom` → replaceKeys → loadedBang), so this branch is skipped.
+      if (this.isStaleTarget()) {
+        return this.reload().then(() => this.target);
+      }
+      return this.target;
+    }
 
     // An in-memory target (set via build / internal assignment paths
     // like Preloader::Association#associate_records_from_unscoped,
