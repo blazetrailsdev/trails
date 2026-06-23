@@ -1560,19 +1560,14 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = this.uniqueConstraintName(tableName, options);
-    const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(
-      `SELECT c.conname, c.conrelid, c.conkey FROM pg_constraint c
-       JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
-       WHERE c.contype = 'u' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
-      [name],
-    );
-    if (rows.length === 0) return undefined;
-    const row = rows[0];
-    const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
-    const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
-    return new UniqueConstraintDefinition(tableName, cols, { name });
+    // Mirrors Rails: name is computed only when no :column option is given, then
+    // the full unique_constraints listing is filtered via defined_for? — which
+    // matches on column as well as name. Rails calls
+    // defined_for?(name: name, **options), so an explicit options.name overrides
+    // the computed fallback (the spread comes last).
+    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
+    const constraints = await this.uniqueConstraints(tableName);
+    return constraints.find((c) => c.definedFor({ name, ...options }));
   }
 
   /** @internal */
