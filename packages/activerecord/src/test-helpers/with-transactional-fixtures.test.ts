@@ -137,9 +137,8 @@ describe("withTransactionalFixtures (defineSchema signature cache invalidation)"
     // If the signature cache hadn't been cleared, `defineSchema` would
     // short-circuit on the cached signature without recreating the
     // table. On SQLite `adapter.columns()` against a missing table
-    // returns `[]` (PRAGMA table_info on an unknown name yields no
-    // rows), so the bug would surface as an empty column list — not a
-    // throw.
+    // raises StatementInvalid (Rails `table_structure` raises when the
+    // PRAGMA yields no rows), so the bug would surface as a throw here.
     await defineSchema(adapter, { defsig_table: { name: "string" } });
     const cols = await adapter.columns("defsig_table");
     expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);

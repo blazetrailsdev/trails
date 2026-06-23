@@ -262,6 +262,7 @@ export function newColumnFromField(
     {
       defaultFunction: defaultFunction ?? undefined,
       collation: field["collation"] as string | undefined,
+      primaryKey: Number(field["pk"]) > 0,
       autoIncrement: Boolean(field["auto_increment"]),
       rowid,
       generatedType,
@@ -367,7 +368,13 @@ export function extractValueFromDefault(dfltValue: string | null): unknown {
 export { extractValueFromDefault as _extractValueFromDefault };
 
 function _extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
-  if (defaultValue == null && dflt != null && /\w+\(.*\)|CURRENT_DATE|CURRENT_TIME/i.test(dflt)) {
+  // Mirrors Rails' SQLite3Adapter#has_default_function? regex
+  // (sqlite3_adapter.rb): a call, CURRENT_* keyword, or `||` concat.
+  if (
+    defaultValue == null &&
+    dflt != null &&
+    /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(dflt)
+  ) {
     return dflt;
   }
   return null;

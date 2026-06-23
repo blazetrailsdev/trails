@@ -50,6 +50,20 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(id?.primaryKey).toBe(true);
   });
 
+  it("columns reflects a STORED generated column's expression as default_function", async () => {
+    // Mirrors Rails' new_column_from_field: for a generated column the
+    // table_structure_with_collation pass overrides dflt_value with the
+    // generation expression, which becomes the column's default_function.
+    await adapter.executeMutation(
+      `CREATE TABLE "widgets" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,
+    );
+    const cols = await adapter.columns("widgets");
+    const total = cols.find((c) => c.name === "total");
+    expect(total?.defaultFunction).toBe(`"price" + "tax"`);
+    // Generated columns never emit a default in the schema dump.
+    expect((total as { isVirtual(): boolean }).isVirtual()).toBe(true);
+  });
+
   it("indexes returns user-created indexes and skips auto-indexes", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, email TEXT UNIQUE, owner TEXT)",

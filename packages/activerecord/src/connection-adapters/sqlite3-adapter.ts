@@ -18,7 +18,7 @@ import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
-  isColumnTheRowid,
+  newColumnFromField,
 } from "./sqlite3/schema-statements.js";
 import {
   indexNameForRemoveFrom,
@@ -963,6 +963,35 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return this._nativeTypeMap.lookup(normalized);
   }
 
+  /**
+   * Build a SqlTypeMetadata from a raw SQLite column type string. Used by
+   * `newColumnFromField` (the Rails `new_column_from_field` flow) so `columns()`
+   * and the schema-statements column path share one type-reflection routine.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata.
+   * Rails carries the full `sql_type` string and lets `lookup_cast_type`'s regex
+   * registrations parse precision/limit; trails' SQLite type map does not extract
+   * those, so we parse the `(N)` parameter here (precision for temporal types,
+   * limit otherwise) and store the base name in `sqlType`.
+   */
+  fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
+    const raw = sqlType || "";
+    const paramMatch = /\((\d+)\)/.exec(raw);
+    const isDtPrec = /^(datetime|timestamp|time)\b/i.test(raw);
+    const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
+    const castType = this.lookupCastType(baseSqlType);
+    const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
+    return new SqlTypeMetadata({
+      sqlType: baseSqlType,
+      type: dslTypeName,
+      limit,
+      precision,
+      scale: null,
+    });
+  }
+
   lookupCastTypeFromColumn(column: {
     sqlType?: string | null;
     precision?: number | null;
@@ -1886,90 +1915,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Return Column objects for the named table. Only the fields the
-   * schema cache actually serializes are populated — name, default,
-   * null, sqlTypeMetadata, primaryKey.
+   * Return Column objects for the named table.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#columns —
+   * `table_structure → table_structure_with_collation → new_column_from_field`.
+   * Routing every field through `newColumnFromField` (rather than a parallel
+   * hand-rolled reflection) means STORED/VIRTUAL generated columns report their
+   * generation expression as `default_function`, since
+   * `tableStructureWithCollation` overrides the GENERATED `dflt_value`.
    */
   async columns(tableName: string): Promise<Column[]> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = (await this.execute(
-      `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
-      [],
-      "SCHEMA",
-    )) as Array<{
-      name: string;
-      type: string;
-      notnull: number;
-      dflt_value: string | null;
-      pk: number;
-    }>;
-
-    // Enrich the PRAGMA rows with COLLATE + AUTOINCREMENT via the same
-    // `table_structure_with_collation` pass Rails uses. We read only
-    // collation/auto_increment here; defaultFunction is still derived from the
-    // raw PRAGMA `dflt_value` below, so the method's GENERATED `dflt_value`
-    // override does not affect this path.
-    const enriched = await this.tableStructureWithCollation(tableName, rows);
-    const collationMap = new Map<string, string>();
-    const autoIncrementCols = new Set<string>();
-    for (const e of enriched) {
-      const name = String(e["name"]);
-      if (e["collation"] != null) collationMap.set(name, String(e["collation"]));
-      if (e["auto_increment"]) autoIncrementCols.add(name);
-    }
-
-    return rows.map((r) => {
-      const sqlType = r.type || "";
-      // Extract (N) parameter — precision for temporal types, limit for everything else.
-      const paramMatch = /\((\d+)\)/.exec(sqlType);
-      const isDtPrec = /^(datetime|timestamp|time)\b/i.test(sqlType);
-      const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-      const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-      // Strip (N) so the base SQL name can be looked up in the TypeMap.
-      // NOTE: baseSqlType is stored in sqlType (e.g. "varchar" not "varchar(10)").
-      // This diverges from Rails' SqlTypeMetadata#sql_type which carries the full
-      // string. It is safe here because `limit` is populated explicitly above, so
-      // schemaLimit does not need to parse parens from column.sqlType.
-      const baseSqlType = paramMatch ? sqlType.slice(0, sqlType.indexOf("(")).trimEnd() : sqlType;
-      // Resolve the DSL cast-type name (e.g. "varchar" → "string") via the
-      // TypeMap so schemaType returns the right DSL identifier after U3 wires
-      // emitTable through columnSpec.
-      const castType = this.lookupCastType(baseSqlType);
-      const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
-      const meta = new SqlTypeMetadata({
-        sqlType: baseSqlType,
-        type: dslTypeName,
-        limit,
-        precision,
-        scale: null,
-      });
-      const rawDflt = r.dflt_value;
-      const defaultValue = sqliteExtractValueFromDefault(rawDflt);
-      // Mirrors Rails' SQLite3Adapter#extract_default_function /
-      // #has_default_function?: only treat the dflt_value as a SQL function
-      // expression when the literal parse returned nil AND the raw string
-      // matches a known function pattern (call, CURRENT_* keywords, concat).
-      const defaultFunction =
-        rawDflt !== null &&
-        !defaultValue &&
-        /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(rawDflt)
-          ? rawDflt
-          : null;
-      // Reflect rowid (INTEGER single-column PK aliases the rowid) and
-      // AUTOINCREMENT so `Column#auto_populated?` reports auto-increment columns
-      // — mirrors Rails SQLite3Adapter#new_column_from_field. The PK's position
-      // in the column list is irrelevant (`t.primary_key :auto_id` declared last
-      // still aliases the rowid).
-      const rowid = isColumnTheRowid(r as unknown as Record<string, unknown>, rows);
-      return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
-        primaryKey: r.pk > 0,
-        collation: collationMap.get(r.name) ?? null,
-        defaultFunction,
-        autoIncrement: autoIncrementCols.has(r.name),
-        rowid,
-      });
-    });
+    const fields = await this.tableStructure(tableName);
+    return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
   // Mirrors: SQLite3Adapter#table_structure_with_collation
@@ -2361,8 +2318,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
+    // Schema-qualified names (ATTACHed DBs) must use the `PRAGMA aux.table_info(t)`
+    // prefix form; `PRAGMA table_info("aux"."t")` treats the whole quoted argument
+    // as a bare table name and returns zero rows.
+    const { schema, bare } = this._splitTableName(tableName);
+    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const pragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
-    return this.execute(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, [], "SCHEMA");
+    return this.execute(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`, [], "SCHEMA");
   }
 
   /** @internal */
@@ -2377,8 +2339,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Rails' table_structure_sql anchors on a single `\s` before each column
     // name; we widen it to `\s*` so hand-written multi-line CREATE TABLE
     // (`,\n    "col"`) still splits — the newline+indent would otherwise defeat
-    // the single-`\s` lookahead. Still safe: the lookahead requires a quoted
-    // column name or CONSTRAINT.
+    // the single-`\s` lookahead. This is the column-reflection path for
+    // `columns()` (COLLATE / AUTOINCREMENT / GENERATED enrichment), so the
+    // multi-line tolerance is load-bearing (see adapters/sqlite3/collation.test.ts).
+    // Still safe: the lookahead requires a quoted column name or CONSTRAINT.
     if (names.length > 0) {
       const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
       splitter = new RegExp(`,(?=\\s*(?:CONSTRAINT|"(?:${escaped})"))`, "i");
