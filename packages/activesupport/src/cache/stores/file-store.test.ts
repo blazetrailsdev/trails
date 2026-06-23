@@ -67,6 +67,14 @@ describe("FileStoreTest", () => {
     expect(existsSync(cacheDir)).toBe(true);
   });
 
+  it("delete prunes empty parent directories", () => {
+    store.write("a/b", "val");
+    expect(existsSync(join(cacheDir, "a"))).toBe(true);
+    store.delete("a/b");
+    expect(existsSync(join(cacheDir, "a"))).toBe(false);
+    expect(existsSync(cacheDir)).toBe(true);
+  });
+
   it("log exception when cache read fails", () => {
     // Corrupted cache files should return null gracefully
     expect(store.read("nonexistent_key")).toBeNull();

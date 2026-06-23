@@ -57,10 +57,25 @@ export class FileStore extends Store implements CacheStore {
     try {
       if (getFs().existsSync(filePath)) {
         getFs().unlinkSync(filePath);
+        this.deleteEmptyDirectories(getPath().dirname(filePath));
         return true;
       }
     } catch {}
     return false;
+  }
+
+  // Mirrors Rails delete_empty_directories (file_store.rb:194-201): after
+  // unlinking the entry, recursively remove now-empty intermediate directories
+  // up to — but never including — cacheDir.
+  private deleteEmptyDirectories(dir: string): void {
+    if (getPath().resolve(dir) === getPath().resolve(this.cacheDir)) return;
+    try {
+      if (getFs().readdirSync(dir).length > 0) return;
+      getFs().rmdirSync(dir);
+    } catch {
+      return;
+    }
+    this.deleteEmptyDirectories(getPath().dirname(dir));
   }
 
   private keyToPath(key: string): string {
