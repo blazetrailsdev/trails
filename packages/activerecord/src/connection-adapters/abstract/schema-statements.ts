@@ -217,19 +217,18 @@ export class SchemaStatements {
   }
 
   /**
-   * Build the PRAGMA target for a SQLite introspection pragma, converged with
-   * SQLite3Adapter's `_splitTableName` schema-prefix form. A schema-qualified
-   * name (e.g. `aux.widgets`, an ATTACHed database) must use the
-   * `PRAGMA aux.table_info("widgets")` prefix form — `PRAGMA table_info("aux"."widgets")`
+   * Split a (possibly schema-qualified) table name into the introspection-PRAGMA
+   * schema prefix and bare name, converged with SQLite3Adapter's
+   * `_splitTableName` form. The schema qualifier comes BEFORE the PRAGMA keyword
+   * (`PRAGMA aux.table_info("widgets")`) — `PRAGMA table_info("aux"."widgets")`
    * makes SQLite treat the whole quoted string as one bare table name and
-   * return zero rows.
+   * return zero rows for ATTACHed databases.
    */
-  protected _sqlitePragmaTarget(tableName: string, pragma: string): string {
+  protected _sqliteSchemaPrefix(tableName: string): { prefix: string; bare: string } {
     const dot = tableName.lastIndexOf(".");
     const schema = dot === -1 ? "" : tableName.slice(0, dot);
     const bare = dot === -1 ? tableName : tableName.slice(dot + 1);
-    const prefix = schema ? `${this._qi(schema)}.` : "";
-    return `${prefix}${pragma}(${this._qi(bare)})`;
+    return { prefix: schema ? `${this._qi(schema)}.` : "", bare };
   }
 
   async createTable(
@@ -972,9 +971,8 @@ export class SchemaStatements {
   async columns(tableName: string): Promise<Column[]> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(
-          `PRAGMA ${this._sqlitePragmaTarget(tableName, "table_info")}`,
-        );
+        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
+        const rows = await this.adapter.execute(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
           return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
@@ -1089,13 +1087,14 @@ export class SchemaStatements {
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(
-          `PRAGMA ${this._sqlitePragmaTarget(tableName, "index_list")}`,
-        );
+        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
+        const rows = await this.adapter.execute(`PRAGMA ${prefix}index_list(${this._qi(bare)})`);
         const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
         for (const row of rows as any[]) {
+          // index_info takes the bare index name; the schema qualifier, if any,
+          // comes before the PRAGMA keyword — same prefix as index_list above.
           const cols = await this.adapter.execute(
-            `PRAGMA index_info(${this.adapter.quote(row.name)})`,
+            `PRAGMA ${prefix}index_info(${this._qi(row.name)})`,
           );
           result.push({
             name: row.name,
@@ -1148,9 +1147,8 @@ export class SchemaStatements {
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     switch (this.adapterName) {
       case "sqlite": {
-        const rows = await this.adapter.execute(
-          `PRAGMA ${this._sqlitePragmaTarget(tableName, "table_info")}`,
-        );
+        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
+        const rows = await this.adapter.execute(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
         const pk = (rows as any[]).find((r: any) => r.pk > 0);
         return pk ? pk.name : null;
       }

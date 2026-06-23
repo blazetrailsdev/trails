@@ -111,13 +111,24 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.allSql.at(-1)).toBe('PRAGMA "aux".index_list("widgets")');
   });
 
-  it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
+  it("indexes() sqlite arm quotes the index name as an identifier in the index_info PRAGMA", async () => {
     // First call is index_list; surface one index whose name has a quote.
-    const sqlite = new SqliteCapturingAdapter([{ name: "idx'x", unique: 1 }]);
+    const sqlite = new SqliteCapturingAdapter([{ name: 'idx"x', unique: 1 }]);
     await sqlite.indexes("things");
-    // The index name passes through `quote()` (a SQL string literal), not an
-    // identifier quoter, so embedded `'` is doubled.
-    expect(sqlite.allSql).toEqual(['PRAGMA index_list("things")', "PRAGMA index_info('idx''x')"]);
+    // Converged with SQLite3Adapter: index_info quotes the index name as an
+    // identifier (quoteColumnName), so embedded `"` is doubled.
+    expect(sqlite.allSql).toEqual(['PRAGMA index_list("things")', 'PRAGMA index_info("idx""x")']);
+  });
+
+  it("indexes() sqlite arm carries the schema prefix into the index_info PRAGMA", async () => {
+    // The index lives in the table's schema, so index_info must use the same
+    // prefix as index_list — not query the default schema for the index name.
+    const sqlite = new SqliteCapturingAdapter([{ name: "idx_widgets_name", unique: 0 }]);
+    await sqlite.indexes("aux.widgets");
+    expect(sqlite.allSql).toEqual([
+      'PRAGMA "aux".index_list("widgets")',
+      'PRAGMA "aux".index_info("idx_widgets_name")',
+    ]);
   });
 
   it("primaryKey() sqlite arm uses the schema-prefix form for a schema-qualified name", async () => {
