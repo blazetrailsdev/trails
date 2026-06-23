@@ -3,9 +3,10 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/delegation_test.rb
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Relation, registerModel } from "../index.js";
-import { delegateArrayMethod } from "./delegation.js";
+import { delegateArrayMethod, DelegateCache, guardBaseMethodDelegation } from "./delegation.js";
+import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -31,6 +32,53 @@ describe("DelegationTest", () => {
     const target = Comment.all();
     expect("project" in target).toBe(false);
     expect(typeof target.arel().project).toBe("function");
+  });
+
+  describe("delegate_base_methods guard", () => {
+    // Mirrors Rails delegation.rb:120-126: when
+    // `DelegateCache.delegate_base_methods` is false (set in Rails'
+    // test/cases/helper.rb:29), delegating a relation `method_missing` into a
+    // method `ActiveRecord::Base` itself responds to raises NotImplementedError
+    // rather than silently scoping the call. Without it, `relation.<baseMethod>`
+    // is delegated-with-scoping, mutating the global scope — the bug the guard
+    // bans from AR's own code.
+    afterEach(() => {
+      DelegateCache.delegateBaseMethods = true;
+    });
+
+    it("does not delegate Base methods on a relation when banned", () => {
+      DelegateCache.delegateBaseMethods = false;
+      const relation = Post.all() as any;
+      // `belongsTo` is an ActiveRecord::Base class method not defined on
+      // Relation, so it reaches the class-method delegation path.
+      expect(() => relation.belongsTo("author")).toThrow(NotImplementedError);
+    });
+
+    it("does not ban Function.prototype builtins when banned", () => {
+      DelegateCache.delegateBaseMethods = false;
+      // `call`/`apply`/`bind`/`constructor` are Function.prototype builtins, not
+      // ActiveRecord::Base methods (`Base.respond_to?(:call)` is false in Ruby),
+      // so the guard must not raise on them even though `modelClass.call` is a
+      // function. A real Base method (`belongsTo`) still raises.
+      for (const builtin of ["call", "apply", "bind", "constructor"]) {
+        expect(() => guardBaseMethodDelegation(Post as any, builtin)).not.toThrow();
+      }
+      expect(() => guardBaseMethodDelegation(Post as any, "belongsTo")).toThrow(
+        NotImplementedError,
+      );
+      // `namedExtension` is a real own static defined on `Post` itself (below
+      // `Base` in the static chain), so it is exempt — proving subclass-defined
+      // class members stay delegable.
+      expect(Object.prototype.hasOwnProperty.call(Post, "namedExtension")).toBe(true);
+      expect(() => guardBaseMethodDelegation(Post as any, "namedExtension")).not.toThrow();
+    });
+
+    it("delegates Base methods on a relation when allowed (default)", () => {
+      // Default `true` preserves ordinary `Post.where(...).<baseMethod>` chains:
+      // the call is delegated rather than raising the guard.
+      const relation = Post.all() as any;
+      expect(() => relation.belongsTo("author")).not.toThrow(NotImplementedError);
+    });
   });
 
   describe("QueryingMethodsDelegationTest", () => {
