@@ -432,6 +432,12 @@ describe("AttributeSetTest", () => {
     expect(set.fetch("wibble", () => fallback)).toBe(fallback);
   });
 
+  it("fetch returns the given default value for an unknown name", () => {
+    const set = new AttributeSet(new Map());
+    const fallback = Attribute.null("wibble");
+    expect(set.fetch("wibble", fallback)).toBe(fallback);
+  });
+
   it("except returns a copy without the given names", () => {
     const intType = typeRegistry.lookup("integer");
     const set = new AttributeSet(

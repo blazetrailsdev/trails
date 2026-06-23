@@ -141,10 +141,11 @@ export class LazyAttributeHash {
   /**
    * Return a new map applying `fn` to each materialized Attribute.
    *
-   * Mirrors: `delegate :transform_values, to: :materialize` — Hash#transform_values.
+   * Mirrors: `delegate :transform_values, to: :materialize` — Hash#transform_values
+   * (generic over the block result, e.g. `attributes.transform_values(&:type)`).
    */
-  transformValues(fn: (attr: Attribute) => Attribute): Map<string, Attribute> {
-    const result = new Map<string, Attribute>();
+  transformValues<T>(fn: (attr: Attribute) => T): Map<string, T> {
+    const result = new Map<string, T>();
     for (const [name, attr] of this.materialize()) result.set(name, fn(attr));
     return result;
   }
@@ -159,16 +160,19 @@ export class LazyAttributeHash {
   }
 
   /**
-   * Fetch the materialized Attribute under `name`. Absent key throws
-   * (Ruby `Hash#fetch` raises KeyError); a block supplies the fallback.
+   * Fetch the materialized Attribute under `name`. Mirrors Ruby `Hash#fetch`:
+   * with a block (function) the block result is the fallback; with a plain
+   * default value that value is returned; with neither, an absent key throws
+   * KeyError.
    *
    * Mirrors: `delegate :fetch, to: :materialize`.
    */
-  fetch(name: string, block?: (name: string) => Attribute): Attribute {
+  fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
     const materialized = this.materialize();
     const attr = materialized.get(name);
     if (attr !== undefined) return attr;
-    if (block) return block(name);
+    if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
+    if (defaultOrBlock !== undefined) return defaultOrBlock;
     const err = new Error(`key not found: ${JSON.stringify(name)}`);
     err.name = "KeyError";
     throw err;

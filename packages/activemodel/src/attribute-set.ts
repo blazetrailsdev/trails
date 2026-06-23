@@ -27,15 +27,17 @@ export class AttributeSet {
   }
 
   /**
-   * Fetch the Attribute stored under `name`. With no block, an absent key
-   * throws (Ruby `Hash#fetch` raises KeyError); a block supplies the fallback.
+   * Fetch the Attribute stored under `name`. Mirrors Ruby `Hash#fetch`: with a
+   * block (function) the block result is the fallback; with a plain default
+   * value that value is returned; with neither, an absent key throws KeyError.
    *
    * Mirrors: `delegate :fetch, to: :attributes`.
    */
-  fetch(name: string, block?: (name: string) => Attribute): Attribute {
+  fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
     const attr = this.attributes.get(name);
     if (attr !== undefined) return attr;
-    if (block) return block(name);
+    if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
+    if (defaultOrBlock !== undefined) return defaultOrBlock;
     const err = new Error(`key not found: ${JSON.stringify(name)}`);
     err.name = "KeyError";
     throw err;

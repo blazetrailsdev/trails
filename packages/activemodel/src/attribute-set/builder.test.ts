@@ -131,6 +131,12 @@ describe("LazyAttributeHash", () => {
     expect(result.get("age")!.value).toBe(42);
   });
 
+  it("transform_values is generic over the block result", () => {
+    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
+    const result: Map<string, unknown> = hash.transformValues((attr) => attr.type);
+    expect(result.get("age")).toBe(intType);
+  });
+
   it("each_value yields every materialized attribute", () => {
     const hash = new LazyAttributeHash(
       new Map([
@@ -153,6 +159,12 @@ describe("LazyAttributeHash", () => {
   it("fetch raises for an unknown name without a block", () => {
     const hash = new LazyAttributeHash(new Map(), {});
     expect(() => hash.fetch("missing")).toThrow();
+  });
+
+  it("fetch returns the given default value for an unknown name", () => {
+    const hash = new LazyAttributeHash(new Map(), {});
+    const fallback = Attribute.null("missing");
+    expect(hash.fetch("missing", fallback)).toBe(fallback);
   });
 
   it("except returns a copy without the given names", () => {
