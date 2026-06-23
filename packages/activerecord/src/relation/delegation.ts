@@ -198,6 +198,55 @@ export function generateRelationMethod(
   generatedMethodsFor(modelClass).generate(name, fn);
 }
 
+/**
+ * Look up a previously generated relation method for `modelClass`, or
+ * `undefined` if none has been cached. Lets `wrapCollectionProxy`
+ * (associations.ts) resolve cached delegations without reaching into the
+ * module-private WeakMap.
+ */
+export function lookupGeneratedRelationMethod(
+  modelClass: typeof Base,
+  name: string,
+): AnyCallable | undefined {
+  return _generatedMethodsByModel.get(modelClass)?.get(name);
+}
+
+/**
+ * Build the function that delegates a model class method through a relation /
+ * collection-proxy scope — Rails' `ClassSpecificRelation#method_missing`
+ * `scoping { @klass.public_send(method, ...) }` (delegation.rb:118-131). The
+ * `this` it's invoked with becomes the current scope for the call's duration:
+ * sync results (a Relation) restore the prior scope immediately so the result
+ * is directly chainable; async results (a Promise) defer restoration until the
+ * promise settles, mirroring Rails' synchronous block-scoping across the body.
+ *
+ * This is also what `generateRelationMethod` caches (delegation.rb:127-129) so
+ * subsequent calls skip the proxy miss path.
+ */
+export function classMethodDelegator(
+  modelClass: typeof Base,
+  prop: string,
+  classMethod: AnyCallable,
+): AnyCallable {
+  return function (this: any, ...args: any[]) {
+    guardBaseMethodDelegation(modelClass, prop);
+    const prev = ScopeRegistry.currentScope(modelClass);
+    ScopeRegistry.setCurrentScope(modelClass, this);
+    let result: unknown;
+    try {
+      result = classMethod.apply(modelClass, args);
+    } catch (e) {
+      ScopeRegistry.setCurrentScope(modelClass, prev);
+      throw e;
+    }
+    if (result instanceof Promise) {
+      return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
+    }
+    ScopeRegistry.setCurrentScope(modelClass, prev);
+    return result;
+  };
+}
+
 export function generateMethod(name: string): AnyCallable {
   const holder = { model: null } as any;
   ASDelegation.generate(holder, [name], { to: "model", allowNil: true });
@@ -405,23 +454,15 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // mirroring Rails' synchronous block-scoping across the full body.
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
-        return (...args: any[]) => {
-          guardBaseMethodDelegation(modelClass, prop);
-          const prev = ScopeRegistry.currentScope(modelClass);
-          ScopeRegistry.setCurrentScope(modelClass, target);
-          let result: unknown;
-          try {
-            result = classMethod.apply(modelClass, args);
-          } catch (e) {
-            ScopeRegistry.setCurrentScope(modelClass, prev);
-            throw e;
-          }
-          if (result instanceof Promise) {
-            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
-          }
-          ScopeRegistry.setCurrentScope(modelClass, prev);
-          return result;
-        };
+        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        // Cache the delegation so subsequent calls resolve through the
+        // generated method above rather than re-running this proxy miss path
+        // (delegation.rb:127-129) — except uncacheable methods (to_a/records/
+        // inspect) which Rails never generates.
+        if (!_uncacheableMethods.has(prop)) {
+          generateRelationMethod(modelClass, prop, delegator);
+        }
+        return (...args: any[]) => delegator.apply(target, args);
       }
       return value;
     },

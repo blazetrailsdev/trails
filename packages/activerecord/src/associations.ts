@@ -4,12 +4,14 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
-import { ScopeRegistry } from "./scoping.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,
   delegateEnumerableMethod,
-  guardBaseMethodDelegation,
+  classMethodDelegator,
+  generateRelationMethod,
+  lookupGeneratedRelationMethod,
+  uncacheableMethods,
 } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -3130,25 +3132,20 @@ function wrapCollectionProxy<T extends Base = Base>(
       // Promise) defer restoration until the promise settles — mirrors Rails'
       // synchronous block-scoping across the full method body.
       const modelClass = target.model;
+      // Cached delegation (delegation.rb:127-129): once a class method has been
+      // delegated, resolve through the generated method bound to the scope
+      // rather than re-running the miss path below.
+      const generated = lookupGeneratedRelationMethod(modelClass, prop);
+      if (generated) {
+        return (...args: any[]) => generated.apply(scope, args);
+      }
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        return (...args: any[]) => {
-          guardBaseMethodDelegation(modelClass, prop);
-          const prev = ScopeRegistry.currentScope(modelClass);
-          ScopeRegistry.setCurrentScope(modelClass, scope);
-          let result: unknown;
-          try {
-            result = classMethod.apply(modelClass, args);
-          } catch (e) {
-            ScopeRegistry.setCurrentScope(modelClass, prev);
-            throw e;
-          }
-          if (result instanceof Promise) {
-            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
-          }
-          ScopeRegistry.setCurrentScope(modelClass, prev);
-          return result;
-        };
+        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        if (!uncacheableMethods().has(prop)) {
+          generateRelationMethod(modelClass, prop, delegator);
+        }
+        return (...args: any[]) => delegator.apply(scope, args);
       }
 
       return scopeVal;
