@@ -1265,7 +1265,7 @@ class ApiExtractor
           meth = ident_name(n[1][1])
         end
         if %w[class_eval module_eval].include?(meth)
-          str_node = first_string_literal(n[0] == :command ? n[2] : n[2])
+          str_node = first_string_literal(n[2])
           return if str_node
         end
       end
