@@ -9,6 +9,7 @@ import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from 
 export interface MethodRef {
   name: string;
   isStatic: boolean;
+  ported?: boolean; // set by annotateAgainstTs
 }
 export interface MethodChange extends MethodRef {
   signatureChanged?: { before: string; after: string };
@@ -64,8 +65,12 @@ function methodMap(info: ClassInfo): Map<string, MethodInfo> {
   return out;
 }
 export function signatureOf(m: MethodInfo): string {
-  const part = (p: ParamInfo) =>
-    `${p.kind} ${p.name}` + (p.literal?.value !== undefined ? `=${p.literal.value}` : "");
+  // Fall back to raw default text when there's no primitive literal, so a change
+  // between non-primitive defaults (nil/array/hash/expr) still shifts the sig.
+  const part = (p: ParamInfo) => {
+    const def = p.literal?.value !== undefined ? String(p.literal.value) : p.default;
+    return `${p.kind} ${p.name}` + (def !== undefined ? `=${def}` : "");
+  };
   return (m.params ?? []).map(part).join(", ");
 }
 function callDelta(
@@ -130,8 +135,9 @@ export function diffManifests(base: ApiManifest, target: ApiManifest): VersionDr
   for (const pkgName of [...pkgNames].sort()) {
     const basePkg = base.packages[pkgName];
     const targetPkg = target.packages[pkgName];
+    // A one-sided package is an extraction asymmetry (the base manifest carries
+    // non-rails gems too), not real drift — skip. See vendor/README.md.
     if (!basePkg || !targetPkg) continue;
-
     const baseClasses = classEntries(basePkg);
     const targetClasses = classEntries(targetPkg);
     const addedClasses: ClassRef[] = [];
@@ -182,25 +188,29 @@ function tsIndex(ts: ApiManifest): Map<string, Map<string, Set<string>>> {
   return out;
 }
 
-/** Mark each affected class/method `ported` when it exists in OUR TS surface;
- *  recompute `summary.portedAffected`. Mutates and returns the same object. */
+/**
+ * Mark each affected class/method `ported` against OUR TS surface and recompute
+ * `summary.portedAffected` (counts items landing on ported surface, each at its
+ * own granularity — see vendor/README.md). Mutates and returns the same object.
+ */
 export function annotateAgainstTs(drift: VersionDrift, ts: ApiManifest): VersionDrift {
   const index = tsIndex(ts);
   let portedAffected = 0;
   const methodKey = (m: MethodRef) => `${m.isStatic ? "s" : "i"}:${m.name}`;
+  const mark = (ref: { ported?: boolean }, ported: boolean) => {
+    ref.ported = ported;
+    if (ported) portedAffected++;
+  };
   for (const pkg of drift.packages) {
     const classes = index.get(pkg.package);
-    for (const c of [...pkg.addedClasses, ...pkg.removedClasses]) {
-      c.ported = classes?.has(c.name) ?? false;
-      if (c.ported) portedAffected++;
-    }
+    for (const c of [...pkg.addedClasses, ...pkg.removedClasses])
+      mark(c, classes?.has(c.name) ?? false);
     for (const c of pkg.changedClasses) {
       const methods = classes?.get(c.name);
       c.ported = methods !== undefined;
-      for (const m of c.changedMethods) {
-        m.ported = methods?.has(methodKey(m)) ?? false;
-        if (m.ported) portedAffected++;
-      }
+      // added/removed keyed on class membership; changed keyed on the method.
+      for (const m of [...c.addedMethods, ...c.removedMethods]) mark(m, c.ported);
+      for (const m of c.changedMethods) mark(m, methods?.has(methodKey(m)) ?? false);
     }
   }
   drift.summary.portedAffected = portedAffected;

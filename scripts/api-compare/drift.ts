@@ -85,7 +85,6 @@ function libPathsFor(cloneRoot: string): Record<string, string> {
   }
   return out;
 }
-
 async function extractTargetApi(cloneRoot: string, ref: string): Promise<string> {
   const outPath = join(OUTPUT_DIR, `rails-api@${ref}.json`);
   console.log(`[drift] extracting Ruby API @ ${ref}...`);
@@ -112,6 +111,8 @@ export async function runDrift(ref: string): Promise<string> {
   const ts = await readManifest(join(OUTPUT_DIR, "ts-api.json"));
   const { dest, sha } = await fetchRef(ref);
   const target = await readManifest(await extractTargetApi(dest, ref));
+  // diffManifests only diffs packages both manifests carry, so the extra
+  // non-rails gems in the base/ts manifests (rack, globalid, …) drop out.
   const drift = annotateAgainstTs(diffManifests(base, target), ts);
   const report = {
     baseRef: RAILS!.origin.ref,
