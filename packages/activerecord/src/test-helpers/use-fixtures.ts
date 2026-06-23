@@ -1,5 +1,9 @@
 import { afterEach, beforeAll, beforeEach } from "vitest";
-import { defineFixtures, defineJoinTableFixtures, habtmJoinTableNames } from "./define-fixtures.js";
+import {
+  defineFixtures,
+  defineJoinTableFixtures,
+  throughJoinTableNames,
+} from "./define-fixtures.js";
 import { defineSchema, type Schema } from "./define-schema.js";
 import {
   fixtureRegistry,
@@ -170,17 +174,18 @@ export async function deriveFixtureSchema(
 
 /**
  * Picks each resolved set's table out of `fullSchema`, plus the join table of any
- * HABTM association on a model-backed set. The join-table pull lets a model fixture
- * materialize join rows from an owner association label (e.g. `developers` seeding
- * `computers_developers` from `sharedComputers: ["laptop"]`) without the caller also
- * requesting the join set by name — the table it writes to must exist in the slice.
+ * `has_many :through` / HABTM association on a model-backed set. The join-table pull
+ * lets a model fixture materialize join rows from an owner association label (e.g.
+ * `developers` seeding `computers_developers` from `sharedComputers: ["laptop"]`)
+ * without the caller also requesting the join set by name — the table it writes to
+ * must exist in the slice.
  */
 function sliceSchema(fixtures: ResolvedFixtureMap, fullSchema: Schema): Schema {
   const sub: Schema = {};
   for (const { table, model } of Object.values(fixtures)) {
     if (table in fullSchema) sub[table] = fullSchema[table]!;
     if (model) {
-      for (const joinTable of habtmJoinTableNames(model)) {
+      for (const joinTable of throughJoinTableNames(model)) {
         if (joinTable in fullSchema) sub[joinTable] = fullSchema[joinTable]!;
       }
     }

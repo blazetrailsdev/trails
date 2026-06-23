@@ -283,59 +283,59 @@ function detectHabtmParts(
   return null;
 }
 
-// --- HABTM association-label join-row materialization ---
+// --- has_many:through / HABTM association-label join-row materialization ---
 
 /**
- * A HABTM association declared on the owner model, resolved into the column
- * names of its join table. Mirrors the data Rails' `FixtureSet::TableRow`
- * reads off a `has_and_belongs_to_many` reflection when it materializes join
- * rows from an association label (`developers.yml`'s `david: { shared_computers: laptop }`):
- * `joinTable` is the join table, `lhsKey` the owner's foreign key in it, `rhsKey`
- * the target's foreign key, and `targetTable` the associated model's table (used
- * to resolve a target label to its fixture id, falling back to CRC32).
+ * A `has_many :through` (or HABTM, which trails models as a through association)
+ * declared on the owner model, resolved into its join table's coordinates.
+ * Mirrors Rails' `FixtureSet::TableRow::HasManyThroughProxy`, which materializes
+ * join rows from an association label (`developers.yml`'s
+ * `david: { shared_computers: laptop }`):
+ *
+ * - `joinTable` — the through model's table (`through_reflection.table_name`);
+ * - `lhsKey` — the owner's FK in it (`through_reflection.foreign_key`);
+ * - `rhsKey` — the target's FK (`association.foreign_key`);
+ * - `targetTable` — the associated model's table, used to resolve a target label
+ *   to its fixture id (CRC32 fallback);
+ * - `throughModel` — the through model, consulted for timestamp filling.
  */
-interface HabtmLabelAssoc {
+interface ThroughLabelAssoc {
   joinTable: string;
   lhsKey: string;
   rhsKey: string;
   targetTable: string | undefined;
+  throughModel: BaseClass | undefined;
 }
 
 /**
- * Builds a map of HABTM association name → join-table coordinates for every
- * `has_and_belongs_to_many` reflection on the model, so a fixture row that names
- * one of them (e.g. `sharedComputers: ["laptop"]`) can be expanded into join
- * rows. Mirrors Rails' `TableRow#resolve_sti_reflections` HABTM arm. Reflection
- * getters that resolve the target class (`joinTable`, `klass`) can throw when the
- * associated model isn't registered yet; such associations are skipped rather
- * than failing the whole fixture load — only those a row actually references matter.
+ * Builds a map of association name → join-table coordinates for every
+ * `has_many :through` reflection on the model (HABTM included — trails builds it
+ * as a through association over an anonymous join model), so a fixture row that
+ * names one (e.g. `sharedComputers: ["laptop"]`) can be expanded into join rows.
+ * Mirrors the `:has_many` + `options[:through]` arm of Rails'
+ * `TableRow#resolve_sti_reflections`. Reflection getters that resolve the target
+ * class (`klass`, `throughReflection`) can throw when an associated model isn't
+ * registered yet; such associations are skipped rather than failing the whole
+ * fixture load — only the ones a row actually references matter.
  */
-export function habtmLabelAssociations(ModelClass: BaseClass): Map<string, HabtmLabelAssoc> {
-  const out = new Map<string, HabtmLabelAssoc>();
+export function throughLabelAssociations(ModelClass: BaseClass): Map<string, ThroughLabelAssoc> {
+  const out = new Map<string, ThroughLabelAssoc>();
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   for (const [name, refl] of Object.entries(reflections)) {
     const r = refl as {
-      macro?: string;
-      joinTable?: string;
-      foreignKey?: string | string[];
-      associationForeignKey?: string;
-      klass?: { tableName?: string };
       isThroughReflection?: () => boolean;
-      throughReflection?: { foreignKey?: string | string[] };
-      sourceReflection?: { foreignKey?: string | string[] };
+      foreignKey?: string | string[];
+      klass?: { tableName?: string };
+      throughReflection?: { foreignKey?: string | string[]; klass?: BaseClass };
     };
-    if (r.macro !== "hasAndBelongsToMany") continue;
+    if (!r.isThroughReflection?.()) continue;
     try {
-      const joinTable = r.joinTable;
-      // trails models HABTM as a has_many:through over an anonymous join model,
-      // so the owner-side FK lives on the through reflection and the target-side
-      // FK on the source reflection (Rails reads them off the HABTM reflection's
-      // `foreign_key` / `association_foreign_key` directly). Prefer the through
-      // shape; fall back to the plain-HABTM getters for a non-through reflection.
-      const lhsKey = r.isThroughReflection?.() ? r.throughReflection?.foreignKey : r.foreignKey;
-      const rhsKey = r.isThroughReflection?.()
-        ? (r.sourceReflection?.foreignKey ?? r.associationForeignKey)
-        : r.associationForeignKey;
+      // Rails' HasManyThroughProxy: rhs_key = association.foreign_key,
+      // lhs_key = through_reflection.foreign_key, join_table = through table.
+      const throughModel = r.throughReflection?.klass;
+      const joinTable = throughModel?.tableName;
+      const lhsKey = r.throughReflection?.foreignKey;
+      const rhsKey = r.foreignKey;
       if (
         typeof joinTable !== "string" ||
         typeof lhsKey !== "string" ||
@@ -343,7 +343,7 @@ export function habtmLabelAssociations(ModelClass: BaseClass): Map<string, Habtm
       ) {
         continue;
       }
-      out.set(name, { joinTable, lhsKey, rhsKey, targetTable: r.klass?.tableName });
+      out.set(name, { joinTable, lhsKey, rhsKey, targetTable: r.klass?.tableName, throughModel });
     } catch {
       continue;
     }
@@ -351,13 +351,13 @@ export function habtmLabelAssociations(ModelClass: BaseClass): Map<string, Habtm
   return out;
 }
 
-/** The join-table names for every resolvable HABTM association on the model. */
-export function habtmJoinTableNames(ModelClass: BaseClass): string[] {
-  return Array.from(habtmLabelAssociations(ModelClass).values(), (a) => a.joinTable);
+/** The join-table names for every resolvable through/HABTM association on the model. */
+export function throughJoinTableNames(ModelClass: BaseClass): string[] {
+  return Array.from(throughLabelAssociations(ModelClass).values(), (a) => a.joinTable);
 }
 
 /**
- * Normalizes a HABTM association-label fixture value into a list of target
+ * Normalizes a through/HABTM association-label fixture value into a list of target
  * labels. Mirrors Rails' `targets.is_a?(Array) ? targets : targets.split(...)`
  * (the Ruby split is on commas with surrounding whitespace): an array is taken
  * as-is; a string is split on commas. Each label resolves to a target fixture id
@@ -610,11 +610,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       ])
     : null;
 
-  // HABTM association labels declared on owner rows (e.g. `sharedComputers: ["laptop"]`)
-  // materialize into join-table rows, mirroring Rails' FixtureSet::TableRow HABTM arm.
-  // Accumulated across all rows and inserted after the model's own rows land.
-  const habtmLabelAssocs = habtmLabelAssociations(ModelClass);
-  const joinTableRows = new Map<string, FixtureAttrs[]>();
+  // Through/HABTM association labels declared on owner rows (e.g.
+  // `sharedComputers: ["laptop"]`) materialize into join-table rows, mirroring
+  // Rails' FixtureSet::TableRow HasManyThroughProxy arm. Accumulated across all
+  // rows and inserted after the model's own rows land. Keyed by join table so a
+  // model with several through associations sharing one table coalesces.
+  const throughLabelAssocs = throughLabelAssociations(ModelClass);
+  const joinTableRows = new Map<
+    string,
+    { rows: FixtureAttrs[]; throughModel: BaseClass | undefined }
+  >();
 
   const labels = Object.keys(fixtures) as K[];
 
@@ -663,21 +668,24 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     for (const [col, val] of Object.entries(attrs)) {
       if (typeof pkCol === "string" && col === pkCol) continue; // PK already set above
 
-      // HABTM association label: not a real column. Expand into join-table rows
-      // (Rails' TableRow#resolve_sti_reflections HABTM arm) and consume the key.
-      const labelAssoc = habtmLabelAssocs.get(col);
+      // Through/HABTM association label: not a real column. Expand into join-table
+      // rows (Rails' TableRow#add_join_records) and consume the key.
+      const labelAssoc = throughLabelAssocs.get(col);
       if (labelAssoc) {
         if (typeof pkCol !== "string") {
           throw new Error(
-            `defineFixtures: ${tableName}.${label} declares HABTM association "${col}" but the owner table has no single primary key to join on`,
+            `defineFixtures: ${tableName}.${label} declares through association "${col}" but the owner table has no single primary key to join on`,
           );
         }
         const ownerId = row[pkCol];
         const targets = normalizeHabtmTargets(tableName, label, col, val);
         if (targets.length > 0) {
-          const accum = joinTableRows.get(labelAssoc.joinTable) ?? [];
+          const accum = joinTableRows.get(labelAssoc.joinTable) ?? {
+            rows: [],
+            throughModel: labelAssoc.throughModel,
+          };
           for (const target of targets) {
-            accum.push({
+            accum.rows.push({
               [labelAssoc.lhsKey]: ownerId,
               [labelAssoc.rhsKey]: labelAssoc.targetTable
                 ? resolveFixtureId(adapter, labelAssoc.targetTable, target)
@@ -903,13 +911,34 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     throw err;
   }
 
-  // Insert any HABTM join rows materialized from owner association labels. Each
-  // join table is delete-before-insert (tablesToDelete) so a reseed replaces the
-  // prior set's rows, exactly like the model-row insert above. These tables have
-  // no model class — seeded straight against their FK columns, like the explicit
+  // Insert any join rows materialized from owner through/HABTM association labels.
+  // Each join table is delete-before-insert (tablesToDelete) so a reseed replaces
+  // the prior set's rows, exactly like the model-row insert above. These join
+  // models are seeded straight against their FK columns, like the explicit
   // join-table fixtures (`developers-projects.ts`) loaded via defineJoinTableFixtures.
-  for (const [joinTable, jrows] of joinTableRows) {
+  for (const [joinTable, { rows: jrows, throughModel }] of joinTableRows) {
     if (jrows.length === 0) continue;
+    // Mirror Rails' HasManyThroughProxy#timestamp_column_names: fill the through
+    // model's timestamp columns with the current time when it records timestamps
+    // and the join table carries them. (Rails reads
+    // `through_reflection.klass.all_timestamp_attributes_in_model`.)
+    if (
+      throughModel &&
+      (throughModel as { recordTimestamps?: boolean }).recordTimestamps !== false &&
+      typeof (adapter as any).columns === "function"
+    ) {
+      const cols: { name: string }[] = await (adapter as any).columns(joinTable);
+      const colNames = new Set(cols.map((c) => c.name));
+      const aliases: Record<string, string> =
+        (throughModel as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
+      const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
+        colNames.has(c),
+      );
+      if (stampCols.length > 0) {
+        const now = currentTimeFromProperTimezone();
+        for (const jr of jrows) for (const c of stampCols) if (!(c in jr)) jr[c] = now;
+      }
+    }
     await insertFixturesSet.call(adapter as unknown as InsertHost, { [joinTable]: jrows }, [
       joinTable,
     ]);
