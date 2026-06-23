@@ -51,16 +51,16 @@ TS source read:
 
 Static call-graph census (from `git grep` over `packages/activerecord/src`):
 
-| Signal                                                                               | Count                    |
-| ------------------------------------------------------------------------------------ | ------------------------ |
-| `*.test.ts` files (`git ls-files`)                                                   | 539 (88 contain `.skip`) |
-| files using a handler suite (`setupHandlerSuite`/`useHandlerFixtures`/transactional) | 199                      |
-| `defineSchema(` call sites (all)                                                     | 502 across 166 files     |
-| files passing `dropExisting:true`                                                    | 28                       |
-| files calling `dropAllTables` directly                                               | 4                        |
-| files calling `repairWorkerSchema` directly                                          | 2 (helper + 1 test)      |
-| canonical tables in `TEST_SCHEMA`                                                    | 246                      |
-| force:"cascade" emitted per table on PG/MySQL                                        | yes (all 246)            |
+| Signal                                                                               | Count                                                  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `*.test.ts` files (`git ls-files`)                                                   | 539 (119 contain a `(describe\|it\|test).skip` marker) |
+| files using a handler suite (`setupHandlerSuite`/`useHandlerFixtures`/transactional) | 199                                                    |
+| `defineSchema(` call sites (all)                                                     | 502 across 166 files                                   |
+| files passing `dropExisting: true`                                                   | 26 (28 reference the token)                            |
+| files calling `dropAllTables` directly                                               | 4                                                      |
+| files calling `repairWorkerSchema` directly                                          | 2 (helper + 1 test)                                    |
+| canonical tables in `TEST_SCHEMA`                                                    | 246                                                    |
+| force:"cascade" emitted per table on PG/MySQL                                        | yes (all 246)                                          |
 
 ## How each DROP path fires
 
@@ -86,7 +86,7 @@ purge+load on each exclusive worker.
 
 `define-schema.ts:654-660`: unconditionally drops **every table in the passed
 schema**, reverse dependency order, before recreating — bypassing the signature
-cache. 28 files opt in, in `beforeAll` (2 in `beforeEach`). Bounded by the
+cache. 26 files opt in, in `beforeAll` (2 in `beforeEach`). Bounded by the
 tables each file declares (typically a small bespoke subset, not all 246).
 
 ### Path C — `defineSchema` signature-mismatch drop
