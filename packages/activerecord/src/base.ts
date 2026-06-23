@@ -3142,7 +3142,7 @@ export class Base extends Model {
     // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
     // — "We always want to persist the locking version, even if we don't detect a
     // change from the default, since the database might have no default." Threaded
-    // through the dead-no-longer mirror so the union lives in the locking layer
+    // through the now-wired mirror so the union lives in the locking layer
     // (optimistic.rb), not in the generic attributes_for_create.
     names = LockingOptimistic._createRecord.call(
       this as any,
