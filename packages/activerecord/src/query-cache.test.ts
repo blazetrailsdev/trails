@@ -139,6 +139,9 @@ async function setup() {
 
   class Task extends Base {
     static {
+      // Raw (non-pooled) adapter can't warm the schema cache, so declare the PK
+      // for the strict writeFromUser id write-back (matches Post/Category below).
+      this.attribute("id", "integer");
       this.attribute("title", "string");
       this.adapter = cached;
     }
@@ -169,6 +172,7 @@ async function setupPooledTask() {
 
   class Task extends Base {
     static {
+      this.attribute("id", "integer");
       this.attribute("title", "string");
       this.adapter = conn;
     }
