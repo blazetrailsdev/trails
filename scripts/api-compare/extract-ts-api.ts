@@ -1166,10 +1166,12 @@ export function harvestObjectLiteralMethods(
     // elsewhere — the arity check tolerates that via its global candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
+    let calls: string[] | undefined;
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
+      calls = extractCalls(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
@@ -1178,6 +1180,7 @@ export function harvestObjectLiteralMethods(
         mname = prop.name.text;
         params = extractParameters(init.parameters);
         optionKeys = extractOptionKeys(init.parameters, checker);
+        calls = extractCalls(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1195,6 +1198,7 @@ export function harvestObjectLiteralMethods(
       line,
       file,
       ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(calls !== undefined ? { calls } : {}),
     });
   }
   return out;
@@ -1587,6 +1591,11 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
  * `baz`. Returns a sorted, de-duplicated list (undefined when empty), so the
  * call-set parity dimension in compare.ts can diff it against the Ruby side
  * without caring about call order or count.
+ *
+ * Wired into method/function bodies (class methods, exported + export-list
+ * functions, object-literal mixin methods). Get/set accessor bodies are not
+ * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
+ * which are accessor-shaped, so accessors would contribute no signal.
  */
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;

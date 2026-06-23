@@ -117,6 +117,18 @@ describe("body call capture", () => {
     const id = cls.instanceMethods.find((m) => m.name === "id")!;
     expect(id.calls).toBeUndefined();
   });
+
+  it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
+    const methods = objectLiteralMethods(
+      `export const QueryMethods = {
+        where(opts: object) { this.spawn(); buildWhere(opts); },
+        toArrow: () => { records(); },
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.calls]));
+    expect(byName["where"]).toEqual(["buildWhere", "spawn"]);
+    expect(byName["toArrow"]).toEqual(["records"]);
+  });
 });
 
 describe("extractFileConstants", () => {

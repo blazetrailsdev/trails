@@ -25,6 +25,15 @@
  * output/arity-mismatches.json is always written; `--arity` adds the
  * per-method breakdown.
  *
+ * Three further advisory checks run on the same name-matched pairs, each
+ * one-line-summarized and always written to its own artifact, none affecting
+ * the parity %: option-keys (output/options-key-mismatches.json), literal
+ * defaults/constants (output/literal-mismatches.json), and call-set parity
+ * (output/call-mismatches.json). The last is a coarse body-fidelity signal —
+ * fidelity-critical Ruby body calls (see SIGNIFICANT_CALLS) absent from the
+ * matched TS body's call-set; it is allowlist-gated because a general
+ * missing-call diff is dominated by Ruby→JS idiom-translation noise.
+ *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
  * `extend`s), recursively. This catches mixin wiring gaps where the
@@ -1156,12 +1165,6 @@ export function main() {
     const literalMismatches: LiteralMismatch[] = [];
     let callsCompared = 0;
     const callMismatches: CallMismatch[] = [];
-    // Every TS method name we know about — used to keep the calls-parity check
-    // high-signal: we only flag a Ruby call that maps to a method WE actually
-    // ported (skips builtins, attribute readers, file-local helpers), so the
-    // report is "your ported method skips a call to another ported method"
-    // rather than the noise of every Ruby idiom.
-    const allTsMethodNames = new Set(tsParamsByName.keys());
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
