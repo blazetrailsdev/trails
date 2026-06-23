@@ -54,6 +54,25 @@ describe("JoinDependency walk() deduplication", () => {
     Post.hasMany("comments", { className: "Comment" });
     Comment.belongsTo("author", { className: "Author" });
     Comment.hasMany("likes", { className: "Like" });
+    Post.hasMany("commentLikes", { through: "comments", source: "likes", className: "Like" });
+  });
+
+  it("deduplicates a matched has_many :through subtree across joinsToAdd", () => {
+    // Matched `walk` branch: oj's provisional through-group dedups to the left's resolved chain.
+    const jd1 = new JoinDependency(Post);
+    jd1.addAssociation("commentLikes");
+    const jd2 = new JoinDependency(Post);
+    jd2.addAssociation("commentLikes");
+
+    const joins = jd1.joinConstraints([jd2]);
+    const tables = joins.map((j) => {
+      const t = (j as Nodes.OuterJoin).left;
+      return (t as any).tableAlias ?? (t as any).name;
+    });
+    // through (comments) + target (likes), deduped to a single chain.
+    expect(joins).toHaveLength(2);
+    expect(tables.filter((t) => t === "comments")).toHaveLength(1);
+    expect(tables.filter((t) => t === "likes")).toHaveLength(1);
   });
 
   it("deduplicates shared subtree when merging two JoinDependencies", () => {

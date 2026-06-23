@@ -177,10 +177,9 @@ export class JoinDependency {
   /**
    * Register manual-join tables (from the relation's `joins(...)` buckets) so the
    * fresh emit-time AliasTracker seeds them as already-claimed. Mirrors Rails'
-   * single `build_joins` alias_tracker: a through-association intermediate landing
-   * on a manually-joined table collides at emit and aliases to its
-   * `alias_candidate` (`joins(:posts).eager_load(:comments)` → `posts` +
-   * `posts_authors`) rather than emitting a second un-aliased `posts`.
+   * single `build_joins` alias_tracker: a through-intermediate landing on a
+   * manually-joined table collides at emit and aliases to its `alias_candidate`
+   * (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`).
    * @internal
    */
   seedConstructionTables(tableNames: Iterable<string>): void {
@@ -289,16 +288,13 @@ export class JoinDependency {
     }
 
     // Aliasing is FULLY deferred to emit-time `makeConstraints`, mirroring Rails'
-    // `make_constraints` resolving the table via `aliased_table_for` and BUILDING
-    // the ON predicate against the chosen alias (join_dependency.rb:189-211). At
-    // construction we build the join against the REAL table (provisional — for
-    // callers that read `arelJoin`/`effectiveSqlName` before emit) and claim the
-    // real table in the construction tracker for introspection. The actual alias
-    // (self-join chains, dup-include collisions, merge collisions, free
-    // references) is resolved against the shared AliasTracker at emit, where the
-    // ON predicate is REBUILT against the resolved alias — no name-based rebind,
-    // so a self-join whose ON references the same real table on both sides is
-    // disentangled correctly.
+    // `make_constraints` BUILDING the ON against the alias `aliased_table_for`
+    // picks (join_dependency.rb:189-211). Construction builds against the REAL
+    // table (provisional, for callers reading `arelJoin` before emit) and claims
+    // it for introspection; the real alias (self-joins, dup-include/merge
+    // collisions, free references) is resolved at emit and the ON REBUILT against
+    // it — no name-rebind, so a self-join referencing the same table on both
+    // sides is disentangled correctly.
     const effectiveName = targetTable!;
     this._aliasTracker.aliases.set(
       targetTable!,
@@ -603,15 +599,13 @@ export class JoinDependency {
     aliasTracker?: AliasTracker,
     references?: string[],
   ): Nodes.Join[] {
-    // Aliasing is now resolved here, at emit-time, against the AliasTracker —
-    // either the shared one threaded in from `build_joins` (so merged joins
-    // collide and alias) or, for a standalone dependency, a fresh tracker seeded
-    // with the base table AND any manual-join tables registered via
-    // `seedConstructionTables` (so an eager through-association intermediate
-    // landing on a `joins(...)` table collides and aliases — the eager path emits
-    // against this fresh tracker, not the `build_joins` one). A fresh tracker per
-    // emit keeps re-emitting the same dependency idempotent (no carried-over
-    // collision counts) and mirrors Rails creating one `AliasTracker.create`.
+    // Aliasing is resolved here, at emit-time, against the AliasTracker — either
+    // the shared one threaded in from `build_joins` (so merged joins collide and
+    // alias) or a fresh tracker seeded with the base table AND any manual-join
+    // tables from `seedConstructionTables` (so an eager through-intermediate
+    // landing on a `joins(...)` table collides — the eager path emits against this
+    // fresh tracker, not the `build_joins` one). A fresh tracker per emit keeps
+    // re-emit idempotent and mirrors Rails creating one `AliasTracker.create`.
     if (aliasTracker) {
       this._aliasTracker = aliasTracker;
     } else {
@@ -620,13 +614,10 @@ export class JoinDependency {
         if ((this._aliasTracker.aliases.get(t) ?? 0) === 0) this._aliasTracker.aliases.set(t, 1);
       }
     }
-    // Through-group resolution is idempotent within one emit but must re-run on a
-    // fresh emit (new tracker); clear the per-group resolved flag so re-emit
-    // re-resolves aliases from scratch. Cover BOTH this dependency's tree AND the
-    // `joinsToAdd` (stashed/merged) dependencies emitted below — those JD objects
-    // persist on the relation and can be re-emitted across arel builds, so a
-    // through-group on one of them would otherwise keep aliases computed against
-    // the prior tracker.
+    // Clear each through-group's resolved flag so this fresh emit re-resolves
+    // aliases from scratch. Cover the `joinsToAdd` (stashed/merged) roots too:
+    // those JD objects persist on the relation and re-emit across arel builds, so
+    // a through-group on one would otherwise keep aliases from the prior tracker.
     const resetThroughGroups = (root: JoinPart): void =>
       root.each((p) => {
         if (p.throughGroup) p.throughGroup.resolved = false;
@@ -733,23 +724,17 @@ export class JoinDependency {
    * table_name) { reflection.alias_candidate(parent.table_name) }`
    * (join_dependency.rb:202, alias_tracker.rb).
    *
-   * This is the single point where a join's table alias is assigned — against
-   * the shared `AliasTracker`: the real table on first use, else the referenced
-   * name (`includes(:author).references(:author)` → `authors AS author`) on its
-   * first use, else the reflection's `alias_candidate` (`{plural}_{parent}`,
-   * `authors_categorizations`, with `_N` on repeat). Because every JoinDependency
-   * in a `build_joins` emits against one shared tracker in order, a `merge` that
-   * joins an already-joined table — or a self-join chain / dup-include collision
-   * WITHIN this dependency — collides here and is aliased, with no construction
-   * plumbing. The ON predicate is REBUILT via `joinConstraints` against the
-   * resolved alias and the parent's resolved table (`_rebuildChildJoin`), so a
-   * self-join whose ON references the same real table on both sides is built
-   * correctly rather than name-rebound.
-   *
-   * Through-built nodes share a `_throughGroup` whose whole reflection chain is
-   * resolved + rebuilt in one pass (`_resolveThroughGroup`), mirroring Rails'
-   * `JoinAssociation#join_constraints` walking the chain against one
-   * `aliased_table_for` block (the `{candidate}_join` self-join scheme).
+   * The single point where a join's table alias is assigned — against the shared
+   * `AliasTracker`: the real table on first use, else the referenced name
+   * (`includes(:author).references(:author)` → `authors AS author`), else the
+   * reflection's `alias_candidate` (`{plural}_{parent}`, `_N` on repeat). Every
+   * JoinDependency in a `build_joins` emits against one shared tracker in order,
+   * so a `merge` onto an already-joined table — or a self-join / dup-include
+   * collision WITHIN this dependency — collides and aliases here. The ON is
+   * REBUILT via `joinConstraints` against the resolved alias and the parent's
+   * resolved table (`_rebuildChildJoin`), so a self-join is built correctly
+   * rather than name-rebound. Through nodes share a `throughGroup` resolved in one
+   * pass (`_resolveThroughGroup`), mirroring `JoinAssociation#join_constraints`.
    * @internal
    */
   private _resolveChildAlias(parent: JoinPart, child: JoinPart): void {
@@ -788,13 +773,11 @@ export class JoinDependency {
   }
 
   /**
-   * Rebuild `child`'s JOIN at emit-time against the SQL alias `newName`, by
-   * re-running `JoinAssociation#joinConstraints` with a resolver that yields the
-   * aliased target table and the parent's already-resolved table as the foreign
-   * side. Mirrors Rails `make_constraints` BUILDING the ON predicate against the
-   * alias chosen by `aliased_table_for` — so a self-join (parent and target share
-   * the same real table) gets a correct `alias.fk = parent.pk` predicate, with no
-   * name-based rebind that could confuse the two sides.
+   * Rebuild `child`'s JOIN at emit-time against the SQL alias `newName`, re-running
+   * `JoinAssociation#joinConstraints` with a resolver yielding the aliased target
+   * and the parent's already-resolved table as foreign side. Mirrors Rails
+   * `make_constraints` BUILDING the ON against the alias — so a self-join gets a
+   * correct `alias.fk = parent.pk` with no name-rebind confusing the two sides.
    * @internal
    */
   private _rebuildChildJoin(parent: JoinPart, child: JoinAssociation, newName: string): void {
@@ -811,13 +794,12 @@ export class JoinDependency {
       (_refl, _remaining) => [aliased, false],
     );
     let arelJoin = joins[0] as Nodes.Join;
-    // joinConstraints builds the FK equality against the aliased `table`, but
-    // scope/STI predicates merged from `klass.all()` reference the model's real
-    // arel table — rebind those to the alias. Guard against a true self-join
-    // (parent and target share the same real name): a name-based rebind cannot
-    // tell the join's target columns from the foreign-side columns, so it is
-    // skipped there (the FK is already correct; only a scoped self-join's scope
-    // predicate stays un-rebound — a pre-existing limitation).
+    // joinConstraints aliases the FK equality, but scope/STI predicates merged
+    // from `klass.all()` reference the model's real arel table — rebind those to
+    // the alias. Guard against a true self-join (parent shares target's real
+    // name): a name-rebind can't tell the two sides apart, so it is skipped (FK
+    // already correct; a scoped self-join's scope predicate stays un-rebound — a
+    // pre-existing limitation).
     const parentEffName = foreignTable.tableAlias ?? foreignTable.name;
     if (newName !== tableName && parentEffName !== tableName) {
       const on = (arelJoin as any).right as Nodes.On;
@@ -837,12 +819,11 @@ export class JoinDependency {
 
   /**
    * Resolve + rebuild an entire through-association chain at emit-time. Mirrors
-   * Rails `JoinAssociation#join_constraints` resolving every reflection in
-   * `reflection.chain` through one `aliased_table_for` block: forward order, so
-   * the target (chain[0]) claims the real name first and a later self-join link
-   * collides and is aliased to `{candidate}` (root) or `{candidate}_join`
-   * (non-root). The resulting joins are redistributed onto the group's tree nodes
-   * (target + `_through_` leaves). Idempotent — runs once per group per emit.
+   * Rails `JoinAssociation#join_constraints` resolving every `reflection.chain`
+   * link through one `aliased_table_for` block in forward order: the target
+   * (chain[0]) claims the real name first, a later self-join link aliases to
+   * `{candidate}` (root) or `{candidate}_join` (non-root). The joins are
+   * redistributed onto the group's tree nodes. Runs once per group per emit.
    * @internal
    */
   private _resolveThroughGroup(parent: JoinPart, group: ThroughJoinGroup): void {
@@ -882,10 +863,8 @@ export class JoinDependency {
       const resolved = resolvedByIdx[chainIdx];
       if (!node || !resolved) continue;
       let arelJoin = joins[i] as Nodes.Join;
-      // joinConstraints aliases the FK equality (both sides are aliased Table
-      // instances), but scope/STI predicates merged from `klass.all()` reference
-      // the link's real table name — rebind those to the alias when this link was
-      // aliased.
+      // joinConstraints aliases the FK; scope/STI predicates from `klass.all()`
+      // still name the real table — rebind them when this link was aliased.
       if (resolved.effectiveName !== group.chainTables[chainIdx].tableName) {
         const on = (arelJoin as any).right as Nodes.On;
         if (on instanceof Nodes.On) {
@@ -1472,18 +1451,13 @@ export class JoinDependency {
     const sourceArelTable = new Table(sourceAlias);
     const parentTableName = modelClass.tableName;
 
-    // Pre-allocate table indices and resolve REAL tables for each chain entry.
-    // chain[0] is the target reflection (ThroughReflection), chain[1..N] are
-    // intermediate through reflections. joinConstraints reverses internally, so
-    // the resolver sees them in forward order but joins are emitted reversed.
-    //
-    // Aliasing is FULLY deferred to emit-time (`_resolveThroughGroup`): here we
-    // only build against real tables for the provisional `arelJoin`/`columns`
-    // (read by callers before emit). The shared `ThroughJoinGroup` carries the
-    // chain metadata so emit can resolve every link's alias against the shared
-    // AliasTracker and rebuild + redistribute the joins — mirroring Rails'
-    // `JoinAssociation#join_constraints` walking the chain against one
-    // `aliased_table_for` block (the `{candidate}_join` self-join scheme).
+    // Pre-allocate table indices and resolve REAL tables for each chain entry
+    // (chain[0] = target ThroughReflection, chain[1..N] = through links;
+    // joinConstraints reverses internally). Aliasing is FULLY deferred to emit
+    // (`_resolveThroughGroup`): construction only builds provisional real-table
+    // joins for callers reading `arelJoin` before emit. The shared
+    // `ThroughJoinGroup` carries the chain metadata so emit resolves every link's
+    // alias against the shared AliasTracker and rebuilds + redistributes the joins.
     const chainTables: Array<{
       table: Table;
       tableName: string;
@@ -1523,8 +1497,7 @@ export class JoinDependency {
 
     if (joins.length === 0) return null;
 
-    // joins are in reversed-chain order: joins[0] corresponds to chain[last],
-    // joins[last] corresponds to chain[0] (the target/ThroughReflection).
+    // joins are in reversed-chain order: joins[i] ↔ chainTables[chain.length-1-i].
     const group: ThroughJoinGroup = {
       reflection,
       parentModel: modelClass,
@@ -1597,13 +1570,12 @@ export class JoinDependency {
 }
 
 /**
- * Shared per-through-association emit state. Created once at construction for a
- * `has_many :through` (and its nested forms) and attached to every tree node the
- * chain produces (target + `_through_` leaves). `_resolveThroughGroup` resolves
- * the whole chain's aliases against the shared AliasTracker and rebuilds the
- * joins in one pass at emit-time — Rails resolves the entire chain through one
- * `aliased_table_for` block, so trails must too (a per-node alias pass cannot
- * disentangle a self-join chain referencing the same real table on both sides).
+ * Shared per-through-association emit state, attached to every tree node a
+ * `has_many :through` chain produces (target + `_through_` leaves).
+ * `_resolveThroughGroup` resolves the whole chain's aliases and rebuilds the
+ * joins in one pass at emit — Rails resolves the entire chain through one
+ * `aliased_table_for` block, so a per-node pass cannot disentangle a self-join
+ * chain referencing the same real table on both sides.
  * @internal
  */
 export interface ThroughJoinGroup {
@@ -1612,7 +1584,7 @@ export interface ThroughJoinGroup {
   parentTableName: string;
   /** Forward-order chain entries (index 0 = target). */
   chainTables: Array<{ tableName: string; model: typeof Base }>;
-  /** Immediate association name of the target link, for `@references` lookup. */
+  /** Target link's association name, for the `@references` lookup. */
   targetImmediateName: string;
   /** Tree nodes by chain index (0 = target, 1.. = `_through_` leaves). */
   nodes: JoinPart[];
