@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import {
   introspectTables,
@@ -138,6 +138,36 @@ describe("introspectIndexes", () => {
 
     expect(idxs.some((i) => i.name === "idx_widgets_name")).toBe(true);
   });
+
+  // The fallback's `where`/`orders` are recovered from index SQL only on the
+  // sqlite arm (via sqliteIndexes); the mysql/postgres arms don't surface them,
+  // so this runtime assertion is sqlite-only.
+  it.runIf(adapterType === "sqlite")(
+    "surfaces where/orders carried by the fallback SchemaStatements.indexes()",
+    async () => {
+      const realAdapter = createTestAdapter();
+      const ctx = new MigrationContext(realAdapter);
+      await ctx.createTable("widgets", {}, (t) => {
+        t.string("name");
+        t.boolean("active");
+      });
+      await ctx.addIndex("widgets", ["name"], {
+        name: "idx_widgets_name_partial",
+        where: "active",
+        order: { name: "desc" },
+      });
+
+      const stripped = withoutMethods(realAdapter, ["indexes"]);
+
+      const idxs = await introspectIndexes(stripped, "widgets");
+      const idx = idxs.find((i) => i.name === "idx_widgets_name_partial");
+
+      // `where` and `orders` are now statically visible on IntrospectedIndex,
+      // not just present at runtime under an `as`-cast.
+      expect(idx?.where).toBe("active");
+      expect(idx?.orders).toEqual({ name: "desc" });
+    },
+  );
 });
 
 describe("introspectPrimaryKey", () => {

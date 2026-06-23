@@ -41,6 +41,12 @@ export interface IntrospectedIndex {
   unique: boolean;
   /** Partial-index predicate; undefined when adapter does not surface it. */
   where?: string;
+  /**
+   * Per-column sort directions (e.g. `{ name: "desc" }`), or a single
+   * direction applied to the whole index. Mirrors Rails'
+   * `IndexDefinition#orders`; undefined when the adapter does not surface it.
+   */
+  orders?: Record<string, string> | string;
 }
 
 function hasTables(a: unknown): a is AdapterWithTables {
