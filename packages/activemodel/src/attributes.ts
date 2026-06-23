@@ -10,6 +10,13 @@ import {
   matchedAttributeMethod as _matchedAttributeMethod,
   missingAttribute as _missingAttribute,
   _readAttribute as __readAttribute,
+  attributeAliases as _attributeAliases,
+  isAttributeAliases as _isAttributeAliases,
+  attributeMethodPatterns as _attributeMethodPatterns,
+  isAttributeMethodPatterns as _isAttributeMethodPatterns,
+  isRespondToWithoutAttributes as _isRespondToWithoutAttributes,
+  type AttributeMethodHost,
+  type AttributeMethodPattern,
 } from "./attribute-methods.js";
 import {
   pushPendingType,
@@ -308,4 +315,29 @@ export function _readAttribute(this: InstanceHost, attr: string): unknown {
     _readAttribute?(name: string): unknown;
   };
   return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
+}
+
+/** @internal Rails class_attribute. Mirrors: #attribute_aliases (via AttributeMethods include) */
+export function attributeAliases(this: AttributeMethodHost): Record<string, string> {
+  return _attributeAliases.call(this);
+}
+
+/** @internal Rails class_attribute predicate. Mirrors: #attribute_aliases? (via AttributeMethods include) */
+export function isAttributeAliases(this: AttributeMethodHost): boolean {
+  return _isAttributeAliases.call(this);
+}
+
+/** @internal Rails class_attribute. Mirrors: #attribute_method_patterns (via AttributeMethods include) */
+export function attributeMethodPatterns(this: AttributeMethodHost): AttributeMethodPattern[] {
+  return _attributeMethodPatterns.call(this);
+}
+
+/** @internal Rails class_attribute predicate. Mirrors: #attribute_method_patterns? (via AttributeMethods include) */
+export function isAttributeMethodPatterns(this: AttributeMethodHost): boolean {
+  return _isAttributeMethodPatterns.call(this);
+}
+
+/** @internal Rails-private helper. Mirrors: #respond_to_without_attributes? (via AttributeMethods include) */
+export function isRespondToWithoutAttributes(this: object, method: string): boolean {
+  return _isRespondToWithoutAttributes.call(this, method);
 }
