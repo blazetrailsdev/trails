@@ -1116,6 +1116,7 @@ export class SchemaStatements {
       case "postgres": {
         const rows = await this.adapter.execute(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
+                  (ix.indexprs IS NOT NULL) AS has_expressions,
                   pg_get_indexdef(i.oid) AS definition
            FROM pg_index ix
            JOIN pg_class t ON t.oid = ix.indrelid
@@ -1138,12 +1139,19 @@ export class SchemaStatements {
           const expressions = defMatch?.[1] ?? "";
           const where = defMatch?.[4]?.trim();
           const ordersMap: Record<string, string> = {};
+          // Mirrors the concrete adapter: only plain (non-expression) indexes
+          // parse orders. Expression columns are already dropped from `columns`
+          // by the `pg_attribute` join (attnum 0), so this fallback does not
+          // surface expression-index columns/orders.
+          const hasExpressions = row.has_expressions === true;
           const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-          for (const [, column, , desc, nulls] of expressions.matchAll(COL_RE)) {
-            if (nulls) {
-              ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
-            } else if (desc) {
-              ordersMap[column] = "desc";
+          if (!hasExpressions) {
+            for (const [, column, , desc, nulls] of expressions.matchAll(COL_RE)) {
+              if (nulls) {
+                ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
+              } else if (desc) {
+                ordersMap[column] = "desc";
+              }
             }
           }
           let orders: Record<string, string> | string | undefined;
@@ -1172,7 +1180,10 @@ export class SchemaStatements {
           }
           // `Collation` is 'A' (ascending), 'D' (descending), or null (unsorted);
           // descending columns surface in `orders`, mirroring Rails' MySQL adapter.
-          indexMap.get(name)!.seqs.push([row.Seq_in_index, row.Column_name, row.Collation ?? null]);
+          // Read both casings (the concrete adapter does `Collation ?? COLLATION`).
+          indexMap
+            .get(name)!
+            .seqs.push([row.Seq_in_index, row.Column_name, row.Collation ?? row.COLLATION ?? null]);
         }
         return Array.from(indexMap.entries())
           .sort(([a], [b]) => a.localeCompare(b))
