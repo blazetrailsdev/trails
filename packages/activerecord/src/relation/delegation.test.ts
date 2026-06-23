@@ -42,8 +42,11 @@ describe("DelegationTest", () => {
     // rather than silently scoping the call. Without it, `relation.<baseMethod>`
     // is delegated-with-scoping, mutating the global scope — the bug the guard
     // bans from AR's own code.
+    // The AR test harness bans base-method delegation suite-wide
+    // (test-setup-ar.ts, mirroring helper.rb:29), so restore that `false`
+    // default — not Rails' production `true` — after each case.
     afterEach(() => {
-      DelegateCache.delegateBaseMethods = true;
+      DelegateCache.delegateBaseMethods = false;
     });
 
     it("does not delegate Base methods on a relation when banned", () => {
@@ -74,8 +77,11 @@ describe("DelegationTest", () => {
     });
 
     it("delegates Base methods on a relation when allowed (default)", () => {
-      // Default `true` preserves ordinary `Post.where(...).<baseMethod>` chains:
-      // the call is delegated rather than raising the guard.
+      // Production default `true` preserves ordinary
+      // `Post.where(...).<baseMethod>` chains: the call is delegated rather than
+      // raising the guard. (The test harness flips this to `false` suite-wide,
+      // so set it back explicitly here.)
+      DelegateCache.delegateBaseMethods = true;
       const relation = Post.all() as any;
       expect(() => relation.belongsTo("author")).not.toThrow(NotImplementedError);
     });

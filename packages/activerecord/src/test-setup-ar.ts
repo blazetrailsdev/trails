@@ -13,6 +13,7 @@
 import "./sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
 import { Base } from "./base.js";
+import { DelegateCache } from "./relation/delegation.js";
 import { loadDefaults } from "./trailtie.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
@@ -22,6 +23,13 @@ import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 // stays true). Use the versioned-defaults mechanism rather than poking Base
 // directly; this exercises the real code path that a consuming app would use.
 loadDefaults("7.0");
+
+// Mirror Rails activerecord/test/cases/helper.rb:29 — ban delegating a
+// relation/collection-proxy call into an `ActiveRecord::Base` method suite-wide
+// so any AR-internal code (or test) relying on such delegation raises and is
+// caught. Production keeps the Rails default of `true` (delegation.rb:25); only
+// the test harness flips it.
+DelegateCache.delegateBaseMethods = false;
 
 // Mirror Rails activerecord/test/cases/helper.rb:40
 Base.automaticallyInvertPluralAssociations = true;
