@@ -584,6 +584,138 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras[0].kind).toBe("moved");
   });
 
+  it("resolves railtie-injected cross-package GlobalID mixin into AR Base's allowed set", () => {
+    // globalid's railtie does `on_load(:active_record) { include
+    // GlobalID::Identification }` — a dynamic include the static extractor
+    // can't see, plus the module lives in a *different* package. Its instance
+    // methods (toGid/toSgid family) and the trails-side Locator-backed finders
+    // (findGlobalId/findSignedGlobalId[Bang]) must NOT be flagged as novel.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        globalid: {
+          classes: {},
+          modules: {
+            "GlobalID::Identification": rubyClass({
+              name: "Identification",
+              file: "identification.rb",
+              instance: [method("to_global_id"), method("to_gid"), method("to_signed_global_id")],
+            }),
+          },
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": rubyClass({
+              name: "Base",
+              file: "base.rb",
+              instance: [method("save")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        globalid: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("save"),
+                method("toGlobalId"), // from GlobalID::Identification (cross-package include)
+                method("toGid"),
+                method("toSignedGlobalId"),
+              ],
+              classMethods: [
+                method("findGlobalId"), // ambient railtie finder (no static Ruby def)
+                method("findSignedGlobalId"),
+                method("findSignedGlobalIdBang"),
+                method("genuinelyNovel"), // the only real extra
+              ],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: true,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+  });
+
+  it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {
+    // A bare `Helper` include in package `a` must resolve ONLY against a's own
+    // module map — package `b`'s same-short-name `B::Helper` must not leak in
+    // via the cross-package fallback (that fallback is FQN-keyed and only fires
+    // for `::`-qualified includes, so a short name can never reach it).
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        a: {
+          classes: {
+            "A::Host": { ...rubyClass({ name: "Host", file: "host.rb" }), includes: ["Helper"] },
+          },
+          modules: {},
+        },
+        b: {
+          classes: {},
+          modules: {
+            "B::Helper": rubyClass({
+              name: "Helper",
+              file: "helper.rb",
+              instance: [method("foreign_method")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        a: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("foreignMethod")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+        b: { classes: {}, modules: {} },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "a",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts");
+    // foreignMethod IS flagged — B::Helper did not bleed into A::Host's allowed set.
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toContain("foreignMethod");
+  });
+
   describe("integer-only flag validation", () => {
     afterEach(() => {
       vi.restoreAllMocks();
