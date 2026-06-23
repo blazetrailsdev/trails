@@ -45,22 +45,29 @@ function _isPgConnectionError(e: unknown): boolean {
 }
 
 async function dropAllPgTables(adapter: DatabaseAdapter): Promise<string[]> {
+  // Accumulate across both attempts: tables dropped before a connection error
+  // are gone from pg_tables, so the retry won't re-enumerate them. Returning
+  // only the retry's list would leave their signature entries un-reconciled —
+  // a stale no-op risk for a raw adapter whose dataSourceExists guard falls
+  // back to `cachedSig !== undefined`.
+  const dropped: string[] = [];
   try {
-    return await _dropAllPgTablesOnce(adapter);
+    await _dropAllPgTablesOnce(adapter, dropped);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      return await _dropAllPgTablesOnce(adapter);
+      await _dropAllPgTablesOnce(adapter, dropped);
+    } else {
+      throw e;
     }
-    throw e;
   }
+  return dropped;
 }
 
-async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<string[]> {
-  const dropped: string[] = [];
+async function _dropAllPgTablesOnce(adapter: DatabaseAdapter, dropped: string[]): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
@@ -90,7 +97,6 @@ async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<string[]>
       if (_isPgConnectionError(e)) throw e;
     }
   }
-  return dropped;
 }
 
 async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<string[]> {
