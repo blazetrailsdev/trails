@@ -25,6 +25,15 @@
  * output/arity-mismatches.json is always written; `--arity` adds the
  * per-method breakdown.
  *
+ * Three further advisory checks run on the same name-matched pairs, each
+ * one-line-summarized and always written to its own artifact, none affecting
+ * the parity %: option-keys (output/options-key-mismatches.json), literal
+ * defaults/constants (output/literal-mismatches.json), and call-set parity
+ * (output/call-mismatches.json). The last is a coarse body-fidelity signal —
+ * fidelity-critical Ruby body calls (see SIGNIFICANT_CALLS) absent from the
+ * matched TS body's call-set; it is allowlist-gated because a general
+ * missing-call diff is dominated by Ruby→JS idiom-translation noise.
+ *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
  * `extend`s), recursively. This catches mixin wiring gaps where the
@@ -56,6 +65,71 @@ import {
   displayLiteral,
 } from "./literals.js";
 import { isSourceUnported } from "./unported-files.js";
+
+// Fidelity-critical Ruby calls for the advisory calls-parity check. Omitting
+// one of these from a ported body is almost always a real bug (callback /
+// transaction / locking / persistence control flow) rather than idiom
+// translation. A general call-set diff is ~72% noise (Enumerable/Object
+// idioms), so we deliberately allowlist instead of denylist.
+//
+// Only names the Ruby extractor actually records are useful here: its
+// walk_for_calls (extract-ruby-api.rb) drops callees starting with `_` or not
+// matching /\A[a-z]/, so e.g. `_run_save_callbacks` can never match — the
+// non-underscore `run_callbacks` path covers callback dispatch instead.
+const SIGNIFICANT_CALLS = new Set([
+  "run_callbacks",
+  "with_lock",
+  "transaction",
+  "lock!",
+  "save",
+  "save!",
+  "destroy",
+  "destroy!",
+  "update",
+  "update!",
+  "touch",
+  "reload",
+  "increment!",
+  "decrement!",
+  "becomes",
+  "clear_attribute_changes",
+  "changes_applied",
+]);
+
+/**
+ * Core of the advisory calls-parity check (pure, exported for tests). For a
+ * name-matched pair, returns the fidelity-critical Ruby body calls that are
+ * absent from the TS body's call-set, formatted as `ruby_call → tsCand|tsCand`.
+ *
+ * Three gates keep it high-signal (a GENERAL missing-call diff is ~72% noise —
+ * Ruby Enumerable/Object idioms that translate to native JS and collide with
+ * ported names):
+ *   1. only calls in `significant` (the SIGNIFICANT_CALLS allowlist);
+ *   2. only calls whose mapped TS candidate is a ported method that TAKES
+ *      arguments somewhere (`isPortedWithArgs`) — excludes zero-arg attribute
+ *      readers, which Ruby records as calls but TS accesses as `this.x`;
+ *   3. flagged only when the TS body makes NONE of the mapped candidates.
+ */
+export function significantMissingCalls(
+  rubyName: string,
+  rubyCalls: string[],
+  tsCalls: Set<string>,
+  isPortedWithArgs: (tsName: string) => boolean,
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+  significant: ReadonlySet<string> = SIGNIFICANT_CALLS,
+): string[] {
+  const missing: string[] = [];
+  for (const rc of rubyCalls) {
+    if (rc === rubyName) continue; // self/recursive call
+    if (!significant.has(rc)) continue;
+    const mapped = mapCall(rc);
+    if (!mapped || mapped.length === 0) continue;
+    if (!mapped.some(isPortedWithArgs)) continue;
+    if (mapped.some((c) => tsCalls.has(c))) continue;
+    missing.push(`${rc} → ${mapped.join("|")}`);
+  }
+  return missing;
+}
 
 const DETAIL_PACKAGES = new Set([
   "arel",
@@ -121,6 +195,13 @@ interface PackageResult {
   arity: ArityResult;
   optionKeys: OptionKeyResult;
   literals: LiteralResult;
+  calls: CallResult;
+}
+
+interface CallResult {
+  compared: number;
+  mismatched: number;
+  mismatches: CallMismatch[];
 }
 
 // Advisory signature comparison: for a name-matched (ruby, ts) pair whose
@@ -158,6 +239,16 @@ interface OptionKeyResult {
   compared: number;
   mismatched: number;
   mismatches: OptionKeyMismatch[];
+}
+
+// Advisory: a name-matched method's TS body omits calls Rails makes to other
+// ported methods. `missing` entries read "ruby_call → tsCandidate|tsCandidate".
+interface CallMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  missing: string[];
 }
 
 // Advisory: a default's or constant's literal value differs for a matched pair.
@@ -750,6 +841,8 @@ export function main() {
     const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
     // Literal-default candidates scoped per (file, name) — unlike arity's global pool.
     const tsParamsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
+    // Body call-sets scoped per (file, name) for the advisory calls-parity check.
+    const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const recordTsParams = (m: MethodInfo, file = m.file ?? "") => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -761,6 +854,11 @@ export function main() {
         const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
         tsOptionKeysByFileName.set(file, byName);
+      }
+      if (m.calls !== undefined) {
+        const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
+        byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
+        tsCallsByFileName.set(file, byName);
       }
     };
 
@@ -1066,6 +1164,8 @@ export function main() {
     let literalsCompared = 0;
     let literalsSkipped = 0;
     const literalMismatches: LiteralMismatch[] = [];
+    let callsCompared = 0;
+    const callMismatches: CallMismatch[] = [];
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -1102,6 +1202,8 @@ export function main() {
       const rubyParamsByName = new Map<string, ParamInfo[]>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
+      // First-sighting Ruby body call-set per name (advisory calls-parity check).
+      const rubyCallsByName = new Map<string, string[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -1111,6 +1213,9 @@ export function main() {
           if (!rubyParamsByName.has(rm.name)) rubyParamsByName.set(rm.name, rm.params);
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
+          }
+          if (rm.calls && !rubyCallsByName.has(rm.name)) {
+            rubyCallsByName.set(rm.name, rm.calls);
           }
         }
       }
@@ -1153,12 +1258,32 @@ export function main() {
         }
       };
 
+      // Advisory calls-parity check: for a name-matched pair, flag Ruby body
+      // calls that (a) map by naming convention to a method we ported and
+      // (b) are absent from the TS body's call-set. A coarse body-fidelity
+      // signal — never affects the parity %. Lossy: legitimate restructuring
+      // (extracted helper, inlined call) shows up here, so it's advisory.
+      const checkCalls = (rubyName: string, tsName: string, tsFile: string) => {
+        const rubyCalls = rubyCallsByName.get(rubyName);
+        if (!rubyCalls || rubyCalls.length === 0) return;
+        const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
+        if (!tsCandidateSets || tsCandidateSets.length === 0) return;
+        const tsCalls = new Set(tsCandidateSets.flat());
+        callsCompared++;
+        const missing = significantMissingCalls(rubyName, rubyCalls, tsCalls, (c) =>
+          (tsParamsByName.get(c) ?? []).some((sig) => sig.length > 0),
+        );
+        if (missing.length === 0) return;
+        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing });
+      };
+
       // Advisory arity check for one name-matched pair: flag when the Ruby and
       // TS positional-arg ranges don't overlap (see arity.ts). Also drives the
       // option-key check, which shares the same matched (ruby, ts) pairs.
       const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
+        checkCalls(rubyName, tsName, tsFile);
         if (ARITY_OVERRIDES.has(rubyName)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
         // match already confirms it exists and arity isn't meaningful here.
@@ -1471,6 +1596,11 @@ export function main() {
         mismatched: literalMismatches.length,
         mismatches: literalMismatches,
       },
+      calls: {
+        compared: callsCompared,
+        mismatched: callMismatches.length,
+        mismatches: callMismatches,
+      },
     });
   }
 
@@ -1551,6 +1681,26 @@ export function main() {
     ),
   );
 
+  // Advisory calls-parity artifact — always written, flat across packages.
+  const callsPath = path.join(OUTPUT_DIR, `call-mismatches${modeSuffix}.json`);
+  const callsFlat = results.flatMap((r) =>
+    r.calls.mismatches.map((m) => ({ package: r.package, ...m })),
+  );
+  fs.writeFileSync(
+    callsPath,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        note: "Advisory. Ruby body calls (to other ported methods) absent from the matched TS body's call-set. Coarse body-fidelity signal; legitimate restructuring shows up here.",
+        compared: results.reduce((n, r) => n + r.calls.compared, 0),
+        mismatched: callsFlat.length,
+        mismatches: callsFlat,
+      },
+      null,
+      2,
+    ),
+  );
+
   printReport(
     results,
     showMissing,
@@ -1598,6 +1748,8 @@ function printReport(
   let grandOptKeysMissing = 0;
   let grandLiteralsCompared = 0;
   let grandLiteralsMismatched = 0;
+  let grandCallsCompared = 0;
+  let grandCallsMismatched = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
@@ -1613,6 +1765,8 @@ function printReport(
     grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
     grandLiteralsCompared += pkg.literals.compared;
     grandLiteralsMismatched += pkg.literals.mismatched;
+    grandCallsCompared += pkg.calls.compared;
+    grandCallsMismatched += pkg.calls.mismatched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -1740,6 +1894,12 @@ function printReport(
     console.log(
       `  Literals (advisory): ${grandLiteralsCompared} default/constant values compared, ` +
         `${grandLiteralsMismatched} differ — see output/literal-mismatches.json`,
+    );
+  }
+  if (grandCallsCompared > 0) {
+    console.log(
+      `  Calls (advisory): ${grandCallsCompared} matched pairs checked, ` +
+        `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);

@@ -455,6 +455,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
       } else if (ts.isFunctionDeclaration(node) && node.name && isExported(node)) {
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
+        const fnCalls = extractCalls(node.body);
         fileFunctions.push({
           name: node.name.text,
           visibility: "public",
@@ -463,6 +464,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           line,
           file: relPath,
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
+          ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
@@ -605,6 +607,15 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           if (isFunctionLike) {
             const line =
               decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+            const body = ts.isFunctionDeclaration(decl)
+              ? decl.body
+              : ts.isVariableDeclaration(decl) &&
+                  decl.initializer &&
+                  (ts.isArrowFunction(decl.initializer) ||
+                    ts.isFunctionExpression(decl.initializer))
+                ? decl.initializer.body
+                : undefined;
+            const calls = extractCalls(body);
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
@@ -612,6 +623,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
               isStatic: false,
               line,
               file: relPath,
+              ...(calls !== undefined ? { calls } : {}),
             });
           }
         }
@@ -1154,10 +1166,12 @@ export function harvestObjectLiteralMethods(
     // elsewhere — the arity check tolerates that via its global candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
+    let calls: string[] | undefined;
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
+      calls = extractCalls(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
@@ -1166,6 +1180,7 @@ export function harvestObjectLiteralMethods(
         mname = prop.name.text;
         params = extractParameters(init.parameters);
         optionKeys = extractOptionKeys(init.parameters, checker);
+        calls = extractCalls(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1183,6 +1198,7 @@ export function harvestObjectLiteralMethods(
       line,
       file,
       ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(calls !== undefined ? { calls } : {}),
     });
   }
   return out;
@@ -1291,6 +1307,7 @@ export function extractClass(
     if (ts.isMethodDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
       const optionKeys = extractOptionKeys(member.parameters, checker);
+      const calls = extractCalls(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -1300,6 +1317,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
+        ...(calls !== undefined ? { calls } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -1563,6 +1581,39 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
     }
   });
   return out;
+}
+
+/**
+ * Collect the set of method names a body invokes — the TS counterpart of the
+ * Ruby extractor's `calls` array (see extract-ruby-api.rb). For each
+ * CallExpression we record the final identifier of the callee:
+ * `this.runCallbacks(...)` → `runCallbacks`, `foo.bar()` → `bar`, `baz()` →
+ * `baz`. Returns a sorted, de-duplicated list (undefined when empty), so the
+ * call-set parity dimension in compare.ts can diff it against the Ruby side
+ * without caring about call order or count.
+ *
+ * Wired into method/function bodies (class methods, exported + export-list
+ * functions, object-literal mixin methods). Get/set accessor bodies are not
+ * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
+ * which are accessor-shaped, so accessors would contribute no signal.
+ */
+function extractCalls(node: ts.Node | undefined): string[] | undefined {
+  if (!node) return undefined;
+  const names = new Set<string>();
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n)) {
+      const callee = n.expression;
+      if (ts.isIdentifier(callee)) {
+        names.add(callee.text);
+      } else if (ts.isPropertyAccessExpression(callee)) {
+        names.add(callee.name.text);
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  ts.forEachChild(node, visit);
+  if (names.size === 0) return undefined;
+  return [...names].sort();
 }
 
 function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): ParamInfo[] {
