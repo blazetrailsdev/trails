@@ -692,16 +692,17 @@ describe("NamedScopingTest", () => {
 
     for (const method of ["destroyAll", "reset", "deleteAll"] as const) {
       const before = post.comments.containingTheLetterE();
-      // The proxy memoizes named-scope relations within one association load,
-      // so a second call before the reset hands back the SAME object — this is
-      // what gives the post-reset `not.toBe` below its teeth (without the
-      // cache it would pass trivially).
+      // trails-specific (RFC 0030): trails memoizes named-scope relations per
+      // association load, so a second call before the reset hands back the SAME
+      // object. (Rails rebuilds each call, so this `toBe` would NOT hold there —
+      // it asserts trails' added cache.) This is what gives the post-reset
+      // `not.toBe` below its teeth; without the cache it would pass trivially.
       expect(post.comments.containingTheLetterE()).toBe(before);
       // Mirror Rails' `post.association(:comments).public_send(method)`: drive
       // the reset through the association object, not the proxy reader.
       await post.association("comments")[method]();
-      // Rails asserts `assert_not_same` to prove the proxy's cached named-scope
-      // relation is invalidated by the reset; the next call rebuilds fresh.
+      // Rails' `assert_not_same`; here the reset invalidates trails' named-scope
+      // memo so the next call rebuilds a fresh relation.
       expect(post.comments.containingTheLetterE()).not.toBe(before);
     }
 

@@ -3070,15 +3070,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Build (or return the memoized) named-scope relation for `name`. Mirrors
-   * Rails' `CollectionAssociation`, which caches scope relations and drops them
-   * via `reset_scope` (reset / destroy_all / delete_all / insert / remove). The
-   * cache lives on the OO `CollectionAssociation` (the canonical Rails cache
-   * site) so a reset driven through `owner.association(:things)` invalidates it
-   * even though the proxy and the association are distinct objects here. Only
-   * zero-arg scope calls are memoized — arg'd calls vary per invocation and
-   * rebuild fresh, sidestepping any need to key on (potentially unserializable)
-   * arguments.
+   * Build (or return the memoized) named-scope relation for `name`. This memo
+   * is trails-specific (RFC 0030): Rails' `scope :name` rebuilds a fresh
+   * relation on every call (named.rb:174-178) — it does NOT cache the named-
+   * scope return value (only `@association_scope` inside `Association#scope` is
+   * memoized). We cache per scope name so two consecutive zero-arg calls within
+   * one association load return the same object. The cache lives on the OO
+   * `CollectionAssociation` so a reset driven through
+   * `owner.association(:things)` invalidates it even though the proxy and the
+   * association are distinct objects here. Only zero-arg scope calls are
+   * memoized — arg'd calls vary per invocation and rebuild fresh, sidestepping
+   * any need to key on (potentially unserializable) arguments. The memo is safe
+   * because the underlying `scope()` is stable within one load: every owner-
+   * state change that would alter it (reload / insert / remove / destroy_all /
+   * delete_all / reset) routes through `CollectionAssociation#reset`, which
+   * clears this cache.
    * @internal
    */
   _cachedNamedScopeRelation(name: string, args: unknown[]): unknown {
