@@ -3059,7 +3059,40 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
+    // Drop the OO association's memoized named-scope relations (Rails'
+    // `reset_scope`) so the next `things.someScope()` rebuilds. Only an
+    // already-built instance can hold a cache, so don't construct one here.
+    const assoc = (this._record as any)._associationInstances?.get(this._assocName) as
+      | { _namedScopeRelations?: Map<string, unknown> }
+      | undefined;
+    if (assoc) assoc._namedScopeRelations = undefined;
     return this;
+  }
+
+  /**
+   * Build (or return the memoized) named-scope relation for `name`. Mirrors
+   * Rails' `CollectionAssociation`, which caches scope relations and drops them
+   * via `reset_scope` (reset / destroy_all / delete_all / insert / remove). The
+   * cache lives on the OO `CollectionAssociation` (the canonical Rails cache
+   * site) so a reset driven through `owner.association(:things)` invalidates it
+   * even though the proxy and the association are distinct objects here. Only
+   * zero-arg scope calls are memoized — arg'd calls vary per invocation and
+   * rebuild fresh, sidestepping any need to key on (potentially unserializable)
+   * arguments.
+   * @internal
+   */
+  _cachedNamedScopeRelation(name: string, args: unknown[]): unknown {
+    if (args.length > 0) {
+      return (this.scope() as Record<string, (...a: unknown[]) => unknown>)[name](...args);
+    }
+    const assoc = this._record.association(this._assocName) as unknown as {
+      _namedScopeRelations?: Map<string, unknown>;
+    };
+    const cache = (assoc._namedScopeRelations ??= new Map());
+    if (cache.has(name)) return cache.get(name);
+    const built = (this.scope() as Record<string, () => unknown>)[name]();
+    cache.set(name, built);
+    return built;
   }
 
   scope(): any {

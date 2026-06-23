@@ -3098,6 +3098,18 @@ function wrapCollectionProxy<T extends Base = Base>(
       const enumerableDelegate = delegateEnumerableMethod(prop, () => target.load());
       if (enumerableDelegate) return enumerableDelegate;
 
+      // Named scopes are memoized on the proxy (mirrors Rails'
+      // CollectionAssociation, which caches scope relations and invalidates them
+      // via `reset_scope`). Route them through `_cachedNamedScopeRelation` so
+      // repeated `things.someScope()` within one association load returns the
+      // same relation object until a reset/insert/remove invalidates the cache.
+      const scopeModel = target.model as typeof Base & {
+        _scopes?: Map<string, unknown>;
+      };
+      if (typeof prop === "string" && scopeModel._scopes?.has(prop)) {
+        return (...args: any[]) => target._cachedNamedScopeRelation(prop, args);
+      }
+
       const scope = target.scope();
       const scopeVal = Reflect.get(scope, prop, scope);
       if (typeof scopeVal === "function") {

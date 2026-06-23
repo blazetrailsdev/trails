@@ -24,6 +24,12 @@ export class CollectionAssociation extends Association {
   nestedAttributesTarget: Base[] | null = null;
   protected _associationIds: unknown[] | null = null;
   _pendingReplace: { newTarget: Base[]; originalTarget: Base[]; wasLoaded: boolean } | null = null;
+  // Memoized named-scope relations built off the proxy (`things.someScope()`),
+  // cached here — the canonical Rails site — so two consecutive scope calls
+  // within one association load return the same object and `reset` (driven by
+  // reset / destroy_all / delete_all / insert / remove) invalidates them, all
+  // mirroring Rails' `reset_scope`. Read/written by `CollectionProxy`.
+  _namedScopeRelations?: Map<string, unknown>;
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
@@ -124,6 +130,9 @@ export class CollectionAssociation extends Association {
     this.target = [];
     this._associationIds = null;
     this._pendingReplace = null;
+    // Rails' `reset_scope`: drop memoized named-scope relations so the next
+    // `things.someScope()` rebuilds against the reset collection.
+    this._namedScopeRelations = undefined;
   }
 
   /**
