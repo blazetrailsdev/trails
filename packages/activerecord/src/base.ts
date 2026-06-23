@@ -499,35 +499,17 @@ async function performClassUpdate(
         throw argumentError(`${this.name}.update: every attrs entry must be a plain object`);
       }
     }
-    // Single `find([...ids])` call, then reorder by input-id to zip with
-    // attrsArr. Rails' AR builds an OR predicate that doesn't guarantee
-    // DB-return order, so rely on a stable id-key lookup. Use
-    // String()-joined keys so bigint PKs don't crash JSON.stringify and
-    // so numeric / string-cast ids (e.g. "1" vs 1 after predicate cast)
-    // hash to the same slot.
-    const stableIdKey = (id: unknown): string =>
-      Array.isArray(id) ? id.map((part) => String(part)).join("\x1f") : String(id);
-    // Rails finds per-id, so a duplicated id (e.g. update([1, 1, 2], …)) just
-    // re-finds the same record. Our batched `find` rejects duplicate ids, so
-    // dedup first; the byKey reorder below restores the requested duplicates.
-    const uniqueIds = [...new Map(idOrAttrs.map((id) => [stableIdKey(id), id])).values()];
-    const found = (await this.find(uniqueIds)) as
-      | InstanceType<typeof Base>
-      | InstanceType<typeof Base>[];
-    const foundArr = Array.isArray(found) ? found : [found];
-    const byKey = new Map<string, InstanceType<typeof Base>>();
-    for (const r of foundArr) byKey.set(stableIdKey(r.id), r);
+    // Mirror Rails' `id.map { |one_id| find(one_id) }.each_with_index { … }`:
+    // find each id individually (so a duplicated id like update([1, 1, 2], …)
+    // yields two DISTINCT in-memory instances of the same row), collecting all
+    // records BEFORE running any update so a missing id raises RecordNotFound
+    // up front without partially applying changes.
     const records: InstanceType<typeof Base>[] = [];
-    for (let i = 0; i < idOrAttrs.length; i++) {
-      const record = byKey.get(stableIdKey(idOrAttrs[i]));
-      if (!record) {
-        throw new RecordNotFound(
-          `Couldn't find ${this.name} with id=${stableIdKey(idOrAttrs[i])}`,
-          this.name,
-        );
-      }
-      await run(record, attrsArr[i]);
-      records.push(record);
+    for (const id of idOrAttrs) {
+      records.push(await this.find(id));
+    }
+    for (let i = 0; i < records.length; i++) {
+      await run(records[i], attrsArr[i]);
     }
     return records;
   }
