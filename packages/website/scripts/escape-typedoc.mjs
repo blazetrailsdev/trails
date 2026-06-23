@@ -111,7 +111,7 @@ export function rewriteDeadLink(url, fileDir, ctx) {
   // A flattened `_media` copy carries its source's relative links verbatim;
   // an index page (rendered package README) sits elsewhere and has typedoc-
   // rewritten `_media/<entry>` links. They map back to the repo differently.
-  const fileIsMedia = fileDir === "api/_media" || fileDir.startsWith("api/_media/");
+  const fileIsMedia = isMediaCopy(fileDir);
 
   let repoTarget = null;
   if (!fileIsMedia && resolved.startsWith(MEDIA_PREFIX)) {
