@@ -24,10 +24,6 @@ function ensureWritableAttribute(record: Base, ctor: typeof Base, name: string):
   if (record._attributes.includesName(name)) return;
   if ((ctor as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.has(name))
     return;
-  // A counter-cache column is registered as part of the model's writable schema
-  // (Rails' `counter_cache_column`), so it is a legitimate write target even
-  // when it isn't reflected as a plain column on a partially-loaded record.
-  if ((ctor as { _counterCacheColumns?: Set<string> })._counterCacheColumns?.has(name)) return;
   const realColumns = ctor.reflectedColumnNamesIfWarm();
   if (realColumns && !realColumns.has(name)) {
     throw new MissingAttributeError(`can't write unknown attribute \`${name}\``);

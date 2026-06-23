@@ -3235,6 +3235,37 @@ export async function updateCounterCaches(
         ? assoc.options.counterCache
         : `${pluralize(underscore(ctor.name))}_count`);
 
+    // Only touch the counter when its column actually exists on the owner.
+    // First resolve attribute aliases the same way the SQL write path does
+    // (Relation#updateCounters → resolveAliasedColumn, which mirrors Rails'
+    // Arel::Table#[] alias resolution): the canonical Comment#post counter cache
+    // resolves to `comments_count`, which Post aliases to `legacy_comments_count`
+    // (test-helpers/models/post.ts:45, mirroring Rails' Post#comments_count
+    // `alias_attribute`), so that case resolves to a real column and DOES update.
+    // The guard below therefore only fires for a genuinely-absent column.
+    //
+    // Deviation from Rails (tracked-pending-convergence: story
+    // 0023-surfaced-deviations/counter-cache-absent-column-skip-vs-raise):
+    // Rails' live belongs_to update path has no column-existence guard —
+    // `require_counter_update?` is just `counter_cache_column && owner.persisted?`
+    // (belongs_to_association.rb:128) — so a truly-missing column makes Rails
+    // *raise* (MissingAttributeError on `increment!`, or StatementInvalid via the
+    // update scope). The `has_attribute?` check in `has_cached_counter?`
+    // (reflection.rb:307) is used only on the has_many/`size` read side and
+    // against the declaring class. trails instead applies the check to the target
+    // class (where the SQL write lands) and turns the raise into a silent no-op so
+    // a counter cache on a non-existent column degrades gracefully. The above
+    // story tracks whether to converge to Rails' raise or ratify this skip.
+    //
+    // loadSchema() warms the cache first so a cold cache doesn't spuriously
+    // report a real column as absent.
+    await targetModel.loadSchema();
+    const resolvedCounterCol = Reflection.resolveAliasedColumn(
+      targetModel as { _attributeAliases?: Record<string, string> },
+      counterCol,
+    );
+    if (!targetModel.hasAttributeDefinition(resolvedCounterCol)) continue;
+
     // Mirrors Rails' BelongsToAssociation#update_counters: if the target owner
     // is already loaded in memory (wired via inverse-of from a collection proxy
     // create/push), update it directly so the caller sees the new count without
@@ -3268,9 +3299,9 @@ export async function updateCounterCaches(
     const touch = assoc.options.touch;
     const opts = touch != null ? { touch } : undefined;
     if (direction === "increment") {
-      await parent.incrementBang(counterCol, 1, opts);
+      await parent.incrementBang(resolvedCounterCol, 1, opts);
     } else {
-      await parent.decrementBang(counterCol, 1, opts);
+      await parent.decrementBang(resolvedCounterCol, 1, opts);
     }
     // The counter UPDATE bumps the parent's lock_version in the DB (via the
     // Locking::Optimistic#update_counters override). When the parent is the
