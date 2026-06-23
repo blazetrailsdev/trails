@@ -86,6 +86,9 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     jd.addAssociation("directComments");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
+
+    // Aliasing is deferred to emit: resolve against the shared AliasTracker.
+    jd.joinConstraints([]);
     // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
     expect(node!.effectiveSqlName).toBe("jdt_comments_jdt_authors");
 
@@ -206,11 +209,14 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     const node = jd.addAssociation("similarPosts");
     expect(node).not.toBeNull();
 
+    // Aliasing is deferred to emit: resolve the whole chain against the shared
+    // AliasTracker (_resolveThroughGroup).
+    jd.joinConstraints([]);
     const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
     // A twice-visited table keeps its real name on first encounter and is
-    // self-join aliased only on the colliding second encounter
-    // (_addThroughViaJoinAssociation: `chainTables.some(...)` detects the
-    // repeat), so exactly one aliased + one real-named join exists for each.
+    // self-join aliased only on the colliding second encounter (the emit-time
+    // chain resolution claims each link in forward order), so exactly one
+    // aliased + one real-named join exists for each.
     expect(effectiveNames).toContain("posts_authors_join");
     expect(effectiveNames).toContain("taggings_authors_join");
     expect(effectiveNames.filter((n) => n === "taggings").length).toBe(1);
@@ -255,6 +261,9 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     jd.addAssociation("jdtPosts");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
+
+    // Aliasing is deferred to emit: resolve against the shared AliasTracker.
+    jd.joinConstraints([]);
 
     // Through table aliased because jdt_posts already used. Non-root chain
     // links get the `_join` suffix (join_dependency.rb:206).

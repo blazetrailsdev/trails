@@ -240,13 +240,17 @@ describe("JoinDependency Arel node construction", () => {
     // First join uses real table name
     const node1 = jd.addAssociation("assets");
     expect(node1!.effectiveSqlName).toBe("assets");
-    const table1 = (node1!.arelJoin as Nodes.OuterJoin).left;
-    expect((table1 as any).tableAlias).toBeNull();
 
     // Register second association to force collision
     (Owner as any)._associations = [];
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     const node2 = jd.addAssociation("assets");
+
+    // Aliasing is deferred to emit: resolve against the shared AliasTracker.
+    jd.joinConstraints([]);
+
+    const table1 = (node1!.arelJoin as Nodes.OuterJoin).left;
+    expect((table1 as any).tableAlias).toBeNull();
     // Rails names self-join collisions via reflection.alias_candidate —
     // `{plural_name}_{parent_table}` (join_dependency.rb:204-206), not `t2`.
     expect(node2!.effectiveSqlName).toBe("assets_owners");
