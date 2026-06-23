@@ -32,6 +32,7 @@ import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connectio
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
+import { wrapWithScopeProxy } from "./delegation.js";
 import { foreignKey } from "@blazetrails/activesupport";
 
 /**
@@ -1283,8 +1284,13 @@ function extendingBang(
       mod(this);
     } else {
       this._extending.push(mod);
+      // Bind extension methods to the scope-proxy-wrapped relation, not the
+      // raw one, so a bare named-scope call inside an extension body (Rails'
+      // `has_many :comments do; def newest; created.last; end; end`) resolves
+      // through the same method_missing/scope delegation as `rel.created`.
+      const wrapped = wrapWithScopeProxy(this);
       for (const [name, fn] of Object.entries(mod)) {
-        (this as any)[name] = fn.bind(this);
+        (this as any)[name] = fn.bind(wrapped);
       }
     }
   }
