@@ -1,5 +1,5 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
-import { PredicateBuilder } from "../relation/predicate-builder.js";
+import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
@@ -339,28 +339,35 @@ export class AssociationScope {
       table?: ArelTable;
     };
     if (table && w.table && !arelTableEql(w.table, table)) {
-      // Table-qualified WHERE for through chains where the FK lives on
-      // an intermediate joined-in table. We keep the Arel-for-aliasing
-      // node (so the alias, not a bare name, qualifies the column) but
-      // produce the type-cast bind through the SAME predicate-builder
-      // path the unqualified `where({ key: value })` branch uses:
-      // `PredicateBuilder#buildBindAttribute` (= what BasicObjectHandler
-      // calls). A fresh PredicateBuilder over the qualified `table`
-      // resolves `typeForAttribute(key)` off the alias' delegated type
-      // caster (with the predicate builder's own identity fallback), so
-      // the owner key is type-cast to the FK column's DB type — e.g. an
-      // integer owner id bound against a string FK column
-      // (`editorships.publication_id`) serializes as a string instead of
-      // emitting `varchar = integer` and tripping PostgreSQL's strict
-      // operator resolution. This replaces the previous hand-rolled
-      // QueryAttribute re-derivation with the native predicate-builder
-      // bind (apply_scope convergence, RFC 0022).
-      const bind = new PredicateBuilder(table as unknown as ArelTable).buildBindAttribute(
-        key,
-        value,
-      );
-      const node = table.get(key).eq(bind);
-      return w.where(node);
+      // Table-qualified WHERE for through chains where the FK lives on an
+      // intermediate joined-in table. Rails writes this as
+      // `scope.where!(table.name => { key => value })` (association_scope.rb:165),
+      // letting `PredicateBuilder#expand_from_hash` resolve `table.name` via
+      // `associated_table` and build the nested condition through the associated
+      // table's own predicate builder. We can't route through the relation's
+      // bare-name resolution: the AliasTracker alias (`children_imageables`,
+      // self-referential `has_many :through`) isn't registered on the scope's
+      // TableMetadata, so `associated_table(table.name)` would miss the type
+      // caster or emit the real table name instead of the alias. Instead we hold
+      // the alias node directly and wrap it in a klass-less `TableMetadata` —
+      // the documented equivalent of Rails' associated-table: its predicate
+      // builder builds `{ key => value }` over the alias node (so the alias, not
+      // a bare name, qualifies the column) while deriving the type-cast bind
+      // through the SAME `BasicObjectHandler` / `buildBindAttribute` path the
+      // unqualified `where({ key: value })` branch uses. The alias node delegates
+      // `typeForAttribute(key)` to the underlying table, so an integer owner id
+      // bound against a string FK column (`editorships.publication_id`)
+      // serializes as a string instead of emitting `varchar = integer` and
+      // tripping PostgreSQL's strict operator resolution. This eliminates the
+      // hand-built `table.get(key).eq(bind)` Arel node (apply_scope nested-hash
+      // convergence, RFC 0022).
+      const meta = new TableMetadata(null, table as unknown as ArelTable);
+      const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
+      let result: unknown = scope;
+      for (const node of nodes) {
+        result = (result as { where: (c: unknown) => unknown }).where(node);
+      }
+      return result;
     }
     return w.where({ [key]: value });
   }
