@@ -536,14 +536,20 @@ async function groupedCompositeAssoc(
 }
 
 /**
- * True when the relation yields no rows without issuing a query: an explicit
- * `none()` (`_isNone`) or a contradictory where-clause (`where(col: [])`, which
- * compiles to an empty `IN`). Mirrors Rails' `where_clause.contradiction?`
- * guard in `Calculations#execute_simple_calculation` / `#perform_calculation`,
- * which returns `ActiveRecord::Result.empty` rather than running the SQL.
+ * True when a calculation yields its empty value without issuing a query.
+ *
+ * `none()` (`_isNone`) always short-circuits — Rails' `NullRelation#calculate`
+ * returns `0`/`nil` (or `{}` when grouped) for every operation. A contradictory
+ * where-clause (`where(col: [])`, which compiles to an empty `IN`) only
+ * short-circuits the SIMPLE calculation: Rails checks `where_clause.contradiction?`
+ * in `execute_simple_calculation` and returns `ActiveRecord::Result.empty`, but
+ * `execute_grouped_calculation` has no such guard — a grouped contradiction still
+ * runs the query (zero rows → `{}`). So the contradiction branch is gated on the
+ * relation being ungrouped.
  */
 function isEmptyCalculationScope(rel: CalculationRelation): boolean {
-  return rel._isNone || rel._whereClause.isContradiction();
+  if (rel._isNone) return true;
+  return rel._groupColumns.length === 0 && rel._whereClause.isContradiction();
 }
 
 export async function performCount(
