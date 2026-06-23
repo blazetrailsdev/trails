@@ -47,7 +47,7 @@ describe("Preloader BigInt PK / number FK key match", () => {
     const posts = internals(david)._preloadedAssociations.get("posts") ?? [];
     expect(posts.length).toBeGreaterThan(0);
     for (const post of posts) {
-      expect(Number(internals(post)._readAttribute("author_id"))).toBe(authors("david").id);
+      expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("david").id));
     }
   });
 
@@ -66,14 +66,14 @@ describe("Preloader BigInt PK / number FK key match", () => {
     const davidPosts = internals(david)._preloadedAssociations.get("posts") ?? [];
     expect(davidPosts.length).toBeGreaterThan(0);
     for (const post of davidPosts) {
-      expect(Number(internals(post)._readAttribute("author_id"))).toBe(authors("david").id);
+      expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("david").id));
     }
 
     // The still-number owner PK must also match its number FKs in the same call.
     const maryPosts = internals(mary)._preloadedAssociations.get("posts") ?? [];
     expect(maryPosts.length).toBeGreaterThan(0);
     for (const post of maryPosts) {
-      expect(Number(internals(post)._readAttribute("author_id"))).toBe(authors("mary").id);
+      expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("mary").id));
     }
   });
 });

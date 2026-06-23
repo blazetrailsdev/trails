@@ -309,7 +309,7 @@ describe("AssociationsJoinModelTest", () => {
     await setHasOne(thinking, "tagging", tagging, { as: "taggable", className: "Tagging" });
 
     expect(tagging.taggable_type).toBe("Post");
-    expect(tagging.taggable_id).toBe(thinking.id);
+    expect(tagging.taggable_id).toBe(Number(thinking.id));
     const taggable = (await loadBelongsTo(tagging, "taggable", { polymorphic: true })) as Base;
     expect(taggable.id).toBe(thinking.id);
   });
@@ -322,7 +322,7 @@ describe("AssociationsJoinModelTest", () => {
     await post.save();
 
     expect(tagging.taggable_type).toBe("Post");
-    expect(tagging.taggable_id).toBe(post.id);
+    expect(tagging.taggable_id).toBe(Number(post.id));
     const taggable = (await loadBelongsTo(tagging, "taggable", { polymorphic: true })) as Base;
     expect(taggable.id).toBe(post.id);
   });
