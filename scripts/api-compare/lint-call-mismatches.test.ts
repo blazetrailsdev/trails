@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   callOf,
   diffAgainstBaseline,
+  findDuplicateKeys,
   flattenArtifact,
   keyOf,
+  loadBaseline,
   reseed,
   type ExcludeEntry,
 } from "./lint-call-mismatches.js";
@@ -62,6 +64,31 @@ describe("diffAgainstBaseline", () => {
     const { added, stale } = diffAgainstBaseline(current, baseline);
     expect(added).toEqual([]);
     expect(stale.map(keyOf)).toEqual(["b.ts bar touch"]);
+  });
+});
+
+describe("findDuplicateKeys", () => {
+  it("returns nothing for a clean baseline", () => {
+    expect(findDuplicateKeys(baseline)).toEqual([]);
+  });
+
+  it("flags a (tsFile, rubyName, call) repeated across rows", () => {
+    expect(
+      findDuplicateKeys([
+        ...baseline,
+        { tsFile: "a.ts", rubyName: "foo", call: "save", reason: "dup" },
+      ]),
+    ).toEqual(["a.ts foo save"]);
+  });
+});
+
+describe("committed baseline", () => {
+  it("is well-formed: no duplicate keys, every entry has a reason", async () => {
+    const committed = await loadBaseline();
+    expect(findDuplicateKeys(committed)).toEqual([]);
+    for (const e of committed) {
+      expect(e.reason.trim().length).toBeGreaterThan(0);
+    }
   });
 });
 

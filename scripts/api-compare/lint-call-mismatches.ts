@@ -127,17 +127,50 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
 
+// A baseline with two rows for the same (tsFile, rubyName, call) is malformed:
+// the diff would silently tolerate one of them going stale. Reject it so the
+// committed file stays a clean 1:1 record of the flagged calls.
+export function findDuplicateKeys(baseline: ExcludeEntry[]): string[] {
+  const seen = new Set<string>();
+  const dups = new Set<string>();
+  for (const e of baseline) {
+    const k = keyOf(e);
+    if (seen.has(k)) dups.add(k);
+    seen.add(k);
+  }
+  return [...dups];
+}
+
 export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return readJson<ExcludeEntry[]>(BASELINE_PATH);
 }
 
 export async function loadCurrent(): Promise<CallMismatchKey[]> {
+  const exists = await fs.access(ARTIFACT_PATH).then(
+    () => true,
+    () => false,
+  );
+  if (!exists) {
+    throw new Error(
+      `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm exec tsx ` +
+        "scripts/api-compare/compare.ts` (or `pnpm api:compare`) first to write it.",
+    );
+  }
   return flattenArtifact(await readJson<Artifact>(ARTIFACT_PATH));
 }
 
 async function main(write: boolean): Promise<number> {
   const baseline = await loadBaseline();
   const current = await loadCurrent();
+
+  const dups = findDuplicateKeys(baseline);
+  if (dups.length > 0) {
+    console.error(
+      `\ncall-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
+        dups.map((d) => `  ${d}`).join("\n"),
+    );
+    return 1;
+  }
 
   if (write) {
     const next = reseed(current, baseline);
