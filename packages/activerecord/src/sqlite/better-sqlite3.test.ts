@@ -107,6 +107,31 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     expect(betterSqlite3Driver.databaseExists?.({ database: ":memory:" })).toBe(true);
   });
 
+  it("databaseExists() treats a relative file: URI as a literal filename", async () => {
+    // better-sqlite3's build doesn't set SQLITE_OPEN_URI, so open() creates a
+    // literal file named "file:name.db" (not the cwd-relative "name.db" a
+    // URI-aware driver would). databaseExists() must check that same literal
+    // string rather than anchoring the URI body at "/".
+    const relName = `bs3-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
+    const literal = `file:${relName}`;
+    try {
+      const conn = await betterSqlite3Driver.open({ database: literal });
+      await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.close();
+      expect(getFs().existsSync(literal)).toBe(true);
+      expect(getFs().existsSync(`/${relName}`)).toBe(false);
+      expect(betterSqlite3Driver.databaseExists?.({ database: literal })).toBe(true);
+    } finally {
+      for (const p of [literal, `${literal}-wal`, `${literal}-shm`]) {
+        try {
+          getFs().unlinkSync(p);
+        } catch {
+          /* best effort */
+        }
+      }
+    }
+  });
+
   it("capabilities reflect better-sqlite3 traits", () => {
     expect(betterSqlite3Driver.capabilities.inProcessSync).toBe(true);
     expect(betterSqlite3Driver.capabilities.streaming).toBe(true);
