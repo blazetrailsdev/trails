@@ -98,6 +98,43 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
   });
 
+  it("columns() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
+    const sqlite = new CapturingAdapter("sqlite");
+    await sqlite.columns("things");
+    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
+    await sqlite.columns('a"b');
+    expect(sqlite.lastSql).toBe('PRAGMA table_info("a""b")');
+  });
+
+  it("indexes() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
+    const sqlite = new CapturingAdapter("sqlite");
+    await sqlite.indexes("things");
+    expect(sqlite.lastSql).toBe('PRAGMA index_list("things")');
+    await sqlite.indexes('a"b');
+    expect(sqlite.lastSql).toBe('PRAGMA index_list("a""b")');
+  });
+
+  it("indexes() sqlite arm quotes the index name in the index_info PRAGMA", async () => {
+    const calls: string[] = [];
+    class IndexAdapter extends AbstractAdapter {
+      get adapterName() {
+        return "sqlite" as any;
+      }
+      execute(sql: string) {
+        calls.push(sql);
+        // First call is index_list; surface one index whose name has a quote.
+        return Promise.resolve(
+          calls.length === 1 ? [{ name: 'idx"x', unique: 1 }] : ([] as Record<string, unknown>[]),
+        );
+      }
+      executeMutation(_sql: string) {
+        return Promise.resolve(0);
+      }
+    }
+    await new IndexAdapter().indexes("things");
+    expect(calls).toEqual(['PRAGMA index_list("things")', 'PRAGMA index_info("idx""x")']);
+  });
+
   it("tables() sqlite/mysql fallback arms are unchanged", async () => {
     const sqlite = new CapturingAdapter("sqlite");
     await sqlite.tables();
