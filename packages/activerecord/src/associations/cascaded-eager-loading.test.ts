@@ -120,6 +120,48 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
+  it("eager association loading dedups a manual join coinciding with an eager root", async () => {
+    // Author.joins(:posts).eager_load(posts: :comments): the manual INNER JOIN
+    // posts and the eager root posts are the SAME association — Rails' `walk`
+    // dedups them to ONE un-aliased `posts` (manual INNER), with `comments`
+    // joined onto it. No second `posts`/`posts_authors` join, no ambiguous column.
+    const loaded = await Author.all()
+      .joins("posts")
+      .eagerLoad({ posts: "comments" })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  });
+
+  it("eager association loading dedups a single-step manual join and eager root", async () => {
+    // Author.joins(:posts).eager_load(:posts): single-step root coincides with
+    // the manual join — one un-aliased INNER `posts`, no duplicate.
+    const loaded = await Author.all()
+      .joins("posts")
+      .eagerLoad("posts")
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+  });
+
+  it("eager association loading dedups a manual join coinciding with a dotted eager root", async () => {
+    // A dotted-path eager spec roots at its first segment (`posts.comments` →
+    // `posts`), so it too dedups against the coinciding manual `joins(:posts)`.
+    const loaded = await Author.all()
+      .joins("posts")
+      .eagerLoad("posts.comments")
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  });
+
   it("eager association loading grafts stashed associations to correct parent", async () => {
     const person = await Person.all()
       .eagerLoad({ primaryContact: "primaryContact" })

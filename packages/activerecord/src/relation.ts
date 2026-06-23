@@ -2717,6 +2717,55 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Root association names of the eager-load JoinDependency — `eager_load(...)`
+   * plus `includes` promoted via `references` (the same set fed to the eager JD
+   * in `_buildEagerOperandManager` / `_executeEagerLoad`). A nested hash spec
+   * (`{posts: :comments}`) contributes its key (`posts`); an array contributes
+   * each element's roots; a string contributes itself.
+   */
+  private _eagerRootNames(): string[] {
+    const roots = [...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()];
+    return roots.flatMap((spec) => this._specRootNames(spec));
+  }
+
+  private _specRootNames(spec: AssociationSpec): string[] {
+    // A dotted path (`"posts.comments"`) roots at its first segment (`posts`).
+    if (typeof spec === "string") return [spec.split(".")[0]];
+    if (Array.isArray(spec)) return spec.flatMap((s) => this._specRootNames(s));
+    if (spec && typeof spec === "object") return Object.keys(spec);
+    return [];
+  }
+
+  /**
+   * Eager-load ROOTS that coincide with a manual `joins(...)` of the SAME
+   * association — Rails' `walk` dedup (`r.table = l.table`, join_dependency.rb)
+   * collapses a join shared by `joins_values` and the eager JoinDependency to a
+   * single un-aliased join. trails emits the two passes separately, so the eager
+   * root would otherwise duplicate the manual INNER JOIN (ambiguous column).
+   * Matched by association NAME (not bare table) so an eager root that merely
+   * shares a table with an unrelated `joins(...)` via a different reflection is
+   * NOT dropped — mirroring `walk`'s `isMatch` association check.
+   */
+  private _joinedEagerValues(): string[] {
+    if (this._namedInnerJoins.length === 0) return [];
+    const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
+    return this._eagerRootNames().filter((name) => joined.has(name));
+  }
+
+  /**
+   * Tables whose eager-load OUTER JOIN is redundant because a manual
+   * `joins(...)` INNER JOIN already covers them: the `includes ∩ joins`
+   * intersection plus `eager_load`/promoted roots that coincide with a manual
+   * join. `_buildEagerJoinManager` skips re-emitting the eager join for these,
+   * leaving nested children (e.g. `comments`) to hang off the manual join.
+   */
+  private _dedupedManualJoinTables(): Set<string> {
+    const tables = this._joinedIncludesTables();
+    for (const t of this._resolveAssocTables(this._joinedEagerValues())) tables.add(t);
+    return tables;
+  }
+
+  /**
    * Resolve association-name join specs to their lowercased table names. An
    * unresolved spec falls back to its own lowercased name (matching the inline
    * resolution in `referencesEagerLoadedTables`).
@@ -2836,24 +2885,22 @@ export class Relation<T extends Base> {
     // construction and aliases to its `alias_candidate`
     // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`),
     // instead of emitting a second un-aliased `posts` (ambiguous column).
-    // The `includes ∩ joins` intersection is excluded: that table is genuinely
-    // deduped — `_buildEagerJoinManager` skips re-emitting the eager OUTER JOIN
-    // and the projection reads the manual INNER JOIN's un-aliased table
-    // (Rails `joined_includes_values`). Every other manual-join table is seeded.
-    //
-    // NB: an `eager_load`/promoted root that coincides with a manual join of the
-    // SAME association (`joins(:posts).eager_load(posts: :comments)`) is NOT in
-    // that intersection, so it is seeded and the eager root aliases to
-    // `posts_authors` — an extra (valid, correctly-scoped) OUTER JOIN rather than
-    // Rails' single `walk`-deduped join. trails emits the eager and manual join
-    // passes separately with no cross-pass `walk`, so seeding yields valid SQL
-    // where omitting it would emit two un-aliased `posts` (ambiguous column).
-    // True cross-pass dedup is tracked by `eager-load-joins-walk-dedup`.
-    const joinedIncludes = this._joinedIncludesTables();
+    // Deduped manual-join tables are excluded: their table is genuinely shared —
+    // `_buildEagerJoinManager` skips re-emitting the eager OUTER JOIN and the
+    // projection reads the manual INNER JOIN's un-aliased table. This covers both
+    // the `includes ∩ joins` intersection (Rails `joined_includes_values`) AND an
+    // `eager_load`/promoted/dotted ROOT that coincides with a manual join of the
+    // SAME association (`joins(:posts).eager_load(posts: :comments)`): excluding
+    // it from the seed keeps the eager root un-aliased so the skip dedups it to a
+    // single `posts` (manual INNER), mirroring Rails' `walk` (`r.table = l.table`).
+    // Every other manual-join table IS seeded, so a through-association
+    // intermediate landing on it still aliases to its `alias_candidate`
+    // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`).
+    const dedupedTables = this._dedupedManualJoinTables();
     const seedTables = [
       ...this._resolveAssocTables(this._namedInnerJoins),
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
-    ].filter((t) => !joinedIncludes.has(t));
+    ].filter((t) => !dedupedTables.has(t));
     if (seedTables.length > 0) jd.seedConstructionTables(seedTables);
 
     const fallbackAssocs: AssociationSpec[] = [];
@@ -4915,11 +4962,18 @@ export class Relation<T extends Base> {
     const manager = table.project(...(projection as Parameters<typeof table.project>));
 
     // Skip eager-load JOINs for tables in the `includes ∩ joins` intersection
-    // (Rails joined_includes_values): `_applyJoinsToManager` emits the named
-    // INNER JOIN, and the JoinDependency projection above reads its columns by
-    // the same (unaliased) table name — so re-emitting the eager OUTER JOIN here
-    // would duplicate the join.
-    const joinedIncludesTables = this._joinedIncludesTables();
+    // (Rails joined_includes_values) and for eager/promoted roots that coincide
+    // with a manual `joins(...)` (Rails `walk` dedup): `_applyJoinsToManager`
+    // emits the named INNER JOIN, and the JoinDependency projection above reads
+    // its columns by the same (unaliased) table name — so re-emitting the eager
+    // OUTER JOIN here would duplicate the join.
+    const joinedIncludesTables = this._dedupedManualJoinTables();
+    // When an eager ROOT is deduped to its manual INNER JOIN, a nested eager
+    // child (e.g. `comments` under a deduped `posts`) joins ON the manual table,
+    // so the manual join must be emitted FIRST — otherwise the child's ON
+    // forward-references a not-yet-joined table (PostgreSQL/MySQL reject it).
+    const manualJoinsFirst = this._joinedEagerValues().length > 0;
+    if (manualJoinsFirst) this._applyJoinsToManager(manager);
     for (const node of joinNodes) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
       if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
@@ -4928,7 +4982,7 @@ export class Relation<T extends Base> {
       manager.appendJoinNode(node);
     }
 
-    this._applyJoinsToManager(manager);
+    if (!manualJoinsFirst) this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
     if (this._isDistinct) manager.distinct();
@@ -4999,7 +5053,11 @@ export class Relation<T extends Base> {
     // Skip eager OUTER JOINs for `includes ∩ joins` tables — `_applyJoinsToManager`
     // emits them as the named INNER JOIN below, so re-emitting here would produce
     // a duplicate join (ambiguous-column error). Mirrors `_buildEagerJoinManager`.
-    const joinedIncludesTables = this._joinedIncludesTables();
+    const joinedIncludesTables = this._dedupedManualJoinTables();
+    // A deduped eager root's nested child joins ON the manual table, so the
+    // manual join must precede it (see `_buildEagerJoinManager`).
+    const manualJoinsFirst = this._joinedEagerValues().length > 0;
+    if (manualJoinsFirst) this._applyJoinsToManager(idSubquery);
     for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
       if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
@@ -5007,7 +5065,7 @@ export class Relation<T extends Base> {
       }
       idSubquery.appendJoinNode(node);
     }
-    this._applyJoinsToManager(idSubquery);
+    if (!manualJoinsFirst) this._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);
     this._applyOrderToManager(idSubquery, table);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
