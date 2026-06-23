@@ -51,16 +51,16 @@ TS source read:
 
 Static call-graph census (from `git grep` over `packages/activerecord/src`):
 
-| Signal                                                                               | Count                |
-| ------------------------------------------------------------------------------------ | -------------------- |
-| `*.test.ts` files                                                                    | 224                  |
-| files using a handler suite (`setupHandlerSuite`/`useHandlerFixtures`/transactional) | 199                  |
-| `defineSchema(` call sites (all)                                                     | 502 across 166 files |
-| files passing `dropExisting:true`                                                    | 28                   |
-| files calling `dropAllTables` directly                                               | 4                    |
-| files calling `repairWorkerSchema` directly                                          | 2 (helper + 1 test)  |
-| canonical tables in `TEST_SCHEMA`                                                    | 246                  |
-| force:"cascade" emitted per table on PG/MySQL                                        | yes (all 246)        |
+| Signal                                                                               | Count                    |
+| ------------------------------------------------------------------------------------ | ------------------------ |
+| `*.test.ts` files (`git ls-files`)                                                   | 539 (88 contain `.skip`) |
+| files using a handler suite (`setupHandlerSuite`/`useHandlerFixtures`/transactional) | 199                      |
+| `defineSchema(` call sites (all)                                                     | 502 across 166 files     |
+| files passing `dropExisting:true`                                                    | 28                       |
+| files calling `dropAllTables` directly                                               | 4                        |
+| files calling `repairWorkerSchema` directly                                          | 2 (helper + 1 test)      |
+| canonical tables in `TEST_SCHEMA`                                                    | 246                      |
+| force:"cascade" emitted per table on PG/MySQL                                        | yes (all 246)            |
 
 ## How each DROP path fires
 
@@ -126,11 +126,14 @@ topology, reconciled against the audit totals (PG 86,810 / Maria 85,781). The
 **first impl story adds a one-line path tag to the profiler to confirm these
 ranges empirically** (it is the cheap, decisive measurement).
 
-Per-run estimate (PG; ~224 file-setups spread over 6 workers, ~37 files/worker):
+Per-run estimate (PG; 539 `*.test.ts` files spread over 6 workers, ~90
+files/worker — slot 1 runs `loadSchema` for every file it loads, including ones
+whose individual tests are `.skip`ped, since the per-file `setupFiles` reset
+runs before test selection):
 
 | Path                                         | Mechanism                                     | Est. drops/run         | Share                                 |
 | -------------------------------------------- | --------------------------------------------- | ---------------------- | ------------------------------------- |
-| **A** loadSchema replay (slot 1, every file) | 246 × ~37 files                               | ~9,000                 | core canonical churn, fully avoidable |
+| **A** loadSchema replay (slot 1, every file) | 246 × ~90 files                               | ~22,000                | core canonical churn, fully avoidable |
 | A' first-file purge+load (slots 2–6)         | 246 × 5                                       | ~1,200                 | one-time per worker                   |
 | **C** defineSchema signature-mismatch        | 166 files × cross-file invalidation           | large (long tail)      | driven by D + bespoke re-shape        |
 | **B** defineSchema dropExisting              | 28 files × declared subset                    | moderate               | bespoke, mostly unavoidable           |
@@ -187,7 +190,7 @@ reuse), `ddl-profile.ts` (path tag, measurement only). `drop-all-tables.ts` and
   (or reuse `reconstructFromSchema`'s truncate fast path) so the 246-table
   force:"cascade" replay fires only on real schema change.
 - Files: `test-setup-dy.ts`, `tasks/database-tasks.ts`, `ddl-profile.ts`.
-- Expected win: eliminate ~9k+ drops/run (Path A) on the slot-1 worker.
+- Expected win: eliminate ~22k drops/run (Path A) on the slot-1 worker.
 
 ### Story 2 — `ar-test-reset-signature-cache-no-blanket-clear` (~80 LOC)
 
