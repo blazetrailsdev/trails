@@ -368,6 +368,14 @@ class ApiExtractor
       process_vcall(node)
     when :method_add_arg
       process_method_add_arg(node)
+    when :method_add_block
+      # `CONST.each do |x| … class_eval "def #{x}…" end` enumerable codegen
+      # (e.g. relation/query_methods.rb's VALUE_METHODS loop). Falls through to
+      # the generic child-walk when it isn't a recognized codegen loop so normal
+      # blocks (`included do … end`, `scope :x do … end`) keep working.
+      unless process_each_codegen(node)
+        node.each { |child| walk(child) if child.is_a?(Array) }
+      end
     when :sclass
       process_sclass(node)
     when :assign
@@ -599,6 +607,8 @@ class ApiExtractor
       process_scope(args)
     when "delegate"
       process_delegate(args)
+    when "define_column_methods"
+      process_define_column_methods(args)
     when "module_function"
       process_module_function(args)
     end
@@ -1036,6 +1046,273 @@ class ApiExtractor
       }
     end
     maybe_update_module_file(fqn, target)
+  end
+
+  # `define_column_methods :integer, :string, …` (connection_adapters schema
+  # definitions) defines one PUBLIC instance method per symbol on the enclosing
+  # `ColumnMethods` module via `module_eval "def #{type}(*names, **options) …"`.
+  # The symbols ARE the generated method names (no suffix) — this is the column
+  # DSL (`t.integer`, `t.json`) that the static extractor can't otherwise see.
+  # See RFC 0025 `extractor-capture-enumerable-metaprogrammed-surface`.
+  def process_define_column_methods(args)
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    names = extract_symbol_args(args)
+    return if names.empty?
+
+    params = [
+      { name: "names", kind: "rest" },
+      { name: "options", kind: "keyword_rest" },
+    ]
+    names.each do |name|
+      target[:instanceMethods] << {
+        name: name,
+        visibility: "public",
+        params: params,
+        file: @current_file,
+        notes: "define_column_methods",
+      }
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  # Models the enumerable `class_eval`/`define_method` codegen loop
+  #
+  #   Relation::VALUE_METHODS.each do |name|
+  #     method_name, _ =
+  #       case name
+  #       when *Relation::MULTI_VALUE_METHODS  then ["#{name}_values", …]
+  #       when *Relation::SINGLE_VALUE_METHODS then ["#{name}_value", …]
+  #       when *Relation::CLAUSE_METHODS       then ["#{name}_clause", …]
+  #       end
+  #     class_eval "def #{method_name}; end; def #{method_name}=(v); end"
+  #   end
+  #
+  # (relation/query_methods.rb:162). The per-element `_value`/`_values`/`_clause`
+  # suffix is chosen by a `case` over symbol-array constants defined in a DIFFERENT
+  # file (relation.rb) — resolved here via @const_symbol_arrays, which persists
+  # across files. Emits the generated reader (and `=` writer, when the template
+  # has one) per member. Returns true when it consumed the node.
+  def process_each_codegen(node)
+    call = node[1]
+    return false unless call.is_a?(Array) && call[0] == :call
+    return false unless ident_name(call[3]) == "each"
+
+    block = node[2]
+    return false unless block.is_a?(Array) &&
+                        [:do_block, :brace_block].include?(block[0])
+    loop_var = block_param_name(block)
+    return false unless loop_var
+    body = block[0] == :do_block ? block[2] : block[2]
+
+    # Local assigned from the `case` (the class_eval template interpolates it).
+    name_local, suffix_map = codegen_name_mapping(body, loop_var)
+    return false unless name_local && !suffix_map.empty?
+
+    forms = codegen_def_forms(body, name_local)
+    return false if forms.empty?
+
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return false unless target
+
+    suffix_map.each do |members, suffix|
+      members.each do |member|
+        base = "#{member}#{suffix}"
+        forms.each do |form|
+          method_name = form == :writer ? "#{base}=" : base
+          target[:instanceMethods] << {
+            name: method_name,
+            visibility: "public",
+            params: form == :writer ? [{ name: "value", kind: "required" }] : [],
+            file: @current_file,
+            notes: "class_eval",
+          }
+        end
+      end
+    end
+    maybe_update_module_file(fqn, target)
+    true
+  end
+
+  # The block param of a `do`/`{}` block: `[:block_var, [:params, [[:@ident…]]…]]`.
+  def block_param_name(block)
+    block_var = block[1]
+    return nil unless block_var.is_a?(Array) && block_var[0] == :block_var
+    params = block_var[1]
+    return nil unless params.is_a?(Array) && params[0] == :params
+    required = params[1]
+    return nil unless required.is_a?(Array) && required[0]
+    ident_name(required[0])
+  end
+
+  # Find the loop's `<local> = case <loop_var> when *CONST then ["#{loop_var}SUF"…]`
+  # assignment. Returns [local_name, [[members, suffix], …]] resolving each
+  # `when *CONST` to its symbol members and the literal suffix that follows the
+  # `#{loop_var}` interpolation. Both `massign` (`a, b = case…`) and single
+  # `assign` are supported.
+  def codegen_name_mapping(body, loop_var)
+    assign = find_codegen_assign(body)
+    return [nil, []] unless assign
+
+    local, rhs = assign
+    return [nil, []] unless rhs.is_a?(Array) && rhs[0] == :case
+
+    pairs = []
+    when_node = rhs[2]
+    while when_node.is_a?(Array) && when_node[0] == :when
+      members = when_star_members(when_node[1])
+      suffix = when_branch_suffix(when_node[2], loop_var)
+      pairs << [members, suffix] if members && !members.empty? && suffix
+      when_node = when_node[3]
+    end
+    [local, pairs]
+  end
+
+  # Locate the first `massign`/`assign` whose RHS is a `case`; return
+  # [first_lhs_local_name, case_node].
+  def find_codegen_assign(body)
+    result = nil
+    visit = lambda do |n|
+      return if result || !n.is_a?(Array)
+      if n[0] == :massign || n[0] == :assign
+        local = first_assign_local(n[1])
+        result = [local, n[2]] if local && n[2].is_a?(Array) && n[2][0] == :case
+        return if result
+      end
+      n.each { |c| visit.call(c) if c.is_a?(Array) }
+    end
+    visit.call(body)
+    result
+  end
+
+  # First var-field ident from an `massign` lhs list or a single `assign` lhs.
+  def first_assign_local(lhs)
+    node = lhs
+    node = node[0] if node.is_a?(Array) && node[0].is_a?(Array) # massign list
+    return nil unless node.is_a?(Array) && node[0] == :var_field
+    ident_name(node[1])
+  end
+
+  # Members of a `when *CONST` guard: `[:args_add_star, [], const_ref]`.
+  def when_star_members(guard)
+    return nil unless guard.is_a?(Array) && guard[0] == :args_add_star
+    resolve_const_symbol_array(guard[2])
+  end
+
+  # The literal suffix after the `#{loop_var}` interpolation in a branch's first
+  # array element, e.g. `["#{name}_values", …]` → `"_values"`.
+  def when_branch_suffix(branch_body, loop_var)
+    return nil unless branch_body.is_a?(Array)
+    first = branch_body[0]
+    return nil unless first.is_a?(Array) && first[0] == :array
+    elems = first[1]
+    return nil unless elems.is_a?(Array) && elems[0].is_a?(Array)
+    str = elems[0]
+    return nil unless str[0] == :string_literal
+    content = str[1]
+    return nil unless content.is_a?(Array) && content[0] == :string_content
+    parts = content[1..]
+    # Expect `[:string_embexpr [loop_var]]` then `[:@tstring_content, suffix]`.
+    embexpr = parts.find do |p|
+      p.is_a?(Array) && p[0] == :string_embexpr && embexpr_var(p) == loop_var
+    end
+    return nil unless embexpr
+    idx = parts.index(embexpr)
+    tail = parts[idx + 1]
+    return nil unless tail.is_a?(Array) && tail[0] == :@tstring_content
+    tail[1]
+  end
+
+  def embexpr_var(node)
+    inner = node[1]
+    return nil unless inner.is_a?(Array) && inner[0].is_a?(Array)
+    ref = inner[0]
+    ref.is_a?(Array) && ref[0] == :var_ref ? ident_name(ref[1]) : nil
+  end
+
+  # Which `def` forms the class_eval/module_eval template defines relative to the
+  # interpolated `name_local`: `:reader` (`def #{name_local}`) and/or `:writer`
+  # (`def #{name_local}=`). Reconstructs the template, replacing each
+  # `#{name_local}` with a sentinel, then scans for `def <sentinel>` occurrences.
+  SENTINEL = " "
+  def codegen_def_forms(body, name_local)
+    template = codegen_template(body, name_local)
+    return [] unless template
+    forms = []
+    template.scan(/\bdef\s+#{SENTINEL}(=?)/) do |writer|
+      forms << (writer[0] == "=" ? :writer : :reader)
+    end
+    forms.uniq
+  end
+
+  # Reconstruct the first `class_eval`/`module_eval` string template, substituting
+  # `#{name_local}` interpolations with SENTINEL and dropping other interpolations.
+  def codegen_template(body, name_local)
+    str_node = nil
+    visit = lambda do |n|
+      return if str_node || !n.is_a?(Array)
+      if [:command, :method_add_arg].include?(n[0])
+        meth = n[0] == :command ? ident_name(n[1]) : nil
+        if n[0] == :method_add_arg && n[1].is_a?(Array) && n[1][0] == :fcall
+          meth = ident_name(n[1][1])
+        end
+        if %w[class_eval module_eval].include?(meth)
+          str_node = first_string_literal(n[0] == :command ? n[2] : n[2])
+          return if str_node
+        end
+      end
+      n.each { |c| visit.call(c) if c.is_a?(Array) }
+    end
+    visit.call(body)
+    return nil unless str_node
+
+    content = str_node[1]
+    return nil unless content.is_a?(Array) && content[0] == :string_content
+    out = +""
+    content[1..].each do |part|
+      next unless part.is_a?(Array)
+      case part[0]
+      when :@tstring_content
+        out << part[1]
+      when :string_embexpr
+        out << SENTINEL if embexpr_var(part) == name_local
+      end
+    end
+    out
+  end
+
+  def first_string_literal(args)
+    found = nil
+    visit = lambda do |n|
+      return if found || !n.is_a?(Array)
+      if n[0] == :string_literal
+        found = n
+        return
+      end
+      n.each { |c| visit.call(c) if c.is_a?(Array) }
+    end
+    visit.call(args)
+    found
+  end
+
+  # Resolve a constant reference (`Relation::MULTI_VALUE_METHODS` or a bare
+  # `CONST`) to its recorded pure-symbol-array members, searching @const_symbol_arrays
+  # (which spans files) by matching the container path against stored FQNs.
+  def resolve_const_symbol_array(node)
+    name = const_name(node)
+    return nil unless name
+    parts = name.split("::")
+    const = parts.last
+    container = parts[0...-1].join("::")
+    @const_symbol_arrays.each do |fqn, consts|
+      next unless consts.key?(const)
+      next unless container.empty? || fqn == container || fqn.end_with?("::#{container}")
+      return consts[const]
+    end
+    nil
   end
 
   # Positional arg list with `arg_paren`/`args_add_block` wrappers peeled off.
