@@ -1476,10 +1476,10 @@ describe("PreloaderTest", () => {
       tag.id,
     )
       .toArray()
-      .then((rows) => rows.map((r) => (r as any).blog_post_id).sort());
+      .then((rows) => rows.map((r) => Number((r as any).blog_post_id)).sort());
     expect(expectedBlogPostIds).not.toHaveLength(0);
     const preloaded = (tag1 as any)._preloadedAssociations.get("blogPosts");
-    expect(preloaded.map((p: any) => p.id).sort()).toEqual(expectedBlogPostIds);
+    expect(preloaded.map((p: any) => Number(p.id)).sort()).toEqual(expectedBlogPostIds);
   });
 
   it("preloads has many on model with a composite primary key through id attribute", async () => {
@@ -2151,7 +2151,7 @@ describe("AssociationsTest", () => {
 
     const comments = await association(blogPost, "comments").toArray();
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
-    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
   });
 
@@ -2190,8 +2190,8 @@ describe("AssociationsTest", () => {
       shardedBlogPosts("great_post_blog_one"),
       shardedBlogPosts("great_post_blog_two"),
     ];
-    expect(blogPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
-      expectedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b),
+    expect(blogPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b)).toEqual(
+      expectedPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b),
     );
   });
 
@@ -2206,8 +2206,8 @@ describe("AssociationsTest", () => {
     });
 
     const expectedPosts = [shardedBlogPosts("great_post_blog_two")];
-    expect(blogPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
-      expectedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b),
+    expect(blogPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b)).toEqual(
+      expectedPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b),
     );
   });
 
@@ -2221,8 +2221,8 @@ describe("AssociationsTest", () => {
       comments: ShardedComment.where({ body: "I really enjoyed the post!" }),
     });
 
-    expect(blogPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
-      expectedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b),
+    expect(blogPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b)).toEqual(
+      expectedPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b),
     );
   });
 
@@ -2251,8 +2251,8 @@ describe("AssociationsTest", () => {
 
     expectQuotedColumnInSql(sql, "sharded_comments.blog_id", { inWhere: true });
     expect(comments).not.toHaveLength(0);
-    expect(comments.map((c: any) => c.id).sort((a: number, b: number) => a - b)).toEqual(
-      expectedComments.map((c: any) => c.id).sort((a: number, b: number) => a - b),
+    expect(comments.map((c: any) => Number(c.id)).sort((a: number, b: number) => a - b)).toEqual(
+      expectedComments.map((c: any) => Number(c.id)).sort((a: number, b: number) => a - b),
     );
   });
 
@@ -2306,7 +2306,7 @@ describe("AssociationsTest", () => {
     expect(comment.isPersisted()).toBe(true);
     const comments = await association(blogPost, "comments").toArray();
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
-    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
   });
 
@@ -2399,8 +2399,8 @@ describe("AssociationsTest", () => {
     const loaded = await (comment as any).loadBelongsTo("blogPost");
     expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
-    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
-    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
+    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
   });
 
   it("nullify composite foreign key belongs to association", async () => {
@@ -2430,7 +2430,7 @@ describe("AssociationsTest", () => {
     const loaded = (comment.association("blogPost") as any).target;
     expect(loaded).toBe(blogPost);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
-    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
+    expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
   });
 
   it("assign composite foreign key belongs to association with autosave", async () => {
@@ -2446,8 +2446,8 @@ describe("AssociationsTest", () => {
     const loaded = await (comment as any).loadBelongsTo("blogPost");
     expect(loaded.id).toBe((blogPost as any).id);
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
-    expect((comment as any).blog_id).toBe((anotherBlog as any).id);
-    expect((comment as any).blog_post_id).toBe((blogPost as any).id);
+    expect(Number((comment as any).blog_id)).toBe(Number((anotherBlog as any).id));
+    expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
   });
 
   it("belongs to association does not use parent query constraints if not configured to", async () => {
@@ -2532,7 +2532,7 @@ describe("AssociationsTest", () => {
 
     expect(loaded.id).toEqual((order as any).id);
     const orderId = (order as any).id[1];
-    expect((agreement as any).order_id).toBe(orderId);
+    expect(Number((agreement as any).order_id)).toBe(Number(orderId));
   });
 
   it("query constraints that dont include the primary key raise with a single column", async () => {
