@@ -2,6 +2,7 @@ import type { DatabaseAdapter } from "../../adapter.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
 import {
   ActiveRecordError,
+  ConnectionFailed,
   PreparedStatementCacheExpired,
   NotImplementedError,
   TransactionIsolationError,
@@ -1262,7 +1263,16 @@ export class TransactionManager {
       try {
         await this.commitTransaction();
       } catch (commitError) {
-        if (!transaction.state.isCompleted()) {
+        // Rails (abstract/transaction.rb:632-643) distinguishes a dropped
+        // connection from other commit failures: a `ConnectionFailed` can't be
+        // ROLLBACK'd on the dead connection, so the transaction is invalidated
+        // (which cascades `invalidate!` to its child savepoint transactions)
+        // instead of attempting a ROLLBACK.
+        if (commitError instanceof ConnectionFailed) {
+          if (!transaction.state.isCompleted()) {
+            transaction.invalidateBang();
+          }
+        } else if (!transaction.state.isCompleted()) {
           await this.rollbackTransaction(transaction);
         }
         throw commitError;
