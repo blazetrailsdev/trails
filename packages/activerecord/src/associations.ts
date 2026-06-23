@@ -5,6 +5,7 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 import { ScopeRegistry } from "./scoping.js";
+import { hasDefaultScopeOverride } from "./scoping/default.js";
 import { delegateArrayMethod, delegateEnumerableMethod } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -62,6 +63,7 @@ export async function initializeAssociations(): Promise<void> {
 import { ConfigurationError, NameError, Rollback } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "./core.js";
+import { StatementCache } from "./statement-cache.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
   AssociationNotFoundError,
@@ -906,6 +908,125 @@ function _builtAssociationScope(
 }
 
 /**
+ * Mirror of Rails' `Association#skip_statement_cache?`
+ * (`associations/association.rb:391-396`): the singular-load statement cache
+ * is bypassed when the compiled SQL/binds would not be stable across owners.
+ *
+ *   reflection.has_scope? ||
+ *   scope.eager_loading? ||
+ *   klass.scope_attributes? ||
+ *   reflection.source_reflection.active_record.default_scopes.any?
+ *
+ * `scope.eager_loading?` is not a distinct check: on the singular load path the
+ * scope's eager-loading can only come from a reflection/macro scope lambda
+ * (subsumed by `reflection.has_scope?` / `options.scope`) or a target default
+ * scope carrying `includes` (subsumed by the `klass.scope_attributes?` arm
+ * below), so the remaining arms cover it.
+ *
+ * Deviation (tracked-pending-convergence): Rails statement-caches through
+ * chains too, but we additionally treat multi-step (chain length > 1) chains
+ * as skip and keep the proven per-load `take()` path. `get_bind_values`
+ * (chain order) and the `params.bind` scope-build bind order currently
+ * disagree for through/enum chains (wrong target returned), so caching them
+ * is unsafe until that converges — story
+ * `through-singular-association-statement-cache` (RFC 0023).
+ */
+function _skipSingularStatementCache(
+  reflection: ReflectionLike,
+  targetModel: typeof Base,
+  options: AssociationOptions,
+): boolean {
+  // `reflection.has_scope?` — a caller-supplied `scope:` lambda (or the
+  // reflection's own macro-time scope) is instance-dependent (it receives the
+  // owner), so the compiled SQL can't be shared.
+  if (options.scope) return true;
+  const refl = reflection as {
+    hasScope?(): boolean;
+    chain?: unknown[];
+    sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
+  };
+  if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
+  // Multi-step chains: defer to the take() path (see doc comment).
+  if (Array.isArray(refl.chain) && refl.chain.length > 1) return true;
+  // `klass.scope_attributes?` (`scoping/default.rb:55`) =
+  // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
+  // thread-local scope, any default scope, OR a method-form `default_scope`
+  // override makes the relation owner/context-dependent. Mirror all three arms
+  // (the third — `hasDefaultScopeOverride` — covers a `def self.defaultScope`
+  // that never lands in `defaultScopes`).
+  const klass = targetModel as unknown as { currentScope?: unknown; defaultScopes?: unknown[] };
+  if (
+    klass.currentScope ||
+    (klass.defaultScopes?.length ?? 0) > 0 ||
+    hasDefaultScopeOverride(targetModel)
+  ) {
+    return true;
+  }
+  // `source_reflection.active_record.default_scopes.any?` (through chains).
+  if ((refl.sourceReflection?.activeRecord?.defaultScopes?.length ?? 0) > 0) return true;
+  return false;
+}
+
+/**
+ * Load a singular association target through a per-association statement
+ * cache, mirroring Rails' `Association#find_target` →
+ * `reflection.association_scope_cache(klass, owner) { ... }` /
+ * `sc.execute(binds, c)` (`associations/association.rb:243-252`).
+ *
+ * The cache (memoized on the target class via `cachedFindByStatement`,
+ * bucketed by the connection's `prepared_statements`) compiles the
+ * association scope ONCE — with `params.bind()` Substitutes standing in for
+ * the owner's key values — and on every later load only re-binds the owner's
+ * current key values (`AssociationScope.getBindValues`), avoiding an
+ * AST/SQL rebuild. Emitted SQL and the unordered LIMIT-1 semantics are
+ * identical to the `take()` path this replaces.
+ */
+async function _loadSingularViaStatementCache(
+  record: Base,
+  assocName: string,
+  reflection: ReflectionLike,
+  targetModel: typeof Base,
+): Promise<Base | null> {
+  // Materialize the Association instance (as `_builtAssociationScope` does on
+  // the take() path) so the post-load `syncToAssociationInstance` finds a
+  // holder to `setTarget`/`loadedBang` — otherwise the cached target is never
+  // marked loaded and every read re-queries. Only the "not registered" case is
+  // swallowed; real construction bugs must surface.
+  const assocFn = (record as { association?: (n: string) => unknown }).association;
+  if (typeof assocFn === "function") {
+    try {
+      assocFn.call(record, assocName);
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
+    }
+  }
+  const connection = (targetModel as unknown as { connection: unknown }).connection;
+  // Rails: `sc = reflection.association_scope_cache(klass, owner) { |params|
+  // target_scope.merge!(AssociationScope.create { params.bind }.scope(self)) }`.
+  // `associationScopeCache` memoizes the compiled StatementCache on the target
+  // class (keyed by reflection + polymorphic owner type).
+  const sc = (
+    reflection as unknown as {
+      associationScopeCache(klass: typeof Base, owner: Base, block: () => unknown): unknown;
+    }
+  ).associationScopeCache(targetModel, record, () =>
+    StatementCache.create(connection as never, (params) => {
+      const as = AssociationScope.create(() => params.bind());
+      const built = as.scope({
+        owner: record,
+        reflection: reflection as never,
+        klass: targetModel,
+      }) as Relation<Base>;
+      return _scopeForAssociation(targetModel).merge(built) as never;
+    }),
+  ) as StatementCache;
+  const chain = (reflection as unknown as { chain: never[] }).chain;
+  const binds = AssociationScope.getBindValues(record, chain);
+  const records = await sc.execute(binds, connection, { allowRetry: true });
+  return records[0] ?? null;
+}
+
+/**
  * Unsaved-owner / null-PK short-circuit shared by every entry point
  * that runs the DJAS chain walk against an owner record.
  *
@@ -1217,16 +1338,22 @@ export async function loadBelongsTo(
 
   let result: Base | null;
   if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    let rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    // Rails' normal singular-load path (`Association#find_target` via the
-    // statement cache) returns an array and calls `Array#first` — no ORDER BY
-    // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
-    // would route through `ordered_relation` and add a spurious ORDER BY. See
-    // has_one_associations_test `test_has_one_does_not_use_order_by`.
-    result = await rel.take();
+    if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+      // Statement-cache path (Rails `Association#find_target` via
+      // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
+      result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
+    } else {
+      const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+      const baseRelation = _scopeForAssociation(targetModel);
+      let rel = baseRelation.merge(built);
+      rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+      // Rails' normal singular-load path (`Association#find_target` via the
+      // statement cache) returns an array and calls `Array#first` — no ORDER BY
+      // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
+      // would route through `ordered_relation` and add a spurious ORDER BY. See
+      // has_one_associations_test `test_has_one_does_not_use_order_by`.
+      result = await rel.take();
+    }
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {
@@ -1409,13 +1536,19 @@ export async function loadHasOne(
 
   let result: Base | null;
   if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    let rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    // Unordered LIMIT 1: Rails' singular load returns an array and calls
-    // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
-    result = await rel.take();
+    if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+      // Statement-cache path (Rails `Association#find_target` via
+      // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
+      result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
+    } else {
+      const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+      const baseRelation = _scopeForAssociation(targetModel);
+      let rel = baseRelation.merge(built);
+      rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+      // Unordered LIMIT 1: Rails' singular load returns an array and calls
+      // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
+      result = await rel.take();
+    }
   } else {
     // Inline fallback: no reflection registered.
     if (Array.isArray(foreignKey)) {

@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
+import { StatementCache } from "../statement-cache.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
@@ -30,6 +31,10 @@ describe("Association scope cache", () => {
     static {
       this.attribute("cache_author_id", "integer");
       this.attribute("title", "string");
+      this.belongsTo("cacheAuthor", {
+        className: "CacheAuthor",
+        foreignKey: "cache_author_id",
+      });
     }
   }
   class CacheComment extends Base {
@@ -152,6 +157,32 @@ describe("Association scope cache", () => {
     // Second loader call — different caches would rebuild the scope.
     // With our cache, AssociationScope.scope count is unchanged.
     await loadHasMany(author, "cachePosts", opts);
+    expect(spy.mock.calls.length).toBe(afterFirst);
+  });
+
+  it("singular belongs_to loads compile the statement once and reuse it across owners", async () => {
+    // Rails' Association#find_target reuses reflection.association_scope_cache
+    // (a StatementCache) across loads instead of recompiling the scope SQL.
+    // The first load of any owner compiles (StatementCache.create); later
+    // loads — including for a different owner — only re-bind values.
+    const a1 = await CacheAuthor.create({ name: "A1" });
+    const a2 = await CacheAuthor.create({ name: "A2" });
+    const { loadBelongsTo } = await import("../associations.js");
+    const opts = { className: "CacheAuthor", foreignKey: "cache_author_id" };
+
+    const p1 = await CachePost.create({ cache_author_id: a1.id, title: "p1" });
+    const p2 = await CachePost.create({ cache_author_id: a2.id, title: "p2" });
+
+    const spy = vi.spyOn(StatementCache, "create");
+
+    const r1 = await loadBelongsTo(p1, "cacheAuthor", opts);
+    expect((r1 as any)?.id).toBe(a1.id);
+    const afterFirst = spy.mock.calls.length;
+    expect(afterFirst).toBe(1);
+
+    // Second owner's load reuses the cached statement — no recompile.
+    const r2 = await loadBelongsTo(p2, "cacheAuthor", opts);
+    expect((r2 as any)?.id).toBe(a2.id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 
