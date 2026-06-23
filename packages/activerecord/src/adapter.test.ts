@@ -816,7 +816,7 @@ describe("AdapterTestWithoutTransaction", () => {
     await Movie.deleteAll();
     await conn.resetPkSequenceBang("movies");
     const movie = await Movie.create({ name: "fight club" });
-    expect(movie.id).toBe(1);
+    expect(Number(movie.id)).toBe(1);
   });
 
   it.skipIf(!respondsToResetPkSequence)("reset table with non integer pk", async () => {

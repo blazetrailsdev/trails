@@ -505,8 +505,8 @@ describe("useFixtures reconciles the PK column against the schema", () => {
   });
 
   it("round-trips the `monkeyID` primary-key column", () => {
-    expect(mixedCaseMonkeys("first").readAttribute("monkeyID")).toBe(1);
-    expect(mixedCaseMonkeys("second").readAttribute("monkeyID")).toBe(2);
+    expect(Number(mixedCaseMonkeys("first").readAttribute("monkeyID"))).toBe(1);
+    expect(Number(mixedCaseMonkeys("second").readAttribute("monkeyID"))).toBe(2);
   });
 
   it("seeds an id-less table without a PK column", async () => {
