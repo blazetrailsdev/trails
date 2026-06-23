@@ -207,7 +207,10 @@ describe("SchemaDumperTest", () => {
   it("schema dumps partial indices", async () => {
     // Mirrors Rails' dump_table_schema("companies") on the canonical
     // `company_partial_index` (firm_id, type) WHERE (rating > 10).
-    await ctx.createTable("companies", {}, (t) => {
+    // force: true mirrors Rails' `create_table :companies` and drops any
+    // canonical `companies` left on the shared file-backed worker DB so the
+    // dump reflects only this test's lone partial index.
+    await ctx.createTable("companies", { force: true }, (t) => {
       t.string("type");
       t.integer("firm_id");
       t.integer("rating");
