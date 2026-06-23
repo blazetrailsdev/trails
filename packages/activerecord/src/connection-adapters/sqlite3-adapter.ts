@@ -2357,8 +2357,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.schemaCache.clear();
     // The rebuild issues its DDL via driver.exec (to manage savepoint nesting),
     // bypassing the executeMutation path that dirtiesQueryCache wraps. Rails'
-    // alter_table runs each move_table statement through `execute`, which is in
-    // the dirties set, so clear the query cache here to match.
+    // alter_table dirties the cache as a side effect of copy_table, which runs
+    // create_table/drop_table through `execute` and copy_table_contents through
+    // `internal_exec_query` — both in the dirties set — so clear it here to match.
     this.clearQueryCache();
   }
 
