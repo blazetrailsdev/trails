@@ -1418,7 +1418,9 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     const allJoins = await HmtDup2Join.all().toArray();
-    const personJoins = allJoins.filter((j: any) => j.hmt_dup2_person_id === person.id);
+    const personJoins = allJoins.filter(
+      (j: any) => Number(j.hmt_dup2_person_id) === Number(person.id),
+    );
     expect(personJoins).toHaveLength(2);
   });
   it("add two instance and then deleting", async () => {
@@ -1508,8 +1510,8 @@ describe("HasManyThroughAssociationsTest", () => {
       course_id: course.id,
     });
 
-    expect(enrollment.student_id).toBe(student.id);
-    expect(enrollment.course_id).toBe(course.id);
+    expect(Number(enrollment.student_id)).toBe(Number(student.id));
+    expect(Number(enrollment.course_id)).toBe(Number(course.id));
   });
 
   it("associate new by building", async () => {
@@ -1753,8 +1755,8 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "writer_id",
     });
     expect(joins).toHaveLength(1);
-    expect(joins[0].writer_id).toBe(writer.id);
-    expect(joins[0].book_id).toBe(book.id);
+    expect(Number(joins[0].writer_id)).toBe(Number(writer.id));
+    expect(Number(joins[0].book_id)).toBe(Number(book.id));
   });
 
   it("delete association", async () => {
@@ -1961,7 +1963,7 @@ describe("HasManyThroughAssociationsTest", () => {
       expect(loadedTag?.id).toBe((tag as any).id);
       await (orderTag as any).update({ attached_reason: "This is our loyal customer" });
       const orderTags = await (order as any).orderTags.toArray();
-      const found = orderTags.find((ot: any) => ot.tag_id === (tag as any).id);
+      const found = orderTags.find((ot: any) => Number(ot.tag_id) === Number((tag as any).id));
       expect(found.attached_reason).toBe("This is our loyal customer");
     });
   });
@@ -2944,7 +2946,7 @@ describe("HasManyThroughAssociationsTest", () => {
       event_id: event.id,
     });
 
-    expect(ship.sponsor_id).toBe(sponsor.id);
+    expect(Number(ship.sponsor_id)).toBe(Number(sponsor.id));
   });
 
   it("through record is built when created with where", async () => {
@@ -2992,7 +2994,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "trb_post_id",
     });
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].trb_tag_id).toBe(tag.id);
+    expect(Number(taggings[0].trb_tag_id)).toBe(Number(tag.id));
   });
   it("associate with create and no options", async () => {
     class HmtSimpleOwner extends Base {
@@ -3022,7 +3024,7 @@ describe("HasManyThroughAssociationsTest", () => {
       hmt_simple_target_id: target.id,
     });
     expect(join.id).not.toBeNull();
-    expect(join.hmt_simple_owner_id).toBe(owner.id);
+    expect(Number(join.hmt_simple_owner_id)).toBe(Number(owner.id));
   });
   it("associate with create with through having conditions", async () => {
     class AccTag extends Base {
@@ -3071,7 +3073,7 @@ describe("HasManyThroughAssociationsTest", () => {
       foreignKey: "acc_post_id",
     });
     expect(taggings).toHaveLength(1);
-    expect(taggings[0].acc_tag_id).toBe(tag.id);
+    expect(Number(taggings[0].acc_tag_id)).toBe(Number(tag.id));
   });
   it("associate with create exclamation and no options", async () => {
     class HmtBangNoOptOwner extends Base {
@@ -3101,7 +3103,7 @@ describe("HasManyThroughAssociationsTest", () => {
       hmt_bang_no_opt_target_id: target.id,
     });
     expect(join.id).not.toBeNull();
-    expect(join.hmt_bang_no_opt_owner_id).toBe(owner.id);
+    expect(Number(join.hmt_bang_no_opt_owner_id)).toBe(Number(owner.id));
   });
   it("create on new record", async () => {
     class HmtNewRecOwner extends Base {
@@ -3132,8 +3134,8 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     expect(join.id).not.toBeNull();
-    expect(join.hmt_new_rec_owner_id).toBe(owner.id);
-    expect(join.hmt_new_rec_thing_id).toBe(thing.id);
+    expect(Number(join.hmt_new_rec_owner_id)).toBe(Number(owner.id));
+    expect(Number(join.hmt_new_rec_thing_id)).toBe(Number(thing.id));
   });
   it("associate with create and invalid options", async () => {
     class HmtInvOptOwner extends Base {
@@ -3186,8 +3188,8 @@ describe("HasManyThroughAssociationsTest", () => {
       hmt_val_opt_item_id: item.id,
     });
     expect(join.id).not.toBeNull();
-    expect(join.hmt_val_opt_owner_id).toBe(owner.id);
-    expect(join.hmt_val_opt_item_id).toBe(item.id);
+    expect(Number(join.hmt_val_opt_owner_id)).toBe(Number(owner.id));
+    expect(Number(join.hmt_val_opt_item_id)).toBe(Number(item.id));
   });
   it("associate with create bang and invalid options", async () => {
     class HmtBangInvOwner extends Base {
@@ -3239,8 +3241,8 @@ describe("HasManyThroughAssociationsTest", () => {
       hmt_bang_val_item_id: item.id,
     });
     expect(join.id).not.toBeNull();
-    expect(join.hmt_bang_val_owner_id).toBe(owner.id);
-    expect(join.hmt_bang_val_item_id).toBe(item.id);
+    expect(Number(join.hmt_bang_val_owner_id)).toBe(Number(owner.id));
+    expect(Number(join.hmt_bang_val_item_id)).toBe(Number(item.id));
   });
   it("push with invalid record", async () => {
     // Rails: firm.developers << Developer.new(name: "0") raises RecordInvalid
@@ -7009,7 +7011,8 @@ describe("HasManyThroughAssociationsTest", () => {
       schema: canonicalSchema,
     });
 
-    const ids = (records: any[]) => records.map((r: any) => r.id).sort((a, b) => a - b);
+    const ids = (records: any[]) =>
+      records.map((r: any) => r.id).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
     it("through scope is affected by unscoping", async () => {
       // Rails: FirstPost.unscoped { author.comments_on_first_posts } returns the

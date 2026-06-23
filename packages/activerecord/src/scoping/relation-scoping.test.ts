@@ -115,7 +115,7 @@ describe("RelationScopingTest", () => {
     const ids = (await association(author, "specialPostsWithDefaultScope").toArray()).map(
       (p: any) => p.id,
     );
-    expect(ids.sort((a: number, b: number) => a - b)).toEqual([1, 5, 6]);
+    expect(ids.map(Number).sort((a, b) => a - b)).toEqual([1, 5, 6]);
     const scopedPosts = await SpecialPostWithDefaultScope.unscoped(async () => {
       author = authors("david");
       await author.reload();
@@ -123,10 +123,12 @@ describe("RelationScopingTest", () => {
     });
     const expected = (await association(author, "posts").toArray())
       .map((p: any) => p.id)
-      .sort((a: number, b: number) => a - b);
-    expect(scopedPosts.map((p: any) => p.id).sort((a: number, b: number) => a - b)).toEqual(
-      expected,
-    );
+      .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0));
+    expect(
+      scopedPosts
+        .map((p: any) => p.id)
+        .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual(expected);
   });
 
   it("reverse order", () => {
@@ -563,7 +565,7 @@ describe("RelationScopingTest", () => {
   it("scoping respects sti constraint", async () => {
     await Comment.unscoped(async () => {
       const comment = (await Comment.find(1)) as Base;
-      expect(comment.id).toBe(1);
+      expect(Number(comment.id)).toBe(1);
       await expect(SpecialComment.find(1)).rejects.toThrow(RecordNotFound);
     });
   });

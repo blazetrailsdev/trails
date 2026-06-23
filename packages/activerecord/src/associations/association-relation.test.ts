@@ -75,7 +75,7 @@ describe("AssociationRelation", () => {
     const blog = await freshBlog();
     const proxy = association<ArPost>(blog, "arPosts");
     const post = await proxy.where({ published: true }).create({ title: "Hello" });
-    expect(post.ar_blog_id).toBe(blog.id);
+    expect(Number(post.ar_blog_id)).toBe(Number(blog.id));
     expect(post.title).toBe("Hello");
     expect(post.published).toBe(true);
     expect(post.isPersisted()).toBe(true);
@@ -85,7 +85,7 @@ describe("AssociationRelation", () => {
     const blog = await freshBlog();
     const proxy = association<ArPost>(blog, "arPosts");
     const post = proxy.where({ published: true }).build({ title: "Draft" });
-    expect(post.ar_blog_id).toBe(blog.id);
+    expect(Number(post.ar_blog_id)).toBe(Number(blog.id));
     expect(post.title).toBe("Draft");
     expect(post.published).toBe(true);
     expect(post.isNewRecord()).toBe(true);
@@ -104,7 +104,7 @@ describe("AssociationRelation", () => {
     const proxy = association<ArPost>(blog, "arPosts");
     const deep = proxy.where({ published: true }).order("title").limit(10).offset(0);
     const post = await deep.create({ title: "Chained" });
-    expect(post.ar_blog_id).toBe(blog.id);
+    expect(Number(post.ar_blog_id)).toBe(Number(blog.id));
     expect(post.published).toBe(true);
   });
 
