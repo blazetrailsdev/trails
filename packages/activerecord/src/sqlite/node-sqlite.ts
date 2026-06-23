@@ -126,10 +126,23 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 }
 
-/** @internal */
+/**
+ * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
+ * query strings) and `:memory:` aliases. Returns `null` for memory databases,
+ * otherwise the decoded filesystem path.
+ *
+ * node:sqlite enables `SQLITE_OPEN_URI`, so — like libsql, and unlike
+ * better-sqlite3 — it opens a rootless `file:foo.db` relative to the cwd, not
+ * as a literal file named `file:foo.db`. So this resolver preserves relative
+ * `file:` paths (returning `foo.db`, not `/foo.db`) so `databaseExists()`
+ * checks the path `open()` actually uses; only `file:/...` / `file://host/...`
+ * is absolute.
+ * @internal
+ */
 function resolveDatabasePath(database: string): string | null {
-  if (database === ":memory:" || database.startsWith("file::memory:")) return null;
+  if (database === ":memory:") return null;
   if (!database.startsWith("file:")) return database;
+  if (database.startsWith("file::memory:")) return null;
   let url: URL;
   try {
     url = new URL(database, "file:///");
@@ -137,11 +150,23 @@ function resolveDatabasePath(database: string): string | null {
     return database;
   }
   if (url.searchParams.get("mode") === "memory") return null;
-  try {
-    return decodeURIComponent(url.pathname);
-  } catch {
-    return url.pathname;
+  const decode = (s: string): string => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      // Malformed escapes (e.g. lone "%") keep databaseExists() total.
+      return s;
+    }
+  };
+  // `new URL` anchors a rootless path at "/", losing relativity. A `file:` body
+  // that doesn't start with "/" (e.g. `file:foo.db`, `file:./foo.db`) is a
+  // cwd-relative SQLite URI; strip any `?query`/`#frag` and return it as-is.
+  const body = database.slice("file:".length);
+  if (!body.startsWith("/")) {
+    const sep = body.search(/[?#]/);
+    return decode(sep === -1 ? body : body.slice(0, sep));
   }
+  return decode(url.pathname);
 }
 
 /** @internal */

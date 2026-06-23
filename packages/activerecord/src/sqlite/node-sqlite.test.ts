@@ -106,6 +106,30 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     expect(nodeSqliteDriver.databaseExists?.({ database: ":memory:" })).toBe(true);
   });
 
+  it("databaseExists() preserves a relative file: URI (cwd-relative, not /-anchored)", async () => {
+    // node:sqlite enables SQLITE_OPEN_URI, so open() opens `file:name.db`
+    // relative to cwd (as `./name.db`), not as a literal file named
+    // "file:name.db" nor "/name.db". databaseExists() must check that same
+    // cwd-relative path rather than anchoring the URI body at "/".
+    const relName = `node-rel-${Date.now()}-${Math.floor(Math.random() * 1e9)}.db`;
+    try {
+      const conn = await nodeSqliteDriver.open({ database: `file:${relName}` });
+      await conn.exec("CREATE TABLE t (x INTEGER)");
+      await conn.close();
+      expect(getFs().existsSync(relName)).toBe(true);
+      expect(getFs().existsSync(`/${relName}`)).toBe(false);
+      expect(nodeSqliteDriver.databaseExists?.({ database: `file:${relName}` })).toBe(true);
+    } finally {
+      for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
+        try {
+          getFs().unlinkSync(p);
+        } catch {
+          /* best effort */
+        }
+      }
+    }
+  });
+
   it("capabilities reflect node-sqlite traits", () => {
     expect(nodeSqliteDriver.capabilities.inProcessSync).toBe(true);
     expect(nodeSqliteDriver.capabilities.streaming).toBe(true);

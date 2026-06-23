@@ -94,33 +94,21 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
 }
 
 /**
- * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
- * query strings) and `:memory:` aliases. Returns `null` for memory databases,
- * otherwise the bare decoded filesystem path.
+ * Map a `database` config value to the filesystem path `databaseExists()`
+ * should probe, returning `null` for in-memory databases.
+ *
+ * better-sqlite3's build does NOT set `SQLITE_OPEN_URI`, so `open()` passes the
+ * string straight to `sqlite3_open` without URI interpretation: `file:foo.db`
+ * opens a literal on-disk file named `file:foo.db`, and even `file::memory:` /
+ * `?mode=memory` are written as on-disk files (see `restoreFromPath`). The only
+ * name `sqlite3_open` treats specially without the URI flag is the bare
+ * `:memory:` alias. So `databaseExists()` must check the literal string to
+ * agree with `open()`. (Contrast libsql.ts, whose resolver decodes `file:`
+ * URIs because libsql IS URI-aware.)
  * @internal
  */
 function resolveDatabasePath(database: string): string | null {
-  if (database === ":memory:") return null;
-  if (!database.startsWith("file:")) return database;
-  // Special-case `file::memory:` (with or without query) before URL parsing —
-  // the SQLite URI shape doesn't round-trip through `new URL` cleanly.
-  if (database.startsWith("file::memory:")) return null;
-  let url: URL;
-  try {
-    // Anchor relative forms (`file:foo.db`) against a fixed base so URL
-    // accepts them; the base is discarded because we only read pathname.
-    url = new URL(database, "file:///");
-  } catch {
-    return database;
-  }
-  if (url.searchParams.get("mode") === "memory") return null;
-  // decodeURIComponent throws on malformed escapes (e.g. lone "%"); fall back
-  // to the raw pathname so databaseExists() stays a total function.
-  try {
-    return decodeURIComponent(url.pathname);
-  } catch {
-    return url.pathname;
-  }
+  return database === ":memory:" ? null : database;
 }
 
 /** @internal */
