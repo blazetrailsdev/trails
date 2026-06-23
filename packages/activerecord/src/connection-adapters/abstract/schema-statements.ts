@@ -461,6 +461,17 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
+    // Adapters that cannot run `ALTER COLUMN ... TYPE` (SQLite) override
+    // changeColumn with a table-rebuild path. Delegate when the adapter supplies
+    // its own implementation; the gate prevents self-recursion now that
+    // SchemaStatements is mixed into AbstractAdapter (see changeColumnDefault).
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.changeColumn === "function" &&
+      adapter.changeColumn !== SchemaStatements.prototype.changeColumn
+    ) {
+      return adapter.changeColumn(tableName, columnName, type, options);
+    }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const sqlType = this.schemaCreation.typeToSql(type, options);
     const table = this._qi(tableName);
