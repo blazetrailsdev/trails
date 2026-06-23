@@ -38,8 +38,8 @@ async function gitSha(cwd: string): Promise<string> {
 
 /** Clone (or reuse) the rails repo at `ref` under output/, reconcile its own
  *  lock entry (output/drift.lock.json — separate from the canonical pin), and
- *  return the clone root. A clone whose sha disagrees with the lock is discarded. */
-async function fetchRef(ref: string): Promise<string> {
+ *  return the clone root + resolved sha. A clone disagreeing with the lock is discarded. */
+async function fetchRef(ref: string): Promise<{ dest: string; sha: string }> {
   const dest = join(OUTPUT_DIR, `drift-src-${ref.replace(/[^A-Za-z0-9._-]/g, "_")}`);
   const lock: DriftLock = existsSync(DRIFT_LOCK)
     ? JSON.parse(await readFile(DRIFT_LOCK, "utf8"))
@@ -73,7 +73,7 @@ async function fetchRef(ref: string): Promise<string> {
   const sorted: DriftLock = { refs: {} };
   for (const k of Object.keys(lock.refs).sort()) sorted.refs[k] = lock.refs[k];
   await writeFile(DRIFT_LOCK, JSON.stringify(sorted, null, 2) + "\n");
-  return dest;
+  return { dest, sha: sha! };
 }
 
 /** Map of `rails` package → absolute lib dir inside the target clone. */
@@ -85,6 +85,7 @@ function libPathsFor(cloneRoot: string): Record<string, string> {
   }
   return out;
 }
+
 async function extractTargetApi(cloneRoot: string, ref: string): Promise<string> {
   const outPath = join(OUTPUT_DIR, `rails-api@${ref}.json`);
   console.log(`[drift] extracting Ruby API @ ${ref}...`);
@@ -101,7 +102,6 @@ async function extractTargetApi(cloneRoot: string, ref: string): Promise<string>
   if (stderr) process.stderr.write(stderr);
   return outPath;
 }
-
 async function readManifest(path: string): Promise<ApiManifest> {
   if (!existsSync(path)) throw new Error(`missing ${path} — run \`pnpm api:compare\` first`);
   return JSON.parse(await readFile(path, "utf8")) as ApiManifest;
@@ -110,12 +110,13 @@ async function readManifest(path: string): Promise<ApiManifest> {
 export async function runDrift(ref: string): Promise<string> {
   const base = await readManifest(join(OUTPUT_DIR, "rails-api.json"));
   const ts = await readManifest(join(OUTPUT_DIR, "ts-api.json"));
-  const cloneRoot = await fetchRef(ref);
-  const target = await readManifest(await extractTargetApi(cloneRoot, ref));
+  const { dest, sha } = await fetchRef(ref);
+  const target = await readManifest(await extractTargetApi(dest, ref));
   const drift = annotateAgainstTs(diffManifests(base, target), ts);
   const report = {
     baseRef: RAILS!.origin.ref,
     targetRef: ref,
+    targetSha: sha,
     generatedAt: new Date().toISOString(),
     ...drift,
   };

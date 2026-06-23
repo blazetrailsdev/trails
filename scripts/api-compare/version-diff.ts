@@ -4,7 +4,7 @@
 // call-set deltas); `annotateAgainstTs` flags what intersects OUR ported
 // surface. Pure (no node:* / process / fs) — drift.ts owns all I/O.
 
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
 
 export interface MethodRef {
   name: string;
@@ -64,7 +64,7 @@ function methodMap(info: ClassInfo): Map<string, MethodInfo> {
   return out;
 }
 export function signatureOf(m: MethodInfo): string {
-  const part = (p: { kind: string; name: string; literal?: { value?: string | boolean } }) =>
+  const part = (p: ParamInfo) =>
     `${p.kind} ${p.name}` + (p.literal?.value !== undefined ? `=${p.literal.value}` : "");
   return (m.params ?? []).map(part).join(", ");
 }
