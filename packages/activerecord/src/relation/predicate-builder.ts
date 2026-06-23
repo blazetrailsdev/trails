@@ -503,10 +503,13 @@ export class PredicateBuilder {
     for (const lookup of lookups) {
       const t = lookup();
       if (t?.isForceEquality?.(value)) {
-        // Only emit equality when the type can produce a safe inline literal.
-        // A type without encodeLiteral would fall through to the BindParam path
-        // which fails under manager.toSql()'s defaultQuoter for non-scalar
-        // objects — so we skip the equality shortcut and let the handler run.
+        // The inline `Quoted` renders via the adapter's own `quote()`
+        // (`visitQuoted`); production compiles through the adapter visitor
+        // (`_compileSelectSql`), so this never reaches arel's default quoter.
+        // Rails instead builds a bind (`build_bind_attribute`) — converging needs
+        // range bind values run through the adapter `typeCast` (story
+        // `force-equality-bind-convergence`). Types without `encodeLiteral` have
+        // no inline form, so they fall through to the handler.
         if (t.encodeLiteral) return attribute.eq(new Nodes.Quoted(t.encodeLiteral(value)));
       }
     }
