@@ -31,13 +31,7 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import {
-  Associations,
-  buildHasManyRelation,
-  loadBelongsTo,
-  loadHasMany,
-  loadHasOne,
-} from "./associations.js";
+import { buildHasManyRelation, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -1784,9 +1778,9 @@ describe("GeneratedMethodsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
+        this.belongsTo("author", {});
       }
     }
-    Associations.belongsTo.call(Post, "author", {});
     const ref = reflectOnAssociation(Post, "author");
     expect(ref).not.toBeNull();
     expect(ref!.macro).toBe("belongsTo");
@@ -1808,9 +1802,9 @@ describe("GeneratedMethodsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tag_id", "integer");
+        this.belongsTo("tag", {});
       }
     }
-    Associations.belongsTo.call(Post, "tag", {});
     const ref = reflectOnAssociation(Post, "tag");
     expect(ref).not.toBeNull();
     expect(ref!.name).toBe("tag");
