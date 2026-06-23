@@ -1195,7 +1195,7 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    await expect(User.find([])).rejects.toThrow(RecordNotFound);
+    expect(await User.find([])).toEqual([]);
   });
   it("exists? with defined table name returns true when record exists", async () => {
     class User extends Base {

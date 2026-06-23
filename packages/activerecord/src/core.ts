@@ -823,12 +823,11 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
 
   if (Array.isArray(id)) {
     if (id.length === 0) {
-      throw new RecordNotFound(
-        `${this.name}: couldn't find all with an empty list of ids`,
-        this.name,
-        String(this.primaryKey),
-        [],
-      );
+      // Rails `find_with_ids`: `return [] if expects_array && ids.first.empty?`
+      // — an empty array argument resolves to `[]` without a query or a
+      // `RecordNotFound`. (Composite PKs derive `expects_array` from a nested
+      // array, so a bare `find([])` there is not an empty-array request.)
+      return [];
     }
     const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
     const records = await this.all()

@@ -51,6 +51,13 @@ export interface NormalizedFindIds {
    * exactly like Rails (`String(tuples)` vs `flatIds.join(", ")`).
    */
   readonly tuples: unknown[][] | null;
+
+  /**
+   * `true` when the caller passed an empty array as the first arg
+   * (`find([])`). Rails' `find_with_ids` short-circuits this to `[]`
+   * before any flatten/lookup, so callers return `[]` without a query.
+   */
+  readonly emptyArray?: boolean;
 }
 
 /**
@@ -84,6 +91,17 @@ export function normalizeFindArgs(
   }
 
   const [first, ...rest] = args;
+
+  // Rails `find_with_ids`: `return [] if expects_array && ids.first.empty?`.
+  // An empty first array short-circuits to `[]` before any flatten or
+  // lookup, so `find([])` resolves to `[]` rather than raising
+  // `RecordNotFound`. For composite PKs Rails derives `expects_array` from
+  // `ids.first.first` (a nested array), so a bare `find([])` does NOT
+  // short-circuit there — hence the simple-PK guard.
+  if (!composite && Array.isArray(first) && first.length === 0) {
+    return { ids: [], wantArray: true, tuples: null, emptyArray: true };
+  }
+
   let ids: unknown[];
   let wantArray: boolean;
 
@@ -107,10 +125,7 @@ export function normalizeFindArgs(
     }
   } else if (Array.isArray(first)) {
     if (composite) {
-      if (first.length === 0) {
-        ids = first;
-        wantArray = true;
-      } else if (first.every((x) => !Array.isArray(x))) {
+      if (first.every((x) => !Array.isArray(x))) {
         ids = [first];
         wantArray = false;
       } else {
@@ -234,6 +249,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   const pk = this._modelClass.primaryKey;
   const modelName = this._modelClass.name;
   const normalized = normalizeFindArgs(modelName, pk, args);
+  if (normalized.emptyArray) return [];
   const { ids, wantArray, tuples } = normalized;
 
   // Composite PK: OR over per-tuple WHERE conditions. The
@@ -683,6 +699,7 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
     (rel as any)._modelClass.primaryKey,
     ids,
   );
+  if (normalized.emptyArray) return [];
   if (normalized.wantArray) {
     return findSome(rel, normalized.ids);
   }
