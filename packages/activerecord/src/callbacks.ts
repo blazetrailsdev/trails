@@ -9,7 +9,13 @@
  */
 
 import type { Base } from "./base.js";
-import { _registerCallbackOnProto, runAllCallbacks } from "@blazetrails/activemodel";
+import {
+  _registerCallbackOnProto,
+  runAllCallbacks,
+  snapshotCallbacksOnProto,
+  restoreCallbacksOnProto,
+} from "@blazetrails/activemodel";
+import { subclasses as _subclasses } from "./inheritance.js";
 import {
   allTimestampAttributesInModel,
   currentTimeFromProperTimezone,
@@ -186,6 +192,36 @@ export function afterInitialize<T extends ModelCtor>(
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "initialize", fn, options);
+}
+
+/**
+ * Snapshot the `event` callbacks on `modelClass` and every subclass, run `fn`,
+ * then restore them — so a callback registered inside `fn` (e.g. a temporary
+ * `after_initialize` recorder) is reverted afterwards and never leaks into the
+ * shared per-worker model state.
+ *
+ * Mirrors the `reset_callbacks(klass, kind)` test helper in
+ * ActiveRecord::TestCase (vendor/rails/activerecord/test/cases/test_case.rb):
+ * it captures `_<kind>_callbacks.dup` for the class and its subclasses, yields,
+ * and restores them in an `ensure`.
+ */
+export async function resetCallbacks(
+  modelClass: ModelCtor,
+  event: string,
+  fn: () => void | Promise<void>,
+): Promise<void> {
+  const targets = [modelClass, ..._subclasses(modelClass)];
+  const snapshots = targets.map(
+    (klass) =>
+      [klass, snapshotCallbacksOnProto((klass as { prototype: object }).prototype, event)] as const,
+  );
+  try {
+    await fn();
+  } finally {
+    for (const [klass, snapshot] of snapshots) {
+      restoreCallbacksOnProto((klass as { prototype: object }).prototype, event, snapshot);
+    }
+  }
 }
 
 type AnyCallbackOptions = CallbackOptions<never> | ValidationCallbackOptions<never>;

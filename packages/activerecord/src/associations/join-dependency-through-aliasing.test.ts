@@ -87,12 +87,12 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
     // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
-    expect(node!.effectiveSqlName).toBe("jdtComments_jdt_authors");
+    expect(node!.effectiveSqlName).toBe("jdt_comments_jdt_authors");
 
     // Target aliased
     const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("jdt_comments");
-    expect(targetTable.tableAlias).toBe("jdtComments_jdt_authors");
+    expect(targetTable.tableAlias).toBe("jdt_comments_jdt_authors");
 
     // Through still uses real name
     const throughNode = jd.nodes.find(
@@ -262,10 +262,10 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
       (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
     );
     expect(throughNode).toBeDefined();
-    expect(throughNode!.effectiveSqlName).toBe("jdtPosts_jdt_authors_join");
+    expect(throughNode!.effectiveSqlName).toBe("jdt_posts_jdt_authors_join");
     const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
     expect(throughTable.name).toBe("jdt_posts");
-    expect(throughTable.tableAlias).toBe("jdtPosts_jdt_authors_join");
+    expect(throughTable.tableAlias).toBe("jdt_posts_jdt_authors_join");
 
     // Target uses real name (first use)
     const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;

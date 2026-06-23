@@ -504,7 +504,11 @@ export class AbstractReflection {
   }
 
   aliasCandidate(name: string): string {
-    return `${this._concrete().pluralName}_${name}`;
+    // Rails' `plural_name` derives from the snake_case reflection name (Ruby
+    // associations are snake_case), so the generated table alias is snake_case
+    // (`primary_contacts_people`). trails association names are camelCase, so
+    // underscore the pluralized name to match Rails' alias SQL verbatim.
+    return `${underscore(this._concrete().pluralName)}_${name}`;
   }
 
   strictLoadingViolationMessage(owner: unknown): string {

@@ -8,11 +8,12 @@
  * one `useHandlerFixtures` call seeding the canonical association tables.
  */
 import { describe, it, expect } from "vitest";
-import { registerModel, enableSti, registerSubclass } from "../index.js";
+import { registerModel, enableSti, registerSubclass, resetCallbacks } from "../index.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
+import { Person } from "../test-helpers/models/person.js";
 import { Post, SpecialPost, FirstPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
@@ -26,7 +27,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices, companies } = useHandlerFixtures(
+  const { authors, topics, vertices, companies, people } = useHandlerFixtures(
     [
       "authors",
       "posts",
@@ -39,11 +40,13 @@ describe("CascadedEagerLoadingTest", () => {
       "categoriesPosts",
       "edges",
       "vertices",
+      "people",
     ],
     { schema: canonicalSchema },
   );
 
   enableSti(Topic);
+  registerModel(Person);
   registerModel(Author);
   registerModel(Post);
   registerModel(SpecialPost);
@@ -92,18 +95,26 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
-    // BLOCKED: join-dependency self-join aliasing gap.
+    // BLOCKED: join-dependency cross-JD emit-time aliasing gap.
     // ROOT-CAUSE: Author.joins(:posts).eager_load(:comments) (comments is
     //   has_many :through :posts) emits a second un-aliased `posts` join and
-    //   raises `ambiguous column name: posts.id`. Rails aliases to
-    //   `posts_authors`. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+    //   raises `ambiguous column name: posts.id`. The explicit joins(:posts) and
+    //   the eager through-posts intermediate are separate JoinDependencies; the
+    //   collision is only visible against the shared build_joins AliasTracker at
+    //   emit time, and the manual/eager emission order prevents the eager
+    //   intermediate from aliasing to Rails' `posts_authors`.
+    //   Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
   });
 
-  it.skip("eager association loading grafts stashed associations to correct parent", () => {
-    // BLOCKED: join-dependency self-join aliasing gap.
-    // ROOT-CAUSE: Person.eager_load(primary_contact: :primary_contact) needs the
-    //   generated self-join alias `primary_contacts_people_2`; trails' alias
-    //   naming differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  it("eager association loading grafts stashed associations to correct parent", async () => {
+    const person = await Person.all()
+      .eagerLoad({ primaryContact: "primaryContact" })
+      .where("primary_contacts_people_2.first_name = ?", "Susan")
+      .order("people.id")
+      .first();
+    // Rails: assert_equal people(:michael), ...first — AR#== is same class + same id.
+    expect(person).toBeInstanceOf(Person);
+    expect(person!.id).toBe((people("michael") as any).id);
   });
 
   it("cascaded eager association loading with join for count", async () => {
@@ -250,17 +261,18 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it.skip("eager association loading with multiple stis and order", () => {
-    // BLOCKED: join-dependency eager-load alias ordering gap.
+    // BLOCKED: join-dependency eager-load alias ordering gap (same root cause as
+    //   `hmt does not table name collide`).
     // ROOT-CAUSE: includes + order on eager-load aliases
-    //   (`very_special_comments_posts.body`) needs the alias-naming fidelity
-    //   above. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+    //   (`very_special_comments_posts.body`) needs the cross-JD emit-time
+    //   aliasing fidelity. Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
   });
 
   it.skip("eager association loading of stis with multiple references", () => {
     // BLOCKED: join-dependency eager-load alias ordering gap.
     // ROOT-CAUSE: includes({posts: {special_comments: {post: ...}}}) with order on
     //   `very_special_comments_posts.body` needs the same alias-naming fidelity.
-    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+    //   Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
   });
 
   it("eager association loading where first level returns nil", async () => {
@@ -362,17 +374,45 @@ describe("CascadedEagerLoadingTest", () => {
     expect(actual).toEqual(expected);
   });
 
-  it.skip("preloading across has one constrains loaded records", () => {
-    // BLOCKED: no reset_callbacks / callback-removal API.
-    // ROOT-CAUSE: test installs a temporary after_initialize recorder via
-    //   reset_callbacks to assert a has_one (ordered) preload instantiates only
-    //   the constrained record; trails callbacks.ts exposes registration only.
-    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  it("preloading across has one constrains loaded records", async () => {
+    const author = (await Author.findBy({ id: (authors("david") as any).id }))!;
+
+    const oldPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
+    await (oldPost as any).comments.createBang({
+      author_id: (authors("mary") as any).id,
+      body: "a response",
+    });
+
+    const recentPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
+    const lastComment = await (recentPost as any).comments.createBang({
+      author_id: (authors("bob") as any).id,
+      body: "a response",
+    });
+
+    const authorsRel = Author.where({ id: author.id });
+    const retrievedComments: Base[] = [];
+
+    await resetCallbacks(Comment, "initialize", async () => {
+      Comment.afterInitialize((record: Comment) => {
+        retrievedComments.push(record);
+      });
+      await authorsRel.preload({ recentPost: "comments" }).load();
+    });
+
+    // Rails: assert_equal [last_comment], retrieved_comments — AR#== is same
+    // class + same id, so match the recorded record's class and id.
+    expect(retrievedComments).toHaveLength(1);
+    expect(retrievedComments[0]).toBeInstanceOf(Comment);
+    expect(retrievedComments[0].id).toBe(lastComment.id);
   });
 
   it.skip("preloading across has one through constrains loaded records", () => {
-    // BLOCKED: no reset_callbacks / callback-removal API.
-    // ROOT-CAUSE: as above, for a has_one :through (recent_response) preload.
-    //   Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+    // BLOCKED: nested preload through a has_one :through does not instantiate the
+    //   nested association (separate from the now-available resetCallbacks API).
+    // ROOT-CAUSE: `preload(recent_response: :author)` loads recent_response (the
+    //   has_one :through), but the nested `:author` on that record is never
+    //   instantiated, so the after_initialize recorder sees 1 record instead of
+    //   2. The recentResponse target loads; its `author` child does not preload.
+    //   Tracked: RFC 0030 story nested-preload-through-has-one-source.
   });
 });

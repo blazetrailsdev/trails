@@ -373,6 +373,41 @@ export function skipCallbackOnProto(
 }
 
 /**
+ * Snapshot the registered callbacks for `event` on `proto` so they can be
+ * restored later. Returns the chain's current entries (a shallow copy of the
+ * array; the Callback entries themselves are immutable) or `undefined` when no
+ * chain exists for the event. Mirrors Rails' test helper capturing
+ * `klass._<kind>_callbacks.dup` before a block that mutates the chain.
+ *
+ * @internal
+ */
+export function snapshotCallbacksOnProto(proto: object, event: string): Callback[] | undefined {
+  const chain = asPeekCallbackChain(proto, event);
+  return chain ? [...chain.entries] : undefined;
+}
+
+/**
+ * Restore the callbacks for `event` on `proto` to a previously captured
+ * `snapshotCallbacksOnProto` value, discarding any registered since. Mirrors
+ * Rails' `klass._<kind>_callbacks = old` in the `ensure` of its reset helper.
+ *
+ * @internal
+ */
+export function restoreCallbacksOnProto(
+  proto: object,
+  event: string,
+  snapshot: Callback[] | undefined,
+): void {
+  // Ensure `proto` owns its chains map (COW) before mutating, so the restore
+  // never bleeds into a parent class's shared chain.
+  const chains = asGetCallbackChains(proto);
+  const chain = chains.get(event);
+  if (!chain) return;
+  chain.clear();
+  if (snapshot) for (const entry of snapshot) chain.append(entry);
+}
+
+/**
  * Run the full callback chain (before + around + after) for `event` on `proto`.
  * Uses a read-only peek (no COW) so subclass isolation is not disturbed.
  *
