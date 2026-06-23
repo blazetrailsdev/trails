@@ -43,16 +43,62 @@ function castInheritanceColumnValue(
  * @internal
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
-  const klass = modelRegistry.get(typeName);
-  if (!klass) {
-    throw new NameError(`uninitialized constant ${typeName}`);
-  }
+  const klass = resolveComputedType(baseClass, typeName);
   if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
     throw new SubclassNotFound(
       `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
     );
   }
   return klass;
+}
+
+/**
+ * Build the ordered constant-name candidates `compute_type` tries, mirroring
+ * Rails' `name.scan(/::|$/) { candidates.unshift "#{$`}::#{type_name}" }` — the
+ * model's own qualified name plus each enclosing namespace prefix, innermost
+ * (most specific) first, then the bare `type_name`. So a `Firm` nested in
+ * `MyApp::Business` resolving `"Account"` tries `MyApp::Business::Firm::Account`,
+ * `MyApp::Business::Account`, `MyApp::Account`, then `Account`.
+ *
+ * @internal
+ */
+function computeTypeCandidates(baseClass: typeof Base, typeName: string): string[] {
+  const segs = qualifiedName(baseClass).split("::");
+  const candidates: string[] = [];
+  for (let i = segs.length; i > 0; i--) {
+    candidates.push(`${segs.slice(0, i).join("::")}::${typeName}`);
+  }
+  candidates.push(typeName);
+  return candidates;
+}
+
+/**
+ * Ruby-style namespace-relative constant resolution, mirroring
+ * ActiveRecord::Inheritance::ClassMethods#compute_type. Walks the model's module
+ * nesting (see {@link computeTypeCandidates}) and returns the first candidate that
+ * resolves to a registered class whose own qualified name equals the candidate —
+ * Rails' `candidate == constant.to_s` guard, which rejects an outer-scope constant
+ * leaking through (so a demodulized type stored under a namespaced model resolves
+ * via the namespace prefix even when the bare name is unregistered). A leading
+ * `::` is an absolute reference resolved directly. Throws NameError when nothing
+ * resolves. Does NOT enforce a subclass relationship — that is {@link computeType}'s
+ * (and Rails' find_sti_class's) job, leaving this usable for polymorphic targets.
+ *
+ * @internal
+ */
+function resolveComputedType(baseClass: typeof Base, typeName: string): typeof Base {
+  if (typeName.startsWith("::")) {
+    const absolute = typeName.slice(2);
+    const klass = modelRegistry.get(absolute);
+    if (!klass) throw new NameError(`uninitialized constant ${absolute}`);
+    return klass;
+  }
+  const candidates = computeTypeCandidates(baseClass, typeName);
+  for (const candidate of candidates) {
+    const klass = modelRegistry.get(candidate);
+    if (klass && qualifiedName(klass) === candidate) return klass;
+  }
+  throw new NameError(`uninitialized constant ${candidates[0]}`);
 }
 
 /**
@@ -711,15 +757,42 @@ export function primaryAbstractClass(modelClass: typeof Base): void {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_class_for
  */
 export function stiClassFor(modelClass: typeof Base, typeName: string): typeof Base {
+  const klass = modelClass as typeof Base & {
+    storeFullStiClass?: boolean;
+    storeFullClassName?: boolean;
+  };
+  // Rails splits this across find_sti_class (the subclass check) and
+  // sti_class_for (the constant resolution, with a `rescue NameError`):
+  // inheritance.rb:311-320, 242-265. Mirror that split so each failure keeps its
+  // Rails message — a name that resolves to no constant becomes "failed to
+  // locate the subclass" (rescued NameError), while a resolved-but-non-subclass
+  // keeps "Invalid single-table inheritance type" (raised *outside* the rescue).
+  let subclass: typeof Base;
   try {
-    return findStiClass(modelClass, typeName);
+    // sti_class_for: constantize when storing the full STI class name, else
+    // namespace-relative compute_type. Bare registry lookup is trails' constantize.
+    if (klass.storeFullStiClass && klass.storeFullClassName) {
+      const resolved = modelRegistry.get(typeName);
+      if (!resolved) throw new NameError(`uninitialized constant ${typeName}`);
+      subclass = resolved;
+    } else {
+      subclass = resolveComputedType(modelClass, typeName);
+    }
   } catch (cause) {
+    if (!(cause instanceof NameError)) throw cause;
     throw new SubclassNotFound(
       `The single-table inheritance mechanism failed to locate the subclass: '${typeName}'. ` +
         `This error is raised because the column '${getInheritanceColumn(modelClass)}' is reserved for storing the class in case of inheritance.`,
       { cause },
     );
   }
+  // find_sti_class: `unless subclass == self || descendants.include?(subclass)`.
+  if (subclass !== modelClass && !(subclass.prototype instanceof modelClass)) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${subclass.name} is not a subclass of ${modelClass.name}`,
+    );
+  }
+  return subclass;
 }
 
 /**
@@ -727,12 +800,17 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_class_for
  */
-export function polymorphicClassFor(_modelClass: typeof Base, name: string): typeof Base {
-  // Mirrors Rails' polymorphic_class_for — resolves any registered class,
-  // not limited to STI subclasses (polymorphic targets are unrelated models).
-  const klass = modelRegistry.get(name);
-  if (!klass) throw new NameError(`uninitialized constant ${name}`);
-  return klass;
+export function polymorphicClassFor(modelClass: typeof Base, name: string): typeof Base {
+  // Mirrors Rails' polymorphic_class_for: constantize when storing the full
+  // class name, else namespace-relative compute_type. Polymorphic targets are
+  // unrelated models, so (unlike STI) no subclass relationship is enforced.
+  const klass = modelClass as typeof Base & { storeFullClassName?: boolean };
+  if (klass.storeFullClassName) {
+    const resolved = modelRegistry.get(name);
+    if (!resolved) throw new NameError(`uninitialized constant ${name}`);
+    return resolved;
+  }
+  return resolveComputedType(modelClass, name);
 }
 
 /**

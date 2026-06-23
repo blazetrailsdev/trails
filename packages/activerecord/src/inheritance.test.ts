@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
+import { loadBelongsTo } from "./associations.js";
 
 import { quoteTableName } from "./test-helpers/quote-regex.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
@@ -1939,6 +1940,136 @@ describe("InheritanceTest — new parity methods", () => {
     registerModel(Comment);
     // polymorphicClassFor resolves without STI constraint
     expect(polymorphicClassFor(Post, "Comment")).toBe(Comment);
+  });
+
+  it("polymorphic_class_for resolves a demodulized type relative to the owner's namespace", () => {
+    // store_full_class_name = false stores the demodulized "Used"; the target is
+    // registered only under its namespaced key, so a bare lookup misses but the
+    // owner's module nesting resolves it (Rails compute_type).
+    class StorefrontUsed extends Base {
+      static moduleName = "Storefront";
+      static _demodulizedName = "Used";
+    }
+    registerModel("Storefront::Used", StorefrontUsed);
+
+    class StorefrontPicture extends Base {
+      static moduleName = "Storefront";
+      static _demodulizedName = "Picture";
+      static storeFullClassName = false;
+    }
+    // "Used" is NOT a registry key — only "Storefront::Used" is.
+    expect(polymorphicClassFor(StorefrontPicture, "Used")).toBe(StorefrontUsed);
+  });
+
+  it("sti_class_for keeps the Invalid-STI-type message for a resolved non-subclass", () => {
+    // Rails raises the subclass check in find_sti_class, outside sti_class_for's
+    // `rescue NameError` (inheritance.rb:315-317), so this message survives.
+    class NsBase extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Base";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+    }
+    class NsUnrelated extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Unrelated";
+    }
+    registerModel("Ns::Unrelated", NsUnrelated);
+    expect(() => stiClassFor(NsBase, "Unrelated")).toThrow(/Invalid single-table inheritance type/);
+  });
+
+  it("sti_class_for uses the failed-to-locate message when the type names no constant", () => {
+    class NsOnly extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Only";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+    }
+    expect(() => stiClassFor(NsOnly, "Nonexistent")).toThrow(/failed to locate the subclass/);
+  });
+});
+
+describe("STI read of a demodulized namespaced type", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ catalog_items: { name: "string", type: "string" } });
+  });
+
+  it("hydrates a namespaced STI subclass from its demodulized stored type", async () => {
+    // store_full_sti_class = false stores the demodulized "Book"; the row read
+    // path (findStiClassForRow → findStiClassInHierarchy) matches it against the
+    // subclass's stiName, which is also demodulized when the flag is off — so the
+    // STI read resolves the namespaced subclass without a bare registry hit.
+    class CatalogItem extends Base {
+      static moduleName = "Catalog";
+      static _demodulizedName = "Item";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+      static {
+        this._tableName = "catalog_items";
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        enableSti(this);
+      }
+    }
+    class CatalogBook extends CatalogItem {
+      static moduleName = "Catalog";
+      static _demodulizedName = "Book";
+    }
+    registerModel([CatalogItem, CatalogBook]);
+
+    const book = await CatalogBook.create({ name: "Dune" });
+    expect(book.type).toBe("Book");
+    const found = await CatalogItem.find(book.id);
+    expect(found).toBeInstanceOf(CatalogBook);
+  });
+});
+
+describe("polymorphic belongs_to namespace-relative type resolution", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      storefront_pictures: { imageable_type: "string", imageable_id: "integer" },
+      storefront_useds: { name: "string" },
+    });
+  });
+
+  it("belongs_to resolves a demodulized polymorphic type for a model registered only under its namespaced key", async () => {
+    class StorefrontUsed extends Base {
+      static moduleName = "Storefront";
+      static _demodulizedName = "Used";
+      static {
+        this._tableName = "storefront_useds";
+        this.attribute("name", "string");
+      }
+    }
+    // Registered ONLY under the namespaced key — the bare "Used" is not a key.
+    registerModel("Storefront::Used", StorefrontUsed);
+
+    class StorefrontPicture extends Base {
+      static moduleName = "Storefront";
+      static _demodulizedName = "Picture";
+      static storeFullClassName = false;
+      static {
+        this._tableName = "storefront_pictures";
+        this.attribute("imageable_type", "string");
+        this.attribute("imageable_id", "integer");
+        this.belongsTo("imageable", { polymorphic: true });
+      }
+    }
+
+    const used = await StorefrontUsed.create({ name: "secondhand" });
+    const picture = await StorefrontPicture.create({
+      imageable_type: "Used",
+      imageable_id: used.id,
+    });
+    const imageable = await loadBelongsTo(picture, "imageable", {
+      polymorphic: true,
+    });
+    expect(imageable).toBeInstanceOf(StorefrontUsed);
+    expect((imageable as { id: number }).id).toBe(used.id);
   });
 });
 
