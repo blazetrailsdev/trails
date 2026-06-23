@@ -3268,7 +3268,7 @@ describe("HasManyAssociationsTest", () => {
     const authors = await FICAuthor.all().includes("ficPosts").where({ name: "Alice" }).toArray();
     expect(authors.length).toBe(1);
     expect(authors[0].name).toBe("Alice");
-    const posts = (authors[0] as any)._preloadedAssociations?.get("ficPosts") ?? [];
+    const posts = (authors[0] as any).association("ficPosts").target ?? [];
     expect(posts.length).toBe(1);
   });
   it("find grouped", async () => {

@@ -265,7 +265,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("ruby");
   });
@@ -296,7 +296,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("ruby");
   });
@@ -353,7 +353,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("taggings").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTaggings = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    const preloadedTaggings = (authors[0] as any).association("taggings").target ?? [];
     expect(preloadedTaggings).toHaveLength(2);
   });
 
@@ -377,7 +377,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("taggings").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    const loaded = (authors[0] as any).association("taggings").target ?? [];
     expect(loaded).toHaveLength(2);
   });
 
@@ -425,7 +425,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("ruby");
   });
@@ -449,7 +449,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(1);
     expect(loaded[0].name).toBe("ruby");
   });
@@ -502,7 +502,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("nested");
   });
@@ -526,7 +526,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(1);
     expect(loaded[0].name).toBe("nested");
   });
@@ -582,7 +582,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(2);
   });
 
@@ -614,7 +614,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(2);
   });
 
@@ -666,7 +666,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("taggings").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTaggings = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    const preloadedTaggings = (authors[0] as any).association("taggings").target ?? [];
     expect(preloadedTaggings).toHaveLength(3);
   });
 
@@ -690,7 +690,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("taggings").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("taggings") ?? [];
+    const loaded = (authors[0] as any).association("taggings").target ?? [];
     expect(loaded).toHaveLength(3);
   });
 
@@ -756,7 +756,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(2);
     const names = preloadedTags.map((t: any) => t.name);
     expect(names).toContain("hs_tag1");
@@ -791,7 +791,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(2);
   });
 
@@ -840,7 +840,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const tags = await Tag.all().preload("posts").toArray();
     expect(tags).toHaveLength(1);
-    const preloadedPosts = (tags[0] as any)._preloadedAssociations?.get("posts") ?? [];
+    const preloadedPosts = (tags[0] as any).association("posts").target ?? [];
     expect(preloadedPosts).toHaveLength(2);
     const titles = preloadedPosts.map((p: any) => p.title);
     expect(titles).toContain("HM1");
@@ -864,7 +864,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const tags = await Tag.all().eagerLoad("posts").toArray();
     expect(tags).toHaveLength(1);
-    const loaded = (tags[0] as any)._preloadedAssociations?.get("posts") ?? [];
+    const loaded = (tags[0] as any).association("posts").target ?? [];
     expect(loaded).toHaveLength(2);
   });
 
@@ -932,7 +932,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(2);
     const names = preloadedTags.map((t: any) => t.name).sort();
     expect(names).toEqual(["hc1", "hc2"]);
@@ -966,7 +966,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(2);
   });
 
@@ -1025,7 +1025,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("bt_tag");
   });
@@ -1056,7 +1056,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tags").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const loaded = (authors[0] as any).association("tags").target ?? [];
     expect(loaded).toHaveLength(1);
     expect(loaded[0].name).toBe("bt_tag");
   });
@@ -1111,7 +1111,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: tag2.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const posts = await Post.all().preload("tags").toArray();
-    const allTags = posts.flatMap((p: any) => p._preloadedAssociations?.get("tags") ?? []);
+    const allTags = posts.flatMap((p: any) => p.association("tags").target ?? []);
     expect(allTags).toHaveLength(2);
   });
 
@@ -1138,7 +1138,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: t2.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const posts = await Post.all().eagerLoad("tags").toArray();
-    const allTags = posts.flatMap((p: any) => p._preloadedAssociations?.get("tags") ?? []);
+    const allTags = posts.flatMap((p: any) => p.association("tags").target ?? []);
     expect(allTags).toHaveLength(2);
   });
 
@@ -1188,7 +1188,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("tag").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTag = (authors[0] as any)._preloadedAssociations?.get("tag");
+    const preloadedTag = (authors[0] as any).association("tag").target;
     expect(preloadedTag).not.toBeNull();
     expect(preloadedTag.name).toBe("hoc_tag");
   });
@@ -1208,7 +1208,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("tag").toArray();
     expect(authors).toHaveLength(1);
-    const loaded = (authors[0] as any)._preloadedAssociations?.get("tag");
+    const loaded = (authors[0] as any).association("tag").target;
     expect(loaded).not.toBeNull();
     expect(loaded.name).toBe("hoc_tag");
   });
@@ -1275,7 +1275,7 @@ describe("NestedThroughAssociationsTest", () => {
 
       const members = await DsMember.all().preload("clubCategory").toArray();
       expect(members).toHaveLength(1);
-      const loaded = (members[0] as any)._preloadedAssociations?.get("clubCategory");
+      const loaded = (members[0] as any).association("clubCategory").target;
       expect(loaded).not.toBeNull();
       expect(loaded.id).toBe(general.id);
     }
@@ -1299,7 +1299,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const tags = await Tag.all().preload("post").toArray();
     expect(tags).toHaveLength(1);
-    const preloadedPost = (tags[0] as any)._preloadedAssociations?.get("post");
+    const preloadedPost = (tags[0] as any).association("post").target;
     expect(preloadedPost).not.toBeNull();
     expect(preloadedPost.title).toBe("BC");
   });
@@ -1320,7 +1320,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const tags = await Tag.all().eagerLoad("post").toArray();
     expect(tags).toHaveLength(1);
-    const loaded = (tags[0] as any)._preloadedAssociations?.get("post");
+    const loaded = (tags[0] as any).association("post").target;
     expect(loaded).not.toBeNull();
     expect(loaded.title).toBe("BC");
   });
@@ -1355,7 +1355,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: tag.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const authors = await Author.all().preload("tags").toArray();
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("tags") ?? [];
+    const preloadedTags = (authors[0] as any).association("tags").target ?? [];
     // Same tag attached via two posts — without distinct_tags association, duplicates are returned
     expect(preloadedTags).toHaveLength(2);
     expect(preloadedTags.every((t: any) => t.name === "general")).toBe(true);
@@ -1391,7 +1391,7 @@ describe("NestedThroughAssociationsTest", () => {
     await Tagging.create({ tag_id: tag.id, taggable_id: post2.id, taggable_type: "Post" });
 
     const authors = await Author.all().preload("distinctTags").toArray();
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("distinctTags") ?? [];
+    const preloadedTags = (authors[0] as any).association("distinctTags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("general");
   });
@@ -1924,8 +1924,7 @@ describe("NestedThroughAssociationsTest", () => {
     await StiNTagging.create({ sti_n_rating_id: plainRating.id });
 
     const posts = await StiNPost.all().preload("specialCommentsRatingsTaggings").toArray();
-    const taggings =
-      (posts[0] as any)._preloadedAssociations?.get("specialCommentsRatingsTaggings") ?? [];
+    const taggings = (posts[0] as any).association("specialCommentsRatingsTaggings").target ?? [];
     expect(taggings).toHaveLength(1);
     expect(taggings[0].id).toBe(specialTagging.id);
   });
@@ -2128,7 +2127,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("blueThroughTags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueThroughTags") ?? [];
+    const preloadedTags = (authors[0] as any).association("blueThroughTags").target ?? [];
     // Only blue tag should be returned due to scope
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("blue");
@@ -2163,7 +2162,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("blueThroughTags").toArray();
     expect(authors).toHaveLength(1);
-    const loadedTags = (authors[0] as any)._preloadedAssociations?.get("blueThroughTags") ?? [];
+    const loadedTags = (authors[0] as any).association("blueThroughTags").target ?? [];
     expect(loadedTags).toHaveLength(1);
     expect(loadedTags[0].name).toBe("blue");
   });
@@ -2197,7 +2196,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("blueTags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    const preloadedTags = (authors[0] as any).association("blueTags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("blue");
   });
@@ -2230,7 +2229,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().preload("blueTags").toArray();
     expect(authors).toHaveLength(1);
-    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    const preloadedTags = (authors[0] as any).association("blueTags").target ?? [];
     expect(preloadedTags).toHaveLength(1);
     expect(preloadedTags[0].name).toBe("blue");
   });
@@ -2305,7 +2304,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const authors = await Author.all().eagerLoad("blueTags").toArray();
     expect(authors).toHaveLength(1);
-    const loadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    const loadedTags = (authors[0] as any).association("blueTags").target ?? [];
     expect(loadedTags).toHaveLength(1);
     expect(loadedTags[0].name).toBe("blue");
   });
@@ -2369,7 +2368,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const orgs = await NfkOrganization.all().preload("nfkCategories").toArray();
     expect(orgs).toHaveLength(1);
-    const preloadedCats = (orgs[0] as any)._preloadedAssociations?.get("nfkCategories") ?? [];
+    const preloadedCats = (orgs[0] as any).association("nfkCategories").target ?? [];
     expect(preloadedCats).toHaveLength(1);
     expect(preloadedCats[0].name).toBe("general");
   });
@@ -2500,8 +2499,8 @@ describe("NestedThroughAssociationsTest", () => {
       .preload("phmtCakeDesigners", "phmtDrinkDesigners")
       .toArray();
     expect(hotels).toHaveLength(1);
-    const cakes = (hotels[0] as any)._preloadedAssociations?.get("phmtCakeDesigners") ?? [];
-    const drinks = (hotels[0] as any)._preloadedAssociations?.get("phmtDrinkDesigners") ?? [];
+    const cakes = (hotels[0] as any).association("phmtCakeDesigners").target ?? [];
+    const drinks = (hotels[0] as any).association("phmtDrinkDesigners").target ?? [];
     expect(cakes.map((r: any) => r.id)).toEqual([cakeDesigner.id]);
     expect(drinks.map((r: any) => r.id)).toEqual([drinkDesigner.id]);
   });
@@ -2592,8 +2591,8 @@ describe("NestedThroughAssociationsTest", () => {
       .preload("phmtChef2s", "phmtCakeDesigner2s", "phmtDrinkDesigner2s")
       .toArray();
     expect(hotels).toHaveLength(1);
-    const cakes = (hotels[0] as any)._preloadedAssociations?.get("phmtCakeDesigner2s") ?? [];
-    const drinks = (hotels[0] as any)._preloadedAssociations?.get("phmtDrinkDesigner2s") ?? [];
+    const cakes = (hotels[0] as any).association("phmtCakeDesigner2s").target ?? [];
+    const drinks = (hotels[0] as any).association("phmtDrinkDesigner2s").target ?? [];
     expect(cakes.map((r: any) => r.id)).toEqual([cakeDesigner.id]);
     expect(drinks.map((r: any) => r.id)).toEqual([drinkDesigner.id]);
   });
@@ -2827,7 +2826,7 @@ describe("NestedThroughAssociationsTest", () => {
     const preloaded = await RsrCategory.all().preload("orderedPostComments").toArray();
     const preloadedCat2 = preloaded.find((c) => (c as any).id === cat2.id)!;
     const preloadedIds = (
-      (preloadedCat2 as any)._preloadedAssociations?.get("orderedPostComments") ?? []
+      (preloadedCat2 as any).association("orderedPostComments").target ?? []
     ).map((c: any) => c.id);
 
     const original = await loadHasManyThrough(cat2, "orderedPostComments", {

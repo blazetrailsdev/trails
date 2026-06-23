@@ -542,7 +542,7 @@ describe("EagerAssociationTest", () => {
 
     const parents = await EagerInvParent.all().includes("eagerInvChildren").toArray();
     expect(parents).toHaveLength(1);
-    const children = (parents[0] as any)._preloadedAssociations.get("eagerInvChildren");
+    const children = (parents[0] as any).association("eagerInvChildren").target;
     expect(children).toHaveLength(2);
   });
   it("loading conditions with or", async () => {
@@ -572,7 +572,7 @@ describe("EagerAssociationTest", () => {
     const posts = await EagerOrPost.all().includes("eagerOrComments").toArray();
     expect(posts).toHaveLength(2);
     for (const post of posts) {
-      const comments = (post as any)._preloadedAssociations.get("eagerOrComments");
+      const comments = (post as any).association("eagerOrComments").target;
       expect(comments).toHaveLength(1);
     }
   });
@@ -628,8 +628,8 @@ describe("EagerAssociationTest", () => {
     const posts = await EagerPost.all().includes("eagerComments").toArray();
     const post1 = posts.find((p: any) => p.title === "A")!;
     const post2 = posts.find((p: any) => p.title === "B")!;
-    expect((post1 as any)._preloadedAssociations.get("eagerComments")).toHaveLength(1);
-    expect((post2 as any)._preloadedAssociations.get("eagerComments")).toHaveLength(0);
+    expect((post1 as any).association("eagerComments").target).toHaveLength(1);
+    expect((post2 as any).association("eagerComments").target).toHaveLength(0);
   });
 
   it("with ordering", async () => {
@@ -657,7 +657,7 @@ describe("EagerAssociationTest", () => {
 
     const posts = await EagerOrderPost.all().includes("eagerOrderComments").toArray();
     expect(posts).toHaveLength(1);
-    const comments = (posts[0] as any)._preloadedAssociations.get("eagerOrderComments");
+    const comments = (posts[0] as any).association("eagerOrderComments").target;
     expect(comments).toHaveLength(2);
   });
   it("has many through with order", async () => {
@@ -744,7 +744,7 @@ describe("EagerAssociationTest", () => {
       .references("eagerHoRefChild")
       .toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoRefChild");
+    const preloaded = (results[0] as any).association("eagerHoRefChild").target;
     expect(preloaded?.value).toBe("C");
   });
   it("eager loaded has one association without primary key", async () => {
@@ -842,7 +842,7 @@ describe("EagerAssociationTest", () => {
 
     const parents = await EagerDupParent.all().includes("eagerDupChildren").toArray();
     expect(parents).toHaveLength(1);
-    const children = (parents[0] as any)._preloadedAssociations.get("eagerDupChildren");
+    const children = (parents[0] as any).association("eagerDupChildren").target;
     expect(children).toHaveLength(2);
   });
   it("including duplicate objects from belongs to", async () => {
@@ -871,8 +871,8 @@ describe("EagerAssociationTest", () => {
     const posts = await EagerDupPost.all().includes("eagerDupAuthor").toArray();
     expect(posts).toHaveLength(2);
     // Both posts should have the same author preloaded
-    const a1 = (posts[0] as any)._preloadedAssociations.get("eagerDupAuthor");
-    const a2 = (posts[1] as any)._preloadedAssociations.get("eagerDupAuthor");
+    const a1 = (posts[0] as any).association("eagerDupAuthor").target;
+    const a2 = (posts[1] as any).association("eagerDupAuthor").target;
     expect(a1?.id).toBe(author.id);
     expect(a2?.id).toBe(author.id);
   });
@@ -901,7 +901,7 @@ describe("EagerAssociationTest", () => {
 
     const results = await EagerArticle.all().includes("eagerTags").includes("eagerTags").toArray();
     expect(results).toHaveLength(1);
-    const tags = (results[0] as any)._preloadedAssociations.get("eagerTags");
+    const tags = (results[0] as any).association("eagerTags").target;
     expect(tags).toHaveLength(1);
   });
 
@@ -932,7 +932,7 @@ describe("EagerAssociationTest", () => {
       .includes("eagerHoChild")
       .toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations.get("eagerHoChild");
+    const preloaded = (results[0] as any).association("eagerHoChild").target;
     expect(preloaded?.value).toBe("C");
   });
   it("finding with includes on belongs to association with same include includes only once", async () => {
@@ -962,7 +962,7 @@ describe("EagerAssociationTest", () => {
       .includes("eagerBtParent")
       .toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations.get("eagerBtParent");
+    const preloaded = (results[0] as any).association("eagerBtParent").target;
     expect(preloaded?.name).toBe("P");
   });
   it("finding with includes on null belongs to association with same include includes only once", async () => {
@@ -992,7 +992,7 @@ describe("EagerAssociationTest", () => {
       .includes("eagerNullParent")
       .toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations.get("eagerNullParent");
+    const preloaded = (results[0] as any).association("eagerNullParent").target;
     expect(preloaded == null).toBe(true);
   });
   it("finding with includes on null belongs to polymorphic association", async () => {
@@ -1012,7 +1012,7 @@ describe("EagerAssociationTest", () => {
     });
     const results = await EagerPolyChild.all().includes("parent").toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations?.get("parent");
+    const preloaded = (results[0] as any).association("parent").target;
     expect(preloaded).toBeNull();
   });
   it("finding with includes on empty polymorphic type column", async () => {
@@ -1028,7 +1028,7 @@ describe("EagerAssociationTest", () => {
     await EagerPolyChild2.create({ name: "empty_type", parent_id: 1, parent_type: "" });
     const results = await EagerPolyChild2.all().includes("parent").toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations?.get("parent");
+    const preloaded = (results[0] as any).association("parent").target;
     expect(preloaded).toBeNull();
   });
 
@@ -1056,7 +1056,7 @@ describe("EagerAssociationTest", () => {
 
     const books = await EagerBook.all().includes("eagerAuthor").toArray();
     expect(books).toHaveLength(1);
-    const preloaded = (books[0] as any)._preloadedAssociations.get("eagerAuthor");
+    const preloaded = (books[0] as any).association("eagerAuthor").target;
     expect(preloaded?.name).toBe("Orwell");
   });
 
@@ -1148,7 +1148,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoAuthor.all().includes("nestHoPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoPost");
+    const post = (authors[0] as any).association("nestHoPost").target;
     expect(post?.title).toBe("First Post");
   });
   it("nested loading through has one association with order", async () => {
@@ -1178,7 +1178,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoOrdAuthor.all().includes("nestHoOrdPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoOrdPost");
+    const post = (authors[0] as any).association("nestHoOrdPost").target;
     expect(post?.title).toBe("Only Post");
   });
   it("nested loading through has one association with order on association", async () => {
@@ -1208,7 +1208,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoOaAuthor.all().includes("nestHoOaPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoOaPost");
+    const post = (authors[0] as any).association("nestHoOaPost").target;
     expect(post?.title).toBe("Carol Post");
   });
   it("nested loading through has one association with order on nested association", async () => {
@@ -1238,7 +1238,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoOnAuthor.all().includes("nestHoOnPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoOnPost");
+    const post = (authors[0] as any).association("nestHoOnPost").target;
     expect(post?.title).toBe("Dave Post");
   });
   it("nested loading through has one association with conditions", async () => {
@@ -1268,7 +1268,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoCAuthor.all().includes("nestHoCPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoCPost");
+    const post = (authors[0] as any).association("nestHoCPost").target;
     expect(post?.title).toBe("Eve Post");
   });
   it("nested loading through has one association with conditions on association", async () => {
@@ -1298,7 +1298,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoCaAuthor.all().includes("nestHoCaPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoCaPost");
+    const post = (authors[0] as any).association("nestHoCaPost").target;
     expect(post?.title).toBe("Frank Post");
   });
   it("nested loading through has one association with conditions on nested association", async () => {
@@ -1328,7 +1328,7 @@ describe("EagerAssociationTest", () => {
 
     const authors = await NestHoCnAuthor.all().includes("nestHoCnPost").toArray();
     expect(authors).toHaveLength(1);
-    const post = (authors[0] as any)._preloadedAssociations.get("nestHoCnPost");
+    const post = (authors[0] as any).association("nestHoCnPost").target;
     expect(post?.title).toBe("Grace Post");
   });
 
@@ -1353,7 +1353,7 @@ describe("EagerAssociationTest", () => {
     const co = await EagerQtCompany.create({ name: "Acme" });
     await EagerQtClient.create({ name: "C1", eager_qt_company_id: co.id });
     const clients = await EagerQtClient.all().includes("eagerQtCompany").toArray();
-    expect((clients[0] as any)._preloadedAssociations.get("eagerQtCompany")?.name).toBe("Acme");
+    expect((clients[0] as any).association("eagerQtCompany").target?.name).toBe("Acme");
   });
   it("eager load has one quotes table and column names", async () => {
     class EagerQtHoParent extends Base {
@@ -1376,7 +1376,7 @@ describe("EagerAssociationTest", () => {
     const p = await EagerQtHoParent.create({ name: "P" });
     await EagerQtHoChild.create({ value: "V", eager_qt_ho_parent_id: p.id });
     const parents = await EagerQtHoParent.all().includes("eagerQtHoChild").toArray();
-    expect((parents[0] as any)._preloadedAssociations.get("eagerQtHoChild")?.value).toBe("V");
+    expect((parents[0] as any).association("eagerQtHoChild").target?.value).toBe("V");
   });
   it("eager load has many quotes table and column names", async () => {
     class EagerQtHmParent extends Base {
@@ -1399,7 +1399,7 @@ describe("EagerAssociationTest", () => {
     const p = await EagerQtHmParent.create({ name: "P" });
     await EagerQtHmChild.create({ value: "C1", eager_qt_hm_parent_id: p.id });
     const parents = await EagerQtHmParent.all().includes("eagerQtHmChildren").toArray();
-    expect((parents[0] as any)._preloadedAssociations.get("eagerQtHmChildren")).toHaveLength(1);
+    expect((parents[0] as any).association("eagerQtHmChildren").target).toHaveLength(1);
   });
   it("eager load has many through quotes table and column names", async () => {
     class EagerQtThrOwner extends Base {
@@ -1442,7 +1442,7 @@ describe("EagerAssociationTest", () => {
       eager_qt_thr_item_id: item.id,
     });
     const owners = await EagerQtThrOwner.all().includes("eagerQtThrItems").toArray();
-    expect((owners[0] as any)._preloadedAssociations.get("eagerQtThrItems")).toHaveLength(1);
+    expect((owners[0] as any).association("eagerQtThrItems").target).toHaveLength(1);
   });
   it("eager load has many with string keys", async () => {
     class EagerStrParent extends Base {
@@ -1468,7 +1468,7 @@ describe("EagerAssociationTest", () => {
 
     const parents = await EagerStrParent.all().includes("eagerStrChildren").toArray();
     expect(parents).toHaveLength(1);
-    const children = (parents[0] as any)._preloadedAssociations.get("eagerStrChildren");
+    const children = (parents[0] as any).association("eagerStrChildren").target;
     expect(children).toHaveLength(1);
   });
   it.skip("string id column joins", () => {
@@ -1553,7 +1553,7 @@ describe("EagerAssociationTest", () => {
 
     const children = await EagerStrBtChild.all().includes("eagerStrBtParent").toArray();
     expect(children).toHaveLength(1);
-    const preloaded = (children[0] as any)._preloadedAssociations.get("eagerStrBtParent");
+    const preloaded = (children[0] as any).association("eagerStrBtParent").target;
     expect(preloaded?.name).toBe("P");
   });
   it("eager association loading with explicit join", async () => {
@@ -1581,12 +1581,12 @@ describe("EagerAssociationTest", () => {
 
     const authors = await EjAuthor.all().eagerLoad("ejPosts").toArray();
     expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any)._preloadedAssociations?.get("ejPosts");
+    const posts = (authors[0] as any).association("ejPosts").target;
     expect(posts).toHaveLength(2);
     const titles = posts.map((p: any) => p.title).sort();
     expect(titles).toEqual(["P1", "P2"]);
 
-    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    // Association proxy wired during hydration (read off the holder, not lazy-synced)
     const proxyInstance = (authors[0] as any)._associationInstances.get("ejPosts");
     expect(proxyInstance).toBeDefined();
     expect(proxyInstance.loaded).toBe(true);
@@ -1617,11 +1617,11 @@ describe("EagerAssociationTest", () => {
 
     const posts2 = await EjBtPost.all().eagerLoad("ejBtAuthor").toArray();
     expect(posts2).toHaveLength(1);
-    const loaded = (posts2[0] as any)._preloadedAssociations?.get("ejBtAuthor");
+    const loaded = (posts2[0] as any).association("ejBtAuthor").target;
     expect(loaded).not.toBeNull();
     expect(loaded.name).toBe("BtAuthor");
 
-    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    // Association proxy wired during hydration (read off the holder, not lazy-synced)
     const btProxy = (posts2[0] as any)._associationInstances.get("ejBtAuthor");
     expect(btProxy).toBeDefined();
     expect(btProxy.loaded).toBe(true);
@@ -1652,11 +1652,11 @@ describe("EagerAssociationTest", () => {
 
     const users = await EjHoUser.all().eagerLoad("ejHoProfile").toArray();
     expect(users).toHaveLength(1);
-    const profile = (users[0] as any)._preloadedAssociations?.get("ejHoProfile");
+    const profile = (users[0] as any).association("ejHoProfile").target;
     expect(profile).not.toBeNull();
     expect(profile.bio).toBe("HoBio");
 
-    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    // Association proxy wired during hydration (read off the holder, not lazy-synced)
     const hoProxy = (users[0] as any)._associationInstances.get("ejHoProfile");
     expect(hoProxy).toBeDefined();
     expect(hoProxy.loaded).toBe(true);
@@ -1730,8 +1730,8 @@ describe("EagerAssociationTest", () => {
 
     const posts = await rel.toArray();
     expect(posts).toHaveLength(2);
-    const cats0 = (posts[0] as any)._preloadedAssociations.get("ejHabtmCategories");
-    const cats1 = (posts[1] as any)._preloadedAssociations.get("ejHabtmCategories");
+    const cats0 = (posts[0] as any).association("ejHabtmCategories").target;
+    const cats1 = (posts[1] as any).association("ejHabtmCategories").target;
     expect(cats0).toHaveLength(2);
     expect(cats1).toHaveLength(1);
     expect(cats1[0].name).toBe("General");
@@ -1766,7 +1766,7 @@ describe("EagerAssociationTest", () => {
 
     const posts = await PrHabtmPost.all().preload("prHabtmCategories").toArray();
     expect(posts).toHaveLength(1);
-    const cats = (posts[0] as any)._preloadedAssociations.get("prHabtmCategories");
+    const cats = (posts[0] as any).association("prHabtmCategories").target;
     expect(cats).toHaveLength(2);
   });
   it("eager with has many through", async () => {
@@ -1939,7 +1939,7 @@ describe("EagerAssociationTest", () => {
     await EagerStiComment.create({ body: "does it hurt", eager_sti_post_id: specialPost.id });
 
     const authors = await EagerStiAuthor.all().includes("specialPostComments").toArray();
-    const comments = (authors[0] as any)._preloadedAssociations.get("specialPostComments");
+    const comments = (authors[0] as any).association("specialPostComments").target;
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("does it hurt");
   });
@@ -2302,9 +2302,9 @@ describe("EagerAssociationTest", () => {
       .limit(3)
       .toArray();
     expect(posts).toHaveLength(3);
-    expect((posts[0] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(2);
-    expect((posts[1] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(1);
-    expect((posts[2] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(0);
+    expect((posts[0] as any).association("habtmLimCategories").target).toHaveLength(2);
+    expect((posts[1] as any).association("habtmLimCategories").target).toHaveLength(1);
+    expect((posts[2] as any).association("habtmLimCategories").target).toHaveLength(0);
   });
   it("eager association loading with habtm", async () => {
     class HabtmEagerPost extends Base {
@@ -2345,9 +2345,9 @@ describe("EagerAssociationTest", () => {
       .order("id", "asc")
       .toArray();
     expect(posts).toHaveLength(3);
-    const cats0 = (posts[0] as any)._preloadedAssociations.get("habtmEagerCategories");
-    const cats1 = (posts[1] as any)._preloadedAssociations.get("habtmEagerCategories");
-    const cats2 = (posts[2] as any)._preloadedAssociations.get("habtmEagerCategories");
+    const cats0 = (posts[0] as any).association("habtmEagerCategories").target;
+    const cats1 = (posts[1] as any).association("habtmEagerCategories").target;
+    const cats2 = (posts[2] as any).association("habtmEagerCategories").target;
     expect(cats0).toHaveLength(2);
     expect(cats1).toHaveLength(1);
     expect(cats2).toHaveLength(0);
@@ -2379,7 +2379,7 @@ describe("EagerAssociationTest", () => {
     await EagerInhClient.create({ name: "Client1", eager_inh_company_id: firm.id });
     const companies = await EagerInhCompany.all().includes("eagerInhClients").toArray();
     expect(companies.length).toBeGreaterThanOrEqual(1);
-    const loaded = (companies[0] as any)._preloadedAssociations?.get("eagerInhClients");
+    const loaded = (companies[0] as any).association("eagerInhClients").target;
     expect(loaded).toBeDefined();
   });
   it("eager has one with association inheritance", async () => {
@@ -2413,7 +2413,7 @@ describe("EagerAssociationTest", () => {
     });
     const parents = await EagerHoiParent.all().includes("eagerHoiProfile").toArray();
     expect(parents).toHaveLength(1);
-    const profile = (parents[0] as any)._preloadedAssociations?.get("eagerHoiProfile");
+    const profile = (parents[0] as any).association("eagerHoiProfile").target;
     expect(profile).not.toBeNull();
     expect(profile.bio).toBe("Special");
   });
@@ -2449,7 +2449,7 @@ describe("EagerAssociationTest", () => {
     });
     const authors = await EagerHmiAuthor.all().includes("eagerHmiPosts").toArray();
     expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any)._preloadedAssociations?.get("eagerHmiPosts");
+    const posts = (authors[0] as any).association("eagerHmiPosts").target;
     expect(posts).toHaveLength(2);
   });
   it("eager habtm with association inheritance", async () => {
@@ -2489,7 +2489,7 @@ describe("EagerAssociationTest", () => {
       .includes("habtmInhSpecialCategories")
       .where({ id: post.id })
       .toArray();
-    const cats = (posts[0] as any)._preloadedAssociations.get("habtmInhSpecialCategories");
+    const cats = (posts[0] as any).association("habtmInhSpecialCategories").target;
     expect(cats).toHaveLength(1);
   });
   it("eager with invalid association reference", async () => {
@@ -2680,7 +2680,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerDsPost.create({ title: "P" });
     await EagerDsComment.create({ body: "c1", eager_ds_post_id: post.id });
     const posts = await EagerDsPost.all().includes("eagerDsComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerDsComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerDsComments").target).toHaveLength(1);
   });
   it("eager with default scope as class method", async () => {
     class EagerDsCmPost extends Base {
@@ -2703,7 +2703,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerDsCmPost.create({ title: "P" });
     await EagerDsCmComment.create({ body: "c1", eager_ds_cm_post_id: post.id });
     const posts = await EagerDsCmPost.all().includes("eagerDsCmComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerDsCmComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerDsCmComments").target).toHaveLength(1);
   });
   it("eager with default scope as class method using find method", async () => {
     class EagerDsFmPost extends Base {
@@ -2748,7 +2748,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerDsLPost.create({ title: "P" });
     await EagerDsLComment.create({ body: "c1", eager_ds_l_post_id: post.id });
     const posts = await EagerDsLPost.all().includes("eagerDsLComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerDsLComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerDsLComments").target).toHaveLength(1);
   });
   it("eager with default scope as block", async () => {
     class EagerDsBPost extends Base {
@@ -2771,7 +2771,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerDsBPost.create({ title: "P" });
     await EagerDsBComment.create({ body: "c1", eager_ds_b_post_id: post.id });
     const posts = await EagerDsBPost.all().includes("eagerDsBComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerDsBComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerDsBComments").target).toHaveLength(1);
   });
   it("eager with default scope as callable", async () => {
     class EagerDsCallPost extends Base {
@@ -2797,7 +2797,7 @@ describe("EagerAssociationTest", () => {
       eager_ds_call_post_id: post.id,
     });
     const posts = await EagerDsCallPost.all().includes("eagerDsCallComments").toArray();
-    expect((posts[0] as any)._preloadedAssociations.get("eagerDsCallComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerDsCallComments").target).toHaveLength(1);
   });
   it("limited eager with order", async () => {
     class EagerLeoPost extends Base {
@@ -2826,7 +2826,7 @@ describe("EagerAssociationTest", () => {
       .includes("eagerLeoComments")
       .toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("eagerLeoComments")).toHaveLength(2);
+    expect((posts[0] as any).association("eagerLeoComments").target).toHaveLength(2);
   });
   it("limited eager with multiple order columns", async () => {
     class EagerLmoPost extends Base {
@@ -2855,7 +2855,7 @@ describe("EagerAssociationTest", () => {
       .includes("eagerLmoComments")
       .toArray();
     expect(posts).toHaveLength(1);
-    expect((posts[0] as any)._preloadedAssociations.get("eagerLmoComments")).toHaveLength(1);
+    expect((posts[0] as any).association("eagerLmoComments").target).toHaveLength(1);
   });
   it("limited eager with numeric in association", async () => {
     class EagerLnPost extends Base {
@@ -2878,7 +2878,7 @@ describe("EagerAssociationTest", () => {
     const post = await EagerLnPost.create({ title: "P" });
     await EagerLnComment.create({ rating: 4.5, eager_ln_post_id: post.id });
     const posts = await EagerLnPost.all().includes("eagerLnComments").toArray();
-    const comments = (posts[0] as any)._preloadedAssociations.get("eagerLnComments");
+    const comments = (posts[0] as any).association("eagerLnComments").target;
     expect(comments).toHaveLength(1);
     expect(comments[0].rating).toBe(4.5);
   });
@@ -2909,7 +2909,7 @@ describe("EagerAssociationTest", () => {
     await PtcTagging.create({ taggable_id: post.id, taggable_type: "OtherType", ptc_tag_id: 2 });
     const posts = await PtcPost.all().includes("ptcTaggings").toArray();
     expect(posts).toHaveLength(1);
-    const taggings = (posts[0] as any)._preloadedAssociations?.get("ptcTaggings") ?? [];
+    const taggings = (posts[0] as any).association("ptcTaggings").target ?? [];
     expect(taggings).toHaveLength(1);
     expect(taggings[0].taggable_type).toBe("PtcPost");
   });
@@ -2956,8 +2956,8 @@ describe("EagerAssociationTest", () => {
       .includes("maHabtmPosts", "maHabtmCategories")
       .toArray();
     expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any)._preloadedAssociations.get("maHabtmPosts");
-    const cats = (authors[0] as any)._preloadedAssociations.get("maHabtmCategories");
+    const posts = (authors[0] as any).association("maHabtmPosts").target;
+    const cats = (authors[0] as any).association("maHabtmCategories").target;
     expect(posts).toHaveLength(1);
     expect(cats).toHaveLength(1);
   });
@@ -2994,7 +2994,7 @@ describe("EagerAssociationTest", () => {
     const parents = await EagerMultiHoParent.all().includes("eagerMultiHoProfile").toArray();
     expect(parents).toHaveLength(2);
     for (const parent of parents) {
-      const profile = (parent as any)._preloadedAssociations.get("eagerMultiHoProfile");
+      const profile = (parent as any).association("eagerMultiHoProfile").target;
       expect(profile).toBeDefined();
       expect(profile.bio).toContain("bio");
     }
@@ -3037,8 +3037,8 @@ describe("EagerAssociationTest", () => {
       .includes("mentorCompany")
       .toArray();
     expect(employees).toHaveLength(1);
-    expect((employees[0] as any)._preloadedAssociations.get("company")?.name).toBe("Acme");
-    expect((employees[0] as any)._preloadedAssociations.get("mentorCompany")?.name).toBe("Globex");
+    expect((employees[0] as any).association("company").target?.name).toBe("Acme");
+    expect((employees[0] as any).association("mentorCompany").target?.name).toBe("Globex");
   });
 
   it("eager with valid association as string not symbol", async () => {
@@ -3096,7 +3096,7 @@ describe("EagerAssociationTest", () => {
     const items = await EagerFloatItem.all().includes("eagerFloatDetails").toArray();
     expect(items).toHaveLength(1);
     expect(items[0].price).toBe(19.99);
-    const details = (items[0] as any)._preloadedAssociations.get("eagerFloatDetails");
+    const details = (items[0] as any).association("eagerFloatDetails").target;
     expect(details).toHaveLength(1);
   });
   it("preconfigured includes with has one", async () => {
@@ -3126,7 +3126,7 @@ describe("EagerAssociationTest", () => {
 
     const results = await EagerPreHoParent.all().includes("eagerPreHoChild").toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations.get("eagerPreHoChild");
+    const preloaded = (results[0] as any).association("eagerPreHoChild").target;
     expect(preloaded?.value).toBe("V");
   });
   it.skip("eager association with scope with joins", () => {
@@ -3176,7 +3176,7 @@ describe("EagerAssociationTest", () => {
       .includes("pciCategories")
       .toArray();
     expect(posts).toHaveLength(1);
-    const cats = (posts[0] as any)._preloadedAssociations.get("pciCategories");
+    const cats = (posts[0] as any).association("pciCategories").target;
     expect(cats).toHaveLength(2);
   });
 
@@ -3233,8 +3233,8 @@ describe("EagerAssociationTest", () => {
       .includes("pcihComments", "pcihCategories")
       .toArray();
     expect(posts).toHaveLength(1);
-    const comments = (posts[0] as any)._preloadedAssociations.get("pcihComments");
-    const cats = (posts[0] as any)._preloadedAssociations.get("pcihCategories");
+    const comments = (posts[0] as any).association("pcihComments").target;
+    const cats = (posts[0] as any).association("pcihCategories").target;
     expect(comments).toHaveLength(2);
     expect(cats).toHaveLength(2);
   });
@@ -3290,7 +3290,7 @@ describe("EagerAssociationTest", () => {
 
     const comments = await StiShareComment.all().includes("stiSharePost").toArray();
     expect(comments).toHaveLength(1);
-    const loaded = (comments[0] as any)._preloadedAssociations.get("stiSharePost");
+    const loaded = (comments[0] as any).association("stiSharePost").target;
     expect(loaded).not.toBeNull();
     expect(loaded.title).toBe("T");
   });
@@ -3322,7 +3322,7 @@ describe("EagerAssociationTest", () => {
     await EagerPkPost.create({ title: "P2", eager_pk_author_id: a.id });
     const authors = await EagerPkAuthor.all().preload("eagerPkPosts").toArray();
     expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any)._preloadedAssociations?.get("eagerPkPosts") ?? [];
+    const posts = (authors[0] as any).association("eagerPkPosts").target ?? [];
     expect(posts).toHaveLength(2);
   });
 
@@ -3348,7 +3348,7 @@ describe("EagerAssociationTest", () => {
     await IncPkPost.create({ title: "Q1", inc_pk_author_id: a.id });
     const authors = await IncPkAuthor.all().includes("incPkPosts").toArray();
     expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any)._preloadedAssociations?.get("incPkPosts") ?? [];
+    const posts = (authors[0] as any).association("incPkPosts").target ?? [];
     expect(posts).toHaveLength(1);
     expect(posts[0].title).toBe("Q1");
   });
@@ -3376,7 +3376,7 @@ describe("EagerAssociationTest", () => {
 
     const children = await EagerEmptyBtChild.all().includes("eagerEmptyBtParent").toArray();
     expect(children).toHaveLength(1);
-    const preloaded = (children[0] as any)._preloadedAssociations.get("eagerEmptyBtParent");
+    const preloaded = (children[0] as any).association("eagerEmptyBtParent").target;
     expect(preloaded == null).toBe(true);
   });
   it("preloading empty belongs to polymorphic", async () => {
@@ -3392,7 +3392,7 @@ describe("EagerAssociationTest", () => {
     await PrePolyOrphan.create({ name: "orphan" });
     const results = await PrePolyOrphan.all().includes("owner").toArray();
     expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any)._preloadedAssociations?.get("owner");
+    const preloaded = (results[0] as any).association("owner").target;
     expect(preloaded).toBeNull();
   });
   it("preloading has many through with distinct", async () => {
@@ -3471,7 +3471,7 @@ describe("EagerAssociationTest", () => {
     const parent = await EagerReordParent.create({ name: "P" });
     await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.id });
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
-    expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.value).toBe("V");
+    expect((parents[0] as any).association("eagerReordChild").target?.value).toBe("V");
   });
   it("join eager with empty order should generate valid sql", async () => {
     class JeeoPost extends Base {
@@ -3522,7 +3522,7 @@ describe("EagerAssociationTest", () => {
       .order("")
       .toArray();
     expect(result).toHaveLength(1);
-    expect(result[0]._preloadedAssociations.get("jeeoComments")).toHaveLength(1);
+    expect(result[0].association("jeeoComments").target).toHaveLength(1);
   });
   it("eager load multiple associations with references", async () => {
     class ElmarMentor extends Base {
@@ -3615,13 +3615,13 @@ describe("EagerAssociationTest", () => {
 
     // Rails: projects.last.mentor.developers.first.contracts == projects.last.developers.last.contracts
     const p = projects[0];
-    const mentorDevContracts = p._preloadedAssociations
-      .get("elmarMentor")
-      ?._preloadedAssociations?.get("elmarDevelopers")?.[0]
-      ?._preloadedAssociations?.get("elmarContracts");
-    const directDevContracts = p._preloadedAssociations
-      .get("elmarDevelopers")?.[0]
-      ?._preloadedAssociations?.get("elmarContracts");
+    const mentorDevContracts = p
+      .association("elmarMentor")
+      .target?.association("elmarDevelopers")
+      .target?.[0]?.association("elmarContracts").target;
+    const directDevContracts = p
+      .association("elmarDevelopers")
+      .target?.[0]?.association("elmarContracts").target;
 
     expect(mentorDevContracts).toHaveLength(1);
     expect(directDevContracts).toHaveLength(1);
@@ -3677,7 +3677,7 @@ describe("EagerAssociationTest", () => {
     await PcsContractship.create({ pcs_project_id: proj.id, pcs_developer_id: bob.id });
 
     const projects = await PcsProject.all().includes("scopedDevs").toArray();
-    const devs = (projects[0] as any)._preloadedAssociations.get("scopedDevs");
+    const devs = (projects[0] as any).association("scopedDevs").target;
     expect(devs.length).toBe(1);
     expect(devs[0].name).toBe("David");
   });
@@ -3696,11 +3696,9 @@ describe("EagerAssociationTest", () => {
     expect(found.id).toBe(c1.id);
     // The current scope's preload values are applied by `find`, so the circular
     // preload actually traverses post -> comments (the original loop hazard).
-    const loadedPost = found._preloadedAssociations.get("post");
+    const loadedPost = found.association("post").target;
     expect(loadedPost.id).toBe(post.id);
-    expect(loadedPost._preloadedAssociations.get("comments").map((c: any) => c.id)).toContain(
-      c1.id,
-    );
+    expect(loadedPost.association("comments").target.map((c: any) => c.id)).toContain(c1.id);
   });
 
   it("circular preload does not modify unscoped", async () => {
@@ -3741,7 +3739,7 @@ describe("EagerAssociationTest", () => {
     await BtScopeAuthor.scoping(BtScopeAuthor.where({ name: "Alice" }), async () => {
       const posts = await BtScopePost.all().includes("btScopeAuthor").toArray();
       expect(posts).toHaveLength(2);
-      const authors = posts.map((p: any) => p._preloadedAssociations.get("btScopeAuthor"));
+      const authors = posts.map((p: any) => p.association("btScopeAuthor").target);
       expect(authors.filter((a: any) => a !== null)).toHaveLength(2);
     });
   });
@@ -3772,7 +3770,7 @@ describe("EagerAssociationTest", () => {
     await HmScopePost.scoping(HmScopePost.where({ title: "P1" }), async () => {
       const authors = await HmScopeAuthor.all().includes("hmScopePosts").toArray();
       expect(authors).toHaveLength(1);
-      const posts = (authors[0] as any)._preloadedAssociations.get("hmScopePosts");
+      const posts = (authors[0] as any).association("hmScopePosts").target;
       expect(posts).toHaveLength(2);
     });
   });
@@ -3862,7 +3860,7 @@ describe("EagerAssociationTest", () => {
     const authors = await (PIDASAuthor as any).preload("pidasPostsWithSignature").toArray();
     expect(authors).not.toHaveLength(0);
     for (const author of authors) {
-      expect(author._preloadedAssociations?.has("pidasPostsWithSignature")).toBe(true);
+      expect(author.association("pidasPostsWithSignature").isLoaded()).toBe(true);
     }
   });
   it("eager loading of instance dependent associations is not supported", async () => {
@@ -3912,7 +3910,7 @@ describe("EagerAssociationTest", () => {
     const authors = await (POIDASAuthor as any).includes("poidasPostsMentioning").toArray();
     expect(authors).not.toHaveLength(0);
     for (const author of authors) {
-      expect(author._preloadedAssociations?.has("poidasPostsMentioning")).toBe(true);
+      expect(author.association("poidasPostsMentioning").isLoaded()).toBe(true);
     }
   });
   it("eager loading of optional instance dependent associations is not supported", async () => {
@@ -3982,7 +3980,7 @@ describe("EagerAssociationTest", () => {
     const authors = await (AweAuthor as any).includes("awePostsWithExtension").toArray();
     expect(authors).not.toHaveLength(0);
     for (const a of authors) {
-      expect(a._preloadedAssociations?.has("awePostsWithExtension")).toBe(true);
+      expect(a.association("awePostsWithExtension").isLoaded()).toBe(true);
     }
     const proxy = association(authors[0], "awePostsWithExtension");
     expect(typeof (proxy as any).extensionMethod).toBe("function");
@@ -4015,8 +4013,8 @@ describe("EagerAssociationTest", () => {
     const authors = await (AwexAuthor as any).includes("awexPostsWithExtAndInstance").toArray();
     expect(authors).not.toHaveLength(0);
     for (const a of authors) {
-      expect(a._preloadedAssociations?.has("awexPostsWithExtAndInstance")).toBe(true);
-      const loaded = a._preloadedAssociations.get("awexPostsWithExtAndInstance");
+      expect(a.association("awexPostsWithExtAndInstance").isLoaded()).toBe(true);
+      const loaded = a.association("awexPostsWithExtAndInstance").target;
       expect(loaded).toHaveLength(1);
       expect(loaded[0].mention).toBe("alice");
       const proxy = association(a, "awexPostsWithExtAndInstance");
@@ -4044,7 +4042,7 @@ describe("EagerAssociationTest", () => {
     const a = await PraAuthor.create({ name: "A" });
     await PraPost.create({ title: "P", pra_author_id: a.id });
     const authors = await PraAuthor.all().preload("praPosts").toArray();
-    const posts = (authors[0] as any)._preloadedAssociations?.get("praPosts") ?? [];
+    const posts = (authors[0] as any).association("praPosts").target ?? [];
     expect(posts).toHaveLength(1);
   });
 
@@ -4069,7 +4067,7 @@ describe("EagerAssociationTest", () => {
     const a = await EnraAuthor.create({ name: "A" });
     await EnraPost.create({ title: "P", enra_author_id: a.id });
     const authors = await EnraAuthor.all().eagerLoad("enraPosts").toArray();
-    const posts = (authors[0] as any)._preloadedAssociations?.get("enraPosts") ?? [];
+    const posts = (authors[0] as any).association("enraPosts").target ?? [];
     expect(posts).toHaveLength(1);
     expect(posts[0]._readonly).not.toBe(true);
   });
@@ -4096,7 +4094,7 @@ describe("EagerAssociationTest", () => {
     const a = await ElraAuthor.create({ name: "A" });
     await ElraPost.create({ title: "P", elra_author_id: a.id });
     const authors = await ElraAuthor.all().eagerLoad("elraPosts").toArray();
-    const posts = (authors[0] as any)._preloadedAssociations?.get("elraPosts") ?? [];
+    const posts = (authors[0] as any).association("elraPosts").target ?? [];
     expect(posts).toHaveLength(1);
     expect(posts[0]._readonly).toBe(true);
   });
@@ -4182,7 +4180,7 @@ describe("EagerAssociationTest", () => {
     // Preloading the through association should work without calling association.reader
     const authors = await PhmtAuthor.all().preload("phmtComments").toArray();
     expect(authors).toHaveLength(1);
-    const comments = (authors[0] as any)._preloadedAssociations.get("phmtComments");
+    const comments = (authors[0] as any).association("phmtComments").target;
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("C");
   });
@@ -4192,12 +4190,12 @@ describe("EagerAssociationTest", () => {
       .preload({ sponsorable: ["post", "membership"] })
       .toArray();
     expect(sponsors).toHaveLength(2);
-    const sponsorables = sponsors.map((s) => (s as any)._preloadedAssociations.get("sponsorable"));
+    const sponsorables = sponsors.map((s) => (s as any).association("sponsorable").target);
     expect(sponsorables.every((s: any) => s != null)).toBe(true);
     const member = sponsorables.find((s: any) => s?.constructor.name === "SgMember");
     const org = sponsorables.find((s: any) => s?.constructor.name === "SgOrganization");
-    expect(member._preloadedAssociations.has("post")).toBe(true);
-    expect(org._preloadedAssociations.has("membership")).toBe(true);
+    expect(member.association("post").isLoaded()).toBe(true);
+    expect(org.association("membership").isLoaded()).toBe(true);
   });
   it("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", async () => {
     await seedSponsors();
@@ -4206,11 +4204,11 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(sponsors).toHaveLength(2);
     const member = sponsors
-      .map((s) => (s as any)._preloadedAssociations.get("sponsorable"))
+      .map((s) => (s as any).association("sponsorable").target)
       .find((s: any) => s?.constructor.name === "SgMember");
-    const post = member._preloadedAssociations.get("post");
+    const post = member.association("post").target;
     expect(post).toBeTruthy();
-    expect(post._preloadedAssociations.get("firstComment")?.body).toBe("First!");
+    expect(post.association("firstComment").target?.body).toBe("First!");
   });
   it("preloading a regular association with a typo through a polymorphic association still raises", async () => {
     await seedSponsors();
@@ -4252,7 +4250,7 @@ describe("EagerAssociationTest", () => {
     const found = (await CpkLineItem.all()
       .eagerLoad("cpkOrder")
       .findBy({ id: lineItem.id })) as any;
-    const order = found._preloadedAssociations.get("cpkOrder");
+    const order = found.association("cpkOrder").target;
     expect(order).not.toBeNull();
     expect(order.name).toBe("Order1");
   });
@@ -4286,7 +4284,7 @@ describe("EagerAssociationTest", () => {
 
     const order = (await CpkHmOrder.first()) as any;
     const found = (await CpkHmOrder.all().eagerLoad("cpkHmItems").findBy({ id: order.id })) as any;
-    const items = found._preloadedAssociations.get("cpkHmItems");
+    const items = found.association("cpkHmItems").target;
     expect(items).toHaveLength(2);
   });
 
@@ -4320,7 +4318,7 @@ describe("EagerAssociationTest", () => {
     const found = (await CpkHoOrder.all()
       .eagerLoad("cpkHoReceipt")
       .findBy({ id: order.id })) as any;
-    const receipt = found._preloadedAssociations.get("cpkHoReceipt");
+    const receipt = found.association("cpkHoReceipt").target;
     expect(receipt).not.toBeNull();
     expect(receipt.number).toBe("R001");
   });
@@ -4406,9 +4404,9 @@ describe("EagerAssociationTest", () => {
     // We collect the comment instance from each category and assert referential equality.
     let sharedComment: any;
     for (const cat of categories) {
-      const posts = cat._preloadedAssociations.get("idupPosts");
+      const posts = cat.association("idupPosts").target;
       expect(posts).toHaveLength(1);
-      const comments = posts[0]._preloadedAssociations.get("idupComments");
+      const comments = posts[0].association("idupComments").target;
       expect(comments).toHaveLength(1);
       expect(comments[0].id).toBe(comment.id);
       if (sharedComment) {
@@ -4483,10 +4481,10 @@ describe("EagerAssociationTest", () => {
       .toArray();
 
     for (const cat of categories) {
-      const posts = cat._preloadedAssociations.get("alarPosts");
+      const posts = cat.association("alarPosts").target;
       expect(posts).toHaveLength(1);
       // association must be loaded (preloaded) for each post
-      expect(posts[0]._preloadedAssociations.has("alarComments")).toBe(true);
+      expect(posts[0].association("alarComments").isLoaded()).toBe(true);
     }
   });
   it("loading with no associations", async () => {
@@ -4514,7 +4512,7 @@ describe("EagerAssociationTest", () => {
     const posts = await (LnaPost as any).all().includes("lnaAuthor").toArray();
     const found = posts.find((p: any) => p.id === post.id);
     expect(found).toBeDefined();
-    const preloadedAuthor = found._preloadedAssociations.get("lnaAuthor");
+    const preloadedAuthor = found.association("lnaAuthor").target;
     expect(preloadedAuthor).toBeNull();
   });
   it("eager association loading with belongs to", async () => {
@@ -4545,7 +4543,7 @@ describe("EagerAssociationTest", () => {
 
     const comments = await (EabtComment as any).all().includes("eabtPost").toArray();
     expect(comments).toHaveLength(3);
-    const titles = comments.map((c: any) => c._preloadedAssociations.get("eabtPost")?.title);
+    const titles = comments.map((c: any) => c.association("eabtPost").target?.title);
     expect(titles).toContain("Welcome");
     expect(titles).toContain("Other");
   });
@@ -4572,12 +4570,12 @@ describe("EagerAssociationTest", () => {
       const directContact = await direct.primaryContact;
       expect(contact.id).toBe(directContact.id);
     }
-    expect(
-      people.find((p: any) => p.id === m1.id)._preloadedAssociations.get("primaryContact").id,
-    ).toBe(f1.id);
-    expect(
-      people.find((p: any) => p.id === m2.id)._preloadedAssociations.get("primaryContact").id,
-    ).toBe(f2.id);
+    expect(people.find((p: any) => p.id === m1.id).association("primaryContact").target.id).toBe(
+      f1.id,
+    );
+    expect(people.find((p: any) => p.id === m2.id).association("primaryContact").target.id).toBe(
+      f2.id,
+    );
   });
   it("preload has many uses exclusive scope", async () => {
     // Rails: Person.males.includes(:agents) — the preload of agents must use the
@@ -4591,7 +4589,7 @@ describe("EagerAssociationTest", () => {
     const people = await (Person as any).males().includes("agents").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
-      const agents = person._preloadedAssociations.get("agents");
+      const agents = person.association("agents").target;
       const direct = await (Person as any).find(person.id);
       const directAgents = await direct.agents.toArray();
       expect(agents.map((a: any) => a.id).sort()).toEqual(
@@ -4631,7 +4629,7 @@ describe("EagerAssociationTest", () => {
       .where({ id: client.id })
       .toArray();
     expect(loaded).toHaveLength(1);
-    const preloaded = loaded[0]._preloadedAssociations.get("pebFirm");
+    const preloaded = loaded[0].association("pebFirm").target;
     expect(preloaded).toBeNull();
     expect(loaded[0].peb_firm_id).toBe(nonExistentId);
   });
@@ -4687,15 +4685,15 @@ describe("EagerAssociationTest", () => {
     expect(posts).toHaveLength(1);
     const p = posts[0];
     // author.dpPosts should be preloaded
-    const preloadedAuthor = p._preloadedAssociations.get("dpAuthor");
+    const preloadedAuthor = p.association("dpAuthor").target;
     expect(preloadedAuthor).toBeDefined();
     expect(preloadedAuthor).not.toBeNull();
     expect(preloadedAuthor.name).toBe("Alice");
-    expect(preloadedAuthor._preloadedAssociations.has("dpPosts")).toBe(true);
+    expect(preloadedAuthor.association("dpPosts").isLoaded()).toBe(true);
     // comment.dpPost should be preloaded
-    const preloadedComments = p._preloadedAssociations.get("dpComments");
+    const preloadedComments = p.association("dpComments").target;
     expect(preloadedComments).toHaveLength(1);
-    expect(preloadedComments[0]._preloadedAssociations.has("dpPost")).toBe(true);
+    expect(preloadedComments[0].association("dpPost").isLoaded()).toBe(true);
   });
   it("preloading the same association twice works", async () => {
     // Rails: Member.preload(:current_membership).includes(current_membership: :club)
@@ -4743,7 +4741,7 @@ describe("EagerAssociationTest", () => {
 
     expect(members).toHaveLength(1);
     const m = members[0];
-    const membership = m._preloadedAssociations.get("pstaCurrentMembership");
+    const membership = m.association("pstaCurrentMembership").target;
     expect(membership).toBeDefined();
     expect(membership).not.toBeNull();
     expect(Number(membership.psta_club_id)).toBe(Number(club.id));
@@ -6013,7 +6011,7 @@ describe("EagerAssociationTest", () => {
     const posts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds })
       .includes("comments")
       .toArray()) as any[];
-    expect(posts.every((post) => post._preloadedAssociations.has("comments"))).toBe(true);
+    expect(posts.every((post) => post.association("comments").isLoaded())).toBe(true);
 
     const greatPostId = shardedBlogPosts("great_post_blog_one").id;
     const post = posts.find((p) => p.id === greatPostId);
@@ -6021,7 +6019,7 @@ describe("EagerAssociationTest", () => {
       blog_id: post.blog_id,
       blog_post_id: post.id,
     }).toArray()) as any[];
-    const loaded = post._preloadedAssociations.get("comments") as any[];
+    const loaded = post.association("comments").target as any[];
     expect(loaded.map((c) => c.id).sort()).toEqual(expectedComments.map((c) => c.id).sort());
   });
 
@@ -6031,11 +6029,11 @@ describe("EagerAssociationTest", () => {
     const comments = (await sharded.ShardedComment.where({ blog_id: blogIds })
       .includes("blogPost")
       .toArray()) as any[];
-    expect(comments.every((comment) => comment._preloadedAssociations.has("blogPost"))).toBe(true);
+    expect(comments.every((comment) => comment.association("blogPost").isLoaded())).toBe(true);
 
     const greatCommentId = shardedComments("great_comment_blog_post_one").id;
     const comment = comments.find((c) => c.id === greatCommentId);
-    const blogPost = comment._preloadedAssociations.get("blogPost");
+    const blogPost = comment.association("blogPost").target;
     expect(blogPost.id).toBe(shardedBlogPosts("great_post_blog_one").id);
   });
 
@@ -6045,7 +6043,7 @@ describe("EagerAssociationTest", () => {
     const blogPosts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds })
       .includes("tags")
       .toArray()) as any[];
-    expect(blogPosts.every((post) => post._preloadedAssociations.has("tags"))).toBe(true);
+    expect(blogPosts.every((post) => post.association("tags").isLoaded())).toBe(true);
 
     const expectedPost = shardedBlogPosts("great_post_blog_one");
     const expectedTags = (await sharded.ShardedBlogPostTag.where({
@@ -6056,7 +6054,7 @@ describe("EagerAssociationTest", () => {
     expect(expectedTagIds.length).toBeGreaterThan(0);
 
     const blogPost = blogPosts.find((p) => p.id === expectedPost.id);
-    const loadedTags = blogPost._preloadedAssociations.get("tags") as any[];
+    const loadedTags = blogPost.association("tags").target as any[];
     expect(loadedTags.map((t) => Number(t.id)).sort((a, b) => a - b)).toEqual(
       expectedTagIds.map(Number).sort((a, b) => a - b),
     );
@@ -6087,7 +6085,7 @@ describe("EagerAssociationTest", () => {
     const comments = (await cpk.CpkComment.all().eagerLoad("post").toArray()) as any[];
     const actual: Record<string, string> = {};
     for (const comment of comments) {
-      actual[comment.text] = comment._preloadedAssociations.get("post").title;
+      actual[comment.text] = comment.association("post").target.title;
     }
     expect(actual).toEqual({ "great post1!": "post1", "great post2!": "post2" });
   });

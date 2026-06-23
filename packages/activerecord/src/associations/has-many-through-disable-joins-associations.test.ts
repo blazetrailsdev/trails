@@ -484,7 +484,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const authors = await DjAuthor.all().preload("djGoodRatings").toArray();
     const preloadedAuthor = authors.find((a: any) => a.id === author.id) as any;
     expect(preloadedAuthor).toBeDefined();
-    const goodRatings = preloadedAuthor._preloadedAssociations.get("djGoodRatings") as any[];
+    const goodRatings = preloadedAuthor.association("djGoodRatings").target as any[];
     expect(goodRatings).toBeDefined();
     expect(
       goodRatings.map((r: any) => r.id).sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)),
@@ -493,9 +493,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     const authors2 = await DjAuthor.all().preload("noJoinsDjGoodRatings").toArray();
     const preloadedAuthor2 = authors2.find((a: any) => a.id === author.id) as any;
     expect(preloadedAuthor2).toBeDefined();
-    const noJoinsGoodRatings = preloadedAuthor2._preloadedAssociations.get(
-      "noJoinsDjGoodRatings",
-    ) as any[];
+    const noJoinsGoodRatings = preloadedAuthor2.association("noJoinsDjGoodRatings").target as any[];
     expect(noJoinsGoodRatings).toBeDefined();
     expect(
       noJoinsGoodRatings

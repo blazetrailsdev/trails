@@ -21,6 +21,8 @@ import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { UniquenessValidator, validatesUniqueness } from "./validations/uniqueness.js";
+import { _preloadedHolderTarget } from "./associations.js";
+import type { Base } from "./base.js";
 
 // Re-export validators (matching Rails' requires at the bottom of validations.rb)
 // plus the validator-adjacent ClassMethods registrars that Rails colocates
@@ -97,7 +99,6 @@ interface ValidationsHost {
   errors: { any: boolean };
   isValid(context?: ValidationContextArg): boolean;
   _associationCache?(name: string): { target?: unknown } | undefined;
-  _preloadedAssociations?: { get?(name: string): unknown };
   _collectionProxies?: { get?(name: string): unknown };
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
   readAttribute(name: string): unknown;
@@ -241,8 +242,8 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   // by the undeclared name and surfaced through `.target`.
   const cached = this._associationCache?.(attribute)?.target;
   if (cached !== undefined) return cached;
-  const preloaded = this._preloadedAssociations?.get?.(attribute);
-  if (preloaded !== undefined) return preloaded;
+  const preloaded = _preloadedHolderTarget(this as unknown as Base, attribute);
+  if (preloaded) return preloaded.value;
   return this.readAttribute(attribute);
 }
 

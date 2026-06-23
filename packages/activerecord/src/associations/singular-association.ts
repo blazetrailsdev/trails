@@ -52,9 +52,9 @@ export class SingularAssociation extends Association {
    *
    * The check only fires when a DB load would actually be needed — it
    * honors:
-   *   - `_preloadedAssociations` / the holder's cached target (including
-   *     keys mapped to `null`, which represent an eagerly-loaded nil
-   *     association — no query needed, no throw).
+   *   - the holder's cached target (including a target of `null`, which
+   *     represents an eagerly-loaded nil association — no query needed, no
+   *     throw).
    *   - `findTargetNeeded()` — returns false when the FK is null
    *     (belongsTo), when the owner is a new record without a
    *     primary key (hasOne), etc. No query would run, so no throw.

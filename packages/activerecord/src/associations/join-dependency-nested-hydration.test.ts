@@ -59,8 +59,10 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy2?.target).toBeDefined();
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
-    expect(comment1._preloadedAssociations?.get("author")).toBeDefined();
-    expect(post._preloadedAssociations?.has("author")).toBeFalsy();
+    expect(comment1.association("author").target).toBeDefined();
+    // "author" is a Comment association, not a Post one — verify it was not
+    // grafted onto the wrong (Post) parent's association cache.
+    expect(post._associationInstances.has("author")).toBe(false);
   });
 
   it("eager association loading with cascaded two levels and one level", () => {

@@ -1180,7 +1180,6 @@ interface ReloadRecord {
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
   _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
-  _preloadedAssociations: Map<string, unknown>;
   _associationInstances: Map<string, { owner: unknown }>;
   _collectionProxies: Map<string, unknown>;
   _resetAssociationCaches(): void;
@@ -1220,7 +1219,6 @@ export async function reload<T extends ReloadRecord>(
       : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
   ) as {
     _attributes: unknown;
-    _preloadedAssociations: Map<string, unknown>;
     _associationInstances: Map<string, { owner: unknown }>;
     _collectionProxies: Map<string, unknown>;
   };
@@ -1239,23 +1237,15 @@ export async function reload<T extends ReloadRecord>(
   // self (persistence.rb):
   //   @association_cache = fresh_object.instance_variable_get(:@association_cache)
   //   @association_cache.each_value { |association| association.owner = self }
-  // RFC-0022 folded our former three maps into one backing store surfaced as
-  // three facet views (see `Base#_resetAssociationCaches`). We mirror Rails by
-  // adopting fresh's whole cache — all three facets — then re-pointing every
-  // owner-bound holder (the `Association` instances and their `CollectionProxy`
-  // companions) back to self; the `_preloadedAssociations` facet carries raw,
-  // ownerless target records, so it needs no re-point.
-  //
-  // `_findRecord` only ever populates `_preloadedAssociations` (it preloads
-  // `strict_loaded_associations` so re-reading one after reload won't trip a
-  // StrictLoadingViolationError lazy load), so on today's preloaded-only path
-  // the instance/proxy facets are empty and the re-point loop is a no-op —
-  // behavior is unchanged. The re-point is the faithful analog kept correct
-  // for any future fetch that adopts owner-bound holders into fresh's cache.
+  // RFC-0022 folded our former maps into one backing store surfaced as facet
+  // views (see `Base#_resetAssociationCaches`). We mirror Rails by adopting
+  // fresh's whole cache, then re-pointing every owner-bound holder (the
+  // `Association` instances and their `CollectionProxy` companions) back to
+  // self. `_findRecord` preloads `strict_loaded_associations` (so re-reading one
+  // after reload won't trip a StrictLoadingViolationError lazy load); those
+  // preloaded targets now live on the real holder in `_associationInstances` /
+  // `_collectionProxies` (RFC 0022), which the loops below adopt.
   this._resetAssociationCaches();
-  for (const [name, value] of fresh._preloadedAssociations) {
-    this._preloadedAssociations.set(name, value);
-  }
   for (const [name, value] of fresh._associationInstances) {
     this._associationInstances.set(name, value);
   }
@@ -1595,12 +1585,10 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
   const self = this as unknown as {
     _strictLoading?: boolean;
     isStrictLoadingNPlusOneOnly?(): boolean;
-    _preloadedAssociations?: Map<string, unknown>;
     _associationInstances?: Map<string, { isLoaded?(): boolean }>;
     _collectionProxies?: Map<string, { loaded?: boolean }>;
   };
   if (self._strictLoading && !self.isStrictLoadingNPlusOneOnly?.()) {
-    for (const name of self._preloadedAssociations?.keys() ?? []) names.add(name);
     for (const [name, instance] of self._associationInstances ?? []) {
       if (instance?.isLoaded?.()) names.add(name);
     }

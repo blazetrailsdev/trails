@@ -12,7 +12,7 @@ import {
 } from "./associations/errors.js";
 import { routeThroughCheckValidity } from "./associations/validate-through-reflection.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
-import type { AssociationDefinition } from "./associations.js";
+import { _preloadedHolderTarget, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { afterCreate, afterUpdate, afterValidation, beforeSave } from "./callbacks.js";
@@ -90,7 +90,7 @@ function _loadedAssociation(record: any, name: string): any | null {
   // which would surface a source-reflection error before the association is
   // actually used.
   const hasCachedData =
-    record._preloadedAssociations?.has(name) ||
+    !!_preloadedHolderTarget(record as Base, name) ||
     !!proxy?.loaded ||
     proxyHasBuiltRecords ||
     existingHasBuiltRecords ||

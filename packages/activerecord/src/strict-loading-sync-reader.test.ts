@@ -167,7 +167,9 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     // Simulate an eager load that resolved to null (e.g., `Post.includes("srAuthor").find(id)`
     // where the author record doesn't exist). The preloaded-null is a
     // legitimate answer — no query needed, no throw.
-    (post as any)._preloadedAssociations = new Map([["srAuthor", null]]);
+    const holder = (post as any).association("srAuthor");
+    holder.setTarget(null);
+    holder._loadedFromPreload = true;
     expect(() => (post as any).srAuthor).not.toThrow();
     expect((post as any).srAuthor).toBeNull();
   });

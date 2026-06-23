@@ -19,7 +19,7 @@ import { Post } from "../test-helpers/models/post.js";
 type RecordInternals = {
   _attributes: { writeCastValue(name: string, value: unknown): void };
   _readAttribute(name: string): unknown;
-  _preloadedAssociations: Map<string, Base[]>;
+  association(name: string): { target?: Base[] };
 };
 
 const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
@@ -44,7 +44,7 @@ describe("Preloader BigInt PK / number FK key match", () => {
 
     await new Preloader({ records: [david], associations: ["posts"] }).call();
 
-    const posts = internals(david)._preloadedAssociations.get("posts") ?? [];
+    const posts = internals(david).association("posts").target ?? [];
     expect(posts.length).toBeGreaterThan(0);
     for (const post of posts) {
       expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("david").id));
@@ -63,14 +63,14 @@ describe("Preloader BigInt PK / number FK key match", () => {
 
     await new Preloader({ records: [david, mary], associations: ["posts"] }).call();
 
-    const davidPosts = internals(david)._preloadedAssociations.get("posts") ?? [];
+    const davidPosts = internals(david).association("posts").target ?? [];
     expect(davidPosts.length).toBeGreaterThan(0);
     for (const post of davidPosts) {
       expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("david").id));
     }
 
     // The still-number owner PK must also match its number FKs in the same call.
-    const maryPosts = internals(mary)._preloadedAssociations.get("posts") ?? [];
+    const maryPosts = internals(mary).association("posts").target ?? [];
     expect(maryPosts.length).toBeGreaterThan(0);
     for (const post of maryPosts) {
       expect(Number(internals(post)._readAttribute("author_id"))).toBe(Number(authors("mary").id));

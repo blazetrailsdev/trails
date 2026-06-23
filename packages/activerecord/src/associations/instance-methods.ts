@@ -18,6 +18,7 @@ import {
   loadBelongsTo as _loadBelongsToOnce,
   loadHasOne as _loadHasOneOnce,
   _associationNotFound,
+  _preloadedHolderTarget,
   type AssociationDefinition as AssocDef,
 } from "../associations.js";
 
@@ -54,13 +55,13 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
     instance.setTarget((cached.target as Base | Base[] | null) ?? null);
     return;
   }
-  // Use `has()` so an eagerly-preloaded "nil association" (the preloader
-  // sets Map.set(name, null) for associations that resolved to no record)
-  // still marks the Association instance loaded — matching Association#
-  // doFindTarget's cache semantics. Checking truthiness would skip those.
-  const preloadedAssociations = this._preloadedAssociations;
-  if (preloadedAssociations?.has(name)) {
-    instance.setTarget(preloadedAssociations.get(name) as any);
+  // Route through the real holder (`_preloadedHolderTarget`) so an
+  // eagerly-preloaded "nil association" (or empty collection) still marks the
+  // instance loaded — the boxed `{ value }` distinguishes a preloaded-nil from
+  // a miss, matching `Association#doFindTarget`'s cache semantics.
+  const preloaded = _preloadedHolderTarget(this, name);
+  if (preloaded) {
+    instance.setTarget(preloaded.value as any);
   }
 }
 

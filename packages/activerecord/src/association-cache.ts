@@ -1,53 +1,47 @@
 /**
  * RFC-0022 association-cache fold. Rails keeps one per-record map,
  * `@association_cache` (name → `Association`, carrying target/proxy/loaded-nil
- * inside that one object). Trails historically split that into three separate
- * maps; this module folds them into one backing slot — a single
+ * inside that one object). Trails historically split that into separate maps;
+ * this module folds them into one backing slot — a single
  * `Map<string, AssociationCacheSlot>` per record, with each former map exposed
  * as a `Map`-compatible {@link AssociationCacheFacet} view onto one field of
- * the shared slot. The three named accessors keep their exact read/write
- * surface (so the call sites are untouched) but now reach through one
- * memoization slot, converging toward Rails' single `@association_cache`.
+ * the shared slot. The named accessors keep their exact read/write surface (so
+ * the call sites are untouched) but now reach through one memoization slot,
+ * converging toward Rails' single `@association_cache`.
  *
  * @internal
  */
 
 /** One field of the unified per-record association cache. */
-export type AssociationFacetKey = "instance" | "proxy" | "preloaded";
+export type AssociationFacetKey = "instance" | "proxy";
 
 /**
- * A single name → cache entry. Each facet (`instance`/`proxy`/`preloaded`)
- * carries its value plus a presence flag, because a preloaded association may
- * legitimately be stored as `null` (preloaded-nil) and must be distinguished
- * from "absent".
+ * A single name → cache entry. Each facet (`instance`/`proxy`) carries its
+ * value plus a presence flag.
  *
  * @internal
  */
 export interface AssociationCacheSlot {
   instance?: unknown;
   proxy?: unknown;
-  preloaded?: unknown;
   hasInstance: boolean;
   hasProxy: boolean;
-  hasPreloaded: boolean;
 }
 
 const PRESENCE: Record<AssociationFacetKey, keyof AssociationCacheSlot> = {
   instance: "hasInstance",
   proxy: "hasProxy",
-  preloaded: "hasPreloaded",
 };
 
 function emptySlot(): AssociationCacheSlot {
   return {
     hasInstance: false,
     hasProxy: false,
-    hasPreloaded: false,
   };
 }
 
 function slotIsEmpty(slot: AssociationCacheSlot): boolean {
-  return !slot.hasInstance && !slot.hasProxy && !slot.hasPreloaded;
+  return !slot.hasInstance && !slot.hasProxy;
 }
 
 /**
@@ -147,8 +141,8 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
 }
 
 /**
- * The three folded association-cache facets for one record, backed by one
- * shared {@link AssociationCacheSlot} store; `clear()` resets every facet.
+ * The folded association-cache facets for one record, backed by one shared
+ * {@link AssociationCacheSlot} store; `clear()` resets every facet.
  *
  * Implemented as a class (not an object literal) so its methods live on the
  * prototype: two empty caches on distinct records deep-equal under `toEqual`,
@@ -161,7 +155,6 @@ export class AssociationCache {
   readonly store = new Map<string, AssociationCacheSlot>();
   readonly instances = new AssociationCacheFacet<unknown>(this.store, "instance");
   readonly proxies = new AssociationCacheFacet<unknown>(this.store, "proxy");
-  readonly preloaded = new AssociationCacheFacet<unknown>(this.store, "preloaded");
 
   clear(): void {
     this.store.clear();

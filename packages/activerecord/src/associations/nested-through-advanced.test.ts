@@ -176,8 +176,8 @@ describe("HMT Slot E — nested-through advanced", () => {
       .preload("ntaTags")
       .toArray()) as any[];
 
-    const firstTags = firstLoad[0]._preloadedAssociations?.get("ntaTags") as any[];
-    const secondTags = secondLoad[0]._preloadedAssociations?.get("ntaTags") as any[];
+    const firstTags = firstLoad[0].association("ntaTags").target as any[];
+    const secondTags = secondLoad[0].association("ntaTags").target as any[];
     // Source-reflection state from the first preload must not bleed
     // into the second (Rails-equivalent of the "reset source
     // reflection after loading" guarantee).
@@ -199,8 +199,8 @@ describe("HMT Slot E — nested-through advanced", () => {
       .where({ id: author.id })
       .preload("ntaTaggings")
       .toArray()) as any[];
-    const t1 = (taggings1[0]._preloadedAssociations?.get("ntaTaggings") ?? []) as any[];
-    const t2 = (taggings2[0]._preloadedAssociations?.get("ntaTaggings") ?? []) as any[];
+    const t1 = (taggings1[0].association("ntaTaggings").target ?? []) as any[];
+    const t2 = (taggings2[0].association("ntaTaggings").target ?? []) as any[];
     expect(t1.map((r: any) => r.id).sort()).toEqual(t2.map((r: any) => r.id).sort());
     expect(t1.length).toBe(2);
   });
@@ -304,8 +304,8 @@ describe("HMT Slot E — nested-through advanced", () => {
 
     const preloaded = (await NtaAuthor.all().preload("ntaTags").toArray()) as any[];
     const byId = new Map(preloaded.map((row: any) => [row.id, row]));
-    const davidTags = byId.get(david.id)!._preloadedAssociations.get("ntaTags") as any[];
-    const maryTags = byId.get(mary.id)!._preloadedAssociations.get("ntaTags") as any[];
+    const davidTags = byId.get(david.id)!.association("ntaTags").target as any[];
+    const maryTags = byId.get(mary.id)!.association("ntaTags").target as any[];
     expect(davidTags.every((t: any) => t.name === "general")).toBe(true);
     expect(maryTags.map((t: any) => t.name)).toEqual(["solo"]);
   });
