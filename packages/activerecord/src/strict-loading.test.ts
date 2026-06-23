@@ -859,7 +859,7 @@ describe("StrictLoadingTest", () => {
     const devs = await SlpwpDev.all().includes("slpwpLogs").strictLoading().toArray();
     const dev = devs[0];
     expect(dev.isStrictLoading()).toBe(true);
-    const preloaded = (dev as any)._preloadedAssociations?.get("slpwpLogs") ?? [];
+    const preloaded = (dev as any).association("slpwpLogs").target ?? [];
     expect(preloaded).toHaveLength(1);
     await expect(
       loadHasMany(dev, "slpwpExtras", { className: "SlpwpExtra", foreignKey: "slpwp_dev_id" }),
@@ -1010,7 +1010,7 @@ describe("StrictLoadingTest", () => {
     const devs = await SlpntDev.all().includes("slpntLogs").toArray();
     const dev = devs[0];
     expect(dev.isStrictLoading()).toBe(false);
-    const logs = (dev as any)._preloadedAssociations?.get("slpntLogs") ?? [];
+    const logs = (dev as any).association("slpntLogs").target ?? [];
     expect(logs).toHaveLength(1);
     expect(logs.some((l: any) => l._strictLoading)).toBe(false);
   });
@@ -1845,7 +1845,7 @@ describe("StrictLoadingTest", () => {
     const loaded = await SlthcDev.all().strictLoading().includes("slthcFirms").first();
     expect(loaded!.isStrictLoading()).toBe(true);
 
-    const firms = (loaded as any)._preloadedAssociations?.get("slthcFirms") ?? [];
+    const firms = (loaded as any).association("slthcFirms").target ?? [];
     expect(firms).toHaveLength(1);
     // The middle records (firms) cascade to strict_loading, so loading their
     // own associations raises.
@@ -1942,7 +1942,7 @@ describe("StrictLoadingTest", () => {
     const devs = await SlpplDev.all().includes("slpplLogs").strictLoading().toArray();
     const dev = devs[0];
     expect(dev.isStrictLoading()).toBe(true);
-    const logs = (dev as any)._preloadedAssociations?.get("slpplLogs") ?? [];
+    const logs = (dev as any).association("slpplLogs").target ?? [];
     expect(logs).toHaveLength(3);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
@@ -1973,7 +1973,7 @@ describe("StrictLoadingTest", () => {
       const devs = await SlpbdDev.all().includes("slpbdLogs").toArray();
       const dev = devs[0];
       expect(dev.isStrictLoading()).toBe(false);
-      const logs = (dev as any)._preloadedAssociations?.get("slpbdLogs") ?? [];
+      const logs = (dev as any).association("slpbdLogs").target ?? [];
       expect(logs).toHaveLength(3);
       expect(logs.every((l: any) => l._strictLoading)).toBe(true);
     } finally {
@@ -2002,7 +2002,7 @@ describe("StrictLoadingTest", () => {
     const dev = await ElslhmDev.create({ name: "D" });
     await ElslhmLog.create({ message: "M", elslhm_dev_id: dev.id });
     const loaded = await ElslhmDev.all().eagerLoad("elslhmLogs").toArray();
-    const logs = (loaded[0] as any)._preloadedAssociations?.get("elslhmLogs") ?? [];
+    const logs = (loaded[0] as any).association("elslhmLogs").target ?? [];
     expect(logs).toHaveLength(1);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
@@ -2030,7 +2030,7 @@ describe("StrictLoadingTest", () => {
     await ElslLog.create({ message: "M2", elsl_dev_id: dev.id });
     const loaded = await ElslDev.all().eagerLoad("elslLogs").strictLoading().toArray();
     expect((loaded[0] as any)._strictLoading).toBe(true);
-    const logs = (loaded[0] as any)._preloadedAssociations?.get("elslLogs") ?? [];
+    const logs = (loaded[0] as any).association("elslLogs").target ?? [];
     expect(logs).toHaveLength(2);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
@@ -2063,7 +2063,7 @@ describe("StrictLoadingTest", () => {
       const loaded = await ElslidDev.all().eagerLoad("elslidLogs").toArray();
       expect(loaded[0].isStrictLoading()).toBe(false);
       expect((await ElslidLog.last())?.isStrictLoading()).toBe(true);
-      const logs = (loaded[0] as any)._preloadedAssociations?.get("elslidLogs") ?? [];
+      const logs = (loaded[0] as any).association("elslidLogs").target ?? [];
       expect(logs).toHaveLength(3);
       expect(logs.every((l: Base) => l.isStrictLoading())).toBe(true);
     } finally {
