@@ -716,6 +716,129 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toContain("foreignMethod");
   });
 
+  it("does NOT pull an unported mixin's methods into the allowed set (stays extra)", () => {
+    // Host `include Unportable`; Unportable's source is `promise.rb`, which
+    // UNPORTED_FILES marks as deliberately not ported. Mirrors the
+    // flattenIncludedMethodInfos guard (compare.ts:507): an unported mixin
+    // must NOT contribute its methods to the host's allowed set, so its TS
+    // port stays flagged as extra surface.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        ar: {
+          classes: {
+            "P::Host": {
+              ...rubyClass({ name: "Host", file: "host.rb" }),
+              includes: ["Unportable"],
+            },
+          },
+          modules: {
+            "P::Unportable": rubyClass({
+              name: "Unportable",
+              file: "promise.rb",
+              instance: [method("unported_method")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        ar: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("unportedMethod")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts");
+    expect(f).toBeDefined();
+    // unportedMethod stays extra — the unported mixin never reached `allowed`.
+    expect(f!.extras.map((e) => e.name)).toContain("unportedMethod");
+  });
+
+  it("resolves the unported guard against a cross-package module's OWNING package", () => {
+    // A cross-package `::`-qualified include where the module's source is
+    // unported only in its OWN package (i18n_railtie.rb, scoped to
+    // activesupport in UNPORTED_FILES). The guard must call isSourceUnported
+    // with the owning package (activesupport) — not the host's (activerecord)
+    // — or the package-scoped pattern wouldn't match and the methods would
+    // wrongly become allowed.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {},
+          modules: {
+            "AS::Injected": rubyClass({
+              name: "Injected",
+              file: "i18n_railtie.rb",
+              instance: [method("injected_method")],
+            }),
+          },
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": {
+              ...rubyClass({ name: "Base", file: "base.rb", instance: [method("save")] }),
+              includes: ["AS::Injected"],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("save"), method("injectedMethod")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
+    expect(f).toBeDefined();
+    // injectedMethod stays extra — guard matched the activesupport-scoped
+    // unported pattern via the module's owning package.
+    expect(f!.extras.map((e) => e.name)).toContain("injectedMethod");
+  });
+
   describe("integer-only flag validation", () => {
     afterEach(() => {
       vi.restoreAllMocks();
