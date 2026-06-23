@@ -3230,17 +3230,18 @@ export async function updateCounterCaches(
     // `alias_attribute`), so that case resolves to a real column and DOES update.
     // The guard below therefore only fires for a genuinely-absent column.
     //
-    // Deviation from Rails (intentional): Rails' live belongs_to update path has
-    // no column-existence guard — `require_counter_update?` is just
-    // `counter_cache_column && owner.persisted?` (belongs_to_association.rb:128),
-    // so a truly-missing column makes Rails *raise* MissingAttributeError on
-    // `increment!`. trails skips silently instead. This is the inverse of the
-    // `has_attribute?` check in `has_cached_counter?` (reflection.rb:307), which
-    // Rails uses only on the has_many/`size` read side and against the declaring
-    // class; we apply it to the target class (where the SQL write lands, the
-    // pragmatically correct side) and turn the raise into a no-op so a counter
-    // cache pointing at a non-existent column degrades gracefully rather than
-    // breaking every create/destroy of the child.
+    // Deviation from Rails (tracked-pending-convergence: story
+    // 0023-surfaced-deviations/counter-cache-absent-column-skip-vs-raise):
+    // Rails' live belongs_to update path has no column-existence guard —
+    // `require_counter_update?` is just `counter_cache_column && owner.persisted?`
+    // (belongs_to_association.rb:128) — so a truly-missing column makes Rails
+    // *raise* (MissingAttributeError on `increment!`, or StatementInvalid via the
+    // update scope). The `has_attribute?` check in `has_cached_counter?`
+    // (reflection.rb:307) is used only on the has_many/`size` read side and
+    // against the declaring class. trails instead applies the check to the target
+    // class (where the SQL write lands) and turns the raise into a silent no-op so
+    // a counter cache on a non-existent column degrades gracefully. The above
+    // story tracks whether to converge to Rails' raise or ratify this skip.
     //
     // loadSchema() warms the cache first so a cold cache doesn't spuriously
     // report a real column as absent.
