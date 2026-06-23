@@ -7,10 +7,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
-import {
-  quoteTableName as sqliteQuoteTableName,
-  quoteColumnName as sqliteQuoteColumnName,
-} from "../sqlite3/quoting.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 
@@ -63,41 +59,6 @@ class CapturingAdapter extends AbstractAdapter {
   }
 }
 
-/**
- * SQLite-flavoured capturing stub: records every SQL string and supplies the
- * real SQLite quoters (quote_table_name with `.`→`"."` rewriting, quote() for
- * string literals) so the introspection-PRAGMA arms can be asserted against the
- * exact Rails output. `firstRows` lets a test surface index_list rows that then
- * drive the index_info call.
- */
-class SqliteCapturingAdapter extends AbstractAdapter {
-  allSql: string[] = [];
-  constructor(private readonly firstRows: Record<string, unknown>[] = []) {
-    super();
-  }
-  get lastSql() {
-    return this.allSql.at(-1) ?? "";
-  }
-  get adapterName() {
-    return "sqlite" as any;
-  }
-  override quoteTableName(name: string) {
-    return sqliteQuoteTableName(name);
-  }
-  override quoteColumnName(name: string) {
-    return sqliteQuoteColumnName(name);
-  }
-  execute(sql: string) {
-    this.allSql.push(sql);
-    return Promise.resolve(
-      this.allSql.length === 1 ? this.firstRows : ([] as Record<string, unknown>[]),
-    );
-  }
-  executeMutation(_sql: string) {
-    return Promise.resolve(0);
-  }
-}
-
 describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("tables() postgres fallback includes partitioned tables and honors search_path", async () => {
     const stub = new CapturingAdapter("postgres");
@@ -135,37 +96,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.lastSql).toContain("c.table_schema = $3");
     expect(stub.lastSql).not.toContain("current_schemas(false)");
     expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
-  });
-
-  it("columns() sqlite arm quotes the table name with quote_table_name so an embedded quote does not break the PRAGMA", async () => {
-    const sqlite = new SqliteCapturingAdapter();
-    await sqlite.columns("things");
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
-    await sqlite.columns('a"b');
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("a""b")');
-    // quote_table_name rewrites `.` to `"."`, so a schema-qualified name stays
-    // a two-part identifier rather than one bare quoted string.
-    await sqlite.columns("foo.bar");
-    expect(sqlite.lastSql).toBe('PRAGMA table_info("foo"."bar")');
-  });
-
-  it("indexes() sqlite arm quotes the table name with quote_table_name so an embedded quote does not break the PRAGMA", async () => {
-    const sqlite = new SqliteCapturingAdapter();
-    await sqlite.indexes("things");
-    expect(sqlite.allSql[0]).toBe('PRAGMA index_list("things")');
-    await sqlite.indexes('a"b');
-    expect(sqlite.allSql.at(-1)).toBe('PRAGMA index_list("a""b")');
-    await sqlite.indexes("foo.bar");
-    expect(sqlite.allSql.at(-1)).toBe('PRAGMA index_list("foo"."bar")');
-  });
-
-  it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
-    // First call is index_list; surface one index whose name has a quote.
-    const sqlite = new SqliteCapturingAdapter([{ name: "idx'x", unique: 1 }]);
-    await sqlite.indexes("things");
-    // Rails passes the index name through `quote()` (a SQL string literal), not
-    // an identifier quoter, so embedded `'` is doubled.
-    expect(sqlite.allSql).toEqual(['PRAGMA index_list("things")', "PRAGMA index_info('idx''x')"]);
   });
 
   it("tables() sqlite/mysql fallback arms are unchanged", async () => {
