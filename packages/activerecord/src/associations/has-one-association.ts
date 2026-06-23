@@ -300,6 +300,19 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
+  /**
+   * Mirrors Rails' `HasOneAssociation#set_new_record` (has_one_association.rb
+   * :87-93): `replace(record, false)`. The save flag is false because the
+   * foreign keys are set when the record is instantiated (via
+   * `scope_for_create`), so they don't need updating within `replace`. Passing
+   * `false` avoids queueing a redundant `_pendingReplace` after the inline
+   * `save` in `_createRecord`, which would otherwise re-persist the record on
+   * the owner's next save.
+   */
+  protected override setNewRecord(record: Base): void {
+    this.replace(record, false);
+  }
+
   private nullifyOwnerAttributes(record: Base): void {
     // Source the column list from the Rails-named helper so custom
     // foreignKey/foreignType (incl. composite PKs and polymorphic `as`)
