@@ -47,13 +47,18 @@ if __FILE__ == $PROGRAM_NAME
   # kinds, sets its mtime past a stale manifest). This is the Ruby counterpart of
   # the TS extractor's SCHEMA_VERSION bump. The output is current only when it's
   # newer than ALL THREE signals; `API_COMPARE_FORCE=1` always regenerates.
-  output_path = File.join(OUTPUT_DIR, "rails-api.json")
+  #
+  # RUBY_API_OUTPUT_PATH overrides the destination (the cross-version drift
+  # report, drift.ts, writes output/rails-api@<ref>.json for an off-pin ref).
+  # A custom destination always regenerates — its mtime can't be reasoned about
+  # against the canonical lockfile — so the gate is skipped when it's set.
+  output_path = ENV.fetch("RUBY_API_OUTPUT_PATH", File.join(OUTPUT_DIR, "rails-api.json"))
   lockfile_path = ENV.fetch("LOCKFILE_PATH") do
     abort "extract-ruby-api.rb: LOCKFILE_PATH env var not set. Caller must export " \
           "it (e.g. LOCKFILE_PATH=\"$ROOT/vendor/sources.lock.json\")."
   end
   sources_ts_path = File.join(File.dirname(lockfile_path), "sources.ts")
-  if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
+  if !ENV.key?("RUBY_API_OUTPUT_PATH") && ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
      File.exist?(lockfile_path) && File.exist?(sources_ts_path) &&
      File.mtime(output_path) >= File.mtime(lockfile_path) &&
      File.mtime(output_path) >= File.mtime(sources_ts_path) &&
@@ -1804,7 +1809,7 @@ def run
          "#{public_count} public methods (#{internal_count} internal)"
   end
 
-  output_path = File.join(OUTPUT_DIR, "rails-api.json")
+  output_path = ENV.fetch("RUBY_API_OUTPUT_PATH", File.join(OUTPUT_DIR, "rails-api.json"))
   File.write(output_path, JSON.pretty_generate(manifest))
   puts "\nWritten to #{output_path}"
 end

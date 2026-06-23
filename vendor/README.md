@@ -11,6 +11,45 @@ schema-parity tooling.
 - `sources.lock.json` (committed, wave 2) records resolved git SHAs for
   reproducibility.
 
+## Scoping a Rails bump (drift report)
+
+We pin `rails` to one tag in `sources.ts` (today `v8.0.2`) while upstream moves
+on. Before bumping that pin, run the cross-version API drift report to scope the
+work:
+
+```sh
+pnpm api:compare          # builds output/rails-api.json (base) + output/ts-api.json (ported)
+pnpm api:drift --ref v8.1.3
+```
+
+`api:drift` fetches the target ref reproducibly into `output/drift-src-<ref>/`
+(its own lock entry in `output/drift.lock.json`, plus the resolved
+`targetSha` in the report — the canonical pin in `sources.ts` stays the single
+active source), extracts its Ruby API to `output/rails-api@<ref>.json`, diffs it
+against the pinned surface, and writes `output/version-drift.json`: classes
+added/removed, per-method signature changes, visibility flips, and call-set
+(body) deltas. Signature deltas include changes to non-primitive default values
+(e.g. `{}` → `{ a: 1 }`), not just primitive literals.
+
+**Limitation — package granularity:** the diff only covers packages both
+manifests carry. Both extractions run over the same `sources.ts` rails package
+set, so a one-sided package is an extraction asymmetry (the base manifest also
+holds non-rails gems like rack/globalid), not real drift — it's skipped. A
+Rails bump that adds or removes a whole gem won't surface until that gem is
+added to `sources.ts`; scope it by eyeballing the upstream `Gemfile` diff.
+
+Each entry carries a `ported` flag (from `output/ts-api.json`) so drift in
+surface **we ported** is separable from churn we never touched.
+`summary.portedAffected` counts the items landing on our ported surface, each at
+its own granularity: an added/removed class we have; an added/removed method on
+a class we have (the method is new/gone upstream, so class membership is the
+test); and a changed method we have (matched by name). A changed method we never
+ported doesn't count — that drift isn't ours to act on. The diff core lives in
+`scripts/api-compare/version-diff.ts` (pure, unit-tested).
+
+Bumping the pin itself (editing `sources.ts` to the new tag) is a separate
+decision, not something the report does.
+
 ## Status
 
 | Wave | Status  | What landed                                                                                 |
