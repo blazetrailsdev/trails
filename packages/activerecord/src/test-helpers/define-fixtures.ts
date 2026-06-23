@@ -326,14 +326,15 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
       isThroughReflection?: () => boolean;
       foreignKey?: string | string[];
       klass?: { tableName?: string };
-      throughReflection?: { foreignKey?: string | string[]; klass?: BaseClass };
+      throughReflection?: { foreignKey?: string | string[]; klass?: BaseClass; tableName?: string };
     };
     if (!r.isThroughReflection?.()) continue;
     try {
       // Rails' HasManyThroughProxy: rhs_key = association.foreign_key,
-      // lhs_key = through_reflection.foreign_key, join_table = through table.
+      // lhs_key = through_reflection.foreign_key,
+      // join_table = through_reflection.table_name.
       const throughModel = r.throughReflection?.klass;
-      const joinTable = throughModel?.tableName;
+      const joinTable = r.throughReflection?.tableName;
       const lhsKey = r.throughReflection?.foreignKey;
       const rhsKey = r.foreignKey;
       if (
@@ -916,32 +917,30 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // the prior set's rows, exactly like the model-row insert above. These join
   // models are seeded straight against their FK columns, like the explicit
   // join-table fixtures (`developers-projects.ts`) loaded via defineJoinTableFixtures.
-  for (const [joinTable, { rows: jrows, throughModel }] of joinTableRows) {
-    if (jrows.length === 0) continue;
-    // Mirror Rails' HasManyThroughProxy#timestamp_column_names: fill the through
-    // model's timestamp columns with the current time when it records timestamps
-    // and the join table carries them. (Rails reads
-    // `through_reflection.klass.all_timestamp_attributes_in_model`.)
-    if (
-      throughModel &&
-      (throughModel as { recordTimestamps?: boolean }).recordTimestamps !== false &&
-      typeof (adapter as any).columns === "function"
-    ) {
-      const cols: { name: string }[] = await (adapter as any).columns(joinTable);
-      const colNames = new Set(cols.map((c) => c.name));
-      const aliases: Record<string, string> =
-        (throughModel as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
-      const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
-        colNames.has(c),
-      );
-      if (stampCols.length > 0) {
-        const now = currentTimeFromProperTimezone();
+  // Rails' `add_join_records` stamps every join row with the fixture set's single
+  // `now`, so compute it once here rather than per join table.
+  if (joinTableRows.size > 0) {
+    const now = currentTimeFromProperTimezone();
+    for (const [joinTable, { rows: jrows, throughModel }] of joinTableRows) {
+      if (jrows.length === 0) continue;
+      // Mirror Rails' HasManyThroughProxy#timestamp_column_names —
+      // `through_reflection.klass.all_timestamp_attributes_in_model`: every
+      // timestamp column the through model *has* (alias-resolved), gated only by
+      // column existence, not by `record_timestamps`.
+      if (throughModel && typeof (adapter as any).columns === "function") {
+        const cols: { name: string }[] = await (adapter as any).columns(joinTable);
+        const colNames = new Set(cols.map((c) => c.name));
+        const aliases: Record<string, string> =
+          (throughModel as { _attributeAliases?: Record<string, string> })._attributeAliases ?? {};
+        const stampCols = TIMESTAMP_COLUMN_NAMES.map((c) => aliases[c] ?? c).filter((c) =>
+          colNames.has(c),
+        );
         for (const jr of jrows) for (const c of stampCols) if (!(c in jr)) jr[c] = now;
       }
+      await insertFixturesSet.call(adapter as unknown as InsertHost, { [joinTable]: jrows }, [
+        joinTable,
+      ]);
     }
-    await insertFixturesSet.call(adapter as unknown as InsertHost, { [joinTable]: jrows }, [
-      joinTable,
-    ]);
   }
 
   // Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
