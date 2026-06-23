@@ -519,43 +519,14 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   const mc = this.constructor as any;
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
 
-  // Rails AttributeMethods::Dirty#attribute_names_for_partial_inserts:
-  //   partial_inserts? ? changed_attribute_names_to_save
-  //                    : attribute_names.reject { |n|
-  //                        column_for_attribute(n).auto_populated_on_insert? &&
-  //                          !attribute_changed?(n) }
-  // (dirty.rb:260-268). The dirty set is populated before the INSERT by
-  // reinstateNewRecordChanges (see callbacks.ts _createRecord), so for a new
-  // record changed_attribute_names_to_save holds the attrs assigned away from
-  // their schema defaults — exactly as Rails' construction-time dirty does.
-  let candidates: string[];
-  if (mc.partialInserts) {
-    const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
-    candidates = changed ?? attributeNames;
-    // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
-    // — "We always want to persist the locking version, even if we don't detect
-    // a change from the default, since the database might have no default."
-    // Without this, the lock column drops from the INSERT when it equals its
-    // default and is therefore "unchanged" under partial_inserts, so the
-    // in-memory value (0) and the DB value diverge and every later
-    // `WHERE locking_column = ?` matches zero rows → StaleObjectError. The
-    // unconditional union is safe even with no DB default because the locking
-    // column's type is hookAttributeType-wrapped and serializes nil→0
-    // (LockingType.serialize), so it inserts an explicit 0, never NULL.
-    if (mc.lockingEnabled && !candidates.includes(mc.lockingColumn)) {
-      candidates = [...candidates, mc.lockingColumn];
-    }
-  } else {
-    candidates = attributeNames.filter((name) => {
-      const col = mc.columnForAttribute?.(name);
-      const autoPopulated = col?.isAutoPopulated?.() ?? col?.defaultFunction != null;
-      return !(autoPopulated && !(this as any).attributeChanged?.(name));
-    });
-  }
-
   // Rails Persistence#attributes_for_create: & column_names, drop the nil pk,
-  // drop virtual columns (persistence.rb / attribute_methods.rb:519-524).
-  return candidates.filter((name) => {
+  // drop virtual columns (persistence.rb / attribute_methods.rb:519-524). The
+  // partial-inserts selection (attribute_names_for_partial_inserts) and the
+  // Locking::Optimistic locking-column union happen UPSTREAM in the create
+  // path (base.ts._performInsert), mirroring the Rails super chain
+  // Dirty#_create_record → Locking::Optimistic#_create_record → Persistence —
+  // so this function stays the generic, locking-agnostic filter Rails ships.
+  return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
     // Rails: pk_attribute?(name) && id.nil? — check per-column PK value so
     // composite PKs work correctly (this.id would be an array, not null).
