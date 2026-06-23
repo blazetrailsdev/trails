@@ -1101,8 +1101,8 @@ describe("SchemaDumperDefaultsTest", () => {
     await ctx.createTable("infinity_defaults", {}, (t) => {
       t.float("float_with_inf_default", { default: Infinity });
       t.float("float_with_nan_default", { default: NaN });
-      t.datetime("beginning_of_time", { default: -Infinity });
-      t.datetime("end_of_time", { default: Infinity });
+      t.datetime("beginning_of_time", { default: "-infinity" });
+      t.datetime("end_of_time", { default: "infinity" });
       t.date("date_with_neg_inf_default", { default: -Infinity });
       t.date("date_with_pos_inf_default", { default: Infinity });
     });

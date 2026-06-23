@@ -70,6 +70,11 @@ describe("PostgreSQL::OID::DateTime", () => {
     expect(type.serialize(DateNegativeInfinity)).toBe("-infinity");
   });
 
+  it("serialize round-trips the 'infinity' / '-infinity' wire strings", () => {
+    expect(type.serialize("infinity")).toBe("infinity");
+    expect(type.serialize("-infinity")).toBe("-infinity");
+  });
+
   it("type_cast_for_schema renders infinity sentinels", () => {
     expect(type.typeCastForSchema(DateInfinity)).toBe("::Float::INFINITY");
     expect(type.typeCastForSchema(DateNegativeInfinity)).toBe("-::Float::INFINITY");
