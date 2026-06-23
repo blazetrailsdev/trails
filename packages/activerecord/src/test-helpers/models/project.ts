@@ -40,7 +40,21 @@ export class Project extends Base {
       beforeRemove: (o: any, r: any) => o.developersLog.push(`before_removing${r.id}`),
       afterRemove: (o: any, r: any) => o.developersLog.push(`after_removing${r.id}`),
     });
-    this.hasAndBelongsToMany("developersRequiredByDefault", { className: "Developer" });
+    // Mirrors Rails project.rb:21-26: declare this habtm while
+    // `belongs_to_required_by_default` is true so the join model's implicit
+    // belongs_to sides are required, then restore the previous value.
+    {
+      const prev = (Base as unknown as { belongsToRequiredByDefault?: boolean })
+        .belongsToRequiredByDefault;
+      (Base as unknown as { belongsToRequiredByDefault?: boolean }).belongsToRequiredByDefault =
+        true;
+      try {
+        this.hasAndBelongsToMany("developersRequiredByDefault", { className: "Developer" });
+      } finally {
+        (Base as unknown as { belongsToRequiredByDefault?: boolean }).belongsToRequiredByDefault =
+          prev;
+      }
+    }
     this.hasAndBelongsToMany("wellPaidSalaryGroups", {
       scope: (q: any) =>
         q.group("developers.salary").having("SUM(salary) > 10000").select("SUM(salary) as salary"),

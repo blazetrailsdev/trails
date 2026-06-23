@@ -2373,10 +2373,27 @@ function createHabtmJoinModel(
     ).moduleName;
   }
 
-  // Delegate connection to the left (declaring) model
+  // Delegate connection to the left (declaring) model. The join model is rooted
+  // at the AR Base class (to shed domain callbacks), so it would otherwise
+  // resolve to the primary pool. Delegating the connection-spec name keeps writes
+  // (and the threaded-connection check in `threadedConnectionFor`) on the owner's
+  // pool — required when the owner lives in an alternate database.
   Object.defineProperty(JoinModel, "connection", {
     get() {
       return lhsModel.connection;
+    },
+    configurable: true,
+  });
+  // `connectionPool` resolves via `connectionSpecificationName`, which reads the
+  // `_connectionSpecificationName` backing field (own-property check + accessor).
+  // Delegating that field — not just the public static accessor — is what routes
+  // the pool lookup to the owner's database.
+  Object.defineProperty(JoinModel, "_connectionSpecificationName", {
+    get() {
+      return lhsModel.connectionSpecificationName;
+    },
+    set(_v: unknown) {
+      /* no-op: always delegates to lhs */
     },
     configurable: true,
   });
@@ -2414,6 +2431,14 @@ function createHabtmJoinModel(
     );
     Reflection.addReflection(JoinModel, assocDef.name, ref);
   }
+
+  // No presence validations on the join model's belongs_to sides: Rails builds
+  // both with `required: false` hardcoded (Builder::HasAndBelongsToMany
+  // add_left/right_association), so define_validations always resolves
+  // `optional`/`required` to opt out — `belongs_to_required_by_default` never
+  // applies to the implicit join model. This keeps habtm usable even when the
+  // owner declares it under a true global flag (see project.rb:21-26 and the
+  // "usable with belongs to required by default" test).
 
   return JoinModel;
 }

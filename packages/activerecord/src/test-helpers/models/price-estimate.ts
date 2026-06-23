@@ -1,4 +1,5 @@
 // vendor/rails/activerecord/test/models/price_estimate.rb
+import { NumberHelper } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
 export class PriceEstimate extends Base {
@@ -9,11 +10,15 @@ export class PriceEstimate extends Base {
   declare currency: string;
   declare estimate_of_id: number;
   declare estimate_of_type: string;
-  declare price: number;
 
   static {
     this.belongsTo("estimateOf", { polymorphic: true });
     this.belongsTo("thing", { polymorphic: true });
     this.validates("price", { numericality: true });
+  }
+
+  // Rails overrides the `price` reader with `number_to_currency(super)`.
+  get price(): string {
+    return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }
 }
