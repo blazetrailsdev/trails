@@ -39,6 +39,25 @@ tester.run("require-table-teardown", rule, {
     "await ctx.createTable(`${schema}.widgets`, () => {});",
     // Bare (non-method) create + drop — receiver-agnostic for bare calls too.
     'await createTable("widgets", () => {});\nawait dropTable("widgets");',
+    // Raw SQL create balanced by a raw SQL drop (quoted name ↔ quoted name).
+    'await adapter.exec(`CREATE TABLE "widgets" (id int)`);\nawait adapter.exec(`DROP TABLE "widgets"`);',
+    // Raw SQL create balanced by the dropTable helper (cross-mechanism).
+    'await adapter.exec("CREATE TABLE widgets (id int)");\nawait ctx.dropTable("widgets");',
+    // Helper create balanced by a raw SQL drop (other direction).
+    'await ctx.createTable("widgets", () => {});\nawait adapter.exec("DROP TABLE widgets");',
+    // IF NOT EXISTS / IF EXISTS and trailing clauses don't defeat matching.
+    'await c.exec("CREATE TABLE IF NOT EXISTS tmp_x (id int)");\nawait c.exec("DROP TABLE IF EXISTS tmp_x CASCADE");',
+    // Interpolated raw-SQL table name is unknowable — neither create nor drop.
+    "await adapter.exec(`CREATE TABLE ${name} (id int)`);",
+    // A CREATE TABLE string NOT handed to a sink (asserted on, as a schema
+    // dumper / SchemaCreation test does) is not a leak and is not flagged.
+    'expect(sql).toContain("CREATE TABLE widgets");',
+    'expect(creation.accept(table)).toBe(`CREATE TABLE "widgets" (id int)`);',
+    // rawSql:false grandfathers a file's raw-create backlog (helper check stays).
+    {
+      code: 'await adapter.exec("CREATE TABLE widgets (id int)");',
+      options: [{ rawSql: false }],
+    },
   ],
   invalid: [
     // Created, never dropped.
@@ -96,6 +115,24 @@ tester.run("require-table-teardown", rule, {
     {
       code: "afterAll(() => Base.adapter.dropAllTables());",
       errors: [{ messageId: "noDropAllTables" }],
+    },
+    // Raw SQL create with no matching drop is flagged like a helper create.
+    {
+      code: 'await adapter.exec(`CREATE TABLE "widgets" (id int)`);',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // Raw create dropped under a different name is still flagged.
+    {
+      code: 'await adapter.exec("CREATE TABLE widgets (id int)");\nawait adapter.exec("DROP TABLE gadgets");',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
+    },
+    // With rawSql:false the raw create is ignored, but a helper create still flags.
+    {
+      code:
+        'await adapter.exec("CREATE TABLE leaked (id int)");\n' +
+        'await ctx.createTable("widgets", () => {});',
+      options: [{ rawSql: false }],
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" } }],
     },
     // dropAllTables no longer satisfies a create: both the carpet bomb AND the
     // unmatched create are reported.

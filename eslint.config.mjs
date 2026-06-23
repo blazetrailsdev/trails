@@ -34,6 +34,17 @@ const noExplicitAnySrcExclude = JSON.parse(
 const noExplicitAnyTestExclude = JSON.parse(
   readFileSync(new URL("./eslint/no-explicit-any-test-exclude.json", import.meta.url), "utf8"),
 );
+// AR test files with a backlog of un-torn-down raw `CREATE TABLE` SQL strings.
+// They keep the createTable/dropTable helper check but opt out of the raw-SQL
+// balance (`rawSql: false`) until ported. Ratchet this to zero — see
+// eslint/require-table-teardown.mjs.
+/** @type {string[]} */
+const requireTableTeardownRawSqlExclude = JSON.parse(
+  readFileSync(
+    new URL("./eslint/require-table-teardown-raw-sql-exclude.json", import.meta.url),
+    "utf8",
+  ),
+);
 
 export default defineConfig(
   {
@@ -366,9 +377,23 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.test.ts"],
     ignores: ["packages/activerecord/src/test-helpers/**"],
     rules: {
-      "blazetrails/require-table-teardown": "error",
+      "blazetrails/require-table-teardown": ["error", { rawSql: true }],
     },
   },
+  // Grandfathered: files with an un-torn-down raw `CREATE TABLE` backlog keep
+  // the helper check but opt out of raw-SQL balancing. Ratchet to zero. Spread
+  // conditionally — flat config rejects an empty `files` array once the list is
+  // burned down.
+  ...(requireTableTeardownRawSqlExclude.length
+    ? [
+        {
+          files: requireTableTeardownRawSqlExclude,
+          rules: {
+            "blazetrails/require-table-teardown": ["error", { rawSql: false }],
+          },
+        },
+      ]
+    : []),
 
   // ── no-raw-sql: ban raw SQL strings passed to execution sinks (and the
   //    RFC-0022 `sql.replace`/`sql.concat` string-surgery pattern) outside the

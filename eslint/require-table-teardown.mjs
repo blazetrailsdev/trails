@@ -48,6 +48,33 @@
  *
  * The `test-helpers/**` infra tests are exempt (configured in eslint.config.mjs)
  * — they exercise createTable/dropTable/dropAllTables as the subject under test.
+ *
+ * ── Raw-SQL leaks ──────────────────────────────────────────────────────────
+ * The schema-statement `createTable`/`dropTable` helpers are not the only way a
+ * test seeds a bespoke table: many tests hand a raw `CREATE TABLE …` string to
+ * an execution sink (`exec`/`execute`/`executeMutation`/…), bypassing the helper
+ * entirely. Those tables leak onto the shared per-worker DB exactly like
+ * helper-created ones, and they are the bulk of the ~2,600 distinct tables the
+ * `dropAllTables` fan-out re-drops every run (RFC 0028 Path D). When the
+ * `rawSql` option is on (the default), the rule scans the **string/template
+ * arguments of execution-sink calls** (see `SQL_SINKS`) for `CREATE TABLE` /
+ * `DROP TABLE` statements and folds their table names into the same per-name
+ * create/drop balance — a raw create may be torn down by a raw drop or by the
+ * `dropTable` helper, and vice versa.
+ *
+ * Scoping to sink *arguments* (rather than every string in the file) is what
+ * keeps SQL-*generation* tests — schema-creation / schema-dumper suites that
+ * merely `expect(sql).toContain("CREATE TABLE …")` on a rendered string, never
+ * executing it — from being mislabelled as leaks. They render DDL as their
+ * subject under test, like `test-helpers/**` does for the helpers; the DDL
+ * string is an assertion target, not an argument to a sink, so it's ignored.
+ *
+ * Only statically-knowable names count: a `CREATE TABLE ${name}` whose name
+ * sits in an interpolation is invisible, like a computed helper name, and SQL
+ * built in a variable and executed later (`exec(sql)`) is not seen. Files with
+ * a backlog of un-torn-down raw creates are grandfathered via the
+ * `rawSql: false` option in eslint.config.mjs, fed by
+ * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
  */
 
 /**
@@ -92,6 +119,54 @@ function droppedTableNames(call) {
   return call.arguments.map(staticString).filter((n) => n !== null);
 }
 
+/**
+ * `CREATE TABLE [IF NOT EXISTS] <name>` and `DROP TABLE [IF EXISTS] <name>`
+ * extracted from a raw SQL fragment. The optional opening quote (`` ` ``, `"`,
+ * `'`) is matched and stripped via a backreference so a quoted name balances an
+ * unquoted helper name (`CREATE TABLE "items"` ↔ `dropTable("items")`). A name
+ * that begins with an interpolation has no leading identifier here and simply
+ * doesn't match — statically unknowable, so skipped like a computed helper name.
+ */
+const CREATE_TABLE_RE =
+  /\bcreate\s+(?:temporary\s+)?table\s+(?:if\s+not\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+const DROP_TABLE_RE = /\bdrop\s+table\s+(?:if\s+exists\s+)?(`|"|')?([\w.]+)\1?/gi;
+
+/**
+ * Call names that execute a raw SQL string against the database. A `CREATE
+ * TABLE` handed to one of these leaks a real table; the same string passed to
+ * `expect(...).toContain` does not. Receiver-agnostic, like every other name
+ * the rule matches. Extend this set if a new execution sink appears.
+ */
+const SQL_SINKS = new Set([
+  "exec",
+  "execute",
+  "executeMutation",
+  "internalExecute",
+  "execQuery",
+  "query",
+]);
+
+function rawSqlTableNames(text, re) {
+  const names = [];
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) names.push(m[2]);
+  return names;
+}
+
+/** The static SQL texts an argument carries (per quasi for templates). */
+function staticSqlTexts(node) {
+  if (node.type === "Literal") {
+    return typeof node.value === "string" ? [node.value] : [];
+  }
+  if (node.type === "TemplateLiteral") {
+    // Each quasi is static text between interpolations; an interpolated table
+    // name lands at a quasi boundary and simply doesn't match the regex.
+    return node.quasis.map((q) => q.value.cooked).filter((t) => t);
+  }
+  return [];
+}
+
 const rule = {
   meta: {
     type: "problem",
@@ -99,7 +174,17 @@ const rule = {
       description:
         'Require each createTable("name") in an activerecord test to be torn down by an explicit dropTable("name") in the same file, and forbid the carpet-bomb dropAllTables().',
     },
-    schema: [],
+    schema: [
+      {
+        type: "object",
+        properties: {
+          // Also balance raw `CREATE TABLE`/`DROP TABLE` SQL strings (default).
+          // Set false to grandfather a file with a raw-create backlog.
+          rawSql: { type: "boolean" },
+        },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       missingTeardown:
         'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body). Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
@@ -109,13 +194,32 @@ const rule = {
   },
 
   create(context) {
+    // Raw-SQL scanning is on by default; `rawSql: false` grandfathers a file
+    // with an un-torn-down raw-create backlog (it still gets the helper check).
+    const checkRawSql = context.options[0]?.rawSql !== false;
+
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
 
+    // Scan an execution sink's string/template arguments for raw CREATE/DROP
+    // TABLE statements, folding their names into the same create/drop balance.
+    function recordSinkSql(call) {
+      for (const arg of call.arguments) {
+        for (const text of staticSqlTexts(arg)) {
+          for (const table of rawSqlTableNames(text, CREATE_TABLE_RE)) {
+            if (!created.has(table)) created.set(table, arg);
+          }
+          for (const table of rawSqlTableNames(text, DROP_TABLE_RE)) {
+            dropped.add(table);
+          }
+        }
+      }
+    }
+
     return {
       CallExpression(node) {
-        // All three operations are matched identically whether invoked bare
+        // All operations are matched identically whether invoked bare
         // (`createTable(...)`) or on a receiver (`ctx.createTable(...)`).
         const name = calledName(node.callee);
         if (name === "dropAllTables") {
@@ -126,6 +230,8 @@ const rule = {
           if (table !== null && !created.has(table)) created.set(table, node);
         } else if (name === "dropTable") {
           for (const table of droppedTableNames(node)) dropped.add(table);
+        } else if (checkRawSql && name !== null && SQL_SINKS.has(name)) {
+          recordSinkSql(node);
         }
       },
 
