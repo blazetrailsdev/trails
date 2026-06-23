@@ -2836,17 +2836,22 @@ export class Relation<T extends Base> {
     // construction and aliases to its `alias_candidate`
     // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`),
     // instead of emitting a second un-aliased `posts` (ambiguous column).
-    // Exclude a manual join whose association is itself eager-loaded by the same
-    // path: `joins(:x).eager_load(:x)` is deduped to a single join (Rails `walk`),
-    // not aliased, so it must not be seeded as a collision. Compared by
-    // association name (not table) so a through-association's intermediate tables
-    // — which legitimately collide with a manual join — are still seeded.
-    const eagerNames = new Set(specs.filter((s): s is string => typeof s === "string"));
+    // The `includes ∩ joins` intersection is excluded: that table is genuinely
+    // deduped — `_buildEagerJoinManager` skips re-emitting the eager OUTER JOIN
+    // and the projection reads the manual INNER JOIN's un-aliased table
+    // (Rails `joined_includes_values`). Every other manual-join table is seeded.
+    //
+    // NB: an `eager_load`/promoted root that coincides with a manual join of the
+    // SAME association (`joins(:posts).eager_load(posts: :comments)`) is NOT in
+    // that intersection, so it is seeded and the eager root aliases to
+    // `posts_authors` — an extra (valid, correctly-scoped) OUTER JOIN rather than
+    // Rails' single `walk`-deduped join. trails emits the eager and manual join
+    // passes separately with no cross-pass `walk`, so seeding yields valid SQL
+    // where omitting it would emit two un-aliased `posts` (ambiguous column).
+    // True cross-pass dedup is tracked by `eager-load-joins-walk-dedup`.
     const joinedIncludes = this._joinedIncludesTables();
     const seedTables = [
-      ...this._namedInnerJoins
-        .filter((v): v is string => typeof v === "string" && !eagerNames.has(v))
-        .flatMap((v) => this._resolveAssocTables([v])),
+      ...this._resolveAssocTables(this._namedInnerJoins),
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
     ].filter((t) => !joinedIncludes.has(t));
     if (seedTables.length > 0) jd.seedConstructionTables(seedTables);
