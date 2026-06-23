@@ -5238,6 +5238,21 @@ describe("EagerAssociationTest", () => {
       expect((post!.association("comments").target as Base[]).length).not.toBe(0);
     });
   });
+
+  it("joins with multiple includes should preload via joins", async () => {
+    let post: Post | undefined;
+    await assertQueriesCount(1, false, async () => {
+      const loaded = await Post.includes("comments", "author")
+        .joins("comments")
+        .order("posts.id desc")
+        .toArray();
+      post = loaded[0];
+    });
+    await assertNoQueries(false, () => {
+      expect((post!.association("comments").target as Base[]).length).not.toBe(0);
+      expect(post!.association("author").target as Base).toBeTruthy();
+    });
+  });
 });
 
 // ==========================================================================
