@@ -657,6 +657,65 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
+  it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {
+    // A bare `Helper` include in package `a` must resolve ONLY against a's own
+    // module map — package `b`'s same-short-name `B::Helper` must not leak in
+    // via the cross-package fallback (that fallback is FQN-keyed and only fires
+    // for `::`-qualified includes, so a short name can never reach it).
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        a: {
+          classes: {
+            "A::Host": { ...rubyClass({ name: "Host", file: "host.rb" }), includes: ["Helper"] },
+          },
+          modules: {},
+        },
+        b: {
+          classes: {},
+          modules: {
+            "B::Helper": rubyClass({
+              name: "Helper",
+              file: "helper.rb",
+              instance: [method("foreign_method")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        a: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("foreignMethod")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+        b: { classes: {}, modules: {} },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "a",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts");
+    // foreignMethod IS flagged — B::Helper did not bleed into A::Host's allowed set.
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toContain("foreignMethod");
+  });
+
   describe("integer-only flag validation", () => {
     afterEach(() => {
       vi.restoreAllMocks();
