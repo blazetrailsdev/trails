@@ -1285,17 +1285,19 @@ export async function loadBelongsTo(
   const defaultFk = `${underscore(assocName)}_id`;
 
   // Polymorphic: use the _type column to determine the target model
-  let className: string;
+  let targetModel: typeof Base;
   if (options.polymorphic) {
     const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
     const typeName = record._readAttribute(typeCol) as string | null;
     if (!typeName) return null;
-    className = typeName;
+    // Rails resolves a polymorphic belongs_to's target via the owner class's
+    // polymorphic_class_for, which honors store_full_class_name and (when off)
+    // namespace-relative compute_type — not a bare global registry lookup.
+    targetModel = ctor.polymorphicClassFor(typeName);
   } else {
-    className = options.className ?? camelize(assocName);
+    const className = options.className ?? camelize(assocName);
+    targetModel = resolveAssocClass(record, assocName, className);
   }
-
-  const targetModel = resolveAssocClass(record, assocName, className);
 
   if (options.inverseOf && !options.polymorphic) {
     validateInverseOf(targetModel, assocName, options.inverseOf);
