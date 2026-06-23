@@ -134,6 +134,37 @@ export function rewriteDeadLink(url, fileDir, ctx) {
   return `${GITHUB_REPO}/${route}/${GITHUB_BRANCH}/${encoded}${frag}`;
 }
 
+// A flattened `_media` copy carries its source's relative links verbatim, so
+// every page-like link's in-place target is meaningless — it must be resolved
+// against the content origin, not VitePress's dead-link verdict. A relocated
+// link can coincidentally resolve to a *different* existing generated page
+// (e.g. depth-2 `../../README.md` -> `api/README`), which VitePress does not
+// flag yet points at the wrong doc.
+export function isMediaCopy(fileDir) {
+  return fileDir === "api/_media" || fileDir.startsWith("api/_media/");
+}
+
+/**
+ * Resolver verdict for a single link in a generated page: `undefined` = keep,
+ * a string = repoint at that URL, `null` = strip the href to plain text.
+ * `dead` is VitePress's own dead-link verdict (from `isDeadLink`).
+ *
+ * In a `_media` copy, repoint any link that maps back to a real repo path via
+ * origin resolution regardless of `dead`; only fall back to the dead-only gate
+ * when the link is unmappable. Outside `_media` (typedoc-managed index pages),
+ * keep the dead-only gate so legitimately-resolving cross-references are left
+ * alone.
+ */
+export function resolveGeneratedLink(url, fileDir, ctx, dead) {
+  if (isMediaCopy(fileDir)) {
+    const working = rewriteDeadLink(url, fileDir, ctx);
+    if (working) return working;
+    return dead ? null : undefined;
+  }
+  if (!dead) return undefined;
+  return rewriteDeadLink(url, fileDir, ctx);
+}
+
 // Ranges [start, end) of inline code spans in `line` (delimited by matching
 // backtick runs). Used to tell a real link from link-like text that is merely
 // literal code — e.g. typedoc renders `this.controller[name](...args)` as one
@@ -338,15 +369,16 @@ async function main() {
       repoKind,
     };
     const resolveLink = (url) => {
-      if (!isDeadLink(url, fileDir, pageExists)) return undefined; // keep
-      const working = rewriteDeadLink(url, fileDir, ctx);
-      if (working) {
+      const dead = isDeadLink(url, fileDir, pageExists);
+      const result = resolveGeneratedLink(url, fileDir, ctx, dead);
+      if (result === undefined) return undefined; // keep
+      if (result) {
         repointed++;
-      } else {
-        stripped++;
-        console.warn(`  unmapped dead link "${url}" in ${fileDir} — stripped to text`);
+        return result;
       }
-      return working; // null => strip
+      stripped++;
+      console.warn(`  unmapped dead link "${url}" in ${fileDir} — stripped to text`);
+      return null; // strip
     };
 
     const processed = escapeForVue(fixDeadLinks(original, resolveLink));

@@ -5,6 +5,8 @@ import {
   escapeForVue,
   fixDeadLinks,
   isDeadLink,
+  isMediaCopy,
+  resolveGeneratedLink,
   resolveTarget,
   rewriteDeadLink,
   treatAsHtml,
@@ -147,6 +149,52 @@ describe("rewriteDeadLink", () => {
   it("returns null when a verbatim link escapes the repo root", () => {
     const ctx = { originDir: "", mediaEntryToRepo: () => null, repoKind: () => "file" as const };
     expect(rewriteDeadLink("../../../etc/passwd", "api/_media", ctx)).toBeNull();
+  });
+});
+
+describe("isMediaCopy", () => {
+  it("recognizes _media and its nested copies, not index pages", () => {
+    expect(isMediaCopy("api/_media")).toBe(true);
+    expect(isMediaCopy("api/_media/twitter-clone")).toBe(true);
+    expect(isMediaCopy("api/@blazetrails/activerecord")).toBe(false);
+  });
+});
+
+describe("resolveGeneratedLink", () => {
+  // twitter-clone/README.md copied to api/_media/twitter-clone/README.md: its
+  // verbatim `../../README.md` resolves to api/README (an existing generated
+  // page), so VitePress does not flag it — yet it points at the wrong doc.
+  const twitterCtx = {
+    originDir: "examples/twitter-clone",
+    mediaEntryToRepo: () => null,
+    repoKind: (p: string) => (p === "README.md" ? ("file" as const) : null),
+  };
+
+  it("repoints a wrong-but-existing nested _media link even when not dead", () => {
+    expect(
+      resolveGeneratedLink(
+        "../../README.md#zero-declare-models--trails-tsc",
+        "api/_media/twitter-clone",
+        twitterCtx,
+        false,
+      ),
+    ).toBe(`${GH}/blob/main/README.md#zero-declare-models--trails-tsc`);
+  });
+
+  it("keeps an unmappable live link in a _media copy", () => {
+    const ctx = { originDir: "examples/twitter-clone", mediaEntryToRepo: () => null, repoKind: () => null };
+    expect(resolveGeneratedLink("./foo.md", "api/_media/twitter-clone", ctx, false)).toBeUndefined();
+  });
+
+  it("strips an unmappable dead link in a _media copy", () => {
+    const ctx = { originDir: "examples/twitter-clone", mediaEntryToRepo: () => null, repoKind: () => null };
+    expect(resolveGeneratedLink("./gone.md", "api/_media/twitter-clone", ctx, true)).toBeNull();
+  });
+
+  it("leaves a live index-page link untouched (dead-only gate outside _media)", () => {
+    expect(
+      resolveGeneratedLink("../_media/README.md", "api/@blazetrails/activerecord", twitterCtx, false),
+    ).toBeUndefined();
   });
 });
 
