@@ -41,6 +41,7 @@ import { deduplicate } from "../deduplicable.js";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
+import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -1086,24 +1087,14 @@ export class SchemaStatements {
     // array of column names otherwise, mirroring Rails' IndexDefinition#columns.
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
     switch (this.adapterName) {
-      case "sqlite": {
-        const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.adapter.execute(`PRAGMA ${prefix}index_list(${this._qi(bare)})`);
-        const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
-        for (const row of rows as any[]) {
-          // index_info takes the bare index name; the schema qualifier, if any,
-          // comes before the PRAGMA keyword — same prefix as index_list above.
-          const cols = await this.adapter.execute(
-            `PRAGMA ${prefix}index_info(${this._qi(row.name)})`,
-          );
-          result.push({
-            name: row.name,
-            columns: (cols as any[]).map((c: any) => c.name),
-            unique: row.unique === 1,
-          });
-        }
-        return result;
-      }
+      case "sqlite":
+        // Share the concrete SQLite3 introspection so this fallback arm
+        // produces the same result shape (skips `sqlite_*` auto-indexes,
+        // recovers partial-index WHERE clauses and expression/DESC columns
+        // from the index SQL) rather than a lower-fidelity subset.
+        return sqliteIndexes(this.adapter, tableName) as Promise<
+          Array<{ name: string; columns: string | string[]; unique: boolean }>
+        >;
       case "postgres": {
         const rows = await this.adapter.execute(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns
