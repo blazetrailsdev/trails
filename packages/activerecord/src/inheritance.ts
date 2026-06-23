@@ -761,21 +761,38 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
     storeFullStiClass?: boolean;
     storeFullClassName?: boolean;
   };
+  // Rails splits this across find_sti_class (the subclass check) and
+  // sti_class_for (the constant resolution, with a `rescue NameError`):
+  // inheritance.rb:311-320, 242-265. Mirror that split so each failure keeps its
+  // Rails message — a name that resolves to no constant becomes "failed to
+  // locate the subclass" (rescued NameError), while a resolved-but-non-subclass
+  // keeps "Invalid single-table inheritance type" (raised *outside* the rescue).
+  let subclass: typeof Base;
   try {
-    // Rails sti_class_for: constantize when storing the full STI class name,
-    // else namespace-relative compute_type. Both resolvers below also enforce
-    // the find_sti_class subclass check (findStiClass directly; computeType via
-    // its SubclassNotFound guard), matching Rails' net behavior.
-    return klass.storeFullStiClass && klass.storeFullClassName
-      ? findStiClass(modelClass, typeName)
-      : computeType(modelClass, typeName);
+    // sti_class_for: constantize when storing the full STI class name, else
+    // namespace-relative compute_type. Bare registry lookup is trails' constantize.
+    if (klass.storeFullStiClass && klass.storeFullClassName) {
+      const resolved = modelRegistry.get(typeName);
+      if (!resolved) throw new NameError(`uninitialized constant ${typeName}`);
+      subclass = resolved;
+    } else {
+      subclass = resolveComputedType(modelClass, typeName);
+    }
   } catch (cause) {
+    if (!(cause instanceof NameError)) throw cause;
     throw new SubclassNotFound(
       `The single-table inheritance mechanism failed to locate the subclass: '${typeName}'. ` +
         `This error is raised because the column '${getInheritanceColumn(modelClass)}' is reserved for storing the class in case of inheritance.`,
       { cause },
     );
   }
+  // find_sti_class: `unless subclass == self || descendants.include?(subclass)`.
+  if (subclass !== modelClass && !(subclass.prototype instanceof modelClass)) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${subclass.name} is not a subclass of ${modelClass.name}`,
+    );
+  }
+  return subclass;
 }
 
 /**

@@ -1960,6 +1960,70 @@ describe("InheritanceTest — new parity methods", () => {
     // "Used" is NOT a registry key — only "Storefront::Used" is.
     expect(polymorphicClassFor(StorefrontPicture, "Used")).toBe(StorefrontUsed);
   });
+
+  it("sti_class_for keeps the Invalid-STI-type message for a resolved non-subclass", () => {
+    // Rails raises the subclass check in find_sti_class, outside sti_class_for's
+    // `rescue NameError` (inheritance.rb:315-317), so this message survives.
+    class NsBase extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Base";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+    }
+    class NsUnrelated extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Unrelated";
+    }
+    registerModel("Ns::Unrelated", NsUnrelated);
+    expect(() => stiClassFor(NsBase, "Unrelated")).toThrow(/Invalid single-table inheritance type/);
+  });
+
+  it("sti_class_for uses the failed-to-locate message when the type names no constant", () => {
+    class NsOnly extends Base {
+      static moduleName = "Ns";
+      static _demodulizedName = "Only";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+    }
+    expect(() => stiClassFor(NsOnly, "Nonexistent")).toThrow(/failed to locate the subclass/);
+  });
+});
+
+describe("STI read of a demodulized namespaced type", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ catalog_items: { name: "string", type: "string" } });
+  });
+
+  it("hydrates a namespaced STI subclass from its demodulized stored type", async () => {
+    // store_full_sti_class = false stores the demodulized "Book"; the row read
+    // path (findStiClassForRow → findStiClassInHierarchy) matches it against the
+    // subclass's stiName, which is also demodulized when the flag is off — so the
+    // STI read resolves the namespaced subclass without a bare registry hit.
+    class CatalogItem extends Base {
+      static moduleName = "Catalog";
+      static _demodulizedName = "Item";
+      static storeFullStiClass = false;
+      static storeFullClassName = false;
+      static {
+        this._tableName = "catalog_items";
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        enableSti(this);
+      }
+    }
+    class CatalogBook extends CatalogItem {
+      static moduleName = "Catalog";
+      static _demodulizedName = "Book";
+    }
+    registerModel([CatalogItem, CatalogBook]);
+
+    const book = await CatalogBook.create({ name: "Dune" });
+    expect(book.type).toBe("Book");
+    const found = await CatalogItem.find(book.id);
+    expect(found).toBeInstanceOf(CatalogBook);
+  });
 });
 
 describe("polymorphic belongs_to namespace-relative type resolution", () => {
