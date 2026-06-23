@@ -378,13 +378,16 @@ describe("CascadedEagerLoadingTest", () => {
     const author = (await Author.findBy({ id: (authors("david") as any).id }))!;
 
     const oldPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
-    await (oldPost as any).comments.createBang({
+    await oldPost.comments.createBang({
       author_id: (authors("mary") as any).id,
       body: "a response",
     });
 
-    const recentPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
-    const lastComment = await (recentPost as any).comments.createBang({
+    const recentPost = await (author as any).posts.createBang({
+      title: "first post",
+      body: "test",
+    });
+    const lastComment = await recentPost.comments.createBang({
       author_id: (authors("bob") as any).id,
       body: "a response",
     });
