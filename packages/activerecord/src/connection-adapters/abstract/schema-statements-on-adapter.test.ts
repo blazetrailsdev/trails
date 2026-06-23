@@ -59,7 +59,75 @@ class CapturingAdapter extends AbstractAdapter {
   }
 }
 
+/**
+ * SQLite-flavoured capturing stub: records every SQL string so the
+ * introspection-PRAGMA arms can be asserted against the exact output. Inherits
+ * AbstractAdapter's quoteIdentifier (double-quote) and quote (string literal),
+ * which is what the converged sqlite arm uses.
+ */
+class SqliteCapturingAdapter extends AbstractAdapter {
+  allSql: string[] = [];
+  constructor(private readonly firstRows: Record<string, unknown>[] = []) {
+    super();
+  }
+  get lastSql() {
+    return this.allSql.at(-1) ?? "";
+  }
+  get adapterName() {
+    return "sqlite" as any;
+  }
+  execute(sql: string) {
+    this.allSql.push(sql);
+    return Promise.resolve(
+      this.allSql.length === 1 ? this.firstRows : ([] as Record<string, unknown>[]),
+    );
+  }
+  executeMutation(_sql: string) {
+    return Promise.resolve(0);
+  }
+}
+
 describe("SchemaStatements mixed into AbstractAdapter", () => {
+  it("columns() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
+    const sqlite = new SqliteCapturingAdapter();
+    await sqlite.columns("things");
+    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
+    await sqlite.columns('a"b');
+    expect(sqlite.lastSql).toBe('PRAGMA table_info("a""b")');
+    // Converged with SQLite3Adapter: a schema-qualified name uses the
+    // `PRAGMA schema.table_info(table)` prefix form (works for ATTACHed DBs),
+    // NOT `PRAGMA table_info("schema"."table")` which returns zero rows.
+    await sqlite.columns("aux.widgets");
+    expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
+  });
+
+  it("indexes() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
+    const sqlite = new SqliteCapturingAdapter();
+    await sqlite.indexes("things");
+    expect(sqlite.allSql[0]).toBe('PRAGMA index_list("things")');
+    await sqlite.indexes('a"b');
+    expect(sqlite.allSql.at(-1)).toBe('PRAGMA index_list("a""b")');
+    await sqlite.indexes("aux.widgets");
+    expect(sqlite.allSql.at(-1)).toBe('PRAGMA "aux".index_list("widgets")');
+  });
+
+  it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
+    // First call is index_list; surface one index whose name has a quote.
+    const sqlite = new SqliteCapturingAdapter([{ name: "idx'x", unique: 1 }]);
+    await sqlite.indexes("things");
+    // The index name passes through `quote()` (a SQL string literal), not an
+    // identifier quoter, so embedded `'` is doubled.
+    expect(sqlite.allSql).toEqual(['PRAGMA index_list("things")', "PRAGMA index_info('idx''x')"]);
+  });
+
+  it("primaryKey() sqlite arm uses the schema-prefix form for a schema-qualified name", async () => {
+    const sqlite = new SqliteCapturingAdapter();
+    await sqlite.primaryKey("things");
+    expect(sqlite.lastSql).toBe('PRAGMA table_info("things")');
+    await sqlite.primaryKey("aux.widgets");
+    expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
+  });
+
   it("tables() postgres fallback includes partitioned tables and honors search_path", async () => {
     const stub = new CapturingAdapter("postgres");
     await stub.tables();

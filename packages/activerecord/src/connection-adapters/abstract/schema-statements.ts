@@ -216,6 +216,22 @@ export class SchemaStatements {
     return this.adapter.quoteTableName(tableName);
   }
 
+  /**
+   * Build the PRAGMA target for a SQLite introspection pragma, converged with
+   * SQLite3Adapter's `_splitTableName` schema-prefix form. A schema-qualified
+   * name (e.g. `aux.widgets`, an ATTACHed database) must use the
+   * `PRAGMA aux.table_info("widgets")` prefix form — `PRAGMA table_info("aux"."widgets")`
+   * makes SQLite treat the whole quoted string as one bare table name and
+   * return zero rows.
+   */
+  protected _sqlitePragmaTarget(tableName: string, pragma: string): string {
+    const dot = tableName.lastIndexOf(".");
+    const schema = dot === -1 ? "" : tableName.slice(0, dot);
+    const bare = dot === -1 ? tableName : tableName.slice(dot + 1);
+    const prefix = schema ? `${this._qi(schema)}.` : "";
+    return `${prefix}${pragma}(${this._qi(bare)})`;
+  }
+
   async createTable(
     name: string,
     optionsOrFn?:
@@ -954,11 +970,18 @@ export class SchemaStatements {
   }
 
   async columns(tableName: string): Promise<Column[]> {
-    // No "sqlite" arm: SQLite3Adapter always overrides columns() with the
-    // Rails-faithful `PRAGMA schema.table_info(...)` schema-prefix form (which
-    // also works for attached databases), so a dialect arm here would be dead
-    // and diverge on schema-qualified names.
     switch (this.adapterName) {
+      case "sqlite": {
+        const rows = await this.adapter.execute(
+          `PRAGMA ${this._sqlitePragmaTarget(tableName, "table_info")}`,
+        );
+        return rows.map((row: any) => {
+          const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
+          return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
+            primaryKey: row.pk > 0,
+          });
+        });
+      }
       case "postgres": {
         // Mirror Rails quoted_scope: split a schema.table argument so
         // table_schema is scoped to the explicit schema when given (else
@@ -1056,9 +1079,6 @@ export class SchemaStatements {
           );
         });
       }
-      default:
-        // @nie disposition=TODO
-        throw new NotImplementedError("columns is not implemented");
     }
   }
 
@@ -1067,8 +1087,24 @@ export class SchemaStatements {
     // `columns` is a string for expression indexes (the raw expression) and an
     // array of column names otherwise, mirroring Rails' IndexDefinition#columns.
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
-    // No "sqlite" arm — SQLite3Adapter always overrides indexes() (see columns()).
     switch (this.adapterName) {
+      case "sqlite": {
+        const rows = await this.adapter.execute(
+          `PRAGMA ${this._sqlitePragmaTarget(tableName, "index_list")}`,
+        );
+        const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
+        for (const row of rows as any[]) {
+          const cols = await this.adapter.execute(
+            `PRAGMA index_info(${this.adapter.quote(row.name)})`,
+          );
+          result.push({
+            name: row.name,
+            columns: (cols as any[]).map((c: any) => c.name),
+            unique: row.unique === 1,
+          });
+        }
+        return result;
+      }
       case "postgres": {
         const rows = await this.adapter.execute(
           `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns
@@ -1106,15 +1142,18 @@ export class SchemaStatements {
             return { name, columns: info.seqs.map((s) => s[1]), unique: info.unique };
           });
       }
-      default:
-        // @nie disposition=TODO
-        throw new NotImplementedError("indexes is not implemented");
     }
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    // No "sqlite" arm — SQLite3Adapter always overrides primaryKey() (see columns()).
     switch (this.adapterName) {
+      case "sqlite": {
+        const rows = await this.adapter.execute(
+          `PRAGMA ${this._sqlitePragmaTarget(tableName, "table_info")}`,
+        );
+        const pk = (rows as any[]).find((r: any) => r.pk > 0);
+        return pk ? pk.name : null;
+      }
       case "postgres": {
         const rows = await this.adapter.execute(
           `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = to_regclass($1) AND i.indisprimary LIMIT 1`,
@@ -1128,9 +1167,6 @@ export class SchemaStatements {
         );
         return rows.length > 0 ? (rows[0] as any).Column_name : null;
       }
-      default:
-        // @nie disposition=TODO
-        throw new NotImplementedError("primary_key is not implemented");
     }
   }
 
