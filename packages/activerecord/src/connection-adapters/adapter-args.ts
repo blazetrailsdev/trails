@@ -19,6 +19,8 @@ import { AdapterNotFound } from "../errors.js";
  * carries no recognizable scheme/extension (e.g. a bare filesystem path or an
  * opaque `jdbc:` string). Used at config-build time so a scheme-less `:memory:`
  * shorthand already names its adapter on the resolved configuration hash.
+ *
+ * @internal
  */
 export function inferAdapterNameFromUrl(url: string): string | undefined {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
