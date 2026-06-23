@@ -61,16 +61,6 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
   execute(sql: string): Promise<unknown>;
   tables(): Promise<string[]>;
   transaction(fn: () => Promise<void>, options: { requiresNew: boolean }): Promise<unknown>;
-  inTransaction: boolean;
-  isTransactionOpen(): boolean;
-  openTransactions: number;
-  materializeTransactions(): Promise<void>;
-  createSavepoint(name: string): Promise<unknown>;
-  releaseSavepoint(name: string): Promise<unknown>;
-  rollbackToSavepoint(name: string): Promise<unknown>;
-  beginTransaction(): Promise<unknown>;
-  commit(): Promise<unknown>;
-  rollback(): Promise<unknown>;
 }
 
 // Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables every
@@ -129,30 +119,10 @@ export async function disableReferentialIntegrity(
 // Rails uses `transaction(requires_new: true)` — a savepoint when already
 // inside a transaction, or a fresh BEGIN otherwise.
 export async function checkAllForeignKeysValidBang(this: ReferentialIntegrityHost): Promise<void> {
-  if (this.inTransaction || this.isTransactionOpen()) {
-    // Materialize any lazy transaction so the savepoint lands inside the
-    // real PG transaction (mirrors Rails' transaction(requires_new: true)).
-    await this.materializeTransactions();
-    // Mirror Rails' savepoint naming: "active_record_#{stack.size}" (transaction.rb:528).
-    // Using openTransactions+1 makes repeated calls in the same transaction safe.
-    const sp = `active_record_${this.openTransactions + 1}`;
-    await this.createSavepoint(sp);
-    try {
+  await this.transaction(
+    async () => {
       await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
-      await this.releaseSavepoint(sp);
-    } catch (e) {
-      await this.rollbackToSavepoint(sp);
-      await this.releaseSavepoint(sp).catch(() => {});
-      throw e;
-    }
-  } else {
-    await this.beginTransaction();
-    try {
-      await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
-      await this.commit();
-    } catch (e) {
-      await this.rollback();
-      throw e;
-    }
-  }
+    },
+    { requiresNew: true },
+  );
 }
