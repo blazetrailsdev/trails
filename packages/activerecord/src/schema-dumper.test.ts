@@ -205,20 +205,26 @@ describe("SchemaDumperTest", () => {
   // partial-index support (MySQL) the DDL drops the `where` clause, so the dump
   // emits a plain index.
   it("schema dumps partial indices", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("email");
-      t.boolean("active");
+    // Mirrors Rails' dump_table_schema("companies") on the canonical
+    // `company_partial_index` (firm_id, type) WHERE (rating > 10).
+    // force: true mirrors Rails' `create_table :companies` and drops any
+    // canonical `companies` left on the shared file-backed worker DB so the
+    // dump reflects only this test's lone partial index.
+    await ctx.createTable("companies", { force: true }, (t) => {
+      t.string("type");
+      t.integer("firm_id");
+      t.integer("rating");
     });
-    await ctx.addIndex("users", "email", {
-      name: "idx_users_email_where_active",
-      where: "active = true",
+    await ctx.addIndex("companies", ["firm_id", "type"], {
+      name: "company_partial_index",
+      where: "(rating > 10)",
     });
     const output = SchemaDumper.dump(ctx);
     // Rails branches the full expected index line on supports_partial_index?;
     // unsupported backends (MySQL) emit the plain index with no `where:`.
     const expected = adapterSupports("partial_index")
-      ? '  await ctx.addIndex("users", "email", { name: "idx_users_email_where_active", where: "active = true" });'
-      : '  await ctx.addIndex("users", "email", { name: "idx_users_email_where_active" });';
+      ? '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
+      : '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index" });';
     expect(output).toContain(expected);
   });
   // Rails runs this unconditionally and branches on `supports_nulls_not_distinct?`
