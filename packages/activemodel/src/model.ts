@@ -58,6 +58,7 @@ import {
   attributeMethodPatterns,
   isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
+  MissingAttributeError,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1322,13 +1323,11 @@ export class Model {
   /**
    * True only while the constructor is assigning its initial attribute bag.
    * trails' constructor writes every key through `writeAttribute` directly
-   * (rather than Rails' `assign_attributes` → per-key setter dispatch), and
-   * leans on its lenient handling of not-yet-modeled names to stash
-   * nested-attribute keys (`commentsAttributes`), composite-PK strings, and
-   * unknown keys for later processing. The strict unknown-attribute raise on
-   * the AR write path therefore stands down during this window — matching the
-   * effect of Rails routing construction through `assign_attributes`, which
-   * rescues the unknown-writer case.
+   * (rather than Rails' `assign_attributes` → per-key setter dispatch). The
+   * loop swallows the strict `MissingAttributeError` `writeFromUser` now raises
+   * so construction stays lenient for not-yet-modeled names; this flag lets the
+   * AR write path detect the window (e.g. composite-PK `id=` remap) without
+   * re-raising mid-construction.
    *
    * @internal
    */
@@ -1412,7 +1411,18 @@ export class Model {
     this._initializingAttributes = true;
     try {
       for (const [key, value] of Object.entries(attrs)) {
-        this.writeAttribute(key, value);
+        try {
+          this.writeAttribute(key, value);
+        } catch (error) {
+          // trails' constructor writes every key through `writeAttribute`
+          // directly (rather than Rails' `assign_attributes` → per-key setter
+          // dispatch), so it sees not-yet-modeled names that Rails would route
+          // to a setter or rescue: nested-attribute keys (`commentsAttributes`,
+          // re-dispatched by `_reapplyNestedAttrSetters`), composite-PK strings,
+          // and unknown keys. `writeFromUser` now raises strictly for those, so
+          // swallow the raise during this window to keep construction lenient.
+          if (!(error instanceof MissingAttributeError)) throw error;
+        }
       }
     } finally {
       this._initializingAttributes = false;

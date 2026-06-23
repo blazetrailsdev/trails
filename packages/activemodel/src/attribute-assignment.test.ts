@@ -20,9 +20,15 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    // Non-existing attributes are stored as extras
-    p.assignAttributes({ unknown_attr: "value" });
-    expect(p.readAttribute("unknown_attr")).toBe("value");
+    // Rails raises UnknownAttributeError for a key with no setter / column.
+    let raised: unknown;
+    try {
+      p.assignAttributes({ unknown_attr: "value" });
+    } catch (e) {
+      raised = e;
+    }
+    expect((raised as Error)?.name).toBe("UnknownAttributeError");
+    expect((raised as { attribute?: string })?.attribute).toBe("unknown_attr");
   });
 
   it("assign non-existing attribute by overriding #attribute_writer_missing", () => {

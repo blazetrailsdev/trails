@@ -3,34 +3,6 @@ import { Model, MissingAttributeError, resolveAliasName } from "@blazetrails/act
 import { ActiveRecordError } from "./errors.js";
 
 /**
- * Rails' `write_from_user` raises `MissingAttributeError` for any name that is
- * not in the (schema-complete) attribute set — e.g. `topic[:no_column_exists] =
- * …`. trails populates the set lazily, so map-absence alone cannot stand in for
- * "unknown column": a real but not-yet-materialized/unselected column (an
- * unselected `title`, a reflected-only counter-cache column, a composite-PK
- * member) is also absent, and Rails does NOT raise for those ("write_attribute
- * does not raise when the attribute isn't selected").
- *
- * The safe discriminator is the warm schema cache: when the table's real
- * columns are known ({@link reflectedColumnNamesIfWarm}), an absent name not
- * among them is definitively unknown and raises, while every real column —
- * selected or not — is in that set and passes. When the cache is cold trails
- * cannot yet list reflected-only columns, so we stay lenient there; closing
- * that gap (and widening `AttributeSet#writeFromUser` itself to the Rails
- * one-liner) is gated on RFC 0031 schema-cache-always-warm.
- */
-function ensureWritableAttribute(record: Base, ctor: typeof Base, name: string): void {
-  if ((record as { _initializingAttributes?: boolean })._initializingAttributes) return;
-  if (record._attributes.includesName(name)) return;
-  if ((ctor as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.has(name))
-    return;
-  const realColumns = ctor.reflectedColumnNamesIfWarm();
-  if (realColumns && !realColumns.has(name)) {
-    throw new MissingAttributeError(`can't write unknown attribute \`${name}\``);
-  }
-}
-
-/**
  * Raised when a persisted record attempts to write to a column declared
  * via `attr_readonly`.
  *
@@ -170,10 +142,10 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     return; // silently skip — mirrors Rails' non-raising mode
   }
   // Mirrors Rails `write_attribute` → `write_from_user`: writing an unknown
-  // attribute raises MissingAttributeError. Mass assignment routes through here
-  // too but rescues this (attribute-assignment.ts), so `new X({unknown: 1})`
-  // stays lenient.
-  ensureWritableAttribute(this, ctor, canonical);
+  // attribute raises MissingAttributeError. The raise originates in
+  // `AttributeSet#writeFromUser` (the schema cache is always warm, so an absent
+  // name is definitively unknown). Mass assignment routes through here too but
+  // rescues it (attribute-assignment.ts), so `new X({unknown: 1})` stays lenient.
   // `super` — route through Model's _writeAttribute with the already-resolved
   // canonical name, matching Rails' `super` into the underscore path.
   Model.prototype._writeAttribute.call(this, canonical, value);
@@ -193,19 +165,11 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
     return;
   }
   // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the
-  // public `write_attribute` path above.
-  //
-  // The strict unknown-attribute raise is deliberately NOT applied here. Rails'
-  // `_write_attribute` does reach `write_from_user` and so raises (write.rb:42),
-  // but trails routes its low-level/internal writes through this path —
-  // store-accessor fallbacks, composite-PK seeding in `_applyCompositePrimaryKey`
-  // (which runs after the constructor's lenient `_initializingAttributes`
-  // window), and other framework writers — some of which target names that are
-  // not plain reflected columns or run before the schema cache is warm. Gating
-  // here would regress those; the public `writeAttribute` carries the Rails
-  // strictness, which is where user `[]=` / `write_attribute` lands. Closing this
-  // is part of the same RFC 0031 warm-cache convergence that lets
-  // `AttributeSet#writeFromUser` raise directly.
+  // public `write_attribute` path above. Like Rails (write.rb:42) this reaches
+  // `write_from_user`, which now raises `MissingAttributeError` for an unknown
+  // name — internal writers (counter caches, timestamps, locking, composite-PK
+  // seeding) all target real columns present in the always-warm schema cache,
+  // so they no longer depend on the former lenience.
   Model.prototype._writeAttribute.call(this, name, value);
 }
 
