@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, afterAll, beforeEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Rollback } from "./errors.js";
+import { Rollback, ConnectionFailed } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -410,6 +410,54 @@ describe("TransactionInstrumentationTest", () => {
     ).rejects.toThrow(MyError);
 
     expect(events).toHaveLength(1);
+  });
+
+  it("ConnectionFailed on commit invalidates the transaction and cascades to children", async () => {
+    // Rails (abstract/transaction.rb:632-643) special-cases a dropped
+    // connection on commit: it can't ROLLBACK a dead connection, so it
+    // `invalidate!`s the transaction (cascading to child savepoint
+    // transactions) instead of attempting `rollback_transaction`. Use an
+    // isolated throwaway adapter because the invalidated/incomplete
+    // transaction drives the outer `throw_away!` ensure (eviction +
+    // disconnect), which would destroy the canonical :memory: schema.
+    const adapter = await freshIsolatedAdapter();
+    const { Topic: IsolatedTopic } = makeTopic(adapter);
+    const tm = (adapter as any).transactionManager;
+
+    const txns: any[] = [];
+    const realBegin = tm.beginTransaction.bind(tm);
+    vi.spyOn(tm, "beginTransaction").mockImplementation(async (opts: any) => {
+      const t = await realBegin(opts);
+      txns.push(t);
+      return t;
+    });
+
+    vi.spyOn(adapter as any, "commitDbTransaction").mockImplementationOnce(async () => {
+      throw new ConnectionFailed("connection lost");
+    });
+
+    const rollbackSpy = vi.spyOn(tm, "rollbackTransaction");
+
+    await expect(
+      IsolatedTopic.transaction(async () => {
+        await IsolatedTopic.transaction(
+          async () => {
+            await (IsolatedTopic as any).create({ title: "savepoint child" });
+          },
+          { requiresNew: true },
+        );
+        await (IsolatedTopic as any).create({ title: "outer" });
+      }),
+    ).rejects.toThrow(ConnectionFailed);
+
+    // Outer (real) transaction is invalidated, not rolled back...
+    expect(txns[0].state.isInvalidated()).toBe(true);
+    expect(txns[0].state.isRolledback()).toBe(false);
+    // ...and `invalidate!` cascaded to the child savepoint transaction.
+    expect(txns[1].state.isInvalidated()).toBe(true);
+    // The commit-failure branch must NOT attempt a ROLLBACK on the dead
+    // connection (a savepoint release on commit isn't a rollbackTransaction).
+    expect(rollbackSpy).not.toHaveBeenCalled();
   });
 
   it.skip("transaction instrumentation on failed rollback", () => {
