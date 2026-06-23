@@ -1105,7 +1105,10 @@ class ApiExtractor
                         [:do_block, :brace_block].include?(block[0])
     loop_var = block_param_name(block)
     return false unless loop_var
-    body = block[0] == :do_block ? block[2] : block[2]
+    # Both `do_block` and `brace_block` carry the body in slot 2 (a `bodystmt`
+    # for `do … end`, a plain stmts list for `{ … }`); the recursive visitors
+    # below handle either shape.
+    body = block[2]
 
     # Local assigned from the `case` (the class_eval template interpolates it).
     name_local, suffix_map = codegen_name_mapping(body, loop_var)
@@ -1237,6 +1240,8 @@ class ApiExtractor
   # interpolated `name_local`: `:reader` (`def #{name_local}`) and/or `:writer`
   # (`def #{name_local}=`). Reconstructs the template, replacing each
   # `#{name_local}` with a sentinel, then scans for `def <sentinel>` occurrences.
+  # The sentinel is NUL (never present in Ruby source), so the `\s+` in the scan
+  # can't ambiguously consume it the way a whitespace marker could.
   SENTINEL = " "
   def codegen_def_forms(body, name_local)
     template = codegen_template(body, name_local)
