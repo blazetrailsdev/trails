@@ -1334,6 +1334,7 @@ describe("MigrationTest", () => {
     const adp = await freshAdapterWithSchema();
     class Event extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = adp;
       }
@@ -1348,6 +1349,7 @@ describe("MigrationTest", () => {
     const adp = await freshAdapterWithSchema();
     class Event extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = adp;
       }
