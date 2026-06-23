@@ -2360,6 +2360,21 @@ export class Base extends Model {
     return _Persistence.createBang.call(this, attrs, block);
   }
 
+  /**
+   * Instantiate a record from a hash of database attributes, dispatching
+   * through STI if applicable.
+   *
+   * Mirrors: ActiveRecord::Persistence::ClassMethods#instantiate
+   */
+  static instantiate<T extends typeof Base>(
+    this: T,
+    attributes: Record<string, unknown>,
+    columnTypes?: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T> {
+    return _Persistence.instantiate.call(this, attributes, columnTypes, block);
+  }
+
   // --- Querying mixin (static methods, wired via extend() after class) ---
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
