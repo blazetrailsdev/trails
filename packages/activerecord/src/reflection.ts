@@ -683,6 +683,13 @@ export class MacroReflection extends AbstractReflection {
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
+    // Rails coerces `class_name` with `.to_s` in AbstractReflection#class_name,
+    // so a Symbol works for every macro (belongs_to, has_many, …). JS has no
+    // Ruby symbol; the faithful analogue is a `Symbol("…")`, normalized to its
+    // description here so all reflection consumers see a string.
+    if (typeof options.className === "symbol") {
+      options = { ...options, className: options.className.description ?? "" };
+    }
     const counterCache = options.counterCache;
     if (counterCache) {
       let active = true;
@@ -1205,9 +1212,14 @@ export class AssociationReflection extends MacroReflection {
       // Namespace-relative walk: mirrors Ruby's compute_type candidate list.
       // For activeRecord registered as "A::B::C", tries "A::B::C::Name",
       // "A::B::Name", "A::Name" before falling through to top-level "Name".
+      // When the registry name carries no namespace (e.g. an anonymous HABTM
+      // join model named "HABTM_Articles"), fall back to the model's Ruby
+      // `moduleName` so the owner's nesting still drives resolution.
       const arName = this.activeRecordRegistryName();
-      if (arName.includes("::")) {
-        const segments = arName.split("::");
+      const moduleName = (this.activeRecord as { moduleName?: string }).moduleName;
+      const nestingSource = arName.includes("::") ? arName : moduleName;
+      if (nestingSource) {
+        const segments = nestingSource.split("::");
         for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");
           const resolved = modelRegistry.get(candidate);

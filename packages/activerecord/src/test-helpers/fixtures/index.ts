@@ -33,6 +33,7 @@ export * from "./colleges.js";
 export * from "./comments.js";
 export * from "./companies.js";
 export * from "./computers.js";
+export * from "./computers-developers.js";
 export * from "./content.js";
 export * from "./content-positions.js";
 export * from "./courses.js";
