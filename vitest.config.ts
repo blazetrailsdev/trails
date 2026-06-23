@@ -306,6 +306,10 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
             "./packages/activerecord/src/test-setup-dy.ts",
+            // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
+            ...(process.env.DDL_PROFILE === "1"
+              ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
+              : []),
           ],
           // Real-DB tests share a per-worker DB; the module-level state in
           // test-adapter.ts has known race windows (see PR #1114 for prior
