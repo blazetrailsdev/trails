@@ -1415,12 +1415,23 @@ export class Model {
           this.writeAttribute(key, value);
         } catch (error) {
           // trails' constructor writes every key through `writeAttribute`
-          // directly (rather than Rails' `assign_attributes` → per-key setter
-          // dispatch), so it sees not-yet-modeled names that Rails would route
-          // to a setter or rescue: nested-attribute keys (`commentsAttributes`,
-          // re-dispatched by `_reapplyNestedAttrSetters`), composite-PK strings,
-          // and unknown keys. `writeFromUser` now raises strictly for those, so
-          // swallow the raise during this window to keep construction lenient.
+          // directly, rather than Rails' `assign_attributes` → `_assign_attribute`
+          // (api.rb:80-82, attribute_assignment.rb:67-75), which dispatches a key
+          // with a writer and routes a writer-less key to `attribute_writer_missing`
+          // (→ `UnknownAttributeError`). The loop relies on construction staying
+          // lenient for not-yet-modeled names: nested-attribute keys
+          // (`commentsAttributes`, re-applied by `_reapplyNestedAttrSetters`),
+          // composite-PK string keys, and — pre-existing trails behavior, NOT a
+          // regression of this PR (origin/main's lazy `write_from_user` stored
+          // them rather than raising) — genuinely unknown keys.
+          //
+          // Converging this window to Rails (raise `UnknownAttributeError` for a
+          // writer-less key) is a distinct, broad convergence: it requires the
+          // constructor to setter-dispatch like `assign_attributes`, and it
+          // surfaces a cluster of tests that ratified the leniency
+          // (base `initialize with invalid attribute`, the cpk-string nested
+          // path, etc.). Tracked as RFC 0046 story
+          // `converge-construction-unknown-attribute-strict`.
           if (!(error instanceof MissingAttributeError)) throw error;
         }
       }
