@@ -1,10 +1,17 @@
 /**
- * THROWAWAY INSTRUMENTATION — DDL timing profiler (DO NOT MERGE AS-IS).
+ * Opt-in DDL timing profiler — DORMANT unless `DDL_PROFILE=1`.
  *
  * Measures how often the test suite issues DDL (CREATE/DROP TABLE, indexes,
  * ALTER, TRUNCATE) and how much wall-clock time it costs, broken down by op
  * type, table, and test file. Entirely gated behind `DDL_PROFILE=1` — when the
  * flag is off, `install()` is a no-op and there is zero cost on any code path.
+ * Not wired into CI; opt in for an ad-hoc measurement run, e.g.:
+ *
+ *   DDL_PROFILE=1 DDL_PROFILE_OUT_DIR=/tmp/ddlprof ARCONN=postgresql \
+ *     PG_TEST_URL=postgres://… pnpm vitest run packages/activerecord/src/<file>
+ *   node scripts/ddl-profile-aggregate.mjs /tmp/ddlprof
+ *
+ * See PR #3904 / the `ddl-timing-profile` audit for the methodology + findings.
  *
  * How it works: on install we monkey-patch the two leaf write/DDL primitives
  * (`execute`, `executeMutation`) on each adapter prototype, classify the SQL by

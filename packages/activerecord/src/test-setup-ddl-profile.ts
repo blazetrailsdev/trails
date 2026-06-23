@@ -1,5 +1,5 @@
 /**
- * THROWAWAY INSTRUMENTATION — vitest setup hook for the DDL timing profiler.
+ * Opt-in DDL profiler vitest setup hook (dormant unless DDL_PROFILE=1).
  * Only wired into the suite when DDL_PROFILE=1 (see vitest.config.ts). Installs
  * the adapter-prototype patches in {@link ./test-helpers/ddl-profile.ts}.
  */

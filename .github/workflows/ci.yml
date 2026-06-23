@@ -108,7 +108,8 @@ jobs:
           # actionpack_affected gates actionpack-tests. True for actionpack +
           # its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
-          # actionview_affected gates actionview-tests. ActionView's only
+          # actionview_affected gates the actionview step of leaf-tests.
+          # ActionView's only
           # workspace dependency is activesupport (see actionview/package.json).
           AV_PKGS_RE='^packages/(actionview|activesupport)/'
           # trailties_affected gates trailties-tests. Trailties consumes
@@ -120,18 +121,20 @@ jobs:
           # (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
           # AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
-          # tse_compiler_affected gates tse-compiler-tests. The package has
+          # tse_compiler_affected gates the tse-compiler step of leaf-tests.
+          # The package has
           # no workspace dependencies today (no activesupport import), so
           # the gate matches the package path only.
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
-          # rack_affected gates rack-tests (split out of unit-tests so a
-          # rack-only PR doesn't drag in arel/activemodel/activesupport
-          # tests). Rack's only workspace dependency is activesupport.
+          # rack_affected gates the rack step of leaf-tests (split out of
+          # unit-tests so a rack-only PR doesn't drag in
+          # arel/activemodel/activesupport tests). Rack's only workspace
+          # dependency is activesupport.
           RACK_PKGS_RE='^packages/(rack|activesupport)/'
           # unit_tests_affected gates the bundled vitest run for the small
           # leaf packages (arel/activemodel/activesupport) and the
           # scripts/guides-typecheck self-test. Rack is excluded here — it
-          # has its own job above.
+          # runs in the leaf-tests job.
           # scripts/tasks/ also rides on this gate since it's bundled into the
           # same vitest invocation as the leaf packages and guides-typecheck.
           UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/tasks/)'
@@ -380,32 +383,73 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm lint
-  prettier:
-    name: Prettier
+  # Consolidated sub-minute PR/push preflight checks. Each of prettier,
+  # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
+  # work; GitHub bills every job rounded UP to a whole minute, so running them
+  # as three jobs cost 3 billed minutes for ~25s of compute. Folding them into
+  # one job's sequential steps bills 1 minute while keeping each check's failure
+  # independently legible in the step log. Each step preserves its original
+  # event/author guard via a per-step `if:` so it no-ops (rather than skipping
+  # the whole job) when its condition isn't met — prettier alone stays ungated
+  # because, like the standalone job, it runs on every event. The guarded steps
+  # prefix `!cancelled() &&` to defeat the implicit success() GitHub ANDs onto a
+  # step `if:`, so an earlier step's failure can't skip a later guard — matching
+  # the independent reporting the three replaced parallel jobs had.
+  # Deliberately NOT folded into
+  # `changes` — that job is on the critical path of every downstream gate, and a
+  # prettier/attribution failure there would block gate computation.
+  preflight:
+    name: Preflight
     needs: changes
-    # Prettier doesn't need the workspace installed. Skip `pnpm install`
-    # entirely and run prettier directly via `npx`. The version below MUST
-    # equal the exact pin in root `package.json` devDependencies; the
-    # `prettier` entry there is intentionally pinned (no `^`) so CI and
-    # local `pnpm format` can never drift.
+    # Needs the PR body for the attribution step; the diff-based steps need
+    # full history (fetch-depth: 0) to diff against the PR base SHA.
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      # contents: read for the two checkout-based steps (prettier reads the
+      # tree, docs-AR-freeze diffs it); pull-requests: read for the attribution
+      # step's `gh api repos/.../pulls` calls. Declaring `permissions:` zeroes
+      # every unlisted scope, so contents must be listed explicitly even though
+      # it is part of the default token.
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Single source of truth for the forbidden-attribution markers, shared by
+      # the PR-body and commit-message scans below so the two can't drift apart.
+      # Matched case-insensitively (grep -iE).
+      ATTRIBUTION_RE: 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          # This job runs prettier via `npx` and never installs pnpm, but
+          # The prettier step runs via `npx` and never installs pnpm, but
           # setup-node v5 defaults `package-manager-cache: true` and would
           # try to cache the pnpm store from the `packageManager` field in
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
-      # Check only the files changed on this PR/push, not the whole tree.
-      # `__ALL__` is the fallback sentinel from the `changes` job (diff
+
+      # Prettier. Unconditional, exactly as the standalone job was: it runs on
+      # push and PR (the events that carry a meaningful diff) and also on the
+      # weekly `schedule` sweep / `workflow_dispatch`, where the `changes` job
+      # falls back to `prettier_files=__ALL__` and the whole tree is checked.
+      # The two checks below need a per-step `if:` to no-op off `pull_request`;
+      # prettier does not, so leaving it ungated keeps coverage identical to the
+      # pre-consolidation job. The version below MUST equal the exact pin in
+      # root `package.json` devDependencies; the `prettier` entry there is
+      # intentionally pinned (no `^`) so CI and local `pnpm format` can never
+      # drift. Checks only the files changed on this PR/push, not the whole
+      # tree. `__ALL__` is the fallback sentinel from the `changes` job (diff
       # couldn't be computed); empty means nothing checkable changed.
       # `--ignore-unknown` skips paths Prettier has no parser for, and
       # `.prettierignore` is still honored.
-      - env:
+      - name: Prettier
+        env:
           PRETTIER_FILES: ${{ needs.changes.outputs.prettier_files }}
         run: |
           set -euo pipefail
@@ -417,6 +461,98 @@ jobs:
             printf '%s\n' "$PRETTIER_FILES" \
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
+
+      # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
+      # `docs/activerecord/` is frozen so the two-source-of-truth split can't
+      # self-heal. Fail any PR that adds or modifies a file under that path,
+      # with a single allowlisted exception. PR-only: push/schedule have no PR
+      # base to diff against. Only `docs/activerecord/` is policed — other
+      # docs/ trees stay live until their own cutover.
+      - name: Docs ActiveRecord Freeze
+        # !cancelled() defeats the implicit success() that GitHub ANDs onto a
+        # step `if:`, so an earlier step's failure (e.g. prettier) can't skip
+        # this guard — preserving the independent reporting the three replaced
+        # parallel jobs had.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # The one tracker that stays under docs/activerecord/.
+          ALLOWLIST='docs/activerecord/parity-verification.md'
+          # Triple-dot: diff against the merge-base, not the base tip, so
+          # unrelated commits merged to main since this branch diverged don't
+          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
+          # is allowed). Path-scope to docs/activerecord/ so nothing else is
+          # policed.
+          changed=$(git diff --name-only --diff-filter=ACMR \
+            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
+          offending=$(printf '%s\n' "$changed" \
+            | grep -E '^docs/activerecord/' \
+            | grep -vxF "$ALLOWLIST" || true)
+          if [ -n "$offending" ]; then
+            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
+            printf '%s\n' "$offending"
+            exit 1
+          fi
+          echo "No new or modified docs/activerecord trackers."
+
+      # PR attribution check. Scoped to deanmarano-authored PRs: the project
+      # forbids Claude attribution in *his* PR descriptions and commits (see
+      # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
+      # contributors are unaffected; push/schedule have no PR body.
+      - name: Forbid Claude attribution in PR body
+        # !cancelled() so a prior step's failure can't suppress this guard
+        # (see Docs ActiveRecord Freeze above).
+        if: >-
+          ${{ !cancelled() &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'deanmarano' }}
+        run: |
+          set -euo pipefail
+          # Fetch the *live* body rather than reading the event payload. The
+          # PR triggers don't include `edited`, so a body edit won't re-fire
+          # CI — but a manual job re-run hits the API fresh and will see the
+          # fix. Reading the payload would replay the stale original body and
+          # leave the check permanently red.
+          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
+            echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in PR body."
+      - name: Forbid Claude attribution in commit messages
+        # !cancelled() so a prior step's failure can't suppress this guard
+        # (see Docs ActiveRecord Freeze above).
+        if: >-
+          ${{ !cancelled() &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.user.login == 'deanmarano' }}
+        run: |
+          set -euo pipefail
+          # Scan every commit message on the PR, not just the PR body. The body
+          # check above misses `Co-authored-by:` trailers that live in commits —
+          # and GitHub's squash-merge auto-aggregates those branch-commit
+          # trailers into the merge commit on `main`, which is exactly how a
+          # Claude attribution reached main past the body check.
+          #
+          # The pulls/{n}/commits endpoint caps at 250 commits even with
+          # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
+          # closed in that case rather than passing on a partial scan — this repo
+          # squashes and has a 500-LOC ceiling, so 250 commits never happens
+          # legitimately; if it does, squash/rebase before re-running.
+          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
+          if [ "$count" -gt 250 ]; then
+            echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
+            exit 1
+          fi
+          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
+          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
+            echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in commit messages."
 
   guides-typecheck:
     name: Guides Code Type Check
@@ -433,23 +569,6 @@ jobs:
       - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: pnpm guides:typecheck
-
-  dx-type-tests:
-    name: DX Type Tests
-    needs: changes
-    # vitest.dx-tests.config.ts only declares activerecord and trailties
-    # projects, so skip when neither is affected.
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      (needs.changes.outputs.activerecord_affected == 'true' ||
-       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm test:types
 
   virtualized-dx-type-tests:
     name: Virtualized DX Type Tests
@@ -486,19 +605,56 @@ jobs:
           scripts/guides-typecheck
           scripts/tasks
 
-  rack-tests:
-    name: Rack Tests
+  # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
+  # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
+  # (~30 s) — each bill a full rounded-up minute when run as separate jobs.
+  # Collapsing them into one job shares a single checkout/install and emits one
+  # billed minute instead of up to four. Each suite is individually `if:`-gated
+  # on its own affected flag so an unaffected package is skipped inside the job;
+  # the job as a whole runs when ANY member flag is true. actionpack (~50 s) and
+  # trailties (~42 s) are deliberately left standalone: their wall-clocks risk
+  # pushing the combined job past ~2 billed minutes, which would erase the
+  # rounding win.
+  leaf-tests:
+    name: Leaf Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.rack_affected == 'true'
+      (needs.changes.outputs.rack_affected == 'true' ||
+       needs.changes.outputs.actionview_affected == 'true' ||
+       needs.changes.outputs.tse_compiler_affected == 'true' ||
+       needs.changes.outputs.activerecord_affected == 'true' ||
+       needs.changes.outputs.trailties_affected == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/rack
+      - id: install
+        run: pnpm install --frozen-lockfile --prefer-offline
+      # Each suite is gated on the install step succeeding rather than on the
+      # default success()-of-all-prior-steps. This preserves the old
+      # separate-job behaviour where every affected leaf ran and reported
+      # independently: a failure in one leaf no longer skips the others, so a
+      # multi-leaf PR surfaces all failures in one run instead of discovering
+      # them one re-run at a time. The job still fails if any step fails.
+      - name: Rack tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.rack_affected == 'true' }}
+        run: pnpm vitest run packages/rack
+      - name: Action View tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actionview_affected == 'true' }}
+        run: pnpm vitest run packages/actionview
+      - name: TSE Compiler tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.tse_compiler_affected == 'true' }}
+        run: pnpm vitest run packages/tse-compiler
+      # vitest.dx-tests.config.ts only declares activerecord and trailties
+      # projects, so this runs when either is affected.
+      - name: DX type tests
+        if: >-
+          ${{ !cancelled() && steps.install.outcome == 'success' &&
+          (needs.changes.outputs.activerecord_affected == 'true' ||
+           needs.changes.outputs.trailties_affected == 'true') }}
+        run: pnpm test:types
 
   actionpack-tests:
     name: Action Pack Tests
@@ -514,20 +670,6 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm vitest run packages/actionpack
 
-  actionview-tests:
-    name: Action View Tests
-    needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.actionview_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actionview
-
   trailties-tests:
     name: Trailties Tests
     needs: changes
@@ -542,20 +684,6 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm vitest run packages/trailties
 
-  tse-compiler-tests:
-    name: TSE Compiler Tests
-    needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.tse_compiler_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/tse-compiler
-
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
   # denominator, producing an honest baseline. There is NO threshold gate —
@@ -563,10 +691,12 @@ jobs:
   # can never block a merge. The summary is written to the run UI and the
   # lcov/json reports are uploaded as artifacts. activerecord is deliberately
   # excluded (its 6-fork suite dominates CI time); AR coverage is a follow-up.
-  # trails-tsc is also excluded: its watcher/build tests spawn subprocesses
-  # that are coverage-hostile under load and can trip vitest's worker-RPC
-  # timeout — which aborts the whole run and writes no report, voiding every
-  # other package's numbers. Not worth that risk for a tsc-plugin harness.
+  # trails-tsc is excluded from THIS shared run: its watcher/build tests spawn
+  # subprocesses that are coverage-hostile under load and can trip vitest's
+  # worker-RPC timeout — which aborts the whole run and writes no report,
+  # voiding every other package's numbers. It gets its own coverage signal from
+  # the isolated `trails-tsc-coverage` job below, where such a timeout can only
+  # void trails-tsc's own report.
   coverage:
     name: Coverage (reporting-only)
     needs: changes
@@ -632,6 +762,101 @@ jobs:
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
+  # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
+  # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
+  # publishes the numbers to the run UI + lcov/json artifacts. This is a
+  # SEPARATE, non-blocking job rather than a `--coverage` flag bolted onto
+  # `sqlite-tests`, because a local micro-benchmark measured the flag adding
+  # ~37% to vitest wall time — material slowdown for a job that gates merges
+  # (sqlite-tests is in the `ci` aggregator's `needs:`). Keeping coverage in its
+  # own `continue-on-error` job off the `ci` needs-graph means it can never slow
+  # the critical path or block a merge; the no-threshold vitest config means it
+  # can never fail on low coverage either. Mirrors the light-package `coverage`
+  # job above.
+  ar-sqlite-coverage:
+    name: Active Record SQLite Coverage (reporting-only)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      # AR_COVERAGE=1 scopes the vitest coverage include to activerecord source
+      # (see vitest.config.ts). Only the main AR suite is covered; the cli run
+      # is intentionally omitted so it can't clobber the report.
+      - run: pnpm vitest run packages/activerecord/ --coverage --coverage.all
+        env:
+          AR_COVERAGE: "1"
+      - name: Write AR coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload AR coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ar-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  trails-tsc-coverage:
+    name: trails-tsc Coverage (reporting-only)
+    needs: changes
+    # Gated like the per-area ar-sqlite-coverage job: only run when trails-tsc
+    # (the covered source) or tse-compiler (which its tests exercise) changed,
+    # so this dedicated job doesn't add cost to unrelated PRs. Not in `ci`'s
+    # `needs`, so a skip here never trips the all-jobs gate.
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.trails_tsc_affected == 'true' ||
+       needs.changes.outputs.tse_compiler_affected == 'true')
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      # trails-tsc is isolated in its own job: its watcher/build tests spawn
+      # subprocesses and run heavy tsc compiles that, under v8 instrumentation,
+      # peg a worker long enough to trip vitest's `onTaskUpdate` worker-RPC
+      # timeout, aborting the run and writing no report. Running alone means
+      # such a timeout can only void THIS report, never the shared non-AR
+      # coverage run. TRAILS_TSC_COVERAGE=1 scopes coverage to trails-tsc
+      # source; TRAILS_TEST_FORKS=1 reduces the fork contention that worsens the
+      # timeout (a residual one is absorbed by dangerouslyIgnoreUnhandledErrors
+      # in vitest.config.ts, gated on the same flag); --test-timeout=60000
+      # absorbs the slower tsc compiles. Reporting-only (no thresholds → never
+      # fails the build).
+      - run: pnpm vitest run packages/trails-tsc --coverage --coverage.all --test-timeout=60000
+        env:
+          TRAILS_TSC_COVERAGE: "1"
+          TRAILS_TEST_FORKS: "1"
+      - name: Write trails-tsc coverage summary to run UI
+        if: always()
+        run: node scripts/ci/coverage-summary.mjs
+      - name: Upload trails-tsc coverage report (lcov + json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trails-tsc-coverage-report
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          if-no-files-found: warn
+          retention-days: 14
+
   postgres-tests:
     name: Active Record PostgreSQL Tests
     needs: changes
@@ -690,16 +915,6 @@ jobs:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
-          # THROWAWAY: DDL timing profiler (see test-helpers/ddl-profile.ts).
-          DDL_PROFILE: "1"
-          DDL_PROFILE_OUT_DIR: ${{ github.workspace }}/ddl-profile
-      - name: Upload DDL profile (postgres)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ddl-profile-postgres
-          path: ddl-profile/
-          if-no-files-found: warn
       - run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
@@ -814,16 +1029,6 @@ jobs:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
-          # THROWAWAY: DDL timing profiler (see test-helpers/ddl-profile.ts).
-          DDL_PROFILE: "1"
-          DDL_PROFILE_OUT_DIR: ${{ github.workspace }}/ddl-profile
-      - name: Upload DDL profile (mariadb)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ddl-profile-mariadb
-          path: ddl-profile/
-          if-no-files-found: warn
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
@@ -858,112 +1063,6 @@ jobs:
         run: pnpm --filter @blazetrails/website run build:sw && pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
-
-  pr-attribution:
-    name: PR Attribution Check
-    # Independent of the `changes` gate — it inspects the PR body, not the
-    # diff, so docs_only / per-package gates don't apply. Only meaningful on
-    # PRs (push/schedule have no PR body) and scoped to deanmarano-authored
-    # ones: the project forbids Claude attribution in *his* PR descriptions
-    # (see CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
-    # contributors are unaffected.
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login == 'deanmarano'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      pull-requests: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      # Single source of truth for the forbidden-attribution markers, shared by
-      # the PR-body and commit-message scans below so the two can't drift apart.
-      # Matched case-insensitively (grep -iE).
-      ATTRIBUTION_RE: 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'
-    steps:
-      - name: Forbid Claude attribution in PR body
-        run: |
-          set -euo pipefail
-          # Fetch the *live* body rather than reading the event payload. The
-          # PR triggers don't include `edited`, so a body edit won't re-fire
-          # CI — but a manual job re-run hits the API fresh and will see the
-          # fix. Reading the payload would replay the stale original body and
-          # leave the check permanently red.
-          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
-          if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
-            echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
-            exit 1
-          fi
-          echo "No forbidden Claude attribution found in PR body."
-      - name: Forbid Claude attribution in commit messages
-        run: |
-          set -euo pipefail
-          # Scan every commit message on the PR, not just the PR body. The body
-          # check above misses `Co-authored-by:` trailers that live in commits —
-          # and GitHub's squash-merge auto-aggregates those branch-commit
-          # trailers into the merge commit on `main`, which is exactly how a
-          # Claude attribution reached main past the body check.
-          #
-          # The pulls/{n}/commits endpoint caps at 250 commits even with
-          # --paginate, so a >250-commit PR would leave its tail unscanned. Fail
-          # closed in that case rather than passing on a partial scan — this repo
-          # squashes and has a 500-LOC ceiling, so 250 commits never happens
-          # legitimately; if it does, squash/rebase before re-running.
-          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
-          if [ "$count" -gt 250 ]; then
-            echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
-            exit 1
-          fi
-          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
-          if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
-            echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
-            exit 1
-          fi
-          echo "No forbidden Claude attribution found in commit messages."
-
-  docs-activerecord-freeze:
-    name: Docs ActiveRecord Freeze
-    # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
-    # `docs/activerecord/` is frozen so the two-source-of-truth split can't
-    # self-heal. Fail any PR that adds or modifies a file under that path,
-    # with a single allowlisted exception. Independent of the `changes` gate
-    # (it inspects the diff directly) and PR-only: push/schedule have no PR
-    # base to diff against, and the skip is allowlisted in the `ci` job below.
-    # Only `docs/activerecord/` is policed — other docs/ trees stay live
-    # until their own cutover.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Forbid new or modified docs/activerecord trackers
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # The one tracker that stays under docs/activerecord/.
-          ALLOWLIST='docs/activerecord/parity-verification.md'
-          # Triple-dot: diff against the merge-base, not the base tip, so
-          # unrelated commits merged to main since this branch diverged don't
-          # show up. --diff-filter=ACMR ignores deletions (removing a tracker
-          # is allowed). Path-scope to docs/activerecord/ so nothing else is
-          # policed.
-          changed=$(git diff --name-only --diff-filter=ACMR \
-            "$BASE_SHA"..."$HEAD_SHA" -- docs/activerecord/ || true)
-          offending=$(printf '%s\n' "$changed" \
-            | grep -E '^docs/activerecord/' \
-            | grep -vxF "$ALLOWLIST" || true)
-          if [ -n "$offending" ]; then
-            echo "::error::AR work tracking lives in the tasks repo — add a story, not a doc. Offending files:"
-            printf '%s\n' "$offending"
-            exit 1
-          fi
-          echo "No new or modified docs/activerecord trackers."
 
   rails-comparison:
     name: Rails API/Test Comparison
@@ -1247,23 +1346,18 @@ jobs:
       - changes
       - build-and-typecheck
       - lint
-      - prettier
+      - preflight
       - guides-typecheck
-      - dx-type-tests
+      - leaf-tests
       - virtualized-dx-type-tests
       - unit-tests
-      - rack-tests
       - actionpack-tests
-      - actionview-tests
       - trailties-tests
-      - tse-compiler-tests
       - sqlite-tests
       - postgres-tests
       - mysql-tests
       - maria-tests
       - website
-      - pr-attribution
-      - docs-activerecord-freeze
       - rails-comparison
       - schema-parity-rails
       - schema-parity-trails
@@ -1321,14 +1415,12 @@ jobs:
               [ "$result" = "skipped" ] || continue
               case "$job" in
                 changes|ci) continue ;;
-                pr-attribution)
-                  # Only runs on deanmarano-authored PRs; skip is always
-                  # legitimate (non-PR events, or any other author).
-                  continue
-                  ;;
-                docs-activerecord-freeze)
-                  # Only runs on pull_request events; skip on push/schedule
-                  # is always legitimate (no PR base to diff against).
+                preflight)
+                  # Always runs (its prettier / docs-AR-freeze / pr-attribution
+                  # steps self-gate via per-step `if:`, so an inapplicable check
+                  # no-ops rather than skipping the job). A whole-job skip only
+                  # happens if `changes` itself failed — already caught above —
+                  # so treat any skip here as legitimate.
                   continue
                   ;;
                 mysql-tests)
@@ -1344,17 +1436,20 @@ jobs:
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
                   [ "$AP_AFFECTED" = "false" ] && continue
                   ;;
-                actionview-tests)
-                  [ "$AV_AFFECTED" = "false" ] && continue
-                  ;;
-                rack-tests)
-                  [ "$RACK_AFFECTED" = "false" ] && continue
-                  ;;
                 trailties-tests)
                   [ "$TRAILTIES_AFFECTED" = "false" ] && continue
                   ;;
-                tse-compiler-tests)
-                  [ "$TSE_COMPILER_AFFECTED" = "false" ] && continue
+                leaf-tests)
+                  # Consolidated rack/actionview/tse-compiler/dx-type job.
+                  # A skip is legitimate only when EVERY member flag is false
+                  # (the DX type step is gated on activerecord OR trailties).
+                  if [ "$RACK_AFFECTED" = "false" ] && \
+                     [ "$AV_AFFECTED" = "false" ] && \
+                     [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
+                     [ "$AR_AFFECTED" = "false" ] && \
+                     [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 unit-tests)
                   [ "$UNIT_TESTS_AFFECTED" = "false" ] && continue
@@ -1372,12 +1467,6 @@ jobs:
                   # Legitimate skip when website_affected is false AND no
                   # website/release label opted the job in.
                   if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
-                    continue
-                  fi
-                  ;;
-                dx-type-tests)
-                  # Legitimate skip when neither activerecord nor trailties paths changed.
-                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILTIES_AFFECTED" = "false" ]; then
                     continue
                   fi
                   ;;

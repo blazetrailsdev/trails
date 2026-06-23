@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// THROWAWAY INSTRUMENTATION companion — aggregate the per-worker DDL-profile
+// Opt-in DDL profiler companion — aggregate the per-worker DDL-profile
 // JSON dumps (written by test-helpers/ddl-profile.ts, collected as CI
 // artifacts) into a single summary. Usage:
 //   node scripts/ddl-profile-aggregate.mjs <dir-of-json> [<dir2> ...]
