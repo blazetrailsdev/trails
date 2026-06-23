@@ -11,6 +11,7 @@ import {
   rangeToFs,
   rangeStep,
   rangeEach,
+  stringSucc,
 } from "../range-ext.js";
 
 describe("RangeTest", () => {
@@ -231,11 +232,22 @@ describe("RangeTest", () => {
   });
 
   it("string include approximates succ for mixed character classes", () => {
-    // Known gap: Ruby's String#succ never produces "a1" from "a" (mixing
-    // letter+digit classes), so ("a".."bbb").include?("a1") == false. The
-    // (length, lex) model returns true. Pinned so the divergence is intentional
-    // and visible; revisit if a validator input needs exact succ reachability.
-    expect(rangeIncludesStringValue(makeRange("a", "bbb"), "a1")).toBe(true);
+    // Ruby's String#succ never produces "a1" from "a" (it carries within a
+    // single character class and never mixes letters with digits), so
+    // ("a".."bbb").include?("a1") == false. Faithful succ enumeration matches.
+    expect(rangeIncludesStringValue(makeRange("a", "bbb"), "a1")).toBe(false);
+  });
+
+  it("string succ carries within character classes", () => {
+    // Mirrors Ruby String#succ.
+    expect(stringSucc("abcd")).toBe("abce");
+    expect(stringSucc("az")).toBe("ba");
+    expect(stringSucc("zz")).toBe("aaa");
+    expect(stringSucc("Zz")).toBe("AAa");
+    expect(stringSucc("99")).toBe("100");
+    expect(stringSucc("a9")).toBe("b0");
+    expect(stringSucc("1.9")).toBe("2.0");
+    expect(stringSucc("<<")).toBe("<=");
   });
 
   it("date time with step", () => {

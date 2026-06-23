@@ -57,36 +57,126 @@ export function rangeIncludesValue<T extends number | Date>(range: Range<T>, val
   return true;
 }
 
+const isAsciiAlnum = (c: number): boolean =>
+  (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+
+/**
+ * `String#succ` — Ruby's successor. Increments the rightmost alphanumeric,
+ * carrying within its character class (`9→0`, `z→a`, `Z→A`) and skipping
+ * non-alphanumerics during the carry; an overflow past the leftmost member of
+ * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
+ * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
+ * unit instead (`"<<".succ == "<="`).
+ */
+export function stringSucc(s: string): string {
+  if (s.length === 0) return "";
+  const codes = Array.from(s, (ch) => ch.charCodeAt(0));
+
+  let lastAlnum = -1;
+  for (let i = codes.length - 1; i >= 0; i--) {
+    if (isAsciiAlnum(codes[i])) {
+      lastAlnum = i;
+      break;
+    }
+  }
+
+  if (lastAlnum === -1) {
+    // No alphanumeric: raw code-unit increment with carry.
+    let i = codes.length - 1;
+    let carry = true;
+    while (i >= 0 && carry) {
+      if (codes[i] >= 0xffff) {
+        codes[i] = 0;
+      } else {
+        codes[i]++;
+        carry = false;
+      }
+      i--;
+    }
+    if (carry) codes.unshift(1);
+    return String.fromCharCode(...codes);
+  }
+
+  let i = lastAlnum;
+  let carry = true;
+  let overflowPos = lastAlnum;
+  let overflowChar = 0;
+  while (i >= 0 && carry) {
+    const c = codes[i];
+    if (!isAsciiAlnum(c)) {
+      i--;
+      continue;
+    }
+    overflowPos = i;
+    if (c === 57) {
+      codes[i] = 48; // '9' → '0'
+      overflowChar = 49; // insert '1'
+    } else if (c === 122) {
+      codes[i] = 97; // 'z' → 'a'
+      overflowChar = 97;
+    } else if (c === 90) {
+      codes[i] = 65; // 'Z' → 'A'
+      overflowChar = 65;
+    } else {
+      codes[i] = c + 1;
+      carry = false;
+    }
+    i--;
+  }
+  if (carry) codes.splice(overflowPos, 0, overflowChar);
+  return String.fromCharCode(...codes);
+}
+
+const lexCmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 /**
  * String `Range#include?` — membership in the `succ`-enumerated sequence from
  * `begin` to `end`, NOT a plain lexicographic cover. Ruby enumerates string
- * ranges by `String#succ`, which orders strings length-first then
- * lexicographically (so `("a".."bbb").include?("z")` is true even though
- * `"z" > "bbb"` lexically — `"z"` is shorter, so it sorts before `"bbb"`).
+ * ranges by `String#succ` (range.c `rb_str_include_range_p` → `str_upto_each`),
+ * so a value is a member only if it is actually *reachable* by repeatedly
+ * applying `succ` to `begin` before passing `end`. This mirrors that
+ * enumeration faithfully: `("a".."bbb").include?("z")` is true (`"z"` is
+ * produced before the length guard trips), and `("a".."bbb").include?("a1")`
+ * is false (`succ` mixes no character classes, so `"a1"` is never produced)
+ * — unlike a `(length, lex)` window, which would wrongly admit `"a1"`.
  *
- * Approximation: this models succ ordering as `(length, then lexicographic)`,
- * which is EXACT for strings whose characters all share one succ class
- * (e.g. pure lowercase `a-z`, the inputs Rails string ranges are used with).
- * It is NOT a full `String#succ` reachability check. Ruby's `succ` only
- * increments alphanumerics and carries within a character class, so values
- * that mix classes or contain punctuation are unreachable even when they fall
- * inside the `(length, lex)` window — e.g. Ruby's `("a".."bbb").include?("a1")`
- * is `false` (succ never produces `"a1"`), but this returns `true`. Faithful
- * succ-reachability would require replicating the per-class carry logic of
- * `String#succ`; deferred until a validator input actually needs it.
+ * Beginless/endless string ranges can't be enumerated, so they fall back to
+ * succ-order bound checks (`(length, then lexicographic)`); both-bounded
+ * ranges — the inputs Rails string ranges are used with — enumerate exactly.
  */
 export function rangeIncludesStringValue(range: Range<string>, value: string): boolean {
-  // succ order: shorter strings sort first; equal-length ties break by the
-  // ordinary code-unit comparison Ruby's `String#<=>` uses.
-  const succCmp = (a: string, b: string): number =>
-    a.length !== b.length ? a.length - b.length : a < b ? -1 : a > b ? 1 : 0;
+  const { begin, end, excludeEnd } = range;
 
-  if (range.begin !== null && succCmp(value, range.begin) < 0) return false;
-  if (range.end !== null) {
-    const c = succCmp(value, range.end);
-    if (range.excludeEnd ? c >= 0 : c > 0) return false;
+  if (begin === null || end === null) {
+    const succCmp = (a: string, b: string): number =>
+      a.length !== b.length ? a.length - b.length : lexCmp(a, b);
+    if (begin !== null && succCmp(value, begin) < 0) return false;
+    if (end !== null) {
+      const c = succCmp(value, end);
+      if (excludeEnd ? c >= 0 : c > 0) return false;
+    }
+    return true;
   }
-  return true;
+
+  // Faithful `str_upto_each`: enumerate begin..end via succ, stopping at
+  // `end.succ`, when the exclusive end is reached, or when the current string
+  // grows past `end`'s length (succ is non-decreasing in length).
+  const n = lexCmp(begin, end);
+  if (n > 0 || (excludeEnd && n === 0)) return false;
+  const afterEnd = stringSucc(end);
+  let current = begin;
+  let guard = 0;
+  while (current !== afterEnd) {
+    let next: string | null = null;
+    if (excludeEnd || current !== end) next = stringSucc(current);
+    if (current === value) return true;
+    if (next === null) break;
+    current = next;
+    if (excludeEnd && current === end) break;
+    if (current.length > end.length || current.length === 0) break;
+    if (++guard > 5_000_000) break;
+  }
+  return false;
 }
 
 export function rangeIncludesRange<T extends number | Date>(
