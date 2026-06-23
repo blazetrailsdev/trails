@@ -97,14 +97,17 @@ function buildModelRegistry(): Map<string, string> {
  */
 function computeBaseNames(sf: ts.SourceFile): string[] {
   const parentOf = new Map<string, string>();
-  for (const stmt of sf.statements) {
-    if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
-    for (const hc of stmt.heritageClauses ?? []) {
-      if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
-      const expr = hc.types[0]?.expression;
-      if (expr && ts.isIdentifier(expr)) parentOf.set(stmt.name.text, expr.text);
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name) {
+      for (const hc of node.heritageClauses ?? []) {
+        if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
+        const expr = hc.types[0]?.expression;
+        if (expr && ts.isIdentifier(expr)) parentOf.set(node.name.text, expr.text);
+      }
     }
-  }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
   const names = new Set<string>(["Base"]);
   let grew = true;
   while (grew) {
@@ -136,6 +139,14 @@ function resolveAutoImports(
   for (const info of classes) collectTargets(info, needed);
   if (needed.size === 0) return [];
   const inScope = collectNamesInScope(sf);
+  // Model classes declared inline inside `describe`/`it`/helper-function
+  // bodies are referenceable from the declares we splice into their
+  // siblings, but `collectNamesInScope` only sees top-level statements —
+  // so without this an in-file nested target would get a dead
+  // `import type { X }` line (unused: TS resolves the bare reference to the
+  // nested class). Treat every in-file class declaration, at any nesting
+  // depth, as already in scope.
+  collectNestedClassNames(sf, inScope);
   const imports: string[] = [];
   for (const name of needed) {
     if (inScope.has(name)) continue;
@@ -147,6 +158,14 @@ function resolveAutoImports(
     imports.push(`import type { ${name} } from "${rel}";`);
   }
   return imports.sort((a, b) => a.localeCompare(b));
+}
+
+function collectNestedClassNames(sf: ts.SourceFile, out: Set<string>): void {
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name) out.add(node.name.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
 }
 
 function collectTargets(info: ClassInfo, out: Set<string>): void {

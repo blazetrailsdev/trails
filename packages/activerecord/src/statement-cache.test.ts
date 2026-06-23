@@ -367,6 +367,8 @@ describe("StatementCacheTest", () => {
       await defineSchema(conn, { books: canonicalSchema.books });
 
       class Book extends Base {
+        declare author_id: number;
+
         static {
           this.tableName = "books";
           this.adapter = conn;
@@ -403,6 +405,10 @@ describe("StatementCacheTest", () => {
         }
       }
       class Molecule extends Base {
+        declare liquid_id: number;
+        declare liquid: Liquid | null;
+        declare loadBelongsTo: (name: "liquid") => Promise<Liquid | null>;
+
         static {
           this.tableName = "molecules";
           this.adapter = conn;

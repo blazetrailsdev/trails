@@ -1,7 +1,9 @@
 // Syntactic walker for model source files.
 //
-// Finds top-level class declarations that extend a name in the allow-list
-// (default: ["Base"]) and collects the runtime calls inside each class's
+// Finds class declarations that extend a name in the allow-list
+// (default: ["Base"]) — anywhere in the file, including classes nested in
+// `describe`/`it`/helper-function bodies — and collects the runtime calls
+// inside each class's
 // static blocks — `this.attribute(...)`, `this.hasMany(...)`,
 // `this.belongsTo(...)`, `this.hasOne(...)`, `this.hasAndBelongsToMany(...)`,
 // `this.scope(...)`, `this.enum(...)` — plus top-level `defineEnum(this, ...)`
@@ -113,48 +115,17 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   const baseNames = new Set(opts.baseNames ?? ["Base"]);
   const out: ClassInfo[] = [];
 
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isClassDeclaration(stmt)) continue;
-    if (!stmt.name) continue;
-    if (!extendsOneOf(stmt, baseNames)) continue;
-
-    const info: ClassInfo = {
-      name: stmt.name.text,
-      classDecl: stmt,
-      openBracePos: findOpenBrace(sourceFile.text, stmt),
-      calls: [],
-      existingMembers: new Set(),
-      existingStaticMembers: new Set(),
-      skip: hasSkipMarker(stmt, sourceFile),
-    };
-
-    if (info.skip) {
-      out.push(info);
-      continue;
+  // Visit class declarations anywhere in the tree — not just top-level
+  // statements. AR test files routinely declare their model classes inside
+  // `describe`/`it`/helper-function bodies, and those classes carry the
+  // same `static { this.hasMany(...) }` association calls we materialize.
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name && extendsOneOf(node, baseNames)) {
+      out.push(buildClassInfo(node, sourceFile));
     }
-
-    for (const member of stmt.members) {
-      recordExistingMember(member, info);
-      if (ts.isClassStaticBlockDeclaration(member)) {
-        for (const s of member.body.statements) {
-          const call = readThisCall(s);
-          if (call) {
-            info.calls.push(call);
-            continue;
-          }
-          // Static-block `defineEnum(this, "status", { ... })` —
-          // Rails-idiomatic authoring form (matches Ruby's
-          // `enum :status, ...` inside the class body). Walker also
-          // supports the top-level `defineEnum(ClassName, ...)` form
-          // below.
-          const defineEnumCall = readDefineEnumThisCall(s);
-          if (defineEnumCall) info.calls.push(defineEnumCall);
-        }
-      }
-    }
-
-    out.push(info);
-  }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 
   // Top-level `defineEnum(ClassName, ...)` calls. Supports both the array
   // form (`["draft", "published"]`) and the object form
@@ -182,6 +153,42 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   }
 
   return out;
+}
+
+function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): ClassInfo {
+  const info: ClassInfo = {
+    name: cls.name!.text,
+    classDecl: cls,
+    openBracePos: findOpenBrace(sourceFile.text, cls),
+    calls: [],
+    existingMembers: new Set(),
+    existingStaticMembers: new Set(),
+    skip: hasSkipMarker(cls, sourceFile),
+  };
+
+  if (info.skip) return info;
+
+  for (const member of cls.members) {
+    recordExistingMember(member, info);
+    if (ts.isClassStaticBlockDeclaration(member)) {
+      for (const s of member.body.statements) {
+        const call = readThisCall(s);
+        if (call) {
+          info.calls.push(call);
+          continue;
+        }
+        // Static-block `defineEnum(this, "status", { ... })` —
+        // Rails-idiomatic authoring form (matches Ruby's
+        // `enum :status, ...` inside the class body). Walker also
+        // supports the top-level `defineEnum(ClassName, ...)` form
+        // below.
+        const defineEnumCall = readDefineEnumThisCall(s);
+        if (defineEnumCall) info.calls.push(defineEnumCall);
+      }
+    }
+  }
+
+  return info;
 }
 
 function extendsOneOf(cls: ts.ClassDeclaration, names: Set<string>): boolean {

@@ -413,6 +413,28 @@ describe("virtualize — multiple classes", () => {
     expect(remapLine(deltas[0].insertedAtLine + 1, deltas)).toBeNull();
     expect(remapLine(deltas[1].insertedAtLine + 1, deltas)).toBeNull();
   });
+
+  test("injects declares into model classes nested inside function bodies", () => {
+    // AR test files declare their models inline inside `describe`/`it`
+    // callbacks. The walker must descend into those bodies — not just
+    // iterate top-level statements — so nested classes still get their
+    // association/attribute declares materialized.
+    const src =
+      'describe("nested", () => {\n' +
+      "  function makeModels() {\n" +
+      "    class Widget extends Base {\n" +
+      "      static {\n" +
+      '        this.attribute("title", "string");\n' +
+      '        this.hasMany("gadgets", { className: "Gadget" });\n' +
+      "      }\n" +
+      "    }\n" +
+      "    return Widget;\n" +
+      "  }\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("declare title: string;");
+    expect(text).toContain("declare gadgets:");
+  });
 });
 
 function indexOfNthNewline(text: string, n: number): number {

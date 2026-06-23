@@ -5,6 +5,7 @@
  *   - HMT insert_record two-step alignment (super.insertRecord →
  *     save_through_record) for HABTM
  */
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
@@ -33,6 +34,9 @@ withTransactionalFixtures(() => _adapter);
 describe("constructor-form association writer", () => {
   function makeHasManyModels() {
     class B30Item extends Base {
+      declare name: string;
+      declare owner_id: number;
+
       static {
         this._tableName = "b30_items";
         this.attribute("name", "string");
@@ -41,6 +45,9 @@ describe("constructor-form association writer", () => {
       }
     }
     class B30Owner extends Base {
+      declare name: string;
+      declare items: AssociationProxy<B30Item>;
+
       static {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
@@ -91,6 +98,9 @@ describe("constructor-form association writer", () => {
 
   it("dispatches single record to hasOne association on construction", () => {
     class B30Profile extends Base {
+      declare name: string;
+      declare owner_id: number;
+
       static {
         this._tableName = "b30_profiles";
         this.attribute("name", "string");
@@ -99,6 +109,10 @@ describe("constructor-form association writer", () => {
       }
     }
     class B30Owner2 extends Base {
+      declare name: string;
+      declare profile: B30Profile | null;
+      declare loadHasOne: (name: "profile") => Promise<B30Profile | null>;
+
       static {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
@@ -121,6 +135,9 @@ describe("constructor-form association writer", () => {
 describe("HABTM insert_record two-step", () => {
   function makeHabtmModels() {
     class B30Post extends Base {
+      declare title: string;
+      declare tags: AssociationProxy<B30Tag>;
+
       static {
         this._tableName = "b30_posts";
         this.attribute("title", "string");
@@ -129,6 +146,8 @@ describe("HABTM insert_record two-step", () => {
       }
     }
     class B30Tag extends Base {
+      declare name: string;
+
       static {
         this._tableName = "b30_tags";
         this.attribute("name", "string");
@@ -161,6 +180,9 @@ describe("HABTM insert_record two-step", () => {
 describe("resetScope on owner save", () => {
   it("clears the memoized association scope before iterating children", async () => {
     class B30Item2 extends Base {
+      declare name: string;
+      declare owner_id: number;
+
       static {
         this._tableName = "b30_items";
         this.attribute("name", "string");
@@ -169,6 +191,9 @@ describe("resetScope on owner save", () => {
       }
     }
     class B30Owner3 extends Base {
+      declare name: string;
+      declare items: AssociationProxy<B30Item2>;
+
       static {
         this._tableName = "b30_owners";
         this.attribute("name", "string");
