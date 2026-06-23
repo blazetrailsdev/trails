@@ -550,6 +550,62 @@ describe("PreloaderTest", () => {
     registerModel("EssaySpecial", EssaySpecial);
     registerModel("Postesque", PostesquePL);
     registerModel("AuthorAddress", AuthorAddress);
+
+    // A reflection memoizes the resolved target class in `_klassCache` (and the
+    // through/source reflection it derives from it) the first time it's touched,
+    // keyed by class NAME via the global modelRegistry. When a sibling test file
+    // that shares this worker registers a bespoke model under a canonical name
+    // (e.g. nested-through-associations.test.ts registers a `Tagging` with no
+    // `tag` source) and that resolution happens first, the canonical reflection
+    // caches the wrong class permanently — surfacing here as
+    // `HasManyThroughSourceAssociationNotFoundError` on Post.tags. The registry
+    // entries above are already corrected to the canonical models; drop the stale
+    // klass/through/source caches so resolution re-runs against them. Covers every
+    // model this beforeEach re-registers (not just the Post→taggings→tag chain that
+    // fails today) so a future file-size reschedule poisoning a different canonical
+    // name — Sharded*, Cpk*, Essay, … — is hardened too. (FK/PK caches are
+    // intentionally left intact — they don't depend on cross-model name resolution
+    // and resetting them mid-suite regresses unrelated tests.)
+    const preloaderModels = [
+      Author,
+      AuthorFavorite,
+      Post,
+      CategoryPost,
+      Comment,
+      Book,
+      Category,
+      SpecialCategory,
+      Tag,
+      Tagging,
+      Essay,
+      Invoice,
+      LineItem,
+      LineItemDiscountApplication,
+      ShippingLine,
+      ShippingLineDiscountApplication,
+      Discount,
+      ShardedBlogPL,
+      ShardedBlogPostPL,
+      ShardedCommentPL,
+      ShardedTagPL,
+      ShardedBlogPostTagPL,
+      CpkOrderPL,
+      CpkOrderAgreementPL,
+      Dog,
+      EssaySpecial,
+      PostesquePL,
+      AuthorAddress,
+    ];
+    for (const M of preloaderModels) {
+      const reflections = (M as { _reflections?: Record<string, unknown> })._reflections ?? {};
+      for (const reflection of Object.values(reflections) as Record<string, unknown>[]) {
+        reflection._klassCache = null;
+        if ("_throughReflectionCache" in reflection) reflection._throughReflectionCache = undefined;
+        if ("_sourceReflectionCache" in reflection) reflection._sourceReflectionCache = undefined;
+        if ("_sourceReflectionNameCache" in reflection)
+          reflection._sourceReflectionNameCache = undefined;
+      }
+    }
   });
 
   it("preload with scope", async () => {

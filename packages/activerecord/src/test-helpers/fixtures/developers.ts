@@ -4,10 +4,10 @@ export const developerFixtureData = {
     id: 1,
     name: "David",
     salary: 80000,
-    // Rails YAML carries `shared_computers: laptop`, but that's the
-    // `has_and_belongs_to_many :shared_computers` association — it
-    // materializes into the `computers_developers` join table (HABTM
-    // join-table loader is a #2572 followup), not a `developers` column.
+    // Rails YAML's `shared_computers: laptop` — the `hasAndBelongsToMany`
+    // `sharedComputers` association label (class_name: "Computer"). The loader
+    // materializes it into a `computers_developers` join row, not a column.
+    sharedComputers: ["laptop"],
   },
   jamis: {
     id: 2,

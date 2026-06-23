@@ -91,7 +91,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       "projects",
       "developersProjects",
       "computers",
-      "computersDevelopers",
       "categories",
       "posts",
       "categoriesPosts",
@@ -1076,8 +1075,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // `shared_computers` → camelCase `sharedComputers` reflection (class_name: "Computer").
     expect((Developer as any)._reflectOnAssociation("sharedComputers")).not.toBeNull();
     // Rails additionally asserts developers.yml literally contains "shared_computers"
-    // (the only way the bug reproduced). trails has no YAML association loader, so the
-    // join row lives in the computersDevelopers fixture — exercised by the data assertion below.
+    // (the only way the bug reproduced). trails' fixture loader materializes the
+    // `sharedComputers: ["laptop"]` association label on `david` into a
+    // computers_developers join row — exercised by the data assertion below.
     const david = developers("david");
     const sharedComputers = await association(david, "sharedComputers").toArray();
     expect((sharedComputers[0] as any).id).toBe((computers("laptop") as any).id);
