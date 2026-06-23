@@ -37,6 +37,11 @@ describe("ar-db-slots", () => {
       setEnv("0");
       expect(workerForkCount()).toBe(1);
     });
+
+    it("treats a non-numeric value as single-worker", () => {
+      setEnv("auto");
+      expect(workerForkCount()).toBe(1);
+    });
   });
 
   describe("slotPoolSize", () => {
@@ -65,9 +70,17 @@ describe("ar-db-slots", () => {
       expect(slotPoolSize()).toBe(6);
     });
 
+    it("clamps an undersized override up to workers + 1", () => {
+      setEnv("8", "4");
+      expect(slotPoolSize()).toBe(9);
+    });
+
     it("is always strictly greater than the worker count", () => {
       for (const forks of [1, 2, 4, 8]) {
         setEnv(String(forks));
+        expect(slotPoolSize()).toBeGreaterThan(workerForkCount());
+        // ...even when an undersized override is supplied.
+        setEnv(String(forks), "1");
         expect(slotPoolSize()).toBeGreaterThan(workerForkCount());
       }
     });

@@ -28,18 +28,26 @@
 // recycle overlap; two leaves margin for back-to-back recycles.
 const SLOT_HEADROOM = 2;
 
-/** vitest worker count (`AR_DB_FORKS`), clamped to >= 1. */
+/**
+ * vitest worker count (`AR_DB_FORKS`), clamped to >= 1. A non-numeric or
+ * non-positive value (e.g. unset, "auto", "0") is treated as single-worker —
+ * matching the pre-decoupling `!Number.isFinite(forks) || forks <= 1` guard.
+ */
 export function workerForkCount(): number {
-  return Math.max(1, parseInt(process.env.AR_DB_FORKS ?? "1", 10));
+  const n = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 /**
  * Number of advisory-lock slot DBs to provision and to scan when claiming.
  * Decoupled from the worker count: `AR_DB_SLOTS` override, else
- * `workers + SLOT_HEADROOM`.
+ * `workers + SLOT_HEADROOM`. An explicit override is clamped to at least
+ * `workers + 1` so it can never undercut the worker count and reintroduce the
+ * pool-exhaustion this decoupling exists to prevent.
  */
 export function slotPoolSize(): number {
+  const workers = workerForkCount();
   const override = parseInt(process.env.AR_DB_SLOTS ?? "", 10);
-  if (Number.isFinite(override) && override > 0) return Math.max(1, override);
-  return workerForkCount() + SLOT_HEADROOM;
+  if (Number.isFinite(override) && override > 0) return Math.max(override, workers + 1);
+  return workers + SLOT_HEADROOM;
 }
