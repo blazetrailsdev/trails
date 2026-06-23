@@ -1159,6 +1159,12 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
+      - name: Call-mismatches ratchet
+        # Gates the advisory call-set parity artifact (output/call-mismatches.json,
+        # written by the API comparison step above) against the committed
+        # baseline. Fails on a new mismatch or a stale baseline entry; reseed
+        # with `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
+        run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
       - name: Conventions doc up to date
         # docs/ruby-ts-conventions.md is generated from explainConventions()
         # in conventions.ts; fail if it drifts so the agent-facing doc can't

@@ -1,0 +1,275 @@
+[
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "process_action",
+    "call": "run_callbacks",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "base.ts",
+    "rubyName": "redirect_to",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "process",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "process_controller_response",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/static.ts",
+    "rubyName": "serve",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/has-one.ts",
+    "rubyName": "touch_record",
+    "call": "touch",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "concat",
+    "call": "transaction",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "replace",
+    "call": "transaction",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "replace",
+    "call": "save",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "_create_record",
+    "call": "changes_applied",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "_touch_row",
+    "call": "changes_applied",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "_touch_row",
+    "call": "clear_attribute_changes",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "_update_record",
+    "call": "changes_applied",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_belongs_to_association",
+    "call": "destroy",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_belongs_to_association",
+    "call": "save",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_collection_association",
+    "call": "destroy",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_collection_association",
+    "call": "save",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_has_one_association",
+    "call": "destroy",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "save_has_one_association",
+    "call": "save",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "base.ts",
+    "rubyName": "update",
+    "call": "save",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "base.ts",
+    "rubyName": "update!",
+    "call": "save!",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "mismatched_foreign_key",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3-adapter.ts",
+    "rubyName": "alter_table",
+    "call": "transaction",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "internal-metadata.ts",
+    "rubyName": "update_entry",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "locking/pessimistic.ts",
+    "rubyName": "lock!",
+    "call": "reload",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "locking/pessimistic.ts",
+    "rubyName": "with_lock",
+    "call": "lock!",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "ddl_transaction",
+    "call": "transaction",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "accepts_nested_attributes_for",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "update_attribute!",
+    "call": "save!",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "secure-token.ts",
+    "rubyName": "has_secure_token",
+    "call": "update!",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "touch-later.ts",
+    "rubyName": "touch_deferred_attributes",
+    "call": "touch",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "current-attributes.ts",
+    "rubyName": "reset",
+    "call": "run_callbacks",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "hash-with-indifferent-access.ts",
+    "rubyName": "merge",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "headers.ts",
+    "rubyName": "replace",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "mock-request.ts",
+    "rubyName": "env_for",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "source-annotation-extractor.ts",
+    "rubyName": "find",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "source-annotation-extractor.ts",
+    "rubyName": "find_in",
+    "call": "update",
+    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+  }
+]
