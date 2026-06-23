@@ -18,6 +18,7 @@ import {
   integerToSql,
   foreignKeys,
   indexes,
+  MysqlSchemaStatements,
 } from "./schema-statements.js";
 import { quote } from "./quoting.js";
 
@@ -479,5 +480,28 @@ describe("MySQL::SchemaStatements", () => {
     );
     expect(idx[0].columns).toEqual(["(lower(`title`))"]);
     expect(idx[0].orders).toEqual({ "(lower(`title`))": "desc" });
+  });
+});
+
+describe("MysqlSchemaStatements#renameColumn delegation", () => {
+  // Migration#renameColumn dispatches through this.schema.renameColumn — i.e.
+  // MysqlSchemaStatements, which inherits the generic base. The base must
+  // delegate to AbstractMysqlAdapter#renameColumn so the RENAME-COLUMN/CHANGE
+  // branch and index fixups run; otherwise the MySQL path is silently skipped.
+  it("inherited renameColumn delegates to the adapter's renameColumn", async () => {
+    const calls: unknown[][] = [];
+    const adapter = {
+      renameColumn: async (...args: unknown[]) => {
+        calls.push(args);
+      },
+      executeMutation: async () => {
+        throw new Error("base RENAME COLUMN path should not run when adapter overrides");
+      },
+      schemaCache: null,
+      pool: {},
+    };
+    const ss = new MysqlSchemaStatements(adapter as never);
+    await ss.renameColumn("users", "old_name", "new_name");
+    expect(calls).toEqual([["users", "old_name", "new_name"]]);
   });
 });
