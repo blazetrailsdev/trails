@@ -156,13 +156,20 @@ export class SingularAssociation extends Association {
     // Rails yields the record in `build_record` before the save (block can
     // mutate persisted attributes).
     if (block) block(record);
-    // Set FK/inverse before saving so the record persists with correct owner reference
-    this.setNewRecord(record);
+    // Match Rails' `SingularAssociation#_create_record` ordering: save first,
+    // then `set_new_record`. The FK / polymorphic-type columns are already on
+    // the built record via `buildRecord` → `initializeAttributes`
+    // (scope_for_create), so the INSERT carries the owner reference without the
+    // pre-save `setNewRecord`. For belongs_to this matters: `set_new_record`
+    // copies the just-saved record's id into the owner's FK, so it must run
+    // after `save` to see a non-nil id.
+    let saved = true;
     if (typeof (record as any).save === "function") {
-      const saved = await (record as any).save();
-      if (!saved && shouldRaise) {
-        throw new RecordInvalid(record);
-      }
+      saved = await (record as any).save();
+    }
+    this.setNewRecord(record);
+    if (!saved && shouldRaise) {
+      throw new RecordInvalid(record);
     }
     return record;
   }
