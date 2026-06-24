@@ -1783,6 +1783,7 @@ export function main() {
     showInheritance,
     showArity,
     mode,
+    wideCalls,
   );
 }
 
@@ -1799,6 +1800,7 @@ function printReport(
   showInheritance = false,
   showArity = false,
   mode: CompareMode = "public",
+  wideCalls = false,
 ) {
   if (mode === "private") {
     console.log(
@@ -1971,8 +1973,8 @@ function printReport(
   }
   if (grandCallsCompared > 0) {
     console.log(
-      `  Calls (advisory): ${grandCallsCompared} matched pairs checked, ` +
-        `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches.json`,
+      `  Calls (advisory${wideCalls ? ", WIDE" : ""}): ${grandCallsCompared} matched pairs checked, ` +
+        `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches${wideCalls ? "-wide" : ""}.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);
