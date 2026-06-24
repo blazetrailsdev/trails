@@ -152,6 +152,72 @@ describe("QueryingTest — static forwarders on Base", () => {
   it("merge() returns a Relation", () => {
     expect(Post.merge(Post.where({ status: "draft" }))).toBeInstanceOf(Relation);
   });
+
+  it("except() removes the named query part (SpawnMethods#except)", () => {
+    const sql = Post.order("id").except("order").toSql();
+    expect(sql).not.toContain("ORDER BY");
+  });
+
+  it("except() does not re-erase the part when later merged (unlike unscope)", () => {
+    // Rails `except(:order)` deletes values one-shot; it must not record
+    // unscope_values, so merging the result preserves the other side's order.
+    const merged = Post.except("order").merge(Post.order("id"));
+    expect(merged.toSql()).toContain("ORDER BY");
+  });
+
+  it("extractAssociated() returns a Promise", async () => {
+    const p = Post.extractAssociated("author");
+    expect(p).toBeInstanceOf(Promise);
+    expect(await p).toEqual([]);
+  });
+
+  it("calculate() returns a Promise", async () => {
+    const p = Post.calculate("count");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncCount() returns a Promise", async () => {
+    const p = Post.asyncCount();
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncAverage() returns a Promise", async () => {
+    const p = Post.asyncAverage("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncMinimum() returns a Promise", async () => {
+    const p = Post.asyncMinimum("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncMaximum() returns a Promise", async () => {
+    const p = Post.asyncMaximum("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncSum() returns a Promise", async () => {
+    const p = Post.asyncSum("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncPluck() returns a Promise", async () => {
+    const p = Post.asyncPluck("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
+
+  it("asyncPick() returns a Promise", async () => {
+    const p = Post.asyncPick("id");
+    expect(p).toBeInstanceOf(Promise);
+    await p;
+  });
 });
 
 describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {

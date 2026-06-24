@@ -1009,6 +1009,94 @@ export function asyncIds<T extends typeof Base>(this: T): Promise<unknown[]> {
   return this.all().asyncIds();
 }
 
+/** Mirrors: ActiveRecord::Querying#extract_associated — delegates through all(). */
+export function extractAssociated<T extends typeof Base>(this: T, name: string): Promise<Base[]> {
+  return this.all().extractAssociated(name);
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#except (SpawnMethods#except) — delegates
+ * through all(). Rails `except(*skips)` is purely a value-key remover; it has
+ * no set-operation branch, so this only accepts skip keys (unknown ones no-op).
+ */
+export function except<T extends typeof Base>(
+  this: T,
+  ...skips: Array<import("./relation/query-methods.js").ExceptKey>
+): Relation<InstanceType<T>> {
+  return this.all().except(...skips);
+}
+
+/** Mirrors: ActiveRecord::Querying#calculate — delegates through all(). */
+export function calculate<T extends typeof Base>(
+  this: T,
+  operation: "count" | "sum" | "average" | "minimum" | "maximum",
+  column?: string,
+): ReturnType<Relation<InstanceType<T>>["calculate"]> {
+  const rel = this.all();
+  return rel.calculate(operation as "count", column) as ReturnType<
+    Relation<InstanceType<T>>["calculate"]
+  >;
+}
+
+/** Mirrors: ActiveRecord::Querying#async_count — params/return derived from Relation#asyncCount. */
+export function asyncCount<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<ReturnType<T["all"]>["asyncCount"]>
+): ReturnType<ReturnType<T["all"]>["asyncCount"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.asyncCount(...args) as ReturnType<ReturnType<T["all"]>["asyncCount"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#async_average — delegates through all(). */
+export function asyncAverage<T extends typeof Base>(
+  this: T,
+  column: string,
+): ReturnType<Relation<InstanceType<T>>["asyncAverage"]> {
+  return this.all().asyncAverage(column);
+}
+
+/** Mirrors: ActiveRecord::Querying#async_minimum — delegates through all(). */
+export function asyncMinimum<T extends typeof Base>(
+  this: T,
+  column: string,
+): ReturnType<Relation<InstanceType<T>>["asyncMinimum"]> {
+  return this.all().asyncMinimum(column);
+}
+
+/** Mirrors: ActiveRecord::Querying#async_maximum — delegates through all(). */
+export function asyncMaximum<T extends typeof Base>(
+  this: T,
+  column: string,
+): ReturnType<Relation<InstanceType<T>>["asyncMaximum"]> {
+  return this.all().asyncMaximum(column);
+}
+
+/** Mirrors: ActiveRecord::Querying#async_sum — delegates through all(). */
+export function asyncSum<T extends typeof Base>(
+  this: T,
+  column?: string,
+): ReturnType<Relation<InstanceType<T>>["asyncSum"]> {
+  return this.all().asyncSum(column);
+}
+
+/** Mirrors: ActiveRecord::Querying#async_pluck — params/return derived from Relation#asyncPluck. */
+export function asyncPluck<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<ReturnType<T["all"]>["asyncPluck"]>
+): ReturnType<ReturnType<T["all"]>["asyncPluck"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.asyncPluck(...args) as ReturnType<ReturnType<T["all"]>["asyncPluck"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#async_pick — params/return derived from Relation#asyncPick. */
+export function asyncPick<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<ReturnType<T["all"]>["asyncPick"]>
+): ReturnType<ReturnType<T["all"]>["asyncPick"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.asyncPick(...args) as ReturnType<ReturnType<T["all"]>["asyncPick"]>;
+}
+
 // `with` is a reserved JS keyword and cannot be a function declaration name.
 // Re-export under the Rails name so extend(Base, Querying) wires Base.with correctly.
 // Reserved words are valid IdentifierNames in export specifiers (ES2022 §16.2.3).
