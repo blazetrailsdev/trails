@@ -245,6 +245,45 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(saved).toBe(true);
     expect(account.isDestroyed()).toBe(true);
   });
+
+  // Rails save_has_one_association (autosave_association.rb:482-483) destroys a
+  // marked-for-destruction child unconditionally — it does NOT guard on
+  // new_record?. Persistence#destroy on a new record still runs the destroy
+  // callback chain and freezes the record; only the DB DELETE is skipped.
+  it("destroy new has_one child marked for destruction freezes and marks destroyed", async () => {
+    const company = await Company.create({ name: "Acme" });
+    const account = new Account({ credit_limit: 100 });
+    expect(account.isNewRecord()).toBe(true);
+
+    markForDestruction(account);
+    company.association("account").setTarget(account as any);
+
+    const saved = await company.save();
+    expect(saved).toBe(true);
+    // Rails Persistence#destroy on a new record still runs the destroy path,
+    // sets @destroyed and freezes; only the DB DELETE is skipped.
+    expect(account.isDestroyed()).toBe(true);
+    expect(account.isFrozen()).toBe(true);
+  });
+
+  // Rails Persistence#destroy gates the DELETE on `persisted?`
+  // (persistence.rb:457): a new record with an assigned primary key must NOT
+  // delete the existing row that shares that id — only callbacks/freeze run.
+  it("destroy new has_one child with assigned id does not delete the existing row", async () => {
+    const company = await Company.create({ name: "Acme" });
+    const existing = await Account.create({ credit_limit: 999 });
+
+    const child = new Account({ id: existing.id, credit_limit: 100 });
+    expect(child.isNewRecord()).toBe(true);
+
+    markForDestruction(child);
+    company.association("account").setTarget(child as any);
+
+    await company.save();
+    expect(child.isDestroyed()).toBe(true);
+    // The pre-existing row sharing the id must survive — Rails skips the DELETE.
+    expect(await Account.findBy({ id: existing.id })).not.toBeNull();
+  });
 });
 
 // ==========================================================================
@@ -316,6 +355,26 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     expect(post.isNewRecord()).toBe(false);
     expect(author.isNewRecord()).toBe(false);
     expect(Number(post.author_id)).toBe(Number(author.id));
+  });
+
+  // Rails save_belongs_to_association (autosave_association.rb:544-547) nulls the
+  // owner FK and then destroys the marked-for-destruction parent unconditionally
+  // — no new_record? guard. A new parent still runs destroy callbacks and freezes.
+  it("destroy new belongs_to parent marked for destruction nulls fk freezes and marks destroyed", async () => {
+    const post = new Post({ title: "Hello" });
+    const author = new Author({ name: "Dean" });
+    expect(author.isNewRecord()).toBe(true);
+
+    markForDestruction(author);
+    post.association("author").setTarget(author as any);
+
+    const saved = await post.save();
+    expect(saved).toBe(true);
+    // Rails save_belongs_to_association nulls the owner FK before destroying.
+    expect((post as any).author_id).toBeNull();
+    // Persistence#destroy on a new record still freezes and marks destroyed.
+    expect(author.isDestroyed()).toBe(true);
+    expect(author.isFrozen()).toBe(true);
   });
 });
 
