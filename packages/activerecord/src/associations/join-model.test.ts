@@ -623,6 +623,20 @@ describe("AssociationsJoinModelTest", () => {
     expect(scoped.map((p) => p.id)).toEqual([posts("welcome").id]);
   });
 
+  it("eager has many polymorphic with source type merges source reflection scope", async () => {
+    // Eager-load counterpart of "has many polymorphic with source type merges
+    // source reflection scope". The preloader path must fold in the polymorphic
+    // `taggable` source's own `-> { where(...) }` scope just like the direct
+    // query, restricting the eager-loaded through target to the welcome post.
+    const general = await ScopedSourceTag.all()
+      .includes("welcomeTaggedPosts")
+      .find(tags("general").id);
+    await assertNoQueries(false, async () => {
+      const target = (general as any).association("welcomeTaggedPosts").target as Base[];
+      expect(target.map((p) => p.id)).toEqual([posts("welcome").id]);
+    });
+  });
+
   it("eager has many polymorphic with source type", async () => {
     const tagWithInclude = await Tag.all().includes("taggedPosts").find(tags("general").id);
     const desired = [posts("welcome").id, posts("thinking").id].sort(
@@ -716,6 +730,22 @@ describe("AssociationsJoinModelTest", () => {
     const author = (await Author.first()) as Author;
     expect(((await (author as any).comments.toArray()) as Base[]).length).toBeGreaterThan(0);
     expect(((await (author as any).nonexistentComments.toArray()) as Base[]).length).toBe(0);
+  });
+
+  it("eager has many through uses conditions specified on the has many association", async () => {
+    // Eager-load counterpart of the direct test above. The plain (non-polymorphic)
+    // source reflection `nonexistentComments` on Post carries `where("comments.id < 0")`;
+    // the preloader must fold that source scope just like the direct query, leaving
+    // the eager-loaded through target empty.
+    const author = (await Author.all().includes("nonexistentComments").first()) as any;
+    // Assert the association was actually preloaded — a fresh collection proxy's
+    // `target` is `[]`, so an empty target alone can't distinguish a preloaded
+    // empty result from one that never loaded. With it loaded, read through the
+    // public reader under assertNoQueries (mirrors Rails' eager tests).
+    expect(author.association("nonexistentComments").loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(((await author.nonexistentComments.toArray()) as Base[]).length).toBe(0);
+    });
   });
 
   it("has many through uses correct attributes", async () => {
