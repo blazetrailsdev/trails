@@ -77,7 +77,7 @@ interface ArtifactMismatch {
   missing: string[];
 }
 
-interface Artifact {
+export interface Artifact {
   mismatches: ArtifactMismatch[];
 }
 
@@ -131,11 +131,23 @@ function sortEntries<T extends CallMismatchKey>(entries: T[]): T[] {
 // Rebuild the baseline from the live artifact: keep each still-flagging call,
 // reusing a prior reason when present, defaulting new ones. Dropped rows are the
 // stale entries the gate would otherwise reject.
-export function reseed(current: CallMismatchKey[], baseline: ExcludeEntry[]): ExcludeEntry[] {
+export function reseed(
+  current: CallMismatchKey[],
+  baseline: ExcludeEntry[],
+  defaultReason: string = DEFAULT_REASON,
+): ExcludeEntry[] {
   const reasons = new Map(baseline.map((e) => [keyOf(e), e.reason]));
-  return sortEntries(
-    current.map((k) => ({ ...k, reason: reasons.get(keyOf(k)) ?? DEFAULT_REASON })),
-  );
+  // Collapse to one entry per key: the artifact can carry several `missing`
+  // rows whose Ruby call name (the key grain) coincides — e.g. one call mapped
+  // to two TS candidates — which flattenArtifact emits as duplicate keys. The
+  // baseline is a 1:1 record (findDuplicateKeys rejects dups), so dedupe here.
+  const byKey = new Map<string, ExcludeEntry>();
+  for (const k of current) {
+    const key = keyOf(k);
+    if (byKey.has(key)) continue;
+    byKey.set(key, { ...k, reason: reasons.get(key) ?? defaultReason });
+  }
+  return sortEntries([...byKey.values()]);
 }
 
 async function readJson<T>(file: string): Promise<T> {

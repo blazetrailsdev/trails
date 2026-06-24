@@ -130,4 +130,32 @@ describe("reseed", () => {
       },
     ]);
   });
+
+  it("honors a custom default reason for new entries (wide RFC 0047 seed)", () => {
+    const current = [{ package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update" }];
+    const next = reseed(current, [], "wide seed");
+    expect(next).toEqual([
+      { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update", reason: "wide seed" },
+    ]);
+  });
+
+  it("collapses artifact rows that share a key into one baseline entry", () => {
+    // The wide population emits the same Ruby call mapped to two TS candidates
+    // as two `missing` rows → duplicate keys; reseed must produce a 1:1 baseline.
+    const current = flattenArtifact({
+      mismatches: [
+        {
+          package: "ar",
+          tsFile: "a.ts",
+          rubyName: "foo",
+          missing: ["save → saveA", "save → saveB"],
+        },
+      ],
+    });
+    const next = reseed(current, [], "wide seed");
+    expect(next).toEqual([
+      { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "wide seed" },
+    ]);
+    expect(findDuplicateKeys(next)).toEqual([]);
+  });
 });
