@@ -128,6 +128,10 @@ import {
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
+import {
+  tokenDefinitions as _tokenDefinitions,
+  generatedTokenVerifier as _generatedTokenVerifier,
+} from "./token-for.js";
 import { registerMigrationArConfig } from "./migration.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -1552,6 +1556,24 @@ export class Base extends Model {
    */
   static get normalizedAttributes(): Set<string> {
     return _normalizedAttributes(this);
+  }
+
+  /**
+   * Per-model `purpose => TokenDefinition` map (inherited purposes included).
+   *
+   * Mirrors: ActiveRecord::Base.token_definitions
+   */
+  static get tokenDefinitions(): Readonly<Record<string, unknown>> {
+    return _tokenDefinitions(this);
+  }
+
+  /**
+   * MessageVerifier backing token-for (null until the first token op builds it).
+   *
+   * Mirrors: ActiveRecord::Base.generated_token_verifier
+   */
+  static get generatedTokenVerifier(): unknown {
+    return _generatedTokenVerifier(this);
   }
 
   // -- Encrypted attributes --
@@ -4101,9 +4123,14 @@ export class Base extends Model {
   }
 
   // --- TokenFor instance methods (token-for.ts, wired at runtime via generatesTokenFor) ---
-  // Rails' TokenFor module is included in Base; these are its instance methods.
-  // Declared here so api:compare credits them to base.ts. No eager import — token-for.ts
-  // pulls in node:crypto and is intentionally excluded from the main barrel (BC-3).
+  // Rails' TokenFor module is included in Base; these are its instance methods,
+  // installed on the prototype lazily by generatesTokenFor (so they're only
+  // declared here for api:compare credit). The TokenFor *class* accessors
+  // (token_definitions / generated_token_verifier) are real static getters above
+  // — token-for.ts only imports MessageVerifier, the same node:crypto-backed
+  // dependency base.ts already pulls in via signed-id.ts; crypto stays out of the
+  // public barrel because index.ts routes generatesTokenFor to a subpath (BC-3),
+  // not because base.ts avoids the import.
   declare generateTokenFor: (purpose: string) => string;
   /** @internal */
   declare fullPurpose: () => string;

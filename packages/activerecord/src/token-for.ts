@@ -81,7 +81,15 @@ export class TokenDefinition {
   }
 
   messageVerifier(): MessageVerifier {
-    return generatedTokenVerifier(this.definingClass);
+    // Rails: `defining_class.generated_token_verifier ||= MessageVerifier.new(...)`
+    // — lazily build and memoize, the value the `generated_token_verifier` reader
+    // returns afterwards.
+    const secret = resolveSecret();
+    if (!_cachedVerifier || _cachedSecret !== secret) {
+      _cachedVerifier = new MessageVerifier(secret);
+      _cachedSecret = secret;
+    }
+    return _cachedVerifier;
   }
 
   payloadFor(model: Base): unknown[] {
@@ -138,33 +146,46 @@ function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinitio
 
 /**
  * Rails: `class_attribute :token_definitions, default: {}` — the per-model
- * `purpose => TokenDefinition` map populated by `generates_token_for`. Trails
- * keeps it in the `tokenDefinitionRegistry` WeakMap; expose the Rails-shaped
- * hash reader (the `=` form maps to the same accessor).
+ * `purpose => TokenDefinition` map populated by `generates_token_for`. The
+ * `class_attribute` reader inherits the parent value, and `generates_token_for`
+ * writes `self.token_definitions = token_definitions.merge(...)`, so a subclass
+ * sees both inherited and own purposes (own overriding on collision). Trails
+ * keeps the per-class maps in `tokenDefinitionRegistry`; merge the prototype
+ * chain parent-first to reproduce the inherited-then-merged hash.
  *
  * Mirrors: ActiveRecord::TokenFor#token_definitions
  */
 export function tokenDefinitions(
   modelClass: typeof Base,
 ): Readonly<Record<string, TokenDefinition>> {
-  return Object.fromEntries(getDefinitions(modelClass));
+  const chain: Map<string, TokenDefinition>[] = [];
+  let current: any = modelClass;
+  while (current) {
+    const map = tokenDefinitionRegistry.get(current);
+    if (map) chain.push(map);
+    current = Object.getPrototypeOf(current);
+  }
+  const out: Record<string, TokenDefinition> = {};
+  // Parent-first so a subclass purpose overrides an inherited one of the same name.
+  for (const map of chain.reverse()) {
+    for (const [purpose, def] of map) out[purpose] = def;
+  }
+  return out;
 }
 
 /**
  * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
- * to sign/verify tokens, lazily built in `TokenDefinition#message_verifier`.
- * Trails' signing secret is process-global (`setTokenForSecret` / env), so the
- * verifier is a single secret-keyed cache rather than a per-class slot; the
- * `modelClass` arg is accepted for Rails-shaped call sites.
+ * to sign/verify tokens. The reader returns nil until `message_verifier` lazily
+ * builds and memoizes it (`||=`); mirror that by returning the current cache
+ * (null before the first token op) rather than forcing secret resolution, so
+ * reading the accessor before any token is generated never throws. Trails'
+ * signing secret is process-global (`setTokenForSecret` / env), so the cache is
+ * a single secret-keyed value rather than a per-class slot; the `modelClass`
+ * arg is accepted for Rails-shaped call sites.
  *
  * Mirrors: ActiveRecord::TokenFor#generated_token_verifier
  */
-export function generatedTokenVerifier(_modelClass: typeof Base): MessageVerifier {
-  const secret = resolveSecret();
-  if (!_cachedVerifier || _cachedSecret !== secret) {
-    _cachedVerifier = new MessageVerifier(secret);
-    _cachedSecret = secret;
-  }
+export function generatedTokenVerifier(_modelClass: typeof Base): MessageVerifier | null {
   return _cachedVerifier;
 }
 
@@ -190,29 +211,6 @@ export function generatesTokenFor(
         return generateTokenFor(this, purposeName);
       },
       writable: true,
-      configurable: true,
-    });
-  }
-
-  // Rails declares `token_definitions` / `generated_token_verifier` as class
-  // accessors read via `defining_class.generated_token_verifier` and
-  // `model.token_definitions.fetch(...)`. token-for.ts is excluded from the main
-  // barrel (BC-3: it pulls in node:crypto), so — like the methods below — these
-  // are wired onto the model class lazily here rather than eagerly on Base.
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "tokenDefinitions")) {
-    Object.defineProperty(modelClass, "tokenDefinitions", {
-      get(this: typeof Base): Readonly<Record<string, TokenDefinition>> {
-        return tokenDefinitions(this);
-      },
-      configurable: true,
-    });
-  }
-
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "generatedTokenVerifier")) {
-    Object.defineProperty(modelClass, "generatedTokenVerifier", {
-      get(this: typeof Base): MessageVerifier {
-        return generatedTokenVerifier(this);
-      },
       configurable: true,
     });
   }
