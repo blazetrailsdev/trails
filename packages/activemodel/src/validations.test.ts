@@ -727,17 +727,25 @@ describe("ValidationsTest", () => {
   });
 
   it("validates each custom reader", () => {
+    // Mirrors Rails' CustomReader: validation reads attribute values through
+    // an overridden `read_attribute_for_validation`, not the model's own store.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
+      data: Record<string, unknown> = {};
+      override readAttributeForValidation(attribute: string): unknown {
+        return this.data[attribute];
+      }
     }
     Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "blank");
+      if (!value) record.errors.add(attr, "gotcha");
     });
-    const p = new Person({});
+    const p = new Person({ name: "ignored" });
+    p.data = { name: "" };
     p.isValid();
-    expect(p.errors.get("name")).toContain("can't be blank");
+    // The empty value comes from `data`, proving the override drove the read.
+    expect(p.errors.get("name")).toContain("gotcha");
   });
 
   it("validates with array condition does not mutate the array", () => {

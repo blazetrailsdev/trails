@@ -15,16 +15,18 @@ function setAssociationAccessors(record: unknown, entries: Record<string, unknow
 
 describe("SerializationTest", () => {
   it("should use read attribute for serialization", () => {
+    // Mirrors Rails: a per-instance `read_attribute_for_serialization` override
+    // is consulted by `serializable_hash` (serialization_test.rb).
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.attribute("age", "integer");
       }
     }
-    const p = new Person({ name: "Alice", age: 25 });
-    const hash = p.serializableHash();
-    expect(hash["name"]).toBe("Alice");
-    expect(hash["age"]).toBe(25);
+    const p = new Person({ name: "Alice" });
+    (
+      p as unknown as { readAttributeForSerialization(n: string): unknown }
+    ).readAttributeForSerialization = () => "Jon";
+    expect(p.serializableHash({ only: ["name"] })).toEqual({ name: "Jon" });
   });
 
   it("include option with empty association", () => {

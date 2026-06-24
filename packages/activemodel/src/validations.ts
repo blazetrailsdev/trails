@@ -32,6 +32,33 @@ export const _defineAroundModelCallback = _defineAroundModelCallbackImpl;
 export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 
 /**
+ * Mirrors: ActiveModel::Validations
+ * (validations.rb:437 `alias :read_attribute_for_validation :send`).
+ *
+ * The default reads the attribute by name (Rails' `send(attr)`);
+ * ActiveRecord overrides this to resolve associations. `EachValidator`
+ * dispatches through any instance override so the lookup chain stays in one
+ * place (see validator.ts).
+ */
+export function readAttributeForValidation(
+  this: ReadAttributeForValidationHost,
+  attribute: string,
+): unknown {
+  return this.readAttribute(attribute);
+}
+
+/**
+ * Host shape consumed by `initInternals`. Kept loose so any class with
+ * the validation-related fields satisfies it without circular imports
+ * back to `Model`.
+ */
+export interface ValidationsInternalsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
+}
+
+/**
  * Lazy per-instance accessor for the active `ValidationContext`.
  * Mirrors Rails
  * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
@@ -63,40 +90,6 @@ export function contextForValidation(this: ContextForValidationHost): Validation
   Object.defineProperty(vc, "_context", accessor);
   this._contextForValidation = vc;
   return vc;
-}
-
-/**
- * Host shape consumed by `initInternals`. Kept loose so any class with
- * the validation-related fields satisfies it without circular imports
- * back to `Model`.
- */
-export interface ValidationsInternalsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-/**
- * Per-instance reset hook for validation state. Mirrors Rails
- * `ActiveModel::Validations#init_internals`
- * (activemodel/lib/active_model/validations.rb:467-471):
- *
- *   def init_internals
- *     super
- *     @errors = nil
- *     @context_for_validation = nil
- *   end
- *
- * Trails eagerly initializes `errors` (rather than Rails' lazy
- * `errors_or_create`), so this assigns a fresh `Errors` and clears
- * the active validation context. Called from the Model constructor.
- *
- * @internal Rails-private helper.
- */
-export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  this.errors = new Errors(this as unknown as TBase);
-  this._validationContext = null;
-  this._contextForValidation = undefined;
 }
 
 /**
@@ -255,6 +248,36 @@ const _predicatesForValidationContexts = new Map<
 >();
 
 /**
+ * Per-instance reset hook for validation state. Mirrors Rails
+ * `ActiveModel::Validations#init_internals`
+ * (activemodel/lib/active_model/validations.rb:467-471):
+ *
+ *   def init_internals
+ *     super
+ *     @errors = nil
+ *     @context_for_validation = nil
+ *   end
+ *
+ * Trails eagerly initializes `errors` (rather than Rails' lazy
+ * `errors_or_create`), so this assigns a fresh `Errors` and clears
+ * the active validation context. Called from the Model constructor.
+ *
+ * @internal Rails-private helper.
+ */
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  this.errors = new Errors(this as unknown as TBase);
+  this._validationContext = null;
+  this._contextForValidation = undefined;
+}
+
+/**
+ * Host shape consumed by `predicateForValidationContext`.
+ */
+export interface ValidationsContextHost {
+  readonly validationContext: string | string[] | null;
+}
+
+/**
  * Run the `:validate` callbacks and report whether the model has no
  * errors. Mirrors Rails
  * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
@@ -268,10 +291,11 @@ export function runValidationsBang(this: RunValidationsHost): boolean {
 }
 
 /**
- * Host shape consumed by `predicateForValidationContext`.
+ * Host shape consumed by `contextForValidation`.
  */
-export interface ValidationsContextHost {
-  readonly validationContext: string | string[] | null;
+export interface ContextForValidationHost {
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
 }
 
 /**
@@ -288,11 +312,11 @@ export function raiseValidationError<TBase extends object = object>(this: {
 }
 
 /**
- * Host shape consumed by `contextForValidation`.
+ * Host shape consumed by `runValidationsBang`.
  */
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
+export interface RunValidationsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _runValidateCallbacks(): void;
 }
 
 /**
@@ -324,12 +348,9 @@ export function predicateForValidationContext(
   return cached;
 }
 
-/**
- * Host shape consumed by `runValidationsBang`.
- */
-export interface RunValidationsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _runValidateCallbacks(): void;
+/** Host shape for the {@link readAttributeForValidation} mixin method. */
+export interface ReadAttributeForValidationHost {
+  readAttribute(name: string): unknown;
 }
 
 /**

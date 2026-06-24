@@ -2,6 +2,7 @@ import {
   serializableHash,
   attributeNamesForSerialization,
   serializableAttributes,
+  readAttributeForSerialization,
   serializableAddIncludes,
   asJsonThenable,
   type SerializeOptions,
@@ -157,6 +158,17 @@ export class JSON {
    */
   protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
     return serializableAttributes(this as unknown as SerializationRecord, attributeNames);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#read_attribute_for_serialization
+   * (serialization.rb:167 `alias :read_attribute_for_serialization :send`),
+   * inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected readAttributeForSerialization(key: string): unknown {
+    return readAttributeForSerialization(this as unknown as SerializationRecord, key);
   }
 
   /**

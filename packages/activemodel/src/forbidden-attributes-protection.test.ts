@@ -1,41 +1,54 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 
-// In Rails, ForbiddenAttributesProtection prevents mass assignment with
-// unpermitted params (ActionController::Parameters). Our TS implementation
-// doesn't have a strong params equivalent, so these tests verify basic
-// mass assignment behavior with plain objects.
+class Account extends Model {
+  static {
+    this.attribute("name", "string");
+  }
+}
+
+// Mirrors Rails' ProtectedParams stub (forbidden_attributes_protection_test.rb):
+// a params-like wrapper exposing `permitted?` and `to_h`. Trails dispatches on
+// the camelCase `permitted` / `toH` members.
+class ProtectedParams {
+  private parameters: Record<string, unknown>;
+  private _permitted = false;
+
+  constructor(attributes: Record<string, unknown>) {
+    this.parameters = attributes;
+  }
+
+  permitted(): boolean {
+    return this._permitted;
+  }
+
+  permit(): this {
+    this._permitted = true;
+    return this;
+  }
+
+  toH(): Record<string, unknown> {
+    return this.parameters;
+  }
+}
+
 describe("ActiveModelMassUpdateProtectionTest", () => {
   it("forbidden attributes cannot be used for mass updating", () => {
-    class Account extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    // Without strong params, plain objects are always allowed
-    const a = new Account({});
-    a.assignAttributes({ name: "test" });
-    expect(a.readAttribute("name")).toBe("test");
+    const params = new ProtectedParams({ a: "b" });
+    expect(() =>
+      new Account().sanitizeForbiddenAttributes(params as unknown as Record<string, unknown>),
+    ).toThrow(ForbiddenAttributesError);
   });
 
   it("permitted attributes can be used for mass updating", () => {
-    class Account extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const a = new Account({});
-    a.assignAttributes({ name: "test" });
-    expect(a.readAttribute("name")).toBe("test");
+    const params = new ProtectedParams({ a: "b" }).permit();
+    expect(
+      new Account().sanitizeForbiddenAttributes(params as unknown as Record<string, unknown>),
+    ).toEqual({ a: "b" });
   });
 
   it("regular attributes should still be allowed", () => {
-    class Account extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const a = new Account({ name: "test" });
-    expect(a.readAttribute("name")).toBe("test");
+    expect(new Account().sanitizeForbiddenAttributes({ a: "b" })).toEqual({ a: "b" });
   });
 });
