@@ -23,24 +23,30 @@ interface MergedJoinAliasHost {
     tableName: string;
     connection: Quoting & { tableAliasLength(): number };
   };
-  _joinValues: (string | Nodes.Join)[];
   _joinClauses: Array<{ table: string; assoc?: string }>;
 }
 
 /**
- * Build the AliasTracker shared across a relation's join dependencies. Seeded
- * with the base table (Rails `AliasTracker.create(connection, table_name,
- * joins)`), the raw `_joinValues` (so `initialCountFor` counts manual joins),
- * and the resolved `_joinClauses` tables. Each JoinDependency then claims and
- * aliases its own tables at emit-time in `makeConstraints`.
+ * Build the AliasTracker shared across a relation's join dependencies. Mirrors
+ * Rails `build_joins`' `alias_tracker(leading_joins + join_nodes, aliases)`
+ * (query_methods.rb:1891): seeded with the base table (Rails
+ * `AliasTracker.create(connection, table_name, joins)`), the `leadingJoins +
+ * joinNodes` raw Arel join nodes (so `initialCountFor` counts a table already
+ * claimed by a leading/raw join — forcing a same-table association join to its
+ * `alias_candidate`), and the resolved `_joinClauses` tables. `existingAliases`
+ * is the alias map threaded in from `build_from` (Rails' `aliases` argument);
+ * its counts are folded in first. Each JoinDependency then claims and aliases
+ * its own tables at emit-time in `makeConstraints`.
  */
-export function buildMergedJoinAliasTracker(host: MergedJoinAliasHost): AliasTracker {
+export function buildMergedJoinAliasTracker(
+  host: MergedJoinAliasHost,
+  joinNodes: Nodes.Join[],
+  existingAliases?: Map<string, number>,
+): AliasTracker {
   const connection = host._modelClass.connection;
   const aliasLength = connection.tableAliasLength();
-  const manualJoins = host._joinValues.map((v) =>
-    typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
-  );
-  const tracker = new AliasTracker(aliasLength, undefined, manualJoins, connection);
+  const seededAliases = existingAliases ? new Map(existingAliases) : new Map<string, number>();
+  const tracker = new AliasTracker(aliasLength, seededAliases, joinNodes, connection);
   const ownerTable = host._modelClass.tableName;
   // Seed the base table (Rails AliasTracker.create sets aliases[initial_table] = 1)
   // so an association that joins back onto the relation's own table collides.

@@ -101,10 +101,19 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("construct finder sql does not table name collide with aliased joins", () => {
-    const { Post } = makeModels();
-    const sql = Post.joins("authors AS a", "posts.author_id = a.id").toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("authors AS a");
+    // Rails passes a raw Arel join node onto a table the association also joins;
+    // `build_joins` seeds the alias_tracker with `leading_joins + join_nodes`, so
+    // the association join finds the table already claimed and re-aliases to its
+    // `alias_candidate` (`posts_authors`) while the raw join keeps the bare name.
+    const { Author } = makeModels();
+    const posts = new Table("posts");
+    const authors = new Table("authors");
+    const rawJoin = posts.join(posts).on(posts.get("author_id").eq(authors.get("id"))).joinSources;
+    const sql = Author.joins("posts")
+      .joins(...rawJoin)
+      .toSql();
+    expect(sql).toContain('"posts" "posts_authors"');
+    expect(sql).toContain('INNER JOIN "posts" ON');
   });
 
   it("user supplied joins order should be preserved", () => {

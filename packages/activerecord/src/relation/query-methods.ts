@@ -2716,12 +2716,19 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   }
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
-  // `build_joins` alias_tracker. Each dependency claims and aliases its tables
-  // lazily at emit-time in `makeConstraints`, so threading this one tracker
-  // through every `joinConstraints` makes a merged join onto an already-joined
-  // table collide and alias. Use the tracker threaded in from `build_from` when
-  // present, else build a fresh one.
-  const sharedTracker = plan.aliases ?? buildMergedJoinAliasTracker(this as any);
+  // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
+  // (query_methods.rb:1891). Seeding it with the leading-join + join-node tables
+  // means a JoinDependency joining a table already claimed by a leading/raw join
+  // node is re-aliased to its `alias_candidate`. Each dependency claims and
+  // aliases its tables lazily at emit-time in `makeConstraints`, so threading
+  // this one tracker through every `joinConstraints` makes a merged join onto an
+  // already-joined table collide and alias. `plan.aliases` is the tracker
+  // threaded in from `build_from` (Rails' `aliases` argument), folded in below.
+  const sharedTracker = buildMergedJoinAliasTracker(
+    this as any,
+    [...plan.leadingJoins, ...plan.joinNodes],
+    plan.aliases?.aliases,
+  );
   const references = (this as any)._aliasableReferences();
 
   // Rails build_joins (query_methods.rb:1893-1896) emits ALL named association
