@@ -872,7 +872,12 @@ class ApiExtractor
     # Record the aliased target so resolve_aliases! can copy its real param
     # list — the alias has the target's arity, not zero. (See resolve_aliases!.)
     entry[:alias_target] = names[1] if names[1]
-    target[:instanceMethods] << entry
+    # Bucket on @in_sclass like process_alias: `alias_method` inside
+    # `class << self` aliases a CLASS method (e.g. ActiveSupport::JSON's
+    # singleton `alias_method :dump, :encode`), so both the alias and its
+    # resolve target live in classMethods.
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    target[bucket] << entry
     maybe_update_module_file(fqn, target)
   end
 

@@ -162,6 +162,23 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Foo#renamed"].params).toEqual(["a", "b"]);
   });
 
+  it("buckets a singleton `alias_method` as a class method and resolves it", () => {
+    // ActiveSupport::JSON pattern: `class << self; alias_method :dump, :encode; end`.
+    // Both the alias and its target are class methods, so the resolver must
+    // search the classMethods bucket.
+    const r = aliasParams({
+      "j.rb": `
+        module Encoding
+          class << self
+            def encode(value, options = nil); end
+            alias_method :dump, :encode
+          end
+        end
+      `,
+    });
+    expect(r["Encoding#dump"]).toMatchObject({ params: ["value", "options"], notes: "alias" });
+  });
+
   it("follows an alias chain (alias of an alias)", () => {
     const r = aliasParams({
       "c.rb": `
