@@ -328,6 +328,9 @@ export function aliasAttributeMethodDefinition(
   newName: string,
   oldName: string,
 ): void {
+  // See defineAttributeMethodPattern: the bare pattern must not generate a
+  // colliding plain-`attr` method, since readers are real accessor properties.
+  if (pattern.prefix === "" && pattern.suffix === "") return;
   const methodName = pattern.methodName(newName);
   const targetName = pattern.methodName(oldName);
   ensureOwnGeneratedMethods(host);
@@ -388,6 +391,12 @@ export function defineAttributeMethodPattern(
   attrName: string,
   options?: { override?: boolean },
 ): void {
+  // Rails' default bare pattern (empty prefix/suffix) exists to route the plain
+  // `attribute` reader through method_missing. trails exposes readers as real
+  // accessor properties via `attribute()`, so generating a bare `attr` method
+  // here would collide with that accessor. Skip it — the seeded bare pattern is
+  // kept only so `attributeMethodPatterns()` matches Rails' default.
+  if (pattern.prefix === "" && pattern.suffix === "") return;
   const methodName = pattern.methodName(attrName);
   if (host.prototype[methodName] !== undefined && !options?.override) return;
   ensureOwnGeneratedMethods(host);
