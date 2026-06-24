@@ -214,11 +214,20 @@ export class Association {
         _reflectOnAssociation?: (n: string) => unknown;
       };
       const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-      this._cachedScope = AssociationScope.scope({
-        owner: this.owner,
-        reflection: richReflection as never,
-        klass: klass as never,
-      });
+      if (this.disableJoins) {
+        const djas = getDjasScopeBuilder();
+        if (!djas)
+          throw new Error(
+            "DisableJoinsAssociationScope not initialized — call initializeAssociations() before using disable_joins associations",
+          );
+        this._cachedScope = djas({ owner: this.owner, reflection: richReflection, klass });
+      } else {
+        this._cachedScope = AssociationScope.scope({
+          owner: this.owner,
+          reflection: richReflection as never,
+          klass: klass as never,
+        });
+      }
     }
     return this._cachedScope;
   }
