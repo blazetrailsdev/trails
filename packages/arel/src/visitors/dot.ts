@@ -125,6 +125,22 @@ export class Dot extends Visitor {
     this.visitEdge(o, "caseSensitive");
   }
 
+  // ---------------------------------------------------------------------
+  // Rails-named alias visitors (dot.rb). Ruby reaches these via `alias`;
+  // TS has no method-alias, so each delegates to the shared ported helper
+  // and is wired into the dispatch table under its own node type.
+  // ---------------------------------------------------------------------
+
+  /** Rails: `alias :visit_Arel_Nodes_Regexp :visit__regexp` (dot.rb:65). */
+  protected visitArelNodesRegexp(o: Nodes.Regexp): void {
+    this.visitRegexp(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_NotRegexp :visit__regexp` (dot.rb:66). */
+  protected visitArelNodesNotRegexp(o: Nodes.NotRegexp): void {
+    this.visitRegexp(o);
+  }
+
   protected visitArelNodesOrdering(o: Nodes.Ordering): void {
     this.visitEdge(o, "expr");
   }
@@ -163,6 +179,16 @@ export class Dot extends Visitor {
   /** Aliased to CurrentRow / Distinct in dispatch (Rails: `alias`). */
   protected visitNoEdges(_o: Node): void {
     // intentionally left blank
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_CurrentRow :visit__no_edges` (dot.rb:104). */
+  protected visitArelNodesCurrentRow(o: Node): void {
+    this.visitNoEdges(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_Distinct :visit__no_edges` (dot.rb:105). */
+  protected visitArelNodesDistinct(o: Node): void {
+    this.visitNoEdges(o);
   }
 
   /**
@@ -260,6 +286,21 @@ export class Dot extends Visitor {
     });
   }
 
+  /** Rails: `alias :visit_Arel_Nodes_And :visit__children` (dot.rb:193). */
+  protected visitArelNodesAnd(o: { children: ReadonlyArray<unknown> }): void {
+    this.visitChildren(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_Or :visit__children` (dot.rb:194). */
+  protected visitArelNodesOr(o: { children: ReadonlyArray<unknown> }): void {
+    this.visitChildren(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_With :visit__children` (dot.rb:195). */
+  protected visitArelNodesWith(o: { children: ReadonlyArray<unknown> }): void {
+    this.visitChildren(o);
+  }
+
   /**
    * Aliased to String / Time / Date / Integer / etc. — stash the value as a
    * side-field on the current node. Rails' `visit_Arel_Nodes_SqlLiteral` is
@@ -274,6 +315,66 @@ export class Dot extends Visitor {
     if (!top) return;
     const value = o instanceof Nodes.SqlLiteral ? o.value : o;
     top.fields.push(value == null ? "" : String(value));
+  }
+
+  // Rails aliases `visit_String` to every primitive leaf (dot.rb:199-208).
+  // The runtime never dispatches on raw JS primitives — `visit()` routes
+  // them through `visitString` directly — but the names exist so the AST is
+  // documented to stash each as a side-field, matching Rails' shape.
+
+  /** Rails: `alias :visit_Time :visit_String` (dot.rb:200). */
+  protected visitTime(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Date :visit_String` (dot.rb:201). */
+  protected visitDate(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_DateTime :visit_String` (dot.rb:202). */
+  protected visitDateTime(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_NilClass :visit_String` (dot.rb:203). */
+  protected visitNilClass(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_TrueClass :visit_String` (dot.rb:204). */
+  protected visitTrueClass(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_FalseClass :visit_String` (dot.rb:205). */
+  protected visitFalseClass(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Integer :visit_String` (dot.rb:206). */
+  protected visitInteger(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_BigDecimal :visit_String` (dot.rb:207). */
+  protected visitBigDecimal(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Float :visit_String` (dot.rb:208). */
+  protected visitFloat(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Symbol :visit_String` (dot.rb:209). */
+  protected visitSymbol(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_SqlLiteral :visit_String` (dot.rb:210). */
+  protected visitArelNodesSqlLiteral(o: Nodes.SqlLiteral): void {
+    this.visitString(o);
   }
 
   protected visitArelNodesBindParam(o: Nodes.BindParam): void {
@@ -300,6 +401,11 @@ export class Dot extends Visitor {
     o.forEach((member, i) => {
       this.edge(String(i), () => this.visit(member));
     });
+  }
+
+  /** Rails: `alias :visit_Set :visit_Array` (dot.rb:231). */
+  protected visitSet(o: ReadonlySet<unknown>): void {
+    this.visitArray([...o]);
   }
 
   protected visitArelNodesComment(o: Nodes.Comment): void {
@@ -561,16 +667,16 @@ export class Dot extends Visitor {
     reg(Nodes.Binary, "visitArelNodesBinary");
     reg(Nodes.UnaryOperation, "visitArelNodesUnaryOperation");
     reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
-    reg(Nodes.Regexp, "visitRegexp");
-    reg(Nodes.NotRegexp, "visitRegexp");
+    reg(Nodes.Regexp, "visitArelNodesRegexp");
+    reg(Nodes.NotRegexp, "visitArelNodesNotRegexp");
     reg(Nodes.Ordering, "visitArelNodesOrdering");
     reg(Nodes.TableAlias, "visitArelNodesTableAlias");
     reg(Nodes.ValuesList, "visitArelNodesValuesList");
     reg(Nodes.StringJoin, "visitArelNodesStringJoin");
     reg(Nodes.Window, "visitArelNodesWindow");
     reg(Nodes.NamedWindow, "visitArelNodesNamedWindow");
-    reg(Nodes.CurrentRow, "visitNoEdges");
-    reg(Nodes.Distinct, "visitNoEdges");
+    reg(Nodes.CurrentRow, "visitArelNodesCurrentRow");
+    reg(Nodes.Distinct, "visitArelNodesDistinct");
     // Statements
     reg(Nodes.InsertStatement, "visitArelNodesInsertStatement");
     reg(Nodes.SelectCore, "visitArelNodesSelectCore");
@@ -582,11 +688,11 @@ export class Dot extends Visitor {
     reg(Nodes.Casted, "visitArelNodesCasted");
     reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
     reg(Nodes.Attribute, "visitArelAttributesAttribute");
-    reg(Nodes.And, "visitChildren");
-    reg(Nodes.Or, "visitChildren");
-    reg(Nodes.With, "visitChildren");
-    reg(Nodes.WithRecursive, "visitChildren");
-    reg(Nodes.SqlLiteral, "visitString");
+    reg(Nodes.And, "visitArelNodesAnd");
+    reg(Nodes.Or, "visitArelNodesOr");
+    reg(Nodes.With, "visitArelNodesWith");
+    reg(Nodes.WithRecursive, "visitArelNodesWith");
+    reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
     reg(Nodes.BindParam, "visitArelNodesBindParam");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.Case, "visitArelNodesCase");

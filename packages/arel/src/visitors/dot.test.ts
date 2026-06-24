@@ -9,6 +9,7 @@ import {
   Nodes,
   Visitors,
 } from "../index.js";
+import { DotNode } from "./dot.js";
 
 describe("TestDot", () => {
   const users = new Table("users");
@@ -80,6 +81,29 @@ describe("TestDot", () => {
     const out = dot.compile(stmt);
     expect(out).toContain("With");
     expect(out).toContain("Cte");
+  });
+
+  it("Arel Nodes And", () => {
+    const node = new Nodes.And([users.get("id"), users.get("name")]);
+    const out = dot.compile(node);
+    expect(out).toContain("And");
+    // visit__children walks each child under an index-labeled edge.
+    expect(out).toContain('[label="0"]');
+    expect(out).toContain('[label="1"]');
+  });
+
+  it("Arel Nodes Or", () => {
+    const node = new Nodes.Or([users.get("id"), users.get("name")]);
+    const out = dot.compile(node);
+    expect(out).toContain("Or");
+    expect(out).toContain('[label="0"]');
+  });
+
+  it("Arel Nodes SqlLiteral", () => {
+    const node = new Nodes.SqlLiteral("RAW SQL");
+    const out = dot.compile(node);
+    // visit_String stashes the literal as a side-field, not a child node.
+    expect(out).toContain("RAW SQL");
   });
 
   it("Arel Nodes SelectCore", () => {
@@ -171,6 +195,61 @@ describe("TestDot", () => {
       expect(out).toMatch(/<f0>NilClass\|<f1>"/); // no characters between |<f1> and the closing "
       expect(out).not.toContain("null");
       expect(out).not.toContain("undefined");
+    });
+
+    it("primitive leaf visitors stash their value as a side-field (visit_String aliases)", () => {
+      // Rails aliases visit_Time/Date/DateTime/Integer/Float/NilClass/
+      // True/False to visit_String (dot.rb:199-208), which pushes the value
+      // onto the current node's fields. Each TS alias delegates to
+      // visitString; drive them under a node and confirm the field lands.
+      const v = new Visitors.Dot();
+      type Internals = {
+        visitInteger(o: unknown): void;
+        visitTrueClass(o: unknown): void;
+        visitNilClass(o: unknown): void;
+        withNode(node: DotNode, block: () => void): void;
+        toDot(): string;
+      };
+      type WithBigDecimal = Internals & {
+        visitBigDecimal(o: unknown): void;
+        visitSymbol(o: unknown): void;
+      };
+      const iv = v as unknown as WithBigDecimal;
+      v.compile(new Nodes.SqlLiteral("seed")); // initialize internal state
+      const node = new DotNode("Integer", 0);
+      (v as unknown as { nodes: DotNode[] }).nodes.push(node);
+      iv.withNode(node, () => {
+        iv.visitInteger(42);
+        iv.visitTrueClass(true);
+        iv.visitNilClass(null);
+        iv.visitBigDecimal("9.99");
+        iv.visitSymbol("sym");
+      });
+      const out = iv.toDot();
+      // Fields appended in order; null renders as "" (Rails nil.to_s).
+      // BigDecimal/Symbol also alias visit_String, so they stash too.
+      expect(out).toContain("<f0>Integer|<f1>42|<f2>true|<f3>|<f4>9.99|<f5>sym");
+    });
+
+    it("visit_Set is aliased to visit_Array (each member becomes an indexed child)", () => {
+      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231).
+      const v = new Visitors.Dot();
+      type Internals = {
+        visitSet(o: ReadonlySet<unknown>): void;
+        withNode(node: DotNode, block: () => void): void;
+        toDot(): string;
+      };
+      const iv = v as unknown as Internals;
+      v.compile(new Nodes.SqlLiteral("seed"));
+      const node = new DotNode("Set", 0);
+      (v as unknown as { nodes: DotNode[] }).nodes.push(node);
+      iv.withNode(node, () => {
+        iv.visitSet(new Set([new Nodes.SqlLiteral("a"), new Nodes.SqlLiteral("b")]));
+      });
+      const out = iv.toDot();
+      // visit_Array walks each member under an index-labeled edge.
+      expect(out).toMatch(/-> \d+ \[label="0"\];/);
+      expect(out).toMatch(/-> \d+ \[label="1"\];/);
     });
 
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {

@@ -238,6 +238,16 @@ export class ToSql extends Visitor {
     return collector;
   }
 
+  /**
+   * Rails: `alias :visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted`
+   * (to_sql.rb:90). Quoted and Casted both inline their quoted literal
+   * (`collector << quote(o.value_for_database)`); only BindParam uses
+   * add_bind. Delegates to the shared Casted visitor.
+   */
+  private visitArelNodesQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
+    return this.visitArelNodesCasted(node as unknown as Nodes.Casted, collector);
+  }
+
   // -- Boolean literals --
 
   protected visitArelNodesTrue(_node: Nodes.True, collector: SQLString): SQLString {
@@ -340,25 +350,6 @@ export class ToSql extends Visitor {
 
     this.maybeVisit(node.comment ?? null, collector);
 
-    return collector;
-  }
-
-  // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
-  // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
-  // an array); each hint is sanitized and the joined result wrapped in
-  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
-  // node and `emitOptimizerHints` delegates here.
-  protected visitArelNodesOptimizerHints(
-    node: Nodes.OptimizerHints,
-    collector: SQLString,
-  ): SQLString {
-    // Each hint routes through `sanitizeAsSqlComment` — the same
-    // connection-delegating helper `visitArelNodesComment` uses (to_sql.rb:171).
-    const sanitized = node.hints
-      .map((h) => this.sanitizeAsSqlComment(h))
-      .filter((h) => h.length > 0);
-    if (sanitized.length === 0) return collector;
-    collector.append(` /*+ ${sanitized.join(" ")} */`);
     return collector;
   }
 
@@ -479,12 +470,31 @@ export class ToSql extends Visitor {
     // Leaf nodes
     reg(Nodes.Distinct, "visitArelNodesDistinct");
     reg(Nodes.SqlLiteral, "visitArelNodesSqlLiteral");
-    reg(Nodes.Quoted, "visitQuoted");
+    reg(Nodes.Quoted, "visitArelNodesQuoted");
     reg(Nodes.Casted, "visitArelNodesCasted");
     reg(Nodes.UnqualifiedColumn, "visitArelNodesUnqualifiedColumn");
     reg(Nodes.Attribute, "visitArelAttributesAttribute");
     reg(Nodes.ValuesList, "visitArelNodesValuesList");
     reg(Table, "visitArelTable");
+  }
+
+  // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
+  // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
+  // an array); each hint is sanitized and the joined result wrapped in
+  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
+  // node and `emitOptimizerHints` delegates here.
+  protected visitArelNodesOptimizerHints(
+    node: Nodes.OptimizerHints,
+    collector: SQLString,
+  ): SQLString {
+    // Each hint routes through `sanitizeAsSqlComment` — the same
+    // connection-delegating helper `visitArelNodesComment` uses (to_sql.rb:171).
+    const sanitized = node.hints
+      .map((h) => this.sanitizeAsSqlComment(h))
+      .filter((h) => h.length > 0);
+    if (sanitized.length === 0) return collector;
+    collector.append(` /*+ ${sanitized.join(" ")} */`);
+    return collector;
   }
 
   // Mirrors Rails: visit_Arel_Nodes_Comment (to_sql.rb:175) — emits the
@@ -1344,9 +1354,93 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#unsupported`. */
-  protected unsupported(o: Node): never {
-    throw new UnsupportedVisitError(`Unknown node type: ${o.constructor.name}`);
+  /**
+   * Mirrors `to_sql.rb#unsupported` (to_sql.rb:828) — `collector` is required
+   * to match the Rails signature even though it's unused after the raise. The
+   * message mirrors `UnsupportedVisitError.new(o)` (to_sql.rb:5-8).
+   */
+  protected unsupported(o: Node, _collector: SQLString): never {
+    throw new UnsupportedVisitError(
+      `Unsupported argument type: ${o.constructor.name}. Construct an Arel node instead.`,
+    );
+  }
+
+  // Rails aliases every Ruby value class with no SQL rendering to
+  // `unsupported` (to_sql.rb:832-845): visiting one raises
+  // `UnsupportedVisitError`. TS has no method-alias, so each delegates to
+  // the shared helper. They aren't wired into the dispatch table — the
+  // trails Arel pipeline never threads a raw JS Date/Class/Hash/etc. as a
+  // node — but the names exist so the unsupported contract is documented
+  // and directly testable. Each keeps the Rails `(o, collector)` shape.
+
+  /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
+  protected visitActiveSupportMultibyteChars(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_ActiveSupport_StringInquirer :unsupported`. */
+  protected visitActiveSupportStringInquirer(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_BigDecimal :unsupported` (to_sql.rb:834). */
+  protected visitBigDecimal(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Class :unsupported`. */
+  protected visitClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Date :unsupported`. */
+  protected visitDate(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_DateTime :unsupported`. */
+  protected visitDateTime(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_FalseClass :unsupported`. */
+  protected visitFalseClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Float :unsupported`. */
+  protected visitFloat(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Hash :unsupported`. */
+  protected visitHash(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_NilClass :unsupported`. */
+  protected visitNilClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_String :unsupported`. */
+  protected visitString(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Symbol :unsupported` (to_sql.rb:843). */
+  protected visitSymbol(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Time :unsupported`. */
+  protected visitTime(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_TrueClass :unsupported`. */
+  protected visitTrueClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   // -- InfixOperation --
@@ -1388,6 +1482,11 @@ export class ToSql extends Visitor {
       this.visitNodeOrValue(item, collector);
     });
     return collector;
+  }
+
+  /** Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861). */
+  protected visitSet(items: ReadonlySet<Nodes.NodeOrValue>, collector: SQLString): SQLString {
+    return this.visitArray([...items], collector);
   }
 
   protected visitArelNodesFragments(node: Nodes.Fragments, collector: SQLString): SQLString {
@@ -1535,6 +1634,28 @@ export class ToSql extends Visitor {
       // A composite primary key arrives as an array of column nodes, rendered as
       // a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2 ...)`. Mirrors Rails
       // `prepare_update_statement`'s `Grouping.new(o.key)`.
+      const key = Array.isArray(o.key)
+        ? o.key.map((k) => this.subselectKey(k))
+        : this.subselectKey(o.key);
+      const columns = new Nodes.Grouping(key);
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
+      if (this.hasJoinSources(o)) {
+        stmt.relation = (o.relation as Nodes.JoinSource).left;
+      }
+      return stmt;
+    }
+    return o;
+  }
+
+  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
+      const stmt = o.clone();
+      stmt.limit = null;
+      stmt.offset = null;
+      stmt.orders = [];
+      // A composite primary key arrives as an array of column nodes; the
+      // visitor renders it as a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2
+      // ...)`. Mirrors Rails `prepare_delete_statement`'s `Grouping.new(o.key)`.
       const key = Array.isArray(o.key)
         ? o.key.map((k) => this.subselectKey(k))
         : this.subselectKey(o.key);
@@ -1722,28 +1843,6 @@ export class ToSql extends Visitor {
     this.visit(node.optimizerHints, collector);
   }
 
-  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
-      stmt.limit = null;
-      stmt.offset = null;
-      stmt.orders = [];
-      // A composite primary key arrives as an array of column nodes; the
-      // visitor renders it as a row-value tuple `(pk1, pk2) IN (SELECT pk1, pk2
-      // ...)`. Mirrors Rails `prepare_delete_statement`'s `Grouping.new(o.key)`.
-      const key = Array.isArray(o.key)
-        ? o.key.map((k) => this.subselectKey(k))
-        : this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
-      return stmt;
-    }
-    return o;
-  }
-
   private subselectKey(key: Node): Node {
     if (key instanceof Nodes.Equality) {
       return key.left as Node;
@@ -1893,15 +1992,6 @@ export class ToSql extends Visitor {
     if (escape == null) return;
     collector.append(" ESCAPE ");
     this.visit(escape, collector);
-  }
-
-  private visitQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
-    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted` (aliased to Casted at :90):
-    // collector << quote(o.value_for_database). Quoted and Casted both inline their
-    // quoted literal; only BindParam uses add_bind.
-    const value = resolveValueForDatabase(node.valueForDatabase());
-    collector.append(this.quote(value));
-    return collector;
   }
 
   // -- Helpers --

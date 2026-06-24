@@ -436,6 +436,54 @@ describe("the to_sql visitor", () => {
     );
   });
 
+  describe("value-class visitors aliased to unsupported", () => {
+    // Rails aliases visit_Class/Date/DateTime/Float/Hash/NilClass/String/
+    // Time/TrueClass/FalseClass and the ActiveSupport string types to
+    // `unsupported` (to_sql.rb:832-845): each raises UnsupportedVisitError.
+    const aliasNames = [
+      "visitActiveSupportMultibyteChars",
+      "visitActiveSupportStringInquirer",
+      "visitBigDecimal",
+      "visitClass",
+      "visitDate",
+      "visitDateTime",
+      "visitFalseClass",
+      "visitFloat",
+      "visitHash",
+      "visitNilClass",
+      "visitString",
+      "visitSymbol",
+      "visitTime",
+      "visitTrueClass",
+    ] as const;
+
+    for (const name of aliasNames) {
+      it(`${name} raises UnsupportedVisitError`, () => {
+        const v = new Visitors.ToSql();
+        const fn = (v as unknown as Record<string, (o: unknown, c: unknown) => never>)[name];
+        const node = new Nodes.SqlLiteral("x");
+        const collector = new Collectors.SQLString();
+        expect(() => fn.call(v, node, collector)).toThrow(Visitors.UnsupportedVisitError);
+      });
+    }
+
+    it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
+      // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
+      const v = new Visitors.ToSql();
+      const collector = new Collectors.SQLString();
+      const set = new Set<Nodes.NodeOrValue>([new Nodes.Quoted(1), new Nodes.Quoted(2)]);
+      const out = (
+        v as unknown as {
+          visitSet(
+            s: ReadonlySet<Nodes.NodeOrValue>,
+            c: Collectors.SQLString,
+          ): Collectors.SQLString;
+        }
+      ).visitSet(set, collector);
+      expect(out.value).toBe("1, 2");
+    });
+  });
+
   describe("distinct on", () => {
     it("raises not implemented error", () => {
       const core = new Nodes.SelectCore();
