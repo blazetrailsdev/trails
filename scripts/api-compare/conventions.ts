@@ -276,9 +276,8 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "an unmatched gap on the aggregate Relation class (relation.rb): the " +
       "delegation.rb module compare already credits trails counterparts (e.g. " +
       "delegation.ts' own name()), so the skip is scoped to relation.rb to avoid " +
-      "un-crediting those. `klass` is Relation's own accessor (relation.rb), " +
-      "realized as the private _modelClass field rather than a named method.",
-    names: ["slice", "transaction", "name", "klass"],
+      "un-crediting those.",
+    names: ["slice", "transaction", "name"],
     rubyFiles: ["relation.rb"],
   },
   {
@@ -286,7 +285,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "Relation#reverse_order_value is a deferred boolean flag in Rails; trails " +
       "has no such field — reverseOrderBang eagerly flips the stored order " +
       "clauses (query_methods.rb reverse_sql_order semantics) at call time, so " +
-      "there is no value to expose.",
+      "there is no value to expose. Tracked for convergence (store a deferred " +
+      "flag, expose the accessor) by story " +
+      "reverse-order-value-deferred-flag-convergence.",
     names: ["reverse_order_value", "reverse_order_value="],
     rubyFiles: ["relation.rb", "relation/query_methods.rb"],
   },
@@ -413,7 +414,6 @@ for (const g of ARITY_OVERRIDE_GROUPS) {
 export function isArityOverridden(rubyName: string, rubyFile: string): boolean {
   return ARITY_OVERRIDE_FILES.get(rubyName)?.has(rubyFile) ?? false;
 }
-
 
 /**
  * Camel-prefixes that are *already* predicates, so the bare camel form is the

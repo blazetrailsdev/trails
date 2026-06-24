@@ -6206,6 +6206,13 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Alias for {@link model} — mirrors `alias :klass :model` (relation.rb:73).
+   */
+  get klass(): typeof Base {
+    return this._modelClass;
+  }
+
+  /**
    * Alias for isLoaded.
    *
    * Mirrors: ActiveRecord::Relation#loaded?
