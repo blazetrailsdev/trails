@@ -206,7 +206,11 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "reader method would clobber the storage slot, so the field IS the accessor; " +
       "there is no separate method to match. `_attr_readonly` is likewise trails' " +
       "private `_readonlyAttributes` set — its public reader is `readonlyAttributes` " +
-      "(Rails: `readonly_attributes` reads `_attr_readonly`), which is ported.",
+      "(Rails: `readonly_attributes` reads `_attr_readonly`), which is ported. " +
+      "`_destroy_association_async_job` is likewise the underscore storage slot " +
+      "(trails' `_destroyAssociationAsyncJob` field) behind the ported public " +
+      "accessor `destroyAssociationAsyncJob` (Rails aliases " +
+      "`destroy_association_async_job=` to `_destroy_association_async_job=`).",
     names: [
       "_reflections",
       "_reflections=",
