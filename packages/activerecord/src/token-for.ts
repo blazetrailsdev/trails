@@ -28,7 +28,10 @@ let _tokenForSecret: string | (() => string) | null = null;
 // / ownVerifier). Entries are tagged with the secret generation; bumping the
 // generation on setTokenForSecret invalidates all cached verifiers without
 // enumerating the WeakMap.
-const tokenVerifierRegistry = new WeakMap<object, { verifier: MessageVerifier; gen: number }>();
+const tokenVerifierRegistry = new WeakMap<
+  object,
+  { verifier: MessageVerifier | null; gen: number }
+>();
 let _secretGeneration = 0;
 
 /**
@@ -43,18 +46,27 @@ export function setTokenForSecret(secret: string | (() => string) | null): void 
   _secretGeneration++;
 }
 
-/** This class's own verifier slot, or null (ignoring stale-generation entries). */
-function ownVerifier(modelClass: object): MessageVerifier | null {
+/**
+ * This class's *own* verifier slot (ignoring stale-generation entries), or
+ * undefined when the class has never written. A present entry whose `verifier`
+ * is null is an explicit nil shadow (Rails: `self.generated_token_verifier = nil`
+ * assigns nil to this class), distinct from "no own slot".
+ */
+function ownVerifierEntry(modelClass: object): { verifier: MessageVerifier | null } | undefined {
   const entry = tokenVerifierRegistry.get(modelClass);
-  return entry && entry.gen === _secretGeneration ? entry.verifier : null;
+  return entry && entry.gen === _secretGeneration ? entry : undefined;
 }
 
-/** Resolved `class_attribute` value: own slot, else nearest inherited. */
+/**
+ * Resolved `class_attribute` value: the nearest class on the chain with an own
+ * slot wins — even a nil shadow stops the walk (so an explicit `= null` does not
+ * inherit the parent's verifier). Returns null when nothing up the chain wrote.
+ */
 function resolvedVerifier(modelClass: object): MessageVerifier | null {
   let current: any = modelClass;
   while (current) {
-    const v = ownVerifier(current);
-    if (v) return v;
+    const entry = ownVerifierEntry(current);
+    if (entry) return entry.verifier;
     current = Object.getPrototypeOf(current);
   }
   return null;
@@ -241,8 +253,10 @@ export function generatedTokenVerifier(modelClass: typeof Base): MessageVerifier
  * tests assign `ActiveRecord::Base.generated_token_verifier = MessageVerifier.new(...)`
  * to inject a verifier; `message_verifier`'s `||=` then returns it instead of
  * building from the secret. Assigns to this class's own slot (subclasses inherit
- * via the reader until they assign their own). A null clears this class's slot,
- * reverting to inherited / lazy build.
+ * via the reader until they assign their own). Assigning null writes an explicit
+ * nil shadow on this class — Rails' generated writer assigns to the class, so the
+ * reader returns nil (not the parent's verifier) and the next token op lazily
+ * builds this class's own verifier.
  *
  * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
  */
@@ -250,11 +264,7 @@ export function setGeneratedTokenVerifier(
   modelClass: typeof Base,
   verifier: MessageVerifier | null,
 ): void {
-  if (verifier) {
-    tokenVerifierRegistry.set(modelClass, { verifier, gen: _secretGeneration });
-  } else {
-    tokenVerifierRegistry.delete(modelClass);
-  }
+  tokenVerifierRegistry.set(modelClass, { verifier, gen: _secretGeneration });
 }
 
 /**
