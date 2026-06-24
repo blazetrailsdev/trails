@@ -1165,6 +1165,16 @@ jobs:
         # baseline. Fails on a new mismatch or a stale baseline entry; reseed
         # with `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
+      - name: API comparison (wide calls)
+        # Regenerates the SEPARATE wide call-set artifact
+        # (output/call-mismatches-wide.json) over WIDE_SIGNIFICANT_CALLS (all
+        # ported names except `super`). Distinct file from the narrow run above.
+        run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
+      - name: Wide call-mismatches ratchet
+        # Gates the RFC 0047 wide artifact against call-mismatches-wide-exclude.json.
+        # Fails on a new wide mismatch or a stale baseline entry; reseed with
+        # `pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write`.
+        run: pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts
       - name: Conventions doc up to date
         # docs/ruby-ts-conventions.md is generated from explainConventions()
         # in conventions.ts; fail if it drifts so the agent-facing doc can't

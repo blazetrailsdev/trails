@@ -25,6 +25,7 @@
     "api:drift": "pnpm tsx scripts/api-compare/drift.ts",
     "api:extra": "pnpm tsx scripts/api-compare/extra-surface.ts",
     "api:calls": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts",
+    "api:calls:wide": "pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts",
     "fixtures:adoption:inventory": "pnpm tsx scripts/fixtures-inventory/inventory.ts",
     "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",

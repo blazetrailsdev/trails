@@ -146,6 +146,22 @@ describe("significantMissingCalls", () => {
     );
     expect(missing).toEqual([]);
   });
+
+  it("wide significant predicate admits every call name except super", () => {
+    // RFC 0047 WIDE_SIGNIFICANT_CALLS shape: `{ has: k => k !== "super" }`.
+    const wide = { has: (k: string) => k !== "super" };
+    const missing = significantMissingCalls(
+      "update",
+      ["assign_attributes", "super"],
+      new Set(),
+      () => true,
+      map,
+      wide,
+    );
+    // assign_attributes is flagged (wide admits it though it's outside `sig`);
+    // super is structurally excluded even by the wide predicate.
+    expect(missing).toEqual(["assign_attributes → assignAttributes"]);
+  });
 });
 
 describe("nameMatches", () => {

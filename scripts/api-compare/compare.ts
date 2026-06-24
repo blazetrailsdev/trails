@@ -13,7 +13,7 @@
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
  *     [--package activerecord] [--missing] [--files] [--incomplete] \
- *     [--inheritance] [--arity] [--public-only | --privates-only]
+ *     [--inheritance] [--arity] [--public-only | --privates-only] [--wide-calls]
  *
  * The default reports the full surface (public + private). `--public-only`
  * drops Rails-private/internal methods on both sides for a contract-only
@@ -36,6 +36,13 @@
  * artifact is itself ratcheted: lint-call-mismatches.ts (CI: "Call-mismatches
  * ratchet") fails on any mismatch not in the committed call-mismatches-exclude.json
  * baseline, and on stale baseline entries (only-shrink) — see RFC 0044.
+ *
+ * `--wide-calls` (or `API_COMPARE_WIDE_CALLS=1`) opts into the RFC 0047 WIDE
+ * variant: the calls check admits every ported call name except `super`
+ * (WIDE_SIGNIFICANT_CALLS) instead of the narrow SIGNIFICANT_CALLS allowlist,
+ * and the artifact is written to output/call-mismatches-wide.json — a SEPARATE
+ * file gated by lint-call-mismatches-wide.ts against call-mismatches-wide-exclude.json,
+ * so the narrow 0044 artifact and gate above are left untouched.
  *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
@@ -112,6 +119,23 @@ const SIGNIFICANT_CALLS = new Set([
   // `significant` parameter.
 ]);
 
+// Opt-in WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
+// significant, except `super` (which the module-mixin port structurally drops —
+// see the SIGNIFICANT_CALLS comment above). Enabled via `--wide-calls` /
+// `API_COMPARE_WIDE_CALLS=1`, this swaps the narrow allowlist for a membership
+// predicate so `checkCalls` flags every name-matched omission, writing a
+// SEPARATE artifact (call-mismatches-wide.json) gated by its own ratcheting
+// baseline (call-mismatches-wide-exclude.json + lint-call-mismatches-wide.ts).
+// The narrow 0044 gate and SIGNIFICANT_CALLS are untouched. The wide population
+// is ~72% Enumerable/Object/accessor noise (bucket c) plus confirmed equivalents
+// (bucket b); the baseline seeds large and shrinks as the per-cluster convergence
+// stories land. The existing noise-suppression gates inside significantMissingCalls
+// (isPortedWithArgs, mapCall, "TS makes NONE of the mapped candidates") still
+// apply, so this is not the raw missing-call diff.
+const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
+  has: (value) => value !== "super",
+};
+
 /**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
  * name-matched pair, returns the fidelity-critical Ruby body calls that are
@@ -132,7 +156,7 @@ export function significantMissingCalls(
   tsCalls: Set<string>,
   isPortedWithArgs: (tsName: string) => boolean,
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
-  significant: ReadonlySet<string> = SIGNIFICANT_CALLS,
+  significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
 ): string[] {
   const missing: string[] = [];
   for (const rc of rubyCalls) {
@@ -826,6 +850,13 @@ export function main() {
   const mode: CompareMode = privatesOnly ? "private" : publicOnly ? "public" : "all";
   const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, mode);
 
+  // Opt-in WIDE calls knob (RFC 0047): widen the calls-check `significant` set to
+  // all ported names except `super`, writing the separate call-mismatches-wide
+  // artifact gated by lint-call-mismatches-wide.ts. The narrow 0044 artifact is
+  // not written in a wide run (and vice-versa), so the two ratchets never collide.
+  const wideCalls = args.includes("--wide-calls") || process.env.API_COMPARE_WIDE_CALLS === "1";
+  const callsSignificant = wideCalls ? WIDE_SIGNIFICANT_CALLS : SIGNIFICANT_CALLS;
+
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
 
@@ -1302,8 +1333,13 @@ export function main() {
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         const tsCalls = new Set(tsCandidateSets.flat());
         callsCompared++;
-        const missing = significantMissingCalls(rubyName, rubyCalls, tsCalls, (c) =>
-          (tsParamsByName.get(c) ?? []).some((sig) => sig.length > 0),
+        const missing = significantMissingCalls(
+          rubyName,
+          rubyCalls,
+          tsCalls,
+          (c) => (tsParamsByName.get(c) ?? []).some((sig) => sig.length > 0),
+          rubyMethodToTs,
+          callsSignificant,
         );
         if (missing.length === 0) return;
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing });
@@ -1714,7 +1750,12 @@ export function main() {
   );
 
   // Advisory calls-parity artifact — always written, flat across packages.
-  const callsPath = path.join(OUTPUT_DIR, `call-mismatches${modeSuffix}.json`);
+  // A wide run (RFC 0047) writes the SEPARATE `-wide` artifact so the narrow
+  // 0044 artifact (call-mismatches.json) and its gate are left untouched.
+  const callsPath = path.join(
+    OUTPUT_DIR,
+    `call-mismatches${wideCalls ? "-wide" : ""}${modeSuffix}.json`,
+  );
   const callsFlat = results.flatMap((r) =>
     r.calls.mismatches.map((m) => ({ package: r.package, ...m })),
   );
