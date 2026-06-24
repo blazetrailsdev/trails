@@ -140,15 +140,16 @@ describe("SerializationTest", () => {
 
   it("find records by serialized attributes through join", async () => {
     const author = await Author.create({ name: "David" });
-    // `title` is `serialize`-wrapped (JSON coder), so the stored value is the
-    // coder's encoded form. Assign/query the pre-serialized string so the
-    // persisted value and the join predicate compare equal.
+    // `title` is coderless-`serialize`-wrapped, so the stored value is the
+    // default (YAML) coder's encoded form (`YAML.dump("Hello") == "Hello\n"`).
+    // Assign/query that pre-serialized string so the persisted value and the
+    // join predicate compare equal.
     await (
       author as unknown as { serializedPosts: { create(attrs: object): Promise<unknown> } }
-    ).serializedPosts.create({ title: JSON.stringify("Hello") });
+    ).serializedPosts.create({ title: "Hello\n" });
 
     const results = await Author.joins("serializedPosts")
-      .where({ name: "David", serialized_posts: { title: JSON.stringify("Hello") } })
+      .where({ name: "David", serialized_posts: { title: "Hello\n" } })
       .toArray();
     expect(results.length).toBe(1);
   });

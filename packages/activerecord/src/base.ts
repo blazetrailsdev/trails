@@ -328,6 +328,7 @@ import {
   storeAccessorForMethod as _storeAccessorForMethod,
 } from "./store.js";
 import { serialize as _serializeAttribute } from "./serialize.js";
+import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
 _registerSerializeFn(_serializeAttribute as any);
@@ -1855,6 +1856,24 @@ export class Base extends Model {
       prefix: options?.prefix,
       suffix: options?.suffix,
     });
+  }
+
+  // The fallback coder used by `serialize` when no explicit coder is given
+  // (`coder ||= default_column_serializer`). Subclasses inherit via JS
+  // prototype lookup and may override per-class.
+  //
+  // Mirrors: ActiveRecord::AttributeMethods::Serialization — `class_attribute
+  // :default_column_serializer, instance_accessor: false, default:
+  // Coders::YAMLColumn` (serialization.rb:19-20).
+  static _defaultColumnSerializer: unknown = _YAMLColumn;
+
+  /** Mirrors: ActiveRecord::Base.default_column_serializer */
+  static get defaultColumnSerializer(): unknown {
+    return this._defaultColumnSerializer;
+  }
+
+  static set defaultColumnSerializer(value: unknown) {
+    this._defaultColumnSerializer = value;
   }
 
   /**
