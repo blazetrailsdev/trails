@@ -125,6 +125,11 @@ export class Duration {
     return this.times(-1);
   }
 
+  /** Unary plus (`Duration#+@`): returns `self` unchanged. */
+  identity(): Duration {
+    return this;
+  }
+
   modulo(other: Duration | number): Duration {
     const thisSecs = this.inSeconds();
     const otherSecs = typeof other === "number" ? other : other.inSeconds();

@@ -385,6 +385,9 @@ export function rubyMethodToTs(name: string): string[] | null {
   // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
   // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
   if (name === "-@") return ["negate"];
+  // Ruby unary plus (`+@`) ports to a named `identity` method (e.g.
+  // ActiveSupport::Duration#+@ → Duration#identity, which returns `self`).
+  if (name === "+@") return ["identity"];
 
   if (name.endsWith("?")) {
     const base = name.slice(0, -1);
@@ -508,6 +511,7 @@ matches the first candidate present in the target file), not a call expression.
 | \`to_json\` | \`toJSON\` | \`to_json\` → ${example("to_json")} |
 | \`to_sql\` | \`toSql\` | \`to_sql\` → ${example("to_sql")} |
 | \`-@\` (unary minus) | \`negate\` | \`-@\` → ${example("-@")} |
+| \`+@\` (unary plus) | \`identity\` | \`+@\` → ${example("+@")} |
 | everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
 
 Predicate-form details: \`is_*?\` collapses to a single candidate so trails can't
