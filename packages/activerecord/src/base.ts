@@ -3947,6 +3947,69 @@ export class Base extends Model {
     this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
   }
 
+  // -- Core config accessors (ActiveRecord::Core class_attributes) --
+  //
+  // Each mirrors a `class_attribute` declared in core.rb. trails realizes the
+  // backing behavior elsewhere (or matches the Rails default), so these are
+  // plain settable class fields the existing call sites already read.
+
+  // The default ConnectionHandler. Rails layers an IsolatedExecutionState
+  // override on top of this in `connection_handler`; trails reads
+  // `_connectionHandler` directly (no per-context override), so the default
+  // handler IS that field.
+  // Mirrors: ActiveRecord::Core.default_connection_handler (core.rb:98).
+  static get defaultConnectionHandler(): ConnectionHandler {
+    return this._connectionHandler;
+  }
+
+  static set defaultConnectionHandler(value: ConnectionHandler) {
+    this._connectionHandler = value;
+  }
+
+  // The default connected role. Rails sets `default_role = writing_role`
+  // (core.rb:250); `currentRole` falls back to it when no `connected_to`
+  // frame applies.
+  // Mirrors: ActiveRecord::Core.default_role (core.rb:100).
+  static get defaultRole(): string {
+    return this.writingRole;
+  }
+
+  static set defaultRole(value: string) {
+    this.writingRole = value;
+  }
+
+  // When true, `belongs_to` associations are required (validate presence)
+  // unless `optional: true`. Read by associations/builder/belongs-to.ts.
+  // Mirrors: ActiveRecord::Core.belongs_to_required_by_default (core.rb:88).
+  static belongsToRequiredByDefault = false;
+
+  // Force enumeration of all columns in SELECT statements instead of `SELECT *`.
+  // Read by relation/query-methods.ts.
+  // Mirrors: ActiveRecord::Core.enumerate_columns_in_select_statements (core.rb:86).
+  static enumerateColumnsInSelectStatements = false;
+
+  // The resolver used by the ShardSelector middleware. nil (no selector) by
+  // default — trails' actual behavior absent explicit sharding config.
+  // Mirrors: ActiveRecord::Core.shard_selector (core.rb:104).
+  static shardSelector: unknown = null;
+
+  // Maximum records destroyed per background job by `dependent: :destroy_async`.
+  // nil (single job) by default, matching Rails and trails' behavior.
+  // Mirrors: ActiveRecord::Core.destroy_association_async_batch_size (core.rb:47).
+  static destroyAssociationAsyncBatchSize: number | null = null;
+
+  // -- ModelSchema config accessors (ActiveRecord::ModelSchema class_attributes) --
+
+  // Controls the primary-key naming prefix convention. nil (no prefix) by
+  // default. Read by attribute-methods/primary-key.ts.
+  // Mirrors: ActiveRecord::ModelSchema.primary_key_prefix_type (model_schema.rb:163).
+  static primaryKeyPrefixType: string | null = null;
+
+  // Column used to order records when no explicit order is given (e.g. for
+  // `first`/`last`). nil by default. Read by relation/finder-methods.ts.
+  // Mirrors: ActiveRecord::ModelSchema.implicit_order_column (model_schema.rb:169).
+  static implicitOrderColumn: string | null = null;
+
   /** The value stored in a polymorphic `*_type` column for this class —
    * the full namespaced name when `storeFullClassName`, else demodulized.
    * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name */

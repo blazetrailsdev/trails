@@ -217,6 +217,38 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "_attr_readonly",
       "_attr_readonly=",
       "_attr_readonly?",
+      "_destroy_association_async_job",
+      "_destroy_association_async_job=",
+      "_destroy_association_async_job?",
+    ],
+  },
+  {
+    reason:
+      "DEVIATION pending convergence (not ratified): ModelSchema config toggles " +
+      "Rails lets callers set but trails currently hardcodes the backing behavior " +
+      "for, so a settable accessor would silently no-op. `pluralize_table_names` — " +
+      "trails always pluralizes table names (model-schema.ts undecoratedTableName / " +
+      "containedTableNamePrefix, documented at lines 78-80). " +
+      "`schema_migrations_table_name` / `internal_metadata_table_name` — the literal " +
+      'strings "schema_migrations" / "ar_internal_metadata" are hardcoded in ' +
+      "migrator.ts / schema-migration.ts / internal-metadata.ts. " +
+      "`immutable_strings_by_default` — trails has no immutable-string attribute " +
+      "type, so there is no behavior to toggle. Wiring each to real config is " +
+      "tracked in story model-schema-hardcoded-config-toggles-converge (RFC 0023); " +
+      "skipped only to keep this api:compare pass green until that lands.",
+    names: [
+      "pluralize_table_names",
+      "pluralize_table_names=",
+      "pluralize_table_names?",
+      "schema_migrations_table_name",
+      "schema_migrations_table_name=",
+      "schema_migrations_table_name?",
+      "internal_metadata_table_name",
+      "internal_metadata_table_name=",
+      "internal_metadata_table_name?",
+      "immutable_strings_by_default",
+      "immutable_strings_by_default=",
+      "immutable_strings_by_default?",
     ],
   },
   {
