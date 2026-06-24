@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
-import type { Type } from "@blazetrails/activemodel";
+import { type Type, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "./type/json.js";
+import { YAMLColumn } from "./coders/yaml-column.js";
 import { Serialized, type Coder } from "./type/serialized.js";
 import {
   ColumnNotSerializableError,
@@ -64,20 +65,39 @@ export interface SerializeOptions {
 function resolveSerializer(
   attribute: string,
   options: SerializeOptions,
+  defaultSerializer: unknown,
 ): { coder: Coder; coderIdentity: unknown; objectType: unknown } {
   const { coder: coderOpt } = options;
 
-  let rawCoder: unknown = JSON_INNER;
-  // Identity passed to type_incompatible_with_serialize?; the JSON arm fires
-  // for `coder == ::JSON`, so default/"json" report as the global JSON.
-  let coderIdentity: unknown = globalThis.JSON;
+  // Mirrors `coder ||= default_column_serializer` (serialization.rb:183). With
+  // no explicit coder, fall back to the class-level configurable default
+  // (YAMLColumn by default) rather than a hardcoded path.
+  let rawCoder: unknown = defaultSerializer;
+  let coderIdentity: unknown = defaultSerializer;
   let objectType: unknown = Object;
 
-  if (!coderOpt || coderOpt === "json") {
-    // default JSON coder
+  if (!coderOpt) {
+    // Mirrors `unless coder; raise ArgumentError, "missing keyword: :coder"`
+    // (serialization.rb:184-189): a coderless serialize with no configured
+    // default has nothing to fall back to.
+    if (!defaultSerializer) {
+      throw new ArgumentError(
+        "missing keyword: :coder. If no default coder is configured, a coder must be provided to `serialize`.",
+      );
+    }
+  } else if (coderOpt === "json") {
+    rawCoder = JSON_INNER;
+    // The JSON arm of type_incompatible_with_serialize? fires for `coder == ::JSON`.
+    coderIdentity = globalThis.JSON;
   } else if (coderOpt === "array") {
+    // trails shorthand for `coder: JSON, type: Array`.
+    rawCoder = JSON_INNER;
+    coderIdentity = globalThis.JSON;
     objectType = globalThis.Array;
   } else if (coderOpt === "hash") {
+    // trails shorthand for `coder: JSON, type: Hash`.
+    rawCoder = JSON_INNER;
+    coderIdentity = globalThis.JSON;
     objectType = HashObject;
   } else {
     rawCoder = coderOpt;
@@ -121,7 +141,13 @@ export function serialize(
   attribute: string,
   options: SerializeOptions = {},
 ): void {
-  const { coder, coderIdentity, objectType } = resolveSerializer(attribute, options);
+  const { coder, coderIdentity, objectType } = resolveSerializer(
+    attribute,
+    options,
+    "defaultColumnSerializer" in modelClass
+      ? (modelClass as { defaultColumnSerializer?: unknown }).defaultColumnSerializer
+      : YAMLColumn,
+  );
 
   modelClass.decorateAttributes([attribute], (name: string, castType: Type): Type => {
     // `castType instanceof Json` (computed here, where Json is already imported)

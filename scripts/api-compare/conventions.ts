@@ -226,23 +226,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "_destroy_association_async_job?",
     ],
   },
-  {
-    reason:
-      "DEVIATION pending convergence (not an accepted design): Rails' `serialize` " +
-      "falls back to `coder ||= default_column_serializer` (default YAMLColumn, " +
-      "serialization.rb:183-184), but trails defaults a coderless `serialize` to " +
-      "JSON (serialize.ts) and exposes no configurable class-level default, so " +
-      "callers cannot set the Rails serializer default. Converging requires " +
-      "flipping that default (≈40 serialized-attribute tests assume JSON) and is " +
-      "tracked in story default-column-serializer-config-accessor (RFC 0023). " +
-      "Skipped only to keep this api:compare pass green until that lands — the " +
-      "`?` predicate additionally has no trails caller.",
-    names: [
-      "default_column_serializer",
-      "default_column_serializer=",
-      "default_column_serializer?",
-    ],
-  },
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));

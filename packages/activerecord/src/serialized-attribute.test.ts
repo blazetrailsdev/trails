@@ -594,9 +594,9 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     serialize(Topic, "content");
     const topic = await Topic.create({
       title: "test",
-      content: JSON.stringify({ somevalue: "thevalue" }) as any,
+      content: { somevalue: "thevalue" } as any,
     });
-    serialize(Topic, "content", { coder: "array" });
+    serialize(Topic, "content", { type: String });
     const found = await Topic.find(topic.id);
     expect(() => found.content).toThrow(SerializationTypeMismatch);
   });
@@ -624,12 +624,12 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.attribute("content", "string");
       }
     }
-    serialize(Topic, "content");
+    serialize(Topic, "content", { type: "Hash" });
     const topic = await Topic.create({
       title: "test",
-      content: JSON.stringify({ zomg: true }) as any,
+      content: { zomg: true } as any,
     });
-    serialize(Topic, "content", { coder: "array" });
+    serialize(Topic, "content", { type: "Array" });
     const reloaded = await Topic.find(topic.id);
     expect(() => reloaded.content).toThrow(SerializationTypeMismatch);
   });
@@ -933,6 +933,32 @@ describe("SerializedAttributeTest", () => {
     const j = new JsonDefault({});
     j.payload = JSON.stringify([1, 2, 3]);
     expect(j.payload).toEqual([1, 2, 3]);
+  });
+
+  it("coderless serialize falls back to the configured default_column_serializer", async () => {
+    const customCoder = {
+      dump(value: unknown): string {
+        return "CUSTOM:" + globalThis.JSON.stringify(value);
+      },
+      load(raw: unknown): unknown {
+        if (raw == null) return null;
+        return globalThis.JSON.parse((raw as string).replace(/^CUSTOM:/, ""));
+      },
+    };
+
+    class Configurable extends Base {
+      static {
+        this.attribute("payload", "string");
+      }
+    }
+    Configurable.defaultColumnSerializer = customCoder;
+    serialize(Configurable, "payload");
+
+    // The default (YAML) coder would load this as the literal string; only the
+    // custom coder's `load` strips the prefix and yields the number.
+    const c = new Configurable({});
+    c.payload = "CUSTOM:42";
+    expect(c.payload).toEqual(42);
   });
 
   it("serialized attribute with boolean true", async () => {
