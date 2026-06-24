@@ -156,7 +156,15 @@ export class Model {
   // (activemodel/lib/active_model/conversion.rb:32)
   static paramDelimiter: string = "-";
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-  static _attributeMethodPatterns: AttributeMethodPattern[] = [];
+  // Rails: `class_attribute :attribute_method_patterns, … default:
+  // [ ClassMethods::AttributeMethodPattern.new ]`
+  // (activemodel/lib/active_model/attribute_methods.rb:72). The bare pattern
+  // (empty prefix/suffix) routes the plain `attribute` reader through Ruby's
+  // method_missing. trails has no method_missing — attribute readers are real
+  // accessor properties defined by `attribute()` — so `defineAttributeMethodPattern`
+  // skips the bare pattern to avoid generating a colliding `attr` method, while
+  // the seed keeps `attributeMethodPatterns()` faithful to Rails' default.
+  static _attributeMethodPatterns: AttributeMethodPattern[] = [new AttributeMethodPattern()];
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   static _generatedMethods: Set<string> = new Set();
