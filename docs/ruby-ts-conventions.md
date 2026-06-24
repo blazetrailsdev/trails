@@ -27,7 +27,6 @@ matches the first candidate present in the target file), not a call expression.
 | `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
 | `to_sql`                                                                                                                 | `toSql`                              | `to_sql` → `toSql`                                    |
 | `-@` (unary minus)                                                                                                       | `negate`                             | `-@` → `negate`                                       |
-| `+@` (unary plus)                                                                                                        | `identity`                           | `+@` → `identity`                                     |
 | everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
 Predicate-form details: `is_*?` collapses to a single candidate so trails can't
@@ -93,6 +92,8 @@ api:compare skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- ActiveSupport::Duration#+@ (`def +@; self; end`, duration.rb:326) is Ruby's unary-plus operator returning self. TS has no syntax that dispatches to a named method for `+duration` — the unary `+` coerces through `valueOf()` to a number — so a ported `identity()` method would be inert dead code no caller can reach (unlike `-@` → `negate`, which is called from `minus()` via `other.negate()`). Scoped to duration.rb so it can't silence a genuine `+@` gap elsewhere.
+  - `+@` (only in: `duration.rb`)
 - Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails realizes dedup via the `deduplicate` free function plus the DeduplicableBase constructor, so the alias has no separate TS surface on these value objects. Scoped to the AR adapter value-object files so it can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).
   - `-@` (only in: `connection_adapters/deduplicable.rb`, `connection_adapters/column.rb`, `connection_adapters/sql_type_metadata.rb`, `connection_adapters/mysql/type_metadata.rb`, `connection_adapters/postgresql/type_metadata.rb`)
 - ActiveRecord::Delegation delegates a curated Array/Enumerable set (`delegate ... to: :records`, delegation.rb:101) and a model set (`to: :model`, delegation.rb:106). trails realizes both through the runtime delegation Proxy in relation/delegation.ts (delegateArrayMethod / delegateEnumerableMethod for records, classMethodDelegator for the model), not as named methods on Relation — Ruby-only entries (sample, rotate, in_groups, to_sentence, to_fs, as_json, …) have no JS analogue and are intentionally dropped, while the rest route through native JS names (each → forEach, index → indexOf) via the Proxy. Tracked for convergence (expose under Rails names) by story relation-delegation-rails-named-methods.
