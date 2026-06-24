@@ -57,6 +57,18 @@ describe("SerializationTest", () => {
     expect(readAttributeForSerialization(host, "name")).toBe("i_am_name");
   });
 
+  it("read_attribute_for_serialization returns undefined for a present reader that returns undefined", () => {
+    // Ruby `send` keys off method existence, not return value: a reader that
+    // exists and returns nil yields nil, it does not raise.
+    const host = {
+      get name(): string | undefined {
+        return undefined;
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBeUndefined();
+  });
+
   it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
     // Ruby `send(:nope)` raises NoMethodError; a name with no reader and no
     // store/hash entry fails loud rather than silently serializing undefined.

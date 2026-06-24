@@ -51,11 +51,16 @@ export function readAttributeForValidation(
   this: ReadAttributeForValidationHost,
   attribute: string,
 ): unknown {
+  // Ruby `send` keys off method *existence* (`respond_to?`), not the return
+  // value: a reader that exists and returns nil yields nil, only a name with
+  // no reader raises NoMethodError. `key in this` is the JS analog — it sees
+  // own data properties, getters, and inherited methods up the prototype chain.
+  if (!(attribute in this)) {
+    const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
+    throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
+  }
   const reader = this[attribute];
-  if (typeof reader === "function") return (reader as () => unknown).call(this);
-  if (reader !== undefined) return reader;
-  const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
-  throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
+  return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
 }
 
 /**

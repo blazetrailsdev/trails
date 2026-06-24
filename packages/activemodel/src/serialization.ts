@@ -165,13 +165,20 @@ export interface SerializeOptions {
  * rather than invoke the method — a JS-runtime-only divergence pinned by the
  * "attribute named toJSON does not shadow Model#toJSON" test.
  *
- * For a plain host (no `_attributes` store) this is literal `send`: a function
- * member is invoked (`def name; …; end` / `attr_accessor :name`), a value
- * member is returned, and a name that resolves to no reader raises like Ruby
- * `send`'s `NoMethodError` rather than silently reading a stale `attributes`
- * hash. `readAttribute` / the `attributes` hash remain as the named-reader
- * fallback before the raise so an AR-style host without a per-key getter still
- * resolves.
+ * For a host with a per-key reader this is literal `send`: it keys off member
+ * *existence* (`key in record`, the JS analog of `respond_to?`), so a reader
+ * that exists and returns `undefined` yields `undefined` (nil) rather than
+ * raising. A function member is invoked (`def name; …; end` / `attr_accessor
+ * :name`); a value member (getter / data property) is returned.
+ *
+ * When the host exposes no per-key reader, trails' `ActiveModel::Serializers::
+ * JSON` host contract surfaces values through the `attributes` hash (the
+ * `attributes`-getter pattern its mixin tests pin across several model shapes,
+ * where `attributes` is the only data source). `readAttribute` / the
+ * `attributes` hash therefore back the named reader before a name with no
+ * reader and no attribute entry raises like `send`'s `NoMethodError`. A real
+ * Rails-shaped model never reaches this tier — its declared attributes are
+ * `_attributes`-backed (the store branch above) or carry generated readers.
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
   const attrStore = record._attributes as AttributeStore;
@@ -180,9 +187,10 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
   } else if (attrStore instanceof Map) {
     return attrStore.get(key);
   }
-  const reader = (record as Record<string, unknown>)[key];
-  if (typeof reader === "function") return (reader as () => unknown).call(record);
-  if (reader !== undefined) return reader;
+  if (key in (record as object)) {
+    const reader = (record as Record<string, unknown>)[key];
+    return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
+  }
   if (record.readAttribute) return record.readAttribute(key);
   if (record.attributes && key in record.attributes) return record.attributes[key];
   throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
