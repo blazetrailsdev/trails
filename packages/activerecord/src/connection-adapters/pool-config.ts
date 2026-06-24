@@ -197,6 +197,19 @@ export class PoolConfig {
     this._pool = null;
   }
 
+  /**
+   * Async-draining variant of `discardPoolBang`: awaits each adapter's pending
+   * async `driver.close()` (via the pool's `disconnectAsync`) before dropping
+   * the pool, so an async-only driver's handle is fully closed before the caller
+   * re-opens the DB. No-ops when the pool is uninitialized or all drivers close
+   * synchronously.
+   */
+  async discardPoolBangAsync(): Promise<void> {
+    if (!this._pool) return;
+    await this._pool.disconnectAsync();
+    this._pool = null;
+  }
+
   static discardPoolsBang(): void {
     for (const ref of INSTANCES) {
       const config = ref.deref();
@@ -208,6 +221,18 @@ export class PoolConfig {
     }
   }
 
+  /** Async-draining variant of `discardPoolsBang`. */
+  static async discardPoolsBangAsync(): Promise<void> {
+    for (const ref of INSTANCES) {
+      const config = ref.deref();
+      if (!config) {
+        INSTANCES.delete(ref);
+        continue;
+      }
+      await config.discardPoolBangAsync();
+    }
+  }
+
   static disconnectAllBang(): void {
     for (const ref of INSTANCES) {
       const config = ref.deref();
@@ -216,6 +241,21 @@ export class PoolConfig {
         continue;
       }
       config.disconnectBang({ automaticReconnect: true });
+    }
+  }
+
+  /** Async-draining variant of `disconnectAllBang`. */
+  static async disconnectAllBangAsync(): Promise<void> {
+    for (const ref of INSTANCES) {
+      const config = ref.deref();
+      if (!config) {
+        INSTANCES.delete(ref);
+        continue;
+      }
+      if (config._pool) {
+        (config._pool as any).automaticReconnect = true;
+        await config._pool.disconnectAsync();
+      }
     }
   }
 

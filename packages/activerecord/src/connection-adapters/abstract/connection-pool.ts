@@ -239,6 +239,14 @@ export class ConnectionPool implements ReapablePool {
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
   private _lastCheckinAt = new Map<DatabaseAdapter, number>();
+  /**
+   * Async `driver.close()` calls fired by synchronous discard paths that cannot
+   * await them under their `void`/throwing contract — currently the
+   * checkout-failure swap discard in {@link checkoutAndVerify}. Each promise
+   * removes itself once settled so the set stays bounded; {@link drainPendingCloses}
+   * lets a caller await the lot before re-opening the same DB.
+   */
+  private _pendingCloseDrains = new Set<Promise<void>>();
   private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
   /**
    * Pool-scoped fixture pin. Separate from {@link _pinnedConnections} (which is
@@ -858,7 +866,26 @@ export class ConnectionPool implements ReapablePool {
   }
 
   discardBang(): void {
-    if (this.isDiscarded()) return;
+    this._discardBang();
+  }
+
+  /**
+   * Synchronous discard shared by `discardBang`/`discardBangAsync`. Returns the
+   * pending async-close drains surfaced by adapters with an async-only
+   * `driver.close()` already in flight (e.g. fired by a prior `disconnectBang`
+   * on a still-pooled conn). Rails' `discard!` abandons the raw handle without
+   * closing it, so SQLite's `discardBang()` fires no new close; but dropping our
+   * `_connections` reference here would orphan any in-flight close, leaking the
+   * handle past teardown and racing a re-open. `discardBang` ignores the drains
+   * (Rails-synchronous); `discardBangAsync` awaits them.
+   */
+  private _discardBang(): Array<Promise<void>> {
+    if (this.isDiscarded()) return [];
+    const draining: Array<Promise<void>> = [];
+    for (const conn of this._connections ?? []) {
+      const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+      if (drain) draining.push(drain);
+    }
     this._pinnedConnections.clear();
     this._fixturePin = null;
     this._connections = null;
@@ -868,9 +895,32 @@ export class ConnectionPool implements ReapablePool {
     this._leases = null;
     this._checkedOut.clear();
     this._lastCheckinAt.clear();
+    return draining;
+  }
+
+  /**
+   * Async-draining variant of `discardBang`: discards synchronously, then awaits
+   * any adapter's in-flight async `driver.close()` before resolving, so the
+   * handle is fully closed before the caller re-opens the same DB. Resolves
+   * immediately for sync drivers (or when nothing is in flight).
+   */
+  async discardBangAsync(): Promise<void> {
+    await Promise.all(this._discardBang());
   }
 
   clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): void {
+    this._clearReloadableConnections(raiseOnAcquisitionTimeout);
+  }
+
+  /**
+   * Synchronous reload-clear shared by `clearReloadableConnections` and its
+   * async variant. Returns the pending async-close drains surfaced by reloadable
+   * adapters whose `driver.close()` (fired by `disconnectBang` below) is
+   * promise-returning. The sync API ignores them (Rails-synchronous);
+   * `clearReloadableConnectionsAsync` awaits them.
+   */
+  private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
+    const draining: Array<Promise<void>> = [];
     withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
       const ctx = String(executionContextId());
       const reloadable = new Set<DatabaseAdapter>();
@@ -893,6 +943,8 @@ export class ConnectionPool implements ReapablePool {
         }
         if (reloadable.has(conn)) {
           (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+          const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+          if (drain) draining.push(drain);
           this._lastCheckinAt.delete(conn);
         }
       }
@@ -901,10 +953,24 @@ export class ConnectionPool implements ReapablePool {
       }
       this._available?.clear();
     });
+    return draining;
+  }
+
+  /**
+   * Async-draining variant of `clearReloadableConnections`: clears
+   * synchronously, then awaits each reloaded adapter's in-flight async close
+   * before resolving. Resolves immediately for sync drivers.
+   */
+  async clearReloadableConnectionsAsync(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
+    await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
   }
 
   clearReloadableConnectionsBang(): void {
     this.clearReloadableConnections(false);
+  }
+
+  async clearReloadableConnectionsBangAsync(): Promise<void> {
+    await this.clearReloadableConnectionsAsync(false);
   }
 
   reap(): void {
@@ -914,10 +980,20 @@ export class ConnectionPool implements ReapablePool {
   }
 
   flush(minimumIdle?: number | null): void {
+    this._flush(minimumIdle);
+  }
+
+  /**
+   * Synchronous flush shared by `flush`/`flushAsync`. Returns the pending
+   * async-close drains surfaced by flushed adapters whose `driver.close()`
+   * (fired by `disconnectBang` below) is promise-returning. `flush` ignores them
+   * (Rails-synchronous); `flushAsync` awaits them.
+   */
+  private _flush(minimumIdle?: number | null): Array<Promise<void>> {
     if (minimumIdle === undefined) minimumIdle = this._idleTimeout;
-    if (minimumIdle === null) return;
-    if (this.isDiscarded()) return;
-    if (!this._connections || !this._available) return;
+    if (minimumIdle === null) return [];
+    if (this.isDiscarded()) return [];
+    if (!this._connections || !this._available) return [];
 
     const now = Date.now();
     const minimumIdleMs = minimumIdle * 1000;
@@ -937,14 +1013,61 @@ export class ConnectionPool implements ReapablePool {
       }
     }
 
+    const draining: Array<Promise<void>> = [];
     for (const conn of idle) {
       (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+      const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
+      if (drain) draining.push(drain);
     }
+    return draining;
+  }
+
+  /**
+   * Async-draining variant of `flush`: evicts idle connections synchronously,
+   * then awaits each one's in-flight async close before resolving. Resolves
+   * immediately for sync drivers.
+   */
+  async flushAsync(minimumIdle?: number | null): Promise<void> {
+    await Promise.all(this._flush(minimumIdle));
   }
 
   flushBang(): void {
     this.reap();
     this.flush(-1);
+  }
+
+  async flushBangAsync(): Promise<void> {
+    this.reap();
+    await this.flushAsync(-1);
+  }
+
+  /**
+   * Record an in-flight async `driver.close()` fired by a synchronous discard
+   * path (the checkout-failure swap) so {@link drainPendingCloses} can await it.
+   * The promise self-removes once settled, keeping the set bounded; a sync
+   * driver's resolved/no-op `whenClosed()` is dropped immediately.
+   *
+   * @internal
+   */
+  trackCloseDrain(drain: Promise<void> | undefined): void {
+    if (!drain) return;
+    this._pendingCloseDrains.add(drain);
+    const forget = (): void => {
+      this._pendingCloseDrains.delete(drain);
+    };
+    drain.then(forget, forget);
+  }
+
+  /**
+   * Await every async close stashed by {@link trackCloseDrain} (currently the
+   * checkout-failure swap discard) so an async-only driver's handle is fully
+   * closed before the caller re-opens the same DB. Resolves immediately when
+   * nothing is in flight (the sync-driver case).
+   *
+   * @internal
+   */
+  async drainPendingCloses(): Promise<void> {
+    await Promise.all(this._pendingCloseDrains);
   }
 
   // --- Connection creation ---
@@ -1621,6 +1744,11 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
   } catch (err) {
     pool.remove(c);
     (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+    // disconnectBang on an async-only driver fires a promise-returning close it
+    // can't await under its sync contract; stash it on the pool so a caller can
+    // drain it (pool.drainPendingCloses) before re-opening the same DB. Sync
+    // drivers contribute a resolved no-op.
+    pool.trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
     throw err;
   }
 }
