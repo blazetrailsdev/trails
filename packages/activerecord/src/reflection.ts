@@ -1469,6 +1469,14 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.options;
   }
 
+  // Rails ThroughReflection delegates `autosave=` to the delegate reflection
+  // (delegate_methods), where the setter writes `options[:autosave]`. Mirror it
+  // so `accepts_nested_attributes_for` on a HABTM/through association flips
+  // autosave on the options the save path reads (delegateReflection.options).
+  set autosave(value: boolean) {
+    this.delegateReflection.autosave = value;
+  }
+
   get activeRecord(): typeof Base {
     return this.delegateReflection.activeRecord;
   }
