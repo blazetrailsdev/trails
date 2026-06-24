@@ -1619,6 +1619,12 @@ describe("RelationTest", () => {
   });
 
   it("does not defer distinct-PK for a singular nested-hash eager spec", () => {
+    // Bespoke models (matching the sibling joins test above) with explicit
+    // foreignKey/attribute declarations so the JoinDependency walk resolves the
+    // nested-hash spec offline — canonical models build their join tree from
+    // DB-loaded columns, which this predicate-only test (no handler suite / live
+    // schema) cannot provide, so their addAssociationSpec rolls back to zero
+    // reflections and the limitability assertion is vacuous.
     try {
       class NhProfile extends Base {
         static {
@@ -1631,6 +1637,7 @@ describe("RelationTest", () => {
         static {
           this.tableName = "nh_avatars";
           this.attribute("url", "string");
+          this.attribute("nh_author_id", "integer");
           registerModel(this);
         }
       }
