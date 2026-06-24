@@ -840,7 +840,12 @@ export class CollectionAssociation extends Association {
         : (record as any)[key],
     );
     if (values.some((v) => v == null)) return record;
-    return JSON.stringify(values.length === 1 ? values[0] : values);
+    // BigInt PKs (int8 default under PG bigserial) can't go through
+    // JSON.stringify ("Do not know how to serialize a BigInt"); fold to their
+    // decimal string. Both merged lists read PKs from the same source, so the
+    // identity key stays deterministic.
+    const ids = values.map((v) => (typeof v === "bigint" ? v.toString() : v));
+    return JSON.stringify(ids.length === 1 ? ids[0] : ids);
   }
 
   protected primaryKeyValue(record: Base): unknown {

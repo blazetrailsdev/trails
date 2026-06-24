@@ -80,10 +80,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
     if ((type as string) === "primary_key") {
-      // PostgreSQLAdapter.typeToSql has no primary_key case and returns the
-      // string literal "primary_key" (invalid SQL). Use the base which returns
-      // "SERIAL PRIMARY KEY" for postgres.
-      return super.typeToSql(type, options);
+      // Mirrors Rails NATIVE_DATABASE_TYPES[:primary_key] = "bigserial primary
+      // key". PostgreSQLAdapter.typeToSql can't resolve it (NATIVE_DATABASE_TYPES
+      // is keyed camelCase `primaryKey`) and the abstract base returns int4
+      // "SERIAL PRIMARY KEY", so emit the native bigserial string directly.
+      return "bigserial primary key";
     }
     // Delegate to the adapter's typeToSql when available (Rails parity:
     // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
