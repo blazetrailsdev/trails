@@ -8,6 +8,7 @@ import {
   IndexDefinition,
   ColumnDefinition,
   TableDefinition,
+  AlterTable,
 } from "../abstract/schema-definitions.js";
 import { TableDefinition as MyTd } from "./schema-definitions.js";
 
@@ -26,6 +27,15 @@ describe("MySQL::SchemaCreation", () => {
     const mdb = new SchemaCreation();
     (mdb as any)._mariadb = true;
     expect((mdb as any).visitDropCheckConstraint("chk")).toBe("DROP CONSTRAINT chk");
+  });
+
+  it("visitAlterTable routes FK/check drops through the MySQL visitors", () => {
+    const at = new AlterTable("posts");
+    at.dropForeignKey("fk_name");
+    at.checkConstraintDrops.push("chk");
+    const sql = (sc as any).visitAlterTable(at);
+    expect(sql).toContain("DROP FOREIGN KEY fk_name");
+    expect(sql).toContain("DROP CHECK chk");
   });
 
   it("visitChangeColumnDefinition generates CHANGE sql", () => {

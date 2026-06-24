@@ -174,10 +174,23 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("quotedIncludeColumns + tableModifierInCreate", () => {
-    expect(s().quotedIncludeColumns("a, b")).toBe("a, b");
+    expect(s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
+    expect(s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
+    expect(s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
     expect(s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
     expect(s().tableModifierInCreate({ temporary: true })).toBe(" TEMPORARY");
     expect(s().tableModifierInCreate({ unlogged: true })).toBe(" UNLOGGED");
     expect(s().tableModifierInCreate({})).toBe("");
+  });
+
+  it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", () => {
+    const sc = new SchemaCreation({
+      quoteIdentifier: (n: string) => `"${n}"`,
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
+      typeToSql: (type: string) => type,
+      quotedIncludeColumnsForIndex: () => "<<delegated>>",
+    } as any) as any;
+    expect(sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
   });
 });

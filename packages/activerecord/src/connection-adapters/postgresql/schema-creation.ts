@@ -299,10 +299,33 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return result;
   }
 
-  /** @internal */
-  protected quotedIncludeColumns(o: string | string[]): string {
+  /**
+   * Rails delegates `quoted_include_columns_for_index` to `@conn`
+   * (postgresql/schema_creation.rb:8). When the real adapter is threaded as the
+   * host it exposes that method, so route through it; fall back to inline
+   * identifier quoting on the host-less unit-test path (only the SchemaQuoter
+   * shim is wired).
+   * @internal
+   */
+  protected quotedIncludeColumnsForIndex(o: string | string[]): string {
+    const host = this.adapter as PgSchemaCreationHost & {
+      quotedIncludeColumnsForIndex?(columns: string | string[]): string;
+    };
+    if (typeof host.quotedIncludeColumnsForIndex === "function") {
+      return host.quotedIncludeColumnsForIndex(o);
+    }
     if (typeof o === "string") return o;
     return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+  }
+
+  /**
+   * Rails' private `quoted_include_columns` returns a raw string verbatim and
+   * otherwise delegates to `quoted_include_columns_for_index`
+   * (postgresql/schema_creation.rb:143-144).
+   * @internal
+   */
+  protected override quotedIncludeColumns(o: string | string[]): string {
+    return typeof o === "string" ? o : this.quotedIncludeColumnsForIndex(o);
   }
 
   /** @internal */

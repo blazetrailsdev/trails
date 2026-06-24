@@ -2783,6 +2783,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this._databaseVersion;
   }
 
+  /**
+   * Mirrors Rails' `PostgreSQLAdapter#postgresql_version`, an alias for
+   * `database_version` (postgresql_adapter.rb). Public so callers can read the
+   * connected server's numeric version without going through the protected
+   * `databaseVersion` getter directly.
+   */
+  postgresqlVersion(): number {
+    return this.databaseVersion;
+  }
+
   supportsBulkAlter(): boolean {
     return true;
   }
