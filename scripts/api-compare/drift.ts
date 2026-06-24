@@ -9,13 +9,14 @@
  * (output/ts-api.json), and writes output/version-drift.json. Prereq: api:compare.
  */
 import { execFile } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { SOURCES } from "../../vendor/sources.js";
+import { diffGemList, gemNamesFromPaths } from "./gem-list.js";
 import type { ApiManifest } from "./types.js";
 import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
 import { annotateAgainstTs, diffManifests } from "./version-diff.js";
@@ -102,6 +103,42 @@ async function extractTargetApi(cloneRoot: string, ref: string): Promise<string>
   if (stderr) process.stderr.write(stderr);
   return outPath;
 }
+/** Collect monorepo gemspec paths (relative to the clone root): the root
+ *  `rails.gemspec` plus each top-level subgem's `<gem>/<gem>.gemspec`. */
+async function gemspecPaths(cloneRoot: string): Promise<string[]> {
+  const paths: string[] = [];
+  const entries = await readdir(cloneRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(".gemspec")) paths.push(entry.name);
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const sub = await readdir(join(cloneRoot, entry.name), { withFileTypes: true });
+    for (const child of sub) {
+      if (child.isFile() && child.name.endsWith(".gemspec")) {
+        paths.push(`${entry.name}/${child.name}`);
+      }
+    }
+  }
+  return paths;
+}
+
+/** Gem-level add/remove between the base pin and the target ref, derived from
+ *  each ref's monorepo subgem list. Surfaces whole-gem drift that
+ *  `diffManifests` can't see (it only diffs gems present in both manifests).
+ *  The base list comes from the vendored source `api:compare` already fetched
+ *  (`vendor/rails`, the exact pin `rails-api.json` was extracted from) — not a
+ *  re-clone — so it can't disagree with the base manifest. */
+async function gemListDelta(targetClone: string) {
+  const baseSource = join(ROOT, "vendor", RAILS!.name);
+  if (!existsSync(baseSource)) {
+    throw new Error(`missing ${baseSource} — run \`pnpm api:compare\` first`);
+  }
+  const [baseGems, targetGems] = await Promise.all([
+    gemspecPaths(baseSource).then(gemNamesFromPaths),
+    gemspecPaths(targetClone).then(gemNamesFromPaths),
+  ]);
+  return diffGemList(baseGems, targetGems);
+}
+
 async function readManifest(path: string): Promise<ApiManifest> {
   if (!existsSync(path)) throw new Error(`missing ${path} — run \`pnpm api:compare\` first`);
   return JSON.parse(await readFile(path, "utf8")) as ApiManifest;
@@ -160,11 +197,16 @@ export async function runDrift(ref: string): Promise<string> {
   // diffManifests only diffs packages both manifests carry, so the extra
   // non-rails gems in the base/ts manifests (rack, globalid, …) drop out.
   const drift = annotateAgainstTs(diffManifests(base, target), ts);
+  // Whole-gem add/remove is invisible to diffManifests; derive it from the
+  // monorepo subgem list at each ref so a bump that adds or drops a gem shows up.
+  const gemDelta = await gemListDelta(dest);
   const report = {
     baseRef: RAILS!.origin.ref,
     targetRef: ref,
     targetSha: sha,
     generatedAt: new Date().toISOString(),
+    addedPackages: gemDelta.addedPackages,
+    removedPackages: gemDelta.removedPackages,
     ...drift,
   };
   const outPath = join(OUTPUT_DIR, "version-drift.json");
@@ -173,7 +215,9 @@ export async function runDrift(ref: string): Promise<string> {
   console.log(
     `\n[drift] ${RAILS!.origin.ref} → ${ref}: +${s.addedClasses}/-${s.removedClasses} classes, ` +
       `${s.signatureChanges} signature, ${s.visibilityChanges} visibility, ${s.callSetChanges} ` +
-      `call-set changes (${s.portedAffected} affect ported surface)\n[drift] written to ${outPath}`,
+      `call-set changes (${s.portedAffected} affect ported surface); ` +
+      `+${gemDelta.addedPackages.length}/-${gemDelta.removedPackages.length} gems` +
+      `\n[drift] written to ${outPath}`,
   );
   return outPath;
 }
