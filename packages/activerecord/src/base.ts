@@ -125,13 +125,18 @@ import {
   signedId as _signedId,
   signedIdVerifier as _signedIdVerifier,
   signedIdVerifierSecret as _signedIdVerifierSecret,
+  setSignedIdVerifierSecret as _setSignedIdVerifierSecret,
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import {
   tokenDefinitions as _tokenDefinitions,
+  setTokenDefinitions as _setTokenDefinitions,
   generatedTokenVerifier as _generatedTokenVerifier,
+  setGeneratedTokenVerifier as _setGeneratedTokenVerifier,
 } from "./token-for.js";
+import type { TokenDefinition as _TokenDefinition } from "./token-for.js";
+import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { registerMigrationArConfig } from "./migration.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -1549,6 +1554,10 @@ export class Base extends Model {
     return _signedIdVerifierSecret();
   }
 
+  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
+    _setSignedIdVerifierSecret(value);
+  }
+
   /**
    * Set of attribute names with a registered normalizer.
    *
@@ -1567,6 +1576,10 @@ export class Base extends Model {
     return _tokenDefinitions(this);
   }
 
+  static set tokenDefinitions(value: Record<string, _TokenDefinition>) {
+    _setTokenDefinitions(this, value);
+  }
+
   /**
    * MessageVerifier backing token-for (null until the first token op builds it).
    *
@@ -1574,6 +1587,10 @@ export class Base extends Model {
    */
   static get generatedTokenVerifier(): unknown {
     return _generatedTokenVerifier(this);
+  }
+
+  static set generatedTokenVerifier(value: _MessageVerifier | null) {
+    _setGeneratedTokenVerifier(this, value);
   }
 
   // -- Encrypted attributes --

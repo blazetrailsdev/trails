@@ -24,18 +24,17 @@ export { InvalidSignature };
 
 let _tokenForSecret: string | (() => string) | null = null;
 let _cachedVerifier: MessageVerifier | null = null;
-let _cachedSecret: string | null = null;
 
 /**
  * Configure the secret used for token generation/verification.
  * If not set, falls back to BLAZETRAILS_SECRET_KEY_BASE or
  * BLAZETRAILS_SIGNED_ID_SECRET env vars. Throws if no secret
- * is configured.
+ * is configured. Clears the cached verifier so the next token op
+ * (or `generated_token_verifier` read) reflects the new secret.
  */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;
   _cachedVerifier = null;
-  _cachedSecret = null;
 }
 
 function resolveSecret(): string {
@@ -82,12 +81,10 @@ export class TokenDefinition {
 
   messageVerifier(): MessageVerifier {
     // Rails: `defining_class.generated_token_verifier ||= MessageVerifier.new(...)`
-    // — lazily build and memoize, the value the `generated_token_verifier` reader
-    // returns afterwards.
-    const secret = resolveSecret();
-    if (!_cachedVerifier || _cachedSecret !== secret) {
-      _cachedVerifier = new MessageVerifier(secret);
-      _cachedSecret = secret;
+    // — return the existing value if set (including one injected via the writer),
+    // otherwise lazily build from the secret and memoize.
+    if (!_cachedVerifier) {
+      _cachedVerifier = new MessageVerifier(resolveSecret());
     }
     return _cachedVerifier;
   }
@@ -174,6 +171,21 @@ export function tokenDefinitions(
 }
 
 /**
+ * Rails-shaped writer for `class_attribute :token_definitions` — Rails'
+ * `generates_token_for` assigns `self.token_definitions = token_definitions.merge(...)`,
+ * and external callers can replace the map outright. Stores the given hash as
+ * this class's own registry entry (subclasses still inherit via the reader).
+ *
+ * Mirrors: ActiveRecord::TokenFor#token_definitions=
+ */
+export function setTokenDefinitions(
+  modelClass: typeof Base,
+  value: Record<string, TokenDefinition>,
+): void {
+  tokenDefinitionRegistry.set(modelClass, new Map(Object.entries(value)));
+}
+
+/**
  * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
  * to sign/verify tokens. The reader returns nil until `message_verifier` lazily
  * builds and memoizes it (`||=`); mirror that by returning the current cache
@@ -187,6 +199,23 @@ export function tokenDefinitions(
  */
 export function generatedTokenVerifier(_modelClass: typeof Base): MessageVerifier | null {
   return _cachedVerifier;
+}
+
+/**
+ * Rails-shaped writer for `class_attribute :generated_token_verifier` — Rails
+ * tests assign `ActiveRecord::Base.generated_token_verifier = MessageVerifier.new(...)`
+ * to inject a verifier; `message_verifier`'s `||=` then returns it instead of
+ * building from the secret. A null clears the injection, reverting to lazy build.
+ * The signing secret is process-global in trails, so the cache is shared rather
+ * than per-class; the `modelClass` arg is accepted for Rails-shaped call sites.
+ *
+ * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
+ */
+export function setGeneratedTokenVerifier(
+  _modelClass: typeof Base,
+  verifier: MessageVerifier | null,
+): void {
+  _cachedVerifier = verifier;
 }
 
 /**
