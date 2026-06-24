@@ -511,11 +511,16 @@ export interface AbstractAdapter {
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
+   * — Rails: `def explain(arel, binds = [], options = [])`; the implementation
+   * renders `arel` via `to_sql(arel, binds)` before executing, so the base
+   * input is an Arel node/AST (`unknown`), not a pre-rendered SQL string.
    */
-  explain?(sql: string, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
+  explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
+   *
+   * @internal
    */
   createTableDefinition?(name: string, options?: Record<string, unknown>): TableDefinition;
 
