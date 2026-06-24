@@ -1,5 +1,4 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { hasDefaultScopeOverride } from "./scoping/default.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -151,13 +150,15 @@ export function scopeRegistry(): ScopeRegistry {
 }
 
 /**
- * Rails: `class_attribute :default_scope_override` — whether the model defines
- * its own `default_scope` rather than only inheriting the base macro. Rails
- * memoizes this boolean in `build_default_scope`; trails computes the equivalent
- * on demand by walking the prototype chain for the `defaultScope` owner.
+ * Rails: `class_attribute :default_scope_override` (default nil) — whether the
+ * model defines its own `default_scope`. Like Rails, this stays nil until
+ * `build_default_scope` first runs and memoizes the boolean into the
+ * `_defaultScopeOverride` class field (see scoping/default.ts); reading it
+ * before then returns nil, not an eagerly-computed boolean.
  *
  * Mirrors: ActiveRecord::Scoping#default_scope_override
  */
-export function defaultScopeOverride(this: ScopingClassHost): boolean {
-  return hasDefaultScopeOverride(this);
+export function defaultScopeOverride(this: ScopingClassHost): boolean | null {
+  const value = (this as any)._defaultScopeOverride;
+  return value == null ? null : value;
 }

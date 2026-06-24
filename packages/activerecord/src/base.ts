@@ -1584,10 +1584,11 @@ export class Base extends Model {
 
   /**
    * Whether this model defines its own default_scope (vs only inheriting it).
+   * Nil until `build_default_scope` first memoizes it (Rails class_attribute).
    *
    * Mirrors: ActiveRecord::Base.default_scope_override
    */
-  static get defaultScopeOverride(): boolean {
+  static get defaultScopeOverride(): boolean | null {
     return _defaultScopeOverride.call(this);
   }
 
