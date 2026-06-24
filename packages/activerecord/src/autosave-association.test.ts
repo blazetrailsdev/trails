@@ -530,8 +530,21 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(await pirate.isValid()).toBe(false);
 
     for (const p of parrots) markForDestruction(p);
+
+    // Rails `assert_not_called(parrot, :valid?)`: a marked-for-destruction child
+    // is skipped by `association_valid?` before validation runs, so `valid?`
+    // must not fire on it during the owner save.
+    const validatedIds: unknown[] = [];
+    for (const p of parrots) {
+      const origIsValid = p.isValid.bind(p);
+      (p as { isValid: (ctx?: unknown) => boolean }).isValid = (ctx?: unknown) => {
+        validatedIds.push(p.id);
+        return origIsValid(ctx as never);
+      };
+    }
     const saved = await pirate.save();
     expect(saved).toBe(true);
+    expect(validatedIds).toEqual([]);
 
     const reloaded = await Pirate.find(pirate.id!);
     expect((await association(reloaded, "parrots").toArray()).length).toBe(0);
