@@ -2475,6 +2475,16 @@ export class Base extends Model {
   declare static only: typeof Querying.only;
   declare static merge: typeof Querying.merge;
   declare static asyncIds: typeof Querying.asyncIds;
+  declare static extractAssociated: typeof Querying.extractAssociated;
+  declare static except: typeof Querying.except;
+  declare static calculate: typeof Querying.calculate;
+  declare static asyncCount: typeof Querying.asyncCount;
+  declare static asyncAverage: typeof Querying.asyncAverage;
+  declare static asyncMinimum: typeof Querying.asyncMinimum;
+  declare static asyncMaximum: typeof Querying.asyncMaximum;
+  declare static asyncSum: typeof Querying.asyncSum;
+  declare static asyncPluck: typeof Querying.asyncPluck;
+  declare static asyncPick: typeof Querying.asyncPick;
   /** @internal */
   declare static _queryBySql: typeof Querying._queryBySql;
   /** @internal */
