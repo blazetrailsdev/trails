@@ -22,19 +22,23 @@ import type {
 } from "./types.js";
 import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
 import { sharedCacheDir, contentFingerprint, readShared, writeShared } from "./shared-cache.js";
+import { extractorSchemaToken } from "./extractor-schema.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
 // takes ~16s; only a handful of packages typically change between
 // runs. Each package's PackageInfo is cached at
 // output/ts-api-cache/<package>.json keyed by `packageFingerprint`
-// (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
-// SCHEMA_VERSION constant we can bump when the extractor's output
-// shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
-const SCHEMA_VERSION = 8;
+// (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus the
+// extractor SCHEMA_VERSION token (see extractor-schema.ts), which changes
+// whenever a new per-method output field is added so stale entries missing
+// the field are evicted automatically. Set `API_COMPARE_FORCE=1` to skip the
+// cache entirely. The token is computed async (it hashes the extractor
+// sources), so it lives on `main()` rather than as a module const.
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 interface CacheEntry {
-  schemaVersion: number;
+  schemaVersion: string;
   fingerprint: string;
   package: PackageInfo;
 }
@@ -90,10 +94,7 @@ if (!isMainThread && parentPort) {
 // registers tsx inside the worker first, then imports this module —
 // when it loads, the `!isMainThread` guard at the top dispatches into
 // extractPackage and posts the result back.
-const WORKER_BOOTSTRAP = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "extract-ts-api-worker.mjs",
-);
+const WORKER_BOOTSTRAP = path.join(SCRIPT_DIR, "extract-ts-api-worker.mjs");
 
 function extractInWorker(pkgName: string, srcDir: string): Promise<PackageInfo> {
   return new Promise((resolve, reject) => {
@@ -143,6 +144,9 @@ export async function main() {
 
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const force = process.env.API_COMPARE_FORCE === "1";
+  // Output-schema token folded into every cache key (local + shared). Stale
+  // entries from a prior output shape carry a different token and are re-extracted.
+  const SCHEMA_VERSION = await extractorSchemaToken(SCRIPT_DIR);
   // `Set` so the per-package summary loop's membership check is O(1).
   const cacheHits = new Set<string>();
   // Cross-worktree content-keyed cache layer (null if not a git checkout, or

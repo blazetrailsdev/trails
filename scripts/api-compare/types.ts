@@ -23,6 +23,9 @@ export interface ParamInfo {
   type?: string;
 }
 
+// When you add a field here that the extractor POPULATES, also add its emitted
+// key to EXTRACTOR_OUTPUT_FIELDS in extractor-schema.ts so the ts-api cache
+// token changes and stale entries missing the field are evicted (see PR #4020).
 export interface MethodInfo {
   name: string;
   visibility: "public" | "protected" | "private";
