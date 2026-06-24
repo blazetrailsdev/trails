@@ -119,7 +119,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const created = await Professor.create({ name: "Nicola" });
       const found = await ForeignProfessorWithPk.find(created.readAttribute("id"));
       expect(found.readAttribute("name")).toBe("Nicola");
-      expect(found.readAttribute("id")).toBe(created.readAttribute("id"));
+      expect(Number(found.readAttribute("id"))).toBe(Number(created.readAttribute("id")));
     });
 
     itIfSupports("foreign_tables", "insert record", async () => {

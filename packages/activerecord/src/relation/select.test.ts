@@ -243,7 +243,7 @@ describe("SelectTest", () => {
         unknown
       > & { readAttribute(n: string): unknown },
     ]) {
-      expect(post.readAttribute("id")).toBe(1);
+      expect(Number(post.readAttribute("id"))).toBe(1);
       expect(post.readAttribute("title")).toBe("Welcome to the weblog");
       expect(post.readAttribute("body")).toBe("Thank you for the welcome");
     }

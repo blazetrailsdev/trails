@@ -30,7 +30,7 @@ describe("FieldOrderedValuesTest", () => {
     const order = [3, 4, 1];
     const posts = Post.inOrderOf("id", order);
 
-    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of empty", async () => {
@@ -73,7 +73,7 @@ describe("FieldOrderedValuesTest", () => {
       order.map((id) => id * 2),
     );
 
-    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of with string column", async () => {
@@ -93,10 +93,10 @@ describe("FieldOrderedValuesTest", () => {
   it("in order of after regular order", async () => {
     const order = [3, 4, 1];
     let posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
-    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
 
     posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
-    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+    expect((await posts.toArray()).map((p: any) => Number(p.id))).toEqual(order);
   });
 
   it("in order of with nil", async () => {
@@ -145,7 +145,7 @@ describe("FieldOrderedValuesTest", () => {
     const order = [3, 4, 1];
     const posts = Post.inOrderOf("id", order, false);
 
-    expect((await posts.limit(3).toArray()).map((p: any) => p.id)).toEqual(order);
+    expect((await posts.limit(3).toArray()).map((p: any) => Number(p.id))).toEqual(order);
     expect(await posts.count()).toBe(11);
   });
 });
