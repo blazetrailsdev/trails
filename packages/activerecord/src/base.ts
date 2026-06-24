@@ -124,9 +124,19 @@ import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/sig
 import {
   signedId as _signedId,
   signedIdVerifier as _signedIdVerifier,
+  signedIdVerifierSecret as _signedIdVerifierSecret,
+  setSignedIdVerifierSecret as _setSignedIdVerifierSecret,
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
+import {
+  tokenDefinitions as _tokenDefinitions,
+  setTokenDefinitions as _setTokenDefinitions,
+  generatedTokenVerifier as _generatedTokenVerifier,
+  setGeneratedTokenVerifier as _setGeneratedTokenVerifier,
+} from "./token-for.js";
+import type { TokenDefinition as _TokenDefinition } from "./token-for.js";
+import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { registerMigrationArConfig } from "./migration.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -182,7 +192,10 @@ import {
   idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
-import { normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn } from "./normalization.js";
+import {
+  normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn,
+  normalizedAttributes as _normalizedAttributes,
+} from "./normalization.js";
 import {
   toKey as _toKey,
   getId as _getId,
@@ -244,6 +257,7 @@ import { argumentError } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
   scopeAttributes,
+  defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
 } from "./scoping.js";
 import {
@@ -978,6 +992,20 @@ export class Base extends Model {
     LockingOptimistic.setLockingColumn(this, col);
   }
 
+  /**
+   * Whether optimistic locking is enabled for this model (default true). Set to
+   * false to disable it even when a lock_version column exists.
+   *
+   * Mirrors: ActiveRecord::Base.lock_optimistically
+   */
+  static get lockOptimistically(): boolean {
+    return LockingOptimistic.lockOptimistically(this);
+  }
+
+  static set lockOptimistically(value: boolean) {
+    LockingOptimistic.setLockOptimistically(this, value);
+  }
+
   static get lockingEnabled(): boolean {
     return LockingOptimistic.lockingEnabled(this);
   }
@@ -1523,6 +1551,77 @@ export class Base extends Model {
     return ReadonlyAttributes.readonlyAttributes.call(this);
   }
 
+  /**
+   * Per-model `associationName => options` map from accepts_nested_attributes_for.
+   *
+   * Mirrors: ActiveRecord::Base.nested_attributes_options
+   */
+  static get nestedAttributesOptions(): Readonly<Record<string, unknown>> {
+    return _NestedAttributes.nestedAttributesOptions.call(this);
+  }
+
+  /**
+   * Secret backing signed_id_verifier (process-global in trails).
+   *
+   * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
+   */
+  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
+    return _signedIdVerifierSecret();
+  }
+
+  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
+    _setSignedIdVerifierSecret(value);
+  }
+
+  /**
+   * Set of attribute names with a registered normalizer.
+   *
+   * Mirrors: ActiveRecord::Base.normalized_attributes
+   */
+  static get normalizedAttributes(): Set<string> {
+    return _normalizedAttributes(this);
+  }
+
+  /**
+   * Whether this model defines its own default_scope (vs only inheriting it).
+   * Nil until `build_default_scope` first memoizes it (Rails class_attribute).
+   *
+   * Mirrors: ActiveRecord::Base.default_scope_override
+   */
+  static get defaultScopeOverride(): boolean | null {
+    return _defaultScopeOverride.call(this);
+  }
+
+  static set defaultScopeOverride(value: boolean | null) {
+    (this as { _defaultScopeOverride?: boolean | null })._defaultScopeOverride = value;
+  }
+
+  /**
+   * Per-model `purpose => TokenDefinition` map (inherited purposes included).
+   *
+   * Mirrors: ActiveRecord::Base.token_definitions
+   */
+  static get tokenDefinitions(): Readonly<Record<string, unknown>> {
+    return _tokenDefinitions(this);
+  }
+
+  static set tokenDefinitions(value: Record<string, _TokenDefinition>) {
+    _setTokenDefinitions(this, value);
+  }
+
+  /**
+   * MessageVerifier backing token-for (null until the first token op builds it).
+   *
+   * Mirrors: ActiveRecord::Base.generated_token_verifier
+   */
+  static get generatedTokenVerifier(): unknown {
+    return _generatedTokenVerifier(this);
+  }
+
+  static set generatedTokenVerifier(value: _MessageVerifier | null) {
+    _setGeneratedTokenVerifier(this, value);
+  }
+
   // -- Encrypted attributes --
 
   /**
@@ -1605,6 +1704,7 @@ export class Base extends Model {
   declare static reflectOnAllAggregations: typeof _Reflection.ClassMethods.reflectOnAllAggregations;
   declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
+  declare static aggregateReflections: typeof _Reflection.ClassMethods.aggregateReflections;
 
   // --- Validations::ClassMethods (wired via extend() after class body) ---
   declare static validates: typeof _Validations.validates;
@@ -4069,9 +4169,14 @@ export class Base extends Model {
   }
 
   // --- TokenFor instance methods (token-for.ts, wired at runtime via generatesTokenFor) ---
-  // Rails' TokenFor module is included in Base; these are its instance methods.
-  // Declared here so api:compare credits them to base.ts. No eager import — token-for.ts
-  // pulls in node:crypto and is intentionally excluded from the main barrel (BC-3).
+  // Rails' TokenFor module is included in Base; these are its instance methods,
+  // installed on the prototype lazily by generatesTokenFor (so they're only
+  // declared here for api:compare credit). The TokenFor *class* accessors
+  // (token_definitions / generated_token_verifier) are real static getters above
+  // — token-for.ts only imports MessageVerifier, the same node:crypto-backed
+  // dependency base.ts already pulls in via signed-id.ts; crypto stays out of the
+  // public barrel because index.ts routes generatesTokenFor to a subpath (BC-3),
+  // not because base.ts avoids the import.
   declare generateTokenFor: (purpose: string) => string;
   /** @internal */
   declare fullPurpose: () => string;

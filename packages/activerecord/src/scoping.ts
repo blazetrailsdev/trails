@@ -148,3 +148,17 @@ export function isScopeAttributes(this: ScopingClassHost): boolean {
 export function scopeRegistry(): ScopeRegistry {
   return ScopeRegistry.instance();
 }
+
+/**
+ * Rails: `class_attribute :default_scope_override` (default nil) — whether the
+ * model defines its own `default_scope`. Like Rails, this stays nil until
+ * `build_default_scope` first runs and memoizes the boolean into the
+ * `_defaultScopeOverride` class field (see scoping/default.ts); reading it
+ * before then returns nil, not an eagerly-computed boolean.
+ *
+ * Mirrors: ActiveRecord::Scoping#default_scope_override
+ */
+export function defaultScopeOverride(this: ScopingClassHost): boolean | null {
+  const value = (this as any)._defaultScopeOverride;
+  return value == null ? null : value;
+}

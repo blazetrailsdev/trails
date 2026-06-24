@@ -51,6 +51,24 @@ interface NestedAttributeConfig {
 }
 
 /**
+ * Rails: `class_attribute :nested_attributes_options, default: {}` — the
+ * per-model map of `associationName => options` populated by
+ * `accepts_nested_attributes_for`. Trails records the same data in the
+ * dynamically-assigned `_nestedAttributeConfigs` array; expose the Rails-shaped
+ * hash reader (the `=`/`?` forms map to the same accessor).
+ *
+ * Mirrors: ActiveRecord::NestedAttributes#nested_attributes_options
+ */
+export function nestedAttributesOptions(
+  this: typeof Base,
+): Readonly<Record<string, NestedAttributeOptions>> {
+  const configs: NestedAttributeConfig[] = (this as any)._nestedAttributeConfigs ?? [];
+  const out: Record<string, NestedAttributeOptions> = {};
+  for (const c of configs) out[c.associationName] = c.options;
+  return out;
+}
+
+/**
  * Configure nested attributes for an association.
  *
  * Mirrors: ActiveRecord::Base.accepts_nested_attributes_for

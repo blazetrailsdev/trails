@@ -23,19 +23,53 @@ function requirePrimaryKey(modelClass: typeof Base): string | string[] {
 export { InvalidSignature };
 
 let _tokenForSecret: string | (() => string) | null = null;
-let _cachedVerifier: MessageVerifier | null = null;
-let _cachedSecret: string | null = null;
+// `generated_token_verifier` is a `class_attribute`, so each class has its own
+// slot that subclasses inherit until they assign their own (see resolvedVerifier
+// / ownVerifier). Entries are tagged with the secret generation; bumping the
+// generation on setTokenForSecret invalidates all cached verifiers without
+// enumerating the WeakMap.
+const tokenVerifierRegistry = new WeakMap<
+  object,
+  { verifier: MessageVerifier | null; gen: number }
+>();
+let _secretGeneration = 0;
 
 /**
  * Configure the secret used for token generation/verification.
  * If not set, falls back to BLAZETRAILS_SECRET_KEY_BASE or
  * BLAZETRAILS_SIGNED_ID_SECRET env vars. Throws if no secret
- * is configured.
+ * is configured. Bumps the secret generation so cached verifiers are rebuilt
+ * on the next token op (or `generated_token_verifier` read).
  */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;
-  _cachedVerifier = null;
-  _cachedSecret = null;
+  _secretGeneration++;
+}
+
+/**
+ * This class's *own* verifier slot (ignoring stale-generation entries), or
+ * undefined when the class has never written. A present entry whose `verifier`
+ * is null is an explicit nil shadow (Rails: `self.generated_token_verifier = nil`
+ * assigns nil to this class), distinct from "no own slot".
+ */
+function ownVerifierEntry(modelClass: object): { verifier: MessageVerifier | null } | undefined {
+  const entry = tokenVerifierRegistry.get(modelClass);
+  return entry && entry.gen === _secretGeneration ? entry : undefined;
+}
+
+/**
+ * Resolved `class_attribute` value: the nearest class on the chain with an own
+ * slot wins — even a nil shadow stops the walk (so an explicit `= null` does not
+ * inherit the parent's verifier). Returns null when nothing up the chain wrote.
+ */
+function resolvedVerifier(modelClass: object): MessageVerifier | null {
+  let current: any = modelClass;
+  while (current) {
+    const entry = ownVerifierEntry(current);
+    if (entry) return entry.verifier;
+    current = Object.getPrototypeOf(current);
+  }
+  return null;
 }
 
 function resolveSecret(): string {
@@ -81,12 +115,16 @@ export class TokenDefinition {
   }
 
   messageVerifier(): MessageVerifier {
-    const secret = resolveSecret();
-    if (!_cachedVerifier || _cachedSecret !== secret) {
-      _cachedVerifier = new MessageVerifier(secret);
-      _cachedSecret = secret;
+    // Rails: `defining_class.generated_token_verifier ||= MessageVerifier.new(...)`
+    // — return the resolved (own or inherited) verifier if set, otherwise build
+    // from the secret and assign it to the defining class's own slot.
+    const cls = this.definingClass;
+    let verifier = resolvedVerifier(cls);
+    if (!verifier) {
+      verifier = new MessageVerifier(resolveSecret());
+      setGeneratedTokenVerifier(cls, verifier);
     }
-    return _cachedVerifier;
+    return verifier;
   }
 
   payloadFor(model: Base): unknown[] {
@@ -122,23 +160,111 @@ export class TokenDefinition {
 /**
  * Registry of token definitions per model class.
  */
-const tokenDefinitions = new WeakMap<object, Map<string, TokenDefinition>>();
+const tokenDefinitionRegistry = new WeakMap<object, Map<string, TokenDefinition>>();
 
-function getDefinitions(modelClass: typeof Base): Map<string, TokenDefinition> {
-  if (!tokenDefinitions.has(modelClass)) {
-    tokenDefinitions.set(modelClass, new Map());
-  }
-  return tokenDefinitions.get(modelClass)!;
-}
-
-function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinition | undefined {
+/**
+ * The nearest class on `modelClass`'s prototype chain (including itself) that has
+ * its own registry entry — i.e. the resolved `class_attribute` value. A class
+ * that has never written returns its parent's map (live inheritance); a class
+ * that has written returns its own snapshot.
+ */
+function resolvedDefinitions(modelClass: object): Map<string, TokenDefinition> | undefined {
   let current: any = modelClass;
   while (current) {
-    const map = tokenDefinitions.get(current);
-    if (map?.has(purpose)) return map.get(purpose);
+    const map = tokenDefinitionRegistry.get(current);
+    if (map) return map;
     current = Object.getPrototypeOf(current);
   }
   return undefined;
+}
+
+/**
+ * The class's *own* registry entry, seeding it on first write with a snapshot of
+ * the currently-inherited definitions — mirroring the class-attribute write
+ * `self.token_definitions = token_definitions.merge(...)`, which reads the
+ * inherited hash *once* and assigns the result to this class's own slot. After
+ * that, later parent writes no longer affect this class.
+ */
+function ownDefinitions(modelClass: typeof Base): Map<string, TokenDefinition> {
+  let map = tokenDefinitionRegistry.get(modelClass);
+  if (!map) {
+    const inherited = resolvedDefinitions(Object.getPrototypeOf(modelClass));
+    map = new Map(inherited ?? []);
+    tokenDefinitionRegistry.set(modelClass, map);
+  }
+  return map;
+}
+
+function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinition | undefined {
+  return resolvedDefinitions(modelClass)?.get(purpose);
+}
+
+/**
+ * Rails: `class_attribute :token_definitions, default: {}` — the per-model
+ * `purpose => TokenDefinition` map populated by `generates_token_for`. The
+ * `class_attribute` reader inherits the parent value until the subclass writes,
+ * at which point `generates_token_for` snapshots the inherited hash via
+ * `self.token_definitions = token_definitions.merge(...)`. So a subclass that
+ * has declared its own token sees the inherited purposes captured at that point
+ * (not parent purposes added afterwards). Trails seeds the subclass's own
+ * snapshot on first write (see `ownDefinitions`); the reader returns the
+ * resolved map — the class's own snapshot, or the parent's map if it never wrote.
+ *
+ * Mirrors: ActiveRecord::TokenFor#token_definitions
+ */
+export function tokenDefinitions(
+  modelClass: typeof Base,
+): Readonly<Record<string, TokenDefinition>> {
+  const map = resolvedDefinitions(modelClass);
+  return map ? Object.fromEntries(map) : {};
+}
+
+/**
+ * Rails-shaped writer for `class_attribute :token_definitions` — Rails'
+ * `generates_token_for` assigns `self.token_definitions = token_definitions.merge(...)`,
+ * and external callers can replace the map outright. Stores the given hash as
+ * this class's own registry entry (subclasses still inherit via the reader).
+ *
+ * Mirrors: ActiveRecord::TokenFor#token_definitions=
+ */
+export function setTokenDefinitions(
+  modelClass: typeof Base,
+  value: Record<string, TokenDefinition>,
+): void {
+  tokenDefinitionRegistry.set(modelClass, new Map(Object.entries(value)));
+}
+
+/**
+ * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
+ * to sign/verify tokens, resolved per class (own slot, else inherited). The
+ * reader returns nil until `message_verifier` lazily builds and memoizes it
+ * (`||=`); mirror that by returning the resolved value (null before the first
+ * token op) rather than forcing secret resolution, so reading the accessor
+ * before any token is generated never throws.
+ *
+ * Mirrors: ActiveRecord::TokenFor#generated_token_verifier
+ */
+export function generatedTokenVerifier(modelClass: typeof Base): MessageVerifier | null {
+  return resolvedVerifier(modelClass);
+}
+
+/**
+ * Rails-shaped writer for `class_attribute :generated_token_verifier` — Rails
+ * tests assign `ActiveRecord::Base.generated_token_verifier = MessageVerifier.new(...)`
+ * to inject a verifier; `message_verifier`'s `||=` then returns it instead of
+ * building from the secret. Assigns to this class's own slot (subclasses inherit
+ * via the reader until they assign their own). Assigning null writes an explicit
+ * nil shadow on this class — Rails' generated writer assigns to the class, so the
+ * reader returns nil (not the parent's verifier) and the next token op lazily
+ * builds this class's own verifier.
+ *
+ * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
+ */
+export function setGeneratedTokenVerifier(
+  modelClass: typeof Base,
+  verifier: MessageVerifier | null,
+): void {
+  tokenVerifierRegistry.set(modelClass, { verifier, gen: _secretGeneration });
 }
 
 /**
@@ -155,7 +281,7 @@ export function generatesTokenFor(
   } = {},
 ): void {
   const def = new TokenDefinition(modelClass, purpose, options.expiresIn, options.generator);
-  getDefinitions(modelClass).set(purpose, def);
+  ownDefinitions(modelClass).set(purpose, def);
 
   if (!(modelClass.prototype as any).generateTokenFor) {
     Object.defineProperty(modelClass.prototype, "generateTokenFor", {
