@@ -243,7 +243,8 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "not as named methods on Relation — Ruby-only entries (sample, rotate, " +
       "in_groups, to_sentence, to_fs, as_json, …) have no JS analogue and are " +
       "intentionally dropped, while the rest route through native JS names " +
-      "(each → forEach, index → indexOf) via the Proxy.",
+      "(each → forEach, index → indexOf) via the Proxy. Tracked for convergence " +
+      "(expose under Rails names) by story relation-delegation-rails-named-methods.",
     names: [
       "to_xml",
       "each",
@@ -276,7 +277,8 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "an unmatched gap on the aggregate Relation class (relation.rb): the " +
       "delegation.rb module compare already credits trails counterparts (e.g. " +
       "delegation.ts' own name()), so the skip is scoped to relation.rb to avoid " +
-      "un-crediting those.",
+      "un-crediting those. Tracked for convergence by story " +
+      "relation-delegation-rails-named-methods.",
     names: ["slice", "transaction", "name"],
     rubyFiles: ["relation.rb"],
   },
