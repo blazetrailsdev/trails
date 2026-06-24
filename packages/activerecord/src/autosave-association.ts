@@ -537,7 +537,10 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
     return true;
   if (isMarkedForDestruction(childRecord)) {
-    if (!childRecord.isNewRecord()) await childRecord.destroy();
+    // Rails save_has_one_association:482-483 — `record.destroy` runs
+    // unconditionally; even a new_record? child runs the destroy callback
+    // chain, dependent cascades, and freeze (only the DB DELETE is skipped).
+    await childRecord.destroy();
     return true;
   }
   // Rails save_has_one_association:487 — gate via
@@ -767,7 +770,10 @@ async function _autosaveBelongsTo(
     // self first so the owner save doesn't keep a dangling reference.
     const fkList = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
     for (const key of fkList) record._writeAttribute(key, null);
-    if (!assocRecord.isNewRecord()) await assocRecord.destroy();
+    // Rails save_belongs_to_association:544-547 — `record.destroy` runs
+    // unconditionally after nulling the owner FK; a new_record? child still
+    // runs destroy callbacks, dependent cascades, and freeze.
+    await assocRecord.destroy();
     return true;
   }
 
