@@ -66,4 +66,21 @@ describe("PostgreSQL::OID::Array", () => {
     expect(type.isForceEquality(["a"])).toBe(true);
     expect(type.isForceEquality("a")).toBe(false);
   });
+
+  it("delegates limit, precision and scale to the subtype", () => {
+    const type = new OidArray({ ...stringSubtype, limit: 4, precision: 6, scale: 2 });
+
+    expect(type.limit).toBe(4);
+    expect(type.precision).toBe(6);
+    expect(type.scale).toBe(2);
+  });
+
+  it("delegates user_input_in_time_zone to the subtype", () => {
+    const type = new OidArray({
+      ...stringSubtype,
+      userInputInTimeZone: (value: unknown, zone?: string) => `${String(value)}@${zone}`,
+    });
+
+    expect(type.userInputInTimeZone("ts", "America/Los_Angeles")).toBe("ts@America/Los_Angeles");
+  });
 });
