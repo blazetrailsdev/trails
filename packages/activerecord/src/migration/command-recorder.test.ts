@@ -149,6 +149,18 @@ describe("CommandRecorder", () => {
       const [cmd] = new CommandRecorder().invertRemoveReference(["posts", "user"]);
       expect(cmd).toBe("addReference");
     });
+
+    it("invert_add_belongs_to_alias", () => {
+      const { cmd, args } = new CommandRecorder().inverseOf("addBelongsTo", ["table", "user"]);
+      expect(cmd).toBe("removeReference");
+      expect(args).toEqual(["table", "user"]);
+    });
+
+    it("invert_remove_belongs_to_alias", () => {
+      const { cmd, args } = new CommandRecorder().inverseOf("removeBelongsTo", ["table", "user"]);
+      expect(cmd).toBe("addReference");
+      expect(args).toEqual(["table", "user"]);
+    });
   });
 
   describe("invertAddForeignKey / invertRemoveForeignKey", () => {

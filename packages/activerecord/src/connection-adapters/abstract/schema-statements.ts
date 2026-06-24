@@ -645,6 +645,20 @@ export class SchemaStatements {
     }
   }
 
+  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
+  async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: ColumnOptions & {
+      polymorphic?: boolean;
+      foreignKey?: boolean;
+      type?: ColumnType;
+      index?: boolean;
+    } = {},
+  ): Promise<void> {
+    return this.addReference(tableName, refName, options);
+  }
+
   async removeReference(
     tableName: string,
     refName: string,
@@ -654,6 +668,15 @@ export class SchemaStatements {
       await this.removeColumn(tableName, `${refName}_type`);
     }
     await this.removeColumn(tableName, `${refName}_id`);
+  }
+
+  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
+  async removeBelongsTo(
+    tableName: string,
+    refName: string,
+    options: { polymorphic?: boolean } = {},
+  ): Promise<void> {
+    return this.removeReference(tableName, refName, options);
   }
 
   async addForeignKey(

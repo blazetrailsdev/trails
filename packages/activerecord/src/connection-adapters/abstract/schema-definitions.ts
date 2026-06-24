@@ -230,6 +230,11 @@ export class ForeignKeyDefinition {
     return this.validate;
   }
 
+  /** Alias of isValidate (Rails: `alias validated? validate?`). */
+  get isValidated(): boolean {
+    return this.isValidate;
+  }
+
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
     return !/^fk_rails_[0-9a-f]{10}$/.test(this.name);
@@ -1188,6 +1193,19 @@ export class TableDefinition {
     return this;
   }
 
+  /** Alias of references (Rails: `alias :belongs_to :references`). */
+  belongsTo(
+    name: string,
+    options: Omit<ColumnOptions, "index"> & {
+      polymorphic?: boolean | Record<string, unknown>;
+      foreignKey?: boolean | ReferenceForeignKeyOptions;
+      index?: boolean | AddIndexOptions;
+      type?: ColumnType;
+    } = {},
+  ): this {
+    return this.references(name, options);
+  }
+
   index(columns: string[], options: AddIndexOptions = {}): this {
     const name = options.name ?? `index_${this.tableName}_on_${columns.join("_and_")}`;
     this.indexes.push(
@@ -1292,6 +1310,10 @@ export class Table {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     await this._schema.addReference(this._tableName, name, options);
   }
+  /** Alias of references (Rails: `alias :belongs_to :references`). */
+  async belongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
+    return this.references(name, options);
+  }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     await this._schema.addTimestamps(this._tableName, options);
@@ -1375,6 +1397,10 @@ export class Table {
   async removeReferences(name: string, options: AddReferenceOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     return this._require("removeReference").call(this._schema, this._tableName, name, options);
+  }
+  /** Alias of removeReferences (Rails: `alias :remove_belongs_to :remove_references`). */
+  async removeBelongsTo(name: string, options: AddReferenceOptions = {}): Promise<void> {
+    return this.removeReferences(name, options);
   }
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {

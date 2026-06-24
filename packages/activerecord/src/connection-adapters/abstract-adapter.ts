@@ -306,7 +306,19 @@ export interface AbstractAdapter {
     refName: string,
     options?: Record<string, unknown>,
   ): Promise<void>;
+  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
+  addBelongsTo(
+    tableName: string,
+    refName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
   removeReference(
+    tableName: string,
+    refName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
+  removeBelongsTo(
     tableName: string,
     refName: string,
     options?: Record<string, unknown>,

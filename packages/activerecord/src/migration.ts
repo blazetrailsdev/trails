@@ -789,6 +789,20 @@ export abstract class Migration {
     await this.schema.addReference(tableName, refName, options);
   }
 
+  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
+  async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: ColumnOptions & {
+      polymorphic?: boolean;
+      foreignKey?: boolean;
+      type?: ColumnType;
+      index?: boolean;
+    } = {},
+  ): Promise<void> {
+    return this.addReference(tableName, refName, options);
+  }
+
   async removeReference(
     tableName: string,
     refName: string,
@@ -800,6 +814,15 @@ export abstract class Migration {
     }
     tableName = this._pt(tableName);
     await this.schema.removeReference(tableName, refName, options);
+  }
+
+  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
+  async removeBelongsTo(
+    tableName: string,
+    refName: string,
+    options: { polymorphic?: boolean } = {},
+  ): Promise<void> {
+    return this.removeReference(tableName, refName, options);
   }
 
   async addForeignKey(
@@ -3463,6 +3486,11 @@ export class Migrator {
     if (version === 0) return null;
     const versionStr = String(version);
     return this._migrations.find((m) => m.version === versionStr) ?? null;
+  }
+
+  /** Alias of currentMigration (Rails: `alias :current :current_migration`). */
+  async current(): Promise<MigrationProxy | null> {
+    return this.currentMigration();
   }
 
   async runnable(): Promise<MigrationProxy[]> {

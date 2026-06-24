@@ -41,6 +41,20 @@ export class CommandRecorder {
   }
 
   /**
+   * Alias of addReference (Rails: `alias :add_belongs_to :add_reference`).
+   * Records the `addReference` command — the alias shares the underlying
+   * generated recordable method, so it records `:add_reference` verbatim.
+   */
+  addBelongsTo(...args: unknown[]): void {
+    this.record("addReference", args);
+  }
+
+  /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
+  removeBelongsTo(...args: unknown[]): void {
+    this.record("removeReference", args);
+  }
+
+  /**
    * Execute a block in reverting mode. Commands recorded inside the block
    * are collected, reversed, and their inverses are appended to the
    * command list.
@@ -280,9 +294,19 @@ export class CommandRecorder {
     return ["removeReference", args];
   }
 
+  /** Alias of invertAddReference (Rails: `alias :invert_add_belongs_to :invert_add_reference`). @internal */
+  invertAddBelongsTo(args: unknown[]): [string, unknown[]] {
+    return this.invertAddReference(args);
+  }
+
   /** @internal */
   invertRemoveReference(args: unknown[]): [string, unknown[]] {
     return ["addReference", args];
+  }
+
+  /** Alias of invertRemoveReference (Rails: `alias :invert_remove_belongs_to :invert_remove_reference`). @internal */
+  invertRemoveBelongsTo(args: unknown[]): [string, unknown[]] {
+    return this.invertRemoveReference(args);
   }
 
   /** @internal */
