@@ -178,14 +178,6 @@ export class Association {
         );
       return djas({ owner: this.owner, reflection: richReflection, klass });
     }
-    // Memoize @association_scope (JOIN-based constraints only).
-    if (this._cachedScope === undefined) {
-      this._cachedScope = AssociationScope.scope({
-        owner: this.owner,
-        reflection: richReflection as never,
-        klass: klass as never,
-      });
-    }
     // Branch 2: klass.current_scope.proxy_association == self.
     // Fires when CollectionProxy.scoping sets an AssociationRelation as
     // klass.currentScope; not yet implemented, so this is unreachable.
@@ -194,13 +186,41 @@ export class Association {
       return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
     }
     // Branches 3 + 4.
+    const associationScope = this.associationScope();
     const target = this.targetScope();
     const base =
       target != null && typeof target.merge === "function"
-        ? target.merge(this._cachedScope)
-        : this._cachedScope;
+        ? target.merge(associationScope)
+        : associationScope;
     const globalScope = ScopeRegistry.globalCurrentScope(klass as unknown as object);
     return globalScope && typeof base?.merge === "function" ? base.merge(globalScope) : base;
+  }
+
+  /**
+   * The scope for this association — the JOIN-based constraints memoized in
+   * `_cachedScope` (Rails' `@association_scope`). `scope()` merges this into
+   * `targetScope()` at call time so surrounding `scoping {}`/`unscoped {}`
+   * blocks can still affect the final query.
+   *
+   * Mirrors: ActiveRecord::Associations::Association#association_scope
+   *
+   * @internal
+   */
+  associationScope(): any {
+    const klass = this.klass as typeof Base | undefined;
+    if (!klass) return undefined;
+    if (this._cachedScope === undefined) {
+      const ctor = this.owner.constructor as typeof Base & {
+        _reflectOnAssociation?: (n: string) => unknown;
+      };
+      const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+      this._cachedScope = AssociationScope.scope({
+        owner: this.owner,
+        reflection: richReflection as never,
+        klass: klass as never,
+      });
+    }
+    return this._cachedScope;
   }
 
   resetScope(): void {

@@ -58,6 +58,23 @@ export abstract class JoinPart {
 
   abstract get table(): Table | string;
 
+  /**
+   * Mirrors Rails' `delegate :column_names, :primary_key, :attribute_types,
+   * to: :base_klass` (join_part.rb:20) — forward each to the node's base model
+   * class so callers can read the joined table's schema off a JoinPart.
+   */
+  columnNames(): string[] {
+    return this.baseKlass.columnNames();
+  }
+
+  get primaryKey(): string {
+    return this.baseKlass.primaryKey as string;
+  }
+
+  attributeTypes(): Record<string, unknown> {
+    return (this.baseKlass as { attributeTypes(): Record<string, unknown> }).attributeTypes();
+  }
+
   isMatch(other: JoinPart): boolean {
     return this.constructor === other.constructor;
   }

@@ -9,7 +9,7 @@ import { compositeQueryConstraintsList } from "../persistence.js";
 import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass } from "../associations.js";
-import { throughTargetScope } from "./through-association.js";
+import { sourceReflection, throughTargetScope } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
@@ -26,6 +26,14 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
 export class HasManyThroughAssociation extends HasManyAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * Mirrors Rails' `delegate :source_reflection, to: :reflection`
+   * (ThroughAssociation, mixed into HasManyThroughAssociation).
+   */
+  sourceReflection(): unknown {
+    return sourceReflection(this);
   }
 
   /**

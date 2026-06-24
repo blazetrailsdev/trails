@@ -6,7 +6,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { queryConstraintsList } from "../persistence.js";
-import { throughTargetScope } from "./through-association.js";
+import { sourceReflection, throughTargetScope } from "./through-association.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -22,6 +22,14 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
 export class HasOneThroughAssociation extends HasOneAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * Mirrors Rails' `delegate :source_reflection, to: :reflection`
+   * (ThroughAssociation, mixed into HasOneThroughAssociation).
+   */
+  sourceReflection(): unknown {
+    return sourceReflection(this);
   }
 
   /**
