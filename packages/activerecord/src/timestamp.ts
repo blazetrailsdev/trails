@@ -203,22 +203,29 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   if (ctor.lockingEnabled) touched.add(lockCol);
 
   const self = this as any;
-  if (self._skipDirtyTracking) {
-    self.clearAttributeChanges(touched);
-  } else {
-    const restores: Array<[string, unknown]> = [];
-    for (const attrName of self._attributes.keys()) {
-      if (touched.has(attrName)) continue;
-      if (self.attributeChanged(attrName)) {
-        restores.push([attrName, self._readAttribute(attrName)]);
-        self._writeAttribute(attrName, self.attributeWas(attrName));
-        self.clearAttributeChange(attrName);
+  try {
+    if (self._skipDirtyTracking) {
+      self.clearAttributeChanges(touched);
+    } else {
+      const restores: Array<[string, unknown]> = [];
+      for (const attrName of self._attributes.keys()) {
+        if (touched.has(attrName)) continue;
+        if (self.attributeChanged(attrName)) {
+          restores.push([attrName, self._readAttribute(attrName)]);
+          self._writeAttribute(attrName, self.attributeWas(attrName));
+          self.clearAttributeChange(attrName);
+        }
+      }
+      self.changesApplied();
+      for (const [attrName, value] of restores) {
+        self._writeAttribute(attrName, value);
       }
     }
-    self.changesApplied();
-    for (const [attrName, value] of restores) {
-      self._writeAttribute(attrName, value);
-    }
+  } finally {
+    // Mirrors Rails AttributeMethods::Dirty#_touch_row `ensure` (dirty.rb:229-231):
+    // clear @_skip_dirty_tracking so a deferred touch (which sets it) doesn't leak
+    // the flag into the record's next, non-deferred touch.
+    self._skipDirtyTracking = null;
   }
 
   await runAfterCallbacksOnProto(ctor.prototype, "touch", this);

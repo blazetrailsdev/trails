@@ -171,6 +171,12 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   const time = (self._touchTime as Temporal.Instant | null) ?? currentTimeFromProperTimezone();
   self._deferTouchAttrs = null;
   self._touchTime = null;
+  // Mirrors Rails touch_deferred_attributes (touch_later.rb:61-63): set
+  // @_skip_dirty_tracking so _touch_row takes the cheap clear_attribute_changes
+  // path (the deferred attrs were already written + cleared by
+  // surreptitiously_touch) instead of the stash/restore dance. _touch_row's
+  // `ensure` (dirty.rb:229-231) — mirrored in timestamp.ts touchRow — clears it.
+  self._skipDirtyTracking = true;
   // Mirrors Rails: touch(time: @_touch_time). Passes the deferred timestamp
   // through the canonical touch path (type casting, locking, after_touch).
   // On failure, restore deferred state so the touch can be retried —
