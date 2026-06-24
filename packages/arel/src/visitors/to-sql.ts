@@ -1354,9 +1354,15 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#unsupported` (to_sql.rb:828). */
-  protected unsupported(o: Node, _collector?: SQLString): never {
-    throw new UnsupportedVisitError(`Unknown node type: ${o.constructor.name}`);
+  /**
+   * Mirrors `to_sql.rb#unsupported` (to_sql.rb:828) — `collector` is required
+   * to match the Rails signature even though it's unused after the raise. The
+   * message mirrors `UnsupportedVisitError.new(o)` (to_sql.rb:5-8).
+   */
+  protected unsupported(o: Node, _collector: SQLString): never {
+    throw new UnsupportedVisitError(
+      `Unsupported argument type: ${o.constructor.name}. Construct an Arel node instead.`,
+    );
   }
 
   // Rails aliases every Ruby value class with no SQL rendering to
