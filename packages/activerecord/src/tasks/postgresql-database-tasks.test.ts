@@ -62,10 +62,17 @@ describe("PostgreSQLDatabaseTasks", () => {
       }
       async execute(sql: string, binds?: unknown[]) {
         executeCalls.push({ sql, binds });
-        // pg_tables result — three user tables in `public`. truncateAll
-        // filters out schema_migrations and ar_internal_metadata at the
-        // query level, so the mock doesn't need to return them.
-        return [{ tablename: "widgets" }, { tablename: "posts" }, { tablename: "comments" }];
+        // pg_tables result — three user tables plus the two bookkeeping
+        // tables. truncateAll subtracts the configured schema_migrations /
+        // ar_internal_metadata names in JS (mirroring Rails truncate_tables),
+        // so they must NOT appear in the TRUNCATE statement.
+        return [
+          { tablename: "widgets" },
+          { tablename: "posts" },
+          { tablename: "comments" },
+          { tablename: "schema_migrations" },
+          { tablename: "ar_internal_metadata" },
+        ];
       }
       async executeMutation(sql: string) {
         mutationCalls.push(sql);
@@ -91,21 +98,20 @@ describe("PostgreSQLDatabaseTasks", () => {
       vi.resetModules();
     }
 
-    // Queries pg_tables scoped to the public schema, skipping the
-    // bookkeeping tables.
+    // Queries pg_tables scoped to the public schema.
     expect(executeCalls).toHaveLength(1);
     expect(executeCalls[0].sql).toMatch(/FROM pg_tables/i);
     expect(executeCalls[0].sql).toMatch(/schemaname = 'public'/);
-    expect(executeCalls[0].sql).toMatch(
-      /tablename NOT IN \('schema_migrations', 'ar_internal_metadata'\)/,
-    );
 
-    // One TRUNCATE statement with all three tables, RESTART IDENTITY
-    // CASCADE, double-quoted.
+    // One TRUNCATE statement with only the user tables (bookkeeping rows
+    // returned by the mock are excluded), RESTART IDENTITY CASCADE,
+    // double-quoted.
     expect(mutationCalls).toHaveLength(1);
     expect(mutationCalls[0]).toBe(
       `TRUNCATE TABLE "widgets", "posts", "comments" RESTART IDENTITY CASCADE`,
     );
+    expect(mutationCalls[0]).not.toContain("schema_migrations");
+    expect(mutationCalls[0]).not.toContain("ar_internal_metadata");
 
     expect(closeMock).toHaveBeenCalledTimes(1);
   });
