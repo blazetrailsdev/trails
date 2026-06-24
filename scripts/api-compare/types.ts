@@ -71,5 +71,13 @@ export interface PackageInfo {
 export interface ApiManifest {
   source: "ruby" | "typescript";
   generatedAt: string;
+  /**
+   * Content hash of the extractor that produced this manifest (Ruby:
+   * `extract-ruby-api.rb`). Lets a cross-version diff detect when the pinned
+   * base and the freshly-extracted target were built by DIFFERENT extractor
+   * versions — which would conflate extractor-version drift with real Rails
+   * drift. Optional for back-compat with manifests written before this field.
+   */
+  extractorHash?: string;
   packages: Record<string, PackageInfo>;
 }

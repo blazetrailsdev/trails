@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 
 import { SOURCES } from "../../vendor/sources.js";
 import type { ApiManifest } from "./types.js";
+import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
 import { annotateAgainstTs, diffManifests } from "./version-diff.js";
 
 const execFileAsync = promisify(execFile);
@@ -106,11 +107,56 @@ async function readManifest(path: string): Promise<ApiManifest> {
   return JSON.parse(await readFile(path, "utf8")) as ApiManifest;
 }
 
+/** Re-extract the pinned base manifest (output/rails-api.json) with the current
+ *  extractor, clearing extractor-version skew against a fresh target. Uses the
+ *  canonical vendor checkout's lib paths (the same source `api:compare` builds
+ *  the base from) and forces a rebuild past the mtime cache gate. */
+async function rebuildBaseManifest(): Promise<void> {
+  console.log(
+    "[drift] rebuilding stale base manifest (output/rails-api.json) with current extractor...",
+  );
+  const { stdout: libPathsJson } = await execFileAsync(
+    "pnpm",
+    ["-s", "vendor:fetch", "--print-lib-paths"],
+    { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
+  );
+  await execFileAsync("ruby", [join(DIR, "extract-ruby-api.rb")], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      LIB_PATHS_JSON: libPathsJson.trim(),
+      LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
+      API_COMPARE_FORCE: "1",
+    },
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
 export async function runDrift(ref: string): Promise<string> {
-  const base = await readManifest(join(OUTPUT_DIR, "rails-api.json"));
+  let base = await readManifest(join(OUTPUT_DIR, "rails-api.json"));
   const ts = await readManifest(join(OUTPUT_DIR, "ts-api.json"));
   const { dest, sha } = await fetchRef(ref);
   const target = await readManifest(await extractTargetApi(dest, ref));
+
+  // Guard extractor-version skew: a base built by a different extractor than the
+  // target conflates extractor drift with real Rails drift. Rebuild the base
+  // (preferred) and re-check; if the hash still doesn't match, abort rather than
+  // emit a conflated diff.
+  let skew = detectExtractorSkew(base, target);
+  if (skew.skewed) {
+    console.warn(`[drift] extractor skew: ${describeExtractorSkew(skew)}`);
+    await rebuildBaseManifest();
+    base = await readManifest(join(OUTPUT_DIR, "rails-api.json"));
+    skew = detectExtractorSkew(base, target);
+    if (skew.skewed) {
+      throw new Error(
+        `[drift] base still skewed after rebuild: ${describeExtractorSkew(skew)} ` +
+          `Run \`pnpm api:compare\` and re-run \`pnpm api:drift\`.`,
+      );
+    }
+    console.log("[drift] base rebuilt; extractor versions now match");
+  }
+
   // diffManifests only diffs packages both manifests carry, so the extra
   // non-rails gems in the base/ts manifests (rack, globalid, …) drop out.
   const drift = annotateAgainstTs(diffManifests(base, target), ts);

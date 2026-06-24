@@ -9,9 +9,18 @@ require "json"
 require "pathname"
 require "time"
 require "set"
+require "digest"
 
 SCRIPT_DIR = File.dirname(__FILE__)
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
+
+# Content hash of this extractor, stamped into every manifest header
+# (`extractorHash`). The cross-version drift report (drift.ts) compares the
+# pinned base and the freshly-extracted target on this value; a mismatch means
+# the two were built by different extractor versions, so their diff would
+# conflate extractor-version drift with real Rails drift. Content-keyed (not
+# mtime) so it's stable across worktrees and re-clones.
+EXTRACTOR_HASH = Digest::SHA256.hexdigest(File.read(__FILE__))[0, 16]
 
 # PACKAGE_DIRS is fed by the caller via LIB_PATHS_JSON (a JSON map of
 # {package_name: absolute_lib_dir}) — built from vendor/sources.ts by
@@ -1818,6 +1827,7 @@ def run
   manifest = {
     source: "ruby",
     generatedAt: Time.now.utc.iso8601,
+    extractorHash: EXTRACTOR_HASH,
     packages: {},
   }
 
