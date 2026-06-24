@@ -862,13 +862,22 @@ class ApiExtractor
 
     new_name = names[0]
     vis = current_visibility
-    target[:instanceMethods] << {
+    entry = {
       name: new_name,
       visibility: vis.to_s,
       params: [],
       file: @current_file,
       notes: "alias",
     }
+    # Record the aliased target so resolve_aliases! can copy its real param
+    # list — the alias has the target's arity, not zero. (See resolve_aliases!.)
+    entry[:alias_target] = names[1] if names[1]
+    # Bucket on @in_sclass like process_alias: `alias_method` inside
+    # `class << self` aliases a CLASS method (e.g. ActiveSupport::JSON's
+    # singleton `alias_method :dump, :encode`), so both the alias and its
+    # resolve target live in classMethods.
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    target[bucket] << entry
     maybe_update_module_file(fqn, target)
   end
 
@@ -884,14 +893,60 @@ class ApiExtractor
     return unless target
 
     bucket = @in_sclass ? :classMethods : :instanceMethods
-    target[bucket] << {
+    entry = {
       name: new_name,
       visibility: current_visibility.to_s,
       params: [],
       file: @current_file,
       notes: "alias",
     }
+    # Record the aliased target so resolve_aliases! can copy its real param
+    # list — the alias has the target's arity, not zero. (See resolve_aliases!.)
+    old_name = symbol_name(node[2])
+    entry[:alias_target] = old_name if old_name
+    target[bucket] << entry
     maybe_update_module_file(fqn, target)
+  end
+
+  # Aliases are recorded with empty params (the `alias`/`alias_method` form
+  # names no parameters), but at runtime an alias shares its target method's
+  # arity. A faithful TS port spells the delegator with the real parameters, so
+  # the advisory arity check would false-flag the alias as a mismatch
+  # (ruby min:0,max:0 vs ts min:N,max:N). Resolve each alias to its target's
+  # param list — searching the same class/module bucket — so the comparison
+  # sees the true arity. Runs after all package files are processed (targets may
+  # be in a different file of a reopened class) and iterates to follow alias
+  # chains (`alias a b; alias b c`). Cross-class/inherited targets that aren't in
+  # the package stay empty (best-effort — the static walker can't see another
+  # gem's source). Drops the transient `alias_target` key afterward so it never
+  # reaches the manifest.
+  # Public: invoked by `run` per package and by the extractor unit test.
+  public def resolve_aliases!
+    (@classes.values + @modules.values).each do |info|
+      [:instanceMethods, :classMethods].each do |bucket|
+        methods = info[bucket]
+        by_name = {}
+        methods.each { |m| by_name[m[:name]] ||= m }
+        # Fixpoint: each non-breaking pass fills at least one previously-empty
+        # alias (filled aliases are skipped on later passes), so the count of
+        # unresolved aliases strictly decreases and the loop always terminates —
+        # no arbitrary iteration cap. Handles alias-of-an-alias chains
+        # regardless of source order.
+        loop do
+          changed = false
+          methods.each do |m|
+            next unless m[:notes] == "alias" && m[:alias_target]
+            next unless m[:params].nil? || m[:params].empty?
+            tgt = by_name[m[:alias_target]]
+            next unless tgt && tgt[:params] && !tgt[:params].empty?
+            m[:params] = tgt[:params].map(&:dup)
+            changed = true
+          end
+          break unless changed
+        end
+        methods.each { |m| m.delete(:alias_target) }
+      end
+    end
   end
 
   # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
@@ -1777,6 +1832,10 @@ def run
     rb_files.each do |filepath|
       extractor.process_file(filepath, pkg_dir)
     end
+
+    # Fill alias param lists from their targets now that every file in the
+    # package has been seen (a reopened class may define the target elsewhere).
+    extractor.resolve_aliases!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
     # `internal: true`) so consumers can opt into private-API coverage.
