@@ -2821,7 +2821,10 @@ export class Relation<T extends Base> {
    * so the #3990 string-root dedup is preserved for an unregistered target — but
    * with a null `klass`, since the walk cannot descend without the child model.
    */
-  private _assocTargetModel(modelClass: any, name: string): { table: string; klass: any } | null {
+  private _assocTargetModel(
+    modelClass: any,
+    name: string,
+  ): { table: string; klass: any; intermediateTables: string[] } | null {
     const assoc = (modelClass?._associations ?? []).find((a: any) => a.name === name);
     if (!assoc) return null;
     const isPlural =
@@ -2830,7 +2833,19 @@ export class Relation<T extends Base> {
       (assoc.type as string) === "hasManyThrough";
     const className = assoc.options?.className ?? _camelize(isPlural ? _singularize(name) : name);
     const klass = modelRegistry.get(className) ?? null;
-    return { table: String(klass?.tableName ?? name).toLowerCase(), klass };
+    // A :through association materializes the full reflection chain — the
+    // intermediate join table(s) plus the target. Rails `JoinDependency#walk`
+    // dedups every table in that chain against a coinciding manual join, not
+    // just the final target, so surface the through-intermediate table(s) too.
+    const intermediateTables: string[] = [];
+    const throughName = assoc.options?.through;
+    if (throughName != null) {
+      const throughChain = this._assocTargetModel(modelClass, throughName);
+      if (throughChain) {
+        intermediateTables.push(...throughChain.intermediateTables, throughChain.table);
+      }
+    }
+    return { table: String(klass?.tableName ?? name).toLowerCase(), klass, intermediateTables };
   }
 
   /**
@@ -2867,6 +2882,7 @@ export class Relation<T extends Base> {
       if (manualChild === undefined) continue;
       const target = this._assocTargetModel(modelClass, name);
       if (!target) continue;
+      for (const t of target.intermediateTables) out.add(t);
       out.add(target.table);
       // Descend only when the child model is known; an unregistered target still
       // dedups this level (name-as-table fallback) but cannot resolve deeper.
