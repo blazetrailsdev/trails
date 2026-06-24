@@ -156,6 +156,14 @@ export class LogSubscriber extends BaseLogSubscriber {
     }
   }
 
+  // Rails: `class_attribute :backtrace_cleaner` on the LogSubscriber. Trails
+  // holds the equivalent instance in the private static `_backtraceCleaner`;
+  // expose the Rails-named reader (the `=`/`?` forms map to the same accessor).
+  // Mirrors: ActiveRecord::LogSubscriber#backtrace_cleaner
+  static get backtraceCleaner(): BacktraceCleaner {
+    return LogSubscriber._backtraceCleaner;
+  }
+
   private static _backtraceCleaner: BacktraceCleaner = (() => {
     const cleaner = new BacktraceCleaner();
     cleaner.addFilter((line) => line.replace(/^at\s+/, ""));

@@ -16,6 +16,19 @@ let _signedIdVerifierSecret: string | (() => string | null | undefined) | null =
 const _cachedVerifierClasses = new Set<any>();
 
 /**
+ * Rails: `class_attribute :signed_id_verifier_secret, instance_writer: false` —
+ * the secret backing `signed_id_verifier`. Trails holds it in a module-level
+ * variable (the secret is process-global, not per-model); expose the reader so
+ * `Model.signedIdVerifierSecret` matches Rails (the `=`/`?` forms map to the
+ * same accessor; the imperative setter is `setSignedIdVerifierSecret`).
+ *
+ * Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret
+ */
+export function signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
+  return _signedIdVerifierSecret;
+}
+
+/**
  * Set the secret used for signed ID verification.
  * Clears any cached verifiers so they pick up the new secret.
  *

@@ -68,6 +68,19 @@ export function normalizes(modelClass: typeof Model, ...args: NormalizesArgs): v
   return modelClass.normalizes(...args);
 }
 
+/**
+ * Rails: `class_attribute :normalized_attributes, default: Set.new` — the set of
+ * attribute names with a registered normalizer. Trails stores the normalizers
+ * in ActiveModel's `Model._normalizations` map; expose the Rails-shaped Set
+ * reader (the `=`/`?` forms map to the same accessor).
+ *
+ * Mirrors: ActiveRecord::Normalization#normalized_attributes
+ */
+export function normalizedAttributes(modelClass: typeof Model): Set<string> {
+  const normalizations: Map<string, unknown> | undefined = (modelClass as any)._normalizations;
+  return new Set(normalizations ? normalizations.keys() : []);
+}
+
 export function normalizeValueFor(
   modelClass: typeof Model,
   ...args: Parameters<typeof Model.normalizeValueFor>

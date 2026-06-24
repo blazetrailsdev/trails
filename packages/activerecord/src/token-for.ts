@@ -81,12 +81,7 @@ export class TokenDefinition {
   }
 
   messageVerifier(): MessageVerifier {
-    const secret = resolveSecret();
-    if (!_cachedVerifier || _cachedSecret !== secret) {
-      _cachedVerifier = new MessageVerifier(secret);
-      _cachedSecret = secret;
-    }
-    return _cachedVerifier;
+    return generatedTokenVerifier(this.definingClass);
   }
 
   payloadFor(model: Base): unknown[] {
@@ -122,23 +117,55 @@ export class TokenDefinition {
 /**
  * Registry of token definitions per model class.
  */
-const tokenDefinitions = new WeakMap<object, Map<string, TokenDefinition>>();
+const tokenDefinitionRegistry = new WeakMap<object, Map<string, TokenDefinition>>();
 
 function getDefinitions(modelClass: typeof Base): Map<string, TokenDefinition> {
-  if (!tokenDefinitions.has(modelClass)) {
-    tokenDefinitions.set(modelClass, new Map());
+  if (!tokenDefinitionRegistry.has(modelClass)) {
+    tokenDefinitionRegistry.set(modelClass, new Map());
   }
-  return tokenDefinitions.get(modelClass)!;
+  return tokenDefinitionRegistry.get(modelClass)!;
 }
 
 function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinition | undefined {
   let current: any = modelClass;
   while (current) {
-    const map = tokenDefinitions.get(current);
+    const map = tokenDefinitionRegistry.get(current);
     if (map?.has(purpose)) return map.get(purpose);
     current = Object.getPrototypeOf(current);
   }
   return undefined;
+}
+
+/**
+ * Rails: `class_attribute :token_definitions, default: {}` — the per-model
+ * `purpose => TokenDefinition` map populated by `generates_token_for`. Trails
+ * keeps it in the `tokenDefinitionRegistry` WeakMap; expose the Rails-shaped
+ * hash reader (the `=` form maps to the same accessor).
+ *
+ * Mirrors: ActiveRecord::TokenFor#token_definitions
+ */
+export function tokenDefinitions(
+  modelClass: typeof Base,
+): Readonly<Record<string, TokenDefinition>> {
+  return Object.fromEntries(getDefinitions(modelClass));
+}
+
+/**
+ * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
+ * to sign/verify tokens, lazily built in `TokenDefinition#message_verifier`.
+ * Trails' signing secret is process-global (`setTokenForSecret` / env), so the
+ * verifier is a single secret-keyed cache rather than a per-class slot; the
+ * `modelClass` arg is accepted for Rails-shaped call sites.
+ *
+ * Mirrors: ActiveRecord::TokenFor#generated_token_verifier
+ */
+export function generatedTokenVerifier(_modelClass: typeof Base): MessageVerifier {
+  const secret = resolveSecret();
+  if (!_cachedVerifier || _cachedSecret !== secret) {
+    _cachedVerifier = new MessageVerifier(secret);
+    _cachedSecret = secret;
+  }
+  return _cachedVerifier;
 }
 
 /**

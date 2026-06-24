@@ -124,6 +124,7 @@ import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/sig
 import {
   signedId as _signedId,
   signedIdVerifier as _signedIdVerifier,
+  signedIdVerifierSecret as _signedIdVerifierSecret,
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
@@ -1523,6 +1524,24 @@ export class Base extends Model {
     return ReadonlyAttributes.readonlyAttributes.call(this);
   }
 
+  /**
+   * Per-model `associationName => options` map from accepts_nested_attributes_for.
+   *
+   * Mirrors: ActiveRecord::Base.nested_attributes_options
+   */
+  static get nestedAttributesOptions(): Readonly<Record<string, unknown>> {
+    return _NestedAttributes.nestedAttributesOptions.call(this);
+  }
+
+  /**
+   * Secret backing signed_id_verifier (process-global in trails).
+   *
+   * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
+   */
+  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
+    return _signedIdVerifierSecret();
+  }
+
   // -- Encrypted attributes --
 
   /**
@@ -1605,6 +1624,7 @@ export class Base extends Model {
   declare static reflectOnAllAggregations: typeof _Reflection.ClassMethods.reflectOnAllAggregations;
   declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
+  declare static aggregateReflections: typeof _Reflection.ClassMethods.aggregateReflections;
 
   // --- Validations::ClassMethods (wired via extend() after class body) ---
   declare static validates: typeof _Validations.validates;

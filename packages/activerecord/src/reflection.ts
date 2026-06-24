@@ -2354,5 +2354,13 @@ export const ClassMethods = {
   reflectOnAllAutosaveAssociations(this: typeof Base): AssociationLikeReflection[] {
     return reflectOnAllAutosaveAssociations(this);
   },
+  // Rails: `class_attribute :aggregate_reflections, default: {}` — the
+  // composed-of registry keyed by aggregation name. Trails stores it in the
+  // dynamically-assigned `_aggregateReflections` Map; expose the Rails-shaped
+  // hash reader (the `=`/`?` forms map to the same accessor).
+  aggregateReflections(this: typeof Base): Readonly<Record<string, AggregateReflection>> {
+    const aggs: Map<string, AggregateReflection> | undefined = (this as any)._aggregateReflections;
+    return aggs ? Object.fromEntries(aggs) : {};
+  },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
