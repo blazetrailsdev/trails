@@ -36,6 +36,17 @@ export class Properties {
     return this._data.has(key);
   }
 
+  // Mirrors Rails' `delegate :each, :key?, to: :data` (properties.rb:20).
+  each(fn: (key: string, value: unknown) => void): void {
+    for (const [key, value] of this._data) {
+      fn(key, value);
+    }
+  }
+
+  isKey(key: string): boolean {
+    return this._data.has(key);
+  }
+
   add(props: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(props)) {
       this.set(key, value);

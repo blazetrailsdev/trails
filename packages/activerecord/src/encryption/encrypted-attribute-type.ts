@@ -139,6 +139,28 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.scheme.deterministic ?? false;
   }
 
+  // Mirrors Rails' `delegate :key_provider, :downcase?, :previous_schemes,
+  // :with_context, :fixed?, to: :scheme` (encrypted_attribute_type.rb:15).
+  get keyProvider(): unknown {
+    return this.scheme.keyProvider;
+  }
+
+  get isDowncase(): boolean {
+    return this.scheme.downcase;
+  }
+
+  get previousSchemes(): Scheme[] {
+    return this.scheme.previousSchemes;
+  }
+
+  withContext<T>(fn: () => T): T {
+    return this.scheme.withContext(fn);
+  }
+
+  isFixed(): boolean {
+    return this.scheme.isFixed();
+  }
+
   get ignoreCase(): boolean {
     return this.scheme.ignoreCase;
   }

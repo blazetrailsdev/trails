@@ -3,9 +3,11 @@ import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 
+type DeclarationListener = (klass: any, name: string) => void;
+
 let _sharedConfig: Config | null = null;
 let _defaultCipher: Cipher | null = null;
-const _listeners: Array<(klass: any, name: string) => void> = [];
+let _listeners: DeclarationListener[] = [];
 const _configureHooks: Array<() => void> = [];
 
 /**
@@ -20,6 +22,17 @@ export class Configurable {
       _sharedConfig = new Config();
     }
     return _sharedConfig;
+  }
+
+  // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
+  // (configurable.rb:11). The listeners are invoked when an encrypted
+  // attribute is declared; see onEncryptedAttributeDeclared.
+  static get encryptedAttributeDeclarationListeners(): DeclarationListener[] {
+    return _listeners;
+  }
+
+  static set encryptedAttributeDeclarationListeners(value: DeclarationListener[]) {
+    _listeners = value;
   }
 
   // Mirrors Rails' delegation of Context::PROPERTIES to context.

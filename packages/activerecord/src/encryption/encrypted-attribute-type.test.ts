@@ -56,3 +56,33 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
     expect(decrypted).toEqual(plaintext);
   });
 });
+
+describe("EncryptedAttributeType — delegations to scheme", () => {
+  it("delegates key_provider, downcase?, previous_schemes, fixed? to the scheme", () => {
+    const keyProvider = { encryptionKeys: () => [], decryptionKeys: () => [] };
+    const previous = new Scheme({});
+    const scheme = new Scheme({
+      keyProvider,
+      deterministic: true,
+      downcase: true,
+      previousSchemes: [previous],
+    });
+    const type = new EncryptedAttributeType({ scheme });
+
+    expect(type.keyProvider).toBe(scheme.keyProvider);
+    expect(type.isDowncase).toBe(scheme.downcase);
+    expect(type.previousSchemes).toBe(scheme.previousSchemes);
+    expect(type.isFixed()).toBe(scheme.isFixed());
+  });
+
+  it("with_context delegates to the scheme's withContext", () => {
+    const scheme = new Scheme({});
+    const spy = vi.spyOn(scheme, "withContext");
+    const type = new EncryptedAttributeType({ scheme });
+
+    const result = type.withContext(() => "value");
+
+    expect(result).toBe("value");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
