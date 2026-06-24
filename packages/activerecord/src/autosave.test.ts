@@ -265,6 +265,25 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(account.isDestroyed()).toBe(true);
     expect(account.isFrozen()).toBe(true);
   });
+
+  // Rails Persistence#destroy gates the DELETE on `persisted?`
+  // (persistence.rb:457): a new record with an assigned primary key must NOT
+  // delete the existing row that shares that id — only callbacks/freeze run.
+  it("destroy new has_one child with assigned id does not delete the existing row", async () => {
+    const company = await Company.create({ name: "Acme" });
+    const existing = await Account.create({ credit_limit: 999 });
+
+    const child = new Account({ id: existing.id, credit_limit: 100 });
+    expect(child.isNewRecord()).toBe(true);
+
+    markForDestruction(child);
+    company.association("account").setTarget(child as any);
+
+    await company.save();
+    expect(child.isDestroyed()).toBe(true);
+    // The pre-existing row sharing the id must survive — Rails skips the DELETE.
+    expect(await Account.findBy({ id: existing.id })).not.toBeNull();
+  });
 });
 
 // ==========================================================================
