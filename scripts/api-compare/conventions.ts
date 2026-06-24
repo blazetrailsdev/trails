@@ -168,6 +168,14 @@ export const SKIP_GROUPS: SkipGroup[] = [
     names: ["extended", "included", "inherited"],
   },
   {
+    reason:
+      "Arel Dot / ToSql primitive visitors for Ruby BigDecimal/Symbol/Set — " +
+      "these are aliases of visit_String / visit_Array / unsupported, but no " +
+      "Ruby BigDecimal, Symbol, or Set value flows through the trails Arel " +
+      "value pipeline, so there is no equivalent dispatch to port.",
+    names: ["visit_BigDecimal", "visit_Symbol", "visit_Set"],
+  },
+  {
     reason: "Ruby object hooks — no TypeScript equivalent.",
     names: ["singleton_method_added"],
   },

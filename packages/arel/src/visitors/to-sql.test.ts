@@ -436,6 +436,35 @@ describe("the to_sql visitor", () => {
     );
   });
 
+  describe("value-class visitors aliased to unsupported", () => {
+    // Rails aliases visit_Class/Date/DateTime/Float/Hash/NilClass/String/
+    // Time/TrueClass/FalseClass and the ActiveSupport string types to
+    // `unsupported` (to_sql.rb:832-845): each raises UnsupportedVisitError.
+    const aliasNames = [
+      "visitActiveSupportMultibyteChars",
+      "visitActiveSupportStringInquirer",
+      "visitClass",
+      "visitDate",
+      "visitDateTime",
+      "visitFalseClass",
+      "visitFloat",
+      "visitHash",
+      "visitNilClass",
+      "visitString",
+      "visitTime",
+      "visitTrueClass",
+    ] as const;
+
+    for (const name of aliasNames) {
+      it(`${name} raises UnsupportedVisitError`, () => {
+        const v = new Visitors.ToSql();
+        const fn = (v as unknown as Record<string, (o: unknown) => never>)[name];
+        const node = new Nodes.SqlLiteral("x");
+        expect(() => fn.call(v, node)).toThrow(Visitors.UnsupportedVisitError);
+      });
+    }
+  });
+
   describe("distinct on", () => {
     it("raises not implemented error", () => {
       const core = new Nodes.SelectCore();
