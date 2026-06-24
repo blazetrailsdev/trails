@@ -60,7 +60,7 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
     "call": "save",
-    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): trails decomposes Rails' synchronous `HasOneAssociation#replace` (which calls `record.save` inside `transaction_if`) into a sync `replace` that queues `_pendingReplace` plus an async `persistReplace` (run from `flushPendingReplaces` on the owner's next save) that performs `pending.record.save()`. The save is reached via the deferred helper, not literally inside `replace`, so the extractor flags it \u2014 false positive, no omission."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): trails splits Rails' synchronous `HasOneAssociation#replace` (which saves the new record inside `transaction_if(save)` for a persisted owner -- has_one_association.rb:66-79) into a sync `replace` that records `_pendingReplace` plus an async `persistReplace` that performs `pending.record.save()`. The awaitable `writer` returns `persistReplace()` immediately for a persisted owner (has-one-association.ts:52-55 -- the Rails-faithful immediate persist); the sync property-setter `queueWrite`/new-owner path defers the same `persistReplace` to the owner's next save via `flushPendingReplaces`. Either way the save lands in `persistReplace`, not literally inside `replace`, so the extractor flags it -- false positive, no omission."
   },
   {
     "package": "activerecord",
@@ -109,7 +109,7 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
     "call": "destroy",
-    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveCollectionAssociation` delegates to `autosaveHasMany`, which destroys marked-for-destruction persisted children via `child.destroy()`, mirroring save_collection_association (autosave_association.rb:440-441). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
+    "reason": "Tracked pending convergence (RFC 0044, autosave-association-save-destroy-cluster -> story autosave-collection-destroy-via-association-destroy): the autosave collection destroy loop destroys marked-for-destruction persisted children via record-level `child.destroy()` (autosave-association.ts autosaveHasMany:397, autosaveHabtm:850), so the DB destroy IS reached and autosave persistence is not silently dropped. Rails' save_collection_association instead calls `association.destroy(record)` (autosave_association.rb:431-434), which also fires before_remove/after_remove and removes the record from the in-memory collection target. trails already has that association-level path (collection-association.ts:302 `destroy`) but the autosave loop does not yet route through it (doing so naively would mutate `inst.target` mid-iteration); iteration-snapshot-safe convergence with a Rails-named test is deferred to the registered story."
   },
   {
     "package": "activerecord",
