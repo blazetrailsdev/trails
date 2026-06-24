@@ -10,7 +10,9 @@ import {
   _mergeAttributes as validationsMergeAttributes,
   _validatesDefaultKeys as validationsValidatesDefaultKeys,
   _parseValidatesOptions as validationsParseValidatesOptions,
+  readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
+import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
   dasherize,
   htmlEscape,
@@ -40,7 +42,13 @@ import {
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
 } from "./callbacks.js";
-import { serializableHash, SerializeOptions, asJsonThenable } from "./serialization.js";
+import {
+  serializableHash,
+  SerializeOptions,
+  asJsonThenable,
+  readAttributeForSerialization as serializationReadAttributeForSerialization,
+  type SerializationRecord,
+} from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ConditionalOptions, ConditionFn, ValidatableRecord } from "./validator.js";
 import { evaluateCondition } from "./validator.js";
@@ -2246,6 +2254,34 @@ export class Model {
    */
   sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
     return attrSanitize(attributes);
+  }
+
+  /**
+   * Mirrors: ActiveModel::ForbiddenAttributesProtection
+   * (`alias :sanitize_forbidden_attributes :sanitize_for_mass_assignment`).
+   *
+   * @internal Rails-private helper.
+   */
+  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
+    return forbiddenSanitize.call(this, attributes);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Validations
+   * (`alias :read_attribute_for_validation :send`). Reads the attribute by
+   * name; ActiveRecord overrides to resolve associations.
+   */
+  readAttributeForValidation(attribute: string): unknown {
+    return validationsReadAttributeForValidation.call(this, attribute);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization
+   * (`alias :read_attribute_for_serialization :send`). Public, overridable hook;
+   * dispatches the named reader, falling back to the attribute store.
+   */
+  readAttributeForSerialization(key: string): unknown {
+    return serializationReadAttributeForSerialization(this as unknown as SerializationRecord, key);
   }
 
   /**

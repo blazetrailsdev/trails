@@ -727,17 +727,82 @@ describe("ValidationsTest", () => {
   });
 
   it("validates each custom reader", () => {
+    // Mirrors Rails' CustomReader: validation reads attribute values through
+    // an overridden `read_attribute_for_validation`, not the model's own store.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      data: Record<string, unknown> = {};
+      override readAttributeForValidation(attribute: string): unknown {
+        return this.data[attribute];
+      }
+    }
+    Person.validatesEach(["name"], (record, attr, value) => {
+      if (!value) record.errors.add(attr, "gotcha");
+    });
+    const p = new Person({ name: "ignored" });
+    p.data = { name: "" };
+    p.isValid();
+    // The empty value comes from `data`, proving the override drove the read.
+    expect(p.errors.get("name")).toContain("gotcha");
+  });
+
+  it("validates an undeclared getter via the send default", () => {
+    // Rails' default `read_attribute_for_validation` is `send`, so a plain
+    // getter with no declared attribute is read by its accessor, not nil.
+    class Person extends Model {
+      static {
+        this.attribute("first", "string");
+      }
+      get fullName(): string {
+        return (this.readAttribute("first") as string) ?? "";
+      }
+    }
+    Person.validatesEach(["fullName"], (record, attr, value) => {
+      if (!value) record.errors.add(attr, "gotcha");
+    });
+    const present = new Person({ first: "Al" });
+    present.isValid();
+    expect(present.errors.get("fullName")).not.toContain("gotcha");
+    const blank = new Person({ first: "" });
+    blank.isValid();
+    expect(blank.errors.get("fullName")).toContain("gotcha");
+  });
+
+  it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
+    // Ruby `send` keys off method existence, not return value: a getter that
+    // exists and returns undefined yields undefined, it does not raise.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      get optional(): string | undefined {
+        return undefined;
+      }
+    }
+    const p = new Person({ name: "Al" });
+    expect(
+      (
+        p as unknown as { readAttributeForValidation(a: string): unknown }
+      ).readAttributeForValidation("optional"),
+    ).toBeUndefined();
+  });
+
+  it("read_attribute_for_validation raises NoMethodError-style for a missing reader", () => {
+    // Ruby `send(:nope)` raises NoMethodError; a typo'd / undeclared validation
+    // attribute with no reader fails loud rather than validating a nil-ish value.
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
-    Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "blank");
-    });
-    const p = new Person({});
-    p.isValid();
-    expect(p.errors.get("name")).toContain("can't be blank");
+    const p = new Person({ name: "Al" });
+    expect(() =>
+      (
+        p as unknown as { readAttributeForValidation(a: string): unknown }
+      ).readAttributeForValidation("nope"),
+    ).toThrow(/undefined method 'nope'/);
   });
 
   it("validates with array condition does not mutate the array", () => {

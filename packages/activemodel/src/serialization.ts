@@ -151,6 +151,81 @@ export interface SerializeOptions {
     | string;
 }
 
+/**
+ * Mirrors: ActiveModel::Serialization#read_attribute_for_serialization
+ * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
+ * Public in Rails (declared before the `private` section) and overridable.
+ *
+ * Mirrors `send(key)`, keying off member *existence* (`key in record`, the JS
+ * analog of `respond_to?`): a reader that exists and returns `undefined` yields
+ * `undefined` (nil) rather than raising; a value member (getter / data property,
+ * including a user override of a declared attribute's reader) is returned and a
+ * function member (`def name; …; end` / `attr_accessor :name`) is invoked.
+ *
+ * The one divergence: on an `_attributes`-backed record (trails Model / AR), a
+ * *function*-valued member means `key` names a method, not an attribute reader
+ * — e.g. `attribute("toJSON")`, which cannot install a getter because `toJSON`
+ * is structurally reserved by `JSON.stringify`; invoking it would recurse
+ * infinitely. Such keys read the store instead (pinned by the "attribute named
+ * toJSON does not shadow Model#toJSON" test). A value-returning getter still
+ * wins, so a reader override is honored; only method-named attributes divert.
+ *
+ * When a storeless host exposes no per-key reader, trails'
+ * `ActiveModel::Serializers::JSON` host contract surfaces values through the
+ * `attributes` hash (the `attributes`-getter pattern its mixin tests pin across
+ * several model shapes, where `attributes` is the only data source). That hash
+ * backs the named reader before a name with no reader and no attribute entry
+ * raises like `send`'s `NoMethodError`. A real Rails-shaped model never reaches
+ * this tier — its declared attributes carry readers or are `_attributes`-backed.
+ */
+export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
+  const attrStore = record._attributes as AttributeStore;
+  const hasStore =
+    (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
+    attrStore instanceof Map;
+  const reader = (record as Record<string, unknown>)[key];
+
+  if (hasStore) {
+    // `send(key)`: a value-returning reader (generated getter or user override)
+    // wins. A function member is a method-named attribute (toJSON) that must
+    // read its stored value, not be invoked — and an absent getter (getterless
+    // declared attribute) also reads the store.
+    if (typeof reader !== "function" && key in (record as object)) return reader;
+    return attrStore instanceof Map
+      ? attrStore.get(key)
+      : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
+  }
+
+  if (key in (record as object)) {
+    return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
+  }
+  if (record.readAttribute) return record.readAttribute(key);
+  if (record.attributes && key in record.attributes) return record.attributes[key];
+  throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
+}
+
+/**
+ * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+ * (serialization.rb:158-160)
+ *
+ *   def attribute_names_for_serialization
+ *     attributes.keys
+ *   end
+ *
+ * Models can override this hook to scope which attributes appear.
+ * Trails has multiple attribute storage shapes (AttributeSet via
+ * `_attributes`, Map, plain object) so the fallback walks them in
+ * order. Virtual attributes (acceptance/confirmation) are filtered
+ * out — they aren't real attributes and shouldn't surface in JSON.
+ *
+ * @internal Rails-private helper.
+ */
+type AttributeStore =
+  | { keys(): string[]; fetchValue(key: string): unknown }
+  | Map<string, unknown>
+  | null
+  | undefined;
+
 /** @internal */
 export function attributeNamesForSerialization(record: SerializationRecord): string[] {
   const attrStore = record._attributes as AttributeStore;
@@ -179,28 +254,6 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
 }
 
 /**
- * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
- * (serialization.rb:158-160)
- *
- *   def attribute_names_for_serialization
- *     attributes.keys
- *   end
- *
- * Models can override this hook to scope which attributes appear.
- * Trails has multiple attribute storage shapes (AttributeSet via
- * `_attributes`, Map, plain object) so the fallback walks them in
- * order. Virtual attributes (acceptance/confirmation) are filtered
- * out — they aren't real attributes and shouldn't surface in JSON.
- *
- * @internal Rails-private helper.
- */
-type AttributeStore =
-  | { keys(): string[]; fetchValue(key: string): unknown }
-  | Map<string, unknown>
-  | null
-  | undefined;
-
-/**
  * Mirrors: ActiveModel::Serialization#serializable_attributes
  * (serialization.rb:162-164)
  *
@@ -219,20 +272,18 @@ export function serializableAttributes(
   record: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  const attrStore = record._attributes as AttributeStore;
+  // Prefer an instance-level override (Rails' subclass-override semantics for
+  // `read_attribute_for_serialization`) over the standalone helper, mirroring
+  // how `serializableHash` dispatches `attribute_names_for_serialization`.
+  const instanceRead = (record as { readAttributeForSerialization?: (key: string) => unknown })
+    .readAttributeForSerialization;
+  const read =
+    typeof instanceRead === "function"
+      ? (key: string) => instanceRead.call(record, key)
+      : (key: string) => readAttributeForSerialization(record, key);
   const result: Record<string, unknown> = {};
   for (const key of attributeNames) {
-    let value: unknown;
-    if (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") {
-      value = (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
-    } else if (attrStore instanceof Map) {
-      value = attrStore.get(key);
-    } else if (record.readAttribute) {
-      value = record.readAttribute(key);
-    } else {
-      value = record.attributes?.[key];
-    }
-    safeSet(result, key, value);
+    safeSet(result, key, read(key));
   }
   return result;
 }

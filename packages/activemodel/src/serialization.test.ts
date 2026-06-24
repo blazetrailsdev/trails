@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
+import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
 
 // Plain ActiveModel serializes `include:` entries via `send(association)` —
 // the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
@@ -15,16 +16,82 @@ function setAssociationAccessors(record: unknown, entries: Record<string, unknow
 
 describe("SerializationTest", () => {
   it("should use read attribute for serialization", () => {
+    // Mirrors Rails: a per-instance `read_attribute_for_serialization` override
+    // is consulted by `serializable_hash` (serialization_test.rb).
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.attribute("age", "integer");
       }
     }
-    const p = new Person({ name: "Alice", age: 25 });
-    const hash = p.serializableHash();
-    expect(hash["name"]).toBe("Alice");
-    expect(hash["age"]).toBe(25);
+    const p = new Person({ name: "Alice" });
+    (
+      p as unknown as { readAttributeForSerialization(n: string): unknown }
+    ).readAttributeForSerialization = () => "Jon";
+    expect(p.serializableHash({ only: ["name"] })).toEqual({ name: "Jon" });
+  });
+
+  it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
+    // Rails default `alias :read_attribute_for_serialization :send`: a host
+    // whose `attributes` only names keys while values live in accessors must
+    // serialize the accessor value, not re-read the hash.
+    const host = {
+      attributes: { name: "STALE" },
+      get name(): string {
+        return "FRESH";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBe("FRESH");
+  });
+
+  it("read_attribute_for_serialization honors an overridden attribute reader (send)", () => {
+    // Rails `send(:name)` calls the reader, so a model overriding a declared
+    // attribute's getter serializes the override, not the raw store value.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      get name(): string {
+        return "OVERRIDE:" + (this.readAttribute("name") as string);
+      }
+    }
+    const p = new Person({ name: "Bob" });
+    expect(p.serializableHash()).toEqual({ name: "OVERRIDE:Bob" });
+  });
+
+  it("read_attribute_for_serialization invokes a method reader (send), not the attributes hash", () => {
+    // Rails' `send(:name)` calls the `name` method; a plain host with a method
+    // reader must serialize its return, not a stale `attributes[:name]`.
+    const host = {
+      attributes: { name: "STALE" },
+      name(): string {
+        return "i_am_name";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBe("i_am_name");
+  });
+
+  it("read_attribute_for_serialization returns undefined for a present reader that returns undefined", () => {
+    // Ruby `send` keys off method existence, not return value: a reader that
+    // exists and returns nil yields nil, it does not raise.
+    const host = {
+      get name(): string | undefined {
+        return undefined;
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBeUndefined();
+  });
+
+  it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
+    // Ruby `send(:nope)` raises NoMethodError; a name with no reader and no
+    // store/hash entry fails loud rather than silently serializing undefined.
+    const host = {
+      attributes: { name: "x" },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization(host, "nope")).toThrow(/undefined method 'nope'/);
   });
 
   it("include option with empty association", () => {

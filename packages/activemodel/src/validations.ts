@@ -4,6 +4,7 @@ import { VALIDATOR_DEFAULT_KEYS } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import { NoMethodError } from "./attribute-assignment.js";
 import {
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
@@ -30,6 +31,48 @@ export const _defineAroundModelCallback = _defineAroundModelCallbackImpl;
  * @internal Rails-private helper.
  */
 export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
+
+/**
+ * Mirrors: ActiveModel::Validations
+ * (validations.rb:437 `alias :read_attribute_for_validation :send`).
+ *
+ * The literal translation of `send(attr)`: dispatch the public reader named
+ * after the attribute. trails exposes declared attributes as value-returning
+ * getters (which read the attribute store, exactly like the generated reader
+ * Rails' `send` would call) and custom readers as methods, so a function member
+ * is invoked (Ruby `send(:full_name)`) and a value member returned directly. A
+ * plain getter with no declared attribute is therefore honored, not read as nil.
+ * A name that resolves to no reader raises, mirroring Ruby `send`'s
+ * `NoMethodError` (a typo'd / undeclared validation attribute fails loud rather
+ * than validating a nil-ish value). `EachValidator` dispatches through any
+ * instance override (validator.ts).
+ */
+export function readAttributeForValidation(
+  this: ReadAttributeForValidationHost,
+  attribute: string,
+): unknown {
+  // Ruby `send` keys off method *existence* (`respond_to?`), not the return
+  // value: a reader that exists and returns nil yields nil, only a name with
+  // no reader raises NoMethodError. `key in this` is the JS analog — it sees
+  // own data properties, getters, and inherited methods up the prototype chain.
+  if (!(attribute in this)) {
+    const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
+    throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
+  }
+  const reader = this[attribute];
+  return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
+}
+
+/**
+ * Host shape consumed by `initInternals`. Kept loose so any class with
+ * the validation-related fields satisfies it without circular imports
+ * back to `Model`.
+ */
+export interface ValidationsInternalsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
+}
 
 /**
  * Lazy per-instance accessor for the active `ValidationContext`.
@@ -63,40 +106,6 @@ export function contextForValidation(this: ContextForValidationHost): Validation
   Object.defineProperty(vc, "_context", accessor);
   this._contextForValidation = vc;
   return vc;
-}
-
-/**
- * Host shape consumed by `initInternals`. Kept loose so any class with
- * the validation-related fields satisfies it without circular imports
- * back to `Model`.
- */
-export interface ValidationsInternalsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-/**
- * Per-instance reset hook for validation state. Mirrors Rails
- * `ActiveModel::Validations#init_internals`
- * (activemodel/lib/active_model/validations.rb:467-471):
- *
- *   def init_internals
- *     super
- *     @errors = nil
- *     @context_for_validation = nil
- *   end
- *
- * Trails eagerly initializes `errors` (rather than Rails' lazy
- * `errors_or_create`), so this assigns a fresh `Errors` and clears
- * the active validation context. Called from the Model constructor.
- *
- * @internal Rails-private helper.
- */
-export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  this.errors = new Errors(this as unknown as TBase);
-  this._validationContext = null;
-  this._contextForValidation = undefined;
 }
 
 /**
@@ -255,6 +264,36 @@ const _predicatesForValidationContexts = new Map<
 >();
 
 /**
+ * Per-instance reset hook for validation state. Mirrors Rails
+ * `ActiveModel::Validations#init_internals`
+ * (activemodel/lib/active_model/validations.rb:467-471):
+ *
+ *   def init_internals
+ *     super
+ *     @errors = nil
+ *     @context_for_validation = nil
+ *   end
+ *
+ * Trails eagerly initializes `errors` (rather than Rails' lazy
+ * `errors_or_create`), so this assigns a fresh `Errors` and clears
+ * the active validation context. Called from the Model constructor.
+ *
+ * @internal Rails-private helper.
+ */
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  this.errors = new Errors(this as unknown as TBase);
+  this._validationContext = null;
+  this._contextForValidation = undefined;
+}
+
+/**
+ * Host shape consumed by `predicateForValidationContext`.
+ */
+export interface ValidationsContextHost {
+  readonly validationContext: string | string[] | null;
+}
+
+/**
  * Run the `:validate` callbacks and report whether the model has no
  * errors. Mirrors Rails
  * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
@@ -268,10 +307,11 @@ export function runValidationsBang(this: RunValidationsHost): boolean {
 }
 
 /**
- * Host shape consumed by `predicateForValidationContext`.
+ * Host shape consumed by `contextForValidation`.
  */
-export interface ValidationsContextHost {
-  readonly validationContext: string | string[] | null;
+export interface ContextForValidationHost {
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
 }
 
 /**
@@ -288,11 +328,11 @@ export function raiseValidationError<TBase extends object = object>(this: {
 }
 
 /**
- * Host shape consumed by `contextForValidation`.
+ * Host shape consumed by `runValidationsBang`.
  */
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
+export interface RunValidationsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _runValidateCallbacks(): void;
 }
 
 /**
@@ -324,12 +364,9 @@ export function predicateForValidationContext(
   return cached;
 }
 
-/**
- * Host shape consumed by `runValidationsBang`.
- */
-export interface RunValidationsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _runValidateCallbacks(): void;
+/** Host shape for the {@link readAttributeForValidation} mixin method. */
+export interface ReadAttributeForValidationHost {
+  [key: string]: unknown;
 }
 
 /**
