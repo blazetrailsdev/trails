@@ -123,6 +123,18 @@ acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: t
 acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: rejectAllBlank });
 
+// vendor/rails/activerecord/test/models/pirate.rb:50-52 —
+//   accepts_nested_attributes_for :parrots, :birds, allow_destroy: true, reject_if: proc(&:empty?)
+//   accepts_nested_attributes_for :ship, allow_destroy: true, reject_if: proc(&:empty?)
+//   accepts_nested_attributes_for :update_only_ship, update_only: true
+// Flips `autosave: true` on these reflections so records marked for destruction
+// are destroyed as part of the owner's save transaction.
+const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
+acceptsNestedAttributesFor(Pirate, "parrots", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "ship", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
+
 export class DestructivePirate extends Pirate {
   static {
     this.hasOne("dependentShip", {

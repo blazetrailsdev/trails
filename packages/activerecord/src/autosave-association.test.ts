@@ -20,6 +20,10 @@ import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Agency, Company, Firm } from "./test-helpers/models/company.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import { Developer } from "./test-helpers/models/developer.js";
+import { ShipPart } from "./test-helpers/models/ship-part.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import {
   markForDestruction,
@@ -205,49 +209,28 @@ beforeAll(async () => {
   await defineSchema(UNIVERSAL_AUTOSAVE_SCHEMA);
 });
 
-describe.skip("TestDestroyAsPartOfAutosaveAssociation", () => {
+describe("TestDestroyAsPartOfAutosaveAssociation", () => {
+  // Transactional fixtures roll back every persisted pirate/ship/parrot per test
+  // so this block does not pollute the shared worker DB for sibling blocks
+  // (e.g. TestAutosaveAssociationOnACollectionRemoveCallbacks) — Rails'
+  // `use_transactional_tests`.
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+    registerModel(CanonicalPirate);
+    registerModel(Ship);
+    registerModel(Developer);
+    registerModel(Bird);
+    registerModel(ShipPart);
+    registerModel(Parrot);
+  });
+
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
 
   function makePirateShip() {
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Ship extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Bird extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    class Part extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ship_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    registerModel("Bird", Bird);
-    registerModel("Part", Part);
-    Associations.hasOne.call(Pirate, "ship", { autosave: true });
-
-    Associations.hasMany.call(Pirate, "birds", { autosave: true });
-    Associations.belongsTo.call(Ship, "pirate", { autosave: true });
-
-    Associations.hasMany.call(Ship, "parts", { autosave: true });
-    return { Pirate, Ship, Bird, Part };
+    return { Pirate: CanonicalPirate, Ship, Bird, Part: ShipPart };
   }
 
   it("a marked for destruction record should not be be marked after reload", async () => {
@@ -511,53 +494,60 @@ describe.skip("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   function makePirateParrot() {
-    class Parrot extends Base {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    class Pirate extends Base {
-      static {
-        this.attribute("catchphrase", "string");
-      }
-    }
-    registerModel("Parrot", Parrot);
-    registerModel("Pirate", Pirate);
-    Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
-      className: "Parrot",
-      joinTable: "parrots_pirates",
-      autosave: true,
-    });
-    return { Pirate, Parrot };
+    return { Pirate: CanonicalPirate, Parrot };
   }
 
   it("should destroy habtm as part of the save transaction if they were marked for destruction", async () => {
     const { Pirate, Parrot } = makePirateParrot();
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
     const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
+    await proxy.create({ name: "parrots_0" });
+    await proxy.create({ name: "parrots_1" });
 
-    markForDestruction(parrot);
-    cacheAssoc(pirate, "parrots", [parrot]);
+    const parrots = await proxy.toArray();
+    expect(parrots.some((p) => isMarkedForDestruction(p))).toBe(false);
+    for (const p of parrots) markForDestruction(p);
+
+    // Rails `assert_no_difference "Parrot.count"`: HABTM mark_for_destruction
+    // removes the join row, it does NOT destroy the associated record.
+    const before = Number(await Parrot.count());
     await pirate.save();
-    expect(parrot.isDestroyed()).toBe(true);
+    expect(Number(await Parrot.count())).toBe(before);
+
+    const reloaded = await Pirate.find(pirate.id!);
+    expect((await association(reloaded, "parrots").toArray()).length).toBe(0);
   });
 
   it("should skip validation on habtm if marked for destruction", async () => {
     const { Pirate, Parrot } = makePirateParrot();
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
     const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
+    await proxy.create({ name: "parrots_0" });
+    await proxy.create({ name: "parrots_1" });
 
-    markForDestruction(parrot);
-    parrot.name = "";
-    cacheAssoc(pirate, "parrots", [parrot]);
+    const parrots = await proxy.toArray();
+    for (const p of parrots) p.name = "";
+    expect(await pirate.isValid()).toBe(false);
+
+    for (const p of parrots) markForDestruction(p);
+
+    // Rails `assert_not_called(parrot, :valid?)`: a marked-for-destruction child
+    // is skipped by `association_valid?` before validation runs, so `valid?`
+    // must not fire on it during the owner save.
+    const validatedIds: unknown[] = [];
+    for (const p of parrots) {
+      const origIsValid = p.isValid.bind(p);
+      (p as { isValid: (ctx?: unknown) => boolean }).isValid = (ctx?: unknown) => {
+        validatedIds.push(p.id);
+        return origIsValid(ctx as never);
+      };
+    }
     const saved = await pirate.save();
     expect(saved).toBe(true);
-    expect(parrot.isDestroyed()).toBe(true);
+    expect(validatedIds).toEqual([]);
+
+    const reloaded = await Pirate.find(pirate.id!);
+    expect((await association(reloaded, "parrots").toArray()).length).toBe(0);
   });
 
   it("should skip validation on habtm if destroyed", async () => {
@@ -613,42 +603,42 @@ describe.skip("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(pirate.isValid()).toBe(true);
   });
   it("a child marked for destruction should not be destroyed twice while saving habtm", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
+    const { Pirate } = makePirateParrot();
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
     const proxy = association(pirate, "parrots");
-    await proxy.push(parrot);
+    await proxy.create({ name: "parrots_1" });
 
-    markForDestruction(parrot);
-    cacheAssoc(pirate, "parrots", [parrot]);
-    await pirate.save();
-    expect(parrot.isDestroyed()).toBe(true);
+    for (const p of await proxy.toArray()) markForDestruction(p);
+    expect(await pirate.save()).toBe(true);
 
-    // Saving again should not try to destroy again
-    cacheAssoc(pirate, "parrots", [parrot]);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    // The join record is already gone — saving again issues no queries.
+    await assertNoQueries(false, async () => {
+      expect(await pirate.save()).toBe(true);
+    });
   });
   it("should rollback destructions if an exception occurred while saving habtm", async () => {
-    const { Pirate, Parrot } = makePirateParrot();
+    const { Pirate } = makePirateParrot();
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const p1 = await Parrot.create({ name: "Polly" });
-    const p2 = await Parrot.create({ name: "Crackers" });
     const proxy = association(pirate, "parrots");
-    await proxy.push(p1);
-    await proxy.push(p2);
-    markForDestruction(p1);
-    markForDestruction(p2);
-    const origDestroy = p2.destroy.bind(p2);
-    (p2 as any).destroy = async () => {
-      await origDestroy();
+    await proxy.create({ name: "parrots_0" });
+    await proxy.create({ name: "parrots_1" });
+
+    const before = (await proxy.toArray()).map((p) => p.id).sort();
+    for (const p of await proxy.toArray()) markForDestruction(p);
+
+    // Mirror Rails: override the parrots association's `destroy` to raise after
+    // running the real destroy, so the whole save transaction rolls back.
+    const inst = (pirate as any).association("parrots");
+    const origDestroy = inst.destroy.bind(inst);
+    inst.destroy = async (...args: unknown[]) => {
+      await origDestroy(...args);
       throw new Error("Oh noes!");
     };
-    cacheAssoc(pirate, "parrots", [p1, p2]);
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
-    // Both destructions should be rolled back — parrots still exist
-    expect(p1.isDestroyed()).toBe(false);
-    expect(p2.isDestroyed()).toBe(false);
+
+    const reloaded = await Pirate.find(pirate.id!);
+    const after = (await association(reloaded, "parrots").toArray()).map((p) => p.id).sort();
+    expect(after).toEqual(before);
   });
 });
 
