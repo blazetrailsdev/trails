@@ -34,6 +34,10 @@ import {
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import { Money } from "./postgresql/oid/money.js";
+import { Range as OidRange } from "./postgresql/oid/range.js";
+import { Data as ArrayData } from "./postgresql/oid/array.js";
+import { Data as XmlData } from "./postgresql/oid/xml.js";
+import { Data as BitData } from "./postgresql/oid/bit.js";
 import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
@@ -3055,6 +3059,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       value instanceof Temporal.ZonedDateTime
     ) {
       return this.quotedDate(value);
+    }
+    // Object-valued binds reach pg as raw objects unless serialized to their pg
+    // literal string. Rails' `type_casted_binds` applies the adapter `type_cast`
+    // per value, which routes the PG OID `Data` wrappers — Range → `encode_range`,
+    // ArrayData → `encode_array`, Xml/Bit `Data` → `value.to_s` (Quoting#type_cast).
+    // These are the object-valued cast outputs `value_for_database` can emit
+    // (e.g. a `where` bind on a range/array/bit/xml column). Apply the cast
+    // narrowly to these wrapper types so we don't reintroduce the bind-everything
+    // pinned-client hang.
+    if (
+      value instanceof OidRange ||
+      value instanceof ArrayData ||
+      value instanceof XmlData ||
+      value instanceof BitData
+    ) {
+      return this.typeCast(value);
     }
     return temporalToBindString(value, "postgres");
   }

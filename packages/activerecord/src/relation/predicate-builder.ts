@@ -483,8 +483,9 @@ export class PredicateBuilder {
 
   /** @internal */
   private _buildRangeEqualityOrNull(attribute: Nodes.Attribute, value: Range): Nodes.Node | null {
+    type CastLike = { cast(v: unknown): unknown; serialize(v: unknown): unknown };
     type TypeLike =
-      | { isForceEquality?(v: unknown): boolean; encodeLiteral?(v: unknown): string }
+      | ({ isForceEquality?(v: unknown): boolean } & Partial<CastLike>)
       | null
       | undefined;
     const lookups = [
@@ -503,14 +504,21 @@ export class PredicateBuilder {
     for (const lookup of lookups) {
       const t = lookup();
       if (t?.isForceEquality?.(value)) {
-        // The inline `Quoted` renders via the adapter's own `quote()`
-        // (`visitQuoted`); production compiles through the adapter visitor
-        // (`_compileSelectSql`), so this never reaches arel's default quoter.
-        // Rails instead builds a bind (`build_bind_attribute`) — converging needs
-        // range bind values run through the adapter `typeCast` (story
-        // `force-equality-bind-convergence`). Types without `encodeLiteral` have
-        // no inline form, so they fall through to the handler.
-        if (t.encodeLiteral) return attribute.eq(new Nodes.Quoted(t.encodeLiteral(value)));
+        // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
+        // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
+        // bind value (e.g. a `Range`) serializes to its pg literal string via the
+        // adapter's `typeCast` in the bind path (`type_casted_binds`).
+        //
+        // Construct the bind with the SAME type object that made the branch true
+        // (`table.type(attribute.name)` in Rails). A joined/aliased range attribute
+        // may be typed on `attribute.relation` / `_tableContext` but not on
+        // `this.table`, so deferring to `buildBindAttribute`'s `this.table` lookup
+        // would bind through the identity type and skip `RangeType#serialize`.
+        const castType =
+          t.cast && t.serialize
+            ? (t as CastLike)
+            : { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+        return attribute.eq(new QueryAttribute(attribute.name, value, castType));
       }
     }
     return null;
