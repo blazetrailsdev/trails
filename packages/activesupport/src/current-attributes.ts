@@ -130,7 +130,9 @@ export abstract class CurrentAttributes {
 
   /**
    * Resets this class's instance: runs the `:reset` callbacks around clearing
-   * all attributes. Mirrors Rails `run_callbacks :reset { self.attributes = {} }`.
+   * all attributes. Mirrors Rails
+   * `run_callbacks :reset { self.attributes = resolve_defaults }` — clearing
+   * `_attributes` is equivalent since defaults are re-evaluated lazily on read.
    */
   static reset(): void {
     const inst = this.instance();
