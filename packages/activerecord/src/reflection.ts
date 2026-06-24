@@ -467,6 +467,12 @@ export class AbstractReflection {
     );
   }
 
+  // Rails: `alias inverse_updates_counter_cache? inverse_which_updates_counter_cache`
+  // — a truthy reflection (or null), not a strict boolean.
+  isInverseUpdatesCounterCache(): AbstractReflection | null {
+    return this.inverseWhichUpdatesCounterCache();
+  }
+
   isInverseUpdatesCounterInMemory(): boolean {
     const inv = this.inverseOf();
     if (inv == null) return false;
