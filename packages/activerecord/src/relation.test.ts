@@ -1618,6 +1618,70 @@ describe("RelationTest", () => {
     }
   });
 
+  it("does not defer distinct-PK for a singular nested-hash eager spec", () => {
+    try {
+      class NhProfile extends Base {
+        static {
+          this.tableName = "nh_profiles";
+          this.attribute("bio", "string");
+          registerModel(this);
+        }
+      }
+      class NhAvatar extends Base {
+        static {
+          this.tableName = "nh_avatars";
+          this.attribute("url", "string");
+          registerModel(this);
+        }
+      }
+      class NhAuthor extends Base {
+        static {
+          this.tableName = "nh_authors";
+          this.attribute("name", "string");
+          this.attribute("nh_profile_id", "integer");
+          this.belongsTo("nhProfile", {
+            className: "NhProfile",
+            foreignKey: "nh_profile_id",
+          });
+          this.hasMany("nhAvatars", {
+            className: "NhAvatar",
+            foreignKey: "nh_author_id",
+          });
+          registerModel(this);
+        }
+      }
+      class NhArticle extends Base {
+        static {
+          this.tableName = "nh_articles";
+          this.attribute("title", "string");
+          this.attribute("nh_author_id", "integer");
+          this.belongsTo("nhAuthor", {
+            className: "NhAuthor",
+            foreignKey: "nh_author_id",
+          });
+          registerModel(this);
+        }
+      }
+      // A nested-hash eager spec with both associations singular (belongsTo →
+      // belongsTo) resolves through construct_join_dependency.reflections to a
+      // non-collection set, so using_limitable_reflections? stays true and the
+      // relation is NOT deferred (Rails finder_methods.rb:457-470).
+      const singularNested = NhArticle.all().eagerLoad({ nhAuthor: "nhProfile" }).limit(5);
+      expect((singularNested as any)._isDeferredDistinctPkSubquery()).toBe(false);
+
+      // A collection anywhere in the eager tree (hasMany nhAvatars) makes the
+      // reflection set non-limitable, so the relation defers to distinct-PK
+      // materialization.
+      const collectionNested = NhArticle.all().eagerLoad({ nhAuthor: "nhAvatars" }).limit(5);
+      expect((collectionNested as any)._isDeferredDistinctPkSubquery()).toBe(true);
+    } finally {
+      modelRegistry.delete("NhProfile");
+      modelRegistry.delete("NhAvatar");
+      modelRegistry.delete("NhAuthor");
+      modelRegistry.delete("NhArticle");
+    }
+  });
+
   it.skip("includes + references promotes to eager load SQL", () => {
     try {
       class Author extends Base {
