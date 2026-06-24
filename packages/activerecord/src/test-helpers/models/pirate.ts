@@ -1,4 +1,4 @@
-import { throwAbort } from "@blazetrails/activesupport";
+import { isBlank, throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
@@ -106,10 +106,22 @@ export class Pirate extends Base {
 // :birds_with_method_callbacks, :birds_with_proc_callbacks, allow_destroy: true`.
 // This flips `autosave: true` on the reflections so a marked-for-destruction
 // child is routed through the collection destroy on owner save.
+// `proc(&:empty?)` — reject when the attributes hash is empty.
+const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
+// `reject_if: :all_blank` — Rails' REJECT_ALL_BLANK_PROC: reject when every
+// attribute (other than `_destroy`) is blank.
+const rejectAllBlank = (attrs: Record<string, unknown>) =>
+  Object.entries(attrs).every(([key, value]) => key === "_destroy" || isBlank(value));
+
+acceptsNestedAttributesFor(Pirate, "parrots", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "ship", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
 acceptsNestedAttributesFor(Pirate, "parrotsWithMethodCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "parrotsWithProcCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
+acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: rejectAllBlank });
 
 export class DestructivePirate extends Pirate {
   static {
