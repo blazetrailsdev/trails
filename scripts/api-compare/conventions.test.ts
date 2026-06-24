@@ -219,6 +219,10 @@ describe("SCOPED_SKIP_GROUPS", () => {
     expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(true);
     expect(isScopedSkip("-@", "duration.rb")).toBe(false);
   });
+
+  it("maps Ruby `-@` to `negate` globally (real surface outside the skip files)", () => {
+    expect(rubyMethodToTs("-@")).toEqual(["negate"]);
+  });
 });
 
 describe("ARITY_OVERRIDE_GROUPS", () => {

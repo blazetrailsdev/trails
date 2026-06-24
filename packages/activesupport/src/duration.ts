@@ -559,6 +559,11 @@ export class Scalar {
     return new Scalar(this.value - otherVal);
   }
 
+  /** Unary minus (`Scalar#-@`): `Scalar.new(-value)`. */
+  negate(): Scalar {
+    return new Scalar(-this.value);
+  }
+
   times(other: number): Scalar {
     return new Scalar(this.value * other);
   }

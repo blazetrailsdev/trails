@@ -26,6 +26,7 @@ matches the first candidate present in the target file), not a call expression.
 | `to_s` / `to_str`                                                                                                        | `toString`                           | `to_s` → `toString`                                   |
 | `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
 | `to_sql`                                                                                                                 | `toSql`                              | `to_sql` → `toSql`                                    |
+| `-@` (unary minus)                                                                                                       | `negate`                             | `-@` → `negate`                                       |
 | everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
 Predicate-form details: `is_*?` collapses to a single candidate so trails can't
