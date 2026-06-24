@@ -301,6 +301,16 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
 }
 
 /**
+ * Rails-shaped SQLite3 configuration hash: the database file (or `:memory:`)
+ * under `database`, merged with the adapter-level options. Mirrors the single
+ * config hash `SQLite3Adapter#initialize(config)` reads in Rails, where the
+ * file is `config[:database]`.
+ */
+export interface SQLite3Config extends SQLite3AdapterOptions {
+  database?: string;
+}
+
+/**
  * MySQL2-specific adapter options that extend the shared base.
  * Kept separate so PG/SQLite3 destructuring of `TrailsAdapterOptions`
  * never receives — and leaks — these keys into their driver configs.

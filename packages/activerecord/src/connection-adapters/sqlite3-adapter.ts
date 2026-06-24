@@ -10,7 +10,7 @@ import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import type { SQLite3AdapterOptions } from "./pool-config.js";
+import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -39,6 +39,7 @@ import {
   DatabaseConnectionError,
   TransactionIsolationError,
 } from "../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
@@ -299,8 +300,38 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this._statementPool.setMaxSize(value);
   }
 
-  constructor(filename: string | ":memory:" = ":memory:", options: SQLite3AdapterOptions = {}) {
+  /**
+   * Rails-shaped hash-only constructor: a single config hash whose `database`
+   * key names the file (or `:memory:`), merged with the adapter options.
+   * Mirrors `SQLite3Adapter#initialize(config)`.
+   */
+  constructor(config: SQLite3Config);
+  /**
+   * @deprecated Positional `(filename, options)` form. Bridged to the
+   * Rails-shaped hash constructor; prefer passing a single config hash with a
+   * `database` key.
+   */
+  constructor(filename?: string | ":memory:", options?: SQLite3AdapterOptions);
+  constructor(
+    filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
+    options: SQLite3AdapterOptions = {},
+  ) {
     super();
+    // Rails-shaped hash form: a single config object whose `database` key is
+    // the file. An empty/missing `database` raises, mirroring Rails'
+    // "No database file specified" guard. The positional form keeps the
+    // legacy `:memory:` default for callers that pass no filename.
+    let filename: string;
+    if (typeof filenameOrConfig === "object") {
+      const { database, ...rest } = filenameOrConfig;
+      if (database === undefined || database === "") {
+        throw new ArgumentError("No database file specified. Missing argument: database");
+      }
+      filename = database;
+      options = rest;
+    } else {
+      filename = filenameOrConfig;
+    }
     this._config = { ...options };
     this._filename = filename;
     this._memoryDatabase = AbstractSQLite3Adapter._isMemoryFilename(filename);
