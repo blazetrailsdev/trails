@@ -205,11 +205,16 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "the equivalent state differently — a dynamically-assigned class field " +
       "(`_reflections`, `_counterCacheColumns`, `_readonlyAttributes`), a " +
       "module-level map keyed by class (`token_definitions`), a static on the " +
-      "feature class (`backtrace_cleaner`), or a value computed on demand — so " +
-      "there is no generated accessor triple to match. The `?` predicate in " +
-      "particular has no trails caller. Config is set through the feature's own " +
-      "DSL (e.g. `normalizes`, `attrReadonly`, `acceptsNestedAttributesFor`, " +
-      "`generatesTokenFor`, `serialize`, `setSignedIdVerifierSecret`).",
+      "feature class (`backtrace_cleaner`), or a value computed on demand " +
+      "(`default_scope_override` walks the prototype chain) — so there is no " +
+      "generated accessor triple to match. We skip rather than expose a wrapper " +
+      "triple because trails has no internal caller for the reader/`=`/`?` form: " +
+      "config is written through each feature's own DSL (`normalizes`, " +
+      "`attrReadonly`, `acceptsNestedAttributesFor`, `generatesTokenFor`, " +
+      "`serialize`, `setSignedIdVerifierSecret`) and read back through the " +
+      "feature's own accessor (`readonlyAttributes`, `reflectOnAllAggregations`), " +
+      "so a generated triple would be speculative surface (CLAUDE.md: no unused " +
+      "stubs). The `?` predicate in particular has no trails caller.",
     names: [
       "_reflections",
       "_reflections=",
