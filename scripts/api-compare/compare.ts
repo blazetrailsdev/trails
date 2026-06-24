@@ -1765,6 +1765,12 @@ export function main() {
       {
         generatedAt: new Date().toISOString(),
         note: "Advisory. Ruby body calls (to other ported methods) absent from the matched TS body's call-set. Coarse body-fidelity signal; legitimate restructuring shows up here.",
+        // The set of packages this run actually compared (sorted). The ratchet
+        // (lint-call-mismatches.ts) reads it to reject a partial-scope artifact
+        // — fewer packages than CI, e.g. a `--package`-filtered run or an
+        // unfetched vendor source — before it can reseed or gate. See that
+        // script's header for the full determinism story.
+        packages: [...new Set(results.map((r) => r.package))].sort(),
         compared: results.reduce((n, r) => n + r.calls.compared, 0),
         mismatched: callsFlat.length,
         mismatches: callsFlat,
