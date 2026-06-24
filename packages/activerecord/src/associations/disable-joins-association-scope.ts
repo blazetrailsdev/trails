@@ -6,7 +6,7 @@ import {
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import type { Relation } from "../relation.js";
-import type { UnscopeType } from "../relation/query-methods.js";
+import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 import { argumentError } from "../relation/query-methods.js";
@@ -274,12 +274,12 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       klass as unknown as { scopeForAssociation?: () => unknown }
     ).scopeForAssociation?.();
     if (sfa) {
-      // Rails: `relation.except(:select, :create_with, :includes, :preload,
-      // :eager_load, :joins, :left_outer_joins)` strips those query parts
-      // before merging. We use `unscope` here (the resulting scope is not
-      // re-merged in a way that replays the resets). The full Rails set is
-      // supported.
-      const stripped = (sfa as { unscope: (...keys: UnscopeType[]) => unknown }).unscope(
+      // Rails: `scope.merge!(relation.except(:select, :create_with, :includes,
+      // :preload, :eager_load, :joins, :left_outer_joins))`
+      // (disable_joins_association_scope.rb:36). `except` removes the value
+      // only — it must NOT record `unscope_values`, or `Merger#mergeUnscope`
+      // would replay the resets into `scope` and erase its own parts.
+      const stripped = (sfa as { except: (...keys: ExceptKey[]) => unknown }).except(
         "select",
         "createWith",
         "includes",
