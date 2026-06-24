@@ -195,11 +195,17 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   // pre-change value, then re-writes it afterward so it stays dirty. The
   // @_skip_dirty_tracking branch (set by touch_later) instead just clears the
   // touched columns' changes.
+  // Mirrors Rails Locking::Optimistic#_touch_row, which pushes the locking
+  // column into @_touch_attr_names before calling super — so the lock_version
+  // increment is treated as a touched column (its dirty state cleared by
+  // changes_applied), not as an unrelated change to preserve.
+  const touched = new Set(touchCols);
+  if (ctor.lockingEnabled) touched.add(lockCol);
+
   const self = this as any;
   if (self._skipDirtyTracking) {
-    self.clearAttributeChanges(touchCols);
+    self.clearAttributeChanges(touched);
   } else {
-    const touched = new Set(touchCols);
     const restores: Array<[string, unknown]> = [];
     for (const attrName of self._attributes.keys()) {
       if (touched.has(attrName)) continue;
