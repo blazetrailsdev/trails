@@ -185,6 +185,18 @@ export function significantMissingCalls(
   return missing;
 }
 
+/**
+ * Whether the narrow SIGNIFICANT_CALLS gate (RFC 0044) applies to a package.
+ * The narrow allowlist (update/save/transaction/run_callbacks/…) encodes
+ * ActiveRecord persistence semantics; matched package-agnostically it produces
+ * name-collision false positives outside activerecord (Hash#update,
+ * Headers#replace's internal update, …). So the narrow gate is activerecord-only.
+ * The opt-in wide RFC 0047 gate (`wideCalls`) stays cross-package by design.
+ */
+export function narrowCallsApplies(pkg: string, wideCalls: boolean): boolean {
+  return wideCalls || pkg === "activerecord";
+}
+
 const DETAIL_PACKAGES = new Set([
   "arel",
   "activemodel",
@@ -1327,6 +1339,9 @@ export function main() {
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
       const checkCalls = (rubyName: string, tsName: string, tsFile: string) => {
+        // Narrow SIGNIFICANT_CALLS (RFC 0044) is activerecord-scoped; outside it
+        // the same names collide as false positives (see narrowCallsApplies).
+        if (!narrowCallsApplies(pkg, wideCalls)) return;
         const rubyCalls = rubyCallsByName.get(rubyName);
         if (!rubyCalls || rubyCalls.length === 0) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);

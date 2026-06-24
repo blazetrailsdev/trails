@@ -12,6 +12,7 @@ import {
   MISPLACED_MIN_HITS,
   buildEntitiesByName,
   significantMissingCalls,
+  narrowCallsApplies,
 } from "./compare.js";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -43,6 +44,21 @@ function makeManifest(
   }
   return result;
 }
+
+describe("narrowCallsApplies", () => {
+  it("applies the narrow 0044 gate only to activerecord", () => {
+    expect(narrowCallsApplies("activerecord", false)).toBe(true);
+    for (const pkg of ["activesupport", "rack", "trailties", "actioncontroller"]) {
+      expect(narrowCallsApplies(pkg, false)).toBe(false);
+    }
+  });
+
+  it("admits every package under the wide RFC 0047 gate", () => {
+    for (const pkg of ["activerecord", "activesupport", "rack", "trailties"]) {
+      expect(narrowCallsApplies(pkg, true)).toBe(true);
+    }
+  });
+});
 
 describe("significantMissingCalls", () => {
   // mapCall: snake → camel for the cases we test; withArgs: every ported name.
