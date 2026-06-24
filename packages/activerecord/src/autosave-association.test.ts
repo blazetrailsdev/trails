@@ -210,7 +210,11 @@ beforeAll(async () => {
 });
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  setupHandlerSuite();
+  // Transactional fixtures roll back every persisted pirate/ship/parrot per test
+  // so this block does not pollute the shared worker DB for sibling blocks
+  // (e.g. TestAutosaveAssociationOnACollectionRemoveCallbacks) — Rails'
+  // `use_transactional_tests`.
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
     registerModel(CanonicalPirate);
