@@ -246,6 +246,18 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "ActiveSupport::Duration#+@ (`def +@; self; end`, duration.rb:326) is " +
+      "Ruby's unary-plus operator returning self. TS has no syntax that " +
+      "dispatches to a named method for `+duration` — the unary `+` coerces " +
+      "through `valueOf()` to a number — so a ported `identity()` method would " +
+      "be inert dead code no caller can reach (unlike `-@` → `negate`, which is " +
+      "called from `minus()` via `other.negate()`). Scoped to duration.rb so it " +
+      "can't silence a genuine `+@` gap elsewhere.",
+    names: ["+@"],
+    rubyFiles: ["duration.rb"],
+  },
+  {
+    reason:
       "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
       "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
       "realizes dedup via the `deduplicate` free function plus the " +
@@ -569,9 +581,6 @@ export function rubyMethodToTs(name: string): string[] | null {
   // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
   // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
   if (name === "-@") return ["negate"];
-  // Ruby unary plus (`+@`) ports to a named `identity` method (e.g.
-  // ActiveSupport::Duration#+@ → Duration#identity, which returns `self`).
-  if (name === "+@") return ["identity"];
 
   if (name.endsWith("?")) {
     const base = name.slice(0, -1);
@@ -695,7 +704,6 @@ matches the first candidate present in the target file), not a call expression.
 | \`to_json\` | \`toJSON\` | \`to_json\` → ${example("to_json")} |
 | \`to_sql\` | \`toSql\` | \`to_sql\` → ${example("to_sql")} |
 | \`-@\` (unary minus) | \`negate\` | \`-@\` → ${example("-@")} |
-| \`+@\` (unary plus) | \`identity\` | \`+@\` → ${example("+@")} |
 | everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
 
 Predicate-form details: \`is_*?\` collapses to a single candidate so trails can't
