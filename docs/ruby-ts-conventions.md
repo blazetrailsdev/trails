@@ -115,3 +115,5 @@ not a real signature gap:
   - `apply_pending_attribute_modifications`, `reset_default_attributes`
 - The real `parse_float` port is `parseFloatRails(num, precision, scale?)`, bound to the validator via prototype assignment plus a `declare parseFloat` type member; the by-name candidate pool only sees the zero-arg `declare` form, not the implementation's arity.
   - `parse_float`
+- `prepare_delete_statement` is `alias :prepare_delete_statement :prepare_update_statement` in both to_sql.rb and mysql.rb, so the Ruby extractor records the alias with zero positional params (the alias definition carries no signature) while the TS port spells the real `(o)` signature it forwards to.
+  - `prepare_delete_statement`
