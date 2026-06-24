@@ -10,6 +10,7 @@ import { ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { getFs, getPath, getCryptoAsync, getOs, getEnv, stdout } from "@blazetrails/activesupport";
 import { ConnectionNotDefined } from "../errors.js";
+import { Base } from "../base.js";
 
 /**
  * Raised when a database task is invoked against an adapter that
@@ -1361,6 +1362,23 @@ export function resolveConfiguration(configuration: unknown): DatabaseConfig {
 export function isVerbose(): boolean {
   const v = getEnv("VERBOSE");
   return v !== undefined ? v !== "false" : true;
+}
+
+/**
+ * The bookkeeping tables `truncate_tables` excludes from truncation — the
+ * composed schema_migrations and ar_internal_metadata table names. Rails reads
+ * `pool.schema_migration.table_name` / `pool.internal_metadata.table_name`
+ * (database_statements.rb:222-223), each composed from the configurable Base
+ * accessors plus table_name_prefix/suffix (schema_migration.rb:49-50,
+ * internal_metadata.rb:31-32).
+ */
+export function metadataTableNames(): Set<string> {
+  const prefix = Base.tableNamePrefix;
+  const suffix = Base.tableNameSuffix;
+  return new Set([
+    `${prefix}${Base.schemaMigrationsTableName}${suffix}`,
+    `${prefix}${Base.internalMetadataTableName}${suffix}`,
+  ]);
 }
 
 /** @internal */
