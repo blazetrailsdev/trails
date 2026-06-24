@@ -1592,6 +1592,10 @@ export class Base extends Model {
     return _defaultScopeOverride.call(this);
   }
 
+  static set defaultScopeOverride(value: boolean | null) {
+    (this as { _defaultScopeOverride?: boolean | null })._defaultScopeOverride = value;
+  }
+
   /**
    * Per-model `purpose => TokenDefinition` map (inherited purposes included).
    *

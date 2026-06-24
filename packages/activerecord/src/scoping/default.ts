@@ -44,17 +44,16 @@ export class Default {
     // Rails default.rb:145-152 — memoize the `default_scope_override` boolean on
     // first build (the class_attribute starts nil): does this class own a
     // `default_scope` method override rather than only inheriting the macro?
-    if (modelClass._defaultScopeOverride == null) {
-      modelClass._defaultScopeOverride = hasDefaultScopeOverride(modelClass);
+    // Written through the class-attribute setter (`self.default_scope_override = `).
+    if (modelClass.defaultScopeOverride == null) {
+      modelClass.defaultScopeOverride = hasDefaultScopeOverride(modelClass);
     }
 
     // Rails: when the model defines its own `default_scope` method (the
     // proc/method form, `def self.default_scope`) rather than registering via
     // the `default_scope { }` macro, call that method with the base relation
     // installed as the current scope (`relation.scoping { default_scope }`).
-    const override = modelClass._defaultScopeOverride
-      ? defaultScopeOverride(modelClass)
-      : undefined;
+    const override = modelClass.defaultScopeOverride ? defaultScopeOverride(modelClass) : undefined;
     if (override) {
       return evaluateDefaultScope(modelClass, () => {
         const base = buildRelation();
