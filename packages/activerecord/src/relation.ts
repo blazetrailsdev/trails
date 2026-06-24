@@ -1676,7 +1676,11 @@ export class Relation<T extends Base> {
           rel._isStrictLoading = false;
           break;
         case "references":
+          // `:references` is a single Rails value key; trails splits its local
+          // representation into the values list and the manual-vs-derived
+          // marker, so both must be cleared together.
           rel._referencesValues = [];
+          rel._manualReferences = [];
           break;
         case "extending":
           rel._extending = [];
