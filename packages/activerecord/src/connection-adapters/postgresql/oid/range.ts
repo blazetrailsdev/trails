@@ -34,10 +34,9 @@ export class Range {
   // Serializes to PG's range literal, identical to PostgreSQL::Quoting#encode_range
   // (vendor rails quoting.rb:210). Rails does NOT quote bounds containing special
   // chars — type_cast_range_value interpolates each bound raw, and the surrounding
-  // `quote`/`Quoted` adds the single outer quoting + escaping. Bounds reaching here
-  // via RangeType#encodeLiteral are already subtype-serialized, so this shares the
-  // same `rangeBoundLiteral` helper as `encode_range`, keeping the predicate-literal
-  // and quote/typeCast literal paths in agreement.
+  // `quote`/`Quoted` adds the single outer quoting + escaping. This shares the
+  // same `rangeBoundLiteral` helper as `encode_range`, keeping the quote/typeCast
+  // literal paths in agreement.
   toString(): string {
     return `[${rangeBoundLiteral(this.begin)},${rangeBoundLiteral(this.end)}${this.excludeEnd ? ")" : "]"}`;
   }
@@ -140,13 +139,6 @@ export class RangeType extends ValueType<Range> {
 
   override isForceEquality(value: unknown): boolean {
     return value instanceof Range;
-  }
-
-  /** @internal */
-  encodeLiteral(value: unknown): string {
-    const serialized = this.serialize(value);
-    if (!(serialized instanceof Range)) return String(value);
-    return serialized.toString();
   }
 
   private typeCastSingle(value: unknown): unknown {

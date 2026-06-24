@@ -483,10 +483,7 @@ export class PredicateBuilder {
 
   /** @internal */
   private _buildRangeEqualityOrNull(attribute: Nodes.Attribute, value: Range): Nodes.Node | null {
-    type TypeLike =
-      | { isForceEquality?(v: unknown): boolean; encodeLiteral?(v: unknown): string }
-      | null
-      | undefined;
+    type TypeLike = { isForceEquality?(v: unknown): boolean } | null | undefined;
     const lookups = [
       () => {
         const rel = (attribute as unknown as { relation?: unknown }).relation;
@@ -503,14 +500,11 @@ export class PredicateBuilder {
     for (const lookup of lookups) {
       const t = lookup();
       if (t?.isForceEquality?.(value)) {
-        // The inline `Quoted` renders via the adapter's own `quote()`
-        // (`visitQuoted`); production compiles through the adapter visitor
-        // (`_compileSelectSql`), so this never reaches arel's default quoter.
-        // Rails instead builds a bind (`build_bind_attribute`) — converging needs
-        // range bind values run through the adapter `typeCast` (story
-        // `force-equality-bind-convergence`). Types without `encodeLiteral` have
-        // no inline form, so they fall through to the handler.
-        if (t.encodeLiteral) return attribute.eq(new Nodes.Quoted(t.encodeLiteral(value)));
+        // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
+        // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
+        // bind value (e.g. a `Range`) serializes to its pg literal string via the
+        // adapter's `typeCast` in the bind path (`type_casted_binds`).
+        return attribute.eq(this.buildBindAttribute(attribute.name, value));
       }
     }
     return null;
