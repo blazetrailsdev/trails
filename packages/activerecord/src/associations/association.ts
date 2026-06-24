@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { resolveModel, _preloadedHolderTarget } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
+import { associationKeysEqual } from "./key-normalization.js";
 import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
@@ -554,8 +555,64 @@ export class Association {
   }
 
   private inversable(record: Base | null): boolean {
+    // Rails `Association#inversable?` (association.rb:406):
+    //   record && ((!record.persisted? || !owner.persisted?) ||
+    //              matches_foreign_key?(record))
+    // The base method previously omitted the `matches_foreign_key?` clause, so
+    // when both owner and record were persisted it never wired the inverse —
+    // the FK-match was reimplemented inline in `AssociationRelation.toArray`.
     if (!record) return false;
-    return record.isNewRecord() || this.owner.isNewRecord();
+    return record.isNewRecord() || this.owner.isNewRecord() || this.matchesForeignKey(record);
+  }
+
+  /**
+   * Rails `Association#matches_foreign_key?` (association.rb:411):
+   *
+   *   if foreign_key_for?(record)
+   *     record.read_attribute(reflection.foreign_key) == owner.id ||
+   *       (foreign_key_for?(owner) && owner.read_attribute(reflection.foreign_key) == record.id)
+   *   else
+   *     owner.read_attribute(reflection.foreign_key) == record.id
+   *   end
+   *
+   * Value-equality (`associationKeysEqual`) bridges a child FK (int4 number)
+   * and an owner PK (int8 BigInt under PG bigserial) as Ruby's `Integer ==`
+   * does, so the inverse still wires across the number/BigInt boundary.
+   * @internal
+   */
+  matchesForeignKey(record: Base): boolean {
+    if (this.isForeignKeyFor(record)) {
+      return (
+        this.keyValuesEqual(this.foreignKeyValues(record), this.idValues(this.owner)) ||
+        (this.isForeignKeyFor(this.owner) &&
+          this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record)))
+      );
+    }
+    return this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record));
+  }
+
+  private resolveForeignKey(): string[] {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
+    };
+    const fk =
+      ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey ??
+      (this.reflection.options as any).foreignKey;
+    return (Array.isArray(fk) ? fk : [fk]).filter((k) => k != null).map(String);
+  }
+
+  private foreignKeyValues(record: Base): unknown[] {
+    return this.resolveForeignKey().map((key) => (record as any)._readAttribute(key));
+  }
+
+  private idValues(record: Base): unknown[] {
+    const pk = (record.constructor as typeof Base).primaryKey;
+    return (Array.isArray(pk) ? pk : [pk]).map((key) => (record as any)._readAttribute(key));
+  }
+
+  private keyValuesEqual(a: unknown[], b: unknown[]): boolean {
+    if (a.length === 0 || a.length !== b.length) return false;
+    return a.every((value, i) => associationKeysEqual(value, b[i]));
   }
 
   private ensureKlassExistsBang(): typeof Base {
