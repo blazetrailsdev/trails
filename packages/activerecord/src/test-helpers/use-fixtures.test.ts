@@ -312,7 +312,7 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
   it("resolves each join row's FK pair to the referenced rows' ids", () => {
     const row = categoriesPosts("general_welcome");
     expect(Number(row.category_id)).toBe(Number(categories("general").readAttribute("id")));
-    expect(row.post_id).toBe(posts("welcome").readAttribute("id"));
+    expect(Number(row.post_id)).toBe(Number(posts("welcome").readAttribute("id")));
   });
 
   it("seeds every label-less join row (HABTM rows carry no id/label column)", async () => {
@@ -353,7 +353,7 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
     const row = peoplesTreasures("michael_diamond");
     expect(Number(row.rich_person_id)).toBe(Number(people("michael").readAttribute("id")));
-    expect(row.treasure_id).toBe(treasures("diamond").readAttribute("id"));
+    expect(Number(row.treasure_id)).toBe(Number(treasures("diamond").readAttribute("id")));
   });
 });
 
