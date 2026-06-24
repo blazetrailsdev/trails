@@ -3465,6 +3465,11 @@ export class Migrator {
     return this._migrations.find((m) => m.version === versionStr) ?? null;
   }
 
+  /** Alias of currentMigration (Rails: `alias :current :current_migration`). */
+  async current(): Promise<MigrationProxy | null> {
+    return this.currentMigration();
+  }
+
   async runnable(): Promise<MigrationProxy[]> {
     return this.pendingMigrations();
   }

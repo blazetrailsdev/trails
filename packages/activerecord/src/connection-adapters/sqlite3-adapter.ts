@@ -1562,6 +1562,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.addColumn(tableName, `${refName}_id`, type, options);
   }
 
+  /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
+  async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    return this.addReference(tableName, refName, options);
+  }
+
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
@@ -2403,6 +2412,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       throw new StatementInvalid(`Could not find table '${tableName}'`, { sql: "", binds: [] });
     }
     return await this.tableStructureWithCollation(tableName, structure);
+  }
+
+  /** Alias of tableStructure (Rails: `alias column_definitions table_structure`). @internal */
+  private async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
+    return this.tableStructure(tableName);
   }
 
   /** @internal */
