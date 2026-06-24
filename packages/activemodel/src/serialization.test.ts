@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
+import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
 
 // Plain ActiveModel serializes `include:` entries via `send(association)` —
 // the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
@@ -27,6 +28,20 @@ describe("SerializationTest", () => {
       p as unknown as { readAttributeForSerialization(n: string): unknown }
     ).readAttributeForSerialization = () => "Jon";
     expect(p.serializableHash({ only: ["name"] })).toEqual({ name: "Jon" });
+  });
+
+  it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
+    // Rails default `alias :read_attribute_for_serialization :send`: a host
+    // whose `attributes` only names keys while values live in accessors must
+    // serialize the accessor value, not re-read the hash.
+    const host = {
+      attributes: { name: "STALE" },
+      get name(): string {
+        return "FRESH";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBe("FRESH");
   });
 
   it("include option with empty association", () => {

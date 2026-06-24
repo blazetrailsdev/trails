@@ -156,29 +156,28 @@ export interface SerializeOptions {
  * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
  * Public in Rails (declared before the `private` section) and overridable.
  *
- * Rails dispatches `send(key)` — the named accessor. trails keeps that for the
- * plain-host case the reviewer describes (a host whose `attributes` only names
- * keys while the values live in accessors): with no `_attributes` store the
- * named reader is dispatched (function member invoked, value member returned)
- * before falling back to `readAttribute` / the `attributes` hash. An
- * `_attributes`-backed record (the trails Model store) reads the store
- * directly — a deliberate divergence so a method-named attribute (e.g.
- * `toJSON`) serializes its value rather than invoking the method (see the
- * "attribute named toJSON does not shadow Model#toJSON" test).
+ * The literal translation of `send(key)`: a value-returning accessor/getter
+ * (a declared-attribute getter, or a plain host whose values live in accessors
+ * while `attributes` only names keys) is returned directly. Only when the named
+ * member is a *function* — meaning `key` names a method, not an attribute
+ * accessor, e.g. an `attribute("toJSON")` that cannot install a getter because
+ * `toJSON` is structurally reserved by `JSON.stringify` — or when no member
+ * responds at all (include-reached `{ _attributes }` doubles without per-key
+ * getters) is the attribute store read instead. Invoking the method would be
+ * Rails-incompatible only at the JS-runtime level (see the "attribute named
+ * toJSON does not shadow Model#toJSON" test); a genuine accessor still wins.
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
+  const reader = (record as Record<string, unknown>)[key];
+  if (reader !== undefined && typeof reader !== "function") return reader;
   const attrStore = record._attributes as AttributeStore;
   if (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") {
     return (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   } else if (attrStore instanceof Map) {
     return attrStore.get(key);
+  } else if (record.readAttribute) {
+    return record.readAttribute(key);
   }
-  // No `_attributes` store: dispatch the named reader (Rails `send(key)`) so a
-  // custom accessor / getter is honored, then fall back to the attribute store.
-  const reader = (record as Record<string, unknown>)[key];
-  if (typeof reader === "function") return (reader as () => unknown).call(record);
-  if (reader !== undefined) return reader;
-  if (record.readAttribute) return record.readAttribute(key);
   return record.attributes?.[key];
 }
 

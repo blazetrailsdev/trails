@@ -35,24 +35,20 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
  * Mirrors: ActiveModel::Validations
  * (validations.rb:437 `alias :read_attribute_for_validation :send`).
  *
- * Rails' default is `send(attr)` — it dispatches the public reader named after
- * the attribute, so a plain getter (no declared attribute) is honored.
+ * The literal translation of `send(attr)`: dispatch the public reader named
+ * after the attribute. trails exposes declared attributes as value-returning
+ * getters (which read the attribute store, exactly like the generated reader
+ * Rails' `send` would call) and custom readers as methods, so a function member
+ * is invoked (Ruby `send(:full_name)`) and a value member returned directly. A
+ * plain getter with no declared attribute is therefore honored, not read as nil.
  * `EachValidator` dispatches through any instance override (validator.ts).
- *
- * trails exposes declared attributes as value-returning getters and custom
- * readers as methods, so a function member is invoked (Ruby `send(:full_name)`)
- * and a value member returned directly. A host that responds to no such member
- * (an internal record shape without per-attribute getters) falls back to the
- * attribute store via `readAttribute`.
  */
 export function readAttributeForValidation(
   this: ReadAttributeForValidationHost,
   attribute: string,
 ): unknown {
   const reader = this[attribute];
-  if (typeof reader === "function") return (reader as () => unknown).call(this);
-  if (reader !== undefined) return reader;
-  return typeof this.readAttribute === "function" ? this.readAttribute(attribute) : reader;
+  return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
 }
 
 /**
@@ -359,7 +355,6 @@ export function predicateForValidationContext(
 /** Host shape for the {@link readAttributeForValidation} mixin method. */
 export interface ReadAttributeForValidationHost {
   [key: string]: unknown;
-  readAttribute?(name: string): unknown;
 }
 
 /**
