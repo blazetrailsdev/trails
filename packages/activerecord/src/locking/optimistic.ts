@@ -30,12 +30,36 @@ export function setLockingColumn(modelClass: typeof Base, column: string): void 
 }
 
 /**
- * Whether a model class uses optimistic locking (has a lock_version column).
+ * Whether optimistic locking is enabled for the model — the `lock_optimistically`
+ * config is on AND a lock_version column exists.
  *
  * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#locking_enabled?
+ * (`lock_optimistically && columns_hash.include?(locking_column)`).
  */
 export function lockingEnabled(modelClass: typeof Base): boolean {
-  return modelClass._attributeDefinitions.has(lockingColumn(modelClass));
+  return (
+    lockOptimistically(modelClass) &&
+    modelClass._attributeDefinitions.has(lockingColumn(modelClass))
+  );
+}
+
+/**
+ * Rails: `class_attribute :lock_optimistically, instance_writer: false,
+ * default: true` — lets a model disable optimistic locking even when a
+ * lock_version column is present. Stored in the `_lockOptimistically` class
+ * field (inherited via the prototype chain), defaulting to true.
+ *
+ * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically
+ */
+export function lockOptimistically(modelClass: typeof Base): boolean {
+  return (modelClass as any)._lockOptimistically !== false;
+}
+
+/**
+ * Mirrors: ActiveRecord::Locking::Optimistic#lock_optimistically=
+ */
+export function setLockOptimistically(modelClass: typeof Base, value: boolean): void {
+  (modelClass as any)._lockOptimistically = value;
 }
 
 /**

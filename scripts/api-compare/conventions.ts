@@ -221,29 +221,19 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "Rails `class_attribute` config that trails realizes by computation rather " +
-      "than a stored per-model slot, so there is no value to read back. " +
-      "`lock_optimistically` (default true): trails gates optimistic locking on " +
-      "presence of the lock_version column via `lockingEnabled` (optimistic.rb), " +
-      "with no per-model enable/disable toggle. `default_column_serializer` " +
-      "(default YAMLColumn): trails resolves the coder inline per call in " +
-      "`buildColumnSerializer` (serialization.rb) with no configurable class-level " +
-      "default. `default_scope_override`: trails computes it on demand by walking " +
-      "the prototype chain for the `defaultScope` owner (scoping/default.ts), " +
-      "rather than memoizing it in a class_attribute. The `=` writer / `?` " +
-      "predicate likewise have no trails caller. `lock_optimistically` and " +
-      "`default_column_serializer` are tracked-pending-convergence: trails " +
-      "hardcodes the behavior today, and porting the configurable accessor is " +
-      "scoped to follow-up stories lock-optimistically-config-accessor and " +
-      "default-column-serializer-config-accessor (RFC 0023).",
+      "DEVIATION pending convergence (not an accepted design): Rails' `serialize` " +
+      "falls back to `coder ||= default_column_serializer` (default YAMLColumn, " +
+      "serialization.rb:183-184), but trails defaults a coderless `serialize` to " +
+      "JSON (serialize.ts) and exposes no configurable class-level default, so " +
+      "callers cannot set the Rails serializer default. Converging requires " +
+      "flipping that default (≈40 serialized-attribute tests assume JSON) and is " +
+      "tracked in story default-column-serializer-config-accessor (RFC 0023). " +
+      "Skipped only to keep this api:compare pass green until that lands — the " +
+      "`?` predicate additionally has no trails caller.",
     names: [
-      "lock_optimistically",
-      "lock_optimistically=",
-      "lock_optimistically?",
       "default_column_serializer",
       "default_column_serializer=",
       "default_column_serializer?",
-      "default_scope_override",
     ],
   },
 ];

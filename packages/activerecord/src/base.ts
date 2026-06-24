@@ -257,6 +257,7 @@ import { argumentError } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
   scopeAttributes,
+  defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
 } from "./scoping.js";
 import {
@@ -991,6 +992,20 @@ export class Base extends Model {
     LockingOptimistic.setLockingColumn(this, col);
   }
 
+  /**
+   * Whether optimistic locking is enabled for this model (default true). Set to
+   * false to disable it even when a lock_version column exists.
+   *
+   * Mirrors: ActiveRecord::Base.lock_optimistically
+   */
+  static get lockOptimistically(): boolean {
+    return LockingOptimistic.lockOptimistically(this);
+  }
+
+  static set lockOptimistically(value: boolean) {
+    LockingOptimistic.setLockOptimistically(this, value);
+  }
+
   static get lockingEnabled(): boolean {
     return LockingOptimistic.lockingEnabled(this);
   }
@@ -1565,6 +1580,15 @@ export class Base extends Model {
    */
   static get normalizedAttributes(): Set<string> {
     return _normalizedAttributes(this);
+  }
+
+  /**
+   * Whether this model defines its own default_scope (vs only inheriting it).
+   *
+   * Mirrors: ActiveRecord::Base.default_scope_override
+   */
+  static get defaultScopeOverride(): boolean {
+    return _defaultScopeOverride.call(this);
   }
 
   /**
