@@ -97,6 +97,16 @@ a genuine gap:
 
 - Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails realizes dedup via the `deduplicate` free function plus the DeduplicableBase constructor, so the alias has no separate TS surface on these value objects. Scoped to the AR adapter value-object files so it can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).
   - `-@` (only in: `connection_adapters/deduplicable.rb`, `connection_adapters/column.rb`, `connection_adapters/sql_type_metadata.rb`, `connection_adapters/mysql/type_metadata.rb`, `connection_adapters/postgresql/type_metadata.rb`)
+- ActiveRecord::Delegation delegates a curated Array/Enumerable set (`delegate ... to: :records`, delegation.rb:101) and a model set (`to: :model`, delegation.rb:106). trails realizes both through the runtime delegation Proxy in relation/delegation.ts (delegateArrayMethod / delegateEnumerableMethod for records, classMethodDelegator for the model), not as named methods on Relation — Ruby-only entries (sample, rotate, in_groups, to_sentence, to_fs, as_json, …) have no JS analogue and are intentionally dropped, while the rest route through native JS names (each → forEach, index → indexOf) via the Proxy. Tracked for convergence (expose under Rails names) by story relation-delegation-rails-named-methods.
+  - `to_xml`, `each`, `join`, `sample`, `reverse`, `rotate`, `compact`, `in_groups`, `in_groups_of`, `to_sentence`, `to_fs`, `to_formatted_s`, `as_json`, `shuffle`, `split`, `index`, `rindex`, `primary_key`, `with_connection`, `connection`, `table_name`, `sanitize_sql_like` (only in: `relation.rb`, `relation/delegation.rb`)
+- Same ActiveRecord::Delegation surface as above, but these names are only an unmatched gap on the aggregate Relation class (relation.rb): the delegation.rb module compare already credits trails counterparts (e.g. delegation.ts' own name()), so the skip is scoped to relation.rb to avoid un-crediting those. Tracked for convergence by story relation-delegation-rails-named-methods.
+  - `slice`, `transaction`, `name` (only in: `relation.rb`)
+- Relation#reverse_order_value is a deferred boolean flag in Rails; trails has no such field — reverseOrderBang eagerly flips the stored order clauses (query_methods.rb reverse_sql_order semantics) at call time, so there is no value to expose. Tracked for convergence (store a deferred flag, expose the accessor) by story reverse-order-value-deferred-flag-convergence.
+  - `reverse_order_value`, `reverse_order_value=` (only in: `relation.rb`, `relation/query_methods.rb`)
+- Calculations#build_count_subquery is realized inline inside trails' performCount (calculations.ts) — the limit/offset count path builds the subquery there rather than as a separate named method.
+  - `build_count_subquery` (only in: `relation.rb`, `relation/calculations.rb`)
+- Calculations#perform_calculation is ported as the module-level free function performCalculation (calculations.ts), which matches against calculations.rb but is not an instance method on the Relation class surface that relation.rb compares against.
+  - `perform_calculation` (only in: `relation.rb`)
 
 ## Arity overrides
 
@@ -109,6 +119,8 @@ not a real signature gap:
   - `validates_size_of`
 - `match?` is `delegate :match?, to: :@name` (forwards to String#match?), so the Ruby extractor records the delegation with zero positional params while the TS port spells the real `(pattern)` signature.
   - `match?`
+- `build_having_clause` is `alias :build_having_clause :build_where_clause` (query_methods.rb:1654), so the Ruby extractor records the alias with zero positional params while the TS port spells the real `(opts, rest)` signature it forwards to build_where_clause.
+  - `build_having_clause`
 - Rails AttributeMethods compiles attribute accessors via a CodeGenerator that evals method-body strings; trails has no eval/code generation, so the port drops the `code_generator`/`parameters`/`call_args` and keyword args these helpers thread into the generated source and defines the method directly.
   - `define_proxy_call`, `define_call`
 - Static-host porting pattern (CLAUDE.md): these Rails instance/class methods are ported as free functions taking the host class explicitly as a leading `cls` param, so the TS arity is one higher than Rails. The receiver is the definitional self, not a real extra argument.
