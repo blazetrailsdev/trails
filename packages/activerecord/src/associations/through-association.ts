@@ -23,6 +23,21 @@ function transaction(
   return block();
 }
 
+/**
+ * The reflection resolving the `:source` of this `has_*_through` association.
+ *
+ * Mirrors Rails' `delegate :source_reflection, to: :reflection`
+ * (through_association.rb:7): forwards to the rich reflection's
+ * `sourceReflection` getter, resolved via the owner class' association
+ * registry (the lightweight `assoc.reflection` is a definition, so we look up
+ * the rich reflection by name first).
+ */
+export function sourceReflection(assoc: { owner: Base; reflection: { name: string } }): unknown {
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? assoc.reflection;
+  return (refl as { sourceReflection?: unknown })?.sourceReflection ?? null;
+}
+
 /** @internal */
 function throughReflection(assoc: { owner: Base; reflection: any }): unknown {
   let refl = assoc.reflection.throughReflection ?? null;
