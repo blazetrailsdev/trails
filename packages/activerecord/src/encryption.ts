@@ -437,7 +437,7 @@ export function config(): Config {
  * Called with no argument it reads; called with a value it writes.
  */
 export function encryptedAttributeDeclarationListeners(
-  ...value: [Array<(klass: any, name: string) => void> | undefined]
+  ...value: [] | [Array<(klass: any, name: string) => void> | undefined]
 ): Array<(klass: any, name: string) => void> | undefined {
   // Use arguments length (not `value !== undefined`) so the writer can clear
   // the accessor back to undefined — mirroring Rails' nil-able mattr_accessor.
