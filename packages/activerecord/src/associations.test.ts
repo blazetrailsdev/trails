@@ -1273,13 +1273,9 @@ describe("PreloaderTest", () => {
     expect(association(author, "essayCategory").loaded).toBe(true);
     // Mirrors Rails' __id__ check: the preloaded category is the *same instance*
     // taken from availableRecords, not a freshly-loaded row. Read off the real
-    // holder (RFC 0022). On this preload-with-availableRecords path the
-    // has-one-through holder currently exposes its target as a 1-element array
-    // (a pre-existing reader divergence — Rails stores the single record;
-    // tracked by `converge-has-one-through-preloaded-reader-arity`), so unwrap
-    // to the single record the singular reader should return.
-    const holderTarget = (author as any).association("essayCategory").target;
-    const preloaded = Array.isArray(holderTarget) ? holderTarget[0] : holderTarget;
+    // holder (RFC 0022) — a has_one :through holder exposes the single target
+    // record (Rails stores the single record in `@association_cache`).
+    const preloaded = (author as any).association("essayCategory").target;
     expect(categories).toContain(preloaded);
   });
 

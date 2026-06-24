@@ -2750,6 +2750,20 @@ export class Base extends Model {
    * @internal
    */
   _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
+    // A loaded *singular* holder (has_one/belongs_to, incl. has_one :through) is
+    // canonical and must win over any CollectionProxy that happens to share the
+    // name — a singular reader stores the unwrapped single record in
+    // `@association_cache`, whereas a proxy hydrated from that same holder boxes
+    // it into a 1-element array. Checking the holder first keeps the singular
+    // reader's target a single record on every preload path (RFC 0022).
+    const instance = this._associationInstances.get(name) as
+      | (AssociationInstance & {
+          isLoaded?(): boolean;
+          isCollection?(): boolean;
+          target?: Base | Base[] | null;
+        })
+      | undefined;
+    if (instance?.isLoaded?.() && instance.isCollection?.() !== true) return instance;
     const proxy = this._collectionProxies.get(name) as
       | { loaded?: boolean; target?: Base[] }
       | undefined;
@@ -2759,14 +2773,6 @@ export class Base extends Model {
     ) {
       return proxy;
     }
-    const instance = this._associationInstances.get(name) as
-      | (AssociationInstance & {
-          isLoaded?(): boolean;
-          isCollection?(): boolean;
-          target?: Base | Base[] | null;
-        })
-      | undefined;
-    if (instance?.isLoaded?.() && instance.isCollection?.() !== true) return instance;
     return undefined;
   }
 
