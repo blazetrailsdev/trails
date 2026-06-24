@@ -882,7 +882,13 @@ export class ConnectionPool implements ReapablePool {
   private _discardBang(): Array<Promise<void>> {
     if (this.isDiscarded()) return [];
     const draining: Array<Promise<void>> = [];
+    // Mirrors Rails' `@connections.each { |conn| conn.discard! }`
+    // (connection_pool.rb#discard!). `discard!` abandons the raw handle without
+    // closing it, so SQLite's adapter `discardBang` is a no-op and fires no
+    // `driver.close()`; collect any close already in flight (e.g. from a prior
+    // `disconnectBang`) so dropping `_connections` below doesn't orphan it.
     for (const conn of this._connections ?? []) {
+      (conn as unknown as { discardBang?: () => void }).discardBang?.();
       const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
       if (drain) draining.push(drain);
     }
