@@ -98,6 +98,18 @@ export class SchemaCreation {
     return this.adapterName === "postgres";
   }
 
+  /**
+   * Quote the column list for an index's `INCLUDE (...)` clause. Rails defines
+   * `quoted_include_columns` only on `PostgreSQL::SchemaCreation`, where the
+   * INCLUDE path is the sole caller (`supports_index_include?` is PG-only); the
+   * base supplies an identifier-quoting default so the shared visitor type-checks.
+   * @internal
+   */
+  protected quotedIncludeColumns(o: string | string[]): string {
+    if (typeof o === "string") return o;
+    return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+  }
+
   accept(o: Definition): string {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
     if (o instanceof AlterTable) return this.visitAlterTable(o);
@@ -205,13 +217,13 @@ export class SchemaCreation {
       parts.push(this.visitAddForeignKey(fk));
     }
     for (const name of o.foreignKeyDrops) {
-      parts.push(this.visitDropConstraint(name));
+      parts.push(this.visitDropForeignKey(name));
     }
     for (const chk of o.checkConstraintAdds) {
       parts.push(this.visitAddCheckConstraint(chk));
     }
     for (const name of o.checkConstraintDrops) {
-      parts.push(this.visitDropConstraint(name));
+      parts.push(this.visitDropCheckConstraint(name));
     }
     for (const name of o.constraintDrops) {
       parts.push(this.visitDropConstraint(name));
@@ -260,8 +272,7 @@ export class SchemaCreation {
           });
     parts.push(`(${columns})`);
     if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
-      const includeCols = index.include.map((c) => this.adapter.quoteIdentifier(c));
-      parts.push(`INCLUDE (${includeCols.join(", ")})`);
+      parts.push(`INCLUDE (${this.quotedIncludeColumns(index.include)})`);
     }
     if (this.supportsNullsNotDistinct() && index.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
     if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
