@@ -125,4 +125,16 @@ describe("PostgreSQL::OID::Range", () => {
       expect(() => type.typeCastForSchema(new Date())).toThrow(/Temporal/);
     });
   });
+
+  it("delegates user_input_in_time_zone to the subtype", () => {
+    const type = new RangeType(
+      {
+        ...integerSubtype,
+        userInputInTimeZone: (value: unknown, zone?: string) => `${String(value)}@${zone}`,
+      },
+      "tsrange",
+    );
+
+    expect(type.userInputInTimeZone("ts", "America/Los_Angeles")).toBe("ts@America/Los_Angeles");
+  });
 });

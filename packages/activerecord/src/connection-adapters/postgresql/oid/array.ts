@@ -17,11 +17,15 @@ function stableStringify(value: unknown): string {
 
 export interface ArraySubtype {
   readonly type?: string | (() => string);
+  readonly limit?: number;
+  readonly precision?: number;
+  readonly scale?: number;
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
   typeCastForSchema?(value: unknown): string;
   map?(value: unknown, block?: (value: unknown) => unknown): unknown;
+  userInputInTimeZone?(value: unknown, zone?: string): unknown;
 }
 
 export class Array extends ValueType<unknown> {
@@ -29,10 +33,27 @@ export class Array extends ValueType<unknown> {
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
 
+  // Rails: `delegate :limit, :precision, to: :subtype`. The subtype is fixed at
+  // construction, so reading it once here matches the dynamic delegation.
+  override readonly limit?: number;
+  override readonly precision?: number;
+
   constructor(subtype: ArraySubtype, delimiter: string = ",") {
     super();
     this.subtype = subtype;
     this.delimiter = delimiter;
+    this.limit = subtype.limit;
+    this.precision = subtype.precision;
+  }
+
+  /** Rails: `delegate :scale, to: :subtype`. */
+  override get scale(): number | undefined {
+    return this.subtype.scale;
+  }
+
+  /** Rails: `delegate :user_input_in_time_zone, to: :subtype`. */
+  userInputInTimeZone(value: unknown, zone?: string): unknown {
+    return this.subtype.userInputInTimeZone?.(value, zone);
   }
 
   /**

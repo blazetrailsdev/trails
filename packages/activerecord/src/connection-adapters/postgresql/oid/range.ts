@@ -60,6 +60,7 @@ export interface RangeSubtype {
   deserialize(value: unknown): unknown;
   /** @internal */
   infinity?(options?: { negative?: boolean }): unknown;
+  userInputInTimeZone?(value: unknown, zone?: string): unknown;
 }
 
 /**
@@ -77,6 +78,11 @@ export class RangeType extends ValueType<Range> {
 
   override type(): string {
     return this.name;
+  }
+
+  /** Rails: `delegate :user_input_in_time_zone, to: :subtype`. */
+  userInputInTimeZone(value: unknown, zone?: string): unknown {
+    return this.subtype.userInputInTimeZone?.(value, zone);
   }
 
   override typeCastForSchema(value: unknown): string {
@@ -166,8 +172,8 @@ export class RangeType extends ValueType<Range> {
       from:
         from === "" || from === "-infinity"
           ? this.infinity({ negative: true })
-          : unquoteRangeBound(from),
-      to: to === "" || to === "infinity" ? this.infinity() : unquoteRangeBound(to),
+          : this.unquote(from),
+      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };
@@ -175,6 +181,15 @@ export class RangeType extends ValueType<Range> {
 
   private infinity(options?: { negative?: boolean }): unknown {
     return this.subtype.infinity?.(options) ?? (options?.negative ? -Infinity : Infinity);
+  }
+
+  /**
+   * Mirrors Rails' private `unquote`. Shares the module-level
+   * {@link unquoteRangeBound} so the adapter's range parser stays in sync.
+   * @internal
+   */
+  private unquote(value: string): string {
+    return unquoteRangeBound(value);
   }
 }
 
