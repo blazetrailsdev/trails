@@ -163,11 +163,10 @@ export class JSON {
   /**
    * Mirrors: ActiveModel::Serialization#read_attribute_for_serialization
    * (serialization.rb:167 `alias :read_attribute_for_serialization :send`),
-   * inherited via `include Serialization`.
-   *
-   * @internal Rails-private helper.
+   * inherited via `include Serialization`. Public in Rails (declared before the
+   * `private` section) so callers and subclasses can override the hook.
    */
-  protected readAttributeForSerialization(key: string): unknown {
+  readAttributeForSerialization(key: string): unknown {
     return readAttributeForSerialization(this as unknown as SerializationRecord, key);
   }
 

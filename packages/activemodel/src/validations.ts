@@ -35,16 +35,24 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
  * Mirrors: ActiveModel::Validations
  * (validations.rb:437 `alias :read_attribute_for_validation :send`).
  *
- * The default reads the attribute by name (Rails' `send(attr)`);
- * ActiveRecord overrides this to resolve associations. `EachValidator`
- * dispatches through any instance override so the lookup chain stays in one
- * place (see validator.ts).
+ * Rails' default is `send(attr)` — it dispatches the public reader named after
+ * the attribute, so a plain getter (no declared attribute) is honored.
+ * `EachValidator` dispatches through any instance override (validator.ts).
+ *
+ * trails exposes declared attributes as value-returning getters and custom
+ * readers as methods, so a function member is invoked (Ruby `send(:full_name)`)
+ * and a value member returned directly. A host that responds to no such member
+ * (an internal record shape without per-attribute getters) falls back to the
+ * attribute store via `readAttribute`.
  */
 export function readAttributeForValidation(
   this: ReadAttributeForValidationHost,
   attribute: string,
 ): unknown {
-  return this.readAttribute(attribute);
+  const reader = this[attribute];
+  if (typeof reader === "function") return (reader as () => unknown).call(this);
+  if (reader !== undefined) return reader;
+  return typeof this.readAttribute === "function" ? this.readAttribute(attribute) : reader;
 }
 
 /**
@@ -350,7 +358,8 @@ export function predicateForValidationContext(
 
 /** Host shape for the {@link readAttributeForValidation} mixin method. */
 export interface ReadAttributeForValidationHost {
-  readAttribute(name: string): unknown;
+  [key: string]: unknown;
+  readAttribute?(name: string): unknown;
 }
 
 /**

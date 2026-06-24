@@ -2277,10 +2277,8 @@ export class Model {
 
   /**
    * Mirrors: ActiveModel::Serialization
-   * (`alias :read_attribute_for_serialization :send`). Reads the attribute by
-   * name; ActiveRecord overrides to resolve associations.
-   *
-   * @internal Rails-private helper.
+   * (`alias :read_attribute_for_serialization :send`). Public, overridable hook;
+   * dispatches the named reader, falling back to the attribute store.
    */
   readAttributeForSerialization(key: string): unknown {
     return serializationReadAttributeForSerialization(this as unknown as SerializationRecord, key);

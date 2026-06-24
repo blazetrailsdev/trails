@@ -748,6 +748,28 @@ describe("ValidationsTest", () => {
     expect(p.errors.get("name")).toContain("gotcha");
   });
 
+  it("validates an undeclared getter via the send default", () => {
+    // Rails' default `read_attribute_for_validation` is `send`, so a plain
+    // getter with no declared attribute is read by its accessor, not nil.
+    class Person extends Model {
+      static {
+        this.attribute("first", "string");
+      }
+      get fullName(): string {
+        return (this.readAttribute("first") as string) ?? "";
+      }
+    }
+    Person.validatesEach(["fullName"], (record, attr, value) => {
+      if (!value) record.errors.add(attr, "gotcha");
+    });
+    const present = new Person({ first: "Al" });
+    present.isValid();
+    expect(present.errors.get("fullName")).not.toContain("gotcha");
+    const blank = new Person({ first: "" });
+    blank.isValid();
+    expect(blank.errors.get("fullName")).toContain("gotcha");
+  });
+
   it("validates with array condition does not mutate the array", () => {
     class Person extends Model {
       static {

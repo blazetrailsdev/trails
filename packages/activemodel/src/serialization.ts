@@ -154,13 +154,17 @@ export interface SerializeOptions {
 /**
  * Mirrors: ActiveModel::Serialization#read_attribute_for_serialization
  * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
+ * Public in Rails (declared before the `private` section) and overridable.
  *
- * Rails reads the attribute by name via `send`; ActiveRecord overrides this
- * to resolve associations. Trails reads through the attribute store
- * fall-through (AttributeSet → Map → readAttribute → plain attributes), the
- * same chain `serializable_attributes` used inline before this hook was named.
- *
- * @internal Rails-private helper.
+ * Rails dispatches `send(key)` — the named accessor. trails keeps that for the
+ * plain-host case the reviewer describes (a host whose `attributes` only names
+ * keys while the values live in accessors): with no `_attributes` store the
+ * named reader is dispatched (function member invoked, value member returned)
+ * before falling back to `readAttribute` / the `attributes` hash. An
+ * `_attributes`-backed record (the trails Model store) reads the store
+ * directly — a deliberate divergence so a method-named attribute (e.g.
+ * `toJSON`) serializes its value rather than invoking the method (see the
+ * "attribute named toJSON does not shadow Model#toJSON" test).
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
   const attrStore = record._attributes as AttributeStore;
@@ -168,9 +172,13 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
     return (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   } else if (attrStore instanceof Map) {
     return attrStore.get(key);
-  } else if (record.readAttribute) {
-    return record.readAttribute(key);
   }
+  // No `_attributes` store: dispatch the named reader (Rails `send(key)`) so a
+  // custom accessor / getter is honored, then fall back to the attribute store.
+  const reader = (record as Record<string, unknown>)[key];
+  if (typeof reader === "function") return (reader as () => unknown).call(record);
+  if (reader !== undefined) return reader;
+  if (record.readAttribute) return record.readAttribute(key);
   return record.attributes?.[key];
 }
 
