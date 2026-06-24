@@ -9,6 +9,11 @@ export class Unary extends NodeExpression {
     this.expr = expr;
   }
 
+  // Mirrors Rails `alias :value :expr` (unary.rb:7).
+  get value(): unknown {
+    return this.expr;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
