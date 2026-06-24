@@ -35,6 +35,14 @@ export class WhereClause {
     return this.predicates.length === 0;
   }
 
+  /**
+   * Mirrors WhereClause's `delegate :any?, :empty?, to: :predicates`
+   * (where_clause.rb:8) — true when any predicate is present.
+   */
+  any(): boolean {
+    return this.predicates.length > 0;
+  }
+
   merge(other: WhereClause): WhereClause {
     // Rails: remove predicates from self that conflict with other's attributes,
     // then union with other's predicates (other wins on conflict)

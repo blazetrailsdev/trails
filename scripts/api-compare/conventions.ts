@@ -233,6 +233,80 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "connection_adapters/postgresql/type_metadata.rb",
     ],
   },
+  {
+    reason:
+      "ActiveRecord::Delegation delegates a curated Array/Enumerable set " +
+      "(`delegate ... to: :records`, delegation.rb:101) and a model set " +
+      "(`to: :model`, delegation.rb:106). trails realizes both through the " +
+      "runtime delegation Proxy in relation/delegation.ts (delegateArrayMethod / " +
+      "delegateEnumerableMethod for records, classMethodDelegator for the model), " +
+      "not as named methods on Relation — Ruby-only entries (sample, rotate, " +
+      "in_groups, to_sentence, to_fs, as_json, …) have no JS analogue and are " +
+      "intentionally dropped, while the rest route through native JS names " +
+      "(each → forEach, index → indexOf) via the Proxy.",
+    names: [
+      "to_xml",
+      "each",
+      "join",
+      "sample",
+      "reverse",
+      "rotate",
+      "compact",
+      "in_groups",
+      "in_groups_of",
+      "to_sentence",
+      "to_fs",
+      "to_formatted_s",
+      "as_json",
+      "shuffle",
+      "split",
+      "index",
+      "rindex",
+      "primary_key",
+      "with_connection",
+      "connection",
+      "table_name",
+      "sanitize_sql_like",
+    ],
+    rubyFiles: ["relation.rb", "relation/delegation.rb"],
+  },
+  {
+    reason:
+      "Same ActiveRecord::Delegation surface as above, but these names are only " +
+      "an unmatched gap on the aggregate Relation class (relation.rb): the " +
+      "delegation.rb module compare already credits trails counterparts (e.g. " +
+      "delegation.ts' own name()), so the skip is scoped to relation.rb to avoid " +
+      "un-crediting those. `klass` is Relation's own accessor (relation.rb), " +
+      "realized as the private _modelClass field rather than a named method.",
+    names: ["slice", "transaction", "name", "klass"],
+    rubyFiles: ["relation.rb"],
+  },
+  {
+    reason:
+      "Relation#reverse_order_value is a deferred boolean flag in Rails; trails " +
+      "has no such field — reverseOrderBang eagerly flips the stored order " +
+      "clauses (query_methods.rb reverse_sql_order semantics) at call time, so " +
+      "there is no value to expose.",
+    names: ["reverse_order_value", "reverse_order_value="],
+    rubyFiles: ["relation.rb", "relation/query_methods.rb"],
+  },
+  {
+    reason:
+      "Calculations#build_count_subquery is realized inline inside trails' " +
+      "performCount (calculations.ts) — the limit/offset count path builds the " +
+      "subquery there rather than as a separate named method.",
+    names: ["build_count_subquery"],
+    rubyFiles: ["relation.rb", "relation/calculations.rb"],
+  },
+  {
+    reason:
+      "Calculations#perform_calculation is ported as the module-level free " +
+      "function performCalculation (calculations.ts), which matches against " +
+      "calculations.rb but is not an instance method on the Relation class " +
+      "surface that relation.rb compares against.",
+    names: ["perform_calculation"],
+    rubyFiles: ["relation.rb"],
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
@@ -289,6 +363,15 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
   },
   {
     reason:
+      "`build_having_clause` is `alias :build_having_clause :build_where_clause` " +
+      "(query_methods.rb:1654), so the Ruby extractor records the alias with zero " +
+      "positional params while the TS port spells the real `(opts, rest)` signature " +
+      "it forwards to build_where_clause.",
+    names: ["build_having_clause"],
+    rubyFiles: ["relation/query_methods.rb", "relation.rb"],
+  },
+  {
+    reason:
       "Rails AttributeMethods compiles attribute accessors via a CodeGenerator that " +
       "evals method-body strings; trails has no eval/code generation, so the port " +
       "drops the `code_generator`/`parameters`/`call_args` and keyword args these " +
@@ -330,6 +413,7 @@ for (const g of ARITY_OVERRIDE_GROUPS) {
 export function isArityOverridden(rubyName: string, rubyFile: string): boolean {
   return ARITY_OVERRIDE_FILES.get(rubyName)?.has(rubyFile) ?? false;
 }
+
 
 /**
  * Camel-prefixes that are *already* predicates, so the bare camel form is the

@@ -4419,6 +4419,115 @@ export class Relation<T extends Base> {
     return this._whereClause;
   }
 
+  // The remaining `VALUE_METHODS.each`-generated accessors (query_methods.rb:162):
+  // Rails reads `@values.fetch(:<name>, default)`; trails keeps each value in a
+  // dedicated private field, so every accessor is a thin getter over that field.
+  // The matching `*=` setters camelize to the same name as the getter
+  // (`includes_values=` → `includesValues`), so a getter alone satisfies both.
+
+  /** Mirrors: ActiveRecord::Relation#includes_values */
+  get includesValues(): AssociationSpec[] {
+    return [...this._includesAssociations];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#eager_load_values */
+  get eagerLoadValues(): AssociationSpec[] {
+    return [...this._eagerLoadAssociations];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#preload_values */
+  get preloadValues(): AssociationSpec[] {
+    return [...this._preloadAssociations];
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation#joins_values — Rails stores every `.joins`
+   * argument (association names and raw SQL/Arel joins) in one array; trails
+   * splits them into `_namedInnerJoins` (resolved through JoinDependency) and
+   * `_joinValues` (raw string/Arel), so the accessor recombines them.
+   */
+  get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
+    return [...this._namedInnerJoins, ...this._joinValues];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
+  get leftOuterJoinsValues(): AssociationSpec[] {
+    return [...this._leftOuterJoinsValues];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#references_values */
+  get referencesValues(): string[] {
+    return [...this._referencesValues];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#extending_values */
+  get extendingValues(): Array<Record<string, (...args: any[]) => any>> {
+    return [...this._extending];
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation#extensions — `alias extensions
+   * extending_values` (query_methods.rb:183), so it returns the same array.
+   */
+  get extensions(): Array<Record<string, (...args: any[]) => any>> {
+    return this.extendingValues;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#unscope_values */
+  get unscopeValues(): Array<string | { where: string | string[] }> {
+    return [...this._unscopeValues];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#optimizer_hints_values */
+  get optimizerHintsValues(): string[] {
+    return [...this._optimizerHints];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#annotate_values */
+  get annotateValues(): string[] {
+    return [...this._annotations];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#with_values */
+  get withValues(): Array<{ name: string; expression: Nodes.Node; recursive: boolean }> {
+    return [...this._ctes];
+  }
+
+  /** Mirrors: ActiveRecord::Relation#readonly_value */
+  get readonlyValue(): boolean {
+    return this._isReadonly;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#reordering_value */
+  get reorderingValue(): boolean {
+    return this._reordering;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#strict_loading_value */
+  get strictLoadingValue(): boolean | undefined {
+    return this._isStrictLoading;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#create_with_value */
+  get createWithValue(): Record<string, unknown> {
+    return { ...this._createWithAttrs };
+  }
+
+  /** Mirrors: ActiveRecord::Relation#skip_query_cache_value */
+  get skipQueryCacheValue(): boolean {
+    return this._skipQueryCache;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#having_clause (CLAUSE_METHODS). */
+  get havingClause(): WhereClause {
+    return this._havingClause;
+  }
+
+  /** Mirrors: ActiveRecord::Relation#from_clause (CLAUSE_METHODS). */
+  get fromClause(): FromClause {
+    return this._fromClause;
+  }
+
   // -- Collection convenience methods --
 
   /**
@@ -6133,6 +6242,14 @@ export class Relation<T extends Base> {
     return records.some((r) => r.isEqual(record));
   }
 
+  /**
+   * Alias of {@link include} — mirrors `alias :member? :include?`
+   * (finder_methods.rb:407).
+   */
+  member(record: T): Promise<boolean> {
+    return this.include(record);
+  }
+
   // ---------------------------------------------------------------------------
   // Missing relation.rb methods — accessors, cache keys, scoping
   // ---------------------------------------------------------------------------
@@ -6744,6 +6861,15 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private buildWhereClause(opts: unknown, rest: unknown[] = []): unknown {
+    return _qm.buildWhereClause.call(this as any, opts, rest);
+  }
+
+  /**
+   * Mirrors `alias :build_having_clause :build_where_clause`
+   * (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
+   * @internal
+   */
+  private buildHavingClause(opts: unknown, rest: unknown[] = []): unknown {
     return _qm.buildWhereClause.call(this as any, opts, rest);
   }
 
