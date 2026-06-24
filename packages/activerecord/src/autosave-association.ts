@@ -1078,18 +1078,20 @@ export async function saveCollectionAssociation(
   //     records -= records_to_destroy
   // Gated on `autosave` (reflection.options[:autosave]) — a plain collection
   // never destroys marked children on owner save. Route each marked-for-
-  // destruction persisted child through the collection-level `destroy` (not
-  // record-level `child.destroy`) so the `before_remove`/`after_remove`
-  // callbacks fire and the record is pruned from the in-memory target. Snapshot
-  // first since `inst.destroy` splices the live target as it removes each
-  // record; new (unpersisted) records are left for the save loop, which skips
-  // them.
+  // destruction child through the collection-level `destroy` (not record-level
+  // `child.destroy`) so the `before_remove`/`after_remove` callbacks fire and
+  // the record is pruned from the in-memory target. A built (unpersisted) child
+  // is destroyed too: `delete_or_destroy`/`remove_records`
+  // (collection_association.rb:385-408) still runs the remove callbacks and
+  // splices `@target` even when `existing_records` is empty (no DB delete).
+  // Snapshot first since `inst.destroy` splices the live target as it removes
+  // each record.
   const autosave = reflection.options?.autosave;
   const inst = _loadedAssociation(owner, reflection.name);
   if (autosave && inst && typeof inst.destroy === "function") {
     const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
     for (const child of snapshot) {
-      if (isMarkedForDestruction(child) && !child.isNewRecord()) {
+      if (isMarkedForDestruction(child)) {
         await inst.destroy(child);
       }
     }
