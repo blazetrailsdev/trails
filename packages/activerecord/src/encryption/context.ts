@@ -75,6 +75,10 @@ export function getDefaultContext(): EncryptionContext {
   return _defaultContext;
 }
 
+export function setDefaultContext(context: EncryptionContext): void {
+  _defaultContext = context;
+}
+
 export function resetDefaultContext(): void {
   _defaultContext = {};
 }

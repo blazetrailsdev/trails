@@ -31,8 +31,11 @@ import { Contexts } from "./encryption/contexts.js";
 import {
   withoutEncryption as _withoutEncryption,
   getEncryptionContext,
+  getDefaultContext,
+  setDefaultContext,
   type EncryptionContext,
 } from "./encryption/context.js";
+import type { Config } from "./encryption/config.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -423,6 +426,27 @@ export function eagerLoadBang(): void {
 
 // ─── Delegation to Configurable (included into Encryption in Rails) ──────────
 
+/** Mirrors: ActiveRecord::Encryption.config (mattr_reader from Configurable) */
+export function config(): Config {
+  return Configurable.config;
+}
+
+/**
+ * Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
+ * (configurable.rb:11), exposed on Encryption via the Configurable concern.
+ * Called with no argument it reads; called with a value it writes.
+ */
+export function encryptedAttributeDeclarationListeners(
+  ...value: [] | [Array<(klass: any, name: string) => void> | undefined]
+): Array<(klass: any, name: string) => void> | undefined {
+  // Use arguments length (not `value !== undefined`) so the writer can clear
+  // the accessor back to undefined — mirroring Rails' nil-able mattr_accessor.
+  if (value.length > 0) {
+    Configurable.encryptedAttributeDeclarationListeners = value[0];
+  }
+  return Configurable.encryptedAttributeDeclarationListeners;
+}
+
 /** Mirrors: ActiveRecord::Encryption.configure */
 export function configure(options: Parameters<typeof Configurable.configure>[0]): void {
   Configurable.configure(options);
@@ -465,6 +489,18 @@ export function context(): EncryptionContext {
 /** Mirrors: ActiveRecord::Encryption.current_custom_context */
 export function currentCustomContext(): EncryptionContext | null {
   return Contexts.currentCustomContext;
+}
+
+/**
+ * Mirrors Rails' `mattr_accessor :default_context` (contexts.rb:17), exposed
+ * on Encryption via the Contexts concern. Called with no argument it reads;
+ * called with a value it writes.
+ */
+export function defaultContext(value?: EncryptionContext): EncryptionContext {
+  if (value !== undefined) {
+    setDefaultContext(value);
+  }
+  return getDefaultContext();
 }
 
 /** @internal */

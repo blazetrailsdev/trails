@@ -58,6 +58,9 @@ export {
   // withEncryptionContext/withoutEncryption/protectingEncryptedData/resetDefaultContext
   // are already re-exported from context.ts above.
   configure,
+  config,
+  defaultContext,
+  encryptedAttributeDeclarationListeners,
   onEncryptedAttributeDeclared,
   encryptedAttributeWasDeclared,
   context,
