@@ -2724,25 +2724,25 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   const sharedTracker = plan.aliases ?? buildMergedJoinAliasTracker(this as any);
   const references = (this as any)._aliasableReferences();
 
-  // Rails build_joins (query_methods.rb:1893-1896) emits ALL named association
+  // Rails build_joins (query_methods.rb:1881-1897) emits ALL named association
   // joins — joins_values (InnerJoin) plus the folded left_outer JoinDependency —
-  // through a SINGLE `join_dependency.join_constraints(stashed_joins, …)` call,
-  // so an association joined both ways (`joins(:posts).left_outer_joins(:posts)`)
-  // dedups via `walk` to one INNER JOIN.
-  if (this._namedInnerJoins.length > 0) {
-    const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
+  // through a SINGLE `construct_join_dependency(named_joins, join_type)` whose
+  // `join_constraints(stashed_joins, …)` folds the stash in one call, so an
+  // association joined both ways (`joins(:posts).left_outer_joins(:posts)`)
+  // dedups via `walk` to one INNER JOIN. `join_type` is InnerJoin normally,
+  // OuterJoin in the pure-left-outer short-circuit (no joins_values). The guard
+  // mirrors `unless named_joins.empty? && stashed_joins.empty?`; when named_joins
+  // is empty but the stash is not, Rails still builds an empty
+  // `construct_join_dependency([], InnerJoin)` and folds the stash into it.
+  const [namedJoins, joinType] =
+    this._namedInnerJoins.length > 0
+      ? ([this._namedInnerJoins, Nodes.InnerJoin] as const)
+      : plan.namedJoins.length > 0
+        ? ([plan.namedJoins, Nodes.OuterJoin] as const)
+        : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
+  if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
+    const jd = constructJoinDependency.call(this, namedJoins, joinType);
     for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker, references))
-      manager.appendJoinNode(node);
-  } else if (plan.namedJoins.length > 0) {
-    // Pure left-outer-only short-circuit (no joins_values): named_join → OuterJoin.
-    const jd = constructJoinDependency.call(this, plan.namedJoins, Nodes.OuterJoin);
-    for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker, references))
-      manager.appendJoinNode(node);
-  } else if (plan.stashedJoins.length > 0) {
-    // Stashed join dependencies only (eager_load or a standalone left_outer JD):
-    // the first is primary, the rest fold in (mirrors build_joins:1896).
-    const [primary, ...rest] = plan.stashedJoins;
-    for (const node of primary.joinConstraints(rest, sharedTracker, references))
       manager.appendJoinNode(node);
   }
 
