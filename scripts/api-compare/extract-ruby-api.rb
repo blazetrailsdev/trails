@@ -922,8 +922,12 @@ class ApiExtractor
         methods = info[bucket]
         by_name = {}
         methods.each { |m| by_name[m[:name]] ||= m }
-        # Bounded passes resolve alias chains; converges well before the cap.
-        8.times do
+        # Fixpoint: each non-breaking pass fills at least one previously-empty
+        # alias (filled aliases are skipped on later passes), so the count of
+        # unresolved aliases strictly decreases and the loop always terminates —
+        # no arbitrary iteration cap. Handles alias-of-an-alias chains
+        # regardless of source order.
+        loop do
           changed = false
           methods.each do |m|
             next unless m[:notes] == "alias" && m[:alias_target]
