@@ -15452,13 +15452,6 @@
     "package": "activerecord",
     "tsFile": "associations/association.ts",
     "rubyName": "inversable?",
-    "call": "matches_foreign_key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association.ts",
-    "rubyName": "inversable?",
     "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
