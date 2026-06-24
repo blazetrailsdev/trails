@@ -5,6 +5,7 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
+import { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
 
 export class NullSchemaMigration {
@@ -25,7 +26,6 @@ export class NullSchemaMigration {
 }
 
 export class SchemaMigration {
-  static readonly TABLE_NAME = "schema_migrations";
   private _adapter: DatabaseAdapter;
   readonly arelTable: Table;
 
@@ -38,8 +38,10 @@ export class SchemaMigration {
     return "version";
   }
 
+  // Rails: "#{Base.table_name_prefix}#{Base.schema_migrations_table_name}
+  // #{Base.table_name_suffix}" (schema_migration.rb:50).
   get tableName(): string {
-    return SchemaMigration.TABLE_NAME;
+    return `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`;
   }
 
   async createTable(): Promise<void> {

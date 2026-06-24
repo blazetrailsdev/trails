@@ -3966,17 +3966,11 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  // The default connected role. Rails sets `default_role = writing_role`
-  // (core.rb:250); `currentRole` falls back to it when no `connected_to`
-  // frame applies.
+  // The default connected role, its own class_attribute in Rails (distinct from
+  // `writing_role`), seeded to `writing_role` at load (core.rb:250). `currentRole`
+  // falls back to it when no `connected_to` frame applies (core.rb:165).
   // Mirrors: ActiveRecord::Core.default_role (core.rb:100).
-  static get defaultRole(): string {
-    return this.writingRole;
-  }
-
-  static set defaultRole(value: string) {
-    this.writingRole = value;
-  }
+  static defaultRole: string = WRITING_ROLE;
 
   // When true, `belongs_to` associations are required (validate presence)
   // unless `optional: true`. Read by associations/builder/belongs-to.ts.
@@ -4009,6 +4003,27 @@ export class Base extends Model {
   // `first`/`last`). nil by default. Read by relation/finder-methods.ts.
   // Mirrors: ActiveRecord::ModelSchema.implicit_order_column (model_schema.rb:169).
   static implicitOrderColumn: string | null = null;
+
+  // When true (the Rails default), inferred table names are pluralized. Read by
+  // model-schema.ts (undecoratedTableName / containedTableNamePrefix).
+  // Mirrors: ActiveRecord::ModelSchema.pluralize_table_names (model_schema.rb:168).
+  static pluralizeTableNames = true;
+
+  // The unprefixed name of the table tracking run migrations. Composed with
+  // tableNamePrefix/Suffix by SchemaMigration. Mirrors Rails default.
+  // Mirrors: ActiveRecord::ModelSchema.schema_migrations_table_name (model_schema.rb:166).
+  static schemaMigrationsTableName = "schema_migrations";
+
+  // The unprefixed name of the internal metadata table. Composed with
+  // tableNamePrefix/Suffix by InternalMetadata. Mirrors Rails default.
+  // Mirrors: ActiveRecord::ModelSchema.internal_metadata_table_name (model_schema.rb:167).
+  static internalMetadataTableName = "ar_internal_metadata";
+
+  // When true, string attribute types reflected from the schema are made
+  // immutable (StringType#toImmutableString). nil/false by default. Read by
+  // model-schema.ts column-type resolution.
+  // Mirrors: ActiveRecord::ModelSchema.immutable_strings_by_default (model_schema.rb:170).
+  static immutableStringsByDefault = false;
 
   /** The value stored in a polymorphic `*_type` column for this class —
    * the full namespaced name when `storeFullClassName`, else demodulized.

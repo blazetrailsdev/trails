@@ -396,7 +396,9 @@ export function currentRole(this: CoreHost): string {
       return entry.role;
     }
   }
-  return WRITING_ROLE;
+  // Rails: current_role falls back to default_role (core.rb:165), a
+  // class_attribute seeded to writing_role.
+  return (this as CoreHost & { defaultRole?: string }).defaultRole ?? WRITING_ROLE;
 }
 
 export function currentShard(this: CoreHost): string {
