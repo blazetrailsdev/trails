@@ -122,11 +122,17 @@ async function gemspecPaths(cloneRoot: string): Promise<string[]> {
 
 /** Gem-level add/remove between the base pin and the target ref, derived from
  *  each ref's monorepo subgem list. Surfaces whole-gem drift that
- *  `diffManifests` can't see (it only diffs gems present in both manifests). */
-async function gemListDelta(baseRef: string, targetClone: string) {
-  const { dest: baseClone } = await fetchRef(baseRef);
+ *  `diffManifests` can't see (it only diffs gems present in both manifests).
+ *  The base list comes from the vendored source `api:compare` already fetched
+ *  (`vendor/rails`, the exact pin `rails-api.json` was extracted from) — not a
+ *  re-clone — so it can't disagree with the base manifest. */
+async function gemListDelta(targetClone: string) {
+  const baseSource = join(ROOT, "vendor", RAILS!.name);
+  if (!existsSync(baseSource)) {
+    throw new Error(`missing ${baseSource} — run \`pnpm api:compare\` first`);
+  }
   const [baseGems, targetGems] = await Promise.all([
-    gemspecPaths(baseClone).then(gemNamesFromPaths),
+    gemspecPaths(baseSource).then(gemNamesFromPaths),
     gemspecPaths(targetClone).then(gemNamesFromPaths),
   ]);
   return diffGemList(baseGems, targetGems);
@@ -147,7 +153,7 @@ export async function runDrift(ref: string): Promise<string> {
   const drift = annotateAgainstTs(diffManifests(base, target), ts);
   // Whole-gem add/remove is invisible to diffManifests; derive it from the
   // monorepo subgem list at each ref so a bump that adds or drops a gem shows up.
-  const gemDelta = await gemListDelta(RAILS!.origin.ref, dest);
+  const gemDelta = await gemListDelta(dest);
   const report = {
     baseRef: RAILS!.origin.ref,
     targetRef: ref,
