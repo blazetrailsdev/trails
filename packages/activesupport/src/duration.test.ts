@@ -65,6 +65,13 @@ describe("Numeric helpers (functional equivalents of Rails numeric extensions)",
   });
 });
 
+describe("Duration", () => {
+  it("test_unary_plus", () => {
+    expect(seconds(1).identity().inSeconds()).toBe(seconds(1).inSeconds());
+    expect(seconds(1).identity()).toBeInstanceOf(Duration);
+  });
+});
+
 describe("Scalar", () => {
   it("wraps a numeric value", () => {
     const s = new Scalar(42);
