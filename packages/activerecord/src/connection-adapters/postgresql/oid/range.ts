@@ -80,9 +80,13 @@ export class RangeType extends ValueType<Range> {
     return this.name;
   }
 
-  /** Rails: `delegate :user_input_in_time_zone, to: :subtype`. */
+  /**
+   * Rails: `delegate :user_input_in_time_zone, to: :subtype`. A real delegation
+   * calls the subtype method (or raises if absent), so call directly rather
+   * than optional-chaining to `undefined`.
+   */
   userInputInTimeZone(value: unknown, zone?: string): unknown {
-    return this.subtype.userInputInTimeZone?.(value, zone);
+    return this.subtype.userInputInTimeZone!(value, zone);
   }
 
   override typeCastForSchema(value: unknown): string {

@@ -33,27 +33,32 @@ export class Array extends ValueType<unknown> {
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
 
-  // Rails: `delegate :limit, :precision, to: :subtype`. The subtype is fixed at
-  // construction, so reading it once here matches the dynamic delegation.
-  override readonly limit?: number;
-  override readonly precision?: number;
-
   constructor(subtype: ArraySubtype, delimiter: string = ",") {
     super();
     this.subtype = subtype;
     this.delimiter = delimiter;
-    this.limit = subtype.limit;
-    this.precision = subtype.precision;
   }
 
-  /** Rails: `delegate :scale, to: :subtype`. */
+  /** Rails: `delegate :limit, :precision, :scale, to: :subtype` — live read-through. */
+  override get limit(): number | undefined {
+    return this.subtype.limit;
+  }
+
+  override get precision(): number | undefined {
+    return this.subtype.precision;
+  }
+
   override get scale(): number | undefined {
     return this.subtype.scale;
   }
 
-  /** Rails: `delegate :user_input_in_time_zone, to: :subtype`. */
+  /**
+   * Rails: `delegate :user_input_in_time_zone, to: :subtype`. A real delegation
+   * calls the subtype method (or raises if absent), so call directly rather
+   * than optional-chaining to `undefined`.
+   */
   userInputInTimeZone(value: unknown, zone?: string): unknown {
-    return this.subtype.userInputInTimeZone?.(value, zone);
+    return this.subtype.userInputInTimeZone!(value, zone);
   }
 
   /**

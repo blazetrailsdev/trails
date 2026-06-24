@@ -1,22 +1,32 @@
 export abstract class Type<T = unknown> {
   abstract readonly name: string;
-  readonly precision?: number;
-  readonly limit?: number;
+  #precision?: number;
+  #limit?: number;
   protected readonly _scale?: number;
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
-    if (options?.precision !== undefined) this.precision = options.precision;
+    if (options?.precision !== undefined) this.#precision = options.precision;
     if (options?.scale !== undefined) this._scale = options.scale;
-    if (options?.limit !== undefined) this.limit = options.limit;
+    if (options?.limit !== undefined) this.#limit = options.limit;
   }
 
   /**
-   * Rails defines `scale` as a method (`def scale; @scale; end`) so
-   * subclasses like OID::Money can override with a constant value.
-   * Expose it as a getter here so subclass `override get scale()` works.
+   * Rails defines `precision`, `limit` and `scale` as `attr_reader`s
+   * (value.rb:11-21), so subclasses — e.g. OID::Array's
+   * `delegate :limit, :precision, :scale, to: :subtype` — override them with
+   * live read-through methods. Expose them as getters here so subclass
+   * `override get …()` works (a getter cannot override a plain field in TS).
    */
+  get precision(): number | undefined {
+    return this.#precision;
+  }
+
   get scale(): number | undefined {
     return this._scale;
+  }
+
+  get limit(): number | undefined {
+    return this.#limit;
   }
 
   isSerializable(_value: unknown): boolean {
