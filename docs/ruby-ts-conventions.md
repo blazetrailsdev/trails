@@ -26,6 +26,7 @@ matches the first candidate present in the target file), not a call expression.
 | `to_s` / `to_str`                                                                                                        | `toString`                           | `to_s` → `toString`                                   |
 | `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
 | `to_sql`                                                                                                                 | `toSql`                              | `to_sql` → `toSql`                                    |
+| `-@` (unary minus)                                                                                                       | `negate`                             | `-@` → `negate`                                       |
 | everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
 Predicate-form details: `is_*?` collapses to a single candidate so trails can't
@@ -82,6 +83,15 @@ api:compare never expects a TS counterpart for these Ruby methods:
   - `any_schema_needs_update?`, `db_configs_in_current_env`, `load_schema!`
 - Migrator internal index helpers — Rails stores @target_version / @direction as instance variables; our TS Migrator passes them as method parameters instead, so these zero-arg helpers can't be faithfully ported.
   - `target`, `start`, `finish`
+
+## Scoped skipped methods
+
+api:compare skips these Ruby methods, but only within the listed files — they
+have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
+a genuine gap:
+
+- Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails realizes dedup via the `deduplicate` free function plus the DeduplicableBase constructor, so the alias has no separate TS surface on these value objects. Scoped to the AR adapter value-object files so it can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).
+  - `-@` (only in: `connection_adapters/deduplicable.rb`, `connection_adapters/column.rb`, `connection_adapters/sql_type_metadata.rb`, `connection_adapters/mysql/type_metadata.rb`, `connection_adapters/postgresql/type_metadata.rb`)
 
 ## Arity overrides
 

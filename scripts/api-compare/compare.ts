@@ -58,7 +58,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
-import { isArityOverridden, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { isArityOverridden, isScopedSkip, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
@@ -652,8 +652,10 @@ export function dedupeRubyMethodInto(
   seen: Map<string, { rubyName: string; rubyModule: string }>,
   rm: MethodInfo,
   itemFqn: string,
+  rubyFile?: string,
 ): void {
   if (rubyMethodToTs(rm.name) === null) return;
+  if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
   if (!seen.has(key)) {
     seen.set(key, { rubyName: rm.name, rubyModule: itemFqn });
@@ -1239,7 +1241,7 @@ export function main() {
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;
-          dedupeRubyMethodInto(seen, rm, item.fqn);
+          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
           if (!rubyParamsByName.has(rm.name)) rubyParamsByName.set(rm.name, rm.params);
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
