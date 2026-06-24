@@ -3578,13 +3578,14 @@ export class Base extends Model {
       await (this as any).destroyAssociations();
 
       const table = ctor.arelTable;
-      const pk = this.id;
       // Mirrors Rails Persistence#destroy: `@_trigger_destroy_callback ||=
-      // persisted? && destroy_row > 0` (persistence.rb:457) — the DELETE only
-      // runs when the record is persisted. A new record (even one with an
-      // assigned primary key) runs callbacks/freeze but must NOT emit a DELETE,
-      // otherwise it would remove an existing row that happens to share the id.
-      if (this.isPersisted() && !(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
+      // persisted? && destroy_row > 0` (persistence.rb:457). The DELETE runs
+      // iff the record is persisted — a new record (even one with an assigned
+      // primary key) runs callbacks/freeze but emits no DELETE. When persisted,
+      // `destroy_row` always calls `_delete_record(_query_constraints_hash)`
+      // (persistence.rb:866-871) with no id-present guard, so query-constraints
+      // models (and nil-in-database PKs) still issue the DELETE.
+      if (this.isPersisted()) {
         // Mirrors Rails Persistence#destroy → _delete_record(_query_constraints_hash):
         // WHERE targets each query-constraint column's `*_in_database` value (the
         // primary key keyed to `id_in_database` when no query_constraints are
