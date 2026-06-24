@@ -60,7 +60,7 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
     "call": "save",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): trails splits Rails' synchronous `HasOneAssociation#replace` (which saves the new record inside `transaction_if(save)` for a persisted owner -- has_one_association.rb:66-79) into a sync `replace` that records `_pendingReplace` plus an async `persistReplace` that performs `pending.record.save()`. The awaitable `writer` returns `persistReplace()` immediately for a persisted owner (has-one-association.ts:52-55 -- the Rails-faithful immediate persist); the sync property-setter `queueWrite`/new-owner path defers the same `persistReplace` to the owner's next save via `flushPendingReplaces`. Either way the save lands in `persistReplace`, not literally inside `replace`, so the extractor flags it -- false positive, no omission."
   },
   {
     "package": "activerecord",
@@ -95,42 +95,42 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "save_belongs_to_association",
     "call": "destroy",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveBelongsToAssociation` delegates to `_autosaveBelongsTo`, which destroys a marked-for-destruction persisted target via `assocRecord.destroy()` after nulling the owner FK, mirroring save_belongs_to_association (autosave_association.rb:544-547). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_belongs_to_association",
     "call": "save",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveBelongsToAssociation` delegates to `_autosaveBelongsTo`, which saves the new/changed target via `assocRecord.save({validate:!autosave})`, mirroring save_belongs_to_association (autosave_association.rb:553). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
     "call": "destroy",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Tracked pending convergence (RFC 0044, autosave-association-save-destroy-cluster -> story autosave-collection-destroy-via-association-destroy): the autosave collection destroy loop destroys marked-for-destruction persisted children via record-level `child.destroy()` (autosave-association.ts autosaveHasMany:397, autosaveHabtm:850), so the DB destroy IS reached and autosave persistence is not silently dropped. Rails' save_collection_association instead calls `association.destroy(record)` (autosave_association.rb:431-434), which also fires before_remove/after_remove and removes the record from the in-memory collection target. trails already has that association-level path (collection-association.ts:302 `destroy`) but the autosave loop does not yet route through it (doing so naively would mutate `inst.target` mid-iteration); iteration-snapshot-safe convergence with a Rails-named test is deferred to the registered story."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
     "call": "save",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveCollectionAssociation` delegates to the `autosaveHasMany` helper, which saves new/changed children via `child.save({validate:false})` (through `_insertCollectionRecord`/`insertRecord`), mirroring save_collection_association (autosave_association.rb:446-456). The call-set extractor scopes to the Ruby-named function body and does not follow the delegation, so the save reads as missing \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_has_one_association",
     "call": "destroy",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which destroys a marked-for-destruction persisted child via `childRecord.destroy()`, mirroring save_has_one_association (autosave_association.rb:483). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_has_one_association",
     "call": "save",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which saves the changed child via `childRecord.save({validate:false})`, mirroring save_has_one_association (autosave_association.rb:503). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
