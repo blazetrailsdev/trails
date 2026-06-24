@@ -483,7 +483,11 @@ export class PredicateBuilder {
 
   /** @internal */
   private _buildRangeEqualityOrNull(attribute: Nodes.Attribute, value: Range): Nodes.Node | null {
-    type TypeLike = { isForceEquality?(v: unknown): boolean } | null | undefined;
+    type CastLike = { cast(v: unknown): unknown; serialize(v: unknown): unknown };
+    type TypeLike =
+      | ({ isForceEquality?(v: unknown): boolean } & Partial<CastLike>)
+      | null
+      | undefined;
     const lookups = [
       () => {
         const rel = (attribute as unknown as { relation?: unknown }).relation;
@@ -504,7 +508,17 @@ export class PredicateBuilder {
         // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
         // bind value (e.g. a `Range`) serializes to its pg literal string via the
         // adapter's `typeCast` in the bind path (`type_casted_binds`).
-        return attribute.eq(this.buildBindAttribute(attribute.name, value));
+        //
+        // Construct the bind with the SAME type object that made the branch true
+        // (`table.type(attribute.name)` in Rails). A joined/aliased range attribute
+        // may be typed on `attribute.relation` / `_tableContext` but not on
+        // `this.table`, so deferring to `buildBindAttribute`'s `this.table` lookup
+        // would bind through the identity type and skip `RangeType#serialize`.
+        const castType =
+          t.cast && t.serialize
+            ? (t as CastLike)
+            : { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+        return attribute.eq(new QueryAttribute(attribute.name, value, castType));
       }
     }
     return null;
