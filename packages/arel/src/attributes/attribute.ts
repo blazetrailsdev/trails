@@ -80,8 +80,9 @@ export interface RelationLike {
   // table) renders bare; `quoteTableName` returns its value unchanged.
   name: string | SqlLiteral;
   // `TableAlias#table_alias` aliases `:name`, which may be a `SqlLiteral`
-  // (Arel::Nodes::Unary `alias :table_alias :name`); `Table#tableAlias` is a
-  // plain string-or-nil. Both flow through here as `o.relation.table_alias`.
+  // (Arel::Nodes::TableAlias `alias :table_alias :name`, table_alias.rb); a
+  // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
+  // `o.relation.table_alias`.
   tableAlias?: string | SqlLiteral | null;
   typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
   typeForAttribute?: (name: string) => unknown;
