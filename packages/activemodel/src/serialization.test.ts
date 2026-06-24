@@ -44,6 +44,21 @@ describe("SerializationTest", () => {
     expect(readAttributeForSerialization(host, "name")).toBe("FRESH");
   });
 
+  it("read_attribute_for_serialization honors an overridden attribute reader (send)", () => {
+    // Rails `send(:name)` calls the reader, so a model overriding a declared
+    // attribute's getter serializes the override, not the raw store value.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      get name(): string {
+        return "OVERRIDE:" + (this.readAttribute("name") as string);
+      }
+    }
+    const p = new Person({ name: "Bob" });
+    expect(p.serializableHash()).toEqual({ name: "OVERRIDE:Bob" });
+  });
+
   it("read_attribute_for_serialization invokes a method reader (send), not the attributes hash", () => {
     // Rails' `send(:name)` calls the `name` method; a plain host with a method
     // reader must serialize its return, not a stale `attributes[:name]`.

@@ -156,39 +156,47 @@ export interface SerializeOptions {
  * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
  * Public in Rails (declared before the `private` section) and overridable.
  *
- * Mirrors `send(key)`. An `_attributes`-backed record (the trails Model / AR
- * store) reads its store directly: for these, every serialized key comes from
- * `attribute_names_for_serialization` (i.e. the store), the store value equals
- * what the generated reader `send` would call returns, and a method-named
- * attribute (e.g. `attribute("toJSON")`, which cannot install a getter because
- * `toJSON` is structurally reserved by `JSON.stringify`) must read its value
- * rather than invoke the method — a JS-runtime-only divergence pinned by the
- * "attribute named toJSON does not shadow Model#toJSON" test.
+ * Mirrors `send(key)`, keying off member *existence* (`key in record`, the JS
+ * analog of `respond_to?`): a reader that exists and returns `undefined` yields
+ * `undefined` (nil) rather than raising; a value member (getter / data property,
+ * including a user override of a declared attribute's reader) is returned and a
+ * function member (`def name; …; end` / `attr_accessor :name`) is invoked.
  *
- * For a host with a per-key reader this is literal `send`: it keys off member
- * *existence* (`key in record`, the JS analog of `respond_to?`), so a reader
- * that exists and returns `undefined` yields `undefined` (nil) rather than
- * raising. A function member is invoked (`def name; …; end` / `attr_accessor
- * :name`); a value member (getter / data property) is returned.
+ * The one divergence: on an `_attributes`-backed record (trails Model / AR), a
+ * *function*-valued member means `key` names a method, not an attribute reader
+ * — e.g. `attribute("toJSON")`, which cannot install a getter because `toJSON`
+ * is structurally reserved by `JSON.stringify`; invoking it would recurse
+ * infinitely. Such keys read the store instead (pinned by the "attribute named
+ * toJSON does not shadow Model#toJSON" test). A value-returning getter still
+ * wins, so a reader override is honored; only method-named attributes divert.
  *
- * When the host exposes no per-key reader, trails' `ActiveModel::Serializers::
- * JSON` host contract surfaces values through the `attributes` hash (the
- * `attributes`-getter pattern its mixin tests pin across several model shapes,
- * where `attributes` is the only data source). `readAttribute` / the
- * `attributes` hash therefore back the named reader before a name with no
- * reader and no attribute entry raises like `send`'s `NoMethodError`. A real
- * Rails-shaped model never reaches this tier — its declared attributes are
- * `_attributes`-backed (the store branch above) or carry generated readers.
+ * When a storeless host exposes no per-key reader, trails'
+ * `ActiveModel::Serializers::JSON` host contract surfaces values through the
+ * `attributes` hash (the `attributes`-getter pattern its mixin tests pin across
+ * several model shapes, where `attributes` is the only data source). That hash
+ * backs the named reader before a name with no reader and no attribute entry
+ * raises like `send`'s `NoMethodError`. A real Rails-shaped model never reaches
+ * this tier — its declared attributes carry readers or are `_attributes`-backed.
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
   const attrStore = record._attributes as AttributeStore;
-  if (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") {
-    return (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
-  } else if (attrStore instanceof Map) {
-    return attrStore.get(key);
+  const hasStore =
+    (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
+    attrStore instanceof Map;
+  const reader = (record as Record<string, unknown>)[key];
+
+  if (hasStore) {
+    // `send(key)`: a value-returning reader (generated getter or user override)
+    // wins. A function member is a method-named attribute (toJSON) that must
+    // read its stored value, not be invoked — and an absent getter (getterless
+    // declared attribute) also reads the store.
+    if (typeof reader !== "function" && key in (record as object)) return reader;
+    return attrStore instanceof Map
+      ? attrStore.get(key)
+      : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   }
+
   if (key in (record as object)) {
-    const reader = (record as Record<string, unknown>)[key];
     return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
   }
   if (record.readAttribute) return record.readAttribute(key);
