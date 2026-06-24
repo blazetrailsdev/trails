@@ -31,12 +31,16 @@ added/removed, per-method signature changes, visibility flips, and call-set
 (body) deltas. Signature deltas include changes to non-primitive default values
 (e.g. `{}` → `{ a: 1 }`), not just primitive literals.
 
-**Limitation — package granularity:** the diff only covers packages both
+**Package granularity:** the class/method diff only covers packages both
 manifests carry. Both extractions run over the same `sources.ts` rails package
 set, so a one-sided package is an extraction asymmetry (the base manifest also
-holds non-rails gems like rack/globalid), not real drift — it's skipped. A
-Rails bump that adds or removes a whole gem won't surface until that gem is
-added to `sources.ts`; scope it by eyeballing the upstream `Gemfile` diff.
+holds non-rails gems like rack/globalid), not real drift — it's skipped at that
+level. To catch whole-gem add/remove without manual `Gemfile` eyeballing, the
+report also carries `addedPackages`/`removedPackages`: the delta of the rails
+monorepo subgem list (each ref's `*/*.gemspec` plus the root `rails.gemspec`)
+between the base pin and the target ref. Gems outside the monorepo (rack,
+globalid) never appear in either list, so they're not reported as removed.
+Auto-adding a discovered gem to `sources.ts` stays a manual decision.
 
 Each entry carries a `ported` flag (from `output/ts-api.json`) so drift in
 surface **we ported** is separable from churn we never touched.
