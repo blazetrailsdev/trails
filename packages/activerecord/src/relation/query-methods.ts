@@ -752,6 +752,104 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
   "with",
 ]);
 
+/**
+ * Value keys accepted by `SpawnMethods#except` — Rails' `Relation::VALUE_METHODS`.
+ * A superset of `UnscopeType`: it additionally covers value keys that have no
+ * `unscope` equivalent (`distinct`, `strictLoading`, `references`, `extending`,
+ * `unscope`, `reordering`, `skipQueryCache`), mirroring
+ * `relation_with values.except(*skips)`.
+ *
+ * Rails' `:reverse_order` is omitted: trails applies `reverseOrder` eagerly
+ * (it flips `_orderClauses` in place rather than storing a `reverse_order`
+ * value), so there is no stored value key to remove.
+ */
+export type ExceptKey =
+  | UnscopeType
+  | "distinct"
+  | "strictLoading"
+  | "references"
+  | "extending"
+  | "unscope"
+  | "reordering"
+  | "skipQueryCache";
+
+/**
+ * Reset a single value-key to its default, with no merge-replay side effect.
+ *
+ * Shared by `unscope!` (which additionally records the key in
+ * `_unscopeValues` so a later merge re-applies the reset) and
+ * `SpawnMethods#except` (which removes the value only, mirroring Rails'
+ * `relation_with values.except(*skips)` — no `unscope_values` directive).
+ */
+export function resetValueForScope(host: QueryMethodsHost, scope: UnscopeType): void {
+  switch (scope) {
+    case "where":
+      host._whereClause = WhereClause.empty();
+      break;
+    case "order":
+      host._orderClauses = [];
+      break;
+    case "limit":
+      host._limitValue = null;
+      break;
+    case "offset":
+      host._offsetValue = null;
+      break;
+    case "group":
+      host._groupColumns = [];
+      break;
+    case "having":
+      host._havingClause = WhereClause.empty();
+      break;
+    case "select":
+      host._selectColumns = null;
+      break;
+    case "lock":
+      host._lockValue = null;
+      break;
+    case "readonly":
+      host._isReadonly = false;
+      break;
+    case "from":
+      host._fromClause = FromClause.empty();
+      break;
+    case "joins":
+      host._joinClauses = [];
+      host._joinValues = [];
+      host._namedInnerJoins = [];
+      break;
+    case "leftOuterJoins":
+      host._joinClauses = host._joinClauses.filter((j) => j.type !== "left");
+      host._leftOuterJoinsValues = [];
+      break;
+    case "includes":
+      // Rails: `unscope(:includes)` clears includes only — preload
+      // and eager_load are independent and have their own keys
+      // below (matches Rails `query_methods.rb` switch on
+      // :includes / :preload / :eager_load).
+      host._includesAssociations = [];
+      break;
+    case "preload":
+      host._preloadAssociations = [];
+      break;
+    case "eagerLoad":
+      host._eagerLoadAssociations = [];
+      break;
+    case "createWith":
+      host._createWithAttrs = {};
+      break;
+    case "optimizerHints":
+      host._optimizerHints = [];
+      break;
+    case "annotate":
+      host._annotations = [];
+      break;
+    case "with":
+      host._ctes = [];
+      break;
+  }
+}
+
 function unscopeBang(
   this: QueryMethodsHost,
   ...types: Array<string | { where: string | string[] }>
@@ -770,72 +868,7 @@ function unscopeBang(
           `Called unscope() with invalid unscoping argument '${scope}'. Valid arguments are: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
         );
       }
-      switch (scope as UnscopeType) {
-        case "where":
-          this._whereClause = WhereClause.empty();
-          break;
-        case "order":
-          this._orderClauses = [];
-          break;
-        case "limit":
-          this._limitValue = null;
-          break;
-        case "offset":
-          this._offsetValue = null;
-          break;
-        case "group":
-          this._groupColumns = [];
-          break;
-        case "having":
-          this._havingClause = WhereClause.empty();
-          break;
-        case "select":
-          this._selectColumns = null;
-          break;
-        case "lock":
-          this._lockValue = null;
-          break;
-        case "readonly":
-          this._isReadonly = false;
-          break;
-        case "from":
-          this._fromClause = FromClause.empty();
-          break;
-        case "joins":
-          this._joinClauses = [];
-          this._joinValues = [];
-          this._namedInnerJoins = [];
-          break;
-        case "leftOuterJoins":
-          this._joinClauses = this._joinClauses.filter((j) => j.type !== "left");
-          this._leftOuterJoinsValues = [];
-          break;
-        case "includes":
-          // Rails: `unscope(:includes)` clears includes only — preload
-          // and eager_load are independent and have their own keys
-          // below (matches Rails `query_methods.rb` switch on
-          // :includes / :preload / :eager_load).
-          this._includesAssociations = [];
-          break;
-        case "preload":
-          this._preloadAssociations = [];
-          break;
-        case "eagerLoad":
-          this._eagerLoadAssociations = [];
-          break;
-        case "createWith":
-          this._createWithAttrs = {};
-          break;
-        case "optimizerHints":
-          this._optimizerHints = [];
-          break;
-        case "annotate":
-          this._annotations = [];
-          break;
-        case "with":
-          this._ctes = [];
-          break;
-      }
+      resetValueForScope(this, scope as UnscopeType);
     } else if (rawScope && typeof rawScope === "object") {
       for (const [key, target] of Object.entries(rawScope)) {
         if (key !== "where") {
@@ -1727,7 +1760,9 @@ export function buildSubquery(
   subqueryAlias: string,
   selectValue: unknown,
 ): SelectManager {
-  // Rails: except(:optimizer_hints).arel.as(alias) — use unscope (our except is SQL EXCEPT, not query-part removal)
+  // Rails: except(:optimizer_hints).arel.as(alias) — call unscope directly. (Note:
+  // Relation#except is the value-key remover and is NOT unscope; here we want the
+  // unscope semantics, so we call unscope explicitly.)
   const relation =
     typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
   if (typeof relation.toArel !== "function") {

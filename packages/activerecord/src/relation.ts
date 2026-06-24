@@ -61,6 +61,7 @@ import {
   arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
   type UnscopeType,
+  type ExceptKey,
   type AssociationSpec,
   type OrderArg,
 } from "./relation/query-methods.js";
@@ -1636,14 +1637,68 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * EXCEPT with another relation.
+   * SQL `EXCEPT` set operation with another relation.
    *
-   * Mirrors: ActiveRecord::Relation#except_
+   * trails-only — Rails has no `EXCEPT` set-operation method (it exposes
+   * `union`/`union_all`/`intersect` only). This is the SQL set-operation
+   * sibling of {@link union}/{@link intersect}; the bare `except` name is
+   * reserved for Rails' `SpawnMethods#except` value-key remover below.
+   *
+   * @internal No Rails equivalent.
    */
-  except(other?: Relation<T>): Relation<T> {
+  exceptRelation(other?: Relation<T>): Relation<T> {
     if (!other) return this._clone();
     const rel = this._clone();
     rel._setOperation = { type: "except", other };
+    return rel;
+  }
+
+  /**
+   * Remove the specified query parts, keeping everything else.
+   *
+   * Mirrors: ActiveRecord::SpawnMethods#except — `relation_with
+   * values.except(*skips)`. Unlike `unscope`, this only removes the value
+   * from the returned relation; it does NOT record an `unscope_values`
+   * directive, so merging the result does not erase the same parts on the
+   * other relation.
+   */
+  except(...skips: Array<ExceptKey>): Relation<T> {
+    const rel = this._clone();
+    for (const skip of skips) {
+      switch (skip) {
+        // Value keys that have no `unscope` equivalent (they are not in
+        // VALID_UNSCOPING_VALUES) but are part of Rails' `Relation::VALUE_METHODS`,
+        // so `values.except(*skips)` removes them too.
+        case "distinct":
+          rel._isDistinct = false;
+          break;
+        case "strictLoading":
+          rel._isStrictLoading = false;
+          break;
+        case "references":
+          // `:references` is a single Rails value key; trails splits its local
+          // representation into the values list and the manual-vs-derived
+          // marker, so both must be cleared together.
+          rel._referencesValues = [];
+          rel._manualReferences = [];
+          break;
+        case "extending":
+          rel._extending = [];
+          break;
+        case "unscope":
+          rel._unscopeValues = [];
+          break;
+        case "reordering":
+          rel._reordering = false;
+          break;
+        case "skipQueryCache":
+          rel._skipQueryCache = false;
+          break;
+        default:
+          _qm.resetValueForScope(rel as any, skip);
+          break;
+      }
+    }
     return rel;
   }
 

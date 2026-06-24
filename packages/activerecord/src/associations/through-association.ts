@@ -184,12 +184,14 @@ export function throughTargetScope(
     //   :eager_load, :joins, :left_outer_joins)` — strip query parts that
     // would conflict with the JOIN-based target query (e.g. a `select` on
     // the through model would otherwise shadow the target's columns).
-    if (interScope && typeof (interScope as { unscope?: unknown }).unscope === "function") {
+    // Must be `except` (value removal), not `unscope`: the result is merged
+    // into `scope`, and `unscope` would replay the resets onto `scope`.
+    if (interScope && typeof (interScope as { except?: unknown }).except === "function") {
       interScope = (
         interScope as {
-          unscope: (...keys: string[]) => unknown;
+          except: (...keys: string[]) => unknown;
         }
-      ).unscope(
+      ).except(
         "select",
         "createWith",
         "includes",
