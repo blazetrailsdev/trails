@@ -9,7 +9,7 @@ import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
-import { DatabaseTasks } from "./database-tasks.js";
+import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
 const ER_DB_CREATE_EXISTS = 1007;
@@ -153,15 +153,15 @@ export class MySQLDatabaseTasks {
     const dbName = this.requireDatabaseName();
     const adapter = new Mysql2Adapter({ ...this.buildAdapterConfig(), database: dbName });
     try {
+      const bookkeeping = metadataTableNames();
       const rows = (await adapter.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
-          "AND table_type = 'BASE TABLE' " +
-          "AND table_name NOT IN ('schema_migrations', 'ar_internal_metadata')",
+          "AND table_type = 'BASE TABLE'",
         [dbName],
       )) as Array<{ table_name?: string; TABLE_NAME?: string }>;
       const names = rows
         .map((r) => r.table_name ?? r.TABLE_NAME)
-        .filter((n): n is string => typeof n === "string");
+        .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));
       if (names.length === 0) return;
       await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 0");
       try {

@@ -55,18 +55,21 @@ export function resolveTableName(this: typeof Base): string {
   const prefix = fullTableNamePrefix.call(this as any);
   const suffix = fullTableNameSuffix.call(this as any);
   const contained = containedTableNamePrefix.call(this as any);
-  const inferred = undecoratedTableName(qualifiedName(this as any));
+  const pluralizes = (this as any).pluralizeTableNames ?? true;
+  const inferred = undecoratedTableName(qualifiedName(this as any), pluralizes);
   return `${prefix}${contained}${inferred}${suffix}`;
 }
 
 /**
  * Guesses the table name, but does not decorate it with prefix and suffix.
+ * Pluralizes only when `pluralize_table_names` is on (Rails default).
  *
  * @internal
  */
-function undecoratedTableName(modelName: string): string {
+function undecoratedTableName(modelName: string, pluralizes = true): string {
   const demodulized = modelName.split("::").pop() ?? modelName;
-  return pluralize(underscore(demodulized));
+  const base = underscore(demodulized);
+  return pluralizes ? pluralize(base) : base;
 }
 
 /**
@@ -76,15 +79,18 @@ function undecoratedTableName(modelName: string): string {
  * Mirrors model_schema.rb:608-612.
  *
  * Rails guards the `singularize` with `if module_parent.pluralize_table_names`
- * (model_schema.rb:610). trails has no `pluralize_table_names` toggle — it is
- * always on (Rails' default) — so the singularize is unconditional here.
+ * (model_schema.rb:610), so the singularize honors the parent's toggle here too.
  */
 function containedTableNamePrefix(this: typeof Base): string {
   const moduleName = (this as any).moduleName as string | undefined;
   if (!moduleName) return "";
   const parent = modelRegistry.get(moduleName);
   if (!parent || getAbstractClass.call(parent as any)) return "";
-  return `${singularize(parent.tableName)}_`;
+  const contained =
+    ((parent as any).pluralizeTableNames ?? true)
+      ? singularize(parent.tableName)
+      : parent.tableName;
+  return `${contained}_`;
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +931,15 @@ function applyColumnsHash(
         ? adapter.lookupCastTypeFromColumn(column)
         : null;
     let type = (castType as Type | null) ?? typeRegistry.lookup("value");
+
+    // Rails type_for_column: convert string types to their immutable variant
+    // when `immutable_strings_by_default` is set (model_schema.rb:623-626).
+    // Only mutable StringType responds to toImmutableString, mirroring
+    // Ruby's `type.respond_to?(:to_immutable_string)` guard.
+    if ((host as { immutableStringsByDefault?: boolean }).immutableStringsByDefault) {
+      const toImmutable = (type as { toImmutableString?: () => Type }).toImmutableString;
+      if (typeof toImmutable === "function") type = toImmutable.call(type);
+    }
 
     type = host.hookAttributeType?.(name, type) ?? type;
 

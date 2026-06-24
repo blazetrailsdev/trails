@@ -111,9 +111,16 @@ describe("MySQLDatabaseTasks", () => {
       }
       async execute(sql: string, binds?: unknown[], _name?: string) {
         executeCalls.push({ sql, binds });
-        // information_schema.tables result — returns three user tables
-        // plus the two bookkeeping tables that truncateAll must skip.
-        return [{ table_name: "widgets" }, { table_name: "posts" }, { table_name: "comments" }];
+        // information_schema.tables result — three user tables plus the two
+        // bookkeeping tables that truncateAll must skip (it subtracts the
+        // configured names in JS, mirroring Rails truncate_tables).
+        return [
+          { table_name: "widgets" },
+          { table_name: "posts" },
+          { table_name: "comments" },
+          { table_name: "schema_migrations" },
+          { table_name: "ar_internal_metadata" },
+        ];
       }
       async executeMutation(sql: string, _binds?: unknown[], _name?: string) {
         mutationCalls.push(sql);
@@ -142,9 +149,6 @@ describe("MySQLDatabaseTasks", () => {
     // Exactly one information_schema query with the db name bound.
     expect(executeCalls).toHaveLength(1);
     expect(executeCalls[0].sql).toMatch(/FROM information_schema\.tables/i);
-    expect(executeCalls[0].sql).toMatch(
-      /table_name NOT IN \('schema_migrations', 'ar_internal_metadata'\)/,
-    );
     expect(executeCalls[0].binds).toEqual(["trails_test"]);
 
     // FK checks toggled around per-table truncates.
@@ -153,6 +157,9 @@ describe("MySQLDatabaseTasks", () => {
     expect(mutationCalls).toContain("TRUNCATE TABLE `widgets`");
     expect(mutationCalls).toContain("TRUNCATE TABLE `posts`");
     expect(mutationCalls).toContain("TRUNCATE TABLE `comments`");
+    // The bookkeeping rows returned by the mock are excluded.
+    expect(mutationCalls).not.toContain("TRUNCATE TABLE `schema_migrations`");
+    expect(mutationCalls).not.toContain("TRUNCATE TABLE `ar_internal_metadata`");
 
     // Adapter was closed.
     expect(closeMock).toHaveBeenCalledTimes(1);

@@ -15,7 +15,7 @@ import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
-import { DatabaseTasks } from "./database-tasks.js";
+import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
@@ -239,10 +239,12 @@ export class PostgreSQLDatabaseTasks {
           password: c.password as string | undefined,
         });
     try {
-      const rows = (await adapter.execute(
-        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' " +
-          "AND tablename NOT IN ('schema_migrations', 'ar_internal_metadata')",
-      )) as Array<{ tablename: string }>;
+      const bookkeeping = metadataTableNames();
+      const rows = (
+        (await adapter.execute(
+          "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+        )) as Array<{ tablename: string }>
+      ).filter((r) => !bookkeeping.has(r.tablename));
       if (rows.length === 0) return;
       const quoted = rows.map((r) => `"${r.tablename.replace(/"/g, '""')}"`).join(", ");
       await adapter.executeMutation(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);

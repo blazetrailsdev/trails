@@ -20,6 +20,7 @@ import type { SchemaStatements } from "./connection-adapters/abstract/schema-sta
 import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { Base } from "./base.js";
 import { Duration } from "@blazetrails/activesupport";
 
 // Lazy-load schema-introspection to break the static cycle
@@ -579,7 +580,14 @@ export class SchemaDumper {
     this._language = lang;
     this._version = typeof options.version === "string" ? options.version : undefined;
     const subclassIgnore = (this.constructor as typeof SchemaDumper).ignoreTables ?? [];
-    this._ignoreTables = ["schema_migrations", "ar_internal_metadata", ...subclassIgnore];
+    // Rails seeds @ignore_tables from the configurable bookkeeping table names
+    // (schema_dumper.rb:78-80) so a renamed schema_migrations/ar_internal_metadata
+    // table is still excluded from the dump.
+    this._ignoreTables = [
+      Base.schemaMigrationsTableName,
+      Base.internalMetadataTableName,
+      ...subclassIgnore,
+    ];
   }
 
   /** @internal */

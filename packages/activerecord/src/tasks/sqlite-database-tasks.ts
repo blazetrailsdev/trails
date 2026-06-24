@@ -20,7 +20,7 @@ import {
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks } from "./database-tasks.js";
+import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
 
 /**
@@ -230,10 +230,12 @@ export class SQLiteDatabaseTasks {
   async truncateAll(): Promise<void> {
     const { adapter, owned } = await this.adapterForOperation();
     try {
-      const rows = (await adapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' " +
-          "AND name <> 'schema_migrations' AND name <> 'ar_internal_metadata'",
-      )) as Array<{ name: string }>;
+      const bookkeeping = metadataTableNames();
+      const rows = (
+        (await adapter.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        )) as Array<{ name: string }>
+      ).filter((r) => !bookkeeping.has(r.name));
       const withFks = adapter as DatabaseAdapter & {
         disableReferentialIntegrity?: (fn: () => Promise<void>) => Promise<void>;
       };

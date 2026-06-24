@@ -1361,13 +1361,26 @@ describe("MigrationTest", () => {
   });
 
   it("schema migrations table name", () => {
-    // In our memory adapter, table naming is based on the model class name
-    class SchemaVersion extends Base {
-      static {
-        this.attribute("version", "string");
-      }
+    const { adapter } = freshContext();
+    const schemaMigration = new SchemaMigration(adapter);
+    const originalTableName = Base.schemaMigrationsTableName;
+    const savedPrefix = Base.tableNamePrefix;
+    const savedSuffix = Base.tableNameSuffix;
+    try {
+      expect(schemaMigration.tableName).toBe("schema_migrations");
+      Base.tableNamePrefix = "prefix_";
+      Base.tableNameSuffix = "_suffix";
+      expect(schemaMigration.tableName).toBe("prefix_schema_migrations_suffix");
+      Base.schemaMigrationsTableName = "changed";
+      expect(schemaMigration.tableName).toBe("prefix_changed_suffix");
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+      expect(schemaMigration.tableName).toBe("changed");
+    } finally {
+      Base.schemaMigrationsTableName = originalTableName;
+      Base.tableNamePrefix = savedPrefix;
+      Base.tableNameSuffix = savedSuffix;
     }
-    expect(SchemaVersion.tableName).toBeDefined();
   });
 
   it("internal metadata stores environment", () => {
@@ -1811,8 +1824,27 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata table name", async () => {
+    const { adapter } = freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
-    expect(InternalMetadata.TABLE_NAME).toBe("ar_internal_metadata");
+    const internalMetadata = new InternalMetadata(adapter);
+    const originalTableName = Base.internalMetadataTableName;
+    const savedPrefix = Base.tableNamePrefix;
+    const savedSuffix = Base.tableNameSuffix;
+    try {
+      expect(internalMetadata.tableName).toBe("ar_internal_metadata");
+      Base.tableNamePrefix = "p_";
+      Base.tableNameSuffix = "_s";
+      expect(internalMetadata.tableName).toBe("p_ar_internal_metadata_s");
+      Base.internalMetadataTableName = "changed";
+      expect(internalMetadata.tableName).toBe("p_changed_s");
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+      expect(internalMetadata.tableName).toBe("changed");
+    } finally {
+      Base.internalMetadataTableName = originalTableName;
+      Base.tableNamePrefix = savedPrefix;
+      Base.tableNameSuffix = savedSuffix;
+    }
   });
 
   it("internal metadata stores environment when migration fails", async () => {

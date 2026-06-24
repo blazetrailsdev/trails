@@ -6,6 +6,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
+import { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import {
   Table,
@@ -44,7 +45,6 @@ export class NullInternalMetadata {
 }
 
 export class InternalMetadata {
-  static readonly TABLE_NAME = "ar_internal_metadata";
   private _connection: DatabaseAdapter;
   readonly arelTable: Table;
 
@@ -60,8 +60,10 @@ export class InternalMetadata {
     return "value";
   }
 
+  // Rails: "#{Base.table_name_prefix}#{Base.internal_metadata_table_name}
+  // #{Base.table_name_suffix}" (internal_metadata.rb:32).
   get tableName(): string {
-    return InternalMetadata.TABLE_NAME;
+    return `${Base.tableNamePrefix}${Base.internalMetadataTableName}${Base.tableNameSuffix}`;
   }
 
   private _enabled: boolean;
