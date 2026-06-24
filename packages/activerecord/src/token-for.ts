@@ -194,6 +194,29 @@ export function generatesTokenFor(
     });
   }
 
+  // Rails declares `token_definitions` / `generated_token_verifier` as class
+  // accessors read via `defining_class.generated_token_verifier` and
+  // `model.token_definitions.fetch(...)`. token-for.ts is excluded from the main
+  // barrel (BC-3: it pulls in node:crypto), so — like the methods below — these
+  // are wired onto the model class lazily here rather than eagerly on Base.
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "tokenDefinitions")) {
+    Object.defineProperty(modelClass, "tokenDefinitions", {
+      get(this: typeof Base): Readonly<Record<string, TokenDefinition>> {
+        return tokenDefinitions(this);
+      },
+      configurable: true,
+    });
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "generatedTokenVerifier")) {
+    Object.defineProperty(modelClass, "generatedTokenVerifier", {
+      get(this: typeof Base): MessageVerifier {
+        return generatedTokenVerifier(this);
+      },
+      configurable: true,
+    });
+  }
+
   if (!(modelClass as any).findByTokenFor) {
     Object.defineProperty(modelClass, "findByTokenFor", {
       value: async function (

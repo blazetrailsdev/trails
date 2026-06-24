@@ -183,7 +183,10 @@ import {
   idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
-import { normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn } from "./normalization.js";
+import {
+  normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn,
+  normalizedAttributes as _normalizedAttributes,
+} from "./normalization.js";
 import {
   toKey as _toKey,
   getId as _getId,
@@ -1540,6 +1543,15 @@ export class Base extends Model {
    */
   static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
     return _signedIdVerifierSecret();
+  }
+
+  /**
+   * Set of attribute names with a registered normalizer.
+   *
+   * Mirrors: ActiveRecord::Base.normalized_attributes
+   */
+  static get normalizedAttributes(): Set<string> {
+    return _normalizedAttributes(this);
   }
 
   // -- Encrypted attributes --
