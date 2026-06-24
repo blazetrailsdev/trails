@@ -300,9 +300,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected quotedIncludeColumns(o: string | string[]): string {
+  protected quotedIncludeColumnsForIndex(o: string | string[]): string {
     if (typeof o === "string") return o;
     return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+  }
+
+  /**
+   * Rails' private `quoted_include_columns` short-circuits on a raw string and
+   * otherwise routes through `quoted_include_columns_for_index`
+   * (postgresql/schema_creation.rb).
+   * @internal
+   */
+  protected quotedIncludeColumns(o: string | string[]): string {
+    return this.quotedIncludeColumnsForIndex(o);
   }
 
   /** @internal */

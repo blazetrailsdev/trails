@@ -174,8 +174,8 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("quotedIncludeColumns + tableModifierInCreate", () => {
-    expect(s().quotedIncludeColumns("a, b")).toBe("a, b");
-    expect(s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
+    expect(s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
+    expect(s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
     expect(s().tableModifierInCreate({ temporary: true })).toBe(" TEMPORARY");
     expect(s().tableModifierInCreate({ unlogged: true })).toBe(" UNLOGGED");
     expect(s().tableModifierInCreate({})).toBe("");

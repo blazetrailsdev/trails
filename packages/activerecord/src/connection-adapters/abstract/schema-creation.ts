@@ -64,6 +64,40 @@ export class SchemaCreation {
     return this.adapterName === "postgres";
   }
 
+  // Quoting delegations. Rails declares these as `delegate ... to: :@conn`
+  // (abstract/schema_creation.rb:16-19); here `@conn` is the {@link SchemaQuoter}
+  // threaded in as `this.adapter`. `quote_column_name` maps to `quoteIdentifier`.
+
+  /** @internal */
+  protected quoteColumnName(name: string): string {
+    return this.adapter.quoteIdentifier(name);
+  }
+
+  /** @internal */
+  protected quoteTableName(name: string): string {
+    return this.adapter.quoteTableName(name);
+  }
+
+  /** @internal */
+  protected quoteDefaultExpression(value: unknown, column?: unknown): string {
+    return this.adapter.quoteDefaultExpression(value, column);
+  }
+
+  /** @internal */
+  protected supportsIndexesInCreate(): boolean {
+    return this.adapterName === "mysql";
+  }
+
+  /** @internal */
+  protected supportsExclusionConstraints(): boolean {
+    return this.adapterName === "postgres";
+  }
+
+  /** @internal */
+  protected supportsUniqueConstraints(): boolean {
+    return this.adapterName === "postgres";
+  }
+
   accept(o: Definition): string {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
     if (o instanceof AlterTable) return this.visitAlterTable(o);
@@ -441,6 +475,16 @@ export class SchemaCreation {
   /** @internal */
   protected visitDropConstraint(name: string): string {
     return `DROP CONSTRAINT ${this.adapter.quoteIdentifier(name)}`;
+  }
+
+  /** @internal */
+  protected visitDropForeignKey(name: string): string {
+    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
+  }
+
+  /** @internal */
+  protected visitDropCheckConstraint(name: string): string {
+    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
   }
 
   /** @internal */

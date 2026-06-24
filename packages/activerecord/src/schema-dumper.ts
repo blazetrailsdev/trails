@@ -557,6 +557,12 @@ export class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
   /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
   static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
+  /** @internal Mirrors Rails' `SchemaDumper.chk_ignore_pattern`. */
+  static chkIgnorePattern: RegExp = /^chk_rails_[0-9a-f]{10}$/;
+  /** @internal Mirrors Rails' `SchemaDumper.excl_ignore_pattern`. */
+  static exclIgnorePattern: RegExp = /^excl_rails_[0-9a-f]{10}$/;
+  /** @internal Mirrors Rails' `SchemaDumper.unique_ignore_pattern`. */
+  static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
