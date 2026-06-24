@@ -193,6 +193,14 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
+      "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
+      "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
+      "realizes dedup via the `deduplicate` free function plus the " +
+      "DeduplicableBase constructor, so the alias has no separate TS surface.",
+    names: ["-@"],
+  },
+  {
+    reason:
       "Migrator internal index helpers — Rails stores @target_version / " +
       "@direction as instance variables; our TS Migrator passes them as method " +
       "parameters instead, so these zero-arg helpers can't be faithfully ported.",

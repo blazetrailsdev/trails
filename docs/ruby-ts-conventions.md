@@ -80,6 +80,8 @@ api:compare never expects a TS counterpart for these Ruby methods:
   - `lookup_cast_type`
 - CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and the ActiveRecord::Tasks infrastructure that has no JS equivalent.
   - `any_schema_needs_update?`, `db_configs_in_current_env`, `load_schema!`
+- Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails realizes dedup via the `deduplicate` free function plus the DeduplicableBase constructor, so the alias has no separate TS surface.
+  - `-@`
 - Migrator internal index helpers — Rails stores @target_version / @direction as instance variables; our TS Migrator passes them as method parameters instead, so these zero-arg helpers can't be faithfully ported.
   - `target`, `start`, `finish`
 
