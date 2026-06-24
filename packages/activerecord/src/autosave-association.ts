@@ -311,76 +311,18 @@ export function clearAutosaveState(record: Base): void {
 // Validate & autosave (called from Base.isValid and Base.save)
 // ---------------------------------------------------------------------------
 
-const _autosavingRecords = new WeakSet<object>();
-
-export async function autosaveBelongsTo(record: Base): Promise<boolean> {
-  if (_autosavingRecords.has(record)) return true;
-  _autosavingRecords.add(record);
-
-  try {
-    const ctor = record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-
-    for (const assoc of associations) {
-      if (!assoc.options.autosave) continue;
-      if (assoc.type !== "belongsTo") continue;
-      const result = await autosaveAssociation(record, assoc);
-      if (!result) return false;
-    }
-    return true;
-  } finally {
-    _autosavingRecords.delete(record);
-  }
-}
-
-export async function autosaveChildren(record: Base): Promise<boolean> {
-  if (_autosavingRecords.has(record)) return true;
-  _autosavingRecords.add(record);
-
-  try {
-    const ctor = record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-
-    for (const assoc of associations) {
-      if (!assoc.options.autosave) continue;
-      if (assoc.type === "belongsTo") continue;
-      const result = await autosaveAssociation(record, assoc);
-      if (!result) return false;
-    }
-    return true;
-  } finally {
-    _autosavingRecords.delete(record);
-  }
-}
-
-export async function autosaveAssociations(record: Base): Promise<boolean> {
-  const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-
-  for (const assoc of associations) {
-    if (!assoc.options.autosave) continue;
-    const result = await autosaveAssociation(record, assoc);
-    if (!result) return false;
-  }
-  return true;
-}
-
 // ---------------------------------------------------------------------------
 // Private save helpers
+//
+// The live save path reaches these through the per-association callbacks
+// registered in `addAutosaveAssociationCallbacks`:
+//   - collections (hasMany + HABTM): `saveCollectionAssociation` ->
+//     `autosaveHasMany`. HABTM reflections route here as a hasMany-typed def,
+//     mirroring Rails, which backs `has_and_belongs_to_many` with
+//     `has_many :through` and runs `save_collection_association` for both.
+//   - hasOne: `saveHasOneAssociation` -> `autosaveHasOne`.
+//   - belongsTo: `saveBelongsToAssociation` -> `_autosaveBelongsTo`.
 // ---------------------------------------------------------------------------
-
-async function autosaveAssociation(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  // Each type-specific handler does its own `_loadedAssociation` lookup and
-  // short-circuits on a null target — no need for a dispatch-level gate.
-  if (assoc.type === "hasMany") return autosaveHasMany(record, assoc);
-  if (assoc.type === "hasOne") return autosaveHasOne(record, assoc);
-  if (assoc.type === "belongsTo") {
-    const reflection = (record.constructor as any)._reflectOnAssociation?.(assoc.name);
-    return _autosaveBelongsTo(record, assoc, reflection);
-  }
-  if (assoc.type === "hasAndBelongsToMany") return autosaveHabtm(record, assoc);
-  return true;
-}
 
 async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
@@ -838,48 +780,6 @@ async function _autosaveBelongsTo(
     // Rails save_belongs_to_association:568 — `association.loaded!` fires
     // inside the `if association.updated?` branch after the FK write.
     if (inst?.isUpdated?.()) inst.loadedBang?.();
-  }
-  return true;
-}
-
-async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const inst = _loadedAssociation(record, assoc.name);
-  // Rails save_collection_association resets the scope cache for every
-  // collection macro (hasMany + HABTM). HABTM is backed by
-  // HasManyThroughAssociation, which also memoizes scope().
-  if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
-    (inst as { resetScope: () => void }).resetScope();
-  }
-  // See autosaveHasMany: marked-for-destruction children are destroyed in
-  // `saveCollectionAssociation`; snapshot to keep the save loop stable.
-  const children: Base[] = Array.isArray(inst?.target) ? [...(inst.target as Base[])] : [];
-
-  for (const child of children) {
-    if (isMarkedForDestruction(child)) continue;
-    // Rails associated_records_to_validate_or_save (autosave_association.rb:
-    // 373-381): when the owner was new before save, every target record
-    // gets processed — not just new/changed ones. The dispatch inside
-    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
-    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
-    // Rails' `associated_records_to_validate_or_save` selects records via
-    // `changed_for_autosave?`, not bare `changed?` — so a persisted child whose
-    // own columns are unchanged but which has a changed (auto)saved grandchild
-    // still cascades (autosave_association.rb:302). `changed` alone would skip it.
-    if (
-      newRecordBeforeSave ||
-      child.isNewRecord() ||
-      ((child as any).changedForAutosave?.() ?? false)
-    ) {
-      const saved = await _insertCollectionRecord(record, inst, assoc, child);
-      if (!saved) {
-        // habtm routes through save_collection_association — same gating as
-        // has_many above (non-autosave, validating only).
-        if (!assoc.options.autosave && assoc.options.validate !== false) {
-          propagateErrors(record, assoc.name);
-        }
-        return false;
-      }
-    }
   }
   return true;
 }
