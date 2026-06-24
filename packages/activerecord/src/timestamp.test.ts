@@ -46,8 +46,23 @@ describe("TimestampTest", () => {
 
   it("touching a record updates its timestamp", async () => {
     const Post = makePost();
-    const post = await Post.create({ title: "test" });
+    const post = (await Post.create({ title: "test" })) as typeof Post.prototype &
+      Record<string, unknown>;
+    const previousUpdatedAt = post.updated_at as Temporal.Instant;
+
+    // Mirrors Rails' @developer.salary change before touch: an unrelated,
+    // unsaved dirty attribute must survive _touch_row's changes_applied (the
+    // method restores non-touched changes after clearing dirty state).
+    post.title = "changed";
     await post.touch();
+
+    expect(post.updated_at).not.toEqual(previousUpdatedAt);
+    expect(post.title).toBe("changed");
+    expect(post.attributeChanged("title")).toBe(true);
+    expect(post.changedAttributes).toEqual(["title"]);
+    // The touched timestamp is cleared by changes_applied.
+    expect(post.attributeChanged("updated_at")).toBe(false);
+
     const reloaded = await Post.find(post.id!);
     expect(reloaded).toBeDefined();
   });

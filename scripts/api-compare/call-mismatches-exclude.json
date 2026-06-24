@@ -32,28 +32,28 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "_create_record",
     "call": "changes_applied",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, dirty-tracking-changes-applied-cluster): the attribute-methods.ts `_createRecord` delegate forwards to dirty.ts `_createRecord`, but the live create path runs through callbacks.ts `_createRecord`, which awaits `_performInsert()` then calls `changesApplied()` (callbacks.ts:306-313) -- mirroring Rails AttributeMethods::Dirty#_create_record (super; changes_applied). dirty.test.ts 'attribute changes' asserts `catchphrase_changed?` is false after saving a new record. The extractor does not follow the delegation into callbacks.ts -- false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "_touch_row",
     "call": "changes_applied",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, dirty-tracking-changes-applied-cluster): the live touch path is timestamp.ts `touchRow`, which after the UPDATE runs Rails' AttributeMethods::Dirty#_touch_row dirty-clearing -- stashing non-touched changes, reverting them so `changesApplied()` snapshots the pre-change value, then re-writing them (timestamp.ts, after the `_triggerUpdateCallback` assignment). dirty.ts `_touchRow` (the call-set parity surface) contains the same `changesApplied`. timestamp.test.ts 'touching a record updates its timestamp' asserts an unrelated in-memory change survives touch while the touched timestamp's dirty flag clears. The extractor does not follow the delegation -- false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "_touch_row",
     "call": "clear_attribute_changes",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, dirty-tracking-changes-applied-cluster): the live touch path (timestamp.ts `touchRow`) calls `clearAttributeChanges(touchCols)` on the `_skipDirtyTracking` branch (set by touch_later), mirroring Rails _touch_row's `clear_attribute_changes(@_touch_attr_names)` guard; the non-skip branch instead clears per-attribute via `clearAttributeChange` + `changesApplied`. dirty.ts `_touchRow` (the call-set parity surface) carries the same `clearAttributeChanges`. The extractor does not follow the delegation -- false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "_update_record",
     "call": "changes_applied",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, dirty-tracking-changes-applied-cluster): the attribute-methods.ts `_updateRecord` delegate forwards to dirty.ts `_updateRecord`, but the live update path runs through callbacks.ts `_updateRecord`, which awaits `_performUpdate()` then calls `changesApplied()` (callbacks.ts:357-366) -- mirroring Rails AttributeMethods::Dirty#_update_record (super; changes_applied). The extractor does not follow the delegation into callbacks.ts -- false positive, no omission."
   },
   {
     "package": "activerecord",
