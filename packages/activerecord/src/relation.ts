@@ -4950,15 +4950,31 @@ export class Relation<T extends Base> {
    * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
    * are limitable. A collection reflection in joins/leftOuterJoins forces
    * `distinct_relation_for_primary_key` materialization even when every eager
-   * reflection is singular. `_namedInnerJoins` holds the association references
-   * routed out of joins (Rails' `select_association_list(joins_values)`); raw
-   * SQL/Arel joins stay in `_joinValues` and are not reflections.
+   * reflection is singular.
    */
   private _applyJoinDependencyIsLimitable(eagerSpecs: AssociationSpec[]): boolean {
-    return (
-      this._eagerReflectionsAreLimitable(eagerSpecs) &&
-      this._eagerReflectionsAreLimitable([...this._namedInnerJoins, ...this._leftOuterJoinsValues])
-    );
+    return this._eagerReflectionsAreLimitable(eagerSpecs) && this._joinsReflectionsAreLimitable();
+  }
+
+  /**
+   * Limitability of Rails' second `using_limitable_reflections?` clause: the
+   * reflections of `construct_join_dependency(select_association_list(joins_values)
+   * .concat(select_association_list(left_outer_joins_values)), nil)`
+   * (finder_methods.rb:466-470). `_namedInnerJoins` holds the association
+   * references routed out of `joins` (Rails' `select_association_list(joins_values)`,
+   * query_methods.rb:1810); `_leftOuterJoinsValues` the same for left joins. Raw
+   * SQL/Arel joins stay in `_joinValues` and are not reflections. Specs are
+   * resolved through a JoinDependency so nested-hash/array chains
+   * (`joins({ account: "profile" })`) contribute every reflection in the tree —
+   * matching Rails' `JoinDependency#reflections` rather than the conservative
+   * eager-spec resolver, which rejects every non-string spec.
+   */
+  private _joinsReflectionsAreLimitable(): boolean {
+    const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
+    if (specs.length === 0) return true;
+    const jd = new JoinDependency(this._modelClass);
+    for (const spec of specs) jd.addAssociationSpec(spec);
+    return this.usingLimitableReflections(jd.reflections);
   }
 
   /**

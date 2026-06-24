@@ -1547,10 +1547,22 @@ describe("RelationTest", () => {
           registerModel(this);
         }
       }
+      class JlProfile extends Base {
+        static {
+          this.tableName = "jl_profiles";
+          this.attribute("bio", "string");
+          registerModel(this);
+        }
+      }
       class JlAuthor extends Base {
         static {
           this.tableName = "jl_authors";
           this.attribute("name", "string");
+          this.attribute("jl_profile_id", "integer");
+          this.belongsTo("jlProfile", {
+            className: "JlProfile",
+            foreignKey: "jl_profile_id",
+          });
           registerModel(this);
         }
       }
@@ -1585,8 +1597,22 @@ describe("RelationTest", () => {
         .leftJoins("jlComments")
         .limit(5);
       expect((withCollectionLeftJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
+
+      // Singular joins — including a nested-hash chain (jlAuthor → jlProfile,
+      // both belongsTo) — resolve to non-collection reflections, so the second
+      // using_limitable_reflections? clause stays true and the relation does NOT
+      // defer (Rails resolves the hash via construct_join_dependency.reflections).
+      const singularJoin = JlArticle.all().eagerLoad("jlAuthor").joins("jlAuthor").limit(5);
+      expect((singularJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
+
+      const singularNestedJoin = JlArticle.all()
+        .eagerLoad("jlAuthor")
+        .joins({ jlAuthor: "jlProfile" })
+        .limit(5);
+      expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
     } finally {
       modelRegistry.delete("JlComment");
+      modelRegistry.delete("JlProfile");
       modelRegistry.delete("JlAuthor");
       modelRegistry.delete("JlArticle");
     }
