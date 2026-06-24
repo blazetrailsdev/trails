@@ -1,6 +1,7 @@
 import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
+import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Pirate extends Base {
   static {
@@ -99,6 +100,16 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
+
+// vendor/rails/activerecord/test/models/pirate.rb:53-54 —
+// `accepts_nested_attributes_for :parrots_with_method_callbacks, ...,
+// :birds_with_method_callbacks, :birds_with_proc_callbacks, allow_destroy: true`.
+// This flips `autosave: true` on the reflections so a marked-for-destruction
+// child is routed through the collection destroy on owner save.
+acceptsNestedAttributesFor(Pirate, "parrotsWithMethodCallbacks", { allowDestroy: true });
+acceptsNestedAttributesFor(Pirate, "parrotsWithProcCallbacks", { allowDestroy: true });
+acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: true });
+acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
 
 export class DestructivePirate extends Pirate {
   static {

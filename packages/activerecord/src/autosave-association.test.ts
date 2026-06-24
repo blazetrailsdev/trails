@@ -19,6 +19,8 @@ import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Agency, Company, Firm } from "./test-helpers/models/company.js";
 import { Project } from "./test-helpers/models/project.js";
+import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
+import { Bird } from "./test-helpers/models/bird.js";
 import {
   markForDestruction,
   isMarkedForDestruction,
@@ -4929,4 +4931,36 @@ describe.skip("computePrimaryKey", () => {
     const result = computePrimaryKey.call(record, { options: {} });
     expect(result).toBe("id");
   });
+});
+
+// vendor/rails/activerecord/test/cases/autosave_association_test.rb:1444-1477 —
+// add/remove callbacks fire when a marked-for-destruction child is destroyed as
+// part of the owner save. Exercises the collection-level destroy path
+// (save_collection_association -> association.destroy(record)) which fires the
+// before_remove/after_remove callbacks, not record-level child.destroy().
+describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+    registerModel(CanonicalPirate);
+    registerModel(Bird);
+  });
+
+  for (const callbackType of ["method", "proc"] as const) {
+    it(`should run remove callback ${callbackType}s for has many`, async () => {
+      const assocName = `birdsWith${callbackType === "method" ? "Method" : "Proc"}Callbacks`;
+      const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
+      const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
+      markForDestruction(child);
+      const childId = child.id;
+
+      pirate.shipLog.splice(0);
+      await pirate.save();
+
+      expect(pirate.shipLog).toEqual([
+        `before_removing_${callbackType}_bird_${childId}`,
+        `after_removing_${callbackType}_bird_${childId}`,
+      ]);
+    });
+  }
 });

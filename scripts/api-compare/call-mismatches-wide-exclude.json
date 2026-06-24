@@ -20681,13 +20681,6 @@
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
-    "call": "destroy",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
-    "rubyName": "save_collection_association",
     "call": "destroyed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -20717,7 +20710,7 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
     "call": "new_record?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Equivalent via delegation: `saveCollectionAssociation` performs only the marked-for-destruction collection destroy inline, then delegates the per-record save to `autosaveHasMany`, where the `record.new_record?` insert-vs-update dispatch (autosave_association.rb:442-457) lives. The call-set extractor scopes to the named body and does not follow the delegation."
   },
   {
     "package": "activerecord",
