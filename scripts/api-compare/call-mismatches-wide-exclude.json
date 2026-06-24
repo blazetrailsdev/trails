@@ -52159,13 +52159,6 @@
   {
     "package": "activesupport",
     "tsFile": "current-attributes.ts",
-    "rubyName": "reset",
-    "call": "run_callbacks",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "current-attributes.ts",
     "rubyName": "set",
     "call": "with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
