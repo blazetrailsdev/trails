@@ -5,7 +5,6 @@ import { _setAssociationRelationCtor } from "./associations/collection-proxy.js"
 import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
-import { associationKeysEqual } from "./associations/key-normalization.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -234,24 +233,9 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     // child's FK actually points at the owner. Chained queries that widen the
     // scope (`.or(other.collection)`, `.unscope(:where)`) can return rows that
     // belong to a *different* owner; wiring those would alias the wrong parent
-    // onto the child. Compare FK→PK via the reflection so composite-PK
-    // reflections work.
-    const fkCols =
-      inverseName && resolvedRefl
-        ? Array.isArray(resolvedRefl.foreignKey)
-          ? resolvedRefl.foreignKey
-          : [resolvedRefl.foreignKey]
-        : null;
-    const pkCols =
-      inverseName && resolvedRefl
-        ? Array.isArray(resolvedRefl.activeRecordPrimaryKey)
-          ? resolvedRefl.activeRecordPrimaryKey
-          : [resolvedRefl.activeRecordPrimaryKey]
-        : null;
-    const ownerRec = owner as unknown as {
-      isPersisted?: () => boolean;
-      _readAttribute: (n: string) => unknown;
-    };
+    // onto the child. The FK→PK comparison lives in
+    // `Association#matchesForeignKey` (Rails `matches_foreign_key?`).
+    const ownerRec = owner as unknown as { isPersisted?: () => boolean };
     const ownerPersisted = ownerRec.isPersisted?.() ?? true;
 
     // Rails' `AssociationRelation#exec_queries` yields a single per-record block
@@ -272,7 +256,10 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     // propagates the owner's mode (which may be "off") onto each child.
     const ownerAssoc = (
       owner as unknown as {
-        association?: (name: string) => { setStrictLoading?: (record: unknown) => unknown };
+        association?: (name: string) => {
+          setStrictLoading?: (record: unknown) => unknown;
+          matchesForeignKey?: (record: unknown) => boolean;
+        };
       }
     ).association?.(reflection.name);
     const strictLoad =
@@ -288,32 +275,16 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       this._instantiateBlock = (record: T): void => {
         if (prevBlock) prevBlock(record);
         if (inverseName) {
-          const childRec = record as unknown as {
-            isPersisted?: () => boolean;
-            _readAttribute: (n: string) => unknown;
-          };
+          const childRec = record as unknown as { isPersisted?: () => boolean };
           const childPersisted = childRec.isPersisted?.() ?? true;
-          let inversable = !ownerPersisted || !childPersisted;
-          if (!inversable && fkCols && pkCols && fkCols.length === pkCols.length) {
-            inversable = true;
-            for (let i = 0; i < fkCols.length; i++) {
-              // A child FK (int4 number) and the owner PK (int8 BigInt default
-              // under PG bigserial) must match here as Ruby's `Integer ==` does,
-              // or the inverse never wires and the cached target reads back nil.
-              if (
-                !associationKeysEqual(
-                  childRec._readAttribute(fkCols[i]),
-                  ownerRec._readAttribute(pkCols[i]),
-                )
-              ) {
-                inversable = false;
-                break;
-              }
-            }
-          } else if (!inversable && (!fkCols || !pkCols)) {
-            // No reflection metadata → preserve prior behavior and wire.
-            inversable = true;
-          }
+          // Mirrors `Association#inversable?`: wire when either side is unsaved,
+          // else fall to the (now base-resident) `matches_foreign_key?` check.
+          // The FK-match logic lives in `Association#matchesForeignKey`; the AR
+          // wiring stays separate only to route the cache through
+          // `_cacheSingularTarget` (which flags `_explicitTarget`, unlike the
+          // base `inversedFromQueries` path).
+          const inversable =
+            !ownerPersisted || !childPersisted || (ownerAssoc?.matchesForeignKey?.(record) ?? true);
           if (inversable) _cacheSingularTarget(record as Base, inverseName, owner);
         }
         if (strictLoad) strictLoad(record);
