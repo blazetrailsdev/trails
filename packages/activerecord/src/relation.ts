@@ -4420,31 +4420,47 @@ export class Relation<T extends Base> {
   }
 
   // The remaining `VALUE_METHODS.each`-generated accessors (query_methods.rb:162):
-  // Rails reads `@values.fetch(:<name>, default)`; trails keeps each value in a
-  // dedicated private field, so every accessor is a thin getter over that field.
-  // The matching `*=` setters camelize to the same name as the getter
-  // (`includes_values=` → `includesValues`), so a getter alone satisfies both.
+  // Rails generates a reader (`@values.fetch(:<name>, default)`) and a writer
+  // (`assert_modifiable!; @values[:<name>] = value`) for each. trails keeps each
+  // value in a dedicated private field, so the reader returns that field directly
+  // (mirroring Rails' stored-reference semantics, not a copy) and the writer
+  // asserts modifiability then assigns. The Ruby `*=` setter name camelizes to
+  // the same symbol as the reader (`includes_values=` → `includesValues`).
 
   /** Mirrors: ActiveRecord::Relation#includes_values */
   get includesValues(): AssociationSpec[] {
-    return [...this._includesAssociations];
+    return this._includesAssociations;
+  }
+  set includesValues(value: AssociationSpec[]) {
+    this.assertModifiableBang();
+    this._includesAssociations = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#eager_load_values */
   get eagerLoadValues(): AssociationSpec[] {
-    return [...this._eagerLoadAssociations];
+    return this._eagerLoadAssociations;
+  }
+  set eagerLoadValues(value: AssociationSpec[]) {
+    this.assertModifiableBang();
+    this._eagerLoadAssociations = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#preload_values */
   get preloadValues(): AssociationSpec[] {
-    return [...this._preloadAssociations];
+    return this._preloadAssociations;
+  }
+  set preloadValues(value: AssociationSpec[]) {
+    this.assertModifiableBang();
+    this._preloadAssociations = value;
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#joins_values — Rails stores every `.joins`
    * argument (association names and raw SQL/Arel joins) in one array; trails
    * splits them into `_namedInnerJoins` (resolved through JoinDependency) and
-   * `_joinValues` (raw string/Arel), so the accessor recombines them.
+   * `_joinValues` (raw string/Arel), so the accessor recombines them. Because of
+   * that split there is no single field to round-trip, so no faithful `=` writer
+   * exists yet — tracked by story relation-value-accessor-rails-semantics.
    */
   get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
     return [...this._namedInnerJoins, ...this._joinValues];
@@ -4452,22 +4468,35 @@ export class Relation<T extends Base> {
 
   /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
   get leftOuterJoinsValues(): AssociationSpec[] {
-    return [...this._leftOuterJoinsValues];
+    return this._leftOuterJoinsValues;
+  }
+  set leftOuterJoinsValues(value: AssociationSpec[]) {
+    this.assertModifiableBang();
+    this._leftOuterJoinsValues = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#references_values */
   get referencesValues(): string[] {
-    return [...this._referencesValues];
+    return this._referencesValues;
+  }
+  set referencesValues(value: string[]) {
+    this.assertModifiableBang();
+    this._referencesValues = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#extending_values */
   get extendingValues(): Array<Record<string, (...args: any[]) => any>> {
-    return [...this._extending];
+    return this._extending;
+  }
+  set extendingValues(value: Array<Record<string, (...args: any[]) => any>>) {
+    this.assertModifiableBang();
+    this._extending = value;
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#extensions — `alias extensions
-   * extending_values` (query_methods.rb:183), so it returns the same array.
+   * extending_values` (query_methods.rb:183), a reader-only alias, so it returns
+   * the same stored array.
    */
   get extensions(): Array<Record<string, (...args: any[]) => any>> {
     return this.extendingValues;
@@ -4475,57 +4504,101 @@ export class Relation<T extends Base> {
 
   /** Mirrors: ActiveRecord::Relation#unscope_values */
   get unscopeValues(): Array<string | { where: string | string[] }> {
-    return [...this._unscopeValues];
+    return this._unscopeValues;
+  }
+  set unscopeValues(value: Array<string | { where: string | string[] }>) {
+    this.assertModifiableBang();
+    this._unscopeValues = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#optimizer_hints_values */
   get optimizerHintsValues(): string[] {
-    return [...this._optimizerHints];
+    return this._optimizerHints;
+  }
+  set optimizerHintsValues(value: string[]) {
+    this.assertModifiableBang();
+    this._optimizerHints = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#annotate_values */
   get annotateValues(): string[] {
-    return [...this._annotations];
+    return this._annotations;
+  }
+  set annotateValues(value: string[]) {
+    this.assertModifiableBang();
+    this._annotations = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#with_values */
   get withValues(): Array<{ name: string; expression: Nodes.Node; recursive: boolean }> {
-    return [...this._ctes];
+    return this._ctes;
+  }
+  set withValues(value: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>) {
+    this.assertModifiableBang();
+    this._ctes = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#readonly_value */
   get readonlyValue(): boolean {
     return this._isReadonly;
   }
+  set readonlyValue(value: boolean) {
+    this.assertModifiableBang();
+    this._isReadonly = value;
+  }
 
   /** Mirrors: ActiveRecord::Relation#reordering_value */
   get reorderingValue(): boolean {
     return this._reordering;
+  }
+  set reorderingValue(value: boolean) {
+    this.assertModifiableBang();
+    this._reordering = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#strict_loading_value */
   get strictLoadingValue(): boolean | undefined {
     return this._isStrictLoading;
   }
+  set strictLoadingValue(value: boolean | undefined) {
+    this.assertModifiableBang();
+    this._isStrictLoading = value;
+  }
 
   /** Mirrors: ActiveRecord::Relation#create_with_value */
   get createWithValue(): Record<string, unknown> {
-    return { ...this._createWithAttrs };
+    return this._createWithAttrs;
+  }
+  set createWithValue(value: Record<string, unknown>) {
+    this.assertModifiableBang();
+    this._createWithAttrs = value;
   }
 
   /** Mirrors: ActiveRecord::Relation#skip_query_cache_value */
   get skipQueryCacheValue(): boolean {
     return this._skipQueryCache;
   }
+  set skipQueryCacheValue(value: boolean) {
+    this.assertModifiableBang();
+    this._skipQueryCache = value;
+  }
 
   /** Mirrors: ActiveRecord::Relation#having_clause (CLAUSE_METHODS). */
   get havingClause(): WhereClause {
     return this._havingClause;
   }
+  set havingClause(value: WhereClause) {
+    this.assertModifiableBang();
+    this._havingClause = value;
+  }
 
   /** Mirrors: ActiveRecord::Relation#from_clause (CLAUSE_METHODS). */
   get fromClause(): FromClause {
     return this._fromClause;
+  }
+  set fromClause(value: FromClause) {
+    this.assertModifiableBang();
+    this._fromClause = value;
   }
 
   // -- Collection convenience methods --
