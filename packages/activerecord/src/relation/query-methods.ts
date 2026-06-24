@@ -756,7 +756,12 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
  * Value keys accepted by `SpawnMethods#except` — Rails' `Relation::VALUE_METHODS`.
  * A superset of `UnscopeType`: it additionally covers value keys that have no
  * `unscope` equivalent (`distinct`, `strictLoading`, `references`, `extending`,
- * `unscope`), mirroring `relation_with values.except(*skips)`.
+ * `unscope`, `reordering`, `skipQueryCache`), mirroring
+ * `relation_with values.except(*skips)`.
+ *
+ * Rails' `:reverse_order` is omitted: trails applies `reverseOrder` eagerly
+ * (it flips `_orderClauses` in place rather than storing a `reverse_order`
+ * value), so there is no stored value key to remove.
  */
 export type ExceptKey =
   | UnscopeType
@@ -764,7 +769,9 @@ export type ExceptKey =
   | "strictLoading"
   | "references"
   | "extending"
-  | "unscope";
+  | "unscope"
+  | "reordering"
+  | "skipQueryCache";
 
 /**
  * Reset a single value-key to its default, with no merge-replay side effect.

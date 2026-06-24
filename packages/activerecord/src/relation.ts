@@ -1684,6 +1684,12 @@ export class Relation<T extends Base> {
         case "unscope":
           rel._unscopeValues = [];
           break;
+        case "reordering":
+          rel._reordering = false;
+          break;
+        case "skipQueryCache":
+          rel._skipQueryCache = false;
+          break;
         default:
           _qm.resetValueForScope(rel as any, skip);
           break;
