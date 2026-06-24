@@ -14,13 +14,20 @@
  * Two independent inputs make the token self-busting, so adding a field can't
  * silently leave stale entries even if a human forgets a manual bump:
  *
- *   1. {@link EXTRACTOR_OUTPUT_FIELDS} — the declared per-method field set. Add
- *      a field name here whenever you add a `MethodInfo` property the extractor
- *      populates (see types.ts).
- *   2. The extractor SOURCE content hashes — any edit to the extractor scripts
- *      (which emitting a new field necessarily requires) changes the token. This
- *      is the same mtime-independent, cross-worktree guard the Ruby manifest
- *      already gets for free by keying on `extract-ruby-api.rb`'s content.
+ *   1. {@link EXTRACTOR_OUTPUT_FIELDS} — the declared per-method field set, the
+ *      INTENTIONAL token a reviewer can audit. Add a field name here whenever
+ *      you add a `MethodInfo` property the extractor populates (see types.ts).
+ *   2. The extractor SOURCE content hashes — the BACKSTOP: any edit to the
+ *      extractor scripts (which emitting a new field necessarily requires)
+ *      changes the token, so even a forgotten (1) can't reintroduce the trap.
+ *      This is the same mtime-independent, cross-worktree guard the Ruby
+ *      manifest already gets for free by keying on `extract-ruby-api.rb`'s
+ *      content (which is why the Ruby cache does NOT share this flaw).
+ *
+ * Tradeoff: input (2) means ANY edit to the extractor scripts — even a comment
+ * — busts the whole cross-worktree TS cache, forcing a ~16s re-extract. That is
+ * deliberate and matches the Ruby side: correctness over a warm cache during
+ * extractor development, and edits to these files are comparatively rare.
  *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
  */
