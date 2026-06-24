@@ -116,14 +116,14 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "save_collection_association",
     "call": "save",
-    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveCollectionAssociation` delegates to the `autosaveHasMany` helper, which saves new/changed children via `child.save({validate:false})` (through `_insertCollectionRecord`/`insertRecord`), mirroring save_collection_association (autosave_association.rb:442-457). The call-set extractor scopes to the Ruby-named function body and does not follow the delegation, so the save reads as missing \u2014 false positive, no omission."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveCollectionAssociation` delegates to the `autosaveHasMany` helper, which saves new/changed children via `child.save({validate:false})` (through `_insertCollectionRecord`/`insertRecord`), mirroring save_collection_association (autosave_association.rb:446-456). The call-set extractor scopes to the Ruby-named function body and does not follow the delegation, so the save reads as missing \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "save_has_one_association",
     "call": "destroy",
-    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which destroys a marked-for-destruction persisted child via `childRecord.destroy()`, mirroring save_has_one_association (autosave_association.rb:482-483). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which destroys a marked-for-destruction persisted child via `childRecord.destroy()`, mirroring save_has_one_association (autosave_association.rb:483). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
