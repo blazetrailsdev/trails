@@ -89,6 +89,7 @@ import type {
   ColumnOptions,
   IdHashOptions,
 } from "./abstract/schema-definitions.js";
+import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -500,6 +501,33 @@ export interface AbstractAdapter {
   currentDatabase(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
+
+  // --- SchemaStatements / DatabaseStatements members provided only by the
+  // SchemaStatements mixin or concrete-adapter subclasses, not the base class.
+  // Declared optional here so a value typed as the base `AbstractAdapter` (the
+  // superset that replaces the deleted `DatabaseAdapter` interface — RFC 0010)
+  // can still reach them with `?.` / `!`. See migration.ts, relation.ts#explain,
+  // and abstract/schema-statements.ts#createTable for the base-typed call sites.
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
+   * — Rails: `def explain(arel, binds = [], options = [])`; the implementation
+   * renders `arel` via `to_sql(arel, binds)` before executing, so the base
+   * input is an Arel node/AST (`unknown`), not a pre-rendered SQL string.
+   */
+  explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
+   *
+   * @internal
+   */
+  createTableDefinition?(name: string, options?: Record<string, unknown>): TableDefinition;
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#schema_creation
+   */
+  readonly schemaCreation?: SchemaCreation;
 }
 /** @internal */
 export type ConnectionCallbackPhase = "checkout" | "checkin";
@@ -965,6 +993,13 @@ export class AbstractAdapter implements Quoting {
     this._runCallbacks("checkin", block);
   }
 
+  // RFC 0010 adapterName typing decision: the base getter returns `string`
+  // (Rails-faithful — `AbstractAdapter#adapter_name` is the literal "Abstract",
+  // which is NOT a member of the normalized `AdapterName` family). The deleted
+  // `DatabaseAdapter` interface typed this `AdapterName`; rather than force that
+  // infidelitous narrow type onto the base, concrete adapters already override
+  // the getter to return `AdapterName` (sqlite3/postgresql/mysql), and the few
+  // downstream sites that need the narrow family narrow/guard at the call site.
   get adapterName(): string {
     return "Abstract";
   }
