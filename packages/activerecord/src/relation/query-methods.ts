@@ -753,6 +753,20 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
 ]);
 
 /**
+ * Value keys accepted by `SpawnMethods#except` — Rails' `Relation::VALUE_METHODS`.
+ * A superset of `UnscopeType`: it additionally covers value keys that have no
+ * `unscope` equivalent (`distinct`, `strictLoading`, `references`, `extending`,
+ * `unscope`), mirroring `relation_with values.except(*skips)`.
+ */
+export type ExceptKey =
+  | UnscopeType
+  | "distinct"
+  | "strictLoading"
+  | "references"
+  | "extending"
+  | "unscope";
+
+/**
  * Reset a single value-key to its default, with no merge-replay side effect.
  *
  * Shared by `unscope!` (which additionally records the key in
@@ -1739,7 +1753,9 @@ export function buildSubquery(
   subqueryAlias: string,
   selectValue: unknown,
 ): SelectManager {
-  // Rails: except(:optimizer_hints).arel.as(alias) — call unscope directly (Relation#except delegates to it)
+  // Rails: except(:optimizer_hints).arel.as(alias) — call unscope directly. (Note:
+  // Relation#except is the value-key remover and is NOT unscope; here we want the
+  // unscope semantics, so we call unscope explicitly.)
   const relation =
     typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
   if (typeof relation.toArel !== "function") {

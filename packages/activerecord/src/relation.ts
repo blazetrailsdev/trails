@@ -61,6 +61,7 @@ import {
   arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
   type UnscopeType,
+  type ExceptKey,
   type AssociationSpec,
   type OrderArg,
 } from "./relation/query-methods.js";
@@ -1661,9 +1662,33 @@ export class Relation<T extends Base> {
    * directive, so merging the result does not erase the same parts on the
    * other relation.
    */
-  except(...skips: Array<UnscopeType>): Relation<T> {
+  except(...skips: Array<ExceptKey>): Relation<T> {
     const rel = this._clone();
-    for (const skip of skips) _qm.resetValueForScope(rel as any, skip);
+    for (const skip of skips) {
+      switch (skip) {
+        // Value keys that have no `unscope` equivalent (they are not in
+        // VALID_UNSCOPING_VALUES) but are part of Rails' `Relation::VALUE_METHODS`,
+        // so `values.except(*skips)` removes them too.
+        case "distinct":
+          rel._isDistinct = false;
+          break;
+        case "strictLoading":
+          rel._isStrictLoading = false;
+          break;
+        case "references":
+          rel._referencesValues = [];
+          break;
+        case "extending":
+          rel._extending = [];
+          break;
+        case "unscope":
+          rel._unscopeValues = [];
+          break;
+        default:
+          _qm.resetValueForScope(rel as any, skip);
+          break;
+      }
+    }
     return rel;
   }
 

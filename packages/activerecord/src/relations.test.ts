@@ -6140,6 +6140,8 @@ describe("RelationTest", () => {
     // does not erase the same parts on the other relation.
     const merged = Post.order("title").merge(stripped);
     expect(merged.toSql()).toContain("ORDER BY");
+    // except removes value keys with no unscope equivalent (Rails VALUE_METHODS).
+    expect(Post.all().distinct().except("distinct").toSql()).not.toContain("DISTINCT");
   });
 
   it("only", () => {
