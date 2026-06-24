@@ -103,7 +103,7 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       const a = Post.where({ author: "alice" });
       const b = Post.where({ author: "bob" });
       expect(rawSql(a.intersect(b))).toContain("INTERSECT");
-      expect(rawSql(a.except(b))).toContain("EXCEPT");
+      expect(rawSql(a.exceptRelation(b))).toContain("EXCEPT");
     });
   });
 

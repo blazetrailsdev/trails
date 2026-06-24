@@ -1727,7 +1727,7 @@ export function buildSubquery(
   subqueryAlias: string,
   selectValue: unknown,
 ): SelectManager {
-  // Rails: except(:optimizer_hints).arel.as(alias) — use unscope (our except is SQL EXCEPT, not query-part removal)
+  // Rails: except(:optimizer_hints).arel.as(alias) — call unscope directly (Relation#except delegates to it)
   const relation =
     typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
   if (typeof relation.toArel !== "function") {

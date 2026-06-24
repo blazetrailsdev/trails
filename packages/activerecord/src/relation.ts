@@ -1636,15 +1636,29 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * EXCEPT with another relation.
+   * SQL `EXCEPT` set operation with another relation.
    *
-   * Mirrors: ActiveRecord::Relation#except_
+   * trails-only — Rails has no `EXCEPT` set-operation method (it exposes
+   * `union`/`union_all`/`intersect` only). This is the SQL set-operation
+   * sibling of {@link union}/{@link intersect}; the bare `except` name is
+   * reserved for Rails' `SpawnMethods#except` value-key remover below.
+   *
+   * @internal No Rails equivalent.
    */
-  except(other?: Relation<T>): Relation<T> {
+  exceptRelation(other?: Relation<T>): Relation<T> {
     if (!other) return this._clone();
     const rel = this._clone();
     rel._setOperation = { type: "except", other };
     return rel;
+  }
+
+  /**
+   * Remove the specified query parts, keeping everything else.
+   *
+   * Mirrors: ActiveRecord::SpawnMethods#except
+   */
+  except(...skips: Array<UnscopeType>): Relation<T> {
+    return this.unscope(...skips);
   }
 
   /**

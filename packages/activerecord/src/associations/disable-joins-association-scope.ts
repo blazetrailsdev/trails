@@ -276,9 +276,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     if (sfa) {
       // Rails: `relation.except(:select, :create_with, :includes, :preload,
       // :eager_load, :joins, :left_outer_joins)` strips those query parts
-      // before merging. Our `Relation#except` is the SQL set-operation
-      // EXCEPT (Rails-faithful for that name); the query-part strip is
-      // `unscope(...)`. The full Rails set is now supported.
+      // before merging. `Relation#except` mirrors Rails' value-key remover
+      // (it delegates to `unscope`); we call `unscope` directly here. The
+      // full Rails set is now supported.
       const stripped = (sfa as { unscope: (...keys: UnscopeType[]) => unknown }).unscope(
         "select",
         "createWith",

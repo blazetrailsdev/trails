@@ -745,7 +745,7 @@ describe("RelationTest", () => {
 
     it("except generates EXCEPT SQL", () => {
       const sql = Post.all()
-        .except(Post.where({ status: "draft" }))
+        .exceptRelation(Post.where({ status: "draft" }))
         .toSql();
       expect(sql).toContain("EXCEPT");
     });
@@ -2828,7 +2828,7 @@ describe("RelationTest", () => {
     await User.create({ name: "Bob", active: false });
 
     const result = await User.all()
-      .except(User.where({ active: true }))
+      .exceptRelation(User.where({ active: true }))
       .toArray();
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("Bob");
@@ -4684,7 +4684,7 @@ describe("RelationTest", () => {
     await Product.create({ name: "B", discontinued: true });
 
     const result = await Product.all()
-      .except(Product.where({ discontinued: true }))
+      .exceptRelation(Product.where({ discontinued: true }))
       .toArray();
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("A");
