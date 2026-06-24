@@ -7,6 +7,8 @@ import {
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
   isArityOverridden,
+  SCOPED_SKIP_GROUPS,
+  isScopedSkip,
   ALREADY_PREDICATE_PREFIXES,
   explainConventions,
 } from "./conventions.js";
@@ -189,6 +191,36 @@ describe("SKIP_GROUPS", () => {
   });
 });
 
+describe("SCOPED_SKIP_GROUPS", () => {
+  it("requires a non-empty reason, name, and file scope per group", () => {
+    for (const g of SCOPED_SKIP_GROUPS) {
+      expect(g.reason.trim().length).toBeGreaterThan(0);
+      expect(g.names.length).toBeGreaterThan(0);
+      expect(g.rubyFiles.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never overlaps the global SKIP set (scoped names stay file-local)", () => {
+    for (const g of SCOPED_SKIP_GROUPS) {
+      for (const name of g.names) expect(SKIP.has(name)).toBe(false);
+    }
+  });
+
+  it("skips each name only in its scoped Ruby files, never globally", () => {
+    for (const g of SCOPED_SKIP_GROUPS) {
+      for (const name of g.names) {
+        for (const file of g.rubyFiles) expect(isScopedSkip(name, file)).toBe(true);
+        expect(isScopedSkip(name, "some/other/unrelated.rb")).toBe(false);
+      }
+    }
+  });
+
+  it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {
+    expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(true);
+    expect(isScopedSkip("-@", "duration.rb")).toBe(false);
+  });
+});
+
 describe("ARITY_OVERRIDE_GROUPS", () => {
   it("has no duplicate names across groups", () => {
     const all = ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names);
@@ -244,6 +276,9 @@ describe("explainConventions", () => {
       expect(md).toContain(g.reason);
     }
     for (const g of ARITY_OVERRIDE_GROUPS) {
+      expect(md).toContain(g.reason);
+    }
+    for (const g of SCOPED_SKIP_GROUPS) {
       expect(md).toContain(g.reason);
     }
   });

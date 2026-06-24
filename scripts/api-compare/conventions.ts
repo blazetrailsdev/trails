@@ -193,14 +193,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
-      "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
-      "realizes dedup via the `deduplicate` free function plus the " +
-      "DeduplicableBase constructor, so the alias has no separate TS surface.",
-    names: ["-@"],
-  },
-  {
-    reason:
       "Migrator internal index helpers — Rails stores @target_version / " +
       "@direction as instance variables; our TS Migrator passes them as method " +
       "parameters instead, so these zero-arg helpers can't be faithfully ported.",
@@ -209,6 +201,54 @@ export const SKIP_GROUPS: SkipGroup[] = [
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
+
+/**
+ * Like {@link SkipGroup}, but the skip applies *only* within the listed Ruby
+ * source files (path relative to the package lib root, as emitted by the
+ * comparison) — never globally. Use this when a Ruby method name has a real TS
+ * surface in some files but legitimately no counterpart in others, so a global
+ * {@link SKIP} entry would silence a genuine gap elsewhere.
+ */
+export interface ScopedSkipGroup {
+  reason: string;
+  names: string[];
+  rubyFiles: string[];
+}
+
+export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason:
+      "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
+      "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
+      "realizes dedup via the `deduplicate` free function plus the " +
+      "DeduplicableBase constructor, so the alias has no separate TS surface on " +
+      "these value objects. Scoped to the AR adapter value-object files so it " +
+      "can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).",
+    names: ["-@"],
+    rubyFiles: [
+      "connection_adapters/deduplicable.rb",
+      "connection_adapters/column.rb",
+      "connection_adapters/sql_type_metadata.rb",
+      "connection_adapters/mysql/type_metadata.rb",
+      "connection_adapters/postgresql/type_metadata.rb",
+    ],
+  },
+];
+
+/** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
+const SCOPED_SKIP_FILES = new Map<string, Set<string>>();
+for (const g of SCOPED_SKIP_GROUPS) {
+  for (const name of g.names) {
+    const files = SCOPED_SKIP_FILES.get(name) ?? new Set<string>();
+    for (const f of g.rubyFiles) files.add(f);
+    SCOPED_SKIP_FILES.set(name, files);
+  }
+}
+
+/** True when `rubyName` should be skipped specifically within `rubyFile`. */
+export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
+  return SCOPED_SKIP_FILES.get(rubyName)?.has(rubyFile) ?? false;
+}
 
 /**
  * A group of Ruby method names whose arity is *intentionally* allowed to diverge
@@ -428,6 +468,12 @@ export function explainConventions(): string {
     return `- ${g.reason}\n  - ${names}`;
   }).join("\n");
 
+  const scopedSkipSections = SCOPED_SKIP_GROUPS.map((g) => {
+    const names = g.names.map((n) => `\`${n}\``).join(", ");
+    const files = g.rubyFiles.map((f) => `\`${f}\``).join(", ");
+    return `- ${g.reason}\n  - ${names} (only in: ${files})`;
+  }).join("\n");
+
   return `# Ruby → TypeScript naming conventions
 
 <!-- GENERATED FILE — do not edit by hand.
@@ -496,6 +542,14 @@ ${pathAliasRows}
 api:compare never expects a TS counterpart for these Ruby methods:
 
 ${skipSections}
+
+## Scoped skipped methods
+
+api:compare skips these Ruby methods, but only within the listed files — they
+have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
+a genuine gap:
+
+${scopedSkipSections}
 
 ## Arity overrides
 
