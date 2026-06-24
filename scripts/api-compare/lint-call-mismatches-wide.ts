@@ -46,6 +46,7 @@ import {
   findDuplicateKeys,
   flattenArtifact,
   keyOf,
+  missingScope,
   reseed,
 } from "./lint-call-mismatches.js";
 
@@ -69,7 +70,7 @@ async function loadBaseline(): Promise<ExcludeEntry[]> {
   return readJson<ExcludeEntry[]>(BASELINE_PATH);
 }
 
-async function loadCurrent(): Promise<CallMismatchKey[]> {
+async function loadArtifact(): Promise<Artifact> {
   const exists = await fs.access(ARTIFACT_PATH).then(
     () => true,
     () => false,
@@ -80,7 +81,7 @@ async function loadCurrent(): Promise<CallMismatchKey[]> {
         "scripts/api-compare/compare.ts --wide-calls` (or `pnpm api:compare --wide-calls`) first to write it.",
     );
   }
-  return flattenArtifact(await readJson<Artifact>(ARTIFACT_PATH));
+  return readJson<Artifact>(ARTIFACT_PATH);
 }
 
 function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
@@ -89,13 +90,30 @@ function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
 
 async function main(write: boolean): Promise<number> {
   const baseline = await loadBaseline();
-  const current = await loadCurrent();
+  const artifact = await loadArtifact();
+  const current = flattenArtifact(artifact);
 
   const dups = findDuplicateKeys(baseline);
   if (dups.length > 0) {
     console.error(
       `\nwide call-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
         dups.map((d) => `  ${d}`).join("\n"),
+    );
+    return 1;
+  }
+
+  // Determinism guard (RFC 0044): same partial-scope coverage check as the
+  // narrow gate (see lint-call-mismatches.ts header).
+  const absent = missingScope(artifact);
+  if (absent.length > 0) {
+    console.error(
+      `\nwide call-mismatches ratchet: artifact compared a PARTIAL scope — missing ` +
+        `${absent.length} package(s): ${absent.join(", ")}.\n` +
+        "It covers fewer packages than CI (an unfetched vendor source, a " +
+        "`--package`-filtered run, or a stale artifact); reseeding or gating " +
+        "from it would desync local vs CI. Regenerate the full surface:\n" +
+        "  pnpm api:calls:wide:reseed   (or `API_COMPARE_FORCE=1 pnpm " +
+        "api:compare --wide-calls` then re-run this).\n",
     );
     return 1;
   }

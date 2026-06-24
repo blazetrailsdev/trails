@@ -29,6 +29,33 @@
  * `reason` of entries that still flag and dropping stale rows. Run it after a
  * burndown story lands a convergence so the committed baseline shrinks.
  *
+ * ── Reseed ONLY from a full, fresh artifact (RFC 0044 determinism) ──────────
+ * This gate was environment-non-deterministic: a stale local ts-api cache
+ * served call-less manifests, so a local `pnpm api:compare` reported FEWER
+ * call mismatches than CI for the same commit. The dangerous move is reseeding
+ * from that artifact: `--write` rebuilds the baseline from whatever the local
+ * run produced, silently DROPPING entries CI still flags and turning a
+ * green-locally baseline red on the merge train (PR #4020). (A stale local
+ * *gate*, by contrast, fails LOUDLY — the dropped entries surface as STALE
+ * baseline rows — so it is `--write`, not the gate, that desyncs.)
+ *
+ * The fix is in three parts:
+ *   1. the stale-cache root cause is closed upstream by the self-busting
+ *      extractor schema token (PR #4044), so a warm local run now matches CI;
+ *   2. reseed ONLY through the canonical path below, which force-rebuilds every
+ *      cache first so the artifact can't be a warm-cache under-report:
+ *
+ *        pnpm api:calls:reseed  # API_COMPARE_FORCE=1 api:compare && this --write
+ *
+ *   3. as a backstop, the artifact records the `packages` it compared and this
+ *      script ABORTS (gate AND `--write`) unless that set covers every
+ *      api-compare package — catching a partial-scope artifact (an unfetched
+ *      vendor source, a `--package`-filtered run, or one predating the field)
+ *      before it can reseed or pass a gate CI would fail.
+ *
+ * Bottom line: do NOT `--write` by hand from a possibly-stale env; run
+ * `pnpm api:calls:reseed`.
+ *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-deps.ts), async fs only.
  */
@@ -36,7 +63,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
 
 const BASELINE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -78,7 +105,26 @@ interface ArtifactMismatch {
 }
 
 export interface Artifact {
+  // The packages this artifact's run actually compared (compare.ts writes it
+  // sorted). Optional so an artifact predating the field doesn't crash the
+  // loader — but its ABSENCE is itself a partial-scope signal (see
+  // missingScope): a current compare.ts always emits it.
+  packages?: string[];
   mismatches: ArtifactMismatch[];
+}
+
+// Packages that SHOULD have been compared but are absent from the artifact's
+// `packages` — the signature of a partial-scope run: an unfetched vendor
+// source, a `--package`-filtered run, or an artifact predating the field. A
+// non-empty result means the artifact covers a narrower surface than CI and
+// must not be reseeded or gated from. `expected` defaults to the full
+// api-compare package set. (This is a coverage check, not a freshness one:
+// a stale ts-api cache leaves every package PRESENT but under-reports its
+// calls — that mode is closed upstream by the extractor schema token (#4044)
+// and, for reseeds, by the force-rebuild api:calls:reseed path.)
+export function missingScope(artifact: Artifact, expected: readonly string[] = PACKAGES): string[] {
+  const present = new Set(artifact.packages ?? []);
+  return expected.filter((p) => !present.has(p)).sort();
 }
 
 export function keyOf(k: CallMismatchKey): string {
@@ -172,7 +218,7 @@ export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return readJson<ExcludeEntry[]>(BASELINE_PATH);
 }
 
-export async function loadCurrent(): Promise<CallMismatchKey[]> {
+export async function loadArtifact(): Promise<Artifact> {
   const exists = await fs.access(ARTIFACT_PATH).then(
     () => true,
     () => false,
@@ -183,18 +229,40 @@ export async function loadCurrent(): Promise<CallMismatchKey[]> {
         "scripts/api-compare/compare.ts` (or `pnpm api:compare`) first to write it.",
     );
   }
-  return flattenArtifact(await readJson<Artifact>(ARTIFACT_PATH));
+  return readJson<Artifact>(ARTIFACT_PATH);
+}
+
+export async function loadCurrent(): Promise<CallMismatchKey[]> {
+  return flattenArtifact(await loadArtifact());
 }
 
 async function main(write: boolean): Promise<number> {
   const baseline = await loadBaseline();
-  const current = await loadCurrent();
+  const artifact = await loadArtifact();
+  const current = flattenArtifact(artifact);
 
   const dups = findDuplicateKeys(baseline);
   if (dups.length > 0) {
     console.error(
       `\ncall-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
         dups.map((d) => `  ${d}`).join("\n"),
+    );
+    return 1;
+  }
+
+  // Determinism guard (RFC 0044): a partial-scope artifact covers fewer
+  // packages than CI, so both reseeding and gating from it desync local vs CI.
+  // Fail loud rather than silently shrink the baseline or pass a gate CI fails.
+  const absent = missingScope(artifact);
+  if (absent.length > 0) {
+    console.error(
+      `\ncall-mismatches ratchet: artifact compared a PARTIAL scope — missing ` +
+        `${absent.length} package(s): ${absent.join(", ")}.\n` +
+        "It covers fewer packages than CI (an unfetched vendor source, a " +
+        "`--package`-filtered run, or a stale artifact); reseeding or gating " +
+        "from it would desync local vs CI. Regenerate the full surface:\n" +
+        "  pnpm api:calls:reseed   (or `API_COMPARE_FORCE=1 pnpm api:compare` " +
+        "then re-run this).\n",
     );
     return 1;
   }

@@ -6,6 +6,7 @@ import {
   flattenArtifact,
   keyOf,
   loadBaseline,
+  missingScope,
   reseed,
   type ExcludeEntry,
 } from "./lint-call-mismatches.js";
@@ -157,5 +158,37 @@ describe("reseed", () => {
       { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "wide seed" },
     ]);
     expect(findDuplicateKeys(next)).toEqual([]);
+  });
+});
+
+describe("missingScope", () => {
+  const expected = ["activerecord", "activesupport", "rack"];
+
+  it("returns nothing when the artifact covers every expected package", () => {
+    expect(
+      missingScope(
+        { packages: ["rack", "activerecord", "activesupport"], mismatches: [] },
+        expected,
+      ),
+    ).toEqual([]);
+  });
+
+  it("flags packages the artifact never compared (partial-scope/stale-cache run)", () => {
+    expect(missingScope({ packages: ["activerecord"], mismatches: [] }, expected)).toEqual([
+      "activesupport",
+      "rack",
+    ]);
+  });
+
+  it("treats a missing `packages` field (pre-field artifact) as full partial-scope", () => {
+    expect(missingScope({ mismatches: [] }, expected)).toEqual([
+      "activerecord",
+      "activesupport",
+      "rack",
+    ]);
+  });
+
+  it("ignores extra packages the artifact compared beyond the expected set", () => {
+    expect(missingScope({ packages: [...expected, "arel"], mismatches: [] }, expected)).toEqual([]);
   });
 });
