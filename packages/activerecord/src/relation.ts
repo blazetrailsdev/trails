@@ -34,7 +34,6 @@ import {
   _cacheSingularTarget,
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
-import { buildMergedJoinAliasTracker } from "./relation/merged-join-alias-tracker.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
   underscore as _toUnderscore,
@@ -3508,13 +3507,20 @@ export class Relation<T extends Base> {
   }
 
   private _applyJoinsToManager(manager: SelectManager): void {
+    // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
+    // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
+    // `from(relation)` subquery path) also delegates to. The two callers differ
+    // only in eager handling: here eager OUTER JOINs are pre-emitted by
+    // `_buildEagerJoinManager` (so `manager.joinSourceCount > 0` signals the
+    // stash and eager-covered left-outer associations are filtered out below),
+    // whereas `buildJoins` folds eager into the stashed bucket via
+    // `buildJoinBuckets`. The shared emitter handles raw join clauses, the
+    // shared AliasTracker, and the left_outer/joins dedup fold.
+    //
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
-    // When stashed joins exist, non-LeadingJoin nodes go to join_node (appended
-    // after), LeadingJoin goes to leading_join (prepended before). Without stashed
-    // joins all nodes go to leading_join in insertion order (Rails' else branch).
-    // Stashed signal: existing join_sources (set by _buildEagerJoinManager before
-    // this call) OR eagerLoad (stashed_eager_load) OR leftOuterJoins associations
-    // (stashed_left_joins).
+    // when stashed joins exist, non-LeadingJoin nodes go to join_node (appended
+    // after), LeadingJoin goes to leading_join (prepended before). Without
+    // stashed joins all nodes go to leading_join (Rails' else branch).
     const hasStashed =
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
@@ -3533,35 +3539,18 @@ export class Relation<T extends Base> {
         leadingJoins.push(node);
       }
     }
-    if (leadingJoins.length > 0) manager.prependJoinNodes(...leadingJoins);
-    for (const join of this._joinClauses) {
-      const tableNode = join.quoted
-        ? join.as
-          ? new Table(join.table, { as: join.as })
-          : new Table(join.table)
-        : join.table;
-      const onNode = typeof join.on === "string" ? new Nodes.SqlLiteral(join.on) : join.on;
-      if (join.type === "inner") {
-        manager.join(tableNode, onNode);
-      } else {
-        manager.outerJoin(tableNode, onNode);
-      }
-    }
-    // Process left_outer_joins_values: resolve via JoinDependency and emit as
-    // StringJoin nodes (mirrors Rails build_join_buckets stashed_left_joins path).
-    // Exclude associations already covered by _eagerLoadAssociations OR by
-    // includes promoted to eager load (includes().references()) — both cause
-    // _buildEagerJoinManager to emit LEFT OUTER JOINs, so emitting again here
-    // would produce duplicate JOINs / ambiguous column errors.
+    // Left_outer_joins_values resolved via JoinDependency. Exclude associations
+    // already covered by _eagerLoadAssociations OR by includes promoted to eager
+    // load (includes().references()) — both cause _buildEagerJoinManager to emit
+    // LEFT OUTER JOINs, so re-emitting here would duplicate JOINs / raise
+    // ambiguous-column errors. (The subquery path folds eager as a stashed JD
+    // instead, so it has no equivalent filter.) When named INNER joins are also
+    // present the left-outer JD folds into the inner JD's join_constraints (Rails
+    // build_join_buckets: stashed_left_joins.unshift), deduping a both-ways
+    // association to a single INNER JOIN via `walk`.
     const promotedIncludes = this._includesToPromoteFromReferences();
     const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
     const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
-    // Build the left-outer JoinDependency once. When named INNER joins are also
-    // present it becomes a stashed join folded into the inner JD's
-    // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift
-    // construct_join_dependency(left_joins, OuterJoin)), so an association joined
-    // both ways is deduped via `walk` to a single INNER JOIN. Otherwise it is
-    // emitted on its own as a LEFT OUTER JOIN.
     const leftOuterJd =
       pendingLeftOuter.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(
@@ -3570,58 +3559,12 @@ export class Relation<T extends Base> {
             Nodes.OuterJoin,
           )
         : null;
-    // Named INNER joins routed through JoinDependency (nested-through chains
-    // needing AliasTracker self-join aliasing). Emitted as InnerJoin so they
-    // produce the canonical `*_<owner>_join` aliases (mirrors Rails joins_values
-    // → named_join with InnerJoin type).
-    // One AliasTracker shared with the cross-klass merged dependencies, mirroring
-    // Rails' single `build_joins` alias_tracker. The same-relation join buckets
-    // (named inner joins, left-outer joins, raw join clauses) seed it with the
-    // tables they emit; a merged dependency joining a table already claimed here
-    // is then re-aliased to its `alias_candidate` (`authors_categorizations`).
-    const sharedTracker = buildMergedJoinAliasTracker(this as any);
-    if (this._namedInnerJoins.length > 0) {
-      const jd = QueryMethodBangs.constructJoinDependency.call(
-        this as any,
-        this._namedInnerJoins,
-        Nodes.InnerJoin,
-      );
-      // Thread references_values so a join referenced by a where-hash / per-join
-      // hash select key aliases its table to the referenced name (first use), and
-      // a duplicate join onto the same table to its alias_candidate — mirroring
-      // Rails build_joins → join_constraints(stashed, alias_tracker,
-      // references_values). The where-hash keys resolve to the same aliased name
-      // (`associatedTable` aliases the resolved table to the key), so the WHERE
-      // and JOIN stay in sync. Aliasing is resolved lazily against the shared
-      // tracker in `makeConstraints`.
-      const stashedLeft = leftOuterJd ? [leftOuterJd] : [];
-      for (const node of jd.joinConstraints(
-        stashedLeft,
-        sharedTracker,
-        this._aliasableReferences(),
-      ))
-        manager.appendJoinNode(node);
-    } else if (leftOuterJd) {
-      for (const node of leftOuterJd.joinConstraints(
-        [],
-        sharedTracker,
-        this._aliasableReferences(),
-      ))
-        manager.appendJoinNode(node);
-    }
-    // Cross-klass merged JoinDependencies (Rails merge_joins): emitted against the
-    // same shared tracker, so a join onto an already-joined table aliases at
-    // emit-time in makeConstraints (a join onto an already-joined table becomes
-    // `authors_categorizations`).
-    for (const jd of this._namedInnerJoinDeps) {
-      for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
-    }
-    // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
-    // emitted against the same shared tracker.
-    for (const jd of this._leftOuterJoinDeps) {
-      for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
-    }
-    for (const node of joinNodes) manager.appendJoinNode(node);
+    _qm.emitJoinPlan.call(this as any, manager, {
+      leadingJoins,
+      joinNodes,
+      stashedJoins: leftOuterJd ? [leftOuterJd] : [],
+      namedJoins: [],
+    });
   }
 
   /**
