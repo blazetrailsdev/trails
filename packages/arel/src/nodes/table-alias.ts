@@ -23,6 +23,11 @@ export class TableAlias extends Binary {
     this.name = name;
   }
 
+  // Mirrors Rails `alias :table_alias :name` (table_alias.rb).
+  get tableAlias(): string | SqlLiteral {
+    return this.name;
+  }
+
   get tableName(): string {
     const rel = this.relation as TypeCastable;
     return typeof rel?.name === "string" ? rel.name : this.nameString;

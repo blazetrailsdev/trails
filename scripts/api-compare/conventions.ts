@@ -352,6 +352,15 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
     names: ["parse_float"],
     rubyFiles: ["validations/numericality.rb"],
   },
+  {
+    reason:
+      "`prepare_delete_statement` is `alias :prepare_delete_statement :prepare_update_statement` " +
+      "in both to_sql.rb and mysql.rb, so the Ruby extractor records the alias with zero " +
+      "positional params (the alias definition carries no signature) while the TS port spells " +
+      "the real `(o)` signature it forwards to.",
+    names: ["prepare_delete_statement"],
+    rubyFiles: ["visitors/to_sql.rb", "visitors/mysql.rb"],
+  },
 ];
 
 /** Map of overridden Ruby method name → the set of Ruby files it's overridden in. */
