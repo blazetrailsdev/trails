@@ -6132,10 +6132,14 @@ describe("RelationTest", () => {
       }
     }
     const rel = Post.where({ title: "a" }).order("title").limit(5);
-    const stripped = rel.unscope("order", "limit");
+    const stripped = rel.except("order", "limit");
     const sql = stripped.toSql();
     expect(sql).not.toContain("ORDER BY");
     expect(sql).not.toContain("LIMIT");
+    // Unlike unscope, except records no unscope_values: merging the result
+    // does not erase the same parts on the other relation.
+    const merged = Post.order("title").merge(stripped);
+    expect(merged.toSql()).toContain("ORDER BY");
   });
 
   it("only", () => {

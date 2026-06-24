@@ -1655,10 +1655,16 @@ export class Relation<T extends Base> {
   /**
    * Remove the specified query parts, keeping everything else.
    *
-   * Mirrors: ActiveRecord::SpawnMethods#except
+   * Mirrors: ActiveRecord::SpawnMethods#except — `relation_with
+   * values.except(*skips)`. Unlike `unscope`, this only removes the value
+   * from the returned relation; it does NOT record an `unscope_values`
+   * directive, so merging the result does not erase the same parts on the
+   * other relation.
    */
   except(...skips: Array<UnscopeType>): Relation<T> {
-    return this.unscope(...skips);
+    const rel = this._clone();
+    for (const skip of skips) _qm.resetValueForScope(rel as any, skip);
+    return rel;
   }
 
   /**
