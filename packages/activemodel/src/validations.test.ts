@@ -770,6 +770,22 @@ describe("ValidationsTest", () => {
     expect(blank.errors.get("fullName")).toContain("gotcha");
   });
 
+  it("read_attribute_for_validation raises NoMethodError-style for a missing reader", () => {
+    // Ruby `send(:nope)` raises NoMethodError; a typo'd / undeclared validation
+    // attribute with no reader fails loud rather than validating a nil-ish value.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({ name: "Al" });
+    expect(() =>
+      (
+        p as unknown as { readAttributeForValidation(a: string): unknown }
+      ).readAttributeForValidation("nope"),
+    ).toThrow(/undefined method 'nope'/);
+  });
+
   it("validates with array condition does not mutate the array", () => {
     class Person extends Model {
       static {

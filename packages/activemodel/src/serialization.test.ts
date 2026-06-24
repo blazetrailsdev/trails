@@ -44,6 +44,29 @@ describe("SerializationTest", () => {
     expect(readAttributeForSerialization(host, "name")).toBe("FRESH");
   });
 
+  it("read_attribute_for_serialization invokes a method reader (send), not the attributes hash", () => {
+    // Rails' `send(:name)` calls the `name` method; a plain host with a method
+    // reader must serialize its return, not a stale `attributes[:name]`.
+    const host = {
+      attributes: { name: "STALE" },
+      name(): string {
+        return "i_am_name";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization(host, "name")).toBe("i_am_name");
+  });
+
+  it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
+    // Ruby `send(:nope)` raises NoMethodError; a name with no reader and no
+    // store/hash entry fails loud rather than silently serializing undefined.
+    const host = {
+      attributes: { name: "x" },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization(host, "nope")).toThrow(/undefined method 'nope'/);
+  });
+
   it("include option with empty association", () => {
     // Rails: `@user.friends = []` then `serializable_hash(include: :friends)`
     // yields `friends: []` — the accessor exists and returns an empty array.

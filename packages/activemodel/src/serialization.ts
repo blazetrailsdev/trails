@@ -156,29 +156,36 @@ export interface SerializeOptions {
  * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
  * Public in Rails (declared before the `private` section) and overridable.
  *
- * The literal translation of `send(key)`: a value-returning accessor/getter
- * (a declared-attribute getter, or a plain host whose values live in accessors
- * while `attributes` only names keys) is returned directly. Only when the named
- * member is a *function* — meaning `key` names a method, not an attribute
- * accessor, e.g. an `attribute("toJSON")` that cannot install a getter because
- * `toJSON` is structurally reserved by `JSON.stringify` — or when no member
- * responds at all (include-reached `{ _attributes }` doubles without per-key
- * getters) is the attribute store read instead. Invoking the method would be
- * Rails-incompatible only at the JS-runtime level (see the "attribute named
- * toJSON does not shadow Model#toJSON" test); a genuine accessor still wins.
+ * Mirrors `send(key)`. An `_attributes`-backed record (the trails Model / AR
+ * store) reads its store directly: for these, every serialized key comes from
+ * `attribute_names_for_serialization` (i.e. the store), the store value equals
+ * what the generated reader `send` would call returns, and a method-named
+ * attribute (e.g. `attribute("toJSON")`, which cannot install a getter because
+ * `toJSON` is structurally reserved by `JSON.stringify`) must read its value
+ * rather than invoke the method — a JS-runtime-only divergence pinned by the
+ * "attribute named toJSON does not shadow Model#toJSON" test.
+ *
+ * For a plain host (no `_attributes` store) this is literal `send`: a function
+ * member is invoked (`def name; …; end` / `attr_accessor :name`), a value
+ * member is returned, and a name that resolves to no reader raises like Ruby
+ * `send`'s `NoMethodError` rather than silently reading a stale `attributes`
+ * hash. `readAttribute` / the `attributes` hash remain as the named-reader
+ * fallback before the raise so an AR-style host without a per-key getter still
+ * resolves.
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
-  const reader = (record as Record<string, unknown>)[key];
-  if (reader !== undefined && typeof reader !== "function") return reader;
   const attrStore = record._attributes as AttributeStore;
   if (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") {
     return (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   } else if (attrStore instanceof Map) {
     return attrStore.get(key);
-  } else if (record.readAttribute) {
-    return record.readAttribute(key);
   }
-  return record.attributes?.[key];
+  const reader = (record as Record<string, unknown>)[key];
+  if (typeof reader === "function") return (reader as () => unknown).call(record);
+  if (reader !== undefined) return reader;
+  if (record.readAttribute) return record.readAttribute(key);
+  if (record.attributes && key in record.attributes) return record.attributes[key];
+  throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
 }
 
 /**

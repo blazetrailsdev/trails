@@ -4,6 +4,7 @@ import { VALIDATOR_DEFAULT_KEYS } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import { NoMethodError } from "./attribute-assignment.js";
 import {
   _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
@@ -41,14 +42,20 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
  * Rails' `send` would call) and custom readers as methods, so a function member
  * is invoked (Ruby `send(:full_name)`) and a value member returned directly. A
  * plain getter with no declared attribute is therefore honored, not read as nil.
- * `EachValidator` dispatches through any instance override (validator.ts).
+ * A name that resolves to no reader raises, mirroring Ruby `send`'s
+ * `NoMethodError` (a typo'd / undeclared validation attribute fails loud rather
+ * than validating a nil-ish value). `EachValidator` dispatches through any
+ * instance override (validator.ts).
  */
 export function readAttributeForValidation(
   this: ReadAttributeForValidationHost,
   attribute: string,
 ): unknown {
   const reader = this[attribute];
-  return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
+  if (typeof reader === "function") return (reader as () => unknown).call(this);
+  if (reader !== undefined) return reader;
+  const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
+  throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
 }
 
 /**
