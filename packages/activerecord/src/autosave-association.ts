@@ -390,13 +390,14 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
   if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
     (inst as { resetScope: () => void }).resetScope();
   }
-  const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
+  // Marked-for-destruction children were already routed through the
+  // collection-level destroy in `saveCollectionAssociation` (Rails
+  // save_collection_association:431-434); the snapshot here keeps the save loop
+  // stable and the `continue` skips any that remain (e.g. new records).
+  const children: Base[] = Array.isArray(inst?.target) ? [...(inst.target as Base[])] : [];
 
   for (const child of children) {
-    if (isMarkedForDestruction(child)) {
-      if (!child.isNewRecord()) await child.destroy();
-      continue;
-    }
+    if (isMarkedForDestruction(child)) continue;
     // Rails associated_records_to_validate_or_save (autosave_association.rb:
     // 373-381): when the owner was new before save, every target record
     // gets processed — not just new/changed ones. The dispatch inside
@@ -843,13 +844,12 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
   if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
     (inst as { resetScope: () => void }).resetScope();
   }
-  const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
+  // See autosaveHasMany: marked-for-destruction children are destroyed in
+  // `saveCollectionAssociation`; snapshot to keep the save loop stable.
+  const children: Base[] = Array.isArray(inst?.target) ? [...(inst.target as Base[])] : [];
 
   for (const child of children) {
-    if (isMarkedForDestruction(child)) {
-      if (!child.isNewRecord()) await child.destroy();
-      continue;
-    }
+    if (isMarkedForDestruction(child)) continue;
     // Rails associated_records_to_validate_or_save (autosave_association.rb:
     // 373-381): when the owner was new before save, every target record
     // gets processed — not just new/changed ones. The dispatch inside
@@ -1070,7 +1070,26 @@ export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<boolean> {
-  return autosaveHasMany(this as unknown as Base, {
+  const owner = this as unknown as Base;
+  // Rails save_collection_association (autosave_association.rb:431-434):
+  //   records_to_destroy = records.select(&:marked_for_destruction?)
+  //   records_to_destroy.each { |record| association.destroy(record) }
+  // Route each marked-for-destruction persisted child through the
+  // collection-level `destroy` (not record-level `child.destroy`) so the
+  // `before_remove`/`after_remove` callbacks fire and the record is pruned from
+  // the in-memory target. Snapshot first since `inst.destroy` splices the live
+  // target as it removes each record; new (unpersisted) records are left for
+  // the save loop, which skips them.
+  const inst = _loadedAssociation(owner, reflection.name);
+  if (inst && typeof inst.destroy === "function") {
+    const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
+    for (const child of snapshot) {
+      if (isMarkedForDestruction(child) && !child.isNewRecord()) {
+        await inst.destroy(child);
+      }
+    }
+  }
+  return autosaveHasMany(owner, {
     name: reflection.name,
     type: "hasMany",
     options: reflection.options ?? {},
