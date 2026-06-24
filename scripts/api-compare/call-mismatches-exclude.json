@@ -130,7 +130,7 @@
     "tsFile": "autosave-association.ts",
     "rubyName": "save_has_one_association",
     "call": "save",
-    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which saves the changed child via `childRecord.save({validate:false})`, mirroring save_has_one_association (autosave_association.rb:498). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
+    "reason": "Confirmed equivalent (RFC 0044, autosave-association-save-destroy-cluster): `saveHasOneAssociation` delegates to `autosaveHasOne`, which saves the changed child via `childRecord.save({validate:false})`, mirroring save_has_one_association (autosave_association.rb:503). The extractor does not follow the delegation into the helper \u2014 false positive, no omission."
   },
   {
     "package": "activerecord",
