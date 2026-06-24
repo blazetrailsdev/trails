@@ -368,24 +368,15 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
       "`:visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted`), so the Ruby extractor " +
       "records each alias with zero positional params (the alias definition carries " +
       "no signature) while the TS port spells the real `(o)` / `(o, collector)` " +
-      "signature it forwards to.",
+      "signature it forwards to. (ToSql-only names; aliases also defined in dot.rb " +
+      "live in the shared group below.)",
     names: [
       "visit_Arel_Nodes_Quoted",
       "visit_ActiveSupport_Multibyte_Chars",
       "visit_ActiveSupport_StringInquirer",
-      "visit_BigDecimal",
       "visit_Class",
-      "visit_Date",
-      "visit_DateTime",
-      "visit_FalseClass",
-      "visit_Float",
       "visit_Hash",
-      "visit_NilClass",
       "visit_String",
-      "visit_Symbol",
-      "visit_Time",
-      "visit_TrueClass",
-      "visit_Set",
     ],
     rubyFiles: ["visitors/to_sql.rb"],
   },
@@ -395,7 +386,8 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
       "(`visit__regexp`, `visit__no_edges`, `visit__children`, `visit_String`, " +
       "`visit_Array`), so the Ruby extractor records each alias with zero positional " +
       "params (the alias definition carries no signature) while the TS port spells " +
-      "the real `(o)` signature it forwards to.",
+      "the real `(o)` signature it forwards to. (Dot-only names; aliases also defined " +
+      "in to_sql.rb live in the shared group below.)",
     names: [
       "visit_Arel_Nodes_Regexp",
       "visit_Arel_Nodes_NotRegexp",
@@ -404,20 +396,31 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
       "visit_Arel_Nodes_And",
       "visit_Arel_Nodes_Or",
       "visit_Arel_Nodes_With",
-      "visit_Time",
-      "visit_Date",
-      "visit_DateTime",
-      "visit_NilClass",
-      "visit_TrueClass",
-      "visit_FalseClass",
       "visit_Integer",
-      "visit_BigDecimal",
-      "visit_Float",
-      "visit_Symbol",
       "visit_Arel_Nodes_SqlLiteral",
-      "visit_Set",
     ],
     rubyFiles: ["visitors/dot.rb"],
+  },
+  {
+    reason:
+      "Ruby value-class visit aliases defined in BOTH to_sql.rb (alias to " +
+      "`unsupported`) and dot.rb (alias to `visit_String`/`visit_Array`); the " +
+      "extractor reads each alias as zero-arg in either file while the TS ports spell " +
+      "the real `(o)` signature. Scoped to both files (one entry per name keeps the " +
+      "override-name set globally unique).",
+    names: [
+      "visit_BigDecimal",
+      "visit_Date",
+      "visit_DateTime",
+      "visit_FalseClass",
+      "visit_Float",
+      "visit_NilClass",
+      "visit_Symbol",
+      "visit_Time",
+      "visit_TrueClass",
+      "visit_Set",
+    ],
+    rubyFiles: ["visitors/to_sql.rb", "visitors/dot.rb"],
   },
 ];
 
