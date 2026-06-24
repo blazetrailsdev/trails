@@ -22808,6 +22808,41 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "clear",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "disconnect!",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "with_exclusively_acquired_all_connections",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "delete",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "disconnect!",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "complete",
     "call": "connection_handler",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
