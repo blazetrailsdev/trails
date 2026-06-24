@@ -3836,7 +3836,7 @@ export class Relation<T extends Base> {
       rel._includesAssociations = [];
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
         // Rails apply_join_dependency, for a limit/offset over a collection
         // reflection, replaces the relation via distinct_relation_for_primary_key
         // (finder_methods.rb:463): execute a query to materialize the limited
@@ -4906,7 +4906,7 @@ export class Relation<T extends Base> {
     // claim parity we reject this combination explicitly. Tracked by the
     // `relation-handler-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (eagerLoading && hasLimitOrOffset && !this._eagerReflectionsAreLimitable(eagerSpecs)) {
+    if (eagerLoading && hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
@@ -4939,6 +4939,26 @@ export class Relation<T extends Base> {
       reflections.push(refl);
     }
     return this.usingLimitableReflections(reflections);
+  }
+
+  /**
+   * Mirror Rails' two-clause `using_limitable_reflections?` test in
+   * `apply_join_dependency` (finder_methods.rb:464-470): a limit/offset over an
+   * eager join dependency is deferral-free (limitable) only when BOTH the eager
+   * join-dependency reflections (`eager_load_values | includes_values`) AND a
+   * second join-dependency built from
+   * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
+   * are limitable. A collection reflection in joins/leftOuterJoins forces
+   * `distinct_relation_for_primary_key` materialization even when every eager
+   * reflection is singular. `_namedInnerJoins` holds the association references
+   * routed out of joins (Rails' `select_association_list(joins_values)`); raw
+   * SQL/Arel joins stay in `_joinValues` and are not reflections.
+   */
+  private _applyJoinDependencyIsLimitable(eagerSpecs: AssociationSpec[]): boolean {
+    return (
+      this._eagerReflectionsAreLimitable(eagerSpecs) &&
+      this._eagerReflectionsAreLimitable([...this._namedInnerJoins, ...this._leftOuterJoinsValues])
+    );
   }
 
   /**
@@ -4976,7 +4996,7 @@ export class Relation<T extends Base> {
     if (this._groupColumns.length > 0) return false;
     if (!this._eagerLoadingForSql()) return false;
     if (this._limitValue === null && this._offsetValue === null) return false;
-    return !this._eagerReflectionsAreLimitable(this._deferredDistinctPkEagerSpecs());
+    return !this._applyJoinDependencyIsLimitable(this._deferredDistinctPkEagerSpecs());
   }
 
   /**

@@ -1537,6 +1537,61 @@ describe("RelationTest", () => {
     }
   });
 
+  it("defers distinct-PK when a collection is in joins despite limitable eager reflections", () => {
+    try {
+      class JlComment extends Base {
+        static {
+          this.tableName = "jl_comments";
+          this.attribute("body", "string");
+          this.attribute("jl_article_id", "integer");
+          registerModel(this);
+        }
+      }
+      class JlAuthor extends Base {
+        static {
+          this.tableName = "jl_authors";
+          this.attribute("name", "string");
+          registerModel(this);
+        }
+      }
+      class JlArticle extends Base {
+        static {
+          this.tableName = "jl_articles";
+          this.attribute("title", "string");
+          this.attribute("jl_author_id", "integer");
+          this.belongsTo("jlAuthor", {
+            className: "JlAuthor",
+            foreignKey: "jl_author_id",
+          });
+          this.hasMany("jlComments", {
+            className: "JlComment",
+            foreignKey: "jl_article_id",
+          });
+          registerModel(this);
+        }
+      }
+      // Eager reflection (belongsTo) is singular → limitable on its own, but the
+      // joins ∪ left_outer_joins clause (finder_methods.rb:464-470) has a
+      // collection (hasMany), so the two-clause using_limitable_reflections? test
+      // is false and the relation defers to distinct-PK materialization.
+      const limitableEager = JlArticle.all().eagerLoad("jlAuthor").limit(5);
+      expect((limitableEager as any)._isDeferredDistinctPkSubquery()).toBe(false);
+
+      const withCollectionJoin = JlArticle.all().eagerLoad("jlAuthor").joins("jlComments").limit(5);
+      expect((withCollectionJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
+
+      const withCollectionLeftJoin = JlArticle.all()
+        .eagerLoad("jlAuthor")
+        .leftJoins("jlComments")
+        .limit(5);
+      expect((withCollectionLeftJoin as any)._isDeferredDistinctPkSubquery()).toBe(true);
+    } finally {
+      modelRegistry.delete("JlComment");
+      modelRegistry.delete("JlAuthor");
+      modelRegistry.delete("JlArticle");
+    }
+  });
+
   it.skip("includes + references promotes to eager load SQL", () => {
     try {
       class Author extends Base {
