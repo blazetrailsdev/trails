@@ -1071,17 +1071,22 @@ export async function saveCollectionAssociation(
   reflection: any,
 ): Promise<boolean> {
   const owner = this as unknown as Base;
-  // Rails save_collection_association (autosave_association.rb:431-434):
-  //   records_to_destroy = records.select(&:marked_for_destruction?)
-  //   records_to_destroy.each { |record| association.destroy(record) }
-  // Route each marked-for-destruction persisted child through the
-  // collection-level `destroy` (not record-level `child.destroy`) so the
-  // `before_remove`/`after_remove` callbacks fire and the record is pruned from
-  // the in-memory target. Snapshot first since `inst.destroy` splices the live
-  // target as it removes each record; new (unpersisted) records are left for
-  // the save loop, which skips them.
+  // Rails save_collection_association (autosave_association.rb:430-434):
+  //   if autosave
+  //     records_to_destroy = records.select(&:marked_for_destruction?)
+  //     records_to_destroy.each { |record| association.destroy(record) }
+  //     records -= records_to_destroy
+  // Gated on `autosave` (reflection.options[:autosave]) — a plain collection
+  // never destroys marked children on owner save. Route each marked-for-
+  // destruction persisted child through the collection-level `destroy` (not
+  // record-level `child.destroy`) so the `before_remove`/`after_remove`
+  // callbacks fire and the record is pruned from the in-memory target. Snapshot
+  // first since `inst.destroy` splices the live target as it removes each
+  // record; new (unpersisted) records are left for the save loop, which skips
+  // them.
+  const autosave = reflection.options?.autosave;
   const inst = _loadedAssociation(owner, reflection.name);
-  if (inst && typeof inst.destroy === "function") {
+  if (autosave && inst && typeof inst.destroy === "function") {
     const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
     for (const child of snapshot) {
       if (isMarkedForDestruction(child) && !child.isNewRecord()) {
