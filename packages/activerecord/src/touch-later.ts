@@ -188,6 +188,14 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
     self._deferTouchAttrs = deferredAttrs;
     self._touchTime = time;
     throw error;
+  } finally {
+    // Rails clears @_skip_dirty_tracking in _touch_row's `ensure` (dirty.rb:229-231),
+    // which wraps the DB update too — so a StaleObjectError or adapter error inside
+    // touchRow still resets it. touchRow only resets on its post-update path, so
+    // guarantee cleanup here at the setter: otherwise a failed deferred touch would
+    // leave the flag set and a later non-deferred touch() would wrongly take the
+    // fast clearAttributeChanges path, discarding unrelated in-memory changes.
+    self._skipDirtyTracking = null;
   }
 }
 
