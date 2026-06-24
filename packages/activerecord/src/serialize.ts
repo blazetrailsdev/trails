@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import { type Type, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "./type/json.js";
-import { YAMLColumn } from "./coders/yaml-column.js";
 import { Serialized, type Coder } from "./type/serialized.js";
 import {
   ColumnNotSerializableError,
@@ -144,9 +143,7 @@ export function serialize(
   const { coder, coderIdentity, objectType } = resolveSerializer(
     attribute,
     options,
-    "defaultColumnSerializer" in modelClass
-      ? (modelClass as { defaultColumnSerializer?: unknown }).defaultColumnSerializer
-      : YAMLColumn,
+    modelClass.defaultColumnSerializer,
   );
 
   modelClass.decorateAttributes([attribute], (name: string, castType: Type): Type => {
