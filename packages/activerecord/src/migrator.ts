@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import type { Migration } from "./migration.js";
+import { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager } from "@blazetrails/arel";
 
 interface MigrationEntry {
@@ -21,7 +22,10 @@ interface MigrationStatus {
 export class MigrationRunner {
   private adapter: DatabaseAdapter;
   private migrations: MigrationEntry[];
-  private readonly arelTable = new Table("schema_migrations");
+  // Composed like SchemaMigration#table_name (schema_migration.rb:49-50):
+  // table_name_prefix + schema_migrations_table_name + table_name_suffix.
+  private readonly tableName = `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`;
+  private readonly arelTable = new Table(this.tableName);
 
   constructor(adapter: DatabaseAdapter, migrations: Migration[]) {
     this.adapter = adapter;
@@ -35,8 +39,9 @@ export class MigrationRunner {
    * Ensure the schema_migrations table exists.
    */
   private async ensureTable(): Promise<void> {
+    const quoted = this.tableName.replace(/"/g, '""');
     await this.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
+      `CREATE TABLE IF NOT EXISTS "${quoted}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
     );
   }
 
