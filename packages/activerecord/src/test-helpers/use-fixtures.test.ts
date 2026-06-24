@@ -250,7 +250,7 @@ describe("useFixtures by registry name", () => {
 
   it("loads authors by label with the expected attributes", async () => {
     const david = authors("david");
-    expect(david.id).toBe(1);
+    expect(Number(david.id)).toBe(1);
     const [row] = await Base.adapter.execute(
       `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
     );
@@ -311,7 +311,7 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 
   it("resolves each join row's FK pair to the referenced rows' ids", () => {
     const row = categoriesPosts("general_welcome");
-    expect(row.category_id).toBe(categories("general").readAttribute("id"));
+    expect(Number(row.category_id)).toBe(Number(categories("general").readAttribute("id")));
     expect(row.post_id).toBe(posts("welcome").readAttribute("id"));
   });
 
@@ -352,7 +352,7 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
     const row = peoplesTreasures("michael_diamond");
-    expect(row.rich_person_id).toBe(people("michael").readAttribute("id"));
+    expect(Number(row.rich_person_id)).toBe(Number(people("michael").readAttribute("id")));
     expect(row.treasure_id).toBe(treasures("diamond").readAttribute("id"));
   });
 });
@@ -375,10 +375,10 @@ describe("useFixtures vertices and edges", () => {
   });
 
   it("resolves every edge ref() source_id and sink_id to a real vertex id", () => {
-    const vertexIds = vertices.all().map((v) => v.readAttribute("id"));
+    const vertexIds = vertices.all().map((v) => Number(v.readAttribute("id")));
     for (const edge of edges.all()) {
-      expect(vertexIds).toContain(edge.readAttribute("source_id"));
-      expect(vertexIds).toContain(edge.readAttribute("sink_id"));
+      expect(vertexIds).toContain(Number(edge.readAttribute("source_id")));
+      expect(vertexIds).toContain(Number(edge.readAttribute("sink_id")));
     }
   });
 });
@@ -397,7 +397,7 @@ describe("useFixtures { schema } auto-derivation", () => {
 
   it("creates the needed tables and seeds without a manual defineSchema call", async () => {
     const david = authors("david");
-    expect(david.id).toBe(1);
+    expect(Number(david.id)).toBe(1);
     const [row] = await Base.adapter.execute(
       `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
     );
@@ -548,8 +548,8 @@ describe("useFixtures seeds composite-primary-key tables", () => {
   it("seeds a composite-schema-PK row from its ref()'d key columns", () => {
     const tag = cpkOrderTags("cpk_first_order_loyal_customer");
     // order_id resolves to cpk_orders.cpk_groceries_order_1's id; tag_id to a cpk_tag.
-    expect(tag.readAttribute("order_id")).toBe(
-      cpkOrders("cpk_groceries_order_1").readAttribute("id"),
+    expect(Number(tag.readAttribute("order_id"))).toBe(
+      Number(cpkOrders("cpk_groceries_order_1").readAttribute("id")),
     );
     expect(tag.readAttribute("tag_id")).not.toBeNull();
     expect(tag.readAttribute("tag_id")).not.toBeUndefined();

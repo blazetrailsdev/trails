@@ -1052,7 +1052,7 @@ describe("WhereTest", () => {
       estimate_of_id: sapphire.id,
     }).toArray();
     expect(only).toHaveLength(2);
-    expect(only.every((r: any) => r.estimate_of_id === sapphire.id)).toBe(true);
+    expect(only.every((r: any) => Number(r.estimate_of_id) === Number(sapphire.id))).toBe(true);
   });
   it("where not association as nand", async () => {
     class PonandNandTreasure extends Base {
