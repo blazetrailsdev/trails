@@ -7,7 +7,9 @@ type DeclarationListener = (klass: any, name: string) => void;
 
 let _sharedConfig: Config | null = null;
 let _defaultCipher: Cipher | null = null;
-let _listeners: DeclarationListener[] = [];
+// Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
+// (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
+let _listeners: DeclarationListener[] | undefined;
 const _configureHooks: Array<() => void> = [];
 
 /**
@@ -27,11 +29,11 @@ export class Configurable {
   // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
   // (configurable.rb:11). The listeners are invoked when an encrypted
   // attribute is declared; see onEncryptedAttributeDeclared.
-  static get encryptedAttributeDeclarationListeners(): DeclarationListener[] {
+  static get encryptedAttributeDeclarationListeners(): DeclarationListener[] | undefined {
     return _listeners;
   }
 
-  static set encryptedAttributeDeclarationListeners(value: DeclarationListener[]) {
+  static set encryptedAttributeDeclarationListeners(value: DeclarationListener[] | undefined) {
     _listeners = value;
   }
 
@@ -91,14 +93,20 @@ export class Configurable {
   }
 
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
-    _listeners.push(callback);
+    // Mirrors Rails' `self.encrypted_attribute_declaration_listeners ||= ...`
+    // (configurable.rb:48) — lazily allocate on first registration.
+    const listeners = (_listeners ??= []);
+    listeners.push(callback);
     return () => {
-      const idx = _listeners.indexOf(callback);
-      if (idx !== -1) _listeners.splice(idx, 1);
+      const idx = listeners.indexOf(callback);
+      if (idx !== -1) listeners.splice(idx, 1);
     };
   }
 
   static encryptedAttributeWasDeclared(klass: any, name: string): void {
+    // Mirrors Rails' `&.each` safe-navigation (configurable.rb:53) — no-op
+    // when no listeners have ever been registered (accessor still nil).
+    if (!_listeners) return;
     for (const listener of [..._listeners]) {
       listener(klass, name);
     }
