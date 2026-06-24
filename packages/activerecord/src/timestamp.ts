@@ -187,7 +187,33 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
   // after_rollback(on: :update) when the enrolling transaction commits/rolls back.
   (this as any)._triggerUpdateCallback = affected === 1;
 
-  this.changesApplied();
+  // Mirrors Rails AttributeMethods::Dirty#_touch_row (dirty.rb:204-231): touch
+  // clears dirty state via changes_applied, but that resets the WHOLE dirty
+  // baseline — so unrelated in-memory changes the caller made before touching
+  // would be silently forgotten. Rails preserves them: it stashes each
+  // non-touched changed attribute, reverts it so changes_applied snapshots the
+  // pre-change value, then re-writes it afterward so it stays dirty. The
+  // @_skip_dirty_tracking branch (set by touch_later) instead just clears the
+  // touched columns' changes.
+  const self = this as any;
+  if (self._skipDirtyTracking) {
+    self.clearAttributeChanges(touchCols);
+  } else {
+    const touched = new Set(touchCols);
+    const restores: Array<[string, unknown]> = [];
+    for (const attrName of self._attributes.keys()) {
+      if (touched.has(attrName)) continue;
+      if (self.attributeChanged(attrName)) {
+        restores.push([attrName, self._readAttribute(attrName)]);
+        self._writeAttribute(attrName, self.attributeWas(attrName));
+        self.clearAttributeChange(attrName);
+      }
+    }
+    self.changesApplied();
+    for (const [attrName, value] of restores) {
+      self._writeAttribute(attrName, value);
+    }
+  }
 
   await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
   return true;
