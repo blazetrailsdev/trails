@@ -231,7 +231,11 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "default. `default_scope_override`: trails computes it on demand by walking " +
       "the prototype chain for the `defaultScope` owner (scoping/default.ts), " +
       "rather than memoizing it in a class_attribute. The `=` writer / `?` " +
-      "predicate likewise have no trails caller.",
+      "predicate likewise have no trails caller. `lock_optimistically` and " +
+      "`default_column_serializer` are tracked-pending-convergence: trails " +
+      "hardcodes the behavior today, and porting the configurable accessor is " +
+      "scoped to follow-up stories lock-optimistically-config-accessor and " +
+      "default-column-serializer-config-accessor (RFC 0023).",
     names: [
       "lock_optimistically",
       "lock_optimistically=",
