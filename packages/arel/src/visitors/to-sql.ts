@@ -1354,8 +1354,8 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  /** Mirrors `to_sql.rb#unsupported`. */
-  protected unsupported(o: Node): never {
+  /** Mirrors `to_sql.rb#unsupported` (to_sql.rb:828). */
+  protected unsupported(o: Node, _collector?: SQLString): never {
     throw new UnsupportedVisitError(`Unknown node type: ${o.constructor.name}`);
   }
 
@@ -1365,66 +1365,76 @@ export class ToSql extends Visitor {
   // the shared helper. They aren't wired into the dispatch table — the
   // trails Arel pipeline never threads a raw JS Date/Class/Hash/etc. as a
   // node — but the names exist so the unsupported contract is documented
-  // and directly testable.
+  // and directly testable. Each keeps the Rails `(o, collector)` shape.
 
   /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
-  protected visitActiveSupportMultibyteChars(o: Node): never {
-    return this.unsupported(o);
+  protected visitActiveSupportMultibyteChars(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_ActiveSupport_StringInquirer :unsupported`. */
-  protected visitActiveSupportStringInquirer(o: Node): never {
-    return this.unsupported(o);
+  protected visitActiveSupportStringInquirer(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_BigDecimal :unsupported` (to_sql.rb:834). */
+  protected visitBigDecimal(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Class :unsupported`. */
-  protected visitClass(o: Node): never {
-    return this.unsupported(o);
+  protected visitClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Date :unsupported`. */
-  protected visitDate(o: Node): never {
-    return this.unsupported(o);
+  protected visitDate(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_DateTime :unsupported`. */
-  protected visitDateTime(o: Node): never {
-    return this.unsupported(o);
+  protected visitDateTime(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_FalseClass :unsupported`. */
-  protected visitFalseClass(o: Node): never {
-    return this.unsupported(o);
+  protected visitFalseClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Float :unsupported`. */
-  protected visitFloat(o: Node): never {
-    return this.unsupported(o);
+  protected visitFloat(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Hash :unsupported`. */
-  protected visitHash(o: Node): never {
-    return this.unsupported(o);
+  protected visitHash(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_NilClass :unsupported`. */
-  protected visitNilClass(o: Node): never {
-    return this.unsupported(o);
+  protected visitNilClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_String :unsupported`. */
-  protected visitString(o: Node): never {
-    return this.unsupported(o);
+  protected visitString(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
+  }
+
+  /** Rails: `alias :visit_Symbol :unsupported` (to_sql.rb:843). */
+  protected visitSymbol(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Time :unsupported`. */
-  protected visitTime(o: Node): never {
-    return this.unsupported(o);
+  protected visitTime(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_TrueClass :unsupported`. */
-  protected visitTrueClass(o: Node): never {
-    return this.unsupported(o);
+  protected visitTrueClass(o: Node, collector: SQLString): never {
+    return this.unsupported(o, collector);
   }
 
   // -- InfixOperation --
@@ -1466,6 +1476,11 @@ export class ToSql extends Visitor {
       this.visitNodeOrValue(item, collector);
     });
     return collector;
+  }
+
+  /** Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861). */
+  protected visitSet(items: ReadonlySet<Nodes.NodeOrValue>, collector: SQLString): SQLString {
+    return this.visitArray([...items], collector);
   }
 
   protected visitArelNodesFragments(node: Nodes.Fragments, collector: SQLString): SQLString {

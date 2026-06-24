@@ -210,7 +210,11 @@ describe("TestDot", () => {
         withNode(node: DotNode, block: () => void): void;
         toDot(): string;
       };
-      const iv = v as unknown as Internals;
+      type WithBigDecimal = Internals & {
+        visitBigDecimal(o: unknown): void;
+        visitSymbol(o: unknown): void;
+      };
+      const iv = v as unknown as WithBigDecimal;
       v.compile(new Nodes.SqlLiteral("seed")); // initialize internal state
       const node = new DotNode("Integer", 0);
       (v as unknown as { nodes: DotNode[] }).nodes.push(node);
@@ -218,10 +222,34 @@ describe("TestDot", () => {
         iv.visitInteger(42);
         iv.visitTrueClass(true);
         iv.visitNilClass(null);
+        iv.visitBigDecimal("9.99");
+        iv.visitSymbol("sym");
       });
       const out = iv.toDot();
-      // Three fields appended in order; null renders as "" (Rails nil.to_s).
-      expect(out).toContain("<f0>Integer|<f1>42|<f2>true|<f3>");
+      // Fields appended in order; null renders as "" (Rails nil.to_s).
+      // BigDecimal/Symbol also alias visit_String, so they stash too.
+      expect(out).toContain("<f0>Integer|<f1>42|<f2>true|<f3>|<f4>9.99|<f5>sym");
+    });
+
+    it("visit_Set is aliased to visit_Array (each member becomes an indexed child)", () => {
+      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231).
+      const v = new Visitors.Dot();
+      type Internals = {
+        visitSet(o: ReadonlySet<unknown>): void;
+        withNode(node: DotNode, block: () => void): void;
+        toDot(): string;
+      };
+      const iv = v as unknown as Internals;
+      v.compile(new Nodes.SqlLiteral("seed"));
+      const node = new DotNode("Set", 0);
+      (v as unknown as { nodes: DotNode[] }).nodes.push(node);
+      iv.withNode(node, () => {
+        iv.visitSet(new Set([new Nodes.SqlLiteral("a"), new Nodes.SqlLiteral("b")]));
+      });
+      const out = iv.toDot();
+      // visit_Array walks each member under an index-labeled edge.
+      expect(out).toMatch(/-> \d+ \[label="0"\];/);
+      expect(out).toMatch(/-> \d+ \[label="1"\];/);
     });
 
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {

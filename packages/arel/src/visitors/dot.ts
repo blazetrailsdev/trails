@@ -357,12 +357,22 @@ export class Dot extends Visitor {
     this.visitString(o);
   }
 
+  /** Rails: `alias :visit_BigDecimal :visit_String` (dot.rb:207). */
+  protected visitBigDecimal(o: unknown): void {
+    this.visitString(o);
+  }
+
   /** Rails: `alias :visit_Float :visit_String` (dot.rb:208). */
   protected visitFloat(o: unknown): void {
     this.visitString(o);
   }
 
-  /** Rails: `alias :visit_Arel_Nodes_SqlLiteral :visit_String` (dot.rb:209). */
+  /** Rails: `alias :visit_Symbol :visit_String` (dot.rb:209). */
+  protected visitSymbol(o: unknown): void {
+    this.visitString(o);
+  }
+
+  /** Rails: `alias :visit_Arel_Nodes_SqlLiteral :visit_String` (dot.rb:210). */
   protected visitArelNodesSqlLiteral(o: Nodes.SqlLiteral): void {
     this.visitString(o);
   }
@@ -391,6 +401,11 @@ export class Dot extends Visitor {
     o.forEach((member, i) => {
       this.edge(String(i), () => this.visit(member));
     });
+  }
+
+  /** Rails: `alias :visit_Set :visit_Array` (dot.rb:231). */
+  protected visitSet(o: ReadonlySet<unknown>): void {
+    this.visitArray([...o]);
   }
 
   protected visitArelNodesComment(o: Nodes.Comment): void {

@@ -73,8 +73,6 @@ api:compare never expects a TS counterpart for these Ruby methods:
   - `dup`, `clone`, `freeze`, `hash`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `respond_to?`, `respond_to_missing?`, `method_missing`, `is_a?`, `kind_of?`, `instance_of?`, `nil?`, `equal?`, `eql?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
 - Ruby module lifecycle hooks — no TypeScript equivalent.
   - `extended`, `included`, `inherited`
-- Arel Dot / ToSql primitive visitors for Ruby BigDecimal/Symbol/Set — these are aliases of visit_String / visit_Array / unsupported, but no Ruby BigDecimal, Symbol, or Set value flows through the trails Arel value pipeline, so there is no equivalent dispatch to port.
-  - `visit_BigDecimal`, `visit_Symbol`, `visit_Set`
 - Ruby object hooks — no TypeScript equivalent.
   - `singleton_method_added`
 - NoTouching: TS uses a Map-based depth counter (\_noTouchingDepth) instead of a thread-local array; klasses() is the Rails internal accessor for that array.
