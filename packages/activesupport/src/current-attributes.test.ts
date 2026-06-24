@@ -105,8 +105,78 @@ describe("CurrentAttributesTest", () => {
     expect(inst.user?.name).toBe("david");
   });
 
-  it.skip("resets auxiliary classes via callback");
-  it.skip("set auxiliary class based on current attributes via before callback");
+  // Rails models `Time.zone` global state; we mirror it with a module-local
+  // holder so the reset-callback behavior can be exercised verbatim.
+  let timeZone: string | undefined;
+
+  class Person {
+    constructor(
+      public id: number,
+      public name: string,
+      public timeZone: string,
+    ) {}
+  }
+
+  class Session extends CurrentAttributes {
+    static {
+      this.attribute("current", "previous");
+    }
+    declare current: number | undefined;
+    declare previous: number | undefined;
+  }
+
+  // Mirrors Rails' `Current` model: a `person=` setter that sets aux state, a
+  // `before_reset` that snapshots the person id, and `resets` blocks that clear
+  // the session and time zone.
+  class CurrentWithResets extends CurrentAttributes {
+    static {
+      this.attribute("person");
+      this.beforeReset(function (this: CurrentWithResets) {
+        Session.instance().previous = this.person?.id;
+      });
+      this.resets(function () {
+        Session.instance().current = undefined;
+      });
+      this.resets(function () {
+        timeZone = "UTC";
+      });
+    }
+
+    get person(): Person | undefined {
+      return this._get("person") as Person | undefined;
+    }
+    set person(p: Person | undefined) {
+      this._set("person", p);
+      timeZone = p?.timeZone;
+      Session.instance().current = p?.id;
+    }
+  }
+
+  it("resets auxiliary classes via callback", () => {
+    CurrentWithResets.reset();
+    Session.reset();
+
+    CurrentWithResets.instance().person = new Person(42, "David", "Central Time (US & Canada)");
+    expect(timeZone).toBe("Central Time (US & Canada)");
+
+    CurrentWithResets.reset();
+    expect(timeZone).toBe("UTC");
+    expect(Session.instance().previous).toBe(42);
+    expect(Session.instance().current).toBeUndefined();
+  });
+
+  it("set auxiliary class based on current attributes via before callback", () => {
+    CurrentWithResets.reset();
+    Session.reset();
+
+    CurrentWithResets.instance().person = new Person(42, "David", "Central Time (US & Canada)");
+    expect(Session.instance().previous).toBeUndefined();
+    expect(Session.instance().current).toBe(42);
+
+    CurrentWithResets.reset();
+    expect(Session.instance().previous).toBe(42);
+    expect(Session.instance().current).toBeUndefined();
+  });
 
   it("set attribute only via scope", () => {
     const inst = Current.instance();

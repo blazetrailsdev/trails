@@ -7,6 +7,8 @@
  * tests, we use a simple synchronous store (no async context).
  */
 
+import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
+
 type AttributeValue = unknown;
 type DefaultValue<T> = T | (() => T);
 
@@ -14,7 +16,8 @@ interface AttributeDefinition<T = AttributeValue> {
   default?: DefaultValue<T>;
 }
 
-type ResetCallback = () => void;
+/** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */
+type ResetCallback = (this: CurrentAttributes) => void;
 
 /**
  * Base class for current-attributes objects. Subclass and call
@@ -25,8 +28,13 @@ export abstract class CurrentAttributes {
   public static _definitions: Map<string, AttributeDefinition> = new Map();
   /** @internal per-class instance storage (one per class, reset on each "request") */
   public static _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes> = new WeakMap();
-  /** @internal before-reset callbacks */
-  public static _resetCallbacks: ResetCallback[] = [];
+
+  static {
+    // Mirrors `include ActiveSupport::Callbacks; define_callbacks :reset` — the
+    // chain lives on the prototype so subclasses inherit it (copy-on-write) and
+    // `runCallbacks` can resolve it from an instance.
+    defineCallbacks(CurrentAttributes.prototype, "reset");
+  }
 
   /** @internal per-instance attribute values */
   protected _attributes: Map<string, AttributeValue> = new Map();
@@ -90,10 +98,45 @@ export abstract class CurrentAttributes {
     return ctor._instances.get(ctor) as InstanceType<T>;
   }
 
-  /** Resets this class's instance (clears all attributes). */
+  /**
+   * Registers a callback to run before #reset clears the attributes. Mirrors
+   * Rails' `before_reset` (`set_callback :reset, :before`).
+   */
+  static beforeReset<T extends typeof CurrentAttributes>(
+    this: T,
+    callback: (this: InstanceType<T>) => void,
+  ): void {
+    setCallback(this.prototype, "reset", "before", callback as ResetCallback);
+  }
+
+  /**
+   * Registers a callback to run after #reset clears the attributes. Mirrors
+   * Rails' `resets` / `after_reset` (`set_callback :reset, :after`).
+   */
+  static resets<T extends typeof CurrentAttributes>(
+    this: T,
+    callback: (this: InstanceType<T>) => void,
+  ): void {
+    setCallback(this.prototype, "reset", "after", callback as ResetCallback);
+  }
+
+  /** Alias for {@link CurrentAttributes.resets} (Rails' `after_reset`). */
+  static afterReset<T extends typeof CurrentAttributes>(
+    this: T,
+    callback: (this: InstanceType<T>) => void,
+  ): void {
+    this.resets(callback);
+  }
+
+  /**
+   * Resets this class's instance: runs the `:reset` callbacks around clearing
+   * all attributes. Mirrors Rails `run_callbacks :reset { self.attributes = {} }`.
+   */
   static reset(): void {
-    const ctor = this as unknown as CurrentAttributesClass;
-    ctor._instances.delete(ctor);
+    const inst = this.instance();
+    runCallbacks(inst, "reset", () => {
+      inst._attributes.clear();
+    });
   }
 
   /** Set multiple attributes at once via the class. */
@@ -153,5 +196,4 @@ export abstract class CurrentAttributes {
 type CurrentAttributesClass = typeof CurrentAttributes & {
   _definitions: Map<string, AttributeDefinition>;
   _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes>;
-  _resetCallbacks: ResetCallback[];
 };
