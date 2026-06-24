@@ -361,6 +361,64 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
     names: ["prepare_delete_statement"],
     rubyFiles: ["visitors/to_sql.rb", "visitors/mysql.rb"],
   },
+  {
+    reason:
+      "Arel::Visitors::ToSql aliases a family of Ruby value classes to a shared " +
+      "visitor body (`alias :visit_X :unsupported`, `:visit_Set :visit_Array`, " +
+      "`:visit_Arel_Nodes_Quoted :visit_Arel_Nodes_Casted`), so the Ruby extractor " +
+      "records each alias with zero positional params (the alias definition carries " +
+      "no signature) while the TS port spells the real `(o)` / `(o, collector)` " +
+      "signature it forwards to.",
+    names: [
+      "visit_Arel_Nodes_Quoted",
+      "visit_ActiveSupport_Multibyte_Chars",
+      "visit_ActiveSupport_StringInquirer",
+      "visit_BigDecimal",
+      "visit_Class",
+      "visit_Date",
+      "visit_DateTime",
+      "visit_FalseClass",
+      "visit_Float",
+      "visit_Hash",
+      "visit_NilClass",
+      "visit_String",
+      "visit_Symbol",
+      "visit_Time",
+      "visit_TrueClass",
+      "visit_Set",
+    ],
+    rubyFiles: ["visitors/to_sql.rb"],
+  },
+  {
+    reason:
+      "Arel::Visitors::Dot aliases its node visitors to shared bodies " +
+      "(`visit__regexp`, `visit__no_edges`, `visit__children`, `visit_String`, " +
+      "`visit_Array`), so the Ruby extractor records each alias with zero positional " +
+      "params (the alias definition carries no signature) while the TS port spells " +
+      "the real `(o)` signature it forwards to.",
+    names: [
+      "visit_Arel_Nodes_Regexp",
+      "visit_Arel_Nodes_NotRegexp",
+      "visit_Arel_Nodes_CurrentRow",
+      "visit_Arel_Nodes_Distinct",
+      "visit_Arel_Nodes_And",
+      "visit_Arel_Nodes_Or",
+      "visit_Arel_Nodes_With",
+      "visit_Time",
+      "visit_Date",
+      "visit_DateTime",
+      "visit_NilClass",
+      "visit_TrueClass",
+      "visit_FalseClass",
+      "visit_Integer",
+      "visit_BigDecimal",
+      "visit_Float",
+      "visit_Symbol",
+      "visit_Arel_Nodes_SqlLiteral",
+      "visit_Set",
+    ],
+    rubyFiles: ["visitors/dot.rb"],
+  },
 ];
 
 /** Map of overridden Ruby method name → the set of Ruby files it's overridden in. */
