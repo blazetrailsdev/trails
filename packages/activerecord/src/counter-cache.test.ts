@@ -9,6 +9,10 @@ import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 
 const TEST_SCHEMA: Schema = {
   topics: {
@@ -118,20 +122,33 @@ const TEST_SCHEMA: Schema = {
     name: "string",
     cars_count: { type: "integer", default: 0 },
   },
-  legacy_posts: {
-    title: "string",
-    legacy_comments_count: { type: "integer", default: 0 },
-  },
-  legacy_comments: {
-    body: "string",
-    legacy_post_id: "integer",
-  },
 };
 
 // -- Helpers --
 // ==========================================================================
 // CounterCacheTest — targets counter_cache_test.rb
 // ==========================================================================
+describe("CounterCacheTest", () => {
+  setupHandlerSuite();
+  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+  beforeAll(() => {
+    registerModel(CanonicalPost);
+    registerModel(CanonicalComment);
+  });
+
+  // Counter cache pointing at an aliased column resolves to the real column at
+  // update time. Mirrors Rails' Post#comments_count (alias_attribute for
+  // legacy_comments_count) used as a belongs_to counter cache: the derived
+  // snake_case column name is resolved through the camelCase attribute alias.
+  it("counter cache updates an aliased column", async () => {
+    const post = await CanonicalPost.create({ title: "Hello", body: "World" });
+    await CanonicalComment.create({ body: "First", post_id: post.id });
+
+    const reloaded = await CanonicalPost.find(post.id);
+    expect(reloaded.legacy_comments_count).toBe(1);
+  });
+});
+
 describe("CounterCacheTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
@@ -161,41 +178,6 @@ describe("CounterCacheTest", () => {
 
     const reloaded = await Topic.find(topic.id);
     expect(reloaded.replies_count).toBe(1);
-  });
-
-  // Counter cache pointing at an aliased column resolves to the real column at
-  // update time. Mirrors Rails' Post#comments_count (alias_attribute for
-  // legacy_comments_count) used as a belongs_to counter cache: the derived
-  // snake_case column name is resolved through the camelCase attribute alias.
-  it("counter cache updates an aliased column", async () => {
-    class LegacyPost extends Base {
-      static {
-        this._tableName = "legacy_posts";
-        this.attribute("title", "string");
-        this.attribute("legacy_comments_count", "integer", { default: 0 });
-        this.aliasAttribute("commentsCount", "legacy_comments_count");
-      }
-    }
-    class LegacyComment extends Base {
-      static {
-        this._tableName = "legacy_comments";
-        this.attribute("body", "string");
-        this.attribute("legacy_post_id", "integer");
-        this.belongsTo("legacyPost", {
-          className: "LegacyPost",
-          foreignKey: "legacy_post_id",
-          counterCache: "comments_count",
-        });
-      }
-    }
-    registerModel(LegacyPost);
-    registerModel(LegacyComment);
-
-    const post = await LegacyPost.create({ title: "Hello" });
-    await LegacyComment.create({ body: "World", legacy_post_id: post.id });
-
-    const reloaded = await LegacyPost.find(post.id);
-    expect(reloaded.legacy_comments_count).toBe(1);
   });
 
   // Rails: test_removing_association_updates_counter
