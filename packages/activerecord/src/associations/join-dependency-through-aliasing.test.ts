@@ -320,26 +320,39 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   });
 
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
+    // Rails JoinDependency#make_constraints memoizes `@joined_tables` for EVERY
+    // child (join_dependency.rb:193-209), including a plain (non-through)
+    // include. The direct `jdtPosts` include and the `jdtComments`-through-posts
+    // path both carry the owner's single `jdtPosts` reflection as a chain tail,
+    // so the direct include populates the memo and the through path reuses that
+    // ONE `jdt_posts` join instead of minting a second
+    // `jdt_posts_jdt_authors_join` alias.
     const jd = new JoinDependency(JdtAuthor);
-    jd.addAssociation("jdtPosts");
+    const directNode = jd.addAssociation("jdtPosts");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
     jd.joinConstraints([]);
 
-    // Through table aliased because jdt_posts already used. Non-root chain
-    // links get the `_join` suffix (join_dependency.rb:206).
-    const throughNode = jd.nodes.find(
-      (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
-    );
-    expect(throughNode).toBeDefined();
-    expect(throughNode!.effectiveSqlName).toBe("jdt_posts_jdt_authors_join");
-    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(throughTable.name).toBe("jdt_posts");
-    expect(throughTable.tableAlias).toBe("jdt_posts_jdt_authors_join");
+    // The direct include keeps the real `jdt_posts` name (first use) and owns
+    // the one emitted join.
+    expect(directNode!.effectiveSqlName).toBe("jdt_posts");
+    const directTable = (directNode!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(directTable.name).toBe("jdt_posts");
+    expect(directTable.tableAlias).toBeNull();
 
-    // Target uses real name (first use)
+    // The through link reuses the memoized `jdt_posts` alias — it is suppressed
+    // (no duplicate join, dropped from the projected `nodes`) so exactly one
+    // `jdt_posts` join survives and no spurious `_join` alias is minted.
+    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    expect(effectiveNames.filter((n) => n === "jdt_posts").length).toBe(1);
+    expect(effectiveNames.some((n) => n.includes("_join"))).toBe(false);
+    expect(
+      jd.nodes.some((n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_")),
+    ).toBe(false);
+
+    // Target uses real name (first use), keyed off the one shared `jdt_posts`.
     const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("jdt_comments");
     expect(targetTable.tableAlias).toBeNull();
