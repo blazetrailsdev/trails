@@ -348,23 +348,40 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
   async loadTarget(): Promise<Base | Base[] | null> {
-    if (this.isStaleTarget() || this.findTargetNeeded()) {
+    // Mirrors Rails' guard `(@stale_state && stale_target?) || find_target?`
+    // (association.rb:190). The `@stale_state &&` factor uses Ruby truthiness
+    // (nil/false falsy; `0`/`""` truthy) — here `!= null`, not `Boolean()`.
+    // The stale and find-target branches are mutually exclusive (`stale_target?`
+    // requires loaded, `find_target?` requires not-loaded), so they split cleanly.
+    if (this._staleState != null && this.isStaleTarget()) {
+      // Rails `find_target` always issues a query; skip the in-memory
+      // `doFindTarget` cache so a stale target is actually re-fetched.
+      await this._findTarget();
+    } else if (this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined) {
         this.target = cached;
       } else {
-        const result = await this.doAsyncFindTarget();
-        if (result !== undefined) {
-          // Rails applies set_strict_loading per record in find_target's DB
-          // execute block — only freshly loaded records, never cached ones.
-          if (result !== null) this.setStrictLoading(result as Base);
-          this.target = result;
-        }
+        await this._findTarget();
       }
     }
 
     this.loadedBang();
     return this.target;
+  }
+
+  /**
+   * Mirrors Rails' `find_target` DB load: issues a query (never the in-memory
+   * cache) and applies `set_strict_loading` per freshly loaded record.
+   */
+  private async _findTarget(): Promise<void> {
+    const result = await this.doAsyncFindTarget();
+    if (result !== undefined) {
+      // Rails applies set_strict_loading per record in find_target's DB
+      // execute block — only freshly loaded records, never cached ones.
+      if (result !== null) this.setStrictLoading(result as Base);
+      this.target = result;
+    }
   }
 
   /**
