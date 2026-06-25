@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA as CANONICAL_SCHEMA } from "./test-helpers/test-schema.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import {
   markForDestruction,
@@ -19,8 +20,8 @@ const TEST_SCHEMA = {
   authors: { name: "string" },
   books: { title: "string", author_id: "integer" },
   companies: { name: "string" },
-  accounts: { credit_limit: "integer", company_id: "integer" },
-  strict_accounts: { credit_limit: "integer", company_id: "integer" },
+  accounts: CANONICAL_SCHEMA.accounts,
+  strict_accounts: { credit_limit: "integer", firm_id: "integer" },
   employees: { name: "string", company_id: "integer" },
   ships: { name: "string" },
   parts: { name: "string", ship_id: "integer" },
@@ -172,7 +173,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   class Account extends Base {
     static {
       this.attribute("credit_limit", "integer");
-      this.attribute("company_id", "integer");
+      this.attribute("firm_id", "integer");
     }
   }
 
@@ -183,7 +184,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("Company", Company);
     registerModel("Account", Account);
 
-    Associations.hasOne.call(Company, "account", { autosave: true });
+    Associations.hasOne.call(Company, "account", { autosave: true, foreignKey: "firm_id" });
   });
   withTransactionalFixtures(() => adapter);
 
@@ -198,7 +199,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(account.isNewRecord()).toBe(false);
-    expect(Number(account.company_id)).toBe(Number(company.id));
+    expect(Number(account.firm_id)).toBe(Number(company.id));
   });
 
   it("test_save_fails_for_invalid_has_one when child has validation errors", async () => {
@@ -206,7 +207,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     class StrictAccount extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.attribute("company_id", "integer");
+        this.attribute("firm_id", "integer");
         this.validates("credit_limit", { presence: true });
       }
     }
@@ -217,6 +218,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     Associations.hasOne.call(Company, "strictAccount", {
       autosave: true,
       className: "StrictAccount",
+      foreignKey: "firm_id",
     });
 
     const badAccount = new StrictAccount({});
@@ -235,7 +237,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("destroy child marked for destruction when parent saves", async () => {
     const company = await Company.create({ name: "Acme" });
-    const account = await Account.create({ credit_limit: 100, company_id: company.id });
+    const account = await Account.create({ credit_limit: 100, firm_id: company.id });
 
     markForDestruction(account);
 
