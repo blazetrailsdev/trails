@@ -209,6 +209,7 @@
   "packages/activerecord/src/reflection.test.ts",
   "packages/activerecord/src/register-model-batch.test.ts",
   "packages/activerecord/src/relation.test.ts",
+  "packages/activerecord/src/relation.trails.test.ts",
   "packages/activerecord/src/relation/and.test.ts",
   "packages/activerecord/src/relation/build-arel-helpers.test.ts",
   "packages/activerecord/src/relation/composite-where.test.ts",

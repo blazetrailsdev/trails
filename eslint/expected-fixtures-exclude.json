@@ -36,6 +36,7 @@
   "packages/activerecord/src/primary-keys.test.ts",
   "packages/activerecord/src/readonly.test.ts",
   "packages/activerecord/src/relation.test.ts",
+  "packages/activerecord/src/relation.trails.test.ts",
   "packages/activerecord/src/relation/and.test.ts",
   "packages/activerecord/src/relation/delete-all.test.ts",
   "packages/activerecord/src/relation/merging.test.ts",
