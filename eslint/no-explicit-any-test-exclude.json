@@ -145,7 +145,7 @@
   "packages/activerecord/src/connection-adapters/sqlite3/schema-statements.test.ts",
   "packages/activerecord/src/connection-adapters/statement-pool.test.ts",
   "packages/activerecord/src/connection-handling.test.ts",
-  "packages/activerecord/src/connection-pool.test.ts",
+  "packages/activerecord/src/connection-pool.trails.test.ts",
   "packages/activerecord/src/core.test.ts",
   "packages/activerecord/src/counter-cache.test.ts",
   "packages/activerecord/src/database-configurations.test.ts",
