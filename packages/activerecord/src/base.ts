@@ -3226,14 +3226,6 @@ export class Base extends Model {
   private _performInsert(attributeNames?: string[]): void {
     const ctor = this.constructor as typeof Base;
 
-    // If suppressed, skip the actual insert but update record state
-    if (_isSuppressed(ctor)) {
-      this._newRecord = false;
-      (this as any)._dirty.snapshot(this._attributes);
-      this.changesApplied();
-      return;
-    }
-
     // Use the connection threaded by the enclosing `withQueryConnection` wrap
     // (Rails' `with_connection` block parameter) rather than the deprecated
     // `.connection` getter, so the INSERT doesn't flip the lease permanent.
@@ -3410,13 +3402,6 @@ export class Base extends Model {
 
   private _performUpdate(): void {
     const ctor = this.constructor as typeof Base;
-
-    // If suppressed, skip the actual update
-    if (_isSuppressed(ctor)) {
-      (this as any)._dirty.snapshot(this._attributes);
-      this.changesApplied();
-      return;
-    }
 
     // Thread the `withQueryConnection` connection rather than the deprecated
     // `.connection` getter (see `_performInsert`); resolved after the suppression
