@@ -1,7 +1,7 @@
 /**
  * Mirrors: activerecord/test/cases/date_test.rb
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -15,6 +15,14 @@ describe("DateTest", () => {
   // shared Topic model with a real `last_read` date column instead of an inline
   // scratch table that collided under parallel forks.
   useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
+  // Eagerly resolve the `last_read` date type (Rails loads schema at boot). The
+  // `assign valid dates` case below builds `Topic.new` synchronously, so without
+  // a warmed type registry the multiparameter assembler can't see `last_read` is
+  // a date column — on MariaDB it then yields a non-PlainDate.
+  beforeAll(async () => {
+    await Topic.loadSchema();
+  });
 
   // Rails: test_date_with_time_value
   it("date with time value", async () => {
