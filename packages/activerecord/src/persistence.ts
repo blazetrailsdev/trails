@@ -261,9 +261,9 @@ export async function _insertRecord(
       !Array.isArray(primaryKey) && primaryKey && pkExists ? primaryKey : false;
     // Rails: `im.insert(connection.empty_insert_statement_value(primary_key))`
     // for a value-less INSERT.
-    if (entries.length === 0 && typeof connection.emptyInsertStatementValue === "function") {
+    if (entries.length === 0) {
       im.insert(
-        connection.emptyInsertStatementValue(!Array.isArray(primaryKey) ? primaryKey : null),
+        connection.emptyInsertStatementValue!(!Array.isArray(primaryKey) ? primaryKey : null),
       );
     }
     return connection.insert(im, `${ctor.name} Create`, pkArg, primaryKeyValue, undefined, [], {

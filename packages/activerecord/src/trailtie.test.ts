@@ -7,6 +7,7 @@ import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { deprecator } from "./deprecator.js";
+import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 
 const { deprecators } = BaseRailtie;
 
@@ -21,6 +22,7 @@ describe("RailtieTest", () => {
   let savedDecodeDates: boolean;
   let savedEncryptionSupportUnencryptedData: boolean;
   let savedPartialInserts: boolean;
+  let savedRaiseOnAssignToAttrReadonly: boolean;
 
   beforeEach(() => {
     savedSubclasses = [...BaseRailtie.subclasses];
@@ -33,6 +35,7 @@ describe("RailtieTest", () => {
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
+    savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly;
 
     // Simulate a fresh app boot for each test: clear the load-hook registry
     // and re-emit the load events that base.ts / the adapter files would
@@ -55,6 +58,7 @@ describe("RailtieTest", () => {
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
+    setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
     }
@@ -150,6 +154,12 @@ describe("RailtieTest", () => {
     Base.partialInserts = true; // reset to framework default
     loadDefaults("7.0");
     expect(Base.partialInserts).toBe(false);
+  });
+
+  it("load_defaults 7.1 sets raise_on_assign_to_attr_readonly to true", () => {
+    setRaiseOnAssignToAttrReadonly(false); // framework default before load_defaults
+    loadDefaults("7.1");
+    expect(raiseOnAssignToAttrReadonly).toBe(true);
   });
 
   it("load_defaults raises for an unknown version string", () => {
