@@ -1487,16 +1487,18 @@ export function main() {
         // false-missing on base.ts. A flag trails doesn't implement anywhere
         // still falls through to missing (a real, un-hidden convergence gap).
         if (umbrellaConfig) {
+          const directPort = tsCandidates.find((c) => tsFilesByMethod.has(c));
           const setterForms = tsCandidates.map(
             (c) => `set${c.charAt(0).toUpperCase()}${c.slice(1)}`,
           );
-          const port =
-            tsCandidates.find((c) => tsFilesByMethod.has(c)) ??
-            setterForms.find((c) => tsFilesByMethod.has(c));
+          const port = directPort ?? setterForms.find((c) => tsFilesByMethod.has(c));
           if (port) {
             const actualFile = [...(tsFilesByMethod.get(port) as Set<string>)].sort()[0];
             fileMatched++;
-            checkArity(rubyName, port, actualFile);
+            // Only an arity-meaningful direct match (`writingRole`) is checked;
+            // a `setX` setter has an extra `value` param vs the Ruby reader, so
+            // comparing their arities manufactures a spurious mismatch.
+            if (directPort) checkArity(rubyName, directPort, actualFile);
             moves.push({
               tsName: port,
               rubyName,
