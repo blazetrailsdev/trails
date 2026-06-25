@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { adapterSupports } from "./test-helpers/supports.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
@@ -34,29 +34,27 @@ describe("TransactionIsolationUnsupportedTest", () => {
 
 // Rails: TransactionIsolationTest (joining/nested subtests).
 // Rails guards the full class with `supports_transaction_isolation? &&
-// !current_adapter?(:SQLite3Adapter)`. The test:compare Ruby extractor drops the
-// adapter half of that compound condition, so the canonical railsGate is the
-// feature-only `transaction_isolation`. These two subtests assert that requesting
-// an isolation level while joining/nesting raises — which holds on every backend
-// (on trails' SQLite, where isolation is unsupported, the request raises the same
-// TransactionIsolationError), so a bare `itIfSupports("transaction_isolation")`
-// matches the gate without an adapter restriction.
+// !current_adapter?(:SQLite3Adapter)` (transaction_isolation_test.rb:20), which the
+// test:compare Ruby extractor renders as adapters=[mysql,postgresql]
+// features=[transaction_isolation]. These two subtests assert that requesting an
+// isolation level while joining/nesting raises — framework-only behavior that holds
+// on both Postgres and MySQL — so the compound guard below mirrors both dimensions of
+// Rails' gate (non-SQLite adapter set + the feature).
 //
 // The four isolation-LEVEL subtests below (read uncommitted/committed/repeatable
 // read/serializable) are NOT framework-only — they need real cross-connection
 // semantics over two independent physical connections, so they stay in the
 // PG-bodied describeIfPg block and remain a tracked wrong-gate (sub-story
-// transaction-isolation-level-generic-dual-connection: a generic-body rewrite
-// plus SQLite isolation support is required before their gate can drop the
-// adapter restriction).
+// transaction-isolation-level-generic-dual-connection: a generic dual-connection
+// body that also runs on MySQL is required before their gate can match Rails'
+// mysql,postgresql adapter set).
 describe("TransactionIsolationTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  itIfSupports(
-    "transaction_isolation",
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "setting isolation when joining a transaction raises an error",
     async () => {
       class Tag extends Base {
@@ -72,8 +70,7 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  itIfSupports(
-    "transaction_isolation",
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "setting isolation when starting a nested transaction raises error",
     async () => {
       class Tag extends Base {

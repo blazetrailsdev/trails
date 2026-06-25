@@ -83,6 +83,26 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("combines an adapterType term and feature predicates in one compound guard", () => {
+    // De-Morgan'd skip form of Rails `if supports_insert_returning? &&
+    // !current_adapter?(:SQLite3Adapter)` → adapters [mysql,postgresql] + feature.
+    expect(
+      gateFromGuardExpr('adapterType === "sqlite" || !adapterSupports("insert_returning")', false),
+    ).toEqual({
+      adapters: ["mysql", "postgresql"],
+      features: ["insert_returning"],
+      source: ["test"],
+    });
+    // Mysql-only + feature: `adapterType !== "mysql"` skips everything but mysql.
+    expect(
+      gateFromGuardExpr('adapterType !== "mysql" || !adapterSupports("expression_index")', false),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["expression_index"],
+      source: ["test"],
+    });
+  });
+
   it("falls back to an unknown guard for unrecognized expressions", () => {
     expect(gateFromGuardExpr("!supportsConflictTarget", false)).toEqual({
       guards: ["unknown"],
