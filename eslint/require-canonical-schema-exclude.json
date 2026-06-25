@@ -3,7 +3,6 @@
   "packages/activerecord/src/associations/association-scope-cache.test.ts",
   "packages/activerecord/src/associations/association-scope.test.ts",
   "packages/activerecord/src/associations/belongs-to-associations.test.ts",
-  "packages/activerecord/src/associations/constructor-form-and-hmt-insert.test.ts",
   "packages/activerecord/src/associations/cp-count-disable-joins-through.test.ts",
   "packages/activerecord/src/associations/disable-joins-association-scope.test.ts",
   "packages/activerecord/src/associations/disable-joins-composite-key.test.ts",
