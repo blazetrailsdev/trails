@@ -49,6 +49,16 @@ export interface MethodInfo {
   /** TS-side property names of the trailing options-object param; `null` when
    *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
   optionKeys?: string[] | null;
+  /**
+   * True when this method was harvested from a top-level umbrella file's
+   * module-level singleton config (e.g. `singleton_class.attr_accessor` in
+   * `active_record.rb`) and redirected onto `<Module>::Base`. trails ports this
+   * config inconsistently — some flags as Base statics, others in their feature
+   * files (schema-cache.ts, database-tasks.ts, …) — so compare credits the port
+   * wherever it lands in the package, treating it as a move rather than a
+   * false-missing pinned to base.ts. See extract-ruby-api.rb#scan_umbrella_file.
+   */
+  umbrellaConfig?: boolean;
 }
 
 export interface ClassInfo {
