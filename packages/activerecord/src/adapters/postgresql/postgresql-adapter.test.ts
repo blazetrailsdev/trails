@@ -839,27 +839,4 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result![0]).toBe("id");
     });
   });
-
-  // ── Transaction lifecycle tests ───────────────────────────────────
-  describe("Transactions", () => {});
-
-  // ── executeMutation auto-RETURNING tests ──────────────────────────
-  describe("executeMutation RETURNING", () => {});
-
-  // ── Multiple bind parameter tests ─────────────────────────────────
-  describe("Bind parameters", () => {});
-
-  // ── Column reflection ──────────────────────────────────────────────
-  describe("Column reflection", () => {
-    afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS col_reflection_test CASCADE`);
-      await adapter.execute(`DROP TYPE IF EXISTS col_reflection_mood CASCADE`);
-    });
-  });
-
-  // ── DatabaseStatements ────────────────────────────────────────────
-  describe("DatabaseStatements", () => {});
-
-  // ── Top-level adapter methods (PR C) ──────────────────────────────
-  describe("PostgreSQLAdapter top-level methods", () => {});
 });
