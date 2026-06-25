@@ -2,6 +2,8 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./associations/collection-proxy.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   Base,
@@ -64,6 +66,8 @@ beforeAll(async () => {
 describe("TransactionCallbacksTest", () => {
   it("before commit exception should pop transaction stack", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -79,6 +83,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("dont call any callbacks after transaction commits for invalid record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
@@ -96,6 +102,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("dont call any callbacks after explicit transaction commits for invalid record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
@@ -114,6 +122,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("dont call after commit on update based on previous transaction", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -136,6 +146,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("dont call after commit on destroy based on previous transaction", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -160,6 +172,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after commit on save after transaction commits for saving record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -177,6 +191,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after commit on update after transaction commits for existing record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -195,6 +211,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after commit on destroy after transaction commits for destroyed record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -217,6 +235,9 @@ describe("TransactionCallbacksTest", () => {
     // → validates_presence_of :content fails → afterCreateCommit never fires.
     const commitHistory: string[] = [];
     class ReplyForAssoc extends Base {
+      declare title: string;
+      declare parent_id: number;
+
       static {
         this._tableName = "topics";
         this.attribute("title", "string");
@@ -228,6 +249,10 @@ describe("TransactionCallbacksTest", () => {
       }
     }
     class TopicForAssoc extends Base {
+      declare title: string;
+      declare parent_id: number;
+      declare assocReplies: AssociationProxy<ReplyForAssoc>;
+
       static {
         this._tableName = "topics";
         this.attribute("title", "string");
@@ -248,6 +273,8 @@ describe("TransactionCallbacksTest", () => {
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -266,6 +293,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after commit on create and doesnt leaky", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -285,6 +314,9 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after commit on update after transaction commits for existing record on touch", async () => {
     class Topic extends Base {
+      declare title: string;
+      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
@@ -303,6 +335,9 @@ describe("TransactionCallbacksTest", () => {
   });
   it("only call after commit on top level transactions", async () => {
     class Topic extends Base {
+      declare title: string;
+      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
@@ -329,6 +364,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("call after rollback after transaction rollsback", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -348,6 +385,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after rollback on update after transaction rollsback for existing record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -368,6 +407,9 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after rollback on update after transaction rollsback for existing record on touch", async () => {
     class Topic extends Base {
+      declare title: string;
+      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
@@ -389,6 +431,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after rollback on destroy after transaction rollsback for destroyed record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -409,6 +453,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("only call after rollback on create after transaction rollsback for new record", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -429,6 +475,8 @@ describe("TransactionCallbacksTest", () => {
   it("call after rollback when commit fails", async () => {
     const afterHistory: string[] = [];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -462,6 +510,8 @@ describe("TransactionCallbacksTest", () => {
   });
   it("only call after rollback on records rolled back to a savepoint", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -498,6 +548,8 @@ describe("TransactionCallbacksTest", () => {
   });
   it("only call after rollback on records rolled back to a savepoint when release savepoint fails", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -537,6 +589,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after commit callback should not swallow errors", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -553,6 +607,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after commit callback when raise should not restore state", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -571,6 +627,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after rollback callback should not swallow errors when set to raise", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -590,6 +648,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after commit callback should not rollback state that already been succeeded", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -611,6 +671,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after rollback callback when raise should restore state", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -640,6 +702,8 @@ describe("TransactionCallbacksTest", () => {
   });
   it("after rollback callbacks should validate on condition", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -651,6 +715,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after commit callbacks should validate on condition", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -662,6 +728,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("after commit chain not called on errors", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -681,6 +749,9 @@ describe("TransactionCallbacksTest", () => {
 
   it("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", async () => {
     class Post extends Base {
+      declare title: string;
+      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
@@ -690,6 +761,11 @@ describe("TransactionCallbacksTest", () => {
     registerModel(Post);
 
     class Comment extends Base {
+      declare body: string;
+      declare post_id: number;
+      declare post: Post | null;
+      declare loadBelongsTo: (name: "post") => Promise<Post | null>;
+
       static {
         this._tableName = "comments";
         this.attribute("body", "string");
@@ -710,6 +786,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -727,6 +805,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("saving two records that override object id should run after rollback callbacks for both", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -749,6 +829,8 @@ describe("TransactionCallbacksTest", () => {
     const opts = ["create", "update"];
     const original = [...opts];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -765,6 +847,8 @@ describe("TransactionCallbacksTest", () => {
   it("only call after commit on create after transaction commits for new record", async () => {
     const history: string[] = [];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.afterCreateCommit(() => {
@@ -786,6 +870,8 @@ describe("TransactionCallbacksTest", () => {
   it("afterSaveCommit fires on create and update but not destroy", async () => {
     const history: string[] = [];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.afterSaveCommit(() => {
@@ -810,6 +896,8 @@ describe("TransactionCallbacksTest", () => {
   it("afterUpdateCommit fires on update but not create", async () => {
     const history: string[] = [];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.afterUpdateCommit(() => {
@@ -829,6 +917,8 @@ describe("TransactionCallbacksTest", () => {
   it("afterDestroyCommit fires on destroy but not create or update", async () => {
     const history: string[] = [];
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
         this.afterDestroyCommit(() => {
@@ -850,6 +940,8 @@ describe("TransactionCallbacksTest", () => {
 
   it("save in after create commit wont invoke extra after create commit", async () => {
     class Topic extends Base {
+      declare title: string;
+
       static {
         this.attribute("title", "string");
       }
@@ -928,6 +1020,8 @@ describe("TransactionCallbacksTest", () => {
     const log: string[] = [];
 
     class Order extends Base {
+      declare total: number;
+
       static {
         this.attribute("total", "integer");
         this.afterCommit((record: any) => {
@@ -944,6 +1038,8 @@ describe("TransactionCallbacksTest", () => {
     const log: string[] = [];
 
     class Payment extends Base {
+      declare amount: number;
+
       static {
         this.attribute("amount", "integer");
         this.afterCommit((record: any) => {
@@ -961,6 +1057,8 @@ describe("TransactionCallbacksTest", () => {
   it("afterCommit fires immediately outside transaction (Rails-guided)", async () => {
     const log: string[] = [];
     class Order extends Base {
+      declare amount: number;
+
       static {
         this.attribute("amount", "integer");
         this.afterCommit(() => {
@@ -975,6 +1073,8 @@ describe("TransactionCallbacksTest", () => {
   it("afterCommit fires on transaction commit (Rails-guided)", async () => {
     const log: string[] = [];
     class Invoice extends Base {
+      declare total: number;
+
       static {
         this.attribute("total", "integer");
         this.afterCommit(() => {
@@ -991,6 +1091,9 @@ describe("TransactionCallbacksTest", () => {
     it("after commit callbacks with optimistic locking", async () => {
       const log: string[] = [];
       class Post extends Base {
+        declare title: string;
+        declare lock_version: number;
+
         static {
           this._tableName = "posts";
           this.attribute("title", "string");
@@ -1015,6 +1118,8 @@ describe("TransactionCallbacksTest", () => {
     it("after commit on multiple actions", async () => {
       const log: string[] = [];
       class Post extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterCreate(function () {
@@ -1039,6 +1144,8 @@ describe("TransactionCallbacksTest", () => {
 
     it("before commit actions", async () => {
       class TopicWithCallbacksOnMultipleActions extends Base {
+        declare title: string;
+
         declare saveBeforeCommitHistory: boolean;
         history: string[] = [];
         static {
@@ -1068,6 +1175,8 @@ describe("TransactionCallbacksTest", () => {
 
     it("before commit update in same transaction", async () => {
       class TopicBC extends Base {
+        declare title: string;
+
         declare updateTitle: boolean;
         static {
           this._tableName = "topics";
@@ -1128,6 +1237,8 @@ describe("TransactionCallbacksTest", () => {
     it("trigger once on multiple deletion within transaction", async () => {
       const log: string[] = [];
       class Topic extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterDestroy((record: any) => {
@@ -1145,6 +1256,8 @@ describe("TransactionCallbacksTest", () => {
     it("trigger once on multiple deletions", async () => {
       const log: string[] = [];
       class Topic extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterDestroy((record: any) => {
@@ -1162,6 +1275,8 @@ describe("TransactionCallbacksTest", () => {
     it("trigger once on multiple deletions in a transaction", async () => {
       const log: string[] = [];
       class Topic extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterDestroy((record: any) => {
@@ -1183,6 +1298,8 @@ describe("TransactionCallbacksTest", () => {
     it("rollback on multiple deletions", async () => {
       const log: string[] = [];
       class Topic extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterDestroy((record: any) => {
@@ -1209,6 +1326,8 @@ describe("TransactionCallbacksTest", () => {
     it("trigger on update where row was deleted", async () => {
       const log: string[] = [];
       class Topic extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.afterUpdate(function () {
@@ -1232,6 +1351,9 @@ describe("TransactionCallbacksTest", () => {
     it("callback on action with condition", async () => {
       const log: string[] = [];
       class Post extends Base {
+        declare title: string;
+        declare published: boolean;
+
         static {
           this.attribute("title", "string");
           this.attribute("published", "boolean", { default: false });
@@ -1386,6 +1508,8 @@ describe("TransactionCallbacksTest", () => {
     it("set callback with on", async () => {
       const log: string[] = [];
       class Post extends Base {
+        declare title: string;
+
         static {
           this.attribute("title", "string");
           this.beforeCreate(function () {
@@ -1406,6 +1530,8 @@ describe("TransactionCallbacksTest", () => {
 describe("hasTransactionalCallbacks regression", () => {
   it("returns true for a model with only beforeCommit callbacks", () => {
     class Widget extends Base {
+      declare name: string;
+
       static {
         this.attribute("name", "string");
       }
