@@ -2322,21 +2322,6 @@ describe("FinderTest", () => {
     await defineSchema(TEST_SCHEMA);
   });
 
-  class User extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("email", "string");
-      this.attribute("age", "integer");
-    }
-  }
-
-  async function seedUsers() {
-    const alice = await User.create({ name: "Alice", email: "alice@test.com", age: 30 });
-    const bob = await User.create({ name: "Bob", email: "bob@test.com", age: 25 });
-    const charlie = await User.create({ name: "Charlie", email: "charlie@test.com", age: 35 });
-    return { alice, bob, charlie };
-  }
-
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {
       static {
