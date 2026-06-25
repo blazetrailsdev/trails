@@ -211,7 +211,12 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   protected override findTargetNeeded(): boolean {
-    return !this.isLoaded() && this.foreignKeyPresent();
+    // Mirrors Rails `find_target?`'s trailing `&& klass` factor
+    // (association.rb:320): a polymorphic belongs_to whose `_type` column is
+    // nil resolves `klass` to undefined, so no query is attempted even when
+    // the foreign key is present. `klass` is evaluated last, matching Ruby's
+    // left-to-right `&&`, so it is untouched when the FK guard is false.
+    return !this.isLoaded() && this.foreignKeyPresent() && !!this.klass;
   }
 
   /**

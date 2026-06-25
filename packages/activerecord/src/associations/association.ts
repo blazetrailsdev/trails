@@ -487,9 +487,15 @@ export class Association {
   }
 
   protected findTargetNeeded(): boolean {
+    // Mirrors Rails `find_target?` (association.rb:320):
+    //   !loaded? && (!owner.new_record? || foreign_key_present?) && klass
+    // The trailing `&& klass` short-circuits when the target class is absent
+    // (e.g. a polymorphic belongs_to whose `_type` column is nil/unresolvable),
+    // so no query is attempted. `klass` is evaluated last, matching Ruby's
+    // left-to-right `&&`, so it is never touched when the FK guard is false.
     if (this.loaded) return false;
     const isNew = this.owner.isNewRecord();
-    return !isNew || this.foreignKeyPresent();
+    return (!isNew || this.foreignKeyPresent()) && !!this.klass;
   }
 
   protected foreignKeyPresent(): boolean {
