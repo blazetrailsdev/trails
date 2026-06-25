@@ -600,6 +600,14 @@ export function raiseRecordNotFoundExceptionBang(
 
   const wrapped = Array.isArray(ids) ? ids : [ids];
   if (wrapped.length === 1) {
+    // Rails: `"...'#{key}'=#{ids}"`. `${ids}` relies on JS coercing the lone
+    // value to its bare string — and a 1-element array to the same (`${[1]}`
+    // → "1"). That matches Rails' user-facing message for both `find(1)` and
+    // `find([1])`: find_with_ids does `ids = ids.first if expects_array` then
+    // `when 1 then find_one(ids.first)`, so the single-id branch always
+    // renders a scalar (`'id'=1`). (Ruby `Array#to_s` would print `[1]` only
+    // if raise_record_not_found_exception! were called directly with a
+    // 1-element array — never via a finder.)
     throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}`, name, k, ids);
   }
 
