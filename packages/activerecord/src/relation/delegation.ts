@@ -580,7 +580,7 @@ function relationClassFor(klass: typeof Base): typeof GeneratedRelationMethods {
 }
 
 /**
- * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-59):
+ * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-60):
  * `delegate.include generated_relation_methods` installs the per-model module's
  * generated methods as real methods on the delegate subclass. trails' analogue
  * copies them onto a target object; not yet wired (same deferral as above).
@@ -594,7 +594,7 @@ function includeRelationMethods(target: object, methods: GeneratedRelationMethod
 }
 
 /**
- * Rails' `DelegateCache#generated_relation_methods` (delegation.rb:63-72): the
+ * Rails' `DelegateCache#generated_relation_methods` (delegation.rb:63-68): the
  * memoized per-model `GeneratedRelationMethods` module. trails resolves it from
  * the `_generatedMethodsByModel` side-table.
  *
