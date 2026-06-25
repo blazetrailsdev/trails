@@ -3344,7 +3344,7 @@ describe("BasicsTest", () => {
       const p = await Post.create({ title: "Hello", body: "World" });
       const id = p.id;
       await p.destroy();
-      await expect(Post.find(id)).rejects.toThrow("not found");
+      await expect(Post.find(id)).rejects.toThrow(`Couldn't find Post with 'id'=${id}`);
     });
 
     it("assignAttributes changes attributes without saving", async () => {
@@ -3386,7 +3386,7 @@ describe("BasicsTest", () => {
     });
 
     it("find raises record not found exception", async () => {
-      await expect(User.find(999)).rejects.toThrow("not found");
+      await expect(User.find(999)).rejects.toThrow("Couldn't find User with 'id'=999");
     });
   });
 

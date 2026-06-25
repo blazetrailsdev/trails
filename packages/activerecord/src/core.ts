@@ -764,7 +764,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     const record = await cachedFindBy.call(this, [pk], [ids[0]]);
     if (record) return record;
     throw new RecordNotFound(
-      `${this.name} with ${this.primaryKey}=${ids[0]} not found`,
+      `Couldn't find ${this.name} with '${pk}'=${String(ids[0])}`,
       this.name,
       pk,
       ids[0],
@@ -787,7 +787,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       const tuples = id as unknown[][];
       if (tuples.length === 0) {
         throw new RecordNotFound(
-          `${this.name}: couldn't find all with an empty list of ids`,
+          `Couldn't find ${this.name} with an empty list of ids`,
           this.name,
           String(this.primaryKey),
           [],
@@ -798,7 +798,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
       if (records.length !== tuples.length) {
         throw new RecordNotFound(
-          `${this.name}: couldn't find all with composite primary key`,
+          `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${String(tuples)})`,
           this.name,
           String(this.primaryKey),
           id,
@@ -813,8 +813,11 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     });
     const record = await this.all().where(whereConditions).first();
     if (!record) {
+      // Composite-PK single-tuple miss flows through Rails' aggregate
+      // "couldn't find all" message (performFind's tuples branch), so a
+      // 1-tuple lookup renders `(${String([tuple])})`.
       throw new RecordNotFound(
-        `${this.name} with ${this.primaryKey}=[${id}] not found`,
+        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${String([id])})`,
         this.name,
         String(this.primaryKey),
         id,
@@ -843,7 +846,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
         .first();
       if (!record) {
         throw new RecordNotFound(
-          `${this.name} with ${this.primaryKey}=${single} not found`,
+          `Couldn't find ${this.name} with '${String(this.primaryKey)}'=${String(single)}`,
           this.name,
           String(this.primaryKey),
           single,
@@ -860,9 +863,8 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     const idToRecord = new Map<unknown, any>();
     for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {
-      const missing = castIds.filter((i) => !idToRecord.has(pkMatchKey(i)));
       throw new RecordNotFound(
-        `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
+        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${castIds.join(", ")})`,
         this.name,
         String(this.primaryKey),
         id,
@@ -877,7 +879,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     .first();
   if (!record) {
     throw new RecordNotFound(
-      `${this.name} with ${this.primaryKey}=${id} not found`,
+      `Couldn't find ${this.name} with '${String(this.primaryKey)}'=${String(id)}`,
       this.name,
       String(this.primaryKey),
       id,

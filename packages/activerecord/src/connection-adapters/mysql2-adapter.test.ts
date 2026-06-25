@@ -348,7 +348,7 @@ describeIfMysql("Mysql2Adapter", () => {
       await user.destroy();
 
       expect(user.isDestroyed()).toBe(true);
-      await expect(User.find(1)).rejects.toThrow("not found");
+      await expect(User.find(1)).rejects.toThrow("Couldn't find User with 'id'=1");
     });
 
     it("findBy returns null for no match", async () => {

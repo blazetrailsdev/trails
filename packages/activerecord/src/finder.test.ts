@@ -821,7 +821,7 @@ describe("FinderTest", () => {
       expect(e.id).toBe(0);
       expect(e.primaryKey).toBe("id");
       expect(e.model).toBe("Topic");
-      expect(e.message).toBe("Topic with id=0 not found");
+      expect(e.message).toBe("Couldn't find Topic with 'id'=0");
     }
   });
 
@@ -2316,7 +2316,7 @@ describe("FinderTest", () => {
       // Rails find_with_ids unwraps the single-element array and dispatches
       // to find_one, so the message is the scalar single-id form, not the
       // aggregate "in [...]" form.
-      expect(e.message).toBe("Topic with id=999999 not found");
+      expect(e.message).toBe("Couldn't find Topic with 'id'=999999");
       expect(e.message).not.toContain("in [");
     }
   });
@@ -3143,12 +3143,14 @@ describe("FinderTest", () => {
   });
 
   it("find raises RecordNotFound for missing ID", async () => {
-    await expect(User.find(999)).rejects.toThrow("not found");
+    await expect(User.find(999)).rejects.toThrow("Couldn't find User with 'id'=999");
   });
 
   it("find with missing IDs throws", async () => {
     const { alice } = await seedUsers();
-    await expect(User.find([alice.id, 999])).rejects.toThrow("not found");
+    await expect(User.find([alice.id, 999])).rejects.toThrow(
+      `Couldn't find all User with 'id': (${alice.id}, 999)`,
+    );
   });
 
   it("findBy returns matching record", async () => {
@@ -3604,7 +3606,7 @@ describe("FinderTest", () => {
       }
     }
     await User.create({ name: "Alice" });
-    await expect(User.find([1, 999])).rejects.toThrow("not found");
+    await expect(User.find([1, 999])).rejects.toThrow("Couldn't find all User with 'id': (1, 999)");
   });
 });
 describe("FinderTest", () => {
