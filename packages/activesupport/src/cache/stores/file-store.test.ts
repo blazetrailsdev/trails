@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "../file-store.js";
@@ -73,6 +73,29 @@ describe("FileStoreTest", () => {
     store.delete("a/b");
     expect(existsSync(join(cacheDir, "a"))).toBe(false);
     expect(existsSync(cacheDir)).toBe(true);
+  });
+
+  it("delete prunes empty directories up to a symlinked cache dir", () => {
+    // Rails delete_empty_directories compares File.realpath(dir) ==
+    // File.realpath(cache_path) (file_store.rb:195) so a symlinked cacheDir
+    // still stops the recursion at the real cache dir. A lexical resolve would
+    // mis-compare the symlink path against its target and recurse past it.
+    const realRoot = mkdtempSync(join(tmpdir(), "file-store-real-"));
+    const linkRoot = join(mkdtempSync(join(tmpdir(), "file-store-link-")), "cache");
+    symlinkSync(realRoot, linkRoot, "dir");
+    try {
+      const linkStore = new FileStore(linkRoot, { expiresIn: 60 });
+      linkStore.write("a/b", "val");
+      expect(existsSync(join(linkRoot, "a"))).toBe(true);
+      linkStore.delete("a/b");
+      expect(existsSync(join(linkRoot, "a"))).toBe(false);
+      // The real cache dir (reached through the symlink) survives the recursion.
+      expect(existsSync(realRoot)).toBe(true);
+      expect(existsSync(linkRoot)).toBe(true);
+    } finally {
+      rmSync(linkRoot, { force: true });
+      rmSync(realpathSync(realRoot), { recursive: true, force: true });
+    }
   });
 
   it("log exception when cache read fails", () => {

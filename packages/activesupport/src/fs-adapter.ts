@@ -34,6 +34,12 @@ export interface FsAdapter {
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
   rmdirSync(path: string): void;
   statSync(path: string): FsStatResult;
+  /**
+   * Sync realpath — resolves symlinks, mirroring Ruby File.realpath. Optional;
+   * adapters without symlink support may omit it (callers fall back to a
+   * lexical resolve). Used by FileStore's synchronous delete path.
+   */
+  realpathSync?(path: string): string;
   openSync(path: string, flags: string): number;
   readSync(
     fd: number,
