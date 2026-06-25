@@ -125,8 +125,7 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     expect(await new Parent().save()).toBe(true);
-    const parent = await Parent.create({});
-    expect(await new Child({ parent_id: parent.id }).save()).toBe(true);
+    expect(await new Parent({ child: new Child() }).save()).toBe(true);
   });
 
   it("required has_one associations have presence validated", async () => {
@@ -148,6 +147,9 @@ describe("RequiredAssociationsTest", () => {
     const record = new Parent();
     expect(await record.save()).toBe(false);
     expect(record.errors.fullMessages).toEqual(["Child must exist"]);
+
+    (record as any).child = new Child();
+    expect(await record.save()).toBe(true);
   });
 
   it("required has_one associations have a correct error message", async () => {
@@ -192,8 +194,10 @@ describe("RequiredAssociationsTest", () => {
   });
 
   // Trails-internal: no Rails counterpart. Pins the `assoc.target != null` guard in
-  // readAttributeForValidation — an unloaded belongs_to with target === null must not
-  // crash validators when has_many validate: true triggers child validation on parent save.
+  // readAttributeForValidation — when has_many validate: true validates a child whose
+  // required belongs_to `parent` target is unloaded (null), the validator must read the
+  // target without crashing. The child has no foreign key, so it is invalid and the parent
+  // save fails cleanly (rather than throwing) — that no-crash outcome is what is pinned.
   it("validates has_many children when parent saves without crashing on unloaded target", async () => {
     class Parent extends Base {
       static {
@@ -214,7 +218,8 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     const parent = new Parent();
-    expect(await parent.save()).toBe(true);
-    expect(parent.id).toBeTruthy();
+    (parent as any).children = [new Child()];
+    expect(await parent.save()).toBe(false);
+    expect(parent.errors.fullMessages).toEqual(["Children is invalid"]);
   });
 });
