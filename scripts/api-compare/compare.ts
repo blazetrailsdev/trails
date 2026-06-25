@@ -685,7 +685,7 @@ export function flattenIncludedMethodInfos(
  * (operators, SKIP list).
  */
 export function dedupeRubyMethodInto(
-  seen: Map<string, { rubyName: string; rubyModule: string }>,
+  seen: Map<string, { rubyName: string; rubyModule: string; umbrellaConfig?: boolean }>,
   rm: MethodInfo,
   itemFqn: string,
   rubyFile?: string,
@@ -694,7 +694,7 @@ export function dedupeRubyMethodInto(
   if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
   if (!seen.has(key)) {
-    seen.set(key, { rubyName: rm.name, rubyModule: itemFqn });
+    seen.set(key, { rubyName: rm.name, rubyModule: itemFqn, umbrellaConfig: rm.umbrellaConfig });
   }
 }
 
@@ -1272,7 +1272,10 @@ export function main() {
       // survive). Multiple Ruby classes in the same file often define
       // the same method (e.g., 8 subclasses in binary.rb each override
       // `invert`). Count once.
-      const seen = new Map<string, { rubyName: string; rubyModule: string }>();
+      const seen = new Map<
+        string,
+        { rubyName: string; rubyModule: string; umbrellaConfig?: boolean }
+      >();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
@@ -1417,7 +1420,7 @@ export function main() {
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
         : null;
 
-      for (const [_dedupeKey, { rubyName, rubyModule }] of seen) {
+      for (const [_dedupeKey, { rubyName, rubyModule, umbrellaConfig }] of seen) {
         const tsCandidates = rubyMethodToTs(rubyName)!;
 
         // Check direct match first — find which candidate matched
@@ -1468,6 +1471,46 @@ export function main() {
               rubyModule,
               expectedFile: expectedTs,
               actualFile: misplacedActualFile!,
+            });
+            continue;
+          }
+        }
+
+        // Umbrella module config (active_record.rb singleton accessors) is
+        // redirected onto Base, but trails ports the individual flags wherever
+        // they belong (schema-cache.ts, database-tasks.ts, …), not all on
+        // base.ts: some as class statics (`Base.writingRole`), most as
+        // ar-config.ts module exports with a `setX` setter function
+        // (`ActiveRecord.protocol_adapters=` → `setProtocolAdapters`). Credit the
+        // port wherever it lands in the package — the static/method form or the
+        // `setX` setter form — as a move rather than pinning it as a
+        // false-missing on base.ts. A flag trails doesn't implement anywhere
+        // still falls through to missing (a real, un-hidden convergence gap).
+        // The reader (`writing_role`) and writer (`writing_role=`) are two
+        // distinct `seen` entries that both map to the one TS symbol
+        // (`writingRole` / `setWritingRole`), so each is credited once — the
+        // same 2-Ruby-methods-cover-1-TS-property accounting the direct-match
+        // path already applies to every `attr_accessor`-backed property in the
+        // codebase. Not umbrella-specific inflation; just consistent with it.
+        if (umbrellaConfig) {
+          const directPort = tsCandidates.find((c) => tsFilesByMethod.has(c));
+          const setterForms = tsCandidates.map(
+            (c) => `set${c.charAt(0).toUpperCase()}${c.slice(1)}`,
+          );
+          const port = directPort ?? setterForms.find((c) => tsFilesByMethod.has(c));
+          if (port) {
+            const actualFile = [...(tsFilesByMethod.get(port) as Set<string>)].sort()[0];
+            fileMatched++;
+            // Only an arity-meaningful direct match (`writingRole`) is checked;
+            // a `setX` setter has an extra `value` param vs the Ruby reader, so
+            // comparing their arities manufactures a spurious mismatch.
+            if (directPort) checkArity(rubyName, directPort, actualFile);
+            moves.push({
+              tsName: port,
+              rubyName,
+              rubyModule,
+              expectedFile: expectedTs,
+              actualFile,
             });
             continue;
           }

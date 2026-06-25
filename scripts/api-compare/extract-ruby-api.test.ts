@@ -219,3 +219,137 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Lonely#gone"]).toMatchObject({ params: [], notes: "alias" });
   });
 });
+
+describe("Ruby extractor umbrella module-config scanning", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Lay out a package libPath with a `base.rb` and a sibling umbrella file
+  // one level above it, scan the package then the umbrella, and return the
+  // ActiveRecord::Base / ActiveRecord entries.
+  function scanWithUmbrella(baseSrc: string, umbrellaSrc: string): Record<string, ClassEntry> {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
+    try {
+      const libPath = path.join(root, "active_record");
+      fs.mkdirSync(libPath, { recursive: true });
+      fs.writeFileSync(path.join(libPath, "base.rb"), baseSrc);
+      fs.writeFileSync(path.join(root, "active_record.rb"), umbrellaSrc);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(libPath)}, "base.rb"), ${JSON.stringify(libPath)})
+        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)})
+        out = {}
+        (ex.classes.merge(ex.modules)).each do |fqn, info|
+          out[fqn] = { classMethods: info[:classMethods], instanceMethods: info[:instanceMethods], file: info[:file] }
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  interface ClassEntry {
+    classMethods: { name: string; umbrellaConfig?: boolean }[];
+    instanceMethods: { name: string }[];
+    file: string;
+  }
+
+  const BASE_SRC = `
+    module ActiveRecord
+      class Base
+        def save; end
+      end
+    end
+  `;
+
+  it("attributes module-level singleton_class config to <Module>::Base, tagged umbrellaConfig", () => {
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        singleton_class.attr_accessor :writing_role
+        singleton_class.attr_reader :default_timezone
+        def self.eager_load!; end
+      end
+    `,
+    );
+    const base = out["ActiveRecord::Base"];
+    const names = base.classMethods.map((m) => m.name);
+    // accessor → reader + writer; reader-only → reader only.
+    expect(names).toContain("writing_role");
+    expect(names).toContain("writing_role=");
+    expect(names).toContain("default_timezone");
+    expect(names).not.toContain("default_timezone=");
+    // Every redirected entry is tagged so compare can credit the port wherever
+    // it lands in the package.
+    for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+      expect(m.umbrellaConfig).toBe(true);
+    }
+    // The umbrella's `def self.` helpers are NOT harvested (not Base statics).
+    expect(names).not.toContain("eager_load!");
+  });
+
+  it("redirects the `class << self; attr_accessor` block form to Base too", () => {
+    // active_record.rb uses the `singleton_class.attr_*` command form today, but
+    // the equivalent `class << self` block form is also module-level config and
+    // must redirect to Base rather than being silently dropped.
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        class << self
+          attr_accessor :writing_role
+        end
+      end
+    `,
+    );
+    const base = out["ActiveRecord::Base"];
+    const names = base.classMethods.map((m) => m.name);
+    expect(names).toContain("writing_role");
+    expect(names).toContain("writing_role=");
+    for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+      expect(m.umbrellaConfig).toBe(true);
+    }
+  });
+
+  it("does not leak umbrella config onto the ActiveRecord module's bucket", () => {
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        singleton_class.attr_accessor :writing_role
+      end
+    `,
+    );
+    const mod = out["ActiveRecord"];
+    const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
+    expect(modNames).not.toContain("writing_role");
+  });
+
+  it("skips umbrella config when the module has no ::Base to redirect to", () => {
+    // `ActiveSupport.error_reporter` lives on a module with no `::Base`; without
+    // a Base to credit it, recording it would leak onto the module's entity-file
+    // bucket as false-missing, so it must be skipped entirely.
+    const out = scanWithUmbrella(
+      `
+      module ActiveSupport
+        class NotBase
+          def call; end
+        end
+      end
+    `,
+      `
+      module ActiveSupport
+        singleton_class.attr_accessor :error_reporter
+      end
+    `,
+    );
+    const mod = out["ActiveSupport"];
+    const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
+    expect(names).not.toContain("error_reporter");
+  });
+});
