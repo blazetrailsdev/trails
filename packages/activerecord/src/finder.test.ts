@@ -3836,7 +3836,7 @@ describe("FinderTest", () => {
     }
     expect(error).toBeInstanceOf(RecordNotFound);
     // Quote-agnostic: SQLite/PG quote identifiers with `"`, MySQL/MariaDB with backticks.
-    expect(error.message).toMatch(/[`"]topics[`"].[`"]type[`"]/);
+    expect(error.message).toMatch(/[`"]topics[`"]\.[`"]type[`"]/);
     expect(error.message).toContain("'Reply'");
     expect(error.message).toContain("(1 = 0)");
   });
