@@ -21,21 +21,9 @@ afterEach(() => {
 
 class Post extends Base {
   declare title: string;
-  declare body: string;
-  declare author: string;
-  declare status: string;
-  declare views: number;
-  declare category: string;
-  declare published: boolean;
 
   static {
     this.attribute("title", "string");
-    this.attribute("body", "string");
-    this.attribute("author", "string");
-    this.attribute("status", "string");
-    this.attribute("views", "integer");
-    this.attribute("category", "string");
-    this.attribute("published", "boolean");
   }
 }
 
