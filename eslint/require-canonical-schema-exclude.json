@@ -60,7 +60,6 @@
   "packages/activerecord/src/store.test.ts",
   "packages/activerecord/src/strict-loading-sync-reader.test.ts",
   "packages/activerecord/src/strict-loading.test.ts",
-  "packages/activerecord/src/suppressor.test.ts",
   "packages/activerecord/src/timestamp.test.ts",
   "packages/activerecord/src/touch-later.test.ts",
   "packages/activerecord/src/transaction-callbacks.test.ts",
