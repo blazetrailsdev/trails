@@ -42,9 +42,11 @@ export class Account extends Base {
       // unbound depending on the callback dispatch path. Prefer the argument.
       const self = (record ?? this) as any;
       const firm = self?.firm;
-      // Only track when the association is a materialized record (not a pending
-      // Promise from an unloaded belongs_to).
-      if (firm && typeof firm === "object" && !("then" in firm) && firm.id != null) {
+      // Mirrors Rails `before_destroy { |account| ... if account.firm }`. The
+      // dependent-destroy cascade preloads `account.firm` so this sync reader
+      // sees a materialized record; `firm.id != null` still guards the rare
+      // path where an unloaded belongs_to surfaces the async reader's Promise.
+      if (firm && firm.id != null) {
         const ids = Account.destroyedAccountIds();
         if (!ids.has(firm.id)) ids.set(firm.id, []);
         ids.get(firm.id)!.push(self.id);
