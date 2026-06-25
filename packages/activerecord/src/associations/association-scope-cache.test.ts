@@ -9,67 +9,34 @@
  *     end
  *
  * Reset on init and on `reload()` via `reset_scope`.
+ *
+ * Trails-internal scope-cache harness — no 1:1 Rails counterpart. Rides the
+ * canonical `Author has_many :posts has_many :comments` fixtures instead of
+ * synthetic `cache_*` tables.
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
+import { registerModel } from "../index.js";
+import { loadHasMany, loadBelongsTo } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("Association scope cache", () => {
-  let adapter: TestDatabaseAdapter;
-
-  class CacheAuthor extends Base {
-    static {
-      this.attribute("name", "string");
-    }
-  }
-  class CachePost extends Base {
-    static {
-      this.attribute("cache_author_id", "integer");
-      this.attribute("title", "string");
-      this.belongsTo("cacheAuthor", {
-        className: "CacheAuthor",
-        foreignKey: "cache_author_id",
-      });
-    }
-  }
-  class CacheComment extends Base {
-    static {
-      this.attribute("cache_post_id", "integer");
-      this.attribute("body", "string");
-    }
-  }
+  setupHandlerSuite();
+  const { authors, posts } = useHandlerFixtures(["authors", "posts", "comments"]);
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      cache_authors: { name: "string" },
-      cache_posts: { cache_author_id: "integer", title: "string" },
-      cache_comments: { cache_post_id: "integer", body: "string" },
-    });
-    CacheAuthor.adapter = adapter;
-    CachePost.adapter = adapter;
-    CacheComment.adapter = adapter;
-    registerModel("CacheAuthor", CacheAuthor);
-    registerModel("CachePost", CachePost);
-    registerModel("CacheComment", CacheComment);
-    (CacheAuthor as any)._associations = [];
-    (CachePost as any)._associations = [];
-    (CacheComment as any)._associations = [];
-    Associations.hasMany.call(CacheAuthor, "cachePosts", {
-      className: "CachePost",
-      foreignKey: "cache_author_id",
-    });
-    Associations.hasMany.call(CachePost, "cacheComments", {
-      className: "CacheComment",
-      foreignKey: "cache_post_id",
-    });
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(Comment);
+    await Author.loadSchema();
+    await Post.loadSchema();
+    await Comment.loadSchema();
   });
-  withTransactionalFixtures(() => adapter);
 
   // Restore spies even if a test throws — leaked spies on
   // AssociationScope.scope can corrupt sibling tests in this file.
@@ -84,11 +51,10 @@ describe("Association scope cache", () => {
     // rebuild. (Going through loadTarget/reload would be ambiguous —
     // a second loadTarget short-circuits on the already-loaded target
     // and never builds a scope, so the cache wouldn't be exercised.)
-    const author = await CacheAuthor.create({ name: "A" });
-    await CachePost.create({ cache_author_id: author.id, title: "p1" });
+    const author = await Author.find(authors("david").id);
 
     const spy = vi.spyOn(AssociationScope, "scope");
-    const assoc = (author as any).association("cachePosts");
+    const assoc = (author as any).association("posts");
 
     assoc.scope();
     const afterFirst = spy.mock.calls.length;
@@ -111,22 +77,14 @@ describe("Association scope cache", () => {
     // `Association.scope()` for disable-joins reflections,
     // so the JOIN-based cache contract doesn't apply — DJAS owns
     // its own per-call construction matching Rails' per-call DJAS
-    // (association.rb:107-117).
-    const { loadHasMany } = await import("../associations.js");
-    Associations.hasMany.call(CacheAuthor, "cacheCommentsDj", {
-      className: "CacheComment",
-      through: "cachePosts",
-      source: "cacheComments",
-      disableJoins: true,
-    });
-    const author = await CacheAuthor.create({ name: "A" });
-    const post = await CachePost.create({ cache_author_id: author.id, title: "p" });
-    await CacheComment.create({ cache_post_id: post.id, body: "c" });
+    // (association.rb:107-117). `Author#noJoinsComments` is the
+    // canonical `has_many through, disable_joins: true` reflection.
+    const author = await Author.find(authors("david").id);
 
     const spy = vi.spyOn(AssociationScope, "scope");
-    const reflection = (CacheAuthor as any)._reflectOnAssociation("cacheCommentsDj");
-    const records = await loadHasMany(author, "cacheCommentsDj", reflection.options);
-    expect(records.map((r: any) => r.body)).toEqual(["c"]);
+    const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
+    const records = await loadHasMany(author, "noJoinsComments", reflection.options);
+    expect(records.length).toBeGreaterThan(0);
     // JOIN-based AssociationScope was never invoked — DJAS handled it.
     expect(spy).not.toHaveBeenCalled();
   });
@@ -138,25 +96,19 @@ describe("Association scope cache", () => {
     // (e.g. `await blog.posts`) would rebuild the scope every time.
     // `_builtAssociationScope` lazily materializes the Association
     // instance to cover this case.
-    const { loadHasMany } = await import("../associations.js");
-    const author = await CacheAuthor.create({ name: "A" });
-    await CachePost.create({ cache_author_id: author.id, title: "p1" });
-    await CachePost.create({ cache_author_id: author.id, title: "p2" });
+    const author = await Author.find(authors("david").id);
 
     const spy = vi.spyOn(AssociationScope, "scope");
-    const opts = {
-      className: "CachePost",
-      foreignKey: "cache_author_id",
-    };
+    const opts = { className: "Post", foreignKey: "author_id" };
 
     // First loader call populates the Association-instance cache.
-    await loadHasMany(author, "cachePosts", opts);
+    await loadHasMany(author, "posts", opts);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBeGreaterThan(0);
 
     // Second loader call — different caches would rebuild the scope.
     // With our cache, AssociationScope.scope count is unchanged.
-    await loadHasMany(author, "cachePosts", opts);
+    await loadHasMany(author, "posts", opts);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 
@@ -165,32 +117,30 @@ describe("Association scope cache", () => {
     // (a StatementCache) across loads instead of recompiling the scope SQL.
     // The first load of any owner compiles (StatementCache.create); later
     // loads — including for a different owner — only re-bind values.
-    const a1 = await CacheAuthor.create({ name: "A1" });
-    const a2 = await CacheAuthor.create({ name: "A2" });
-    const { loadBelongsTo } = await import("../associations.js");
-    const opts = { className: "CacheAuthor", foreignKey: "cache_author_id" };
+    const opts = { className: "Author", foreignKey: "author_id" };
 
-    const p1 = await CachePost.create({ cache_author_id: a1.id, title: "p1" });
-    const p2 = await CachePost.create({ cache_author_id: a2.id, title: "p2" });
+    // `welcome` belongs to david, `misc_by_bob` belongs to bob — distinct owners.
+    const p1 = await Post.find(posts("welcome").id);
+    const p2 = await Post.find(posts("misc_by_bob").id);
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const r1 = await loadBelongsTo(p1, "cacheAuthor", opts);
-    expect((r1 as any)?.id).toBe(a1.id);
+    const r1 = await loadBelongsTo(p1, "author", opts);
+    expect((r1 as any)?.id).toBe(authors("david").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the cached statement — no recompile.
-    const r2 = await loadBelongsTo(p2, "cacheAuthor", opts);
-    expect((r2 as any)?.id).toBe(a2.id);
+    const r2 = await loadBelongsTo(p2, "author", opts);
+    expect((r2 as any)?.id).toBe(authors("bob").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 
   it("different owners get independent caches", async () => {
-    const a1 = await CacheAuthor.create({ name: "A1" });
-    const a2 = await CacheAuthor.create({ name: "A2" });
-    const assoc1 = (a1 as any).association("cachePosts");
-    const assoc2 = (a2 as any).association("cachePosts");
+    const a1 = await Author.find(authors("david").id);
+    const a2 = await Author.find(authors("mary").id);
+    const assoc1 = (a1 as any).association("posts");
+    const assoc2 = (a2 as any).association("posts");
     await assoc1.loadTarget();
     await assoc2.loadTarget();
     // Cache fields are per-instance; loading one doesn't pollute the other.
