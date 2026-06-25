@@ -37,6 +37,12 @@ import {
   appendInfoToPayload,
 } from "./trailties/controller-runtime.js";
 import { instrument } from "./trailties/job-runtime.js";
+import {
+  setBelongsToRequiredValidatesForeignKey,
+  setGenerateSecureTokenOn,
+  setMaintainTestSchema,
+  setQueues,
+} from "./ar-config.js";
 
 export const ControllerRuntime = { processAction, cleanupViewRuntime, appendInfoToPayload };
 export const JobRuntime = { instrument };
@@ -207,6 +213,20 @@ export class Trailtie extends BaseRailtie {
       if (cfg.postgresqlAdapterDecodeDates) {
         onLoad("active_record_postgresqladapter", { once: true }, setPostgresqlDecodeDates);
       }
+    });
+
+    this.initializer("active_record.set_configs", () => {
+      // Rails' `active_record.set_configs` initializer copies each
+      // `config.active_record.x` entry into the matching `ActiveRecord.x=`
+      // module setter (railtie.rb). These flags have a canonical home in
+      // `ar-config.ts` (the module global the framework consults); the railtie
+      // config is the boot-time staging copy. Forward them so there is a single
+      // source of truth at runtime.
+      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      setMaintainTestSchema(cfg.maintainTestSchema);
+      setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
+      setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
+      setQueues(cfg.queues);
     });
 
     this.initializer("active_record_encryption.configuration", () => {
