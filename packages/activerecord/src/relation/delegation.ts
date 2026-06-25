@@ -247,7 +247,7 @@ export function initializeRelationDelegateCache(): void {
  * Per-model cache of generated relation-method delegators.
  *
  * Deviation (tracked-pending-convergence): Rails creates ONE per-model
- * `GeneratedRelationMethods` module (delegation.rb:64-90) and `include`s it
+ * `GeneratedRelationMethods` module (delegation.rb:71-91) and `include`s it
  * into all four dynamically-built delegate subclasses — Relation /
  * CollectionProxy / AssociationRelation / DisableJoinsAssociationRelation
  * (delegation.rb:32-45) — so cached delegators become **real methods** resolved
@@ -565,7 +565,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 }
 
 /**
- * Rails' `DelegateCache#relation_class_for` (delegation.rb:144): the per-model
+ * Rails' `ClassMethods#relation_class_for` (delegation.rb:144): the per-model
  * delegate subclass into which the model's `GeneratedRelationMethods` module is
  * `include`d. trails has no per-model subclass (see the deviation documented on
  * `_generatedMethodsByModel`), so this returns the carrier type backing the
