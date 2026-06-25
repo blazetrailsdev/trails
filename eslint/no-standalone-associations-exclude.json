@@ -315,8 +315,5 @@
   "packages/activerecord/src/reserved-word.test.ts::Group::hasOne::values",
   "packages/activerecord/src/reserved-word.test.ts::Select::hasMany::groups",
   "packages/activerecord/src/strict-loading.test.ts::Author::hasMany::books",
-  "packages/activerecord/src/strict-loading.test.ts::Book::belongsTo::author",
-  "packages/activerecord/src/strict-loading.test.ts::ClirAuthor::hasMany::clir_books",
-  "packages/activerecord/src/strict-loading.test.ts::Post::belongsTo::author2",
-  "packages/activerecord/src/strict-loading.test.ts::SlogAuthor::hasMany::slog_books"
+  "packages/activerecord/src/strict-loading.test.ts::ClirAuthor::hasMany::clir_books"
 ]
