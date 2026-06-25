@@ -2306,6 +2306,35 @@ describe("FinderTest", () => {
     expect((found as any[]).length).toBe(1);
   });
 
+  it("find by array of one id missing raises single id message", async () => {
+    const Topic = makeTopic();
+    try {
+      await Topic.find([999999]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      // Rails find_with_ids unwraps the single-element array and dispatches
+      // to find_one, so the message is the scalar single-id form, not the
+      // aggregate "in [...]" form.
+      expect(e.message).toBe("Topic with id=999999 not found");
+      expect(e.message).not.toContain("in [");
+    }
+  });
+
+  it("find by array of one id on a relation dispatches to single id path", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "One" });
+    // Relation-scoped find routes through performFind (not Core#find). It
+    // should return a 1-element array on a hit and raise the scalar single-id
+    // message on a miss, matching Rails find_with_ids.
+    const found = await Topic.all().find([t.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+    await expect(Topic.all().find([999999])).rejects.toThrow(
+      "Couldn't find Topic with 'id'=999999",
+    );
+  });
+
   it("find by ids", async () => {
     const Topic = makeTopic();
     const t1 = await Topic.create({ title: "A" });
