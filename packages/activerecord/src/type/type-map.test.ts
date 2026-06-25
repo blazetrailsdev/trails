@@ -89,7 +89,7 @@ describe("TypeMapTest", () => {
 describe("HashLookupTypeMapTest", () => {
   it("additional lookup args", () => {
     const mapping = new HashLookupTypeMap();
-    mapping.registerType("varchar", (_type: string | number, limit: unknown) =>
+    mapping.registerType("varchar", undefined, (_type: string | number, limit: unknown) =>
       (limit as number) > 255 ? ({ name: "text" } as any) : ({ name: "string" } as any),
     );
     mapping.aliasType("string", "varchar");
@@ -122,7 +122,7 @@ describe("HashLookupTypeMapTest", () => {
   it("fetch memoizes on args", () => {
     const mapping = new HashLookupTypeMap();
     let callCount = 0;
-    mapping.registerType("foo", (type: string | number, ...args: unknown[]) => {
+    mapping.registerType("foo", undefined, (type: string | number, ...args: unknown[]) => {
       callCount++;
       return [type, ...args].join("-") as any;
     });
@@ -165,7 +165,7 @@ it("fetch", () => {
 it("fetch memoizes", () => {
   const mapping = new HashLookupTypeMap();
   let lookupCount = 0;
-  mapping.registerType(1, () => {
+  mapping.registerType(1, undefined, () => {
     if (lookupCount > 0) throw new Error("should not be called twice");
     lookupCount++;
     return "string" as any;

@@ -12,7 +12,8 @@ import { Vector } from "./vector.js";
 export interface TypeMap {
   registerType(
     oid: number | string,
-    type: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
+    type?: unknown,
+    block?: (oid: number | string, ...args: unknown[]) => unknown,
   ): void;
   /** @internal */
   aliasType(oid: number | string, targetOid: number | string): void;
@@ -138,7 +139,16 @@ export class TypeMapInitializer {
     oid: number | string,
     oidType: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
   ): void {
-    this.store.registerType(this.assertValidRegistration(oid, oidType), oidType);
+    const validOid = this.assertValidRegistration(oid, oidType);
+    if (typeof oidType === "function") {
+      this.store.registerType(
+        validOid,
+        undefined,
+        oidType as (oid: number | string, ...args: unknown[]) => unknown,
+      );
+    } else {
+      this.store.registerType(validOid, oidType);
+    }
   }
 
   private aliasType(oid: number | string, target: number | string): void {

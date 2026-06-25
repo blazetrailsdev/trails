@@ -100,7 +100,7 @@ export function registerClassWithLimit(
   key: string,
   klass: new (options?: { limit?: number }) => Type,
 ): void {
-  mapping.registerType(key, (_key, ...args) => {
+  mapping.registerType(key, undefined, (_key, ...args) => {
     const sqlType = sqlTypeFromArgs(args);
     return new klass({ limit: extractLimit(sqlType) });
   });
@@ -116,7 +116,7 @@ export function registerClassWithPrecision(
   klass: new (options: { precision?: number } & Record<string, unknown>) => Type,
   extraOptions: Record<string, unknown> = {},
 ): void {
-  mapping.registerType(key, (_key, ...args) => {
+  mapping.registerType(key, undefined, (_key, ...args) => {
     const sqlType = sqlTypeFromArgs(args);
     return new klass({ precision: extractPrecision(sqlType), ...extraOptions });
   });
@@ -182,7 +182,7 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   // bits of (fmod - 4); when those are zero the column was declared
   // with no scale (NUMERIC(p) / NUMERIC) and should use the integer-
   // flavored DecimalWithoutScale.
-  m.registerType("numeric", (_key, ...args) => {
+  m.registerType("numeric", undefined, (_key, ...args) => {
     const fmod = fmodFromArgs(args);
     const sqlType = sqlTypeFromArgs(args);
     const precision = extractPrecision(sqlType);
@@ -192,7 +192,7 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
     return new Decimal({ precision, scale: extractScale(sqlType) });
   });
 
-  m.registerType("interval", (_key, ...args) => {
+  m.registerType("interval", undefined, (_key, ...args) => {
     const sqlType = sqlTypeFromArgs(args);
     return new Interval({ precision: extractPrecision(sqlType) });
   });
