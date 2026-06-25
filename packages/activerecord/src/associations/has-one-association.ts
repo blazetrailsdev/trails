@@ -253,6 +253,27 @@ export class HasOneAssociation extends SingularAssociation {
     });
   }
 
+  /**
+   * Mirrors Rails' `HasOneAssociation#_create_record`
+   * (has_one_association.rb:133-138): guard that the owner is persisted before
+   * creating the associated record, then delegate to the base
+   * `SingularAssociation#_create_record`. A has_one foreign key lives on the
+   * child and points at the owner's primary key, so creating the child against
+   * an unsaved owner would persist a row with a nil FK — Rails refuses with
+   * `RecordNotSaved` rather than silently orphaning it. (belongs_to has no such
+   * guard: its FK lives on the owner, so the child can be created first.)
+   */
+  protected override async _createRecord(
+    attributes?: Record<string, unknown>,
+    shouldRaise = false,
+    block?: (record: Base) => void,
+  ): Promise<Base | null> {
+    if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
+    }
+    return super._createRecord(attributes, shouldRaise, block);
+  }
+
   protected override async doAsyncFindTarget(): Promise<Base | null> {
     return loadHasOne(this.owner, this.reflection.name, this.reflection.options);
   }
