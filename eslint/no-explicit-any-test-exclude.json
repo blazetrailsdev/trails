@@ -36,6 +36,7 @@
   "packages/activerecord/src/adapters/postgresql/numbers.test.ts",
   "packages/activerecord/src/adapters/postgresql/optimizer-hints.test.ts",
   "packages/activerecord/src/adapters/postgresql/postgresql-adapter.test.ts",
+  "packages/activerecord/src/adapters/postgresql/postgresql-adapter.trails.test.ts",
   "packages/activerecord/src/adapters/postgresql/range.test.ts",
   "packages/activerecord/src/adapters/postgresql/schema-authorization.test.ts",
   "packages/activerecord/src/adapters/postgresql/schema.test.ts",
