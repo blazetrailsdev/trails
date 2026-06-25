@@ -50,16 +50,12 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
 }
 
 /**
- * Check if the given model class (or any ancestor) is currently
- * suppressed in the active scope.
+ * Check if the given model class is currently suppressed in the active scope.
+ *
+ * Mirrors ActiveRecord::Suppressor#save: keyed on `self.class.name` — the
+ * exact class, not any ancestor. An STI subclass of a suppressed class is
+ * not itself suppressed (it would save normally in Rails).
  */
 export function isSuppressed(modelClass: typeof Base): boolean {
-  const reg = registry();
-  let current: typeof Base | null = modelClass;
-  while (current && typeof current === "function") {
-    const klassName = current.name;
-    if (klassName && reg[klassName]) return true;
-    current = Object.getPrototypeOf(current);
-  }
-  return false;
+  return !!registry()[modelClass.name];
 }
