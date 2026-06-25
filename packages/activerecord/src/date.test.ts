@@ -3,13 +3,12 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {
-  setupHandlerSuite();
+  // `useHandlerFixtures` wires `setupHandlerSuite` internally, so no separate call.
   // Rails date_test.rb declares no `fixtures`; wiring the canonical `topics`
   // table (and recreating its shape via `{ schema }`) lets the file ride the
   // shared Topic model with a real `last_read` date column instead of an inline
