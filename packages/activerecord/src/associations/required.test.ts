@@ -25,23 +25,31 @@ describe("RequiredAssociationsTest", () => {
   });
 
   it("belongs_to associations can be optional by default", async () => {
-    class Parent extends Base {}
-    class Child extends Base {
-      static {
-        this.attribute("parent_id", "integer");
+    const prev = (Base as any).belongsToRequiredByDefault;
+    try {
+      (Base as any).belongsToRequiredByDefault = false;
+      class Parent extends Base {}
+      class Child extends Base {
+        static {
+          this.attribute("parent_id", "integer");
+        }
+      }
+      Associations.belongsTo.call(Child, "parent", {
+        inverseOf: false,
+        className: "Parent",
+      });
+      registerModel("Parent", Parent);
+      registerModel("Child", Child);
+
+      expect(await new Child().save()).toBe(true);
+      expect(await new Child({ parent: new Parent() }).save()).toBe(true);
+    } finally {
+      if (prev === undefined) {
+        delete (Base as any).belongsToRequiredByDefault;
+      } else {
+        (Base as any).belongsToRequiredByDefault = prev;
       }
     }
-    Associations.belongsTo.call(Child, "parent", {
-      optional: true,
-      inverseOf: false,
-      className: "Parent",
-    });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
-
-    expect(await new Child().save()).toBe(true);
-    const parent = await Parent.create({});
-    expect(await new Child({ parent_id: parent.id }).save()).toBe(true);
   });
 
   it("required belongs_to associations have presence validated", async () => {
@@ -117,8 +125,7 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     expect(await new Parent().save()).toBe(true);
-    const parent = await Parent.create({});
-    expect(await new Child({ parent_id: parent.id }).save()).toBe(true);
+    expect(await new Parent({ child: new Child() }).save()).toBe(true);
   });
 
   it("required has_one associations have presence validated", async () => {
@@ -140,6 +147,9 @@ describe("RequiredAssociationsTest", () => {
     const record = new Parent();
     expect(await record.save()).toBe(false);
     expect(record.errors.fullMessages).toEqual(["Child must exist"]);
+
+    (record as any).child = new Child();
+    expect(await record.save()).toBe(true);
   });
 
   it("required has_one associations have a correct error message", async () => {
@@ -182,122 +192,34 @@ describe("RequiredAssociationsTest", () => {
     await record.save();
     expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
   });
-});
 
-describe("belongs_to required option", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  let ctx: MigrationContext;
-  beforeAll(async () => {
-    ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("r_authors", { force: true }, (t) => {
-      t.string("name");
-    });
-    await ctx.createTable("r_books", { force: true }, (t) => {
-      t.string("title");
-      t.integer("author_id");
-    });
-    await ctx.createTable("r_writers", { force: true }, (t) => {
-      t.string("name");
-    });
-    await ctx.createTable("r_novels", { force: true }, (t) => {
-      t.string("title");
-      t.integer("writer_id");
-    });
-    await ctx.createTable("rg_parents", { force: true }, (t) => {
-      t.string("name");
-    });
-    await ctx.createTable("rg_children", { force: true }, (t) => {
-      t.string("title");
-      t.integer("rg_parent_id");
-    });
-  });
-  afterAll(async () => {
-    await ctx.dropTable(
-      "r_authors",
-      "r_books",
-      "r_writers",
-      "r_novels",
-      "rg_parents",
-      "rg_children",
-      { ifExists: true },
-    );
-  });
-
-  it("validates presence of foreign key when required: true", async () => {
-    class RAuthor extends Base {
-      static _tableName = "r_authors";
-    }
-    RAuthor.attribute("name", "string");
-
-    class RBook extends Base {
-      static _tableName = "r_books";
-    }
-    RBook.attribute("author_id", "integer");
-    RBook.attribute("title", "string");
-
-    registerModel("RAuthor", RAuthor);
-    registerModel("RBook", RBook);
-    Associations.belongsTo.call(RBook, "author", { required: true, className: "RAuthor" });
-
-    const book = new RBook({ title: "No Author" });
-    expect(await book.save()).toBe(false);
-    expect(book.errors.fullMessages.some((m: string) => m.toLowerCase().includes("author"))).toBe(
-      true,
-    );
-  });
-
-  it("passes validation when foreign key is present", async () => {
-    class RWriter extends Base {
-      static _tableName = "r_writers";
-    }
-    RWriter.attribute("name", "string");
-
-    class RNovel extends Base {
-      static _tableName = "r_novels";
-    }
-    RNovel.attribute("writer_id", "integer");
-    RNovel.attribute("title", "string");
-
-    registerModel("RWriter", RWriter);
-    registerModel("RNovel", RNovel);
-    Associations.belongsTo.call(RNovel, "writer", { required: true, className: "RWriter" });
-
-    const writer = await RWriter.create({ name: "Tolkien" });
-    const novel = new RNovel({ title: "LotR", writer_id: writer.id });
-    expect(await novel.save()).toBe(true);
-  });
-
-  // Pins the `assoc.target != null` guard in readAttributeForValidation: an unloaded
-  // belongs_to with target === null must not crash validators when has_many validate: true
-  // triggers child validation on parent save.
+  // Trails-internal: no Rails counterpart. Pins the `assoc.target != null` guard in
+  // readAttributeForValidation — when has_many validate: true validates a child whose
+  // required belongs_to `parent` target is unloaded (null), the validator must read the
+  // target without crashing. The child has no foreign key, so it is invalid and the parent
+  // save fails cleanly (rather than throwing) — that no-crash outcome is what is pinned.
   it("validates has_many children when parent saves without crashing on unloaded target", async () => {
-    class RGChild extends Base {
-      static _tableName = "rg_children";
+    class Parent extends Base {
+      static {
+        this.hasMany("children", { validate: true, foreignKey: "parent_id", className: "Child" });
+      }
     }
-    RGChild.attribute("title", "string");
-    RGChild.attribute("rg_parent_id", "integer");
-
-    class RGParent extends Base {
-      static _tableName = "rg_parents";
+    class Child extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+      }
     }
-    RGParent.attribute("name", "string");
-
-    registerModel("RGParent", RGParent);
-    registerModel("RGChild", RGChild);
-    Associations.belongsTo.call(RGChild, "rgParent", {
+    Associations.belongsTo.call(Child, "parent", {
       required: true,
-      foreignKey: "rg_parent_id",
-      className: "RGParent",
+      foreignKey: "parent_id",
+      className: "Parent",
     });
-    Associations.hasMany.call(RGParent, "rgChildren", {
-      validate: true,
-      foreignKey: "rg_parent_id",
-      className: "RGChild",
-    });
+    registerModel("Parent", Parent);
+    registerModel("Child", Child);
 
-    const parent = new RGParent({ name: "p1" });
-    expect(await parent.save()).toBe(true);
-    expect(parent.id).toBeTruthy();
+    const parent = new Parent();
+    (parent as any).children = [new Child()];
+    expect(await parent.save()).toBe(false);
+    expect(parent.errors.fullMessages).toEqual(["Children is invalid"]);
   });
 });
