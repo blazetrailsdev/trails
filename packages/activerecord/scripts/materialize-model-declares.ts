@@ -22,9 +22,7 @@ import { virtualize } from "../src/type-virtualization/virtualize.js";
 import { walk, type ClassInfo } from "../src/type-virtualization/walker.js";
 import { resolveAssociationTarget } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
-import { TEST_SCHEMA } from "../src/test-helpers/test-schema.js";
-import { isWrappedSchema } from "../src/test-helpers/define-schema.js";
-import type { TableSchema } from "../src/test-helpers/define-schema.js";
+import type { TableSchema, WrappedTableSchema } from "../src/test-helpers/define-schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
@@ -44,7 +42,10 @@ type SchemaColumnsByTable = Record<string, Record<string, SchemaColumnValue>>;
  * `Record<table, Record<col, SchemaColumnValue>>` the virtualizer wants.
  * Array columns are rendered as `Element[]` via `arrayElementType`.
  */
-function normalizeSchema(schema: Record<string, TableSchema>): SchemaColumnsByTable {
+function normalizeSchema(
+  schema: Record<string, TableSchema>,
+  isWrappedSchema: (table: TableSchema) => table is WrappedTableSchema,
+): SchemaColumnsByTable {
   const out: SchemaColumnsByTable = {};
   for (const [table, value] of Object.entries(schema)) {
     // Discriminate the wrapped `{ columns, primaryKey?, indexes? }` shape from
@@ -172,13 +173,14 @@ function resolveAutoImports(
   fileName: string,
   registry: ReadonlyMap<string, string>,
   isModelClass: (cls: ts.ClassDeclaration) => boolean,
+  aliases: ReadonlyMap<string, string>,
 ): string[] {
   const classes = walk(sf, { isModelClass });
   const moduleScope = collectNamesInScope(sf);
   const imports = new Map<string, string>();
   for (const info of classes) {
     const needed = new Set<string>();
-    collectTargets(info, needed);
+    collectTargets(info, needed, aliases);
     if (needed.size === 0) continue;
     // A declare spliced into THIS class can only reference a bare
     // `Target` that is lexically visible from the class — module-scope
@@ -223,7 +225,11 @@ function collectVisibleClassNames(node: ts.Node, out: Set<string>): void {
   }
 }
 
-function collectTargets(info: ClassInfo, out: Set<string>): void {
+function collectTargets(
+  info: ClassInfo,
+  out: Set<string>,
+  aliases: ReadonlyMap<string, string>,
+): void {
   for (const call of info.calls) {
     if (
       call.kind !== "hasMany" &&
@@ -233,8 +239,41 @@ function collectTargets(info: ClassInfo, out: Set<string>): void {
     )
       continue;
     if (call.kind === "belongsTo" && call.options["polymorphic"] === "true") continue;
-    out.add(resolveAssociationTarget(call));
+    const target = resolveAssociationTarget(call);
+    out.add(aliases.get(target) ?? target);
   }
+}
+
+/**
+ * Build the association-`className` → in-file class-name alias map from the
+ * file's `registerModel("Alias", LocalClass)` calls (at any nesting depth).
+ * Test models routinely register under an alias that differs from the class
+ * identifier; without this map an association `className: "EsOctopus"` would
+ * emit `declare octopus: EsOctopus | null`, a type that does not exist.
+ */
+function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
+  const aliases = new Map<string, string>();
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "registerModel"
+    ) {
+      const [nameArg, classArg] = node.arguments;
+      if (
+        nameArg &&
+        ts.isStringLiteralLike(nameArg) &&
+        classArg &&
+        ts.isIdentifier(classArg) &&
+        nameArg.text !== classArg.text
+      ) {
+        aliases.set(nameArg.text, classArg.text);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return aliases;
 }
 
 function collectNamesInScope(sf: ts.SourceFile): Set<string> {
@@ -331,7 +370,7 @@ function insertHoistedImports(text: string, importLines: readonly string[]): str
   return text.slice(0, match.index) + block + text.slice(match.index);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   // With no args, process the canonical pilot set under MODELS_DIR. With args,
   // accept either a bare model filename (resolved against MODELS_DIR, the
@@ -346,10 +385,19 @@ function main(): void {
           return path.join(MODELS_DIR, path.basename(a));
         })
       : PILOT.map((f) => path.join(MODELS_DIR, f));
-  const schemaColumnsByTable = normalizeSchema(TEST_SCHEMA);
   const registry = buildModelRegistry();
 
   const modelsDirPrefix = MODELS_DIR + path.sep;
+  // The canonical schema map is only consumed when materializing files UNDER
+  // MODELS_DIR (test-local models elsewhere supply their own bespoke schema).
+  // Load it lazily via dynamic import so a test-file-only run never pulls in
+  // `define-schema`'s adapter-runtime dependency graph.
+  let schemaColumnsByTable: SchemaColumnsByTable = {};
+  if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
+    const { TEST_SCHEMA } = await import("../src/test-helpers/test-schema.js");
+    const { isWrappedSchema } = await import("../src/test-helpers/define-schema.js");
+    schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
+  }
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
@@ -361,7 +409,8 @@ function main(): void {
     for (const cls of collectModelClassNodes(sf)) modelSpans.add(`${cls.pos}:${cls.end}`);
     const isModelClass = (cls: ts.ClassDeclaration): boolean =>
       modelSpans.has(`${cls.pos}:${cls.end}`);
-    const prependImports = resolveAutoImports(sf, file, registry, isModelClass);
+    const classNameAliases = buildClassNameAliases(sf);
+    const prependImports = resolveAutoImports(sf, file, registry, isModelClass, classNameAliases);
     // The schema-column merge maps each model to a table by `tableName` (or
     // `pluralize(underscore(className))` when unset) and bakes that table's
     // canonical columns into the declares. That is correct for the canonical
@@ -377,6 +426,10 @@ function main(): void {
       isModelClass,
       prependImports,
       schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
+      classNameAliases,
+      // Baked attribute declares allow null assignment (Rails attributes
+      // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
+      attributesNullable: true,
     });
     if (virtualized === source) {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);
@@ -396,4 +449,4 @@ function main(): void {
   }
 }
 
-main();
+await main();

@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import {
   Base,
@@ -888,6 +889,8 @@ describe("TestNestedAttributesInGeneral", () => {
   });
   it("base should have an empty nested attributes options", () => {
     class Plain extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -1276,6 +1279,9 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   });
   it("index in nested_attributes_order order", async () => {
     class IENTag extends Base {
+      declare name: string | null;
+      declare ien_article_id: number | null;
+
       static {
         this._tableName = "ien_tags";
         this.attribute("name", "string");
@@ -1293,6 +1299,9 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 
   it("index unaffected by reject_if", async () => {
     class IERTag extends Base {
+      declare name: string | null;
+      declare ier_article_id: number | null;
+
       static {
         this._tableName = "ier_tags";
         this.attribute("name", "string");
@@ -1300,6 +1309,9 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
       }
     }
     class IERArticle extends Base {
+      declare title: string | null;
+      declare ierTags: AssociationProxy<IERTag>;
+
       static {
         this._tableName = "ier_articles";
         this.attribute("title", "string");
@@ -1330,6 +1342,9 @@ describe("TestNestedAttributesWithExtend", () => {
   });
   it("extend affects nested attributes", async () => {
     class ExtTag extends Base {
+      declare name: string | null;
+      declare ext_article_id: number | null;
+
       static {
         this._tableName = "ext_tags";
         this.attribute("name", "string");
@@ -1337,6 +1352,9 @@ describe("TestNestedAttributesWithExtend", () => {
       }
     }
     class ExtArticle extends Base {
+      declare title: string | null;
+      declare extTags: AssociationProxy<ExtTag>;
+
       static {
         this._tableName = "ext_articles";
         this.attribute("title", "string");
@@ -1368,12 +1386,19 @@ describe("TestNestedAttributesForDelegatedType", () => {
   });
   it("should build a new record based on the delegated type", async () => {
     class DTComment extends Base {
+      declare body: string | null;
+
       static {
         this._tableName = "dt_comments";
         this.attribute("body", "string");
       }
     }
     class DTEntry extends Base {
+      declare entryable_type: string | null;
+      declare entryable_id: number | null;
+      declare dtComment: DTComment | null;
+      declare loadHasOne: (name: "dtComment") => Promise<DTComment | null>;
+
       static {
         this._tableName = "dt_entries";
         this.attribute("entryable_type", "string");
@@ -1390,6 +1415,9 @@ describe("TestNestedAttributesForDelegatedType", () => {
     // Delegated type is essentially a polymorphic pattern; verify basic nested attrs work
     // with a simple has_one for now
     class DTComment2 extends Base {
+      declare body: string | null;
+      declare dt_entry2_id: number | null;
+
       static {
         this._tableName = "dt_comments2";
         this.attribute("body", "string");
@@ -1397,6 +1425,10 @@ describe("TestNestedAttributesForDelegatedType", () => {
       }
     }
     class DTEntry2 extends Base {
+      declare title: string | null;
+      declare dtComment2: DTComment2 | null;
+      declare loadHasOne: (name: "dtComment2") => Promise<DTComment2 | null>;
+
       static {
         this._tableName = "dt_entries2";
         this.attribute("title", "string");
@@ -1950,6 +1982,9 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "create with nested attributes"
   it("creates associated records through nested attributes", async () => {
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+
       static {
         this._tableName = "comments";
         this.attribute("id", "integer");
@@ -1960,6 +1995,8 @@ describe("Nested Attributes (Rails-guided)", () => {
     registerModel(Comment);
 
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
@@ -1985,6 +2022,9 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "update with nested attributes"
   it("updates existing associated records", async () => {
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+
       static {
         this._tableName = "comments";
         this.attribute("id", "integer");
@@ -1995,6 +2035,8 @@ describe("Nested Attributes (Rails-guided)", () => {
     registerModel(Comment);
 
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
@@ -2018,6 +2060,9 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "destroy with nested attributes"
   it("destroys associated records when _destroy is set and allowDestroy is true", async () => {
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+
       static {
         this._tableName = "comments";
         this.attribute("id", "integer");
@@ -2028,6 +2073,8 @@ describe("Nested Attributes (Rails-guided)", () => {
     registerModel(Comment);
 
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
@@ -2053,6 +2100,9 @@ describe("Nested Attributes (Rails-guided)", () => {
   // Rails: test "reject_if"
   it("rejects nested records matching rejectIf condition", async () => {
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+
       static {
         this._tableName = "comments";
         this.attribute("id", "integer");
@@ -2063,6 +2113,8 @@ describe("Nested Attributes (Rails-guided)", () => {
     registerModel(Comment);
 
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
