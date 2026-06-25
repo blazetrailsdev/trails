@@ -220,7 +220,7 @@ export async function _insertRecord(
     insert?(arel: unknown, ...args: unknown[]): Promise<unknown>;
     executeMutation?(sql: string, binds?: unknown[]): Promise<number>;
     toSql(arel: unknown): string;
-    emptyInsertStatementValue?(): string;
+    emptyInsertStatementValue?(pk?: string | null): string;
   },
   values: Record<string, unknown>,
   returning?: string[] | null,
@@ -248,8 +248,22 @@ export async function _insertRecord(
 
   if (typeof connection.insert === "function") {
     // Rails: `connection.insert(im, "#{self} Create", primary_key || false,
-    //         primary_key_value, returning: returning)`.
-    const pkArg: string | false = !Array.isArray(primaryKey) && primaryKey ? primaryKey : false;
+    //         primary_key_value, returning: returning)`. Rails reflects
+    // `primary_key` as nil for a key-less table, so `primary_key || false`
+    // yields `false` there; trails' `primaryKey` instead assumes the "id"
+    // convention until the schema cache is warm, so guard on the column actually
+    // existing to avoid emitting a pk-derived `RETURNING "id"` against a table
+    // with no `id` column. An empty/unwarmed column list keeps the pk (current
+    // behavior for direct callers without a loaded schema).
+    const cols = typeof ctor.columns === "function" ? (ctor.columns() as { name: string }[]) : [];
+    const pkExists = cols.length === 0 || cols.some((c) => c.name === primaryKey);
+    const pkArg: string | false =
+      !Array.isArray(primaryKey) && primaryKey && pkExists ? primaryKey : false;
+    // Rails: `im.insert(connection.empty_insert_statement_value(primary_key,
+    // table_name))` for a value-less INSERT.
+    if (entries.length === 0 && typeof connection.emptyInsertStatementValue === "function") {
+      im.insert(connection.emptyInsertStatementValue(pkArg || null));
+    }
     return connection.insert(im, `${ctor.name} Create`, pkArg, primaryKeyValue, undefined, [], {
       returning: returning ?? null,
     });
