@@ -831,6 +831,26 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       // array, so a bare `find([])` there is not an empty-array request.)
       return [];
     }
+    if (id.length === 1) {
+      // Rails `find_with_ids` unwraps a single-element array and dispatches to
+      // the single-id path (`find_one`): a miss raises the scalar id message
+      // (not the aggregate "in [...]"), and a hit is wrapped back into a
+      // 1-element array because `expects_array` is true.
+      const single = id[0];
+      const castSingle = this._castAttributeValue(this.primaryKey as string, single);
+      const record = await this.all()
+        .where({ [this.primaryKey as string]: castSingle })
+        .first();
+      if (!record) {
+        throw new RecordNotFound(
+          `${this.name} with ${this.primaryKey}=${single} not found`,
+          this.name,
+          String(this.primaryKey),
+          single,
+        );
+      }
+      return [record];
+    }
     const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
     const records = await this.all()
       .where({ [this.primaryKey as string]: castIds })

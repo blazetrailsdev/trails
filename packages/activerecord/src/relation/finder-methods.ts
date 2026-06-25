@@ -287,14 +287,19 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
     throw new Error("performFind: composite PK without tuples (normalizer invariant violation)");
   }
 
-  // Simple PK, single scalar: find(1)
-  if (!wantArray) {
+  // Simple PK, single id: find(1) or find([1]). Rails' find_with_ids
+  // unwraps a single-element array and dispatches to the single-id path
+  // (`find_one`), so a missing record raises the scalar "with 'id'=N"
+  // message rather than the aggregate "with 'id': (N)". When the caller
+  // passed an array (`expects_array`), the found record is wrapped back
+  // into a 1-element array.
+  if (ids.length === 1) {
     const id = ids[0];
     const records = await this.where({ [pk]: id })
       .limit(1)
       .toArray();
     if (records.length === 0) raiseNotFoundSingle(modelName, pk, id, conditions);
-    return records[0];
+    return wantArray ? [records[0]] : records[0];
   }
 
   // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3]).
@@ -754,6 +759,14 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
     ids,
   );
   if (normalized.emptyArray) return [];
+  // Rails find_with_ids: `when 1 then result = find_one(ids.first);
+  // expects_array ? [result] : result`. A single-element list dispatches
+  // to find_one (single-id message on miss), wrapped back into an array
+  // when the caller passed one.
+  if (normalized.ids.length === 1) {
+    const result = await findOne(rel, normalized.ids[0]);
+    return normalized.wantArray ? [result] : result;
+  }
   if (normalized.wantArray) {
     return findSome(rel, normalized.ids);
   }

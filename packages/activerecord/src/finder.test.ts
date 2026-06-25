@@ -2306,6 +2306,21 @@ describe("FinderTest", () => {
     expect((found as any[]).length).toBe(1);
   });
 
+  it("find by array of one id missing raises single id message", async () => {
+    const Topic = makeTopic();
+    try {
+      await Topic.find([999999]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      // Rails find_with_ids unwraps the single-element array and dispatches
+      // to find_one, so the message is the scalar single-id form, not the
+      // aggregate "in [...]" form.
+      expect(e.message).toBe("Topic with id=999999 not found");
+      expect(e.message).not.toContain("in [");
+    }
+  });
+
   it("find by ids", async () => {
     const Topic = makeTopic();
     const t1 = await Topic.create({ title: "A" });
