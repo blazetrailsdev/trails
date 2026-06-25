@@ -10,6 +10,7 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
+import { Reply } from "./test-helpers/models/reply.js";
 
 const TEST_SCHEMA = {
   topics: {
@@ -3834,5 +3835,38 @@ describe("FinderTest", () => {
     const firm = await Company.create({ name: "37signals" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 50 });
     expect((await Account.findBy({ firm: firm }))!.id).toBe(account.id);
+  });
+});
+
+describe("FinderTest", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    // Rebuild the canonical `topics` table (with its STI `type` column) and
+    // re-warm the cache: an earlier bespoke block in this file defines a
+    // `type`-less `topics`, which would otherwise poison Reply's reflected
+    // schema and suppress finder_needs_type_condition?.
+    await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
+  });
+
+  // trails-only: no Rails finder_test asserts the STI type_condition in a
+  // not-found message, but Rails' `arel.where_sql(model)` builds from the
+  // relation's *full* arel — so for an STI subclass the bracketed conditions
+  // clause includes the `type` predicate, not just the explicit where_clause.
+  // `Reply` is an STI subclass of `Topic` over the `topics.type` column.
+  it("find_by! conditions clause includes the STI type_condition", async () => {
+    // Reflect the topics schema so finder_needs_type_condition? sees the STI
+    // `type` column (it recomputes once the column reflects, inheritance.rb).
+    await (Reply as any).loadSchema();
+    let error: any;
+    try {
+      await Reply.findByBang("1 = 0");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotFound);
+    // Quote-agnostic: SQLite/PG quote identifiers with `"`, MySQL/MariaDB with backticks.
+    expect(error.message).toMatch(/[`"]topics[`"]\.[`"]type[`"]/);
+    expect(error.message).toContain("'Reply'");
+    expect(error.message).toContain("(1 = 0)");
   });
 });

@@ -6445,9 +6445,16 @@ export class Relation<T extends Base> {
    * `conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`
    * (finder_methods.rb:418), appended to every `raise_record_not_found_exception!`
    * message. Returns the bracketed `[WHERE …]` suffix (with a leading space) for
-   * a scoped relation, or "" when the where clause is empty. Arel's `where_sql`
-   * prefixes the predicate SQL with `WHERE `; our `_whereClauseToSql` renders only
-   * the predicates, so we add the keyword here.
+   * a scoped relation, or "" when the where clause is empty.
+   *
+   * The guard is `where_clause.empty?`, but the rendered SQL comes from
+   * `arel.where_sql(model)` — the relation's *full* arel, whose WHERE folds in
+   * the STI `type_condition` and any default-scope predicates, not just the
+   * explicit `where_clause`. So we render the WHERE from the built manager's
+   * constraints (`_buildArel`), matching Arel's `SelectManager#where_sql`
+   * (which prefixes the predicate SQL with `WHERE `), rather than the raw
+   * `_whereClause`. For an STI subclass this includes the `"type" IN (…)`
+   * predicate; for a default-scoped model it includes the scope's WHEREs.
    *
    * @internal trails-only helper — Rails inlines this in raise_record_not_found_exception!.
    */
@@ -6455,7 +6462,10 @@ export class Relation<T extends Base> {
     if (this._whereClause.isEmpty()) return "";
     const connection = this._conn();
     if (!connection?.toSql) return "";
-    const sql = _whereClauseToSql(this._whereClause, connection);
+    const wheres = this._buildArel().constraints;
+    if (wheres.length === 0) return "";
+    const node = wheres.length === 1 ? wheres[0] : new Nodes.And(wheres);
+    const sql = connection.toSql(node);
     if (sql === "") return "";
     return ` [WHERE ${sql}]`;
   }
