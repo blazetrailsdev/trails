@@ -183,6 +183,27 @@ describe("CascadedEagerLoadingTest", () => {
     expect(commentCount(targetArr(loaded[1], "posts"))).toBe(1);
   });
 
+  it("eager association loading dedups a through-association intermediate join and eager spec", async () => {
+    // Author.joins(:comments).eager_load(:comments) where `comments` is a
+    // has_many :through :posts. The through reflection materializes BOTH the
+    // intermediate `posts` join AND the target `comments` join. Rails' `walk`
+    // dedups the FULL reflection chain (join_dependency.rb:214-219), so the
+    // intermediate `posts` collapses against the manual join too — not just the
+    // `comments` target. No extra aliased `posts` (e.g. `posts_authors`).
+    const rel = Author.all().joins("comments").eagerLoad("comments").order("authors.id");
+    // The intermediate `posts` join is deduped: no aliased duplicate such as
+    // `posts_authors`/`posts_authors_join` re-emitted for the eager spec.
+    const sql = rel.toSql();
+    expect(sql).not.toMatch(/posts_authors/);
+    const loaded = await rel.toArray();
+    // INNER JOIN semantics (manual join wins): only authors reachable through a
+    // post that has a comment. The single deduped `posts`/`comments` joins drive
+    // the eager hydration with no fan-out duplication from an extra alias.
+    expect(loaded).toHaveLength(2);
+    expect(targetArr(loaded[0], "comments")).toHaveLength(11);
+    expect(targetArr(loaded[1], "comments")).toHaveLength(1);
+  });
+
   it("eager association loading grafts stashed associations to correct parent", async () => {
     const person = await Person.all()
       .eagerLoad({ primaryContact: "primaryContact" })
