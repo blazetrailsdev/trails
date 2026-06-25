@@ -17,6 +17,7 @@ import {
   findSomeOrdered,
   findTake,
   findTakeWithLimit,
+  raiseRecordNotFoundExceptionBang,
   _orderColumns,
 } from "./finder-methods.js";
 import { RecordNotFound } from "../errors.js";
@@ -267,6 +268,7 @@ function makeFindSomeRel(
     _orderClauses: opts.ordered !== false ? ["id ASC"] : [],
     _rawOrderClauses: [],
     selectValues: [],
+    raiseRecordNotFoundExceptionBang,
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -372,6 +374,7 @@ function makeFindSomeOrderedRel(
     _orderClauses: [],
     _rawOrderClauses: [],
     selectValues: [],
+    raiseRecordNotFoundExceptionBang,
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -543,6 +546,7 @@ describe("finder not-found message fidelity", () => {
   it("test_find_one_message_on_primary_key", async () => {
     const rel: any = {
       _modelClass: { name: "Car", primaryKey: "id" },
+      raiseRecordNotFoundExceptionBang,
       findBy: async () => null,
     };
     try {
@@ -569,6 +573,7 @@ describe("finder not-found message fidelity", () => {
       _limitValue: null,
       _offsetValue: null,
       selectValues: [],
+      raiseRecordNotFoundExceptionBang,
       where(_cond: any) {
         const inner: any = { toArray: async () => [], select: () => inner };
         return inner;

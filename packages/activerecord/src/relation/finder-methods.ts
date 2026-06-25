@@ -736,7 +736,7 @@ export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
   const record = await (rel as any).findBy(conditions);
   if (!record) {
     // Rails find_one: raise_record_not_found_exception!(id, 0, 1)
-    raiseRecordNotFoundExceptionBang.call(rel, id, 0, 1);
+    (rel as any).raiseRecordNotFoundExceptionBang(id, 0, 1);
   }
   return record;
 }
@@ -764,7 +764,7 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
 
   if (records.length !== expectedSize) {
     // Rails find_some: raise_record_not_found_exception!(ids, result.size, expected_size)
-    raiseRecordNotFoundExceptionBang.call(rel, ids, records.length, expectedSize, pk);
+    (rel as any).raiseRecordNotFoundExceptionBang(ids, records.length, expectedSize, pk);
   }
   return records;
 }
@@ -789,7 +789,7 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 
   if (records.length !== ids.length) {
     // Rails find_some_ordered: raise_record_not_found_exception!(ids, result.size, ids.size)
-    raiseRecordNotFoundExceptionBang.call(rel, ids, records.length, ids.length, pk);
+    (rel as any).raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, pk);
   }
   const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
   return records.sort((a: any, b: any) => {
