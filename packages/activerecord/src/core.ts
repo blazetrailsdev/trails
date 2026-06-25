@@ -19,6 +19,7 @@ import {
   _reflectOnAssociation,
   reflectOnAggregation,
 } from "./reflection.js";
+import { compactUniqIds } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
@@ -731,22 +732,6 @@ function pkMatchKey(value: unknown): unknown {
   return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
 }
 
-// Rails `find_with_ids` does `ids.compact.uniq` before its size dispatch.
-// Drop nils, then dedupe by `pkMatchKey` so a BigInt and the equal number/
-// string id collapse to one (matching the lookup's value-equality below).
-function compactUniqIds(ids: unknown[]): unknown[] {
-  const seen = new Set<unknown>();
-  const out: unknown[] = [];
-  for (const id of ids) {
-    if (id === null || id === undefined) continue;
-    const key = pkMatchKey(id);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(id);
-  }
-  return out;
-}
-
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -840,17 +825,28 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   }
 
   if (Array.isArray(id)) {
+    if (id.length === 0) {
+      // Rails `find_with_ids`: `return [] if expects_array && ids.first.empty?`
+      // — a *literally* empty array argument short-circuits to `[]` before the
+      // `compact.uniq` / size dispatch. (Composite PKs derive `expects_array`
+      // from a nested array, so a bare `find([])` there is not an empty-array
+      // request.)
+      return [];
+    }
     // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` before the
     // `case ids.size` dispatch. `find([1, 1])` collapses to a single id
     // (→ single-id path, wrapped per `expects_array`) and `find([1, nil])`
     // drops the nil. Simple PK only — composite tuples returned above.
     const compactedIds = compactUniqIds(id);
     if (compactedIds.length === 0) {
-      // Rails `find_with_ids`: `return [] if expects_array && ids.first.empty?`
-      // — an empty array argument resolves to `[]` without a query or a
-      // `RecordNotFound`. (Composite PKs derive `expects_array` from a nested
-      // array, so a bare `find([])` there is not an empty-array request.)
-      return [];
+      // All entries were nil (e.g. `find([nil, nil])`): unlike the empty-input
+      // short-circuit above, this passed the `ids.first.empty?` guard and hits
+      // Rails' `case ids.size … when 0` → raise "without an ID".
+      throw new RecordNotFound(
+        `Couldn't find ${this.name} without an ID`,
+        this.name,
+        String(this.primaryKey),
+      );
     }
     if (compactedIds.length === 1) {
       // Rails `find_with_ids` unwraps a single-element array and dispatches to

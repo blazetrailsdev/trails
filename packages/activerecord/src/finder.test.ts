@@ -2367,6 +2367,16 @@ describe("FinderTest", () => {
     expect((found as any[])[0].id).toBe(t.id);
   });
 
+  it("find with all nil ids raises without an ID", async () => {
+    const Topic = makeTopic();
+    // Rails: `find([nil, nil])` passes the `ids.first.empty?` short-circuit
+    // (the input array is not empty), then `compact.uniq` empties it, so the
+    // `case ids.size … when 0` branch raises — it does NOT return `[]` like
+    // the empty-input `find([])` case.
+    await expect(Topic.find([null, null])).rejects.toThrow("Couldn't find Topic without an ID");
+    await expect(Topic.all().find([null, null])).rejects.toBeInstanceOf(RecordNotFound);
+  });
+
   it("find with duplicate ids on a relation dispatches to single id path", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "Dup" });
