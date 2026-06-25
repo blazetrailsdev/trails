@@ -9,6 +9,7 @@
  */
 
 import { Nodes } from "@blazetrails/arel";
+import { pluralize } from "@blazetrails/activesupport";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
@@ -575,19 +576,41 @@ export async function performCreateOrFindByBang(
   }
 }
 
+// Mirrors ActiveRecord::FinderMethods#raise_record_not_found_exception!
+// (finder_methods.rb:417). Composes the faithful not-found messages from the
+// same ids / result_size / expected_size / key / not_found_ids arguments Rails
+// passes, so the resulting RecordNotFound message, model, primary_key, and id
+// fields match. (The Rails `conditions` clause derived from `arel.where_sql`
+// has no trails equivalent and is omitted; the tested finder cases run on a
+// bare relation with an empty where clause.)
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
-  message?: string,
-  modelName?: string,
-  primaryKey?: string,
-  id?: unknown,
+  ids?: unknown,
+  resultSize?: number,
+  expectedSize?: number,
+  key?: string,
+  notFoundIds?: unknown[],
 ): never {
-  throw new RecordNotFound(
-    message ?? `Couldn't find ${this._modelClass.name}`,
-    modelName ?? this._modelClass.name,
-    primaryKey ?? String(this._modelClass.primaryKey),
-    id,
-  );
+  const name = this._modelClass.name;
+  const k = key ?? String(this._modelClass.primaryKey);
+
+  if (ids === undefined || ids === null) {
+    throw new RecordNotFound(`Couldn't find ${name}`, name, k);
+  }
+
+  const wrapped = Array.isArray(ids) ? ids : [ids];
+  if (wrapped.length === 1) {
+    throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}`, name, k, ids);
+  }
+
+  let error = `Couldn't find all ${pluralize(name)} with '${k}': `;
+  error += `(${wrapped.join(", ")}) (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  if (notFoundIds) {
+    error +=
+      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
+      ` with ${pluralize(k, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
+  }
+  throw new RecordNotFound(error, name, k, ids);
 }
 
 export const FinderMethods = {
@@ -712,8 +735,8 @@ export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
   const conditions = Array.isArray(pk) ? buildPkWhere(pk, id as unknown[]) : { [pk as string]: id };
   const record = await (rel as any).findBy(conditions);
   if (!record) {
-    const modelName = (rel as any)._modelClass.name as string;
-    throw new RecordNotFound(`Couldn't find ${modelName}`, modelName, String(pk), id);
+    // Rails find_one: raise_record_not_found_exception!(id, 0, 1)
+    raiseRecordNotFoundExceptionBang.call(rel, id, 0, 1);
   }
   return record;
 }
@@ -740,14 +763,8 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
     expectedSize = ids.length - offsetValue;
 
   if (records.length !== expectedSize) {
-    const foundIds = records.map((r: any) => r.readAttribute?.(pk) ?? r[pk]);
-    const remaining = [...ids];
-    for (const foundId of foundIds) {
-      const idx = remaining.findIndex((id) => id === foundId);
-      if (idx >= 0) remaining.splice(idx, 1);
-    }
-    const modelName = (rel as any)._modelClass.name as string;
-    throw new RecordNotFound(`Couldn't find all ${modelName}`, modelName, pk, remaining);
+    // Rails find_some: raise_record_not_found_exception!(ids, result.size, expected_size)
+    raiseRecordNotFoundExceptionBang.call(rel, ids, records.length, expectedSize, pk);
   }
   return records;
 }
@@ -771,14 +788,8 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
   const castKey = (v: unknown) => String(pkType.cast(v));
 
   if (records.length !== ids.length) {
-    const modelName = (rel as any)._modelClass.name as string;
-    const remaining = [...ids];
-    for (const r of records) {
-      const key = castKey(r.readAttribute?.(pk) ?? r[pk]);
-      const idx = remaining.findIndex((id) => castKey(id) === key);
-      if (idx >= 0) remaining.splice(idx, 1);
-    }
-    throw new RecordNotFound(`Couldn't find all ${modelName}`, modelName, pk, remaining);
+    // Rails find_some_ordered: raise_record_not_found_exception!(ids, result.size, ids.size)
+    raiseRecordNotFoundExceptionBang.call(rel, ids, records.length, ids.length, pk);
   }
   const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
   return records.sort((a: any, b: any) => {
