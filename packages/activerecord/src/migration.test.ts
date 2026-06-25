@@ -3077,30 +3077,41 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
 // compound feature guard runs it on Postgres only — where the PG-specific body (gen_random_uuid)
 // belongs. Kept out of describeIfPg so the gate carries no adapter restriction, matching Rails.
 //
-// Latent gap: by Rails' own feature definitions the gate also admits MariaDB ≥ 10.2.1
+// Latent gap (now closed): by Rails' own feature definitions the gate also admits MariaDB ≥ 10.2.1
 // (supports_bulk_alter? is true for MySQL adapters per abstract_mysql_adapter.rb:96, and
 // supports_text_column_with_default? is true for any non-MySQL/Trilogy adapter per
 // adapter_helper.rb:42 — which includes MariaDB). Rails branches in-body (migration_test.rb:1460)
 // to `UUID()` on the non-Postgres path. Our CI matrix is mysql:8 (not MariaDB), so at runtime this
-// only ever runs on Postgres and the gen_random_uuid() body is exact. If MariaDB ever joins the
-// matrix, add the `UUID()` else-branch (and a backend-appropriate adapter) to mirror Rails' body
-// before that lane goes green.
+// only ever runs on Postgres today, but the body now branches like Rails: a backend-appropriate
+// adapter plus `gen_random_uuid()` on Postgres / `UUID()` otherwise (default_function `uuid()`),
+// so the test is correct if MariaDB ever joins the matrix.
 describe("BulkAlterTableMigrationsTest", () => {
   it.skipIf(!adapterSupports("bulk_alter") || !adapterSupports("text_column_with_default"))(
     "default functions on columns",
     async () => {
-      const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+      const isPg = adapterType === "postgres";
+      const adapter = isPg ? new PostgreSQLAdapter(PG_TEST_URL) : new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         await adapter.exec("DROP TABLE IF EXISTS delete_me");
-        await adapter.exec(`CREATE TABLE delete_me (id serial primary key)`);
+        await adapter.exec(
+          isPg
+            ? `CREATE TABLE delete_me (id serial primary key)`
+            : `CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))`,
+        );
         const ss = adapter.schemaStatements();
         await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
-          t.string("name", { default: () => "gen_random_uuid()" });
+          t.string("name", { default: () => (isPg ? "gen_random_uuid()" : "UUID()") });
         });
         const cols = await adapter.columns("delete_me");
         const name = cols.find((c) => c.name === "name")!;
         expect(name.default).toBeNull();
-        expect((name as any).defaultFunction).toBe("gen_random_uuid()");
+        expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
+
+        await adapter.exec(
+          isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
+        );
+        const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
+        expect(String(row!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
       } finally {
         await adapter.exec("DROP TABLE IF EXISTS delete_me");
         await adapter.close();
