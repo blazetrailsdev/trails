@@ -17,7 +17,6 @@ export abstract class JoinPart {
 
   tableIndex = -1;
   tableAlias = "";
-  tableName = "";
   /**
    * The Arel table this part selects from. Set at tree-construction time so the
    * `Aliases` value object can build column aliases (`node.table[col].as(...)`)
@@ -59,10 +58,17 @@ export abstract class JoinPart {
   abstract get table(): Table | string;
 
   /**
-   * Mirrors Rails' `delegate :column_names, :primary_key, :attribute_types,
-   * to: :base_klass` (join_part.rb:20) — forward each to the node's base model
-   * class so callers can read the joined table's schema off a JoinPart.
+   * Mirrors Rails' `delegate :table_name, :column_names, :primary_key,
+   * :attribute_types, to: :base_klass` (join_part.rb:20) — forward each to the
+   * node's base model class so callers can read the joined table's schema off a
+   * JoinPart. `table_name` always returns the base model's real (un-aliased)
+   * table name; the resolved/aliased SQL name lives separately on
+   * `effectiveSqlName` / `tableAlias` / the Arel table.
    */
+  get tableName(): string {
+    return this.baseKlass.tableName;
+  }
+
   columnNames(): string[] {
     return this.baseKlass.columnNames();
   }

@@ -403,7 +403,6 @@ export class JoinDependency {
     treePart.tableIndex = tableIndex;
     treePart.arelTable = targetArelTable;
     treePart.tableAlias = tableAlias;
-    treePart.tableName = targetTable!;
     treePart.effectiveSqlName = effectiveName;
     treePart.columns = columns;
     treePart.assocName = options?.parentAssocName
@@ -1617,7 +1616,6 @@ export class JoinDependency {
         treePart.tableIndex = entry.tableIndex;
         treePart.arelTable = entry.table;
         treePart.tableAlias = entry.tableAlias;
-        treePart.tableName = entry.tableName;
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
         treePart.assocName = fullAssocName;
@@ -1641,7 +1639,6 @@ export class JoinDependency {
         treePart.tableIndex = entry.tableIndex;
         treePart.arelTable = entry.table;
         treePart.tableAlias = entry.tableAlias;
-        treePart.tableName = entry.tableName;
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
         treePart.assocName = throughNodeName;
