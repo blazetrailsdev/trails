@@ -19,9 +19,19 @@ export interface QueryTransformer {
 
 /**
  * The mutable, process-global transformer list. Mutate in place
- * (`queryTransformers.push(...)`, `queryTransformers.length = 0`) — ESM live
- * bindings are read-only for importers, so the array identity is stable and
- * callers register/reset by mutating its contents, exactly as Rails appends to
- * and resets `ActiveRecord.query_transformers`.
+ * (`queryTransformers.push(...)`, `queryTransformers.length = 0`) to register
+ * or reset, exactly as Rails appends to and resets
+ * `ActiveRecord.query_transformers`. Consumers import this live binding and
+ * iterate it fresh on every query, so {@link setQueryTransformers} (a
+ * wholesale reassignment, mirroring Rails' `query_transformers=`) is also
+ * observed.
  */
-export const queryTransformers: QueryTransformer[] = [];
+export let queryTransformers: QueryTransformer[] = [];
+
+/**
+ * Replaces the transformer list wholesale. Mirrors
+ * `ActiveRecord.query_transformers=` (active_record.rb:431).
+ */
+export function setQueryTransformers(value: QueryTransformer[]): void {
+  queryTransformers = value;
+}
