@@ -864,7 +864,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {
       throw new RecordNotFound(
-        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${castIds.join(", ")})`,
+        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${id.join(", ")})`,
         this.name,
         String(this.primaryKey),
         id,
