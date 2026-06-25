@@ -1,52 +1,52 @@
-import { describe, it, expect, beforeAll } from "vitest";
+/**
+ * Mirrors: activerecord/test/cases/date_test.rb
+ */
+import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ events: { start_date: "date" } });
-});
 describe("DateTest", () => {
+  setupHandlerSuite();
+  // Rails date_test.rb declares no `fixtures`; wiring the canonical `topics`
+  // table (and recreating its shape via `{ schema }`) lets the file ride the
+  // shared Topic model with a real `last_read` date column instead of an inline
+  // scratch table that collided under parallel forks.
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
+  // Rails: test_date_with_time_value
   it("date with time value", async () => {
-    class Event extends Base {
-      static {
-        this.attribute("start_date", "date");
-      }
-    }
-    const e = await Event.create({ start_date: "2024-01-15" });
-    const reloaded = await Event.find(e.id);
-    expect(reloaded.start_date).toBeInstanceOf(Temporal.PlainDate);
+    const timeValue = Temporal.PlainDateTime.from({
+      year: 2016,
+      month: 5,
+      day: 11,
+      hour: 19,
+    });
+    const topic = await Topic.create({ last_read: timeValue });
+    const found = await Topic.findBy({ last_read: timeValue });
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(topic.id);
   });
 
+  // Rails: test_date_with_string_value
   it("date with string value", async () => {
-    class Event extends Base {
-      static {
-        this.attribute("start_date", "date");
-      }
-    }
-    const e = await Event.create({ start_date: "2024-01-15" });
-    const reloaded = await Event.find(e.id);
-    const val = reloaded.start_date as Temporal.PlainDate;
-    expect(val).toBeInstanceOf(Temporal.PlainDate);
-    expect(val.year).toBe(2024);
+    const stringValue = "2016-05-11 19:00:00";
+    const topic = await Topic.create({ last_read: stringValue });
+    const found = await Topic.findBy({ last_read: stringValue });
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(topic.id);
   });
 
+  // Rails: test_assign_valid_dates
   it("assign valid dates", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
-
     const validDates: Array<[number, number, number]> = [
       [2007, 11, 30],
       [1993, 2, 28],
       [2008, 2, 29],
     ];
+
     // Rails: invalid multiparameter dates roll over the way Time does
     // (Date.new raises → rescued → instantiate_time_object(...).to_date),
     // so Nov 31 → Dec 1 and Feb 29 in a common year → Mar 1.
@@ -70,7 +70,7 @@ describe("DateTest", () => {
         "last_read(1i)": String(y),
         "last_read(2i)": String(m),
         "last_read(3i)": String(d),
-      }) as unknown as { last_read: Temporal.PlainDate };
+      });
       expect(topic.last_read.equals(Temporal.PlainDate.from({ year: y, month: m, day: d }))).toBe(
         true,
       );
@@ -81,7 +81,7 @@ describe("DateTest", () => {
         "last_read(1i)": String(y),
         "last_read(2i)": String(m),
         "last_read(3i)": String(d),
-      }) as unknown as { last_read: Temporal.PlainDate };
+      });
       expect(
         topic.last_read.equals(Temporal.PlainDate.from({ year: ey, month: em, day: ed })),
       ).toBe(true);
