@@ -1,5 +1,19 @@
 [
   {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "_create_record",
+    "call": "new",
+    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` — the `new` operator, not a recognized method call."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "_create_record",
+    "call": "owner",
+    "reason": "Rails `owner.persisted?` reads `owner` as a method; trails accesses it as the `this.owner` property (getter), so no `owner()` call appears."
+  },
+  {
     "package": "abstractcontroller",
     "tsFile": "base.ts",
     "rubyName": "_valid_action_name?",
