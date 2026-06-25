@@ -624,18 +624,27 @@ export abstract class Migration {
   }
 
   async dropTable(
-    name: string,
-    options?: { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+    ...args:
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && typeof last === "object";
+    const options = hasOptions
+      ? (last as { ifExists?: boolean; force?: "cascade"; temporary?: boolean })
+      : undefined;
+    const names = (hasOptions ? args.slice(0, -1) : args) as string[];
     if (this._recording) {
-      this._recorder.record("dropTable", [name]);
+      // Record the raw (un-prefixed) names — invert replays through createTable,
+      // which re-applies the table-name prefix. The recorder accepts the splat.
+      this._recorder.record("dropTable", options ? [...names, options] : names);
       return;
     }
-    const tname = this._pt(name);
+    const tnames = names.map((n) => this._pt(n)) as [string, ...string[]];
     if (options) {
-      await this.schema.dropTable(tname, options);
+      await this.schema.dropTable(...tnames, options);
     } else {
-      await this.schema.dropTable(tname);
+      await this.schema.dropTable(...tnames);
     }
   }
 
@@ -2108,23 +2117,36 @@ export class MigrationContext {
   }
 
   async dropTable(
-    name: string,
-    options?: { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+    ...args:
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
     // Mirrors Rails MySQL drop_table: emit `DROP TEMPORARY TABLE` when `temporary: true`.
     // `IF EXISTS` is included by default (matches the abstract drop_table contract); pass
     // `ifExists: false` to omit it. `force: "cascade"` adds `CASCADE` on Postgres.
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && typeof last === "object";
+    const options = (hasOptions ? last : {}) as {
+      ifExists?: boolean;
+      force?: "cascade";
+      temporary?: boolean;
+    };
+    const names = (hasOptions ? args.slice(0, -1) : args) as string[];
     const temporary =
-      options?.temporary === true && this._adapterName === "mysql" ? " TEMPORARY" : "";
-    const ifExists = options?.ifExists === false ? "" : " IF EXISTS";
+      options.temporary === true && this._adapterName === "mysql" ? " TEMPORARY" : "";
+    const ifExists = options.ifExists === false ? "" : " IF EXISTS";
     const cascade =
-      options?.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
-    const quoted = this.connection.quoteTableName(name);
-    await this.connection.executeMutation(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
-    this._tables.delete(name);
-    this._columns.delete(name);
-    this._columnMeta.delete(name);
-    this._indexes.delete(name);
+      options.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
+    for (const name of names) {
+      const quoted = this.connection.quoteTableName(name);
+      await this.connection.executeMutation(
+        `DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`,
+      );
+      this._tables.delete(name);
+      this._columns.delete(name);
+      this._columnMeta.delete(name);
+      this._indexes.delete(name);
+    }
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {

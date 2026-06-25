@@ -77,9 +77,7 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
   });
 
   afterEach(async () => {
-    await ctx.dropTable("defaults", { ifExists: true });
-    await ctx.dropTable("timestamp_defaults", { ifExists: true });
-    await ctx.dropTable("datetime_defaults", { ifExists: true });
+    await ctx.dropTable("defaults", "timestamp_defaults", "datetime_defaults", { ifExists: true });
   });
 
   // The `uuid()`/`concat()` function defaults reflect on both MySQL 8 (via the

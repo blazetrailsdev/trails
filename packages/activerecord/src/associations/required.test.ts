@@ -21,8 +21,7 @@ describe("RequiredAssociationsTest", () => {
     });
   });
   afterAll(async () => {
-    await ctx.dropTable("children", { ifExists: true });
-    await ctx.dropTable("parents", { ifExists: true });
+    await ctx.dropTable("children", "parents", { ifExists: true });
   });
 
   it("belongs_to associations can be optional by default", async () => {
@@ -214,12 +213,15 @@ describe("belongs_to required option", () => {
     });
   });
   afterAll(async () => {
-    await ctx.dropTable("r_authors", { ifExists: true });
-    await ctx.dropTable("r_books", { ifExists: true });
-    await ctx.dropTable("r_writers", { ifExists: true });
-    await ctx.dropTable("r_novels", { ifExists: true });
-    await ctx.dropTable("rg_parents", { ifExists: true });
-    await ctx.dropTable("rg_children", { ifExists: true });
+    await ctx.dropTable(
+      "r_authors",
+      "r_books",
+      "r_writers",
+      "r_novels",
+      "rg_parents",
+      "rg_children",
+      { ifExists: true },
+    );
   });
 
   it("validates presence of foreign key when required: true", async () => {

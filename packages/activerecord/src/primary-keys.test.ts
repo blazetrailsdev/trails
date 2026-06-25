@@ -547,9 +547,7 @@ describe("CompositePrimaryKeyTest", () => {
       { dropExisting: true },
     );
     const conn = Base.connection as any;
-    await conn.dropTable("uber_barcodes", { ifExists: true });
-    await conn.dropTable("barcodes_reverse", { ifExists: true });
-    await conn.dropTable("travels", { ifExists: true });
+    await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
     await conn.createTable(
       "uber_barcodes",
       { primaryKey: ["region", "code"], force: true },
@@ -574,9 +572,7 @@ describe("CompositePrimaryKeyTest", () => {
 
   afterAll(async () => {
     const conn = Base.connection as any;
-    await conn.dropTable("uber_barcodes", { ifExists: true });
-    await conn.dropTable("barcodes_reverse", { ifExists: true });
-    await conn.dropTable("travels", { ifExists: true });
+    await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
   });
 
   it("composite primary key", async () => {

@@ -70,9 +70,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoProfile);
   });
   afterAll(async () => {
-    await ctx.dropTable("lo_profiles", { ifExists: true });
-    await ctx.dropTable("lo_posts", { ifExists: true });
-    await ctx.dropTable("lo_authors", { ifExists: true });
+    await ctx.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
   withTransactionalFixtures(() => adapter);
 
