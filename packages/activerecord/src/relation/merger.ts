@@ -173,6 +173,7 @@ export class Merger {
     if (this.other._isDistinct) rel._isDistinct = true;
     if (this.other._lockValue) rel._lockValue = this.other._lockValue;
     if (this.other._isReadonly) rel._isReadonly = true;
+    if (this.other._skipQueryCache) rel._skipQueryCache = true;
     if (this.other._isStrictLoading !== undefined)
       rel._isStrictLoading = this.other._isStrictLoading;
     // Mirrors merge_single_values (merger.rb): create_with merges hash-wise with

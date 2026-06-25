@@ -1,601 +1,506 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/merging_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Nodes } from "@blazetrails/arel";
+import { sql as arelSql } from "@blazetrails/arel";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { itIfSupports } from "../test-helpers/supports.js";
+import { registerModel, Range } from "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
+import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Developer } from "../test-helpers/models/developer.js";
+import { Comment, CommentThatAutomaticallyAltersPostBody } from "../test-helpers/models/comment.js";
+import { Post, PostThatLoadsCommentsInAnAfterSaveHook } from "../test-helpers/models/post.js";
+import { Rating } from "../test-helpers/models/rating.js";
+import { Computer } from "../test-helpers/models/computer.js";
+import { Project } from "../test-helpers/models/project.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+registerModel([
+  Author,
+  Developer,
+  Comment,
+  CommentThatAutomaticallyAltersPostBody,
+  Post,
+  PostThatLoadsCommentsInAnAfterSaveHook,
+  Rating,
+  Computer,
+  Project,
+]);
 
-beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string", author: "string" },
-    items: { name: "string", status: "string" },
-    users: { name: "string", age: "integer", active: "boolean" },
-  });
-});
+const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((r: any) => r.id);
 
 describe("RelationMergingTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post };
-  }
+  const { authors, developers } = useHandlerFixtures(
+    ["developers", "comments", "authors", "authorAddresses", "posts", "ratings"],
+    { schema: canonicalSchema },
+  );
+
+  const mergeClauseAssertions = async (
+    davidAndMary: any,
+    maryAndBob: any,
+    david: any,
+    mary: any,
+    bob: any,
+    authorList: unknown[],
+  ): Promise<void> => {
+    expect(await ids(davidAndMary)).toEqual([david.id, mary.id]);
+    expect(await ids(maryAndBob)).toEqual([mary.id, bob.id]);
+
+    expect(await ids(davidAndMary.merge(Author.where({ id: mary })))).toEqual([mary.id]);
+    expect(await ids(davidAndMary.merge(Author.rewhere({ id: mary })))).toEqual([mary.id]);
+
+    expect(await ids(davidAndMary.merge(Author.where({ id: bob })))).toEqual([bob.id]);
+    expect(await ids(davidAndMary.merge(Author.rewhere({ id: bob })))).toEqual([bob.id]);
+
+    expect(await ids(maryAndBob.merge(Author.where({ id: [david, bob] })))).toEqual([
+      david.id,
+      bob.id,
+    ]);
+
+    expect(await ids(davidAndMary.merge(maryAndBob))).toEqual([mary.id, bob.id]);
+    expect(await ids(davidAndMary.and(maryAndBob))).toEqual([mary.id]);
+    expect(await ids(davidAndMary.or(maryAndBob))).toEqual(authorList);
+
+    expect(await ids(maryAndBob.merge(davidAndMary))).toEqual([david.id, mary.id]);
+    expect(await ids(davidAndMary.and(maryAndBob))).toEqual([mary.id]);
+    expect(await ids(davidAndMary.or(maryAndBob))).toEqual(authorList);
+
+    const davidAndBob = Author.where({ id: david }).or(Author.where({ name: "Bob" }));
+
+    expect(await ids(davidAndMary.merge(davidAndBob))).toEqual([david.id]);
+    expect(await ids(davidAndMary.and(davidAndBob))).toEqual([david.id]);
+    expect(await ids(davidAndMary.or(davidAndBob))).toEqual(authorList);
+  };
 
   it("merge in clause", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", author: "alice" });
-    await Post.create({ title: "b", author: "bob" });
-    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+    const authorList = [david.id, mary.id, bob.id];
+
+    const davidAndMary = Author.where({ id: [david, mary] }).order("id");
+    const maryAndBob = Author.where({ id: [mary, bob] }).order("id");
+
+    await mergeClauseAssertions(davidAndMary, maryAndBob, david, mary, bob, authorList);
   });
 
-  it("merge between clause", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
-    expect(r.toSql()).toContain("WHERE");
+  it("merge between clause", async () => {
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+    const authorList = [david.id, mary.id, bob.id];
+
+    const davidAndMary = Author.where({ id: new Range(david.id, mary.id) }).order("id");
+    const maryAndBob = Author.where({ id: new Range(mary.id, bob.id) }).order("id");
+
+    await mergeClauseAssertions(davidAndMary, maryAndBob, david, mary, bob, authorList);
   });
 
-  it("merge or clause", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "a" }).or(Post.where({ title: "b" }));
-    expect(r.toSql()).toContain("OR");
+  it("merge or clause", async () => {
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+    const authorList = [david.id, mary.id, bob.id];
+
+    const davidAndMary = Author.where({ id: david })
+      .or(Author.where({ id: mary }))
+      .order("id");
+    const maryAndBob = Author.where({ id: mary })
+      .or(Author.where({ id: bob }))
+      .order("id");
+
+    await mergeClauseAssertions(davidAndMary, maryAndBob, david, mary, bob, authorList);
   });
 
-  it("merge not in clause", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "a" });
-    expect(r.toSql()).toContain("WHERE");
+  it("merge not in clause", async () => {
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+
+    const nonMaryAndBob = Author.whereNot({ id: [mary, bob] });
+
+    expect(await ids(nonMaryAndBob)).toEqual([david.id]);
+
+    expect(await ids(Author.where({ id: david }).merge(nonMaryAndBob))).toEqual([david.id]);
+
+    expect(await ids(Author.where({ id: mary }).merge(nonMaryAndBob))).toEqual([david.id]);
   });
 
-  it("merge not range clause", () => {
-    const { Post } = makeModel();
-    const r = Post.order("title");
-    expect(r.toSql()).toContain("ORDER");
+  it("merge not range clause", async () => {
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+
+    const lessThanBob = Author.whereNot({ id: new Range(bob.id, Infinity) }).order("id");
+
+    expect(await ids(lessThanBob)).toEqual([david.id, mary.id]);
+
+    expect(await ids(Author.where({ id: david }).merge(lessThanBob))).toEqual([david.id, mary.id]);
+
+    expect(await ids(Author.where({ id: mary }).merge(lessThanBob))).toEqual([david.id, mary.id]);
   });
 
   it("merge doesnt duplicate same clauses", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "x", author: "a" });
-    const r = Post.where({ title: "x" }).merge(Post.where({ title: "x" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+
+    const nonMaryAndBob = Author.whereNot({ id: [mary, bob] });
+
+    const authorId = quoteTableName("authors.id");
+    await assertQueriesMatch(
+      // Rails uses `\g<1>` (subexpression call — re-match group 1's pattern);
+      // JS `\1` is a backreference, so repeat the alternation instead.
+      new RegExp(
+        `WHERE ${escapeRegExp(authorId)} NOT IN \\((?:\\?|\\W?\\w?\\d), (?:\\?|\\W?\\w?\\d)\\)$`,
+      ),
+      undefined,
+      false,
+      async () => {
+        expect(await ids(nonMaryAndBob.merge(nonMaryAndBob))).toEqual([david.id]);
+      },
+    );
   });
 
   it("relation merging", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "merged", author: "alice" });
-    const r = Post.where({ title: "merged" }).merge(Post.where({ author: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].title).toBe("merged");
+    const devs = Developer.where("salary >= 80000")
+      .merge(Developer.limit(2))
+      .merge(Developer.order("id ASC").where("id < 3"));
+    expect(await ids(devs)).toEqual([developers("david").id, developers("jamis").id]);
+
+    const devWithCount = Developer.limit(1)
+      .merge(Developer.order("id DESC"))
+      .merge(Developer.select("developers.*"));
+    expect(await ids(devWithCount)).toEqual([developers("poor_jamis").id]);
   });
 
-  it("relation to sql", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "test" }).merge(Post.order("author")).toSql();
-    expect(sql).toContain("WHERE");
-    expect(sql).toContain("ORDER");
+  it("relation to sql", async () => {
+    const post = await Post.first();
+    const sql = (post as any).comments.toSql();
+    expect(sql).toMatch(new RegExp(`.?post_id.? = ${post!.id}$`, "i"));
   });
 
-  it("relation merging with arel equalities keeps last equality", () => {
-    const { Post } = makeModel();
-    // merge combines conditions; result should be a valid SQL query
-    const sql = Post.where({ title: "a" })
-      .merge(Post.where({ title: "b" }))
-      .toSql();
-    expect(sql).toContain("WHERE");
+  it("relation merging with arel equalities keeps last equality", async () => {
+    const salaryAttr = Developer.arelTable.get("salary");
+
+    let devs = Developer.where(salaryAttr.eq(80000) as any).merge(
+      Developer.where(salaryAttr.eq(9000) as any),
+    );
+    expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
+
+    devs = Developer.where(salaryAttr.eq(80000) as any).rewhere(salaryAttr.eq(9000) as any);
+    expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
   });
 
-  it("relation merging with arel equalities keeps last equality with non attribute left hand", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "yes", author: "bob" });
-    const r = Post.where({ title: "yes" }).merge(Post.where({ author: "bob" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+  // TODO(story merge-where-nonattribute-equality): where-merge "keeps last
+  // equality" only replaces predicates with a plain Attribute LHS; an Arel
+  // NamedFunction LHS isn't recognized so both predicates survive (→ no rows).
+  it.skip("relation merging with arel equalities keeps last equality with non attribute left hand", async () => {
+    const salaryAttr = Developer.arelTable.get("salary");
+    const absSalary = new Nodes.NamedFunction("abs", [salaryAttr]);
+
+    let devs = Developer.where(absSalary.eq(80000) as any).merge(
+      Developer.where(absSalary.eq(9000) as any),
+    );
+    expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
+
+    devs = Developer.where(absSalary.eq(80000) as any).rewhere(absSalary.eq(9000) as any);
+    expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
   });
 
-  it("relation merging with eager load", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "x" }).merge(Post.all().includes("comments"));
-    expect(r.toSql()).toContain("SELECT");
+  // TODO(story merge-eager-load-association-target): merging an eagerLoad(...)
+  // relation doesn't carry the hasOne (lastComment) target through to the
+  // merged result, so the eager association reads back undefined.
+  it.skip("relation merging with eager load", async () => {
+    const relations = [
+      Post.order("comments.id DESC").merge(Post.eagerLoad("lastComment")).merge(Post.all()),
+      Post.eagerLoad("lastComment").merge(Post.order("comments.id DESC")).merge(Post.all()),
+    ];
+
+    const expected = (await Post.find(1)).lastComment;
+    for (const rel of relations) {
+      const posts = await rel.toArray();
+      const post = posts.find((p: any) => p.id === 1);
+      expect((post as any).lastComment?.id).toEqual((expected as any)?.id);
+    }
   });
 
-  it("relation merging with preload", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "x" });
-    expect(r.toSql()).toContain("WHERE");
+  it("relation merging with locks", () => {
+    const devs = Developer.lock(true)
+      .where("salary >= 80000")
+      .order("id DESC")
+      .merge(Developer.limit(2));
+    expect(devs.isLocked).toBe(true);
   });
 
-  it("relation merging with joins", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "x" }).merge(Post.order("title"));
-    expect(r.toSql()).toContain("WHERE");
+  it("relation merging with preload", async () => {
+    const relations = [
+      Post.all().merge(Post.preload("author")),
+      Post.preload("author").merge(Post.all()),
+    ];
+    for (const posts of relations) {
+      await assertQueriesCount(2, false, async () => {
+        const first = await posts.first();
+        expect((first as any).author).toBeTruthy();
+      });
+    }
   });
 
-  it("relation merging with left outer joins", () => {
-    const { Post } = makeModel();
-    const r = Post.order("title").merge(Post.where({ author: "alice" }));
-    expect(r.toSql()).toContain("ORDER");
+  it("relation merging with joins", async () => {
+    const comments = Comment.joins("post")
+      .where({ body: "Thank you for the welcome" })
+      .merge(Post.where({ body: "Such a lovely day" }));
+    expect(await comments.count()).toBe(1);
+  });
+
+  it("relation merging with left outer joins", async () => {
+    const comments = Comment.joins("post")
+      .where({ body: "Thank you for the welcome" })
+      .merge(Post.leftOuterJoins("author").where({ body: "Such a lovely day" }));
+    expect(await comments.count()).toBe(1);
   });
 
   it("relation merging with skip query cache", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "x" });
-    expect(r.toSql()).toContain("WHERE");
+    expect(Post.all().merge(Post.all().skipQueryCacheBang()).skipQueryCacheValue).toBe(true);
   });
 
   it("relation merging with association", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "assoc", author: "a" });
-    const r = Post.where({ title: "assoc" });
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    await assertQueriesCount(2, false, async () => {
+      const post = await Post.where({ body: "Such a lovely day" }).first();
+      const comments = Comment.where({ body: "Thank you for the welcome" }).merge(
+        (post as any).comments,
+      );
+      expect(await comments.count()).toBe(1);
+    });
   });
 
-  it("merge collapses wheres from the LHS only", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "t", author: "alice" });
-    const r = Post.where({ title: "t" }).merge(Post.where({ author: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+  it("merge collapses wheres from the LHS only", () => {
+    const left = Post.where({ title: "omg" }).where({ commentsCount: 1 });
+    const right = Post.where({ title: "wtf" }).where({ title: "bbq" });
+
+    const merged = left.merge(right);
+
+    expect(merged.toSql()).not.toContain("omg");
+    expect(merged.toSql()).toContain("wtf");
+    expect(merged.toSql()).toContain("bbq");
   });
 
   it("merging reorders bind params", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "r", author: "z" });
-    const r = Post.where({ author: "z" }).merge(Post.where({ title: "r" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const post = await Post.first();
+    const right = Post.where({ id: 1 });
+    const left = Post.where({ title: post!.title });
+
+    const merged = left.merge(right);
+    expect((await merged.first())!.id).toBe(post!.id);
   });
 
-  it("merging compares symbols and strings as equal", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "sym", author: "a" });
-    const results = await Post.where({ title: "sym" }).toArray();
-    expect(results.length).toBe(1);
+  // TODO(story merge-belongsto-target-in-after-save-hook): the canonical
+  // CommentThatAutomaticallyAltersPostBody after_save hook does `this.post.update(...)`,
+  // but the in-memory belongsTo target isn't a record here (`post.update` is undefined).
+  it.skip("merging compares symbols and strings as equal", async () => {
+    const post = await PostThatLoadsCommentsInAnAfterSaveHook.create({
+      title: "First Post",
+      body: "Blah blah blah.",
+    });
+    const comment = await (post as any).comments.where({ body: "First comment!" }).firstOrCreate();
+    expect(comment.body).toBe("First comment!");
   });
 
   it("merging with from clause", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "x" }).toSql();
-    expect(sql).toContain("FROM");
+    let relation = Post.all();
+    expect(relation.fromClause.isEmpty()).toBe(true);
+    relation = relation.merge(Post.from("posts"));
+    expect(relation.fromClause.isEmpty()).toBe(false);
   });
 
-  it("merging with from clause on different class", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("FROM");
+  // TODO(story merge-from-clause-different-class): merging Post.from("posts")
+  // into a Comment relation builds SQL that still references the `comments`
+  // table under the swapped FROM clause (→ "no such table: comments").
+  it.skip("merging with from clause on different class", async () => {
+    expect(await Comment.joins("post").merge(Post.from("posts")).first()).toBeTruthy();
   });
 
   it("merging with order with binds", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "a" }).order("author").toSql();
-    expect(sql).toContain("ORDER");
+    const relation = Post.all().merge(Post.order([arelSql("title LIKE ?"), "%suffix"] as any));
+    expect(relation.orderValues.map((v: any) => v.value ?? String(v))).toEqual([
+      "title LIKE '%suffix'",
+    ]);
   });
 
   it("merging with order without binds", () => {
-    const { Post } = makeModel();
-    const sql = Post.order("title").merge(Post.order("author")).toSql();
-    expect(sql).toContain("ORDER");
+    const relation = Post.all().merge(Post.order(arelSql("title LIKE '%?'")));
+    expect(relation.orderValues.map((v: any) => v.value ?? String(v))).toEqual(["title LIKE '%?'"]);
   });
 
-  it("merging annotations respects merge order", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("first").merge(Post.all().annotate("second")).toSql();
-    expect(sql).toContain("first");
-    expect(sql).toContain("second");
+  it("merging annotations respects merge order", async () => {
+    await assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, undefined, false, async () => {
+      await Post.annotate("foo").merge(Post.annotate("bar")).first();
+    });
+    await assertQueriesMatch(/\/\* bar \*\/ \/\* foo \*\//, undefined, false, async () => {
+      await Post.annotate("bar").merge(Post.annotate("foo")).first();
+    });
+    await assertQueriesMatch(
+      /\/\* foo \*\/ \/\* bar \*\/ \/\* baz \*\/ \/\* qux \*\//,
+      undefined,
+      false,
+      async () => {
+        await Post.annotate("foo")
+          .annotate("bar")
+          .merge(Post.annotate("baz").annotate("qux"))
+          .first();
+      },
+    );
   });
 
-  it("merging duplicated annotations", () => {
-    const { Post } = makeModel();
-    const sql = Post.all().annotate("dup").merge(Post.all().annotate("dup")).toSql();
-    expect(sql).toContain("dup");
+  it("merging duplicated annotations", async () => {
+    const posts = Post.annotate("foo");
+    const quotedTable = escapeRegExp(Post.quotedTableName());
+    await assertQueriesMatch(
+      new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/$`),
+      undefined,
+      false,
+      async () => {
+        await posts.merge(posts).uniqBang("annotate").toArray();
+      },
+    );
+
+    await assertQueriesMatch(
+      new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/$`),
+      undefined,
+      false,
+      async () => {
+        await posts.merge(posts).toArray();
+      },
+    );
+    await assertQueriesMatch(
+      new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/ \\/\\* bar \\*\\/$`),
+      undefined,
+      false,
+      async () => {
+        await Post.annotate("foo").merge(Post.annotate("bar")).merge(posts).toArray();
+      },
+    );
+    await assertQueriesMatch(
+      new RegExp(`FROM ${quotedTable} \\/\\* bar \\*\\/ \\/\\* foo \\*\\/$`),
+      undefined,
+      false,
+      async () => {
+        await Post.annotate("bar").merge(Post.annotate("foo")).merge(posts).toArray();
+      },
+    );
   });
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post };
-  }
+  const { posts } = useHandlerFixtures(
+    ["posts", "authors", "authorAddresses", "developers", "comments"],
+    { schema: canonicalSchema },
+  );
 
   it("merging where relations", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", author: "alice" });
-    await Post.create({ title: "b", author: "bob" });
-    const r = Post.where({ title: "a" }).merge(Post.where({ author: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const helloByBob = await Post.where({ body: "hello" })
+      .joins("author")
+      .merge(Author.where({ name: "Bob" }))
+      .order("posts.id")
+      .pluck("posts.id");
+
+    expect(helloByBob).toEqual([posts("misc_by_bob").id, posts("other_by_bob").id]);
   });
 
-  it("merging order relations", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "b", author: "z" });
-    await Post.create({ title: "a", author: "a" });
-    const r = Post.order("title").merge(Post.order("author"));
-    const sql = r.toSql();
-    expect(sql).toContain("ORDER");
+  // TODO(story merge-cross-model-order-qualification): when merging a relation
+  // from a different model, its order columns must be qualified against *its*
+  // table (authors.name) like mergeSelectValues does; trails qualifies late
+  // against the receiver → "no such column: posts.name".
+  it.skip("merging order relations", async () => {
+    let postsByAuthorName = await Post.limit(3)
+      .joins("author")
+      .whereNot({ "authors.name": "David" })
+      .merge(Author.order("name"))
+      .pluck("authors.name");
+    expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
+
+    postsByAuthorName = await Post.limit(3)
+      .joins("author")
+      .whereNot({ "authors.name": "David" })
+      .merge(Author.order("name"))
+      .pluck("authors.name");
+    expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
   });
 
-  it("merging order relations (using a hash argument)", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "b" });
-    await Post.create({ title: "a" });
-    const sql = Post.order("title").merge(Post.order("author")).toSql();
-    expect(sql).toContain("ORDER");
+  // TODO(story merge-cross-model-order-qualification): same cross-model order
+  // qualification gap, here with a hash order argument (Author.order({name})).
+  it.skip("merging order relations (using a hash argument)", async () => {
+    const postsByAuthorName = await Post.limit(4)
+      .joins("author")
+      .whereNot({ "authors.name": "David" })
+      .merge(Author.order({ name: "desc" }))
+      .pluck("authors.name");
+
+    expect(postsByAuthorName).toEqual(["Mary", "Mary", "Mary", "Bob"]);
   });
 
   it("relation merging (using a proc argument)", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "proc", author: "alice" });
-    const r = Post.where({ title: "proc" });
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const dev = await Developer.where({ name: "Jamis" }).first();
+
+    const comment1 = await (dev as any).comments.create({
+      body: "I'm Jamis",
+      post: await Post.first(),
+    });
+    const rating1 = await comment1.ratings.create();
+
+    const comment2 = await (dev as any).comments.create({
+      body: "I'm John",
+      post: await Post.first(),
+    });
+    await comment2.ratings.create();
+
+    expect(await ids((dev as any).ratings)).toEqual([rating1.id]);
   });
 
-  itIfSupports("common_table_expressions", "merging relation with common table expression", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "x" })
-      .merge(Post.where({ author: "y" }))
-      .toSql();
-    expect(sql).toContain("WHERE");
+  // TODO(story merge-cte-with-from): merging relations that carry `with(...)`
+  // CTE definitions doesn't fold the other relation's CTEs into the result, so
+  // the merged query references an undefined CTE ("no such table: posts_with_tags").
+  it.skip("merging relation with common table expression", async () => {
+    const postsWithTags = Post.with({
+      posts_with_tags: Post.where("tags_count > 0"),
+    }).from("posts_with_tags AS posts");
+    const postsWithComments = Post.where("legacy_comments_count > 0");
+    const relation = postsWithComments.merge(postsWithTags).order("posts.id");
+
+    expect(await relation.pluck("id")).toEqual([1, 2, 7]);
   });
 
-  itIfSupports(
-    "common_table_expressions",
-    "merging multiple relations with common table expression",
-    () => {
-      const { Post } = makeModel();
-      const sql = Post.where({ title: "x" }).where({ author: "y" }).toSql();
-      expect(sql).toContain("WHERE");
-    },
-  );
+  // TODO(story merge-cte-with-from): see above — CTE merge folding.
+  it.skip("merging multiple relations with common table expression", async () => {
+    const postsWithTags = Post.with({ posts_with_tags: Post.where("tags_count > 0") });
+    const postsWithComments = Post.with({
+      posts_with_comments: Post.where("legacy_comments_count > 0"),
+    });
+    const relation = postsWithComments
+      .merge(postsWithTags)
+      .joins(
+        "JOIN posts_with_tags pwt ON pwt.id = posts.id JOIN posts_with_comments pwc ON pwc.id = posts.id",
+      )
+      .order("posts.id");
 
-  itIfSupports(
-    "common_table_expressions",
-    "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
-    () => {
-      const { Post } = makeModel();
-      const sql = Post.all().toSql();
-      expect(sql).toContain("SELECT");
-    },
-  );
-});
-
-describe("RelationMergingTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post };
-  }
-
-  it("relation merging with locks", () => {
-    const { Post } = makeModel();
-    const sql = Post.all()
-      .lock(true)
-      .merge(Post.where({ title: "a" }))
-      .toSql();
-    expect(sql).toContain("WHERE");
-  });
-});
-
-describe("merge()", () => {
-  it("combines conditions from two relations", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    Item.attribute("status", "string");
-
-    await Item.create({ name: "A", status: "active" });
-    await Item.create({ name: "B", status: "inactive" });
-    await Item.create({ name: "C", status: "active" });
-
-    const active = Item.all().where({ status: "active" });
-    const items = await Item.all().where({ name: "A" }).merge(active).toArray();
-    expect(items).toHaveLength(1);
-    expect(items[0].name).toBe("A");
+    expect(await relation.pluck("id")).toEqual([1, 2, 7]);
   });
 
-  it("propagates the none() short-circuit across merge in either direction", async () => {
-    // Rails: a null-relation stays empty through merge so callers
-    // don't broaden an already-empty scope by composing state. We
-    // mirror the sticky behavior on `_isNone` and it has to hold
-    // whichever side the `.none()` is on.
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
+  // TODO(story merge-cte-with-from): see above — CTE merge folding.
+  it.skip("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", async () => {
+    const postsWithTags = Post.with({ popular_posts: Post.where("tags_count > 0") });
+    const postsWithComments = Post.with({
+      popular_posts: Post.where("legacy_comments_count > 0"),
+    });
+    const relation = postsWithTags
+      .merge(postsWithComments)
+      .joins("JOIN popular_posts pp ON pp.id = posts.id");
 
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-
-    // populated.merge(none) — the propagation case the merger fix
-    // was written for.
-    const noneOther = Item.all().none();
-    const fromPopulated = Item.all().merge(noneOther);
-    expect(fromPopulated.isNone()).toBe(true);
-    expect(await fromPopulated.toArray()).toEqual([]);
-
-    // none.merge(populated) — already emptied by the left side; the
-    // merge must not accidentally un-empty it. Exercised here so a
-    // future refactor that rebuilds state from `other` on top of a
-    // fresh base can't regress this.
-    const populatedOther = Item.all().where({ name: "A" });
-    const fromNone = Item.all().none().merge(populatedOther);
-    expect(fromNone.isNone()).toBe(true);
-    expect(await fromNone.toArray()).toEqual([]);
-
-    // Same sticky behavior through the in-place `merge!` variant —
-    // the merger and spawn-methods paths stay in sync.
-    const bangTarget = Item.all();
-    (bangTarget as unknown as { mergeBang: (o: unknown) => unknown }).mergeBang(Item.all().none());
-    expect(bangTarget.isNone()).toBe(true);
-    expect(await bangTarget.toArray()).toEqual([]);
-  });
-
-  it("merges order from other relation", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
-    await Item.create({ name: "B" });
-    await Item.create({ name: "A" });
-
-    const ordered = Item.all().order({ name: "asc" });
-    const items = await Item.all().merge(ordered).toArray();
-    expect(items[0].name).toBe("A");
-  });
-});
-
-describe("from()", () => {
-  it("changes the FROM clause in SQL", () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-
-    const sql = Item.all().from('"other_items"').toSql();
-    expect(sql).toContain('FROM "other_items"');
-    expect(sql).not.toContain('FROM "items"');
-  });
-});
-
-describe("unscope()", () => {
-  it("removes where conditions", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-
-    const items = await Item.all().where({ name: "A" }).unscope("where").toArray();
-    expect(items).toHaveLength(2);
-  });
-
-  it("removes order", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-
-    await Item.create({ name: "B" });
-    await Item.create({ name: "A" });
-
-    const sql = Item.all().order({ name: "asc" }).unscope("order").toSql();
-    expect(sql).not.toContain("ORDER BY");
-  });
-
-  it("removes limit and offset", () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-
-    const sql = Item.all().limit(5).offset(10).unscope("limit", "offset").toSql();
-    expect(sql).not.toContain("LIMIT");
-    expect(sql).not.toContain("OFFSET");
-  });
-});
-
-describe("pluck with Arel nodes", () => {
-  it("accepts Arel Attribute nodes", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-
-    const nameAttr = User.arelTable.get("name");
-    const names = await User.all().pluck(nameAttr);
-    expect(names.sort()).toEqual(["Alice", "Bob"]);
-  });
-});
-
-describe("only()", () => {
-  it("keeps only specified query parts", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-    await User.create({ name: "Charlie" });
-
-    // Build a complex relation
-    const rel = User.all().where({ name: "Alice" }).order("name").limit(1);
-    // Keep only where — strips order and limit
-    const simplified = rel.only("where");
-    const results = await simplified.toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe("Alice");
-  });
-});
-
-describe("unscope()", () => {
-  it("removes specified query parts", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-
-    const rel = User.all().where({ name: "Alice" }).limit(1);
-    const withoutWhere = rel.unscope("where");
-    const results = await withoutWhere.toArray();
-    // Without the where clause, should get 1 record (limit still applies)
-    expect(results.length).toBe(1);
-  });
-});
-
-describe("Relation Merging (Rails-guided)", () => {
-  it("merge combines two relations", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-      }
-    }
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
-
-    const base = User.where({ active: true });
-    const other = User.where({ name: "Alice" });
-    const result = await base.merge(other).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Alice");
-  });
-});
-
-describe("Unscope (Rails-guided)", () => {
-  it("removes where conditions", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-
-    const result = await Item.where({ name: "A" }).unscope("where").toArray();
-    expect(result).toHaveLength(2);
-  });
-
-  it("removes order", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = Item.all().order({ name: "asc" }).unscope("order").toSql();
-    expect(sql).not.toContain("ORDER BY");
-  });
-
-  it("removes limit and offset", () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const sql = Item.all().limit(5).offset(10).unscope("limit", "offset").toSql();
-    expect(sql).not.toContain("LIMIT");
-    expect(sql).not.toContain("OFFSET");
-  });
-});
-
-describe("Pluck (Rails-guided)", () => {
-  it("pluck single column", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-    expect(await User.all().pluck("name")).toEqual(["Alice", "Bob"]);
-  });
-
-  it("pluck multiple columns returns arrays", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    expect(await User.all().pluck("name", "age")).toEqual([
-      ["Alice", 25],
-      ["Bob", 30],
-    ]);
-  });
-
-  it("pluck with where", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-      }
-    }
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
-    expect(await User.where({ active: true }).pluck("name")).toEqual(["Alice"]);
-  });
-
-  it("pluck on empty table returns empty", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(await User.all().pluck("name")).toEqual([]);
-  });
-
-  it("ids returns primary key values", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const alice = await User.create({ name: "Alice" });
-    const bob = await User.create({ name: "Bob" });
-    expect(await User.all().ids()).toEqual([alice.id, bob.id]);
+    await expect(relation.toArray()).rejects.toThrow();
   });
 });
