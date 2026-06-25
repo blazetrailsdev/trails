@@ -22,6 +22,11 @@ import {
   assertNoQueries,
 } from "../testing/query-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA as CANONICAL_SCHEMA } from "../test-helpers/test-schema.js";
+import { Carrier } from "../test-helpers/models/carrier.js";
+import { Customer } from "../test-helpers/models/customer.js";
+import { CustomerCarrier } from "../test-helpers/models/customer-carrier.js";
+import { ShopAccount } from "../test-helpers/models/shop-account.js";
 
 const TEST_SCHEMA = {
   clubs: { name: "string" },
@@ -129,10 +134,10 @@ const TEST_SCHEMA = {
   ds_authors: { name: "string" },
   ds_posts: { author_id: "integer", title: "string" },
   ds_comments: { post_id: "integer", body: "string" },
-  cc_customers: {},
-  cc_carriers: {},
-  cc_customer_carriers: { customer_id: "integer", carrier_id: "integer" },
-  cc_shop_accounts: { customer_carrier_id: "integer" },
+  customers: CANONICAL_SCHEMA.customers,
+  carriers: CANONICAL_SCHEMA.carriers,
+  customer_carriers: CANONICAL_SCHEMA.customer_carriers,
+  shop_accounts: CANONICAL_SCHEMA.shop_accounts,
   pst_clubs: { name: "string" },
   pst_sponsors: {
     club_id: "integer",
@@ -1493,74 +1498,36 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("has one through do not cache association reader if the though method has default scopes", async () => {
-    class CcCustomer extends Base {
-      static {
-        this._tableName = "cc_customers";
-      }
-    }
-    class CcCarrier extends Base {
-      static {
-        this._tableName = "cc_carriers";
-      }
-    }
-    class CcCustomerCarrier extends Base {
-      static currentCustomer: any = null;
-      static {
-        this._tableName = "cc_customer_carriers";
-        this.attribute("customer_id", "integer");
-        this.attribute("carrier_id", "integer");
-        this.defaultScope((rel: any) => {
-          const cur = (CcCustomerCarrier as any).currentCustomer;
-          return cur ? rel.where({ customer_id: cur.id }) : rel;
-        });
-        this.belongsTo("carrier", { className: "CcCarrier", foreignKey: "carrier_id" });
-      }
-    }
-    class CcShopAccount extends Base {
-      static {
-        this._tableName = "cc_shop_accounts";
-        this.attribute("customer_carrier_id", "integer");
-        this.belongsTo("customerCarrier", {
-          className: "CcCustomerCarrier",
-          foreignKey: "customer_carrier_id",
-        });
-        this.hasOne("carrier", {
-          className: "CcCarrier",
-          through: "customerCarrier",
-          source: "carrier",
-        });
-      }
-    }
-    registerModel("CcCustomer", CcCustomer);
-    registerModel("CcCarrier", CcCarrier);
-    registerModel("CcCustomerCarrier", CcCustomerCarrier);
-    registerModel("CcShopAccount", CcShopAccount);
-    const customer = await CcCustomer.create({});
-    const carrier = await CcCarrier.create({});
-    const customerCarrier = await CcCustomerCarrier.create({
+    registerModel(Customer);
+    registerModel(Carrier);
+    registerModel(CustomerCarrier);
+    registerModel(ShopAccount);
+    const customer = await Customer.create({});
+    const carrier = await Carrier.create({});
+    const customerCarrier = await CustomerCarrier.create({
       customer_id: customer.id,
       carrier_id: carrier.id,
     });
-    const account = await CcShopAccount.create({ customer_carrier_id: customerCarrier.id });
+    const account = await ShopAccount.create({ customer_carrier_id: customerCarrier.id });
     try {
-      CcCustomerCarrier.currentCustomer = customer;
+      CustomerCarrier.currentCustomer = customer;
       const accountCarrier = await account.association("carrier").loadTarget();
       expect((accountCarrier as any)?.id).toBe(carrier.id);
 
-      CcCustomerCarrier.currentCustomer = null;
-      const otherCarrier = await CcCarrier.create({});
-      const otherCustomer = await CcCustomer.create({});
-      const otherCustomerCarrier = await CcCustomerCarrier.create({
+      CustomerCarrier.currentCustomer = null;
+      const otherCarrier = await Carrier.create({});
+      const otherCustomer = await Customer.create({});
+      const otherCustomerCarrier = await CustomerCarrier.create({
         customer_id: otherCustomer.id,
         carrier_id: otherCarrier.id,
       });
-      const otherAccount = await CcShopAccount.create({
+      const otherAccount = await ShopAccount.create({
         customer_carrier_id: otherCustomerCarrier.id,
       });
       const otherAccountCarrier = await otherAccount.association("carrier").loadTarget();
       expect((otherAccountCarrier as any)?.id).toBe(otherCarrier.id);
     } finally {
-      CcCustomerCarrier.currentCustomer = null;
+      CustomerCarrier.currentCustomer = null;
     }
   });
 
