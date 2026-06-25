@@ -254,6 +254,7 @@
   "packages/activerecord/src/transaction-callbacks.test.ts",
   "packages/activerecord/src/transaction-instrumentation.test.ts",
   "packages/activerecord/src/transactions.test.ts",
+  "packages/activerecord/src/transactions.trails.test.ts",
   "packages/activerecord/src/type/date-time.test.ts",
   "packages/activerecord/src/type/string.test.ts",
   "packages/activerecord/src/type/type-map.test.ts",
