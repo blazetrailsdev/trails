@@ -61,6 +61,15 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   for (const attr of attributes) {
     (this as any)._readonlyAttributes.add(attr);
   }
+  // Rails reads `raise_on_assign_to_attr_readonly` HERE, at declaration time
+  // (readonly_attributes.rb:33), and only `include HasReadonlyAttributes` — the
+  // write guards — when it is true. Capture that decision per-class: a later
+  // flip of the live flag does not retroactively arm (or disarm) the guards on
+  // an already-declared model. `include` is idempotent and one-way, so we never
+  // clear the flag once set.
+  if (raiseOnAssignToAttrReadonly) {
+    (this as any)._readonlyAttributesRaise = true;
+  }
 }
 
 /**
@@ -89,8 +98,10 @@ export function readonlyAttributeQ(this: typeof Base, attribute: string): boolea
  *
  *   - frozen record: raises `Cannot modify a frozen X`.
  *   - readonly column on a persisted record: raises `ReadonlyAttributeError`
- *     when `getRaiseOnAssignToAttrReadonly()` is true (default); silently
- *     skips the write when false — mirrors `raise_on_assign_to_attr_readonly`.
+ *     when the guard was armed at declaration time (`_readonlyAttributesRaise`,
+ *     captured from `raise_on_assign_to_attr_readonly` when `attrReadonly` ran);
+ *     otherwise the write falls through to `super` and the value is written in
+ *     memory (Rails leaves HasReadonlyAttributes uninstalled in that case).
  *
  * During construction the `_newRecord` field initializer on `Base` hasn't
  * run yet when `Model`'s constructor invokes `writeAttribute` — gate the
@@ -134,11 +145,17 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
       throw new MissingAttributeError(`can't write unknown attribute \`${arrayName}\``);
     }
   }
-  if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
-    if (raiseOnAssignToAttrReadonly) {
-      throw new ReadonlyAttributeError(canonical);
-    }
-    return; // silently skip — mirrors Rails' non-raising mode
+  // Rails only installs this guard when `raise_on_assign_to_attr_readonly` was
+  // true at `attr_readonly` declaration time (captured in `_readonlyAttributesRaise`).
+  // When it was false the guard is absent, so the write falls straight through to
+  // `super` — the value IS written in memory; persist-time exclusion of readonly
+  // columns (attributesForUpdate) keeps it out of the UPDATE.
+  if (
+    this._newRecord === false &&
+    (ctor as { _readonlyAttributesRaise?: boolean })._readonlyAttributesRaise &&
+    ctor.readonlyAttributeQ(canonical)
+  ) {
+    throw new ReadonlyAttributeError(canonical);
   }
   // Mirrors Rails `write_attribute` → `write_from_user`: writing an unknown
   // attribute raises MissingAttributeError. The raise originates in
@@ -157,11 +174,12 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
  */
 export function _writeAttribute(this: Base, name: string, value: unknown): void {
   const ctor = this.constructor as typeof Base;
-  if (this._newRecord === false && ctor.readonlyAttributeQ(String(name))) {
-    if (raiseOnAssignToAttrReadonly) {
-      throw new ReadonlyAttributeError(String(name));
-    }
-    return;
+  if (
+    this._newRecord === false &&
+    (ctor as { _readonlyAttributesRaise?: boolean })._readonlyAttributesRaise &&
+    ctor.readonlyAttributeQ(String(name))
+  ) {
+    throw new ReadonlyAttributeError(String(name));
   }
   // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the public
   // `write_attribute` path above. Rails (write.rb:42) reaches `write_from_user`

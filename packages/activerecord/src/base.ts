@@ -1530,6 +1530,17 @@ export class Base extends Model {
   // -- Readonly attributes --
   static _readonlyAttributes: Set<string> = new Set();
 
+  // Whether the readonly write guards (Rails' HasReadonlyAttributes mixin) are
+  // active for this class. Rails decides at `attr_readonly` declaration time
+  // whether to `include HasReadonlyAttributes` — only when
+  // `raise_on_assign_to_attr_readonly` is true at that moment. Once included it
+  // raises unconditionally regardless of later flag flips; when not included a
+  // write to a readonly attr goes straight through (value written in memory,
+  // persist-time exclusion keeps it out of the UPDATE). We capture the flag
+  // value when `attrReadonly` runs into this own-property, inherited down the
+  // prototype chain like Ruby's include. (readonly_attributes.rb:33)
+  static _readonlyAttributesRaise = false;
+
   // Suppresses after_initialize in the constructor when set by _instantiate /
   // directInstantiate (inheritance.ts) so we can fire after_find first, then
   // after_initialize — matching Rails' init_with_attributes call order.
