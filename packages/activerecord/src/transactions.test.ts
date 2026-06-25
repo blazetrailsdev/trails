@@ -873,25 +873,28 @@ describe("TransactionTest", () => {
   });
 
   it("rollback of frozen records", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "test" })) as any;
-    await post.destroy();
-    expect(post.isDestroyed?.() ?? true).toBe(true);
+    const { Topic } = makeSQLiteTopic();
+    const topic = (await Topic.create({})) as any;
+    topic.freeze();
+
+    await Topic.transaction(async () => {
+      await topic.destroy();
+      throw new Rollback();
+    });
+
+    expect(topic.isFrozen()).toBe(true);
   });
 
   it("read attribute after rollback", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "changed";
-    expect(post.title).toBe("changed");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({}) as any;
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      throw new Rollback();
+    });
+
+    expect(topic.readAttribute("id")).toBeNull();
   });
 
   it("write attribute after rollback", async () => {
