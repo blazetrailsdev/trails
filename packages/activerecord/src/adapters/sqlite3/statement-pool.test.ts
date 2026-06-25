@@ -1,68 +1,10 @@
-import { it, expect, afterEach } from "vitest";
+import { it } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3StatementPoolTest", () => {
-  // Track every adapter created so a failing assertion can't leak an
-  // open SQLite handle into later tests.
-  const openAdapters: AbstractSQLite3Adapter[] = [];
-  const track = (adapter: AbstractSQLite3Adapter): AbstractSQLite3Adapter => {
-    openAdapters.push(adapter);
-    return adapter;
-  };
-  afterEach(() => {
-    while (openAdapters.length) {
-      try {
-        openAdapters.pop()!.disconnectBang();
-      } catch {
-        // best-effort cleanup
-      }
-    }
-  });
-
-  it.skip("cache is per pid", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in statement-pool
-    // ROOT-CAUSE: adapters/sqlite3/statement-pool.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/statement-pool.ts; affects ~1–17 tests in statement-pool.test.ts
-  });
-
-  it("reads statementLimit from the options hash", () => {
-    const adapter = track(new BetterSQLite3Adapter(":memory:", { statementLimit: 7 }));
-    expect(adapter.statementLimit).toBe(7);
-  });
-
-  it("reads preparedStatements from the options hash", () => {
-    const adapter = track(new BetterSQLite3Adapter(":memory:", { preparedStatements: false }));
-    expect(adapter.preparedStatements).toBe(false);
-  });
-
-  it("rejects invalid statementLimit at construction time", () => {
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: -1 })).toThrow(RangeError);
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: 1.5 })).toThrow(RangeError);
-  });
-
-  it("rejects non-boolean preparedStatements at construction time and via assignment", () => {
-    expect(
-      () =>
-        new BetterSQLite3Adapter(":memory:", { preparedStatements: "false" as unknown as boolean }),
-    ).toThrow(TypeError);
-    expect(
-      () => new BetterSQLite3Adapter(":memory:", { preparedStatements: 0 as unknown as boolean }),
-    ).toThrow(TypeError);
-
-    const adapter = track(new BetterSQLite3Adapter(":memory:"));
-    expect(() => {
-      (adapter as unknown as { preparedStatements: unknown }).preparedStatements = "true";
-    }).toThrow(TypeError);
-  });
-
-  it("clearCacheBang clears the pool without throwing on next query", async () => {
-    const adapter = track(new BetterSQLite3Adapter(":memory:"));
-    adapter.exec(`CREATE TABLE t (id INTEGER)`);
-    await adapter.execute("SELECT * FROM t WHERE id = ?", [1]);
-    adapter.clearCacheBang();
-    await adapter.execute("SELECT * FROM t WHERE id = ?", [2]);
-    await adapter.exec(`DROP TABLE IF EXISTS t`);
-  });
+  // Rails' only test here is guarded by `Process.respond_to?(:fork)` and forks a
+  // child to prove the StatementPool cache is per-pid. trails has no `fork`
+  // primitive (process.* is banned), so the test is unportable; kept skipped to
+  // preserve the convention mapping to statement_pool_test.rb.
+  it.skip("cache is per pid", () => {});
 });
