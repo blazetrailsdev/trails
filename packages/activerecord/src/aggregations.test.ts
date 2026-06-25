@@ -296,102 +296,115 @@ describe("OverridingAggregationsTest", () => {
   });
 });
 
+// Backed by the canonical `accounts` table (credit_limit:integer, status:string)
+// rather than a bespoke `orders` shape — re-declaring `orders` without its
+// canonical billing/shipping FK columns poisoned the shared worker DB for
+// autosave-association.test.ts under parallel forks. Unique inline class names
+// (`AccountAgg`) keep these bespoke aggregation models out of the global
+// registry slot used by the real `Account` model.
 describe("Aggregations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ orders: { amount: "integer", status: "string" } });
+    await defineSchema({ accounts: canonicalSchema.accounts });
   });
 
   it("should sum field", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    await Order.create({ amount: 20 });
-    await Order.create({ amount: 30 });
+    await AccountAgg.create({ credit_limit: 10 });
+    await AccountAgg.create({ credit_limit: 20 });
+    await AccountAgg.create({ credit_limit: 30 });
 
-    expect(await Order.all().sum("amount")).toBe(60);
+    expect(await AccountAgg.all().sum("credit_limit")).toBe(60);
   });
 
   it("should average field", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    await Order.create({ amount: 20 });
-    await Order.create({ amount: 30 });
+    await AccountAgg.create({ credit_limit: 10 });
+    await AccountAgg.create({ credit_limit: 20 });
+    await AccountAgg.create({ credit_limit: 30 });
 
-    expect(await Order.all().average("amount")).toBe(20);
+    expect(await AccountAgg.all().average("credit_limit")).toBe(20);
   });
 
   it("should get minimum of field", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    await Order.create({ amount: 5 });
-    await Order.create({ amount: 30 });
+    await AccountAgg.create({ credit_limit: 10 });
+    await AccountAgg.create({ credit_limit: 5 });
+    await AccountAgg.create({ credit_limit: 30 });
 
-    expect(await Order.all().minimum("amount")).toBe(5);
+    expect(await AccountAgg.all().minimum("credit_limit")).toBe(5);
   });
 
   it("should get maximum of field", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    await Order.create({ amount: 5 });
-    await Order.create({ amount: 30 });
+    await AccountAgg.create({ credit_limit: 10 });
+    await AccountAgg.create({ credit_limit: 5 });
+    await AccountAgg.create({ credit_limit: 30 });
 
-    expect(await Order.all().maximum("amount")).toBe(30);
+    expect(await AccountAgg.all().maximum("credit_limit")).toBe(30);
   });
 
   it("should sum field with conditions", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
         this.attribute("status", "string");
       }
     }
 
-    await Order.create({ amount: 10, status: "paid" });
-    await Order.create({ amount: 20, status: "pending" });
-    await Order.create({ amount: 30, status: "paid" });
+    await AccountAgg.create({ credit_limit: 10, status: "paid" });
+    await AccountAgg.create({ credit_limit: 20, status: "pending" });
+    await AccountAgg.create({ credit_limit: 30, status: "paid" });
 
-    expect(await Order.where({ status: "paid" }).sum("amount")).toBe(40);
+    expect(await AccountAgg.where({ status: "paid" }).sum("credit_limit")).toBe(40);
   });
 
   it("no queries for empty relation on sum", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    expect(await Order.all().none().sum("amount")).toBe(0);
+    expect(await AccountAgg.all().none().sum("credit_limit")).toBe(0);
   });
 
   it("no queries for empty relation on average", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    expect(await Order.all().none().average("amount")).toBeNull();
+    expect(await AccountAgg.all().none().average("credit_limit")).toBeNull();
   });
 });
 
@@ -399,49 +412,53 @@ describe("Aggregation edge cases", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ orders: { amount: "integer", status: "string" } });
+    await defineSchema({ accounts: canonicalSchema.accounts });
   });
 
   it("no queries for empty relation on minimum", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    expect(await Order.all().minimum("amount")).toBeNull();
+    expect(await AccountAgg.all().minimum("credit_limit")).toBeNull();
   });
 
   it("no queries for empty relation on maximum", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    expect(await Order.all().maximum("amount")).toBeNull();
+    expect(await AccountAgg.all().maximum("credit_limit")).toBeNull();
   });
 
   it("minimum on none() returns null", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    expect(await Order.all().none().minimum("amount")).toBeNull();
+    await AccountAgg.create({ credit_limit: 10 });
+    expect(await AccountAgg.all().none().minimum("credit_limit")).toBeNull();
   });
 
   it("maximum on none() returns null", async () => {
-    class Order extends Base {
+    class AccountAgg extends Base {
+      static _tableName = "accounts";
       static {
-        this.attribute("amount", "integer");
+        this.attribute("credit_limit", "integer");
       }
     }
 
-    await Order.create({ amount: 10 });
-    expect(await Order.all().none().maximum("amount")).toBeNull();
+    await AccountAgg.create({ credit_limit: 10 });
+    expect(await AccountAgg.all().none().maximum("credit_limit")).toBeNull();
   });
 });
 
@@ -449,9 +466,7 @@ describe("composed_of", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({
-      customers: { address_street: "string", address_city: "string" },
-    });
+    await defineSchema({ customers: canonicalSchema.customers });
   });
   it("composes value objects from multiple attributes", async () => {
     class Address {
@@ -516,7 +531,7 @@ describe("composed_of (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ products: { price_amount: "integer", price_currency: "string" } });
+    await defineSchema({ accounts: canonicalSchema.accounts });
   });
 
   // Rails: test "reading a composed-of attribute"
@@ -528,23 +543,25 @@ describe("composed_of (Rails-guided)", () => {
       ) {}
     }
 
-    class Product extends Base {
+    // Backed by canonical `accounts` (credit_limit:integer, status:string) to
+    // avoid a bespoke `products` shape on the shared worker DB.
+    class AccountComposed extends Base {
       static {
-        this._tableName = "products";
+        this._tableName = "accounts";
         this.attribute("id", "integer");
-        this.attribute("price_amount", "integer");
-        this.attribute("price_currency", "string");
+        this.attribute("credit_limit", "integer");
+        this.attribute("status", "string");
       }
     }
-    composedOf(Product, "price", {
+    composedOf(AccountComposed, "price", {
       className: Money,
       mapping: [
-        ["price_amount", "amount"],
-        ["price_currency", "currency"],
+        ["credit_limit", "amount"],
+        ["status", "currency"],
       ],
     });
 
-    const p = await Product.create({ price_amount: 1999, price_currency: "USD" });
+    const p = await AccountComposed.create({ credit_limit: 1999, status: "USD" });
     const price = (p as any).price;
     expect(price).toBeInstanceOf(Money);
     expect(price.amount).toBe(1999);
@@ -560,27 +577,27 @@ describe("composed_of (Rails-guided)", () => {
       ) {}
     }
 
-    class Product extends Base {
+    class AccountComposed extends Base {
       static {
-        this._tableName = "products";
+        this._tableName = "accounts";
         this.attribute("id", "integer");
-        this.attribute("price_amount", "integer");
-        this.attribute("price_currency", "string");
+        this.attribute("credit_limit", "integer");
+        this.attribute("status", "string");
       }
     }
-    composedOf(Product, "price", {
+    composedOf(AccountComposed, "price", {
       className: Money,
       mapping: [
-        ["price_amount", "amount"],
-        ["price_currency", "currency"],
+        ["credit_limit", "amount"],
+        ["status", "currency"],
       ],
     });
 
-    const p = await Product.create({ price_amount: 0, price_currency: "EUR" });
+    const p = await AccountComposed.create({ credit_limit: 0, status: "EUR" });
     (p as any).price = new Money(2500, "GBP");
 
-    expect(p.price_amount).toBe(2500);
-    expect(p.price_currency).toBe("GBP");
+    expect(p.credit_limit).toBe(2500);
+    expect(p.status).toBe("GBP");
   });
 
   // Rails: test "composed_of returns null when all columns are null"
