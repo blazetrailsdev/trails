@@ -6448,6 +6448,8 @@ export class Relation<T extends Base> {
    * a scoped relation, or "" when the where clause is empty. Arel's `where_sql`
    * prefixes the predicate SQL with `WHERE `; our `_whereClauseToSql` renders only
    * the predicates, so we add the keyword here.
+   *
+   * @internal trails-only helper — Rails inlines this in raise_record_not_found_exception!.
    */
   _conditionsClause(): string {
     if (this._whereClause.isEmpty()) return "";
