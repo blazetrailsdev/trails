@@ -1,5 +1,13 @@
 /**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/nested_deadlock_test.rb
+ * Trails-specific deadlock invariants for the MySQL adapter.
+ *
+ * The Rails counterpart `adapters/abstract_mysql_adapter/nested_deadlock_test.rb`
+ * is formally unported (see scripts/api-compare/unported-files.ts): it provokes a
+ * real database deadlock across two Ruby Threads synchronized with a
+ * `Concurrent::CyclicBarrier`, which single-threaded Ruby concurrency cannot be
+ * mirrored 1:1 in JS. These tests instead exercise the same trails invariants
+ * (savepoint promotion + Deadlocked/Rollback handling) using two separate adapter
+ * connections driven concurrently with `Promise.allSettled` and an async barrier.
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
@@ -186,6 +194,4 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
   });
-
-  // -- Rails: abstract_mysql_adapter/sql_types_test.rb --
 });
