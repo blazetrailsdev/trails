@@ -677,41 +677,41 @@ describe("PersistenceTest", () => {
   it("update many with duplicated ids", async () => {
     const updated = await Topic.update(
       [1, 1, 2],
-      [{ title: "1 duplicated" }, { title: "1 updated" }, { title: "2 updated" }],
+      [{ content: "1 duplicated" }, { content: "1 updated" }, { content: "2 updated" }],
     );
     expect(updated.map((t) => Number(t.id))).toEqual([1, 1, 2]);
     // Rails' `id.map { find }` returns a distinct instance per requested id, so
     // the two occurrences of id=1 are separate objects (each updated once).
     expect(updated[0]).not.toBe(updated[1]);
-    expect((await Topic.find(1)).title).toBe("1 updated");
-    expect((await Topic.find(2)).title).toBe("2 updated");
+    expect((await Topic.find(1)).content).toBe("1 updated");
+    expect((await Topic.find(2)).content).toBe("2 updated");
   });
 
   it("update many with invalid id", async () => {
     await expect(
-      Topic.update([1, 2, 99999], [{ title: "1 updated" }, { title: "2 updated" }, {}]),
+      Topic.update([1, 2, 99999], [{ content: "1 updated" }, { content: "2 updated" }, {}]),
     ).rejects.toThrow(RecordNotFound);
-    expect((await Topic.find(1)).title).not.toBe("1 updated");
-    expect((await Topic.find(2)).title).not.toBe("2 updated");
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
+    expect((await Topic.find(2)).content).not.toBe("2 updated");
   });
 
   it("update many with active record base object", async () => {
-    await expect((Topic as any).update(topics("first"), { title: "1 updated" })).rejects.toThrow(
+    await expect((Topic as any).update(topics("first"), { content: "1 updated" })).rejects.toThrow(
       "You are passing an instance of ActiveRecord::Base to `update`. " +
         "Please pass the id of the object by calling `.id`.",
     );
-    expect((await Topic.find(1)).title).not.toBe("1 updated");
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
   });
 
   it("update many with array of active record base objects", async () => {
     await expect(
-      (Topic as any).update([topics("first"), topics("second")], { title: "updated" }),
+      (Topic as any).update([topics("first"), topics("second")], { content: "updated" }),
     ).rejects.toThrow(
       "You are passing an array of ActiveRecord::Base instances to `update`. " +
         "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
     );
-    expect((await Topic.find(1)).title).not.toBe("updated");
-    expect((await Topic.find(2)).title).not.toBe("updated");
+    expect((await Topic.find(1)).content).not.toBe("updated");
+    expect((await Topic.find(2)).content).not.toBe("updated");
   });
 
   it("becomes includes errors", () => {
