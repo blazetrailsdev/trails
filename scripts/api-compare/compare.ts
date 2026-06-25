@@ -1486,6 +1486,12 @@ export function main() {
         // `setX` setter form — as a move rather than pinning it as a
         // false-missing on base.ts. A flag trails doesn't implement anywhere
         // still falls through to missing (a real, un-hidden convergence gap).
+        // The reader (`writing_role`) and writer (`writing_role=`) are two
+        // distinct `seen` entries that both map to the one TS symbol
+        // (`writingRole` / `setWritingRole`), so each is credited once — the
+        // same 2-Ruby-methods-cover-1-TS-property accounting the direct-match
+        // path already applies to every `attr_accessor`-backed property in the
+        // codebase. Not umbrella-specific inflation; just consistent with it.
         if (umbrellaConfig) {
           const directPort = tsCandidates.find((c) => tsFilesByMethod.has(c));
           const setterForms = tsCandidates.map(

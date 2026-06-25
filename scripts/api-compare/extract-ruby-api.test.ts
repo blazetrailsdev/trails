@@ -293,6 +293,29 @@ describe("Ruby extractor umbrella module-config scanning", () => {
     expect(names).not.toContain("eager_load!");
   });
 
+  it("redirects the `class << self; attr_accessor` block form to Base too", () => {
+    // active_record.rb uses the `singleton_class.attr_*` command form today, but
+    // the equivalent `class << self` block form is also module-level config and
+    // must redirect to Base rather than being silently dropped.
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        class << self
+          attr_accessor :writing_role
+        end
+      end
+    `,
+    );
+    const base = out["ActiveRecord::Base"];
+    const names = base.classMethods.map((m) => m.name);
+    expect(names).toContain("writing_role");
+    expect(names).toContain("writing_role=");
+    for (const m of base.classMethods.filter((m) => m.name.startsWith("writing_role"))) {
+      expect(m.umbrellaConfig).toBe(true);
+    }
+  });
+
   it("does not leak umbrella config onto the ActiveRecord module's bucket", () => {
     const out = scanWithUmbrella(
       BASE_SRC,

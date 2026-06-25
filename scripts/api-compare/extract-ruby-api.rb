@@ -310,12 +310,14 @@ class ApiExtractor
 
   # Scan a top-level umbrella file (e.g. `lib/active_record.rb`, one level above
   # the package's libPath and therefore never reached by the `**/*.rb` glob).
-  # Only the module-level `singleton_class.attr_accessor`/`attr_reader`/
-  # `attr_writer` config is harvested; it's attributed to `<Module>::Base`
-  # (the trails entity that ports it as statics) so it credits against those
-  # statics instead of leaking into the umbrella module's entity-file bucket
-  # (the junk-drawer `deprecator.rb`). Must run AFTER the package's own files so
-  # the `<Module>::Base` class already exists in `@classes`.
+  # Only module-level singleton config is harvested — both the
+  # `singleton_class.attr_accessor`/`attr_reader`/`attr_writer` command form
+  # (what `active_record.rb` uses today) and the equivalent
+  # `class << self; attr_accessor; end` block form — and attributed to
+  # `<Module>::Base` (the trails entity that ports it as statics) so it credits
+  # against those statics instead of leaking into the umbrella module's
+  # entity-file bucket (the junk-drawer `deprecator.rb`). Must run AFTER the
+  # package's own files so the `<Module>::Base` class already exists in `@classes`.
   def scan_umbrella_file(filepath, package_root)
     @scanning_umbrella = true
     process_file(filepath, package_root)
@@ -629,8 +631,13 @@ class ApiExtractor
 
     # Umbrella scans harvest only module-level singleton config; ignore every
     # other command (include/extend/scope/visibility/…) in the umbrella file.
+    # Singleton accessors arrive either as `singleton_class.attr_*` (on_singleton)
+    # or as a plain `attr_*` inside a `class << self` block (@in_sclass); both
+    # are class-level config and must be kept.
     if @scanning_umbrella
-      return unless on_singleton && %w[attr_reader attr_writer attr_accessor].include?(cmd_name)
+      singleton_attr =
+        (on_singleton || @in_sclass) && %w[attr_reader attr_writer attr_accessor].include?(cmd_name)
+      return unless singleton_attr
     end
 
     case cmd_name
@@ -876,11 +883,13 @@ class ApiExtractor
     end
   end
 
-  # During an umbrella scan, a module-level `singleton_class.attr_*` on a module
-  # that has a `<Module>::Base` class is config trails ports as Base statics;
-  # return that Base FQN so the accessor is attributed there. Nil otherwise.
+  # During an umbrella scan, a module-level singleton accessor (the
+  # `singleton_class.attr_*` command form sets `force_class`; the
+  # `class << self; attr_*; end` block form sets `@in_sclass`) on a module that
+  # has a `<Module>::Base` class is config trails ports as Base statics; return
+  # that Base FQN so the accessor is attributed there. Nil otherwise.
   def umbrella_base_redirect(fqn, force_class)
-    return nil unless @scanning_umbrella && force_class
+    return nil unless @scanning_umbrella && (force_class || @in_sclass)
     base = "#{fqn}::Base"
     @classes.key?(base) ? base : nil
   end
