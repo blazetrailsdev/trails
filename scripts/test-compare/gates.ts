@@ -96,9 +96,15 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  * when the expression is true, so it runs when false) and `true` for `runIf`.
  *
  * Recognizes the adapter idiom in the suite — `adapterType === "mysql"` /
- * `adapterType !== "sqlite"`. Anything else resolves to a `guards: ["unknown"]`
- * gate so the comparison knows the test is conditional without inventing an
- * adapter set.
+ * `adapterType !== "sqlite"` — anywhere in the expression, and feature
+ * predicates — `adapterSupports("x")`. A compound guard mixing the two (e.g.
+ * `adapterType === "sqlite" || !adapterSupports("insert_returning")`, the
+ * De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
+ * !current_adapter?(:SQLite3Adapter)`) yields BOTH an adapter set and a feature
+ * set, mirroring how the Ruby extractor derives adapters from `current_adapter?`
+ * and features from `supports_X?` as independent dimensions. Anything with
+ * neither resolves to a `guards: ["unknown"]` gate so the comparison knows the
+ * test is conditional without inventing an adapter set.
  *
  * Source is `"test"` (per-test inline guard) — the TS analog of the Ruby
  * extractor's `"body-skip"`, distinct from a named `"wrapper"` suite.
@@ -106,8 +112,14 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
 export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): TestGate {
   const text = exprText.trim();
 
-  // adapterType (===|!==) "literal"
-  const adapterMatch = text.match(/^adapterType\s*(===|!==)\s*["']([a-z0-9]+)["']$/);
+  // `adapterType (===|!==) "literal"` — matched anywhere (not anchored) so it
+  // is picked up alongside feature predicates in a compound guard. Only a single
+  // adapterType term is supported (the suite's idiom); the first is used. In the
+  // standard skip idiom `skipIf(A || B || …)` (run iff every term is false) the
+  // adapter term's contribution is evaluated in isolation — exactly the
+  // single-term polarity below — and likewise for `runIf(A && B && …)`.
+  const adapterMatch = text.match(/adapterType\s*(===|!==)\s*["']([a-z0-9]+)["']/);
+  let adapters: GateAdapter[] | undefined;
   if (adapterMatch) {
     const [, op, literal] = adapterMatch;
     const adapter = normalizeAdapterType(literal);
@@ -115,8 +127,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
       // Does the expression being true mean "is this adapter"?
       const trueMeansEqual = op === "===";
       const runWhenEqual = runsWhenTrue ? trueMeansEqual : !trueMeansEqual;
-      const adapters = runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter);
-      return { adapters: sortedUnique(adapters), source: ["test"] };
+      adapters = sortedUnique(runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter));
     }
   }
 
@@ -129,6 +140,11 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const featureMatches = [...text.matchAll(/adapterSupports\(\s*["']([a-z0-9_]+)["']\s*\)/g)].map(
     (m) => m[1],
   );
+
+  if (adapters && featureMatches.length) {
+    return { adapters, features: sortedUnique(featureMatches), source: ["test"] };
+  }
+  if (adapters) return { adapters, source: ["test"] };
   if (featureMatches.length) {
     return { features: sortedUnique(featureMatches), source: ["test"] };
   }

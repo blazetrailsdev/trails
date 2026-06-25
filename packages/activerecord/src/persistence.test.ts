@@ -24,7 +24,7 @@ import {
   ActiveRecordError,
   registerModel,
 } from "./index.js";
-import { itIfSupports } from "./test-helpers/supports.js";
+import { adapterSupports } from "./test-helpers/supports.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -871,10 +871,11 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("cached");
   });
 
-  // Rails gates this `features=[insert_returning]` (no adapter restriction); SQLite
-  // ≥ 3.35 supports RETURNING, so run it generically wherever the feature holds.
-  itIfSupports(
-    "insert_returning",
+  // Rails gates this `supports_insert_returning? && !current_adapter?(:SQLite3Adapter)`
+  // (persistence_test.rb:1612) → adapters=[mysql,postgresql] features=[insert_returning].
+  // The compound guard mirrors both dimensions; at runtime mysql:8 lacks
+  // insert_returning so it runs on Postgres only.
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("insert_returning"))(
     "model with no auto populated fields still returns primary key after insert",
     async () => {
       const p = await Post.create({ title: "pk-test" });

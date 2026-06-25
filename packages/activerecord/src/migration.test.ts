@@ -36,7 +36,7 @@ function emitTableSql(td: TableDefinition): string {
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports, describeIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import {
   describeIfMysql,
@@ -3069,18 +3069,35 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("datetime");
     expect(cols.find((c) => c.name === "age")!.null).toBe(false);
   });
+});
 
-  it("default functions on columns", async () => {
-    await adapter.exec(`CREATE TABLE delete_me (id serial primary key)`);
-    const ss = adapter.schemaStatements();
-    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
-      t.string("name", { default: () => "gen_random_uuid()" });
-    });
-    const cols = await adapter.columns("delete_me");
-    const name = cols.find((c) => c.name === "name")!;
-    expect(name.default).toBeNull();
-    expect((name as any).defaultFunction).toBe("gen_random_uuid()");
-  });
+// Rails gates this `if supports_bulk_alter?` (class) ▸ `if supports_text_column_with_default?`
+// (migration_test.rb:1457) → features=[bulk_alter,text_column_with_default] with no adapter
+// restriction. mysql:8 lacks text_column_with_default and sqlite lacks bulk_alter, so the
+// compound feature guard runs it on Postgres only — where the PG-specific body (gen_random_uuid)
+// belongs. Kept out of describeIfPg so the gate carries no adapter restriction, matching Rails.
+describe("BulkAlterTableMigrationsTest", () => {
+  it.skipIf(!adapterSupports("bulk_alter") || !adapterSupports("text_column_with_default"))(
+    "default functions on columns",
+    async () => {
+      const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await adapter.exec("DROP TABLE IF EXISTS delete_me");
+        await adapter.exec(`CREATE TABLE delete_me (id serial primary key)`);
+        const ss = adapter.schemaStatements();
+        await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+          t.string("name", { default: () => "gen_random_uuid()" });
+        });
+        const cols = await adapter.columns("delete_me");
+        const name = cols.find((c) => c.name === "name")!;
+        expect(name.default).toBeNull();
+        expect((name as any).defaultFunction).toBe("gen_random_uuid()");
+      } finally {
+        await adapter.exec("DROP TABLE IF EXISTS delete_me");
+        await adapter.close();
+      }
+    },
+  );
 });
 
 describeIfMysql("BulkAlterTableMigrationsTest", () => {
