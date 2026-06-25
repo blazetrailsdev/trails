@@ -306,4 +306,27 @@ describe("Ruby extractor umbrella module-config scanning", () => {
     const modNames = mod ? mod.classMethods.map((m) => m.name) : [];
     expect(modNames).not.toContain("writing_role");
   });
+
+  it("skips umbrella config when the module has no ::Base to redirect to", () => {
+    // `ActiveSupport.error_reporter` lives on a module with no `::Base`; without
+    // a Base to credit it, recording it would leak onto the module's entity-file
+    // bucket as false-missing, so it must be skipped entirely.
+    const out = scanWithUmbrella(
+      `
+      module ActiveSupport
+        class NotBase
+          def call; end
+        end
+      end
+    `,
+      `
+      module ActiveSupport
+        singleton_class.attr_accessor :error_reporter
+      end
+    `,
+    );
+    const mod = out["ActiveSupport"];
+    const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
+    expect(names).not.toContain("error_reporter");
+  });
 });

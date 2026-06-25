@@ -836,6 +836,12 @@ class ApiExtractor
     # `<Module>::Base` — the entity trails ports it to as statics — so it credits
     # against those statics instead of the umbrella module's entity-file bucket.
     redirect_fqn = umbrella_base_redirect(fqn, force_class)
+    # Umbrella scans harvest ONLY config that redirects to a `<Module>::Base`.
+    # Without a Base to credit it (e.g. `ActiveSupport.error_reporter`, whose
+    # module has no `::Base`), recording it would leak onto the umbrella module's
+    # entity-file bucket as false-missing — so skip it entirely, leaving that
+    # surface exactly as it was before the umbrella was scanned.
+    return if @scanning_umbrella && !redirect_fqn
     target = redirect_fqn ? @classes[redirect_fqn] : (@classes[fqn] || @modules[fqn])
     return unless target
 
