@@ -68,7 +68,10 @@ export class FileStore extends Store implements CacheStore {
   // unlinking the entry, recursively remove now-empty intermediate directories
   // up to — but never including — cacheDir.
   private deleteEmptyDirectories(dir: string): void {
-    if (getPath().resolve(dir) === getPath().resolve(this.cacheDir)) return;
+    // Rails compares File.realpath(dir) == File.realpath(cache_path)
+    // (file_store.rb:195), which resolves symlinks; a lexical path.resolve
+    // would mis-compare when cacheDir or an intermediate dir is symlinked.
+    if (this.realPath(dir) === this.realPath(this.cacheDir)) return;
     let children: string[];
     try {
       children = getFs().readdirSync(dir);
@@ -82,6 +85,19 @@ export class FileStore extends Store implements CacheStore {
       getFs().rmdirSync(dir);
     } catch {}
     this.deleteEmptyDirectories(getPath().dirname(dir));
+  }
+
+  // Resolve symlinks like Ruby File.realpath. Adapters without symlink support
+  // (or paths that no longer exist) fall back to a lexical resolve, which keeps
+  // the guard sound for the common no-symlink case.
+  private realPath(dir: string): string {
+    const fs = getFs();
+    if (fs.realpathSync) {
+      try {
+        return fs.realpathSync(dir);
+      } catch {}
+    }
+    return getPath().resolve(dir);
   }
 
   private keyToPath(key: string): string {
