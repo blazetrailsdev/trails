@@ -19,6 +19,7 @@ import {
   RecordNotFound,
   DeleteRestrictionError,
   RecordInvalid,
+  RecordNotSaved,
 } from "../index.js";
 import { Associations } from "../associations.js";
 import {
@@ -373,6 +374,21 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
+  it("create when parent is new raises", async () => {
+    const firm = new Firm();
+    let error: unknown;
+    try {
+      await (firm as any).createAccount();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+    expect((error as RecordNotSaved).message).toBe(
+      "You cannot call create unless the parent is saved",
+    );
+    expect((error as RecordNotSaved).record).toBe(firm);
+  });
+
   it.skip("clearing an association clears the associations inverse", () => {
     // BLOCKED: `post.update({ author: null })` does not nullify the belongs_to
     // foreign key — belongs_to association assignment via update is a gap.
@@ -399,11 +415,6 @@ describe("HasOneAssociationsTest", () => {
   it.skip("create with inexistent foreign key failing", () => {
     // BLOCKED: building an Account through `account_with_inexistent_foreign_key`
     // does not raise UnknownAttributeError for the bad foreign key column.
-  });
-
-  it.skip("create when parent is new raises", () => {
-    // BLOCKED: `create_account` on an unsaved parent does not raise
-    // RecordNotSaved ("You cannot call create unless the parent is saved").
   });
 
   it("reload association", async () => {
