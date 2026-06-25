@@ -333,23 +333,7 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
               : []),
           ],
-          // Real-DB tests share a per-worker DB; the module-level state in
-          // test-adapter.ts has known race windows (see PR #1114 for prior
-          // _createdTables drift recovery). Retry intermittents on PG/MySQL
-          // only.
-          //
-          // Tradeoff: this is broader than the known shared-DB flakes — it
-          // also covers describeIfPg/describeIfMysql backend-only tests that
-          // SQLite never exercises, so a flaky-but-real regression in
-          // backend-only code could slip through after a retry. We accept
-          // this because (a) retries only mask non-deterministic failures —
-          // a 100% regression still fails through all attempts, (b) the
-          // observed flake pattern spans 10+ files across the project,
-          // making per-file scoping brittle, and (c) the alternative —
-          // letting CI fail on every transient race — burns more reviewer
-          // time than the rare hidden flake costs. Revisit if a real
-          // regression slips through.
-          retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
+          retry: 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
           // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MySQL
