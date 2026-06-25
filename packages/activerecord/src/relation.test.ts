@@ -1618,77 +1618,6 @@ describe("RelationTest", () => {
     }
   });
 
-  it("does not defer distinct-PK for a singular nested-hash eager spec", () => {
-    // Bespoke models (matching the sibling joins test above) with explicit
-    // foreignKey/attribute declarations so the JoinDependency walk resolves the
-    // nested-hash spec offline — canonical models build their join tree from
-    // DB-loaded columns, which this predicate-only test (no handler suite / live
-    // schema) cannot provide, so their addAssociationSpec rolls back to zero
-    // reflections and the limitability assertion is vacuous.
-    try {
-      class NhProfile extends Base {
-        static {
-          this.tableName = "nh_profiles";
-          this.attribute("bio", "string");
-          registerModel(this);
-        }
-      }
-      class NhAvatar extends Base {
-        static {
-          this.tableName = "nh_avatars";
-          this.attribute("url", "string");
-          this.attribute("nh_author_id", "integer");
-          registerModel(this);
-        }
-      }
-      class NhAuthor extends Base {
-        static {
-          this.tableName = "nh_authors";
-          this.attribute("name", "string");
-          this.attribute("nh_profile_id", "integer");
-          this.belongsTo("nhProfile", {
-            className: "NhProfile",
-            foreignKey: "nh_profile_id",
-          });
-          this.hasMany("nhAvatars", {
-            className: "NhAvatar",
-            foreignKey: "nh_author_id",
-          });
-          registerModel(this);
-        }
-      }
-      class NhArticle extends Base {
-        static {
-          this.tableName = "nh_articles";
-          this.attribute("title", "string");
-          this.attribute("nh_author_id", "integer");
-          this.belongsTo("nhAuthor", {
-            className: "NhAuthor",
-            foreignKey: "nh_author_id",
-          });
-          registerModel(this);
-        }
-      }
-      // A nested-hash eager spec with both associations singular (belongsTo →
-      // belongsTo) resolves through construct_join_dependency.reflections to a
-      // non-collection set, so using_limitable_reflections? stays true and the
-      // relation is NOT deferred (Rails finder_methods.rb:457-470).
-      const singularNested = NhArticle.all().eagerLoad({ nhAuthor: "nhProfile" }).limit(5);
-      expect((singularNested as any)._isDeferredDistinctPkSubquery()).toBe(false);
-
-      // A collection anywhere in the eager tree (hasMany nhAvatars) makes the
-      // reflection set non-limitable, so the relation defers to distinct-PK
-      // materialization.
-      const collectionNested = NhArticle.all().eagerLoad({ nhAuthor: "nhAvatars" }).limit(5);
-      expect((collectionNested as any)._isDeferredDistinctPkSubquery()).toBe(true);
-    } finally {
-      modelRegistry.delete("NhProfile");
-      modelRegistry.delete("NhAvatar");
-      modelRegistry.delete("NhAuthor");
-      modelRegistry.delete("NhArticle");
-    }
-  });
-
   it.skip("includes + references promotes to eager load SQL", () => {
     try {
       class Author extends Base {
@@ -2072,5 +2001,24 @@ describe("RelationTest", () => {
     const sql = CanonPost.where({ author_id: subquery }).toSql();
     expect(sql).toMatch(/IN \(SELECT/i);
     expect(sql).toMatch(/GROUP BY/i);
+  });
+
+  // Rails resolves nested-hash/array eager specs through
+  // construct_join_dependency(eager_load_values | includes_values).reflections
+  // (finder_methods.rb:457-470, join_dependency.rb:81-82) before
+  // using_limitable_reflections?. A spec whose whole tree is singular
+  // (Author hasOne post → Post belongsTo author) stays limitable, so a
+  // limit/offset relation is NOT deferred to distinct_relation_for_primary_key.
+  it("where with a singular nested-hash eager-loading limited subquery does not defer materialization", () => {
+    const subquery = CanonAuthor.eagerLoad({ post: "author" }).order("id").limit(2);
+    expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(false);
+  });
+
+  // A collection anywhere in the nested eager tree (Author hasOne post → Post
+  // hasMany comments) makes the reflection set non-limitable, so the relation
+  // defers to distinct-PK materialization just as a top-level collection does.
+  it("where with a collection nested-hash eager-loading limited subquery defers materialization", () => {
+    const subquery = CanonAuthor.eagerLoad({ post: "comments" }).order("id").limit(2);
+    expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
   });
 });
