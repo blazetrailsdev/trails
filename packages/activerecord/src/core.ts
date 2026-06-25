@@ -13,6 +13,7 @@ import {
   IsolatedExecutionState,
   ParameterFilter,
   camelize,
+  pluralize,
 } from "@blazetrails/activesupport";
 import {
   strictLoadingViolationMessage,
@@ -731,6 +732,32 @@ function pkMatchKey(value: unknown): unknown {
   return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
 }
 
+/**
+ * Raise the "couldn't find all" aggregate not-found error, mirroring Rails'
+ * `raise_record_not_found_exception!` else-branch (finder_methods.rb:430-431):
+ * the model name is pluralized and the message carries the found/expected
+ * counts. `ids` is flattened for the message so composite tuples render like
+ * Ruby's recursive `Array#join` (`[[1, 2], [3, 4]].join(", ")` → "1, 2, 3, 4").
+ * Core#find runs unscoped, so there is no `[WHERE …]` conditions clause.
+ */
+function raiseCouldntFindAll(
+  name: string,
+  pk: string,
+  ids: unknown[],
+  payload: unknown,
+  resultSize: number,
+  expectedSize: number,
+): never {
+  throw new RecordNotFound(
+    `Couldn't find all ${pluralize(name)} with '${pk}': ` +
+      `(${ids.flat(Infinity).join(", ")}) ` +
+      `(found ${resultSize} results, but was looking for ${expectedSize}).`,
+    name,
+    pk,
+    payload,
+  );
+}
+
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -785,23 +812,17 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   if (this.compositePrimaryKey && Array.isArray(id)) {
     if (id.length > 0 && Array.isArray(id[0])) {
       const tuples = id as unknown[][];
-      if (tuples.length === 0) {
-        throw new RecordNotFound(
-          `Couldn't find ${this.name} with an empty list of ids`,
-          this.name,
-          String(this.primaryKey),
-          [],
-        );
-      }
       const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
       const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
       const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
       if (records.length !== tuples.length) {
-        throw new RecordNotFound(
-          `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${String(tuples)})`,
+        raiseCouldntFindAll(
           this.name,
           String(this.primaryKey),
+          tuples,
           id,
+          records.length,
+          tuples.length,
         );
       }
       return records;
@@ -813,15 +834,11 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     });
     const record = await this.all().where(whereConditions).first();
     if (!record) {
-      // Composite-PK single-tuple miss flows through Rails' aggregate
-      // "couldn't find all" message (performFind's tuples branch), so a
-      // 1-tuple lookup renders `(${String([tuple])})`.
-      throw new RecordNotFound(
-        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${String([id])})`,
-        this.name,
-        String(this.primaryKey),
-        id,
-      );
+      // Rails find_one([tuple]) raises via raise_record_not_found_exception!
+      // with Array.wrap(ids).size == pkArity > 1, so a composite single-tuple
+      // miss renders the aggregate "couldn't find all" message (found 0, was
+      // looking for 1).
+      raiseCouldntFindAll(this.name, String(this.primaryKey), id as unknown[], id, 0, 1);
     }
     return record;
   }
@@ -863,12 +880,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     const idToRecord = new Map<unknown, any>();
     for (const r of records) idToRecord.set(pkMatchKey(r.id), r);
     if (records.length !== castIds.length) {
-      throw new RecordNotFound(
-        `Couldn't find all ${this.name} with '${String(this.primaryKey)}': (${id.join(", ")})`,
-        this.name,
-        String(this.primaryKey),
-        id,
-      );
+      raiseCouldntFindAll(this.name, String(this.primaryKey), id, id, records.length, id.length);
     }
     // in_order_of: return in input order
     return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
