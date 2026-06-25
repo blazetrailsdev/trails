@@ -515,8 +515,15 @@ describe("CustomPropertiesTest", () => {
   });
   it("immutable_strings_by_default retains limit information", async () => {
     await withImmutableStrings(() => {
-      // trails models a column's limit on the reflected column (not on the
-      // Type, as Rails does), so assert it survives immutable inference there.
+      // Rails asserts `type_for_attribute("inferred_string").limit == 255`,
+      // but in trails `typeForAttribute(col).limit` is `undefined`:
+      // `lookupCastTypeFromColumn` builds the StringType via a bare
+      // `lookupCastType(sqlType)` that never threads `column.limit` into the
+      // type constructor, so `toImmutableString()` (which does copy
+      // `limit: this.limit`) inherits an undefined limit. trails keeps limit on
+      // the reflected column, so assert retention there. Known gap, tracked by
+      // story 0043 thread-column-limit-into-cast-type (wire column.limit into
+      // the cast type so the Rails type-level assertion can be restored).
       expect(
         (OverloadedType.columnsHash() as Record<string, { limit?: number }>).inferred_string.limit,
       ).toBe(255);
