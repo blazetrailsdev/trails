@@ -278,6 +278,23 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([accountId]);
   });
 
+  // Trails deviation guard (no Rails counterpart): Rails' Account#before_destroy
+  // issues a lazy synchronous query for `account.firm` on a direct destroy, so
+  // it records the id. trails' async belongs_to reader cannot be awaited inside
+  // a sync callback, so the direct-destroy path materializes the record's
+  // belongs_to before the callback chain runs. Story
+  // belongs-to-sync-read-direct-destroy-callback (RFC 0023-surfaced-deviations).
+  it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
+    const account = (await Account.find(1)) as any;
+    expect(account.association("firm").isLoaded()).toBe(false);
+    // Key by the firm record's id (not account.firm_id) so the lookup type
+    // matches what the callback stores; on PG firm.id is a BigInt.
+    const firm = (await Company.find(account.firm_id)) as any;
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
+    await account.destroy();
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
+  });
+
   it("exclusive dependence", async () => {
     const numAccounts = (await Account.count()) as number;
     const firm = (await ExclusivelyDependentFirm.find(9)) as any;

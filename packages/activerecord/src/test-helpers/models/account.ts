@@ -41,12 +41,12 @@ export class Account extends Base {
       // The framework passes the record as the first argument; `this` may be
       // unbound depending on the callback dispatch path. Prefer the argument.
       const self = (record ?? this) as any;
+      // Mirrors Rails `before_destroy { |account| ... if account.firm }`. Both
+      // the dependent-destroy cascade and the direct destroy now materialize
+      // `account.firm` before this sync reader runs, so it sees the record (or
+      // null) rather than the async reader's Promise.
       const firm = self?.firm;
-      // Mirrors Rails `before_destroy { |account| ... if account.firm }`. The
-      // dependent-destroy cascade preloads `account.firm` so this sync reader
-      // sees a materialized record; `firm.id != null` still guards the rare
-      // path where an unloaded belongs_to surfaces the async reader's Promise.
-      if (firm && firm.id != null) {
+      if (firm) {
         const ids = Account.destroyedAccountIds();
         if (!ids.has(firm.id)) ids.set(firm.id, []);
         ids.get(firm.id)!.push(self.id);
