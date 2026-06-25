@@ -3938,6 +3938,10 @@ export class Relation<T extends Base> {
             val,
           );
         if (isRangeCol) return [table.get(key), def!.type.serialize(val)];
+        // Mirrors Rails relation.rb#_substitute_values: a raw `Arel.sql(...)`
+        // assignment value is wrapped in a Grouping so a scalar-subquery value
+        // renders as `SET col = (select ...)`, which SQLite/MySQL/PG require.
+        if (val instanceof Nodes.SqlLiteral) return [table.get(key), new Nodes.Grouping(val)];
         return [table.get(key), val];
       },
     );

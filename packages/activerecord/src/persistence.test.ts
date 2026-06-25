@@ -1048,13 +1048,8 @@ describe("PersistenceTest", () => {
     const person = people("michael") as any;
     await person.updateBang({ cars_count: 0 });
 
-    // Rails' heredoc has no surrounding parens — its Arel UPDATE visitor
-    // parenthesizes a scalar-subquery assignment value. trails' `updateAll`
-    // renders a bare `SqlLiteral` value verbatim, so SQLite rejects an
-    // unparenthesized `SET cars_count = select ...`. The parens here stand in
-    // for that missing convergence (tracked: updateall-parenthesize-subquery-value).
     await Person.updateAll({
-      cars_count: arelSql("(select count(*) from cars where cars.person_id = people.id)"),
+      cars_count: arelSql("select count(*) from cars where cars.person_id = people.id"),
     });
     await person.reload();
     expect(person.cars_count).toBe(1);
