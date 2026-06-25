@@ -68,6 +68,12 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
   });
+  afterAll(async () => {
+    const { modelRegistry } = await import("./associations.js");
+    modelRegistry.delete("Reply");
+    modelRegistry.delete("Topic");
+    modelRegistry.delete("CpkOrder");
+  });
 
   it("counter cache on unloaded association class works", async () => {
     // Declare Reply (with belongs_to + counterCache) BEFORE Topic exists in the

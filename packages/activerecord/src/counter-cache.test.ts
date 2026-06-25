@@ -399,18 +399,7 @@ describe("CounterCacheTest", () => {
     Notifications.unsubscribeAll();
   });
 
-  // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
-  // Rails: test_removing_association_updates_counter
-  // Rails: test_update_counter_with_initial_null_value
-  // Rails: test_increment_counter
-  // Rails: test_decrement_counter
-  // Rails: test_decrement_counter_by_specific_amount
-  // Rails: test_update_other_counters_on_parent_destroy
-  // Rails: test_update_counters_in_a_polymorphic_relationship
-  // Rails: test_counter_caches_are_updated_in_memory_when_the_default_value_is_nil
-  // Rails: test_update_counters_doesnt_touch_timestamps_by_default
-  // Rails: test_active_counter_cache
-  // Rails: test_inactive_counter_cache
+  // Rails: test_reset_counters
   it("reset counters", async () => {
     class Topic extends Base {
       static {
