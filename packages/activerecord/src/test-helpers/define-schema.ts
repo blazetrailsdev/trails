@@ -271,11 +271,15 @@ const PG_ONLY_TYPES = new Set<string>(["citext", "hstore", "uuid", "interval", "
 
 // MySQL/MariaDB accepts native DATETIME columns with "YYYY-MM-DD HH:MM:SS" format
 // (no T/Z suffix). AR DateTime.serialize now emits this format, so datetime can
-// use the native column type. date/time/json still use "string" (VARCHAR);
-// `binary` routes through the native BLOB mapping so encrypted binary
-// attributes round-trip (BinaryData-wrapped ciphertext needs a binary column).
-// PG-only types are deliberately absent: defineSchema throws when one is used
-// against MySQL or SQLite.
+// use the native column type. `date` likewise uses the native DATE column — the
+// MySQL adapter quotes Temporal.PlainDate and casts DATE fields back via
+// temporal-type-cast, so date attributes round-trip with the correct type.
+// Without this, an introspected DATE-as-VARCHAR resolves to StringType and
+// multiparameter date assignment yields a raw string. time/json still use
+// "string" (VARCHAR); `binary` routes through the native BLOB mapping so
+// encrypted binary attributes round-trip (BinaryData-wrapped ciphertext needs a
+// binary column). PG-only types are deliberately absent: defineSchema throws
+// when one is used against MySQL or SQLite.
 /** @internal */
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   string: "string",
@@ -286,7 +290,7 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   decimal: "decimal",
   boolean: "boolean",
   datetime: "datetime",
-  date: "string",
+  date: "date",
   time: "string",
   binary: "binary",
   json: "string",
