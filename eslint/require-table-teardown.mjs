@@ -82,8 +82,11 @@
  * object in one call (`dropTable("a", "b", { ifExists: true })`), which the
  * adapter splits via `_splitTableNamesAndOptions`. A run of separate adjacent
  * `dropTable` calls — `await conn.dropTable("a"); await conn.dropTable("b");` —
- * issues one round-trip per table and re-churns the shared DB; the list form
- * collapses them into a single statement. The rule flags (and autofixes) a run
+ * is just N lines of teardown boilerplate; the list form is one call. (Note:
+ * the base `SchemaStatements.dropTable` and `MigrationContext.dropTable` still
+ * loop one `DROP TABLE` per name, so this is shorter code, *not* fewer SQL
+ * statements — only the MySQL adapter folds the list into a single statement.)
+ * The rule flags (and autofixes) a run
  * of **2+ adjacent** `dropTable` calls in the same statement list when they
  * share a receiver, share their `await` wrapping, and carry a *compatible*
  * options object — either none of them pass options, or they all pass a
@@ -276,7 +279,7 @@ const rule = {
       noDropAllTables:
         'Avoid `dropAllTables()` — drop the specific tables this file created with `dropTable("…")` instead. The carpet-bomb teardown also wipes tables other code seeded, and hides which tables a test actually owns. If this is genuinely necessary, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
       preferTableList:
-        'Merge adjacent dropTable() calls into a single dropTable("a", "b") list call — fewer round-trips and less shared-DB churn.',
+        'Merge adjacent dropTable() calls into a single dropTable("a", "b") list call — shorter teardown code, one call instead of N.',
     },
   },
 
