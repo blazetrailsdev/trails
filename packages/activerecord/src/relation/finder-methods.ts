@@ -759,14 +759,6 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
     ids,
   );
   if (normalized.emptyArray) return [];
-  // Rails find_with_ids: `when 1 then result = find_one(ids.first);
-  // expects_array ? [result] : result`. A single-element list dispatches
-  // to find_one (single-id message on miss), wrapped back into an array
-  // when the caller passed one.
-  if (normalized.ids.length === 1) {
-    const result = await findOne(rel, normalized.ids[0]);
-    return normalized.wantArray ? [result] : result;
-  }
   if (normalized.wantArray) {
     return findSome(rel, normalized.ids);
   }
