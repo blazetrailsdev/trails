@@ -895,14 +895,16 @@ describe("TransactionTest", () => {
   });
 
   it("write attribute after rollback", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "new value";
-    expect(post.title).toBe("new value");
+    const { Topic } = makeSQLiteTopic();
+    const topic = (await Topic.create({})) as any;
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      throw new Rollback();
+    });
+
+    topic.writeAttribute("id", null);
+    expect(topic.id).toBeNull();
   });
 
   it("restore new record after double save", async () => {
