@@ -720,16 +720,6 @@ export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
 ): Promise<boolean> {
-  // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises first,
-  // then `return false if destroyed?`. `save` returns false (it does not raise)
-  // for a destroyed record; `save!` turns that false into
-  // RecordNotSaved("Failed to save the record").
-  if (this._readonly) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-  if (this._destroyed) {
-    return false;
-  }
   // Reflect the schema before validations/INSERT touch attribute defs.
   await (
     this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
@@ -743,10 +733,26 @@ export async function save<T extends SaveRecord>(
     this.constructor,
     true,
   );
+  // Mirrors the Rails module layering: ActiveRecord::Validations#save! runs
+  // `perform_validations` first and only on success calls super →
+  // Persistence#save! → create_or_update, where the readonly/destroyed guards
+  // live. So validations run *before* the guards: a record that is both
+  // destroyed and invalid raises RecordInvalid (validations first), not
+  // RecordNotSaved.
   if (!performValidations.call(this, options)) return false;
   const self = this as any;
   if (options?.validate !== false) {
     if (!(await self._runAsyncValidations())) return false;
+  }
+  // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises first,
+  // then `return false if destroyed?`. `save` returns false (it does not raise)
+  // for a destroyed record; `save!` turns that false into
+  // RecordNotSaved("Failed to save the record").
+  if (this._readonly) {
+    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+  }
+  if (this._destroyed) {
+    return false;
   }
 
   self._skipTouch = options?.touch === false;

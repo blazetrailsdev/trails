@@ -571,6 +571,17 @@ describe("PersistenceTest", () => {
     );
   });
 
+  // Mirrors the Rails module layering: ActiveRecord::Validations#save! runs
+  // perform_validations before super → Persistence#create_or_update (where the
+  // destroyed guard lives). A record that is both destroyed and invalid must
+  // therefore raise RecordInvalid (validations first), not the
+  // RecordNotSaved("Failed to save the record") the destroyed guard would yield.
+  it("save! runs validations before the destroyed guard", async () => {
+    const developer = CanonicalDeveloper.new({ name: "DC", salary: 1_000_000 });
+    (developer as any)._destroyed = true;
+    await expect(developer.saveBang()).rejects.toThrow(RecordInvalid);
+  });
+
   // Rails: `assert_equal Developer.all.to_a, Developer.update(salary: 1_000_000)`
   // — the non-bang class-level update returns every record in scope even
   // though the salary inclusion validation (50_000..200_000) rejects 1_000_000.

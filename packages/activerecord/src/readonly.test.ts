@@ -58,10 +58,15 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBe(true);
 
-    // In-memory writes remain allowed; only persistence is blocked.
-    expect(() => {
-      (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
-    }).not.toThrow();
+    // In-memory writes remain allowed; only persistence is blocked. The
+    // 25-char name violates Developer's `length: { in: [3, 20] }` validation,
+    // so `save` returns false from validations (which run before the readonly
+    // guard, per ActiveRecord::Validations#save → Persistence#create_or_update)
+    // rather than raising ReadOnlyRecord. Resetting to a valid name then
+    // surfaces the readonly guard.
+    (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
+    expect(await dev.save()).toBe(false);
+    (dev as Record<string, unknown>).name = "Forbidden.";
 
     await expect(dev.save()).rejects.toThrow("Developer is marked as readonly");
     await expect(dev.saveBang()).rejects.toThrow("Developer is marked as readonly");
