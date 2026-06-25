@@ -562,7 +562,7 @@ export class Association {
     // when both owner and record were persisted it never wired the inverse —
     // the FK-match was reimplemented inline in `AssociationRelation.toArray`.
     if (!record) return false;
-    return record.isNewRecord() || this.owner.isNewRecord() || this.matchesForeignKey(record);
+    return !record.isPersisted() || !this.owner.isPersisted() || this.matchesForeignKey(record);
   }
 
   /**
