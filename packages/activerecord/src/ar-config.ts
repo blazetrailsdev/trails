@@ -316,3 +316,16 @@ export let generateSecureTokenOn: "create" | "initialize" = "create";
 export function setGenerateSecureTokenOn(value: "create" | "initialize"): void {
   generateSecureTokenOn = value;
 }
+
+/**
+ * When true, assigning to a readonly attribute on a persisted record raises
+ * `ReadonlyAttributeError`; when false (the default) the write is silently
+ * skipped. Mirrors `ActiveRecord.raise_on_assign_to_attr_readonly`
+ * (active_record.rb:342-343, default false). The Rails 7.1 framework default
+ * and the AR test suite (`test/cases/helper.rb:42`) flip it to true.
+ */
+export let raiseOnAssignToAttrReadonly = false;
+
+export function setRaiseOnAssignToAttrReadonly(value: boolean): void {
+  raiseOnAssignToAttrReadonly = value;
+}
