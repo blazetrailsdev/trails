@@ -4,8 +4,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
-import { ReadOnlyError } from "./errors.js";
+import { ReadOnlyError, StatementInvalid } from "./errors.js";
 import { itIfSupports } from "./test-helpers/supports.js";
+import { adapterType } from "./test-adapter.js";
+import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
 let adapter: AbstractSQLite3Adapter;
 
@@ -64,13 +66,27 @@ describe("AdapterPreventWritesTest", () => {
   // (raises StatementInvalid on encoding errors before the write-prevention check) and
   // one for all other adapters (assert_nothing_raised). This first occurrence is the
   // PostgreSQL variant; it requires a live PG connection to exercise.
-  it.skip("doesnt error when a select query has encoding errors", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in adapter-prevent-writes.test.ts and base-prevent-writes.test.ts
-    // PostgreSQL raises StatementInvalid on encoding errors regardless of write-prevention;
-    // requires PostgreSQLAdapter — not exercisable with SQLite3Adapter.
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "doesnt error when a select query has encoding errors",
+    async () => {
+      // Rails sends Ruby's `'\xC8'` literal as a raw 0xC8 byte, which PG's client
+      // eagerly rejects as invalid UTF-8 (StatementInvalid). JS strings can't carry
+      // a raw 0xC8 byte — node-pg always emits valid UTF-8 — so we provoke the same
+      // UTF8 encoding error server-side via a bytea literal. The key assertion holds:
+      // the write-prevention check (a read) doesn't pre-empt the encoding failure.
+      const pg = new PostgreSQLAdapter(PG_TEST_URL);
+      (pg as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = {
+        preventWrites: true,
+      };
+      try {
+        await expect(pg.selectAll(`SELECT convert_from('\\xc8'::bytea, 'UTF8')`)).rejects.toThrow(
+          StatementInvalid,
+        );
+      } finally {
+        await pg.close();
+      }
+    },
+  );
 
   // Non-PostgreSQL variant (Rails' `else` branch): the extractor records it as
   // unconditional, so this stays ungated to pair with that variant.
