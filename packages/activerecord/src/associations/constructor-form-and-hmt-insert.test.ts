@@ -1,174 +1,75 @@
 /**
- * Batch 30 — HMT Slot C smoke tests:
+ * HMT Slot C smoke tests:
  *   - constructor-form collection writer in assignAttributes
  *   - association.resetScope invocation during saveCollectionAssociation
- *   - HMT insert_record two-step alignment (super.insertRecord →
- *     save_through_record) for HABTM
+ *   - has_many :through insert_record two-step alignment
+ *     (super.insertRecord → save_through_record)
+ *
+ * No 1:1 Rails counterpart — a trails-internal harness for the
+ * constructor-form / through-insert write path. Rides the canonical schema
+ * (`Author has_many :posts`/`has_one :post`, `Post has_many :tags, through:
+ * :taggings`) + fixtures; no inline tables and no `defineSchema`.
  */
-import type { AssociationProxy } from "./collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { registerModel } from "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Tag } from "../test-helpers/models/tag.js";
+import { Tagging } from "../test-helpers/models/tagging.js";
 
-let _adapter: TestDatabaseAdapter;
-beforeAll(async () => {
-  _adapter = createTestAdapter();
-  await defineSchema(_adapter, {
-    b30_owners: { name: "string" },
-    b30_items: { name: "string", owner_id: "integer" },
-    b30_profiles: { name: "string", owner_id: "integer" },
-    b30_posts: { title: "string" },
-    b30_tags: { name: "string" },
-    // HABTM defaults (mirrors Rails Builder::HasAndBelongsToMany#table_name):
-    //   joinTable = sort + `[._]`-prefix collapse of ["b30_posts","b30_tags"]
-    //             = "b30_posts_tags"
-    //   ownerFk   = `${underscore(model.name)}_id`            = "b30_post_id"
-    //   sourceFk  = `${underscore(demodulize(className))}_id` = "b30_tag_id"
-    b30_posts_tags: { b30_post_id: "integer", b30_tag_id: "integer" },
-  });
-});
-withTransactionalFixtures(() => _adapter);
+registerModel(Author);
+registerModel(Post);
+registerModel(Tag);
+registerModel(Tagging);
+
+const { posts } = useHandlerFixtures(["posts"]);
 
 describe("constructor-form association writer", () => {
-  function makeHasManyModels() {
-    class B30Item extends Base {
-      declare name: string;
-      declare owner_id: number;
-
-      static {
-        this._tableName = "b30_items";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("owner_id", "integer");
-        this.adapter = _adapter;
-      }
-    }
-    class B30Owner extends Base {
-      declare name: string;
-      declare items: AssociationProxy<B30Item>;
-
-      static {
-        this._tableName = "b30_owners";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = _adapter;
-        this.hasMany("items", { className: "B30Item", foreignKey: "owner_id" });
-      }
-    }
-    registerModel("B30Item", B30Item);
-    registerModel("B30Owner", B30Owner);
-    return { B30Owner, B30Item };
-  }
-
   it("dispatches array values to hasMany association on construction", () => {
-    const { B30Owner, B30Item } = makeHasManyModels();
-    const i1 = new B30Item({ name: "a" });
-    const i2 = new B30Item({ name: "b" });
-    const owner = new B30Owner({ name: "Acme", items: [i1, i2] });
-    const target = (owner as any).association("items").target as Base[];
+    const p1 = new Post({ title: "a" });
+    const p2 = new Post({ title: "b" });
+    const author = new Author({ name: "Acme", posts: [p1, p2] });
+    const target = (author as any).association("posts").target;
     expect(target).toHaveLength(2);
-    expect(target[0]).toBe(i1);
-    expect(target[1]).toBe(i2);
+    expect(target[0]).toBe(p1);
+    expect(target[1]).toBe(p2);
   });
 
   it("dispatches via assignAttributes (manual-call path, non-multiparameter)", () => {
-    const { B30Owner, B30Item } = makeHasManyModels();
-    const owner = new B30Owner();
-    const i1 = new B30Item({ name: "a" });
-    owner.assignAttributes({ name: "Acme", items: [i1] });
-    expect((owner as any).readAttribute("name")).toBe("Acme");
-    expect((owner as any).association("items").target).toEqual([i1]);
+    const author = new Author();
+    const p1 = new Post({ title: "a" });
+    author.assignAttributes({ name: "Acme", posts: [p1] });
+    expect((author as any).readAttribute("name")).toBe("Acme");
+    expect((author as any).association("posts").target).toEqual([p1]);
   });
 
   it("dispatches via assignAttributes (multiparameter branch)", () => {
-    const { B30Owner, B30Item } = makeHasManyModels();
-    const owner = new B30Owner();
-    const i1 = new B30Item({ name: "a" });
+    const author = new Author();
+    const p1 = new Post({ title: "a" });
     // Mix in a multiparameter key so assignAttributes takes the
     // hasMultiparameterKeys branch — association routing must still happen.
-    owner.assignAttributes({
-      items: [i1],
+    author.assignAttributes({
+      posts: [p1],
       // Force the multiparameter branch via a parenthesized key —
-      // value content is irrelevant; we only care that `items` still
+      // value content is irrelevant; we only care that `posts` still
       // routes through assignAssociationIfMatch in this branch.
       "name(1)": "x",
     });
-    expect((owner as any).association("items").target).toEqual([i1]);
+    expect((author as any).association("posts").target).toEqual([p1]);
   });
 
   it("dispatches single record to hasOne association on construction", () => {
-    class B30Profile extends Base {
-      declare name: string;
-      declare owner_id: number;
-
-      static {
-        this._tableName = "b30_profiles";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("owner_id", "integer");
-        this.adapter = _adapter;
-      }
-    }
-    class B30Owner2 extends Base {
-      declare name: string;
-      declare profile: B30Profile | null;
-      declare loadHasOne: (name: "profile") => Promise<B30Profile | null>;
-
-      static {
-        this._tableName = "b30_owners";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = _adapter;
-        this.hasOne("profile", {
-          className: "B30Profile",
-          foreignKey: "owner_id",
-        });
-      }
-    }
-    registerModel("B30Profile", B30Profile);
-    registerModel("B30Owner2", B30Owner2);
-
-    const p = new B30Profile({ name: "p" });
-    const owner = new B30Owner2({ name: "x", profile: p });
-    expect((owner as any).association("profile").target).toBe(p);
+    const p = new Post({ title: "p" });
+    const author = new Author({ name: "x", post: p });
+    expect((author as any).association("post").target).toBe(p);
   });
 });
 
 describe("HABTM insert_record two-step", () => {
-  function makeHabtmModels() {
-    class B30Post extends Base {
-      declare title: string;
-      declare tags: AssociationProxy<B30Tag>;
-
-      static {
-        this._tableName = "b30_posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.adapter = _adapter;
-        this.hasAndBelongsToMany("tags", { className: "B30Tag" });
-      }
-    }
-    class B30Tag extends Base {
-      declare name: string;
-
-      static {
-        this._tableName = "b30_tags";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = _adapter;
-      }
-    }
-    registerModel("B30Post", B30Post);
-    registerModel("B30Tag", B30Tag);
-    return { B30Post, B30Tag };
-  }
-
   it("super.insertRecord saves the target, save_through_record persists join row", async () => {
-    const { B30Post, B30Tag } = makeHabtmModels();
-    const post = await B30Post.create({ title: "Hello" });
-    const tag = new B30Tag({ name: "ruby" });
+    const post = posts("welcome");
+    const tag = new Tag({ name: "ruby" });
     const ok = await (post as any).association("tags").insertRecord(tag, true, false);
     expect(ok).toBe(true);
     // super.insertRecord saved the target
@@ -176,7 +77,7 @@ describe("HABTM insert_record two-step", () => {
     // Reload to force a fresh through-load from the DB so we know the join
     // row was actually persisted (rather than just cached in the in-memory
     // proxy from build()).
-    const reloaded = await B30Post.find(post.id);
+    const reloaded = await Post.find(post.id);
     const tags = await (reloaded as any).association("tags").loadTarget();
     expect(tags).toHaveLength(1);
     expect(tags[0].id).toBe(tag.id);
@@ -185,38 +86,8 @@ describe("HABTM insert_record two-step", () => {
 
 describe("resetScope on owner save", () => {
   it("clears the memoized association scope before iterating children", async () => {
-    class B30Item2 extends Base {
-      declare name: string;
-      declare owner_id: number;
-
-      static {
-        this._tableName = "b30_items";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("owner_id", "integer");
-        this.adapter = _adapter;
-      }
-    }
-    class B30Owner3 extends Base {
-      declare name: string;
-      declare items: AssociationProxy<B30Item2>;
-
-      static {
-        this._tableName = "b30_owners";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = _adapter;
-        this.hasMany("items", {
-          className: "B30Item2",
-          foreignKey: "owner_id",
-        });
-      }
-    }
-    registerModel("B30Item2", B30Item2);
-    registerModel("B30Owner3", B30Owner3);
-
-    const owner = await B30Owner3.create({ name: "o" });
-    const assoc = (owner as any).association("items");
+    const author = await Author.create({ name: "o" });
+    const assoc = (author as any).association("posts");
     // saveCollectionAssociation must call resetScope() before iterating
     // children so a stale scope doesn't survive into per-child saves.
     let resetCount = 0;
@@ -225,8 +96,8 @@ describe("resetScope on owner save", () => {
       resetCount++;
       return original();
     };
-    (owner as any).items = [];
-    await owner.save();
+    (author as any).posts = [];
+    await author.save();
     expect(resetCount).toBeGreaterThan(0);
   });
 });
