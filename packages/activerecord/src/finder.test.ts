@@ -2478,6 +2478,20 @@ describe("FinderTest", () => {
     await expect(Post.findByBang({ id: 999999999 })).rejects.toThrow();
   });
 
+  // Rails: test "find_by! raises RecordNotFound if the record is missing"
+  // (finder_test.rb) — the not-found message carries the relation's WHERE
+  // conditions clause: `arel.where_sql(model)` → "WHERE (1 = 0)".
+  it("find_by! raises RecordNotFound if the record is missing", async () => {
+    let error: any;
+    try {
+      await Post.findByBang("1 = 0");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotFound);
+    expect(error.message).toBe("Couldn't find Post with [WHERE (1 = 0)]");
+  });
+
   it("implicit order set to primary key", async () => {
     await Post.create({ title: "pk-order" });
     const sql = Post.all().toSql();
@@ -3121,7 +3135,7 @@ describe("FinderTest", () => {
   });
 
   it("findBy! raises when no match", async () => {
-    await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow("not found");
+    await expect(User.findByBang({ name: "Nobody" })).rejects.toThrow("Couldn't find User");
   });
 
   it("findBy with multiple conditions", async () => {
