@@ -2345,6 +2345,48 @@ describe("FinderTest", () => {
     expect((found as any[]).length).toBe(2);
   });
 
+  it("find with duplicate ids", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Dup" });
+    // Rails find_with_ids does `ids = ids.compact.uniq` before the size
+    // dispatch, so `find([id, id])` collapses to one id and dispatches to
+    // find_one, returning the record wrapped in a 1-element array.
+    const found = await Topic.find([t.id, t.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+    expect((found as any[])[0].id).toBe(t.id);
+  });
+
+  it("find with nil ids", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Nil" });
+    // compact strips the nil entry before dispatch, so `find([id, nil])`
+    // dispatches to the single-id path and returns a 1-element array.
+    const found = await Topic.find([t.id, null]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+    expect((found as any[])[0].id).toBe(t.id);
+  });
+
+  it("find with all nil ids raises without an ID", async () => {
+    const Topic = makeTopic();
+    // Rails: `find([nil, nil])` passes the `ids.first.empty?` short-circuit
+    // (the input array is not empty), then `compact.uniq` empties it, so the
+    // `case ids.size … when 0` branch raises — it does NOT return `[]` like
+    // the empty-input `find([])` case.
+    await expect(Topic.find([null, null])).rejects.toThrow("Couldn't find Topic without an ID");
+    await expect(Topic.all().find([null, null])).rejects.toBeInstanceOf(RecordNotFound);
+  });
+
+  it("find with duplicate ids on a relation dispatches to single id path", async () => {
+    const Topic = makeTopic();
+    const t = await Topic.create({ title: "Dup" });
+    const found = await Topic.all().find([t.id, t.id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as any[]).length).toBe(1);
+    expect((found as any[])[0].id).toBe(t.id);
+  });
+
   it("find by ids missing one", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "A" });

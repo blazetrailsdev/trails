@@ -13,6 +13,7 @@ import { pluralize } from "@blazetrails/activesupport";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
+import { compactUniqIds } from "./compact-uniq-ids.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -106,6 +107,11 @@ export function normalizeFindArgs(
   let ids: unknown[];
   let wantArray: boolean;
 
+  // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` BEFORE the
+  // `case ids.size` dispatch. So `find([1, 1])` collapses to one id
+  // (→ `find_one`) and `find([1, nil])` drops the nil. Applied to the
+  // simple-PK flatten branches below; composite tuple lists are not
+  // compacted/uniq'd (a tuple may legitimately contain nil components).
   if (rest.length > 0) {
     if (composite) {
       if (args.every((x) => !Array.isArray(x))) {
@@ -121,7 +127,7 @@ export function normalizeFindArgs(
     } else {
       // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
       // canonicalize to `[1, 2, 3]`.
-      ids = args.flat(Infinity);
+      ids = compactUniqIds(args.flat(Infinity));
       wantArray = true;
     }
   } else if (Array.isArray(first)) {
@@ -136,7 +142,7 @@ export function normalizeFindArgs(
     } else {
       // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
       // `find([1, 2])`, matching Rails' `Array#flatten`.
-      ids = (first as unknown[]).flat(Infinity);
+      ids = compactUniqIds((first as unknown[]).flat(Infinity));
       wantArray = true;
     }
   } else {
