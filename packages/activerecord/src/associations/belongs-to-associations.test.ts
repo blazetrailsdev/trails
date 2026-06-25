@@ -19,6 +19,7 @@ import {
   touchBelongsToParents,
 } from "../associations.js";
 
+import { assertNoQueries } from "../testing/query-assertions.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -1994,6 +1995,20 @@ describe("BelongsToAssociationsTest", () => {
     const loaded = await loadBelongsTo(sponsor, "sponsorable", { polymorphic: true });
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("Alice");
+
+    // klass-guard: a foreign key present with a nil type column resolves klass
+    // to undefined, so find_target?'s trailing `&& klass` (association.rb:320,
+    // belongs_to_association.rb:124) is false and no query is attempted.
+    const typeless = PacSponsor.new({ sponsorable_id: member.id });
+    const assoc = typeless.association("sponsorable");
+    expect(assoc.klass).toBeUndefined();
+    const findTargetNeeded = (assoc as unknown as { findTargetNeeded(): boolean }).findTargetNeeded;
+    expect(findTargetNeeded.call(assoc)).toBe(false);
+    let target: unknown = "unset";
+    await assertNoQueries(false, async () => {
+      target = await assoc.loadTarget();
+    });
+    expect(target).toBeNull();
   });
   it("with polymorphic and condition", async () => {
     class WpcPost extends Base {
