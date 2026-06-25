@@ -68,7 +68,7 @@ export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
   // an already-declared model. `include` is idempotent and one-way, so we never
   // clear the flag once set.
   if (raiseOnAssignToAttrReadonly) {
-    (this as any)._readonlyAttributesRaise = true;
+    this._readonlyAttributesRaise = true;
   }
 }
 
@@ -152,7 +152,7 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
   // columns (attributesForUpdate) keeps it out of the UPDATE.
   if (
     this._newRecord === false &&
-    (ctor as { _readonlyAttributesRaise?: boolean })._readonlyAttributesRaise &&
+    ctor._readonlyAttributesRaise &&
     ctor.readonlyAttributeQ(canonical)
   ) {
     throw new ReadonlyAttributeError(canonical);
@@ -176,7 +176,7 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
   const ctor = this.constructor as typeof Base;
   if (
     this._newRecord === false &&
-    (ctor as { _readonlyAttributesRaise?: boolean })._readonlyAttributesRaise &&
+    ctor._readonlyAttributesRaise &&
     ctor.readonlyAttributeQ(String(name))
   ) {
     throw new ReadonlyAttributeError(String(name));
