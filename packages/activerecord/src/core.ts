@@ -731,6 +731,22 @@ function pkMatchKey(value: unknown): unknown {
   return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
 }
 
+// Rails `find_with_ids` does `ids.compact.uniq` before its size dispatch.
+// Drop nils, then dedupe by `pkMatchKey` so a BigInt and the equal number/
+// string id collapse to one (matching the lookup's value-equality below).
+function compactUniqIds(ids: unknown[]): unknown[] {
+  const seen = new Set<unknown>();
+  const out: unknown[] = [];
+  for (const id of ids) {
+    if (id === null || id === undefined) continue;
+    const key = pkMatchKey(id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(id);
+  }
+  return out;
+}
+
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // Reflect the schema before casting ids — the cast below reads
   // attribute definitions that lazy reflection populates.
@@ -824,19 +840,24 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   }
 
   if (Array.isArray(id)) {
-    if (id.length === 0) {
+    // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` before the
+    // `case ids.size` dispatch. `find([1, 1])` collapses to a single id
+    // (→ single-id path, wrapped per `expects_array`) and `find([1, nil])`
+    // drops the nil. Simple PK only — composite tuples returned above.
+    const compactedIds = compactUniqIds(id);
+    if (compactedIds.length === 0) {
       // Rails `find_with_ids`: `return [] if expects_array && ids.first.empty?`
       // — an empty array argument resolves to `[]` without a query or a
       // `RecordNotFound`. (Composite PKs derive `expects_array` from a nested
       // array, so a bare `find([])` there is not an empty-array request.)
       return [];
     }
-    if (id.length === 1) {
+    if (compactedIds.length === 1) {
       // Rails `find_with_ids` unwraps a single-element array and dispatches to
       // the single-id path (`find_one`): a miss raises the scalar id message
       // (not the aggregate "in [...]"), and a hit is wrapped back into a
       // 1-element array because `expects_array` is true.
-      const single = id[0];
+      const single = compactedIds[0];
       const castSingle = this._castAttributeValue(this.primaryKey as string, single);
       const record = await this.all()
         .where({ [this.primaryKey as string]: castSingle })
@@ -851,7 +872,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       }
       return [record];
     }
-    const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
+    const castIds = compactedIds.map((i) => this._castAttributeValue(this.primaryKey as string, i));
     const records = await this.all()
       .where({ [this.primaryKey as string]: castIds })
       .toArray();
@@ -865,7 +886,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
         `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
         this.name,
         String(this.primaryKey),
-        id,
+        compactedIds,
       );
     }
     // in_order_of: return in input order

@@ -106,6 +106,23 @@ export function normalizeFindArgs(
   let ids: unknown[];
   let wantArray: boolean;
 
+  // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` BEFORE the
+  // `case ids.size` dispatch. So `find([1, 1])` collapses to one id
+  // (→ `find_one`) and `find([1, nil])` drops the nil. Applies to the
+  // simple-PK flatten branches below; composite tuple lists are not
+  // compacted/uniq'd (a tuple may legitimately contain nil components).
+  const compactUniq = (xs: unknown[]): unknown[] => {
+    const seen = new Set<unknown>();
+    const out: unknown[] = [];
+    for (const x of xs) {
+      if (x === null || x === undefined) continue;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      out.push(x);
+    }
+    return out;
+  };
+
   if (rest.length > 0) {
     if (composite) {
       if (args.every((x) => !Array.isArray(x))) {
@@ -121,7 +138,7 @@ export function normalizeFindArgs(
     } else {
       // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
       // canonicalize to `[1, 2, 3]`.
-      ids = args.flat(Infinity);
+      ids = compactUniq(args.flat(Infinity));
       wantArray = true;
     }
   } else if (Array.isArray(first)) {
@@ -136,7 +153,7 @@ export function normalizeFindArgs(
     } else {
       // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
       // `find([1, 2])`, matching Rails' `Array#flatten`.
-      ids = (first as unknown[]).flat(Infinity);
+      ids = compactUniq((first as unknown[]).flat(Infinity));
       wantArray = true;
     }
   } else {
