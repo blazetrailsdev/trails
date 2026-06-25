@@ -12,10 +12,12 @@ import {
   normalizeFindArgs,
   raiseNotFoundAll,
   raiseNotFoundSingle,
+  findOne,
   findSome,
   findSomeOrdered,
   findTake,
   findTakeWithLimit,
+  raiseRecordNotFoundExceptionBang,
   _orderColumns,
 } from "./finder-methods.js";
 import { RecordNotFound } from "../errors.js";
@@ -266,6 +268,7 @@ function makeFindSomeRel(
     _orderClauses: opts.ordered !== false ? ["id ASC"] : [],
     _rawOrderClauses: [],
     selectValues: [],
+    raiseRecordNotFoundExceptionBang,
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -371,6 +374,7 @@ function makeFindSomeOrderedRel(
     _orderClauses: [],
     _rawOrderClauses: [],
     selectValues: [],
+    raiseRecordNotFoundExceptionBang,
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -529,5 +533,63 @@ describe("_orderColumns — Rails _order_columns precedence", () => {
       _queryConstraintsList: ["shop_id", "id"],
     });
     expect(_orderColumns(rel)).toEqual(["created_at", "shop_id", "id"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// raise_record_not_found_exception! message fidelity — finder not-found paths
+// route through raiseRecordNotFoundExceptionBang and compose Rails' faithful
+// messages (finder_methods.rb#raise_record_not_found_exception!, line 417).
+// ---------------------------------------------------------------------------
+
+describe("finder not-found message fidelity", () => {
+  it("test_find_one_message_on_primary_key", async () => {
+    const rel: any = {
+      _modelClass: { name: "Car", primaryKey: "id" },
+      raiseRecordNotFoundExceptionBang,
+      findBy: async () => null,
+    };
+    try {
+      await findOne(rel, 0);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      expect(err.message).toBe("Couldn't find Car with 'id'=0");
+      expect(err.id).toBe(0);
+      expect(err.primaryKey).toBe("id");
+      expect(err.model).toBe("Car");
+    }
+  });
+
+  it("test_find_some_message_with_custom_primary_key", async () => {
+    const rel: any = {
+      _modelClass: {
+        name: "MercedesCar",
+        primaryKey: "name",
+        typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+        arelTable: { get: (col: string) => col },
+      },
+      _limitValue: null,
+      _offsetValue: null,
+      selectValues: [],
+      raiseRecordNotFoundExceptionBang,
+      where(_cond: any) {
+        const inner: any = { toArray: async () => [], select: () => inner };
+        return inner;
+      },
+    };
+    try {
+      await findSomeOrdered(rel, ["Hello", "World!"]);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      expect(err.message).toBe(
+        "Couldn't find all MercedesCars with 'name': (Hello, World!) (found 0 results, but was looking for 2).",
+      );
+      expect(err.model).toBe("MercedesCar");
+      expect(err.primaryKey).toBe("name");
+    }
   });
 });
