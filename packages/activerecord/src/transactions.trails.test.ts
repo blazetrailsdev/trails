@@ -8,16 +8,41 @@
  * machinery. They were relocated verbatim out of transactions.test.ts (which
  * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Base, transaction } from "./index.js";
 import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { AbstractAdapter } from "./index.js";
+
+// Internal record state poked by the rememberTransactionRecordState /
+// rolledbackBang guards below; not part of Base's public surface.
+type StartTransactionState = { level: number; attributes: unknown } | null;
+interface TxRecordInternals {
+  _newRecord: boolean;
+  changesApplied(): void;
+  writeAttribute(name: string, value: unknown): void;
+  readAttribute(name: string): unknown;
+  _startTransactionState: StartTransactionState;
+  _dirty: {
+    changed: boolean;
+    mutationsFromDatabase: Record<string, unknown>;
+    attributeChanged(name: string): boolean;
+    attributeWas(name: string): unknown;
+  };
+}
+
+// The wrapper adapter exposes currentTransaction() at runtime but not on the
+// public DatabaseAdapter type; narrow to just the member these guards read.
+interface AdapterTxView {
+  currentTransaction?(): unknown;
+}
 
 const openAdapters: AbstractSQLite3Adapter[] = [];
 
@@ -52,18 +77,8 @@ afterEach(async () => {
 describe("TransactionTest", () => {
   setupHandlerSuite();
 
-  class Account extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("balance", "integer", { default: 0 });
-    }
-  }
-
   beforeAll(async () => {
-    await defineSchema({ accounts: { name: "string", balance: "integer" } });
-  });
-  beforeEach(async () => {
-    await Base.connection.executeMutation("DELETE FROM accounts");
+    await defineSchema({ topics: canonicalSchema.topics });
   });
 
   describe("after_failure_actions on PreparedStatementCacheExpired", () => {
@@ -86,7 +101,7 @@ describe("TransactionTest", () => {
         "clearCacheBang",
       );
       await expect(
-        transaction(Account, async () => {
+        transaction(CanonicalTopic, async () => {
           throw new PreparedStatementCacheExpired("cached plan expired");
         }),
       ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
@@ -99,7 +114,7 @@ describe("TransactionTest", () => {
         "clearCacheBang",
       );
       await expect(
-        transaction(Account, async () => {
+        transaction(CanonicalTopic, async () => {
           throw new Error("unrelated");
         }),
       ).rejects.toThrow("unrelated");
@@ -182,43 +197,45 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     const { rememberTransactionRecordState } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "before" });
-    (topic as any)._newRecord = false;
+    const internals = topic as unknown as TxRecordInternals;
+    internals._newRecord = false;
 
-    rememberTransactionRecordState.call(topic as any);
+    rememberTransactionRecordState.call(topic);
 
-    const state = (topic as any)._startTransactionState;
+    const state = internals._startTransactionState;
     expect(state).not.toBeNull();
-    expect(state.level).toBe(1);
-    expect(state.attributes).toBeDefined();
+    expect(state?.level).toBe(1);
+    expect(state?.attributes).toBeDefined();
     // Second call increments level, does not overwrite attributes snapshot
-    rememberTransactionRecordState.call(topic as any);
-    expect((topic as any)._startTransactionState.level).toBe(2);
+    rememberTransactionRecordState.call(topic);
+    expect(internals._startTransactionState?.level).toBe(2);
   });
 
   it("rolledbackBang restores identity and clears mutation tracking", async () => {
     const { rolledbackBang, rememberTransactionRecordState } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
-    (topic as any)._newRecord = false;
+    const internals = topic as unknown as TxRecordInternals;
+    internals._newRecord = false;
     // A new record is dirty against its defaults (Rails parity); persisting
     // clears that. Mark the constructed-as-persisted record clean so "original"
     // is the pre-TX baseline, not a construction-time change.
-    (topic as any).changesApplied();
+    internals.changesApplied();
 
-    rememberTransactionRecordState.call(topic as any);
-    (topic as any).writeAttribute("title", "changed-during-tx");
+    rememberTransactionRecordState.call(topic);
+    internals.writeAttribute("title", "changed-during-tx");
 
-    await rolledbackBang.call(topic as any, {
+    await rolledbackBang.call(topic, {
       forceRestoreState: true,
       shouldRunCallbacks: false,
     });
 
-    expect((topic as any)._startTransactionState).toBeNull();
+    expect(internals._startTransactionState).toBeNull();
     // In-TX user edit preserved: "changed-during-tx" stays live in memory,
     // "original" (pre-TX) is the dirty baseline. Mirrors Rails' attribute
     // reconstruction via attr.with_value_from_user(current_value).
-    expect((topic as any).readAttribute("title")).toBe("changed-during-tx");
-    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+    expect(internals.readAttribute("title")).toBe("changed-during-tx");
+    expect(internals._dirty.mutationsFromDatabase).toEqual({
       title: ["original", "changed-during-tx"],
     });
   });
@@ -232,23 +249,24 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
-    (topic as any)._newRecord = false;
-    (topic as any).changesApplied();
+    const internals = topic as unknown as TxRecordInternals;
+    internals._newRecord = false;
+    internals.changesApplied();
 
-    rememberTransactionRecordState.call(topic as any);
-    (topic as any).writeAttribute("title", "tx-edit");
+    rememberTransactionRecordState.call(topic);
+    internals.writeAttribute("title", "tx-edit");
 
-    await rolledbackBang.call(topic as any, {
+    await rolledbackBang.call(topic, {
       forceRestoreState: true,
       shouldRunCallbacks: false,
     });
 
     // Post-TX value stays live in memory; pre-TX value becomes the dirty baseline.
     // Mirrors Rails: attr.with_value_from_user keeps current value, pre-TX as original.
-    expect((topic as any).readAttribute("title")).toBe("tx-edit");
-    expect((topic as any)._dirty.attributeChanged("title")).toBe(true);
-    expect((topic as any)._dirty.attributeWas("title")).toBe("original");
-    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+    expect(internals.readAttribute("title")).toBe("tx-edit");
+    expect(internals._dirty.attributeChanged("title")).toBe(true);
+    expect(internals._dirty.attributeWas("title")).toBe("original");
+    expect(internals._dirty.mutationsFromDatabase).toEqual({
       title: ["original", "tx-edit"],
     });
   });
@@ -257,19 +275,20 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
-    (topic as any)._newRecord = false;
-    (topic as any).changesApplied();
+    const internals = topic as unknown as TxRecordInternals;
+    internals._newRecord = false;
+    internals.changesApplied();
 
-    rememberTransactionRecordState.call(topic as any);
+    rememberTransactionRecordState.call(topic);
     // No attribute writes during TX
 
-    await rolledbackBang.call(topic as any, {
+    await rolledbackBang.call(topic, {
       forceRestoreState: true,
       shouldRunCallbacks: false,
     });
 
-    expect((topic as any)._dirty.changed).toBe(false);
-    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({});
+    expect(internals._dirty.changed).toBe(false);
+    expect(internals._dirty.mutationsFromDatabase).toEqual({});
   });
 });
 
@@ -313,9 +332,9 @@ describe("SchemaAdapter TM delegation", () => {
     // the shared real adapter via the sidecar — that's what the wrapper's
     // withinNewTransaction routes to and what TM dispatches against.
     const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: { name: "string" } });
+    await defineSchema(testAdapter, { items: canonicalSchema.items });
     const { adapter: realAdapter } = createSidecarTestAdapter();
-    const spy = vi.spyOn(realAdapter as any, "withinNewTransaction");
+    const spy = vi.spyOn(realAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -334,7 +353,7 @@ describe("SchemaAdapter TM delegation", () => {
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
     const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: { name: "string" } });
+    await defineSchema(testAdapter, { items: canonicalSchema.items });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -348,14 +367,14 @@ describe("SchemaAdapter TM delegation", () => {
 
     await transaction(Item, async () => {
       await Item.create({ name: "outer" });
-      const cur = (testAdapter as any).currentTransaction?.();
+      const cur = (testAdapter as unknown as AdapterTxView).currentTransaction?.();
       outerType = cur instanceof TxBase ? cur.constructor.name : String(cur);
 
       await transaction(
         Item,
         async () => {
           await Item.create({ name: "inner" });
-          const curIn = (testAdapter as any).currentTransaction?.();
+          const curIn = (testAdapter as unknown as AdapterTxView).currentTransaction?.();
           innerType = curIn instanceof TxBase ? curIn.constructor.name : String(curIn);
         },
         { requiresNew: true },
@@ -374,7 +393,7 @@ describe("SchemaAdapter TM delegation", () => {
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
     // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
     const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: { name: "string" } });
+    await defineSchema(testAdapter, { items: canonicalSchema.items });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -400,7 +419,7 @@ describe("SchemaAdapter TM delegation", () => {
             // were leaking, two concurrent callers would observe the SAME
             // frame here.
             await Item.create({ name: `concurrent-${i}` });
-            const inside = (testAdapter as any).currentTransaction?.();
+            const inside = (testAdapter as unknown as AdapterTxView).currentTransaction?.();
             observed.push({ inside });
           } finally {
             active--;
@@ -411,7 +430,9 @@ describe("SchemaAdapter TM delegation", () => {
 
     // After all transactions complete, the adapter's chain-aware view sees
     // no current transaction — NullTransaction is the Rails-correct sentinel.
-    expect((testAdapter as any).currentTransaction?.()).toBeInstanceOf(NullTransaction);
+    expect((testAdapter as unknown as AdapterTxView).currentTransaction?.()).toBeInstanceOf(
+      NullTransaction,
+    );
     // Mutex must have fully serialized — no two bodies ever overlapped.
     expect(maxActive).toBe(1);
     // Every chain must have seen a frame (no nulls/undefined) AND each frame
@@ -429,7 +450,7 @@ describe("SchemaAdapter TM delegation", () => {
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
     const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: { name: "string" } });
+    await defineSchema(testAdapter, { items: canonicalSchema.items });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -439,21 +460,23 @@ describe("SchemaAdapter TM delegation", () => {
     }
     await Item.create({ name: "prime" });
 
-    expect((testAdapter as any).inTransaction).toBe(false);
-    expect((testAdapter as any).openTransactions).toBe(0);
-    expect((testAdapter as any).currentTransaction?.()).toBeInstanceOf(NullTransaction);
+    expect(testAdapter.inTransaction).toBe(false);
+    expect(testAdapter.openTransactions).toBe(0);
+    expect((testAdapter as unknown as AdapterTxView).currentTransaction?.()).toBeInstanceOf(
+      NullTransaction,
+    );
 
     await testAdapter.beginTransaction();
-    expect((testAdapter as any).inTransaction).toBe(true);
-    expect((testAdapter as any).openTransactions).toBeGreaterThan(0);
+    expect(testAdapter.inTransaction).toBe(true);
+    expect(testAdapter.openTransactions).toBeGreaterThan(0);
 
     await testAdapter.commit();
-    expect((testAdapter as any).inTransaction).toBe(false);
-    expect((testAdapter as any).openTransactions).toBe(0);
+    expect(testAdapter.inTransaction).toBe(false);
+    expect(testAdapter.openTransactions).toBe(0);
 
     await testAdapter.beginTransaction();
-    expect((testAdapter as any).inTransaction).toBe(true);
+    expect(testAdapter.inTransaction).toBe(true);
     await testAdapter.rollback();
-    expect((testAdapter as any).inTransaction).toBe(false);
+    expect(testAdapter.inTransaction).toBe(false);
   });
 });

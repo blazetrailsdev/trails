@@ -65,7 +65,6 @@
   "packages/activerecord/src/touch-later.test.ts",
   "packages/activerecord/src/transaction-callbacks.test.ts",
   "packages/activerecord/src/transactions.test.ts",
-  "packages/activerecord/src/transactions.trails.test.ts",
   "packages/activerecord/src/validations/association-validation.test.ts",
   "packages/activerecord/src/validations/numericality-validation.test.ts",
   "packages/activerecord/src/validations/uniqueness-validation.test.ts",
