@@ -22,18 +22,21 @@ function freshAdapter(): DatabaseAdapter {
 // with sibling files under parallel forks.
 afterEach(async () => {
   const ss = (freshAdapter() as any).schemaStatements();
-  await ss.dropTable("horses", { ifExists: true });
-  await ss.dropTable("animals", { ifExists: true });
-  await ss.dropTable("foo", { ifExists: true });
-  await ss.dropTable("bar_table", { ifExists: true });
-  await ss.dropTable("items", { ifExists: true });
-  await ss.dropTable("first_table", { ifExists: true });
-  await ss.dropTable("second_table", { ifExists: true });
-  await ss.dropTable("up_test", { ifExists: true });
-  await ss.dropTable("down_test", { ifExists: true });
-  await ss.dropTable("idx_test", { ifExists: true });
-  await ss.dropTable("up_only_tbl", { ifExists: true });
-  await ss.dropTable("posts", { ifExists: true });
+  await ss.dropTable(
+    "horses",
+    "animals",
+    "foo",
+    "bar_table",
+    "items",
+    "first_table",
+    "second_table",
+    "up_test",
+    "down_test",
+    "idx_test",
+    "up_only_tbl",
+    "posts",
+    { ifExists: true },
+  );
 });
 
 describe("InvertibleMigrationTest", () => {
@@ -380,8 +383,7 @@ describe("InvertibleMigrationTest", () => {
         });
       }
       async down() {
-        await this.dropTable("books_fk");
-        await this.dropTable("authors_fk");
+        await this.dropTable("books_fk", "authors_fk");
       }
     }
     const m = makeMigration(new FKMig());

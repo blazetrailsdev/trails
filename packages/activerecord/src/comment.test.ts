@@ -42,9 +42,7 @@ describe("CommentTest", () => {
   });
 
   afterEach(async () => {
-    await ctx.dropTable("commenteds", { ifExists: true });
-    await ctx.dropTable("blank_comments", { ifExists: true });
-    await ctx.dropTable("pk_commenteds", { ifExists: true });
+    await ctx.dropTable("commenteds", "blank_comments", "pk_commenteds", { ifExists: true });
   });
 
   itIfSupports("comments", "default primary key comment", async () => {

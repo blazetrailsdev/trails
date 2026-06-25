@@ -76,6 +76,31 @@
  * a backlog of un-torn-down raw creates are grandfathered via the
  * `rawSql: false` option in eslint.config.mjs, fed by
  * `eslint/require-table-teardown-raw-sql-exclude.json`, and ratcheted to zero.
+ *
+ * ── Prefer the dropTable list form ─────────────────────────────────────────
+ * `dropTable` accepts several table names plus an optional trailing options
+ * object in one call (`dropTable("a", "b", { ifExists: true })`), which the
+ * adapter splits via `_splitTableNamesAndOptions`. A run of separate adjacent
+ * `dropTable` calls — `await conn.dropTable("a"); await conn.dropTable("b");` —
+ * is just N lines of teardown boilerplate; the list form is one call. (Note:
+ * the base `SchemaStatements.dropTable` and `MigrationContext.dropTable` still
+ * loop one `DROP TABLE` per name, so this is shorter code, *not* fewer SQL
+ * statements — only the MySQL adapter folds the list into a single statement.)
+ * The rule flags (and autofixes) a run
+ * of **2+ adjacent** `dropTable` calls in the same statement list when they
+ * share a receiver, share their `await` wrapping, and carry a *compatible*
+ * options object — either none of them pass options, or they all pass a
+ * structurally identical one (`preferTableList`). The autofix merges the run
+ * into a single list call, keeping the receiver, `await`, and shared options.
+ *
+ *   ✗  await conn.dropTable("a", { ifExists: true });
+ *      await conn.dropTable("b", { ifExists: true });
+ *   ✓  await conn.dropTable("a", "b", { ifExists: true });
+ *
+ * Only contiguous, compatible calls merge: a non-`dropTable` statement, a
+ * different receiver, a differing options object, a differing `await`, or a
+ * dynamic/computed table name breaks the run (any contiguous sub-runs on either
+ * side are still flagged independently).
  */
 
 /**
@@ -191,9 +216,48 @@ function rawDropNames(text) {
   return names;
 }
 
+/**
+ * Inspect a statement for a mergeable `dropTable` call. Tolerates `await`
+ * wrapping (`await x.dropTable(...)`). Returns the call's merge attributes, or
+ * null when the statement is not a `dropTable` ExpressionStatement, or
+ * `{ dynamic: true }` when it is a `dropTable` call that can't participate in a
+ * merge (a dynamic/computed table-name argument) — both break a run, but a
+ * dynamic drop is never itself the start of a new mergeable run.
+ */
+function analyzeDropCall(stmt, sourceCode) {
+  if (stmt.type !== "ExpressionStatement") return null;
+  let expr = stmt.expression;
+  let awaited = false;
+  if (expr.type === "AwaitExpression") {
+    awaited = true;
+    expr = expr.argument;
+  }
+  if (!expr || expr.type !== "CallExpression") return null;
+  const callee = expr.callee;
+  if (calledName(callee) !== "dropTable") return null;
+
+  const receiverText =
+    callee.type === "Identifier" ? "<<bare>>" : sourceCode.getText(callee.object);
+
+  const args = expr.arguments;
+  let optionsNode = null;
+  let nameNodes = args;
+  if (args.length > 0 && args[args.length - 1].type === "ObjectExpression") {
+    optionsNode = args[args.length - 1];
+    nameNodes = args.slice(0, -1);
+  }
+  // A run only merges static names; a dynamic/computed name can't be carried.
+  if (nameNodes.length === 0 || nameNodes.some((n) => staticString(n) === null)) {
+    return { dynamic: true };
+  }
+  const optionsSig = optionsNode ? sourceCode.getText(optionsNode).replace(/\s+/g, "") : "<<none>>";
+  return { stmt, awaited, receiverText, calleeNode: callee, nameNodes, optionsNode, optionsSig };
+}
+
 const rule = {
   meta: {
     type: "problem",
+    fixable: "code",
     docs: {
       description:
         'Require each createTable("name") in an activerecord test to be torn down by an explicit dropTable("name") in the same file, and forbid the carpet-bomb dropAllTables().',
@@ -214,6 +278,8 @@ const rule = {
         'Table `{{table}}` is created with createTable() but never torn down. Add a matching `dropTable("{{table}}")` (in afterEach/afterAll or the test body). Leaked tables collide with sibling files under parallel forks. If this is intentional, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
       noDropAllTables:
         'Avoid `dropAllTables()` — drop the specific tables this file created with `dropTable("…")` instead. The carpet-bomb teardown also wipes tables other code seeded, and hides which tables a test actually owns. If this is genuinely necessary, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
+      preferTableList:
+        'Merge adjacent dropTable() calls into a single dropTable("a", "b") list call — shorter teardown code, one call instead of N.',
     },
   },
 
@@ -222,9 +288,62 @@ const rule = {
     // with an un-torn-down raw-create backlog (it still gets the helper check).
     const checkRawSql = context.options[0]?.rawSql !== false;
 
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
+
     // table name → first create node seen (for the report location).
     const created = new Map();
     const dropped = new Set();
+
+    // Flag (and autofix) a run of 2+ adjacent, mergeable dropTable calls in a
+    // single statement list: same receiver, same await wrapping, compatible
+    // options. An incompatible-but-valid drop starts a fresh run; a non-drop or
+    // dynamic-name drop breaks the run entirely.
+    function checkStatements(statements) {
+      let i = 0;
+      while (i < statements.length) {
+        const first = analyzeDropCall(statements[i], sourceCode);
+        if (!first || first.dynamic) {
+          i++;
+          continue;
+        }
+        let j = i + 1;
+        const run = [first];
+        while (j < statements.length) {
+          const next = analyzeDropCall(statements[j], sourceCode);
+          if (!next || next.dynamic) break;
+          if (
+            next.receiverText !== first.receiverText ||
+            next.optionsSig !== first.optionsSig ||
+            next.awaited !== first.awaited
+          ) {
+            break;
+          }
+          run.push(next);
+          j++;
+        }
+        if (run.length >= 2) reportRun(run, first);
+        i = j;
+      }
+    }
+
+    function reportRun(run, first) {
+      context.report({
+        node: run[0].stmt,
+        messageId: "preferTableList",
+        fix(fixer) {
+          // Render from the full callee node so a parenthesized/cast receiver
+          // (`(Base.connection as any).dropTable`) is preserved verbatim.
+          const calleeText = sourceCode.getText(first.calleeNode);
+          const names = run.flatMap((r) => r.nameNodes.map((n) => sourceCode.getText(n)));
+          const optionsText = first.optionsNode ? `, ${sourceCode.getText(first.optionsNode)}` : "";
+          const merged = `${first.awaited ? "await " : ""}${calleeText}(${names.join(
+            ", ",
+          )}${optionsText});`;
+          const last = run[run.length - 1].stmt;
+          return fixer.replaceTextRange([run[0].stmt.range[0], last.range[1]], merged);
+        },
+      });
+    }
 
     // Scan an execution sink's string/template arguments for raw CREATE/DROP
     // TABLE statements, folding their names into the same create/drop balance.
@@ -266,6 +385,19 @@ const rule = {
         } else if (checkRawSql && name !== null && SQL_SINKS.has(name)) {
           recordSinkSql(node);
         }
+      },
+
+      BlockStatement(node) {
+        checkStatements(node.body);
+      },
+      StaticBlock(node) {
+        checkStatements(node.body);
+      },
+      SwitchCase(node) {
+        checkStatements(node.consequent);
+      },
+      Program(node) {
+        checkStatements(node.body);
       },
 
       // Deferred so creates and drops in any order across the file are matched.

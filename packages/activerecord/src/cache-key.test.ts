@@ -39,8 +39,7 @@ describe("CacheKeyTest", () => {
   });
 
   afterEach(async () => {
-    await ctx.dropTable("cache_mes", { ifExists: true });
-    await ctx.dropTable("cache_me_with_versions", { ifExists: true });
+    await ctx.dropTable("cache_mes", "cache_me_with_versions", { ifExists: true });
   });
 
   function cacheMe() {

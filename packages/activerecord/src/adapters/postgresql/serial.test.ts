@@ -117,8 +117,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("CollidedSequenceNameTest", () => {
     beforeEach(async () => {
-      await adapter.dropTable("foo_bar", { ifExists: true });
-      await adapter.dropTable("foo", { ifExists: true });
+      await adapter.dropTable("foo_bar", "foo", { ifExists: true });
       await adapter.createTable("foo_bar", { force: true }, (table) => {
         (table as PgTableDefinition).serial("baz_id");
       });
@@ -129,8 +128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
     afterEach(async () => {
-      await adapter.dropTable("foo_bar", { ifExists: true });
-      await adapter.dropTable("foo", { ifExists: true });
+      await adapter.dropTable("foo_bar", "foo", { ifExists: true });
     });
 
     it("serial columns", async () => {

@@ -34,10 +34,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 // per-worker DB; drop them by name so they don't collide with sibling files.
 afterEach(async () => {
   const ctx = new MigrationContext(createTestAdapter());
-  await ctx.dropTable("widgets", { ifExists: true });
-  await ctx.dropTable("gadgets", { ifExists: true });
-  await ctx.dropTable("users", { ifExists: true });
-  await ctx.dropTable("standalone", { ifExists: true });
+  await ctx.dropTable("widgets", "gadgets", "users", "standalone", { ifExists: true });
 });
 
 describe("introspectTables", () => {

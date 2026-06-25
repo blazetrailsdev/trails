@@ -2274,8 +2274,7 @@ describe("MigrationTest", () => {
     const pid = cols.find((c) => c.name === "person_id");
     expect(pid?.type).toBe("integer");
 
-    await ctx.dropTable("table_from_query_testings");
-    await ctx.dropTable("people_src");
+    await ctx.dropTable("table_from_query_testings", "people_src");
   });
 
   it("create table with query from relation", async () => {
@@ -2295,8 +2294,7 @@ describe("MigrationTest", () => {
     const rows = await adapter.execute(`SELECT * FROM table_from_query_testings2`);
     expect(rows).toHaveLength(1);
 
-    await ctx.dropTable("table_from_query_testings2");
-    await ctx.dropTable("people_src2");
+    await ctx.dropTable("table_from_query_testings2", "people_src2");
   });
 
   it.skipIf(adapterType !== "sqlite")(

@@ -20,9 +20,9 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", () => {});\nawait this.dropTable("widgets");',
     // Computed-name create is skipped (can't match statically) — no report.
     "await ctx.createTable(tableName, () => {});",
-    // Multiple tables, each with its own drop.
-    'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
-      'await ctx.dropTable("a");\nawait ctx.dropTable("b");',
+    // Multiple tables, each with its own (non-adjacent) drop.
+    'await ctx.createTable("a", () => {});\nawait ctx.dropTable("a");\n' +
+      'await ctx.createTable("b", () => {});\nawait ctx.dropTable("b");',
     // dropTable with options (ifExists) still matches by name.
     'await ctx.createTable("widgets", () => {});\nawait ctx.dropTable("widgets", { ifExists: true });',
     // No createTable at all.
@@ -66,6 +66,18 @@ tester.run("require-table-teardown", rule, {
       code: 'await adapter.exec("CREATE TABLE widgets (id int)");',
       options: [{ rawSql: false }],
     },
+    // ── preferTableList: NOT mergeable ──────────────────────────────────────
+    // A single dropTable is already the list form.
+    'await ctx.dropTable("a", "b");',
+    // Adjacent drops on different receivers don't merge.
+    'await ctx.dropTable("a");\nawait other.dropTable("b");',
+    // Adjacent drops with differing options objects don't merge.
+    'await ctx.dropTable("a", { ifExists: true });\nawait ctx.dropTable("b");',
+    'await ctx.dropTable("a", { ifExists: true });\nawait ctx.dropTable("b", { force: true });',
+    // Non-adjacent drops (unrelated statement between) don't merge.
+    'await ctx.dropTable("a");\ndoSomething();\nawait ctx.dropTable("b");',
+    // A dynamic-name drop can't be merged with its neighbour.
+    'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
   ],
   invalid: [
     // Created, never dropped.
@@ -164,6 +176,55 @@ tester.run("require-table-teardown", rule, {
         { messageId: "missingTeardown", data: { table: "widgets" } },
         { messageId: "noDropAllTables" },
       ],
+    },
+    // ── preferTableList: mergeable runs (autofixed) ─────────────────────────
+    // Adjacent no-options run merges into one list call.
+    {
+      code: 'await conn.dropTable("a");\nawait conn.dropTable("b");',
+      errors: [{ messageId: "preferTableList" }],
+      output: 'await conn.dropTable("a", "b");',
+    },
+    // Adjacent shared `{ ifExists: true }` run merges, options kept once.
+    {
+      code:
+        'await conn.dropTable("uber_barcodes", { ifExists: true });\n' +
+        'await conn.dropTable("barcodes_reverse", { ifExists: true });\n' +
+        'await conn.dropTable("travels", { ifExists: true });',
+      errors: [{ messageId: "preferTableList" }],
+      output:
+        'await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });',
+    },
+    // The `(Base.connection as any).dropTable(...)` receiver form merges, cast kept.
+    {
+      code:
+        'await (Base.connection as any).dropTable("a");\n' +
+        'await (Base.connection as any).dropTable("b");',
+      errors: [{ messageId: "preferTableList" }],
+      output: 'await (Base.connection as any).dropTable("a", "b");',
+    },
+    // A run interrupted by an unrelated statement flags only the contiguous
+    // sub-runs (here: the two-call run after the interruption).
+    {
+      code:
+        'await conn.dropTable("a");\ndoSomething();\n' +
+        'await conn.dropTable("b");\nawait conn.dropTable("c");',
+      errors: [{ messageId: "preferTableList" }],
+      output: 'await conn.dropTable("a");\ndoSomething();\n' + 'await conn.dropTable("b", "c");',
+    },
+    // Two contiguous sub-runs separated by an interruption are each flagged.
+    {
+      code:
+        'await conn.dropTable("a");\nawait conn.dropTable("b");\ndoSomething();\n' +
+        'await conn.dropTable("c");\nawait conn.dropTable("d");',
+      errors: [{ messageId: "preferTableList" }, { messageId: "preferTableList" }],
+      output:
+        'await conn.dropTable("a", "b");\ndoSomething();\n' + 'await conn.dropTable("c", "d");',
+    },
+    // Non-awaited adjacent drops merge too (await wrapping consistent).
+    {
+      code: 'ctx.dropTable("a");\nctx.dropTable("b");',
+      errors: [{ messageId: "preferTableList" }],
+      output: 'ctx.dropTable("a", "b");',
     },
   ],
 });

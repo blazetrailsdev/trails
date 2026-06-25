@@ -32,15 +32,18 @@ describe("ActiveRecordSchemaTest", () => {
 
   afterEach(async () => {
     const ctx = new MigrationContext(adapter);
-    await ctx.dropTable("pk_test", { ifExists: true });
-    await ctx.dropTable("schema_test", { ifExists: true });
-    await ctx.dropTable("fruits", { ifExists: true });
-    await ctx.dropTable("nep_fruits", { ifExists: true });
-    await ctx.dropTable("multi_idx", { ifExists: true });
-    await ctx.dropTable("ts_change", { ifExists: true });
-    await ctx.dropTable("has_timestamps", { ifExists: true });
-    await ctx.dropTable("ts_opts", { ifExists: true });
-    await ctx.dropTable("ts_add", { ifExists: true });
+    await ctx.dropTable(
+      "pk_test",
+      "schema_test",
+      "fruits",
+      "nep_fruits",
+      "multi_idx",
+      "ts_change",
+      "has_timestamps",
+      "ts_opts",
+      "ts_add",
+      { ifExists: true },
+    );
   });
 
   it("has primary key", async () => {

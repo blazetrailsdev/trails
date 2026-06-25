@@ -1036,9 +1036,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // exercises the createTable → DDL → dump round-trip via the
     // `options:` table-option string.
     afterEach(async () => {
-      await adapter.dropTable("trains", { ifExists: true });
-      await adapter.dropTable("transportation_modes", { ifExists: true });
-      await adapter.dropTable("vehicles", { ifExists: true });
+      await adapter.dropTable("trains", "transportation_modes", "vehicles", { ifExists: true });
     });
 
     itIfSupports("native_partitioning", "list partition options is dumped", async () => {

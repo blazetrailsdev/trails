@@ -224,8 +224,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
       expect(fks[0].toTable).toBe("students");
       expect(fks[0].onDelete).toBe("cascade");
     } finally {
-      await a.dropTable("lessons_students", { ifExists: true });
-      await a.dropTable("students", { ifExists: true });
+      await a.dropTable("lessons_students", "students", { ifExists: true });
     }
   });
 });
