@@ -8,8 +8,12 @@ import { Vector } from "./vector.js";
 class TestStore implements TypeMap {
   readonly mapping = new Map<number | string, unknown>();
 
-  registerType(oid: number | string, type: unknown): void {
-    this.mapping.set(oid, type);
+  registerType(
+    oid: number | string,
+    type?: unknown,
+    block?: (oid: number | string, ...args: unknown[]) => unknown,
+  ): void {
+    this.mapping.set(oid, block ?? type);
   }
 
   aliasType(oid: number | string, targetOid: number | string): void {

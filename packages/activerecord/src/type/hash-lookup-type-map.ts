@@ -82,13 +82,16 @@ export class HashLookupTypeMap {
 
   registerType(
     key: string | number,
-    value?: Type | ((lookupKey: string | number, ...args: unknown[]) => Type),
+    value?: Type,
+    block?: (lookupKey: string | number, ...args: unknown[]) => Type,
   ): void {
-    if (value == null) throw new ArgumentError("registerType requires a value or block");
-    if (typeof value === "function") {
-      this._mapping.set(key, value as (...args: unknown[]) => Type);
+    if (value == null && block == null) {
+      throw new ArgumentError("registerType requires a value or block");
+    }
+    if (block) {
+      this._mapping.set(key, block);
     } else {
-      this._mapping.set(key, () => value);
+      this._mapping.set(key, () => value!);
     }
     this._cache.clear();
   }
@@ -99,7 +102,7 @@ export class HashLookupTypeMap {
   }
 
   aliasType(type: string | number, targetType: string | number): void {
-    this.registerType(type, (_lookupKey: unknown, ...args: unknown[]) =>
+    this.registerType(type, undefined, (_lookupKey, ...args: unknown[]) =>
       this.lookup(targetType, ...args),
     );
   }
