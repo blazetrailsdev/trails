@@ -9,6 +9,7 @@ import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { applicationRecordClass, setApplicationRecordClass } from "./ar-config.js";
 
 /**
  * Helper: cast inheritance column value through its attribute type.
@@ -701,16 +702,19 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
   return false;
 }
 
-let _applicationRecordClass: typeof Base | null = null;
+// The primary abstract class is stored in the canonical `ar-config.ts` module
+// binding (`ActiveRecord.application_record_class`), not a parallel
+// module-local. Read/write it through there so there is a single source of
+// truth.
 
 /** Test-only: reset the primary abstract class singleton. */
 export function __resetPrimaryAbstractClass(): void {
-  _applicationRecordClass = null;
+  setApplicationRecordClass(null);
 }
 
 /** @internal */
 export function getApplicationRecordClass(): typeof Base | null {
-  return _applicationRecordClass;
+  return applicationRecordClass as typeof Base | null;
 }
 
 /**
@@ -723,8 +727,8 @@ export function getApplicationRecordClass(): typeof Base | null {
  * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
  */
 export function applicationRecordClassQ(modelClass: typeof Base): boolean {
-  if (_applicationRecordClass) {
-    return modelClass === _applicationRecordClass;
+  if (applicationRecordClass) {
+    return modelClass === applicationRecordClass;
   }
   return modelClass === (globalThis as Record<string, unknown>)["ApplicationRecord"];
 }
@@ -737,14 +741,14 @@ export function applicationRecordClassQ(modelClass: typeof Base): boolean {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#primary_abstract_class
  */
 export function primaryAbstractClass(modelClass: typeof Base): void {
-  if (_applicationRecordClass && _applicationRecordClass !== modelClass) {
+  if (applicationRecordClass && applicationRecordClass !== modelClass) {
     throw new ArgumentError(
-      `The \`primary_abstract_class\` is already set to ${_applicationRecordClass.name}. ` +
+      `The \`primary_abstract_class\` is already set to ${applicationRecordClass.name}. ` +
         "There can only be one `primary_abstract_class` in an application.",
     );
   }
   (modelClass as any).abstractClass = true;
-  _applicationRecordClass = modelClass;
+  setApplicationRecordClass(modelClass);
 }
 
 /**

@@ -9,6 +9,7 @@ import {
 } from "../../counter-cache.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
+import { belongsToRequiredValidatesForeignKey } from "../../ar-config.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -331,7 +332,7 @@ export class BelongsTo extends SingularAssociation {
         reflection.foreignKey ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
       const foreignKeys = Array.isArray(rawFk) ? rawFk : [rawFk];
 
-      if (model.belongsToRequiredValidatesForeignKey ?? true) {
+      if (belongsToRequiredValidatesForeignKey) {
         if (typeof model.validatesPresenceOf === "function") {
           for (const key of foreignKeys) {
             model.validatesPresenceOf(key, { message: "required" });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Relation } from "./index.js";
-import { activeRecordConfig } from "./relation/batches.js";
+import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./ar-config.js";
 
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -612,8 +612,8 @@ describe("EachTest", () => {
       }
     }
     await Post.create({ title: "a" });
-    const prev = activeRecordConfig.errorOnIgnoredOrder;
-    activeRecordConfig.errorOnIgnoredOrder = true;
+    const prev = errorOnIgnoredOrder;
+    setErrorOnIgnoredOrder(true);
     let threw = false;
     try {
       for await (const _b of Post.order("title").findInBatches({
@@ -625,7 +625,7 @@ describe("EachTest", () => {
     } catch {
       threw = true;
     } finally {
-      activeRecordConfig.errorOnIgnoredOrder = prev;
+      setErrorOnIgnoredOrder(prev);
     }
     expect(threw).toBe(false);
   });
@@ -636,8 +636,8 @@ describe("EachTest", () => {
         this.attribute("title", "string");
       }
     }
-    const prevErrCfg = activeRecordConfig.errorOnIgnoredOrder;
-    activeRecordConfig.errorOnIgnoredOrder = true;
+    const prevErrCfg = errorOnIgnoredOrder;
+    setErrorOnIgnoredOrder(true);
     try {
       await expect(async () => {
         for await (const _b of Post.order("title").findInBatches({ batchSize: 1 })) {
@@ -645,7 +645,7 @@ describe("EachTest", () => {
         }
       }).rejects.toThrow();
     } finally {
-      activeRecordConfig.errorOnIgnoredOrder = prevErrCfg;
+      setErrorOnIgnoredOrder(prevErrCfg);
     }
   });
 

@@ -3,6 +3,8 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
+import { errorOnIgnoredOrder } from "../ar-config.js";
+
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
@@ -118,16 +120,11 @@ export function buildBatchOrders(
 
 /** @internal */
 export function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
-  const raise =
-    errorOnIgnore !== undefined ? errorOnIgnore : activeRecordConfig.errorOnIgnoredOrder;
+  const raise = errorOnIgnore !== undefined ? errorOnIgnore : errorOnIgnoredOrder;
   if (raise) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
   }
 }
-
-export const activeRecordConfig = {
-  errorOnIgnoredOrder: false,
-};
 
 /** @internal */
 export function batchOnLoadedRelation(opts: {
