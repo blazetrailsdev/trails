@@ -36,6 +36,7 @@ import {
   stiName,
 } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
+import { isSuppressed } from "./suppressor.js";
 import {
   performValidations,
   raiseValidationError,
@@ -720,6 +721,13 @@ export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
 ): Promise<boolean> {
+  // Mirrors ActiveRecord::Suppressor#save: a suppressed record returns `true`
+  // immediately, before validations or the INSERT/UPDATE. This is why
+  // `create!`/`save!` inside `suppress` never raise even on invalid records —
+  // `create_or_update` is never reached.
+  if (isSuppressed(this.constructor as unknown as Parameters<typeof isSuppressed>[0])) {
+    return true;
+  }
   // Reflect the schema before validations/INSERT touch attribute defs.
   await (
     this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
