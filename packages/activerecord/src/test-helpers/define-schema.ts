@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "../adapter.js";
-import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
+import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -655,6 +655,7 @@ async function _defineSchemaImpl(
   opts?: DefineSchemaOpts,
   warm = false,
 ): Promise<void> {
+  const { SchemaStatements } = await import("../connection-adapters/abstract/schema-statements.js");
   const ss = adapter.schemaStatements ? adapter.schemaStatements() : new SchemaStatements(adapter);
   const order = resolveReferences(schema);
   const typeMap =

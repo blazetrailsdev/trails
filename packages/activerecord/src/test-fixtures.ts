@@ -9,6 +9,8 @@
  *   const f = createFixtures();
  *   const post = await f.Post.create({ title: "Hello", body: "World" });
  */
+import type { AssociationProxy } from "./associations/collection-proxy.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
 
 /**
@@ -51,6 +53,14 @@ export interface TestFixtures {
 export function createFixtures(): TestFixtures {
   // ── Author ──────────────────────────────────────────────────────────
   class Author extends Base {
+    declare name: string;
+    declare author_address_id: number;
+    declare author_address_extra_id: number;
+    declare owned_essay_id: number;
+    declare organization_id: string;
+    declare posts: AssociationProxy<Post>;
+    declare books: AssociationProxy<Book>;
+
     static {
       this._tableName = "authors";
       this.attribute("name", "string");
@@ -78,6 +88,17 @@ export function createFixtures(): TestFixtures {
 
   // ── Post ────────────────────────────────────────────────────────────
   class Post extends Base {
+    declare title: string;
+    declare body: string;
+    declare "type": string;
+    declare author_id: number;
+    declare legacy_comments_count: number;
+    declare tags_count: number;
+    declare author: Author | null;
+    declare comments: AssociationProxy<Comment>;
+    declare taggings: AssociationProxy<Tagging>;
+    declare loadBelongsTo: (name: "author") => Promise<Author | null>;
+
     static {
       this._tableName = "posts";
       this.attribute("title", "string");
@@ -103,6 +124,15 @@ export function createFixtures(): TestFixtures {
 
   // ── Comment ─────────────────────────────────────────────────────────
   class Comment extends Base {
+    declare body: string;
+    declare post_id: number;
+    declare "type": string;
+    declare parent_id: number;
+    declare company_id: number;
+    declare children_count: number;
+    declare post: Post | null;
+    declare loadBelongsTo: (name: "post") => Promise<Post | null>;
+
     static {
       this._tableName = "comments";
       this.attribute("body", "string");
@@ -120,6 +150,9 @@ export function createFixtures(): TestFixtures {
 
   // ── Tag ─────────────────────────────────────────────────────────────
   class Tag extends Base {
+    declare name: string;
+    declare taggings: AssociationProxy<Tagging>;
+
     static {
       this._tableName = "tags";
       this.attribute("name", "string");
@@ -132,6 +165,15 @@ export function createFixtures(): TestFixtures {
 
   // ── Tagging ─────────────────────────────────────────────────────────
   class Tagging extends Base {
+    declare tag_id: number;
+    declare post_id: number;
+    declare taggable_id: number;
+    declare taggable_type: string;
+    declare tag: Tag | null;
+    declare post: Post | null;
+    declare loadBelongsTo: ((name: "tag") => Promise<Tag | null>) &
+      ((name: "post") => Promise<Post | null>);
+
     static {
       this._tableName = "taggings";
       this.attribute("tag_id", "integer");
@@ -151,6 +193,9 @@ export function createFixtures(): TestFixtures {
 
   // ── Category ────────────────────────────────────────────────────────
   class Category extends Base {
+    declare name: string;
+    declare "type": string;
+
     static {
       this._tableName = "categories";
       this.attribute("name", "string");
@@ -160,6 +205,16 @@ export function createFixtures(): TestFixtures {
 
   // ── Pirate ──────────────────────────────────────────────────────────
   class Pirate extends Base {
+    declare catchphrase: string;
+    declare parrot_id: number;
+    declare parrot: Parrot | null;
+    declare birds: AssociationProxy<Bird>;
+    declare ship: Ship | null;
+    declare treasures: AssociationProxy<Treasure>;
+    declare parrots: AssociationProxy<Parrot>;
+    declare loadBelongsTo: (name: "parrot") => Promise<Parrot | null>;
+    declare loadHasOne: (name: "ship") => Promise<Ship | null>;
+
     static {
       this._tableName = "pirates";
       this.attribute("catchphrase", "string");
@@ -189,6 +244,13 @@ export function createFixtures(): TestFixtures {
 
   // ── Ship ────────────────────────────────────────────────────────────
   class Ship extends Base {
+    declare name: string;
+    declare pirate_id: number;
+    declare treasures_count: number;
+    declare pirate: Pirate | null;
+    declare parts: AssociationProxy<ShipPart>;
+    declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
+
     static {
       this._tableName = "ships";
       this.attribute("name", "string");
@@ -208,6 +270,11 @@ export function createFixtures(): TestFixtures {
 
   // ── ShipPart ────────────────────────────────────────────────────────
   class ShipPart extends Base {
+    declare name: string;
+    declare ship_id: number;
+    declare ship: Ship | null;
+    declare loadBelongsTo: (name: "ship") => Promise<Ship | null>;
+
     static {
       this._tableName = "ship_parts";
       this.attribute("name", "string");
@@ -221,6 +288,11 @@ export function createFixtures(): TestFixtures {
 
   // ── Treasure ────────────────────────────────────────────────────────
   class Treasure extends Base {
+    declare name: string;
+    declare pirate_id: number;
+    declare pirate: Pirate | null;
+    declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
+
     static {
       this._tableName = "treasures";
       this.attribute("name", "string");
@@ -234,6 +306,11 @@ export function createFixtures(): TestFixtures {
 
   // ── Bird ────────────────────────────────────────────────────────────
   class Bird extends Base {
+    declare name: string;
+    declare pirate_id: number;
+    declare pirate: Pirate | null;
+    declare loadBelongsTo: (name: "pirate") => Promise<Pirate | null>;
+
     static {
       this._tableName = "birds";
       this.attribute("name", "string");
@@ -248,6 +325,9 @@ export function createFixtures(): TestFixtures {
 
   // ── Parrot ──────────────────────────────────────────────────────────
   class Parrot extends Base {
+    declare name: string;
+    declare pirates: AssociationProxy<Pirate>;
+
     static {
       this._tableName = "parrots";
       this.attribute("name", "string");
@@ -260,6 +340,11 @@ export function createFixtures(): TestFixtures {
 
   // ── Developer ───────────────────────────────────────────────────────
   class Developer extends Base {
+    declare name: string;
+    declare salary: number;
+    declare shared_computers: string;
+    declare projects: AssociationProxy<Project>;
+
     static {
       this._tableName = "developers";
       this.attribute("name", "string");
@@ -274,6 +359,9 @@ export function createFixtures(): TestFixtures {
 
   // ── Project ─────────────────────────────────────────────────────────
   class Project extends Base {
+    declare name: string;
+    declare developers: AssociationProxy<Developer>;
+
     static {
       this._tableName = "projects";
       this.attribute("name", "string");
@@ -290,6 +378,11 @@ export function createFixtures(): TestFixtures {
   // key. Declaring the CPK here matches Rails and lets the test-adapter keep
   // the HABTM-driven CPK shape (see test-adapter.ts extractColumnsFromModels).
   class DevelopersProject extends Base {
+    declare developer_id: number;
+    declare project_id: number;
+    declare joined_on: Temporal.PlainDate;
+    declare access_level: number;
+
     static {
       this._tableName = "developers_projects";
       this._primaryKey = ["developer_id", "project_id"];
@@ -302,6 +395,18 @@ export function createFixtures(): TestFixtures {
 
   // ── Company ─────────────────────────────────────────────────────────
   class Company extends Base {
+    declare name: string;
+    declare "type": string;
+    declare firm_id: number;
+    declare client_of: number;
+    declare firm_name: string;
+    declare rating: number;
+    declare description: string;
+    declare account_id: number;
+    declare status: number;
+    declare firm: Company | null;
+    declare loadBelongsTo: (name: "firm") => Promise<Company | null>;
+
     static {
       this._tableName = "companies";
       this.attribute("name", "string");
@@ -322,6 +427,15 @@ export function createFixtures(): TestFixtures {
 
   // ── Topic ───────────────────────────────────────────────────────────
   class Topic extends Base {
+    declare title: string;
+    declare content: string;
+    declare "type": string;
+    declare author_name: string;
+    declare parent_id: number;
+    declare replies_count: number;
+    declare parent: Topic | null;
+    declare loadBelongsTo: (name: "parent") => Promise<Topic | null>;
+
     static {
       this._tableName = "topics";
       this.attribute("title", "string");
@@ -339,6 +453,21 @@ export function createFixtures(): TestFixtures {
 
   // ── Book ────────────────────────────────────────────────────────────
   class Book extends Base {
+    declare name: string;
+    declare author_id: number;
+    declare format: string;
+    declare status: number;
+    declare last_read: number;
+    declare language: number;
+    declare author_visibility: number;
+    declare illustrator_visibility: number;
+    declare font_size: number;
+    declare difficulty: number;
+    declare boolean_status: number;
+    declare cover: string;
+    declare author: Author | null;
+    declare loadBelongsTo: (name: "author") => Promise<Author | null>;
+
     static {
       this._tableName = "books";
       this.attribute("name", "string");
@@ -362,6 +491,9 @@ export function createFixtures(): TestFixtures {
 
   // ── Person ──────────────────────────────────────────────────────────
   class Person extends Base {
+    declare first_name: string;
+    declare lock_version: number;
+
     static {
       this._tableName = "people";
       this.attribute("first_name", "string");
@@ -371,6 +503,15 @@ export function createFixtures(): TestFixtures {
 
   // ── Account ─────────────────────────────────────────────────────────
   class Account extends Base {
+    declare firm_id: number;
+    declare credit_limit: number;
+    declare firm_name: string;
+    declare status: string;
+    declare transactions_count: number;
+    declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+    declare firm: Company | null;
+    declare loadBelongsTo: (name: "firm") => Promise<Company | null>;
+
     static {
       this._tableName = "accounts";
       this.attribute("firm_id", "integer");
