@@ -3580,11 +3580,11 @@ describe("FinderTest", () => {
         this.attribute("name", "string");
       }
     }
-    await User.create({ name: "Alice" });
+    const alice = await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
-    await User.create({ name: "Charlie" });
+    const charlie = await User.create({ name: "Charlie" });
 
-    const found = (await User.find([1, 3])) as User[];
+    const found = (await User.find([alice.id, charlie.id])) as User[];
     expect(found).toHaveLength(2);
     expect(found[0].name).toBe("Alice");
     expect(found[1].name).toBe("Charlie");
