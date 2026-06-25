@@ -3595,9 +3595,16 @@ export class Base extends Model {
    *
    * Scoped to classes that actually register a before/around destroy callback
    * so a plain destroy issues no extra query (Rails only queries when the
-   * callback touches the association). Each load is best-effort: a strict-
-   * loading violation or a missing FK row is swallowed, leaving the association
-   * unloaded exactly as it would be in Rails when nothing reads it.
+   * callback touches the association). A same-FK sibling (e.g. Account#firm and
+   * Account#unautosavedFirm share `firm_id`) is loaded too even when only one is
+   * read; the extra read is side-effect-free and resolves to the same owner row.
+   *
+   * Loading is best-effort: a `belongs_to` whose target class is unregistered or
+   * whose row is missing must not abort the destroy (the callback may never read
+   * it). On a load failure we resolve the association to `null` rather than
+   * leaving it unloaded, so a sync callback that *does* read it sees `null` and
+   * not trails' async-reader Promise — keeping the bare `if (record.parent)`
+   * guard safe even when the preload could not materialize the parent.
    *
    * @internal
    */
@@ -3609,14 +3616,14 @@ export class Base extends Model {
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
-      } catch {
-        continue;
-      }
-      if (!assoc || assoc.isLoaded?.()) continue;
-      try {
+        if (!assoc || assoc.isLoaded?.()) continue;
         await assoc.loadTarget();
       } catch {
-        // Non-loadable back-reference (missing FK row, strict loading): skip.
+        // An unregistered target class, missing FK row, strict-loading
+        // violation, or transient DB error must not abort the destroy. Resolve
+        // the association to `null` so a sync callback that reads it sees `null`
+        // rather than trails' async-reader Promise.
+        assoc?.setTarget?.(null);
       }
     }
   }

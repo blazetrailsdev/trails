@@ -286,11 +286,13 @@ describe("HasOneAssociationsTest", () => {
   // belongs-to-sync-read-direct-destroy-callback (RFC 0023-surfaced-deviations).
   it("direct destroy records destroyed account id via unloaded belongs_to", async () => {
     const account = (await Account.find(1)) as any;
-    const firmId = account.firm_id;
     expect(account.association("firm").isLoaded()).toBe(false);
-    expect(Account.destroyedAccountIds().get(firmId) ?? []).toEqual([]);
+    // Key by the firm record's id (not account.firm_id) so the lookup type
+    // matches what the callback stores; on PG firm.id is a BigInt.
+    const firm = (await Company.find(account.firm_id)) as any;
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
     await account.destroy();
-    expect(Account.destroyedAccountIds().get(firmId) ?? []).toEqual([account.id]);
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
   });
 
   it("exclusive dependence", async () => {
