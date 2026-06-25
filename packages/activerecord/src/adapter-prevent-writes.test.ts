@@ -69,14 +69,19 @@ describe("AdapterPreventWritesTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "doesnt error when a select query has encoding errors",
     async () => {
-      // PostgreSQL eagerly fails on encoding errors at the client, so the read
-      // raises StatementInvalid before the write-prevention check even applies.
+      // Rails sends Ruby's `'\xC8'` literal as a raw 0xC8 byte, which PG's client
+      // eagerly rejects as invalid UTF-8 (StatementInvalid). JS strings can't carry
+      // a raw 0xC8 byte — node-pg always emits valid UTF-8 — so we provoke the same
+      // UTF8 encoding error server-side via a bytea literal. The key assertion holds:
+      // the write-prevention check (a read) doesn't pre-empt the encoding failure.
       const pg = new PostgreSQLAdapter(PG_TEST_URL);
       (pg as PostgreSQLAdapter & { pool: { preventWrites?: boolean } }).pool = {
         preventWrites: true,
       };
       try {
-        await expect(pg.selectAll(`SELECT '\xC8'`)).rejects.toThrow(StatementInvalid);
+        await expect(pg.selectAll(`SELECT convert_from('\\xc8'::bytea, 'UTF8')`)).rejects.toThrow(
+          StatementInvalid,
+        );
       } finally {
         await pg.close();
       }
