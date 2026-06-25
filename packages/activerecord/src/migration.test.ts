@@ -3106,6 +3106,12 @@ describe("BulkAlterTableMigrationsTest", () => {
         const name = cols.find((c) => c.name === "name")!;
         expect(name.default).toBeNull();
         expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
+
+        await adapter.exec(
+          isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
+        );
+        const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
+        expect(String(row!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
       } finally {
         await adapter.exec("DROP TABLE IF EXISTS delete_me");
         await adapter.close();
