@@ -341,6 +341,20 @@ export function _registerCallbackOnProto(
 }
 
 /**
+ * True when `proto` has any `before` or `around` callback registered for
+ * `event`. Unlike `hasCallbackOnProto`, this matches by timing alone — it
+ * does not require a specific filter — so callers can ask "could a user
+ * before/around callback run for this event?" without knowing the filters.
+ *
+ * @internal
+ */
+export function hasBeforeOrAroundCallbackOnProto(proto: object, event: string): boolean {
+  const chain = asPeekCallbackChain(proto, event);
+  if (!chain) return false;
+  return chain.entries.some((e) => e.kind === "before" || e.kind === "around");
+}
+
+/**
  * @internal
  */
 export function hasCallbackOnProto(

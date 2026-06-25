@@ -117,6 +117,7 @@ import {
 import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
+  hasBeforeOrAroundCallbackOnProto,
   sanitizeForMassAssignment,
   shouldValidate,
 } from "@blazetrails/activemodel";
@@ -3586,8 +3587,53 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Persistence#destroy (the super that Transactions#destroy calls)
    */
+  /**
+   * Materialize this record's unloaded `belongs_to` targets before the destroy
+   * callback chain runs, so a sync `before_destroy`/`around_destroy` callback
+   * reading the association sees a loaded record (matching Rails' lazy
+   * synchronous query) rather than trails' async-reader Promise.
+   *
+   * Scoped to classes that actually register a before/around destroy callback
+   * so a plain destroy issues no extra query (Rails only queries when the
+   * callback touches the association). Each load is best-effort: a strict-
+   * loading violation or a missing FK row is swallowed, leaving the association
+   * unloaded exactly as it would be in Rails when nothing reads it.
+   *
+   * @internal
+   */
+  private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
+    const ctor = this.constructor as typeof Base;
+    if (!hasBeforeOrAroundCallbackOnProto(ctor.prototype, "destroy")) return;
+    if (typeof (this as any).association !== "function") return;
+    for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
+      let assoc: any;
+      try {
+        assoc = (this as any).association(ref.name);
+      } catch {
+        continue;
+      }
+      if (!assoc || assoc.isLoaded?.()) continue;
+      try {
+        await assoc.loadTarget();
+      } catch {
+        // Non-loadable back-reference (missing FK row, strict loading): skip.
+      }
+    }
+  }
+
   private async _destroyRow(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
+
+    // A sync `before_destroy` callback that reads an unloaded `belongs_to`
+    // cannot await trails' async association reader, so the reader surfaces a
+    // Promise and the callback's `if record.parent` guard sees a truthy
+    // Promise (or skips it). Rails issues the lazy synchronous query inside the
+    // callback. We approximate that by materializing the record's `belongs_to`
+    // targets here — before the destroy callback chain runs — so the reader
+    // returns the loaded record synchronously. The dependent-destroy cascade
+    // has its own inverse preload (`preloadDestroyInverseBelongsTo`); this is
+    // the direct-destroy counterpart.
+    await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
     const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {

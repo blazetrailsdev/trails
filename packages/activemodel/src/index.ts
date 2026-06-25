@@ -68,6 +68,7 @@ export { DirtyTracker } from "./dirty.js";
 export {
   _registerCallbackOnProto,
   hasCallbackOnProto,
+  hasBeforeOrAroundCallbackOnProto,
   skipCallbackOnProto,
   runAllCallbacks,
   runBeforeCallbacksOnProto,
