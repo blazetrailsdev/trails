@@ -256,6 +256,69 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(throughNode.effectiveSqlName).toBe("jdt_posts");
   });
 
+  it("reuses one chain-tail alias for two distinct through associations sharing it", () => {
+    // Mirrors Rails JoinDependency#make_constraints memoizing `@joined_tables`
+    // (join_dependency.rb:193-200): two `through: :posts` associations both
+    // carry the owner's single `posts` reflection as their chain tail, so
+    // eager-loading both reuses ONE `mem_posts` join instead of minting a
+    // second `mem_posts_mem_authors_join` alias.
+    class MemAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("memPosts", { className: "MemPost", foreignKey: "author_id" });
+        this.hasMany("memComments", {
+          through: "memPosts",
+          source: "memComments",
+          className: "MemComment",
+        });
+        this.hasMany("memRatings", {
+          through: "memPosts",
+          source: "memRatings",
+          className: "MemRating",
+        });
+      }
+    }
+    class MemPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.hasMany("memComments", { className: "MemComment", foreignKey: "post_id" });
+        this.hasMany("memRatings", { className: "MemRating", foreignKey: "post_id" });
+      }
+    }
+    class MemComment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    class MemRating extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("value", "integer");
+      }
+    }
+    const adapter = createTestAdapter();
+    for (const m of [MemAuthor, MemPost, MemComment, MemRating]) {
+      m.adapter = adapter;
+      registerModel(m);
+    }
+
+    const jd = new JoinDependency(MemAuthor);
+    jd.addAssociation("memComments");
+    jd.addAssociation("memRatings");
+    jd.joinConstraints([]);
+
+    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    // Exactly one `mem_posts` join survives; the shared tail emits no spurious
+    // `_join` alias for the second through path.
+    expect(effectiveNames.filter((n) => n === "mem_posts").length).toBe(1);
+    expect(effectiveNames.some((n) => n.includes("mem_posts") && n.includes("_join"))).toBe(false);
+
+    // Both targets still join — and both key off the one shared `mem_posts`.
+    expect(effectiveNames).toContain("mem_comments");
+    expect(effectiveNames).toContain("mem_ratings");
+  });
+
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     jd.addAssociation("jdtPosts");
