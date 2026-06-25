@@ -181,12 +181,13 @@ export function raiseNotFoundAll(
   modelName: string,
   pk: string | string[],
   normalized: NormalizedFindIds,
+  conditions = "",
 ): never {
   const { ids, tuples } = normalized;
   const messageIds = tuples ? String(tuples) : ids.join(", ");
   const payload = tuples ?? ids;
   throw new RecordNotFound(
-    `Couldn't find all ${modelName} with '${String(pk)}': (${messageIds})`,
+    `Couldn't find all ${modelName} with '${String(pk)}': (${messageIds})${conditions}`,
     modelName,
     String(pk),
     payload,
@@ -197,9 +198,14 @@ export function raiseNotFoundAll(
  * Raise the single-id not-found error for a simple PK.
  * Matches `Relation.performFind`'s `"with 'pk'=<id>"` message.
  */
-export function raiseNotFoundSingle(modelName: string, pk: string, id: unknown): never {
+export function raiseNotFoundSingle(
+  modelName: string,
+  pk: string,
+  id: unknown,
+  conditions = "",
+): never {
   throw new RecordNotFound(
-    `Couldn't find ${modelName} with '${pk}'=${String(id)}`,
+    `Couldn't find ${modelName} with '${pk}'=${String(id)}${conditions}`,
     modelName,
     pk,
     id,
@@ -227,7 +233,9 @@ interface FinderRelation {
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
   _clone(): any;
-  where(conditions: Record<string, unknown>): any;
+  /** Rails' not-found `conditions` clause: ` [WHERE …]` or "" (relation.ts). */
+  _conditionsClause(): string;
+  where(conditions: unknown, ...rest: unknown[]): any;
   limit(n: number): any;
   order(...args: any[]): any;
   reverseOrder(): any;
@@ -252,6 +260,9 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   const normalized = normalizeFindArgs(modelName, pk, args);
   if (normalized.emptyArray) return [];
   const { ids, wantArray, tuples } = normalized;
+  // Rails appends the relation's WHERE clause to every not-found message
+  // (`conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`).
+  const conditions = this._conditionsClause();
 
   // Composite PK: OR over per-tuple WHERE conditions. The
   // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
@@ -265,7 +276,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
       rel = rel.or(this.where(orConditions[i]));
     }
     const records = await rel.toArray();
-    if (records.length !== tuples.length) raiseNotFoundAll(modelName, pk, normalized);
+    if (records.length !== tuples.length) raiseNotFoundAll(modelName, pk, normalized, conditions);
     return wantArray ? records : records[0];
   }
 
@@ -282,22 +293,25 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
     const records = await this.where({ [pk]: id })
       .limit(1)
       .toArray();
-    if (records.length === 0) raiseNotFoundSingle(modelName, pk, id);
+    if (records.length === 0) raiseNotFoundSingle(modelName, pk, id, conditions);
     return records[0];
   }
 
   // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3]).
   const records = await this.where({ [pk]: ids }).toArray();
-  if (records.length !== ids.length) raiseNotFoundAll(modelName, pk, normalized);
+  if (records.length !== ids.length) raiseNotFoundAll(modelName, pk, normalized, conditions);
   return records;
 }
 
 export async function performFindBy(
   this: FinderRelation,
-  conditions: Record<string, unknown>,
+  conditions: unknown,
+  ...rest: unknown[]
 ): Promise<any | null> {
   try {
-    const records = await this.where(conditions).limit(1).toArray();
+    const records = await this.where(conditions, ...rest)
+      .limit(1)
+      .toArray();
     return records[0] ?? null;
   } catch (err) {
     // Rails: `find_by` returns nil for values that can't be serialized
@@ -313,11 +327,15 @@ export async function performFindBy(
 
 export async function performFindByBang(
   this: FinderRelation,
-  conditions: Record<string, unknown>,
+  conditions: unknown,
+  ...rest: unknown[]
 ): Promise<any> {
-  const record = await performFindBy.call(this, conditions);
+  // Rails: `find_by!(arg, *args) = where(arg, *args).take!`. The not-found
+  // message therefore flows through `raise_record_not_found_exception!` (no
+  // id) and carries the `[WHERE …]` conditions clause from the scoped relation.
+  const record = await performFindBy.call(this, conditions, ...rest);
   if (!record) {
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    raiseRecordNotFoundExceptionBang.call(this.where(conditions, ...rest));
   }
   return record;
 }
@@ -580,9 +598,8 @@ export async function performCreateOrFindByBang(
 // (finder_methods.rb:417). Composes the faithful not-found messages from the
 // same ids / result_size / expected_size / key / not_found_ids arguments Rails
 // passes, so the resulting RecordNotFound message, model, primary_key, and id
-// fields match. (The Rails `conditions` clause derived from `arel.where_sql`
-// has no trails equivalent and is omitted; the tested finder cases run on a
-// bare relation with an empty where clause.)
+// fields match — including the `conditions` clause derived from the relation's
+// where clause (` [#{arel.where_sql(model)}]" unless where_clause.empty?`).
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,
@@ -593,9 +610,15 @@ export function raiseRecordNotFoundExceptionBang(
 ): never {
   const name = this._modelClass.name;
   const k = key ?? String(this._modelClass.primaryKey);
+  const conditions = this._conditionsClause();
 
   if (ids === undefined || ids === null) {
-    throw new RecordNotFound(`Couldn't find ${name}`, name, k);
+    // Rails: `error << " with#{conditions}" if conditions`.
+    throw new RecordNotFound(
+      `Couldn't find ${name}${conditions ? ` with${conditions}` : ""}`,
+      name,
+      k,
+    );
   }
 
   const wrapped = Array.isArray(ids) ? ids : [ids];
@@ -608,11 +631,11 @@ export function raiseRecordNotFoundExceptionBang(
     // renders a scalar (`'id'=1`). (Ruby `Array#to_s` would print `[1]` only
     // if raise_record_not_found_exception! were called directly with a
     // 1-element array — never via a finder.)
-    throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}`, name, k, ids);
+    throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}${conditions}`, name, k, ids);
   }
 
   let error = `Couldn't find all ${pluralize(name)} with '${k}': `;
-  error += `(${wrapped.join(", ")}) (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  error += `(${wrapped.join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
   if (notFoundIds) {
     error +=
       ` Couldn't find ${pluralize(name, notFoundIds.length)}` +

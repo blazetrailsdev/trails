@@ -982,6 +982,6 @@ async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): 
   }
 }
 
-export function findByBang(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
-  return this.all().findByBang(conditions);
+export function findByBang(this: CoreHost, conditions: unknown, ...rest: unknown[]): Promise<any> {
+  return this.all().findByBang(conditions, ...rest);
 }

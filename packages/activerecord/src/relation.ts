@@ -6440,6 +6440,24 @@ export class Relation<T extends Base> {
     }
   }
 
+  /**
+   * Rails' not-found `conditions` clause:
+   * `conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`
+   * (finder_methods.rb:418), appended to every `raise_record_not_found_exception!`
+   * message. Returns the bracketed `[WHERE …]` suffix (with a leading space) for
+   * a scoped relation, or "" when the where clause is empty. Arel's `where_sql`
+   * prefixes the predicate SQL with `WHERE `; our `_whereClauseToSql` renders only
+   * the predicates, so we add the keyword here.
+   */
+  _conditionsClause(): string {
+    if (this._whereClause.isEmpty()) return "";
+    const connection = this._conn();
+    if (!connection?.toSql) return "";
+    const sql = _whereClauseToSql(this._whereClause, connection);
+    if (sql === "") return "";
+    return ` [WHERE ${sql}]`;
+  }
+
   get isEmptyScope(): boolean {
     // Rails: `@values == klass.unscoped.values`. The unscoped baseline may carry
     // the STI `type_condition`, so a relation whose WHERE matches that baseline

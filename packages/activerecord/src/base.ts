@@ -2065,9 +2065,12 @@ export class Base extends Model {
     conditions: Record<string, unknown>,
   ) => Promise<InstanceType<T> | null>;
 
+  // Mirrors Rails `find_by!(arg, *args)`: a Hash of conditions or a raw SQL
+  // fragment (`Post.find_by!("1 = 0")`) plus optional bind args.
   declare static findByBang: <T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown>,
+    conditions: Record<string, unknown> | string,
+    ...rest: unknown[]
   ) => Promise<InstanceType<T>>;
 
   /**
