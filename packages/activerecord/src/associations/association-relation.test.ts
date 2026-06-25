@@ -88,11 +88,14 @@ describe("AssociationRelation", () => {
     const ship = await freshShip();
     const proxy = association<ShipPart>(ship, "parts");
     await proxy.create({ name: "A" });
+    await proxy.create({ name: "A" });
     await proxy.create({ name: "B" });
-    await proxy.create({ name: "C" });
 
-    const scope = proxy.order("name") as unknown as AssociationRelation<ShipPart>;
+    const scope = proxy
+      .where({ name: "A" })
+      .order("id") as unknown as AssociationRelation<ShipPart>;
     const records = await scope.toArray();
+    expect(records.length).toBe(2);
     expect(await scope.equals(records)).toBe(true);
     expect(await scope.equals([])).toBe(false);
   });
