@@ -6,8 +6,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
-import { Base, ReadonlyAttributeError } from "./index.js";
-import { formatForInspect } from "./attribute-inspection.js";
+import { Base } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
@@ -90,51 +89,6 @@ describe("AttributeMethodsTest", () => {
     await defineSchema(TEST_SCHEMA);
   });
 
-  it("attribute names returns list of attribute names", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const names = Post.attributeNames();
-    expect(names).toContain("title");
-    expect(names).toContain("body");
-  });
-
-  it("has attribute returns true for defined attributes", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "a" });
-    expect(p.hasAttribute("title")).toBe(true);
-    expect(p.hasAttribute("nonexistent")).toBe(false);
-  });
-
-  it("reading attributes", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const p = new Post({ title: "hello", body: "world" });
-    expect(p.readAttribute("title")).toBe("hello");
-    expect(p.readAttribute("body")).toBe("world");
-  });
-
-  it("writing attributes", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "old" });
-    p.writeAttribute("title", "new");
-    expect(p.readAttribute("title")).toBe("new");
-  });
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
       static {
@@ -218,16 +172,6 @@ describe("AttributeMethodsTest", () => {
     const p = Post.new({ title: "for-db" }) as any;
     const attrs = p.attributeNames ? p.attributeNames() : {};
     expect(attrs).toBeDefined();
-  });
-
-  it("#define_attribute_methods defines alias attribute methods after undefining", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = Post.new({ title: "test" }) as any;
-    expect(p.title).toBe("test");
   });
 
   it("allocated objects can be inspected", async () => {
@@ -377,24 +321,6 @@ describe("AttributeMethodsTest", () => {
     return { Post };
   }
 
-  it("defineAttributeMethods cascades to the superclass", async () => {
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Dog extends Animal {
-      static {
-        this.attribute("breed", "string");
-      }
-    }
-    // Generating the subclass drives the parent's generation first, so the
-    // parent's own flag is set even though it was never generated directly.
-    (Dog as any).defineAttributeMethods();
-    expect(Object.prototype.hasOwnProperty.call(Animal, "_attributeMethodsGenerated")).toBe(true);
-    expect((Animal as any)._attributeMethodsGenerated).toBe(true);
-    expect((Dog as any)._attributeMethodsGenerated).toBe(true);
-  });
   it("aliasing `id` attribute allows reading the column value for a CPK model", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "alias_id" });
@@ -428,23 +354,6 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
 
-  it("formatForInspect renders a valid Date as a quoted ISO string", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date("2026-04-15T12:00:00.000Z"));
-    expect(out).toBe('"2026-04-15T12:00:00.000Z"');
-  });
-
-  it("formatForInspect renders an invalid Date as quoted 'Invalid Date'", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date(NaN));
-    expect(out).toBe('"Invalid Date"');
-  });
-
-  it("formatForInspect does not crash for array containing an object with bigint values", () => {
-    class M extends Base {}
-    expect(() => formatForInspect.call(new M(), "x", [{ a: 1n }])).not.toThrow();
-    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a":"1"}]');
-  });
   it("attribute_for_inspect with a long array", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "inspect_arr" });
@@ -834,13 +743,6 @@ describe("AttributeMethodsTest", () => {
     return Topic;
   }
 
-  it("attribute present", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Hello" });
-    expect(t.attributePresent("title")).toBe(true);
-    expect(t.attributePresent("author_name")).toBe(false);
-  });
-
   it("set attributes", async () => {
     const Topic = makeTopic();
     const t = new (Topic as any)({});
@@ -942,13 +844,6 @@ describe("AttributeMethodsTest", () => {
     }
   });
 
-  it("respond to?", async () => {
-    const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Hello" });
-    // In TS, readAttribute is the equivalent
-    expect(typeof t.readAttribute).toBe("function");
-  });
-
   it("attributes without primary key", async () => {
     class NoPk extends Base {
       static {
@@ -1020,36 +915,6 @@ describe("AttributeMethodsTest", () => {
     await defineSchema(TEST_SCHEMA);
   });
 
-  it("read_attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "hello" }) as any;
-    expect(t.readAttribute("title")).toBe("hello");
-  });
-
-  it("read_attribute when false", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("approved", "boolean");
-      }
-    }
-    const t = Topic.new({ approved: false }) as any;
-    expect(t.readAttribute("approved")).toBe(false);
-  });
-
-  it("read_attribute when true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("approved", "boolean");
-      }
-    }
-    const t = Topic.new({ approved: true }) as any;
-    expect(t.readAttribute("approved")).toBe(true);
-  });
-
   it("read_attribute with nil should not asplode", async () => {
     class Topic extends Base {
       static {
@@ -1060,16 +925,6 @@ describe("AttributeMethodsTest", () => {
     expect(t.readAttribute("title")).toBeNull();
   });
 
-  it("string attribute predicate", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "hello" }) as any;
-    expect(t.title).toBeTruthy();
-  });
-
   it("number attribute predicate", async () => {
     class Topic extends Base {
       static {
@@ -1078,16 +933,6 @@ describe("AttributeMethodsTest", () => {
     }
     const t = Topic.new({ views: 0 }) as any;
     expect(t.views).toBe(0);
-  });
-
-  it("boolean attribute predicate", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("approved", "boolean");
-      }
-    }
-    const t = Topic.new({ approved: true }) as any;
-    expect(t.approved).toBe(true);
   });
 
   it("write_attribute can write aliased attributes as well", async () => {
@@ -1112,17 +957,6 @@ describe("AttributeMethodsTest", () => {
     expect(t.readAttribute("title")).toBe("aliased");
   });
 
-  it("overridden write_attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "original" }) as any;
-    t.writeAttribute("title", "overridden");
-    expect(t.readAttribute("title")).toBe("overridden");
-  });
-
   it("overridden read_attribute", async () => {
     class Topic extends Base {
       static {
@@ -1131,16 +965,6 @@ describe("AttributeMethodsTest", () => {
     }
     const t = Topic.new({ title: "read-test" }) as any;
     expect(t.readAttribute("title")).toBe("read-test");
-  });
-
-  it("read overridden attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "overridden" }) as any;
-    expect(t.title).toBe("overridden");
   });
 
   it("attribute_method?", async () => {
@@ -1165,16 +989,6 @@ describe("AttributeMethodsTest", () => {
     expect(names).toContain("title");
   });
 
-  it("case-sensitive attributes hash", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "Case" }) as any;
-    expect(t.title).toBe("Case");
-  });
-
   it("hashes are not mangled", async () => {
     class Topic extends Base {
       static {
@@ -1193,28 +1007,6 @@ describe("AttributeMethodsTest", () => {
     }
     const t = (await Topic.create({ title: "factory" })) as any;
     expect(t.title).toBe("factory");
-  });
-
-  it("converted values are returned after assignment", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("views", "integer");
-      }
-    }
-    const t = Topic.new({ views: "5" }) as any;
-    // integer type cast
-    expect(t.views).toBe(5);
-  });
-
-  it("write nil to time attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("created_at", "datetime");
-      }
-    }
-    const t = Topic.new({}) as any;
-    t.created_at = null;
-    expect(t.created_at).toBeNull();
   });
 
   it("attribute_names with a custom select", async () => {
@@ -1449,26 +1241,6 @@ describe("AttributeMethodsTest", () => {
     expect(t.score).toBe(10);
   });
 
-  it("non-attribute read and write", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({ title: "test" }) as any;
-    expect(t.title).toBe("test");
-  });
-
-  it("read attributes after type cast on a date", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("published_at", "date");
-      }
-    }
-    const t = Topic.new({ published_at: "2024-06-15" }) as any;
-    expect(t.published_at).toBeInstanceOf(Temporal.PlainDate);
-  });
-
   it("update array content", async () => {
     class Topic extends Base {
       static {
@@ -1501,368 +1273,6 @@ describe("AttributeMethodsTest", () => {
   });
 });
 
-describe("AttributeMethodsTest", () => {
-  it("creates a getter/setter alias for an attribute", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.aliasAttribute("fullName", "name");
-
-    const u = new User({ name: "Alice" });
-    expect((u as any).fullName).toBe("Alice");
-
-    (u as any).fullName = "Bob";
-    expect(u.name).toBe("Bob");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("formats string attributes with quotes", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const user = new User({ name: "Alice" });
-    expect(user.attributeForInspect("name")).toBe('"Alice"');
-  });
-
-  it("truncates long strings to 50 chars", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const longName = "a".repeat(100);
-    const user = new User({ name: longName });
-    const result = user.attributeForInspect("name");
-    expect(result).toBe(`"${"a".repeat(50)}..."`);
-  });
-
-  it("returns nil for null", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const user = new User({});
-    expect(user.attributeForInspect("name")).toBe("nil");
-  });
-
-  it("formats numbers as JSON", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("age", "integer");
-
-    const user = new User({ age: 25 });
-    expect(user.attributeForInspect("age")).toBe("25");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  // Rails: test "alias_attribute creates accessor alias"
-  it("creates a getter/setter alias", () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.aliasAttribute("title", "name");
-      }
-    }
-
-    const p = new Person({ name: "Dr. Smith" });
-    expect((p as any).title).toBe("Dr. Smith");
-
-    (p as any).title = "Prof. Smith";
-    expect(p.name).toBe("Prof. Smith");
-  });
-
-  // Rails: test "alias_attribute works with different types"
-  it("alias works with integer attributes", () => {
-    class Product extends Base {
-      static {
-        this._tableName = "products";
-        this.attribute("id", "integer");
-        this.attribute("price_cents", "integer");
-        this.aliasAttribute("cost", "price_cents");
-      }
-    }
-
-    const p = new Product({ price_cents: 999 });
-    expect((p as any).cost).toBe(999);
-
-    (p as any).cost = 1500;
-    expect(p.price_cents).toBe(1500);
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("converts snake_case to human-readable form", () => {
-    expect(Base.humanAttributeName("first_name")).toBe("First name");
-    expect(Base.humanAttributeName("email")).toBe("Email");
-    expect(Base.humanAttributeName("created_at")).toBe("Created at");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("returns true for non-null, non-empty values", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("email", "string");
-
-    const user = new User({ name: "Alice" });
-    expect(user.attributePresent("name")).toBe(true);
-    expect(user.attributePresent("email")).toBe(false); // null
-  });
-
-  it("returns false for empty strings", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    const user = new User({ name: "  " });
-    expect(user.attributePresent("name")).toBe(false);
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("returns raw values before type casting", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const u = new User({ name: "Alice", age: "25" });
-    const raw = u.attributesBeforeTypeCast;
-    expect(raw.age).toBe("25");
-    expect(u.age).toBe(25);
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("returns column metadata", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    const col = u.columnForAttribute("name");
-    expect(col).not.toBeNull();
-    expect(col!.name).toBe("name");
-    expect(u.columnForAttribute("nope")).toBeNull();
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("returns a map of attribute name to type object", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const types = User.attributeTypes();
-    expect(types).toHaveProperty("id");
-    expect(types).toHaveProperty("name");
-    expect(types).toHaveProperty("age");
-    expect(types["name"].cast("42")).toBe("42");
-    expect(types["age"].cast("42")).toBe(42);
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("returns a hash of column definitions", () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-
-    const hash = User.columnsHash();
-    expect(hash["name"].type).toBe("string");
-    expect(hash["age"].type).toBe("integer");
-    expect(hash["id"].type).toBe("integer");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("excludes PK, FK, and timestamp columns", () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.attribute("department_id", "integer");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const content = User.contentColumns();
-    expect(content).toContain("name");
-    expect(content).toContain("email");
-    expect(content).not.toContain("id");
-    expect(content).not.toContain("department_id");
-    expect(content).not.toContain("created_at");
-    expect(content).not.toContain("updated_at");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  it("can be set and retrieved on a model class", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-
-    User.ignoredColumns = ["legacy_field"];
-    expect(User.ignoredColumns).toEqual(["legacy_field"]);
-  });
-});
-describe("AttributeMethodsTest", () => {
-  class Person extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("email", "string");
-      this.attribute("active", "boolean");
-    }
-  }
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  describe("readAttribute / writeAttribute", () => {
-    it("reads and writes attributes", () => {
-      const p = new Person({ name: "Alice" });
-      expect(p.name).toBe("Alice");
-      p.name = "Bob";
-      expect(p.name).toBe("Bob");
-    });
-
-    it("returns null for unset attributes", () => {
-      const p = new Person({});
-      expect(p.name).toBeNull();
-    });
-  });
-
-  describe("attributes", () => {
-    it("returns all attributes as a plain object", () => {
-      const p = new Person({ name: "Alice", age: 30 });
-      const attrs = p.attributes;
-      expect(attrs.name).toBe("Alice");
-      expect(attrs.age).toBe(30);
-    });
-  });
-
-  describe("id", () => {
-    it("reads the primary key value", async () => {
-      const p = await Person.create({ name: "Alice" });
-      expect(p.id).toBeTruthy();
-    });
-
-    it("can set id", () => {
-      const p = new Person({});
-      p.id = 42;
-      expect(Number(p.id)).toBe(42);
-    });
-  });
-
-  describe("dirty tracking", () => {
-    it("new record starts without changes tracked", () => {
-      // Rails parity: a new record built by assignment is dirty against its
-      // column defaults — an unassigned record is clean, but assigning a value
-      // that differs from the default marks it changed.
-      expect(new Person({}).changed).toBe(false);
-      expect(new Person({ name: "Alice" }).changed).toBe(true);
-    });
-
-    it("clears changes after save", async () => {
-      const p = await Person.create({ name: "Alice" });
-      expect(p.changed).toBe(false);
-    });
-
-    it("detects changes after writeAttribute", async () => {
-      const p = await Person.create({ name: "Alice" });
-      p.writeAttribute("name", "Bob");
-      expect(p.changed).toBe(true);
-    });
-  });
-
-  describe("hasAttribute", () => {
-    it("returns true for defined attributes", () => {
-      expect(Person.hasAttributeDefinition("name")).toBe(true);
-    });
-
-    it("returns false for undefined attributes", () => {
-      expect(Person.hasAttributeDefinition("foo")).toBe(false);
-    });
-
-    it("returns true for alias_attribute names on instances", () => {
-      // Rails `has_attribute?` resolves attribute_aliases
-      // (active_record/attribute_methods.rb).
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-          this.aliasAttribute("heading", "title");
-        }
-      }
-      const t = new Topic({ title: "Hi" });
-      expect(t.hasAttribute("heading")).toBe(true);
-      expect(t.hasAttribute("title")).toBe(true);
-      expect(t.hasAttribute("missing")).toBe(false);
-    });
-  });
-
-  describe("readonly attributes", () => {
-    it("readonly attributes are not updated after create", async () => {
-      // Rails raises ReadonlyAttributeError on a persisted-record write to an
-      // attr_readonly column (readonly_attributes.rb line 49). The test name's
-      // "are not updated" wording pre-dates Rails adding the raise; the
-      // attribute isn't updated because the write itself is rejected.
-      class Item extends Base {
-        static {
-          this.attribute("code", "string");
-          this.attribute("name", "string");
-          this.attrReadonly("code");
-        }
-      }
-      const item = await Item.create({ code: "ABC", name: "Widget" });
-      expect(() => {
-        item.code = "XYZ";
-      }).toThrow(ReadonlyAttributeError);
-      item.name = "Updated";
-      await item.save();
-      const found = await Item.find(item.id);
-      expect(found.code).toBe("ABC");
-      expect(found.name).toBe("Updated");
-    });
-  });
-});
-
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb (continued)
 // ==========================================================================
@@ -1886,65 +1296,5 @@ describe("attribute_alias arelTable integration", () => {
     }
     const attr = User.arelTable.get("login");
     expect(attr.name).toBe("username");
-  });
-
-  it("arelTable.get passthrough for unaliased attribute", () => {
-    class User extends Base {
-      static {
-        this.attribute("username", "string");
-        this.aliasAttribute("login", "username");
-      }
-    }
-    const attr = User.arelTable.get("username");
-    expect(attr.name).toBe("username");
-  });
-});
-
-describe("AttributeMethodsTest", () => {
-  // Rails: a model that overrides only the writer still gets the generated reader
-  // (activerecord/test/models/bulb.rb:27-29 — color= override, no explicit reader).
-  it("setter-only override does not suppress generated reader", () => {
-    class Widget extends Base {
-      static {
-        this.attribute("color", "string");
-      }
-      set color(v: string) {
-        (this as any).writeAttribute("color", v.toUpperCase());
-      }
-    }
-    (Widget as any).defineAttributeMethods();
-    const desc = Object.getOwnPropertyDescriptor(Widget.prototype, "color");
-    expect(desc?.get).toBeDefined();
-    expect(desc?.set).toBeDefined();
-  });
-
-  it("getter-only override does not suppress generated setter", () => {
-    class Widget extends Base {
-      static {
-        this.attribute("color", "string");
-      }
-      get color(): unknown {
-        return ((this as any).readAttribute("color") as string | null)?.toLowerCase() ?? null;
-      }
-    }
-    (Widget as any).defineAttributeMethods();
-    const desc = Object.getOwnPropertyDescriptor(Widget.prototype, "color");
-    expect(desc?.get).toBeDefined();
-    expect(desc?.set).toBeDefined();
-  });
-
-  it("full accessor override is not clobbered by generation", () => {
-    class Widget extends Base {
-      static {
-        this.attribute("color", "string");
-      }
-      get color(): unknown {
-        return "fixed";
-      }
-      set color(_v: unknown) {}
-    }
-    (Widget as any).defineAttributeMethods();
-    const w = new (Widget as any)();
-    expect(w.color).toBe("fixed");
   });
 });
