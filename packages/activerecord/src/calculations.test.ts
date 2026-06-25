@@ -2396,9 +2396,4 @@ describe("CalculationsTest", () => {
     expect(await CanonicalAccount.joins("firm").count("companies.id")).toBe(5);
     expect(await CanonicalAccount.joins("firm").distinct().count("companies.id")).toBe(4);
   });
-
-  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
-  // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
-  // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
-  // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.
 });

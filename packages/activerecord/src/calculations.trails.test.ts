@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { Base, registerModel } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // ==========================================================================
 // lookupCastTypeFromJoinDependencies unit tests
@@ -79,5 +83,57 @@ describe("lookupCastTypeFromJoinDependencies", () => {
       [[nodeMissing, nodeGood]] as unknown as JoinDependency[],
     );
     expect(result).toBe(type);
+  });
+});
+
+// ==========================================================================
+// lookupCastTypeFromJoinDependencies integration test
+//
+// trails-specific invariant (no Rails counterpart): an end-to-end check that
+// joining a real model resolves a joined column's concrete cast type through
+// the join-dependency walk — complementing the mock-based unit tests above.
+// Relocated verbatim out of calculations.test.ts (RFC 0043).
+// ==========================================================================
+
+describe("lookupCastTypeFromJoinDependencies integration", () => {
+  registerModel("Topic", Topic);
+
+  // Rails' Author `has_many :topics, primary_key: "name", foreign_key:
+  // "author_name"`. Defined locally under a distinct class name (not the
+  // canonical Author model) so importing it does not perturb the shared model
+  // registry / name-disambiguation counter used by other describe blocks.
+  class CalcAuthor extends Base {
+    static {
+      this._tableName = "authors";
+      this.attribute("name", "string");
+      this.hasMany("topics", {
+        primaryKey: "name",
+        foreignKey: "author_name",
+        className: "Topic",
+      });
+    }
+  }
+
+  useHandlerFixtures(["topics", "authors"], { schema: canonicalSchema });
+
+  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
+  // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
+  // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
+  // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.
+  it("resolves joined column cast type through the join-dependency walk", () => {
+    const rel = CalcAuthor.joins("topics");
+    // `written_on` is a datetime attribute that lives only on the joined Topic;
+    // it resolves to Topic's Time cast type via the join-dependency walk (the
+    // base CalcAuthor has no such attribute).
+    const castType = lookupCastTypeFromJoinDependencies(
+      rel as unknown as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
+      "written_on",
+    ) as {
+      constructor: { name: string };
+    } | null;
+    expect(castType).toBeTruthy();
+    // The joined Topic's concrete datetime type (e.g. SQLiteDateTimeType), not
+    // the default ValueType the base CalcAuthor returns for unknown columns.
+    expect(castType?.constructor.name).not.toBe("ValueType");
   });
 });
