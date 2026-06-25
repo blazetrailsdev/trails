@@ -5,6 +5,10 @@
  * module itself (active_record.rb:321-322).
  */
 import { ArgumentError } from "@blazetrails/activemodel";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+
+/** Any constructable class — used for module-config flags that hold a class. */
+type AnyClass = abstract new (...args: never[]) => object;
 
 /**
  * Provides a mapping between database protocols/DBMSs and the underlying
@@ -149,4 +153,166 @@ export function isSchemaCacheIgnoredTable(tableName: string): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Maps each DBMS to the command-line client invoked by `dbconsole`. Mirrors
+ * `ActiveRecord.database_cli` (active_record.rb:211-212, default
+ * `{ postgresql: "psql", mysql: %w[mysql mysql5], sqlite: "sqlite3" }`).
+ */
+export let databaseCli: Record<string, string | string[]> = {
+  postgresql: "psql",
+  mysql: ["mysql", "mysql5"],
+  sqlite: "sqlite3",
+};
+
+export function setDatabaseCli(value: Record<string, string | string[]>): void {
+  databaseCli = value;
+}
+
+/**
+ * Selects the async query executor backing `load_async`. `null` (the default)
+ * disables background execution; `"thread_pool"` uses a single shared pool and
+ * `"multi_thread_pool"` a per-database pool. Mirrors
+ * `ActiveRecord.async_query_executor` (active_record.rb:283-284, default nil).
+ */
+export let asyncQueryExecutor: "thread_pool" | "multi_thread_pool" | null = null;
+
+export function setAsyncQueryExecutor(value: "thread_pool" | "multi_thread_pool" | null): void {
+  asyncQueryExecutor = value;
+}
+
+/**
+ * Names of the queues used by background jobs (e.g. `destroy_association_async`).
+ * Mirrors `ActiveRecord.queues` (active_record.rb:317-318, default `{}`).
+ */
+export let queues: Record<string, unknown> = {};
+
+export function setQueues(value: Record<string, unknown>): void {
+  queues = value;
+}
+
+/**
+ * When the test suite should keep the test schema current against
+ * `schema.rb`/`structure.sql`. `null` (the default) defers to the framework's
+ * `maintainTestSchemaBang` opt-in. Mirrors `ActiveRecord.maintain_test_schema`
+ * (active_record.rb:320-321, default nil).
+ */
+export let maintainTestSchema: boolean | null = null;
+
+export function setMaintainTestSchema(value: boolean | null): void {
+  maintainTestSchema = value;
+}
+
+/**
+ * When true (the default), a required `belongs_to` also validates that the
+ * association's foreign key is present, not just the association object.
+ * Mirrors `ActiveRecord.belongs_to_required_validates_foreign_key`
+ * (active_record.rb:326-327, default true).
+ */
+export let belongsToRequiredValidatesForeignKey = true;
+
+export function setBelongsToRequiredValidatesForeignKey(value: boolean): void {
+  belongsToRequiredValidatesForeignKey = value;
+}
+
+/**
+ * The application's primary abstract record class (`ApplicationRecord`). `null`
+ * until `primary_abstract_class` is declared. Mirrors
+ * `ActiveRecord.application_record_class` (active_record.rb:329-330, default nil).
+ */
+export let applicationRecordClass: AnyClass | null = null;
+
+export function setApplicationRecordClass(value: AnyClass | null): void {
+  applicationRecordClass = value;
+}
+
+/**
+ * When true, a batch enumerator (`find_each`/`in_batches`) raises if the
+ * relation carries an explicit order it must ignore; when false (the default)
+ * it silently overrides the order. Mirrors `ActiveRecord.error_on_ignored_order`
+ * (active_record.rb:376-381, default false).
+ */
+export let errorOnIgnoredOrder = false;
+
+export function setErrorOnIgnoredOrder(value: boolean): void {
+  errorOnIgnoredOrder = value;
+}
+
+/**
+ * When true (the default), generated migration filenames are prefixed with a
+ * UTC timestamp rather than a sequential number. Mirrors
+ * `ActiveRecord.timestamped_migrations` (active_record.rb:384-387, default true).
+ */
+export let timestampedMigrations = true;
+
+export function setTimestampedMigrations(value: boolean): void {
+  timestampedMigrations = value;
+}
+
+/**
+ * The execution strategy migrations run through. Defaults to
+ * {@link DefaultStrategy}, which runs the migration's `up`/`down` directly.
+ * Mirrors `ActiveRecord.migration_strategy` (active_record.rb:398-401, default
+ * `Migration::DefaultStrategy`).
+ */
+export let migrationStrategy: AnyClass = DefaultStrategy;
+
+export function setMigrationStrategy(value: AnyClass): void {
+  migrationStrategy = value;
+}
+
+/**
+ * When true, fixtures are loaded with foreign-key checks verified afterwards.
+ * Mirrors `ActiveRecord.verify_foreign_keys_for_fixtures`
+ * (active_record.rb:423-429, default false).
+ */
+export let verifyForeignKeysForFixtures = false;
+
+export function setVerifyForeignKeysForFixtures(value: boolean): void {
+  verifyForeignKeysForFixtures = value;
+}
+
+/**
+ * When true, the YAML column coder loads with Psych's unsafe loader instead of
+ * `safe_load`. Mirrors `ActiveRecord.use_yaml_unsafe_load`
+ * (active_record.rb:435-439, default false).
+ */
+export let useYamlUnsafeLoad = false;
+
+export function setUseYamlUnsafeLoad(value: boolean): void {
+  useYamlUnsafeLoad = value;
+}
+
+/**
+ * When true (the default), the PostgreSQL adapter raises if handed an integer
+ * wider than signed 64-bit. Mirrors `ActiveRecord.raise_int_wider_than_64bit`
+ * (active_record.rb:451-456, default true).
+ */
+export let raiseIntWiderThan64bit = true;
+
+export function setRaiseIntWiderThan64bit(value: boolean): void {
+  raiseIntWiderThan64bit = value;
+}
+
+/**
+ * Additional classes the YAML column coder permits during `safe_load`. Mirrors
+ * `ActiveRecord.yaml_column_permitted_classes` (active_record.rb:458-462,
+ * default `[Symbol]`).
+ */
+export let yamlColumnPermittedClasses: unknown[] = [Symbol];
+
+export function setYamlColumnPermittedClasses(value: unknown[]): void {
+  yamlColumnPermittedClasses = value;
+}
+
+/**
+ * Controls when `has_secure_token` generates its value: `"create"` (the
+ * default) or `"initialize"`. Mirrors `ActiveRecord.generate_secure_token_on`
+ * (active_record.rb:464-468, default `:create`).
+ */
+export let generateSecureTokenOn: "create" | "initialize" = "create";
+
+export function setGenerateSecureTokenOn(value: "create" | "initialize"): void {
+  generateSecureTokenOn = value;
 }
