@@ -1,23 +1,28 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, StatementInvalid } from "./index.js";
+import { describe, it, expect } from "vitest";
+import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { registerModel } from "./associations.js";
+import { Developer } from "./test-helpers/models/developer.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Project } from "./test-helpers/models/project.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import "./associations/collection-proxy.js";
+import "./association-relation.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+registerModel(Developer);
+registerModel(Comment);
+registerModel(Post);
+registerModel(Project);
+registerModel(Ship);
 
-beforeAll(async () => {
-  await defineSchema({
-    developers: { name: "string", salary: "integer", updated_at: "datetime" },
-  });
-});
-
-function expectedUsec(ts: Temporal.Instant): string {
-  const dt = ts.toZonedDateTimeISO("UTC");
+function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
+  const dt =
+    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts.toZonedDateTime("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");
@@ -28,260 +33,285 @@ function expectedUsec(ts: Temporal.Instant): string {
   return `${y}${mo}${day}${h}${mi}${s}${us}`;
 }
 
-function withCollectionCacheVersioning(klass: typeof Base, fn: () => Promise<void>): Promise<void> {
-  const original = klass.collectionCacheVersioning;
-  klass.collectionCacheVersioning = true;
+function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
+  const original = Base.collectionCacheVersioning;
+  Base.collectionCacheVersioning = true;
   return fn().finally(() => {
-    klass.collectionCacheVersioning = original;
+    Base.collectionCacheVersioning = original;
   });
-}
-
-class Developer extends Base {
-  static {
-    this.attribute("name", "string");
-    this.attribute("salary", "integer");
-    this.attribute("updated_at", "datetime");
-  }
 }
 
 describe("CollectionCacheKeyTest", () => {
+  const { topics, projects } = useHandlerFixtures(
+    ["developers", "developersProjects", "projects", "topics", "comments", "posts"],
+    { schema: canonicalSchema },
+  );
+
   it("collection_cache_key on model", async () => {
-    await Developer.create({ name: "Alice", salary: 100000 });
     const key = await Developer.collectionCacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
+    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key for relation", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
-    const key = await devs.cacheKey();
-    const digest = hexdigest(devs.toSql());
-    const count = await Developer.where({ salary: 100000 }).count();
-    expect(key).toBe(`developers/query-${digest}-${count}-${expectedUsec(t)}`);
+    const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+      .updated_at as Temporal.Instant;
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
+    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[2]).toBe(String(await developers.count()));
+    expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
 
   it("cache_key for relation with limit", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
-    const key = await devs.cacheKey();
-    const digest = hexdigest(devs.toSql());
-    expect(key).toBe(`developers/query-${digest}-1-${expectedUsec(t)}`);
+    const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+      .updated_at as Temporal.Instant;
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
+    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[2]).toBe(String(await developers.count()));
+    expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
 
   it("cache_key for relation with custom select and limit", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
-    const devsWithSelect = devs.select("*");
-    const key = await devsWithSelect.cacheKey();
-    const digest = hexdigest(devsWithSelect.toSql());
-    expect(key).toBe(`developers/query-${digest}-1-${expectedUsec(t)}`);
+    const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
+    const developersWithSelect = developers.select("developers.*");
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+      .updated_at as Temporal.Instant;
+
+    expect(await developersWithSelect.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    const m = (await developersWithSelect.cacheKey()).match(
+      /^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/,
+    )!;
+    expect(m[1]).toBe(hexdigest(developersWithSelect.toSql()));
+    expect(m[2]).toBe(String(await developers.count()));
+    expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
 
   it("cache_key for loaded relation", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const devs = await Developer.where({ salary: 100000 })
+    const developers = await Developer.where({ salary: 100000 })
       .order({ updated_at: "desc" })
       .limit(5)
       .load();
-    const key = await devs.cacheKey();
-    const digest = hexdigest(devs.toSql());
-    // digest and count are stable; timestamp comes from loaded record's in-memory Date
-    expect(key).toMatch(new RegExp(`^developers/query-${digest}-1-\\d{20}$`));
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+      .updated_at as Temporal.Instant;
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
+    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[2]).toBe(String(await developers.count()));
+    expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
 
   it("cache_key for relation with table alias", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
-    const key = await devs.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-1-/);
+    const tableAlias = Developer.arelTable.alias("omg_developers");
+
+    let developers = new Relation(Developer, tableAlias as never);
+    developers = developers.where({ salary: 100000 }).order({ updated_at: "desc" });
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+      .updated_at as Temporal.Instant;
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)-(\d+)-(\d+)$/)!;
+    expect(m[1]).toBe(hexdigest(developers.toSql()));
+    expect(m[2]).toBe(String(await developers.count()));
+    expect(m[3]).toBe(expectedUsec(lastDeveloperTimestamp));
   });
 
   it("cache_key for relation with includes", async () => {
-    await Developer.create({ name: "Alice", salary: 100000 });
-    const key = await Developer.where({ salary: 100000 }).cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+/);
+    const comments = Comment.includes("post").where({ "posts.type": "Post" });
+    expect(await comments.cacheKey()).toMatch(/^comments\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key for loaded relation with includes", async () => {
-    await Developer.create({ name: "Alice" });
-    const devs = await Developer.all().load();
-    const key = await devs.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+/);
+    const comments = await Comment.includes("post").where({ "posts.type": "Post" }).load();
+    expect(await comments.cacheKey()).toMatch(/^comments\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("update_all will update cache_key", async () => {
-    await Developer.create({ name: "David", salary: 80000 });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    await devs.updateAll({ updated_at: instant("2025-01-01T00:00:00Z") }); // resets devs memos
-    expect(await devs.cacheKey()).not.toBe(key1);
+    const developers = Developer.where({ name: "David" });
+    const cacheKey = await developers.cacheKey();
+
+    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+
+    expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
 
   it("update_all with includes will update cache_key", async () => {
-    await Developer.create({ name: "David", salary: 80000 });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    await devs.updateAll({ updated_at: instant("2025-06-01T00:00:00Z") });
-    expect(await devs.cacheKey()).not.toBe(key1);
+    const developers = Developer.includes("projects").where({ "projects.name": "Active Record" });
+    const cacheKey = await developers.cacheKey();
+
+    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+
+    expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
 
   it("delete_all will update cache_key", async () => {
-    await Developer.create({ name: "David" });
-    await Developer.create({ name: "David" });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    await devs.deleteAll(); // resets devs memos
-    expect(await devs.cacheKey()).not.toBe(key1);
+    const developers = Developer.where({ name: "David" });
+    const cacheKey = await developers.cacheKey();
+
+    await developers.deleteAll();
+
+    expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
 
   it("delete_all with includes will update cache_key", async () => {
-    await Developer.create({ name: "David" });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    await devs.deleteAll();
-    expect(await devs.cacheKey()).not.toBe(key1);
+    const developers = Developer.includes("projects").where({ "projects.name": "Active Record" });
+    const cacheKey = await developers.cacheKey();
+
+    await developers.deleteAll();
+
+    expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
 
   it("destroy_all will update cache_key", async () => {
-    await Developer.create({ name: "David" });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    await devs.destroyAll();
-    expect(await devs.cacheKey()).not.toBe(key1);
+    const developers = Developer.where({ name: "David" });
+    const cacheKey = await developers.cacheKey();
+
+    await developers.destroyAll();
+
+    expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
 
   it("it triggers at most one query", async () => {
-    await Developer.create({ name: "David" });
-    const devs = Developer.where({ name: "David" });
-    const key1 = await devs.cacheKey();
-    const key2 = await devs.cacheKey(); // memoized
+    const developers = Developer.where({ name: "David" });
+    const key1 = await developers.cacheKey();
+    const key2 = await developers.cacheKey();
     expect(key1).toBe(key2);
   });
 
   it("it doesn't trigger any query if the relation is already loaded", async () => {
-    await Developer.create({ name: "David" });
-    const devs = await Developer.where({ name: "David" }).load();
-    const key = await devs.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+/);
+    const developers = await Developer.where({ name: "David" }).load();
+    const key = await developers.cacheKey();
+    expect(key).toMatch(/^developers\/query-[0-9a-f]+/);
   });
 
   it("it doesn't trigger any query if collection_cache_versioning is enabled", async () => {
-    await Developer.create({ name: "David" });
-    await withCollectionCacheVersioning(Developer, async () => {
-      const devs = Developer.where({ name: "David" });
-      const key = await devs.cacheKey();
-      // Stable key — just the digest, no DB query needed
+    await withCollectionCacheVersioning(async () => {
+      const developers = Developer.where({ name: "David" });
+      const key = await developers.cacheKey();
       expect(key).toMatch(/^developers\/query-[0-9a-f]+$/);
     });
   });
 
   it("relation cache_key changes when the sql query changes", async () => {
-    await Developer.create({ name: "David" });
-    const devs = Developer.where({ name: "David" });
-    const other = Developer.where({ name: "David" }).where("1 = 1");
-    expect(await devs.cacheKey()).not.toBe(await other.cacheKey());
+    const developers = Developer.where({ name: "David" });
+    const otherRelation = Developer.where({ name: "David" }).where("1 = 1");
+
+    expect(await developers.cacheKey()).not.toBe(await otherRelation.cacheKey());
   });
 
   it("cache_key for empty relation", async () => {
-    const key = await Developer.where({ name: "Non Existent Developer" }).cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
+    const developers = Developer.where({ name: "Non Existent Developer" });
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key with custom timestamp column", async () => {
-    const t = instant("2024-06-15T08:00:00.000Z");
-    await Developer.create({ name: "Alice", updated_at: t });
-    const key = await Developer.all().cacheKey("updated_at");
-    expect(key).toContain(expectedUsec(t));
+    const topicsRel = Topic.where("title like ?", "%Topic%");
+    const lastTopicTimestamp = expectedUsec(topics("fifth").written_on);
+    expect(await topicsRel.cacheKey("written_on")).toContain(lastTopicTimestamp);
   });
 
   it("cache_key with unknown timestamp column", async () => {
-    await Developer.create({ name: "Alice" });
-    await expect(Developer.all().cacheKey("published_at")).rejects.toThrow(StatementInvalid);
+    const topicsRel = Topic.where("title like ?", "%Topic%");
+    await expect(topicsRel.cacheKey("published_at")).rejects.toThrow(StatementInvalid);
   });
 
   it("collection proxy provides a cache_key", async () => {
-    await Developer.create({ name: "Alice", salary: 100000 });
-    const key = await Developer.where({ salary: 100000 }).cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
+    const developers = (projects("active_record") as unknown as { developers: Relation<Developer> })
+      .developers;
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key for loaded collection with zero size", async () => {
-    const devs = await Developer.where({ name: "Nobody" }).load();
-    const key = await devs.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
+    await Comment.deleteAll();
+    const posts = Post.includes("comments");
+    const emptyLoadedCollection = (
+      (await posts.first()) as unknown as { comments: Relation<Comment> }
+    ).comments;
+
+    expect(await emptyLoadedCollection.cacheKey()).toMatch(/^comments\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key for queries with offset which return 0 rows", async () => {
-    const key = await Developer.offset(20).cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
+    const developers = Developer.offset(20);
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key with a relation having selected columns", async () => {
-    await Developer.create({ name: "Alice", salary: 80000 });
-    const key = await Developer.select("salary").cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
+    const developers = Developer.select("salary");
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key with a relation having distinct and order", async () => {
-    await Developer.create({ name: "Alice", salary: 80000 });
-    const devs = Developer.distinct().order("salary").limit(5);
-    const key = await devs.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
-    expect(devs.isLoaded).toBe(false);
+    const developers = Developer.distinct().order("salary").limit(5);
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+    expect(developers.isLoaded).toBe(false);
   });
 
   it("cache_key with a relation having custom select and order", async () => {
-    await Developer.create({ name: "Alice", salary: 80000 });
-    const key = await Developer.select("name").order("name DESC").limit(5).cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
+    const developers = Developer.select("name AS dev_name").order("dev_name DESC").limit(5);
+
+    expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
   });
 
   it("cache_key should be stable when using collection_cache_versioning", async () => {
-    await Developer.create({ name: "Alice", salary: 100000 });
-    await withCollectionCacheVersioning(Developer, async () => {
-      const devs = Developer.where({ salary: 100000 });
-      const key = await devs.cacheKey();
-      const digest = hexdigest(devs.toSql());
-      expect(key).toBe(`developers/query-${digest}`);
+    await withCollectionCacheVersioning(async () => {
+      const developers = Developer.where({ salary: 100000 });
+
+      expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+$/);
+
+      const m = (await developers.cacheKey()).match(/^developers\/query-([0-9a-f]+)$/)!;
+      expect(m[1]).toBe(hexdigest(developers.toSql()));
     });
   });
 
   it("cache_version for relation", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    await withCollectionCacheVersioning(Developer, async () => {
-      const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
-      const version = await devs.cacheVersion();
-      const count = await Developer.where({ salary: 100000 }).count();
-      expect(version).toBe(`${count}-${expectedUsec(t)}`);
+    await withCollectionCacheVersioning(async () => {
+      const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
+      const lastDeveloperTimestamp = ((await developers.first()) as Developer)
+        .updated_at as Temporal.Instant;
+
+      const version = await developers.cacheVersion();
+      expect(version).toMatch(/(\d+)-(\d+)$/);
+
+      const m = version!.match(/(\d+)-(\d+)$/)!;
+      expect(m[1]).toBe(String(await developers.count()));
+      expect(m[2]).toBe(expectedUsec(lastDeveloperTimestamp));
     });
   });
 
   it("reset will reset cache_version", async () => {
-    await Developer.create({ name: "Alice" });
-    await withCollectionCacheVersioning(Developer, async () => {
-      const devs = Developer.all();
-      const v1 = await devs.cacheVersion();
-      await Developer.updateAll({ updated_at: instant("2024-06-01T10:00:00.000Z") });
-      devs.reset();
-      const v2 = await devs.cacheVersion();
-      expect(v1).not.toBe(v2);
+    await withCollectionCacheVersioning(async () => {
+      const developers = Developer.all();
+
+      expect(await developers.cacheVersion()).toBe(await Developer.all().cacheVersion());
+
+      await Developer.updateAll({
+        updated_at: Temporal.Now.instant().add({ seconds: 1 }),
+      });
+      developers.reset();
+
+      expect(await developers.cacheVersion()).toBe(await Developer.all().cacheVersion());
     });
   });
 
   it("cache_key_with_version contains key and version regardless of collection_cache_versioning setting", async () => {
-    const t = instant("2024-01-15T10:00:00.000Z");
-    await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
-    const kv1 = await Developer.all().cacheKeyWithVersion();
-    expect(kv1).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
-    await withCollectionCacheVersioning(Developer, async () => {
-      const kv2 = await Developer.all().cacheKeyWithVersion();
-      expect(kv2).toBe(kv1);
+    const keyWithVersion1 = await Developer.all().cacheKeyWithVersion();
+    expect(keyWithVersion1).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
+
+    await withCollectionCacheVersioning(async () => {
+      const keyWithVersion2 = await Developer.all().cacheKeyWithVersion();
+      expect(keyWithVersion2).toBe(keyWithVersion1);
     });
   });
 });

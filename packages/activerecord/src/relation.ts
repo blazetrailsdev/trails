@@ -5496,7 +5496,11 @@ export class Relation<T extends Base> {
    * composes the two managers).
    */
   private _buildSelectManager(): SelectManager {
-    const table = this._modelClass.arelTable;
+    // `this.table` is the model's arel_table unless the relation was built on a
+    // table alias (Rails `Relation.create(Model, table: arel_table.alias(...))`),
+    // in which case projections, FROM, and ORDER BY must all reference the alias
+    // so they stay consistent with the WHERE clause the predicate builder wrote.
+    const table = this.table;
     const projections = this._buildProjections(table);
     const manager = table.project(...(projections as any));
 
@@ -5845,6 +5849,13 @@ export class Relation<T extends Base> {
             } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
               const lit = this.orderColumn(rawCol) as Nodes.Node;
               manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
+            } else if (!this._isKnownColumn(rawCol)) {
+              // A bare identifier that isn't a real column (e.g. a SELECT alias
+              // like `name AS dev_name` → `ORDER BY dev_name DESC`) must pass
+              // through verbatim — qualifying it to the base table would emit
+              // `developers.dev_name`, which the database can't resolve. Mirrors
+              // Rails treating a string order arg as a raw SQL literal.
+              manager.order(new Nodes.SqlLiteral(trimmed));
             } else {
               const node = table.get(rawCol);
               manager.order(
@@ -6719,7 +6730,15 @@ export class Relation<T extends Base> {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
         const inner = collection._clone();
-        inner._selectColumns = [tsColumn.as("collection_cache_key_timestamp")];
+        // Rails appends `select("<col> AS collection_cache_key_timestamp")` to
+        // whatever the collection already selects — a custom `select(...)` must
+        // survive so its aliases (e.g. an `ORDER BY` on a `name AS dev_name`
+        // select) still resolve in the subquery. Replacing the select list here
+        // dropped those aliases and broke ordering.
+        inner._selectColumns = [
+          ...(inner._selectColumns ?? []),
+          tsColumn.as("collection_cache_key_timestamp"),
+        ];
         if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
           inner._selectColumns = [this.table.star, ...inner._selectColumns];
         }

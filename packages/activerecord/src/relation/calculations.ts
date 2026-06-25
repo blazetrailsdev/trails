@@ -822,7 +822,11 @@ export async function performCount(
     return Number(rows[0]?.count ?? 0);
   }
 
-  const table = this._modelClass.arelTable;
+  // Use the relation's table — the model's arel_table unless the relation was
+  // built on a table alias — so COUNT's FROM/WHERE match the alias the
+  // predicate builder qualified the conditions with.
+  const baseTable = this._modelClass.arelTable;
+  const table = (this as unknown as { table?: typeof baseTable }).table ?? baseTable;
   const effectiveColumn = column === "*" ? undefined : column;
 
   if (effectiveColumn) {
