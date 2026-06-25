@@ -50,6 +50,7 @@ export const JobRuntime = { instrument };
 
 type FrameworkDefaultsEntry = {
   partialInserts?: boolean;
+  raiseOnAssignToAttrReadonly?: boolean;
 };
 
 // Mirrors the set of version strings Rails' Configuration#load_defaults
@@ -62,6 +63,8 @@ const KNOWN_VERSIONS = new Set(["5.0", "5.1", "5.2", "6.0", "6.1", "7.0", "7.1",
 // Seed only flags that have been ported; grow per-story.
 const FRAMEWORK_DEFAULTS: Array<[string, FrameworkDefaultsEntry]> = [
   ["7.0", { partialInserts: false }],
+  // configuration.rb:286 — `active_record.raise_on_assign_to_attr_readonly = true`.
+  ["7.1", { raiseOnAssignToAttrReadonly: true }],
 ];
 
 function compareVersions(a: string, b: string): number {
@@ -82,6 +85,9 @@ export function loadDefaults(version: string): void {
   for (const [v, defaults] of FRAMEWORK_DEFAULTS) {
     if (compareVersions(v, version) <= 0) {
       if (defaults.partialInserts !== undefined) Base.partialInserts = defaults.partialInserts;
+      if (defaults.raiseOnAssignToAttrReadonly !== undefined) {
+        setRaiseOnAssignToAttrReadonly(defaults.raiseOnAssignToAttrReadonly);
+      }
     }
   }
 }
