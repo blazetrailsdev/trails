@@ -5,131 +5,98 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Reply } from "../test-helpers/models/reply.js";
+import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
   // Teardown: Topic.class_eval { @predicate_builder = nil }
-  // We use a local custom class instead of Regexp to keep the test self-contained.
+  // We use a local RegexFilter class instead of Regexp to keep the test
+  // self-contained — trails has no Regexp predicate-builder coercion.
+  class RegexFilter {
+    constructor(public source: string) {}
+  }
+  const regexpHandler = {
+    call: (attr: any, val: RegexFilter) =>
+      new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
+  };
 
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // Rails declares no fixtures here; we still ride the canonical tables so the
+  // models' schema is warmed for the synchronous `toSql()` assertions below.
+  useHandlerFixtures(["topics", "posts", "authors", "products"], {
+    schema: canonicalSchema,
+  });
 
-  beforeAll(async () => {
-    await defineSchema({
-      topics: { title: "string" },
-      replies: { parent_id: "integer" },
-      products: { metadata: "string" },
-      authors: { name: "string" },
-      posts: { author_id: "integer", title: "string" },
-    });
+  beforeAll(() => {
+    // Reply.belongs_to(:topic) and the nested {topics: …} key both resolve
+    // "Topic" through the registry — Rails has these globally available.
+    registerModel("Topic", Topic);
+    registerModel("Reply", Reply);
+  });
+
+  afterAll(() => {
+    modelRegistry.delete("Topic");
+    modelRegistry.delete("Reply");
   });
 
   it("registering new handlers", () => {
-    class PbTopic extends Base {
-      static {
-        this.tableName = "topics";
-        this.attribute("title", "string");
-      }
-    }
-    class RegexFilter {
-      constructor(public source: string) {}
-    }
-    PbTopic.predicateBuilder.registerHandler(RegexFilter, {
-      call: (attr, val: RegexFilter) =>
-        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
-    });
+    Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
-      const sql = PbTopic.where({ title: new RegexFilter("rails") }).toSql();
+      const sql = Topic.where({ title: new RegexFilter("rails") }).toSql();
       expect(sql).toMatch(
         new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      (PbTopic as any)._predicateBuilder = null;
+      (Topic as any)._predicateBuilder = null;
     }
   });
 
   it("registering new handlers for association", () => {
-    // Mirror Rails: Topic (tableName "topics") + Reply (belongsTo "topic"),
-    // handler on Topic, where key is the table name "topics".
-    class Topic extends Base {
-      static {
-        this.tableName = "topics";
-        this.attribute("title", "string");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.tableName = "replies";
-        this.attribute("parent_id", "integer");
-        this.belongsTo("topic");
-      }
-    }
-    registerModel("Topic", Topic);
-    registerModel("Reply", Reply);
-    class RegexFilter2 {
-      constructor(public source: string) {}
-    }
-    Topic.predicateBuilder.registerHandler(RegexFilter2, {
-      call: (attr, val: RegexFilter2) =>
-        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
-    });
+    Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
-      const sql = Reply.where({ topics: { title: new RegexFilter2("rails") } }).toSql();
+      const sql = Reply.joins("topic")
+        .where({ topics: { title: new RegexFilter("rails") } })
+        .toSql();
       expect(sql).toMatch(
         new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      modelRegistry.delete("Topic");
-      modelRegistry.delete("Reply");
       (Topic as any)._predicateBuilder = null;
     }
   });
 
   it("registering new handlers for joins", () => {
-    // Rails: Reply.joins(:regexp_topic).references(Arel.sql("regexp_topic")).to_sql
-    // aliases the joined `topics` table to the association name `regexp_topic`
-    // (an aliasable SqlLiteral reference), yielding `"regexp_topic"."title" ~ 'rails'`.
-    class RegexFilter3 {
-      constructor(public source: string) {}
-    }
-    class JTopic extends Base {
+    // Rails: Reply.belongs_to :regexp_topic, -> { where(title: /rails/) },
+    //   class_name: "Topic", foreign_key: "parent_id"
+    // then Reply.joins(:regexp_topic).references(Arel.sql("regexp_topic")).to_sql
+    // aliases the joined `topics` table to the association name `regexp_topic`.
+    // We add the association on a throwaway Reply subclass rather than mutating
+    // the canonical Reply (Rails leaks the association; we keep it scoped).
+    class RegexpReply extends Reply {
       static {
-        this.tableName = "topics";
-        this.attribute("title", "string");
-      }
-    }
-    class JReply extends Base {
-      static {
-        this.tableName = "replies";
-        this.attribute("parent_id", "integer");
         this.belongsTo("regexp_topic", {
-          className: "JTopic",
+          className: "Topic",
           foreignKey: "parent_id",
-          scope: (rel: any) => rel.where({ title: new RegexFilter3("rails") }),
+          scope: (rel: any) => rel.where({ title: new RegexFilter("rails") }),
         });
       }
     }
-    registerModel("JTopic", JTopic);
-    registerModel("JReply", JReply);
-    JTopic.predicateBuilder.registerHandler(RegexFilter3, {
-      call: (attr, val: RegexFilter3) =>
-        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
-    });
+    registerModel("RegexpReply", RegexpReply);
+    Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
-      const sql = JReply.joins("regexp_topic")
+      const sql = RegexpReply.joins("regexp_topic")
         .references(new Nodes.SqlLiteral("regexp_topic") as any)
         .toSql();
       expect(sql).toMatch(
         new RegExp(`${escapeRegExp(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      modelRegistry.delete("JTopic");
-      modelRegistry.delete("JReply");
-      (JTopic as any)._predicateBuilder = null;
+      modelRegistry.delete("RegexpReply");
+      (Topic as any)._predicateBuilder = null;
     }
   });
 
@@ -140,23 +107,18 @@ describe("PredicateBuilderTest", () => {
   });
 
   it("build from hash with schema", () => {
-    // Rails: predicate_builder.build_from_hash("schema.table.column" => "value").first.to_sql
+    // Rails: Topic.predicate_builder.build_from_hash("schema.table.column" => "value").first.to_sql
     // convert_dot_notation_to_hash splits on rindex("."):
     //   "schema.table.column" → { "schema.table" => { "column" => "value" } }
-    // TableMetadata.associated_table("schema.table") falls back to a bare Arel::Table("schema.table"),
-    // so expand_from_hash produces: "schema.table"."column" = 'value'
-    class PbSchemaModel extends Base {
-      static {
-        this.tableName = "topics";
-        this.attribute("title", "string");
-      }
-    }
-    // Use TableMetadata-backed PB to enable associated_table fallback expansion,
-    // matching Rails' Topic.predicate_builder which is always backed by TableMetadata.
-    const [node] = new TableMetadata(
-      PbSchemaModel as any,
-      PbSchemaModel.arelTable,
-    ).predicateBuilder.buildFromHash({ "schema.table.column": "value" });
+    // TableMetadata.associated_table("schema.table") falls back to a bare
+    // Arel::Table("schema.table"), so expand_from_hash produces:
+    //   "schema.table"."column" = 'value'
+    // Rails' Topic.predicate_builder is always TableMetadata-backed; trails'
+    // Base.predicateBuilder is Table-backed, so we build the TableMetadata-backed
+    // PB explicitly to exercise the associated_table fallback expansion.
+    const [node] = new TableMetadata(Topic as any, Topic.arelTable).predicateBuilder.buildFromHash({
+      "schema.table.column": "value",
+    });
     const sql = new Visitors.ToSql().compile(node);
     // Arel resolves "schema.table" as schema.table identifier, producing:
     // "schema"."table"."column" = ?  (the value is a BindParam, not inlined —
@@ -166,19 +128,12 @@ describe("PredicateBuilderTest", () => {
   });
 
   it("does not mutate", () => {
-    class PbTopic3 extends Base {
-      static {
-        this.tableName = "topics";
-        this.attribute("title", "string");
-        this.attribute("approved", "boolean");
-      }
-    }
     const defaults: Record<string, unknown> = {
       topics: { title: "rails" },
       "topics.approved": true,
     };
     const original = { topics: { title: "rails" }, "topics.approved": true };
-    PbTopic3.where(defaults).toSql();
+    Topic.where(defaults).toSql();
     expect(defaults).toEqual(original);
   });
 
@@ -375,11 +330,11 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("nested table-keyed hash expansion", () => {
-    class PbTestAuthor extends Base {
-      static {
-        this.tableName = "authors";
-      }
-    }
+    // Mirror of Post.belongs_to(:author) plus a deliberately-renamed
+    // belongs_to(:writer, class_name: "Author") to exercise the
+    // associated_table aliasing path. Both ride the canonical posts/authors
+    // tables. The canonical Post has no `writer` association, so we build a
+    // throwaway model carrying both.
     class PbTestPost extends Base {
       static {
         this.tableName = "posts";
@@ -390,7 +345,7 @@ describe("PredicateBuilderTest", () => {
     }
 
     beforeAll(() => {
-      registerModel("Author", PbTestAuthor);
+      registerModel("Author", Author);
       registerModel("Post", PbTestPost);
     });
 
@@ -433,20 +388,22 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("does not expand when key is a known column on the current table (mirrors Rails !table.has_column? guard)", () => {
+      // products.price is a real canonical column, so a nested hash keyed by it
+      // must NOT be treated as an association — it stays an equality on the
+      // current table.
       class PbTestProduct extends Base {
         static {
           this.tableName = "products";
-          this.attribute("metadata", "string");
           registerModel("PbTestProduct", this);
         }
       }
       try {
         const meta = new TableMetadata(PbTestProduct as any, new Table("products"));
         const builder = meta.predicateBuilder;
-        const nodes = builder.buildFromHash({ metadata: { foo: "bar" } });
+        const nodes = builder.buildFromHash({ price: { foo: "bar" } });
         const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
-        expect(sql).toContain('"products"."metadata"');
-        expect(sql).not.toContain('"metadata"."foo"');
+        expect(sql).toContain('"products"."price"');
+        expect(sql).not.toContain('"price"."foo"');
       } finally {
         modelRegistry.delete("PbTestProduct");
       }
