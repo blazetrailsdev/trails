@@ -73,6 +73,21 @@ export interface VirtualizeOptions extends WalkOptions {
   schemaColumnsByTable?: Readonly<
     Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>
   >;
+  /**
+   * Maps an association `className` to the in-file class it was registered
+   * against (`registerModel("Alias", LocalClass)`). Forwarded to
+   * `synthesizeDeclares` so association declares resolve to the real
+   * in-file type rather than a non-existent alias type. See
+   * {@link import("./synthesize.js").SynthesizeOptions.classNameAliases}.
+   */
+  classNameAliases?: ReadonlyMap<string, string>;
+  /**
+   * Render `attribute()` declares as `T | null`. Forwarded to
+   * `synthesizeDeclares` — set by the materializing generator so baked
+   * declares allow null assignment. See
+   * {@link import("./synthesize.js").SynthesizeOptions.attributesNullable}.
+   */
+  attributesNullable?: boolean;
 }
 
 export function virtualize(
@@ -96,6 +111,8 @@ export function virtualize(
     if (info.openBracePos < 0) continue;
     const decls = synthesizeDeclares(info, {
       schemaColumnsByTable: options.schemaColumnsByTable,
+      classNameAliases: options.classNameAliases,
+      attributesNullable: options.attributesNullable,
     });
     if (decls.length === 0) continue;
     const block = "\n" + decls.join("\n") + "\n";

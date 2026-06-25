@@ -46,10 +46,30 @@ export type SchemaColumnValue =
 
 export interface SynthesizeOptions {
   schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
+  /**
+   * Maps a runtime association `className` to the in-file TypeScript class
+   * name it was registered against (via `registerModel("Alias", LocalClass)`).
+   * Test models frequently register under an alias that differs from the
+   * class identifier (e.g. `class Octopus` registered as `"EsOctopus"`); an
+   * association `className: "EsOctopus"` would otherwise emit
+   * `declare octopus: EsOctopus | null` — a type that doesn't exist (TS2304).
+   * With the alias map the declare resolves to the real `Octopus` class.
+   */
+  classNameAliases?: ReadonlyMap<string, string>;
+  /**
+   * Render `this.attribute(name, type)` declares as `T | null` rather than
+   * `T`. An AR attribute carries no NOT NULL constraint, so it is nullable
+   * by Rails' conservative default — assigning `null` to it must typecheck.
+   * The live tsc-plugin keeps the bare `T` form (an attribute you declared
+   * is expected to hold a value at read sites), but the materializing
+   * generator opts in so baked declares allow null assignment (no TS2322).
+   */
+  attributesNullable?: boolean;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
   const out: string[] = [];
+  const aliases = opts.classNameAliases;
   // Track ALL synthesized instance member names so schema-reflected
   // declares don't collide with attribute() / hasMany() / belongsTo() /
   // hasOne() / scope() etc. Rails allows an association named "comments"
@@ -57,14 +77,14 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
   // emitting two `declare comments: ...` members is a TS error.
   const synthesizedInstanceNames = new Set<string>();
   for (const call of info.calls) {
-    for (const line of renderCall(info, call)) {
+    for (const line of renderCall(info, call, aliases, opts.attributesNullable ?? false)) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         out.push(line.text);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
     }
   }
-  for (const l of renderLoaderOverloads(info)) {
+  for (const l of renderLoaderOverloads(info, aliases)) {
     if (!info.existingMembers.has(l.declaredName)) {
       out.push(l.text);
       synthesizedInstanceNames.add(l.declaredName);
@@ -157,12 +177,15 @@ function isValidIdentifier(name: string): boolean {
  * Collections (hasMany / HABTM) use `await record.<name>` for explicit
  * loads — no method emitted.
  */
-function renderLoaderOverloads(info: ClassInfo): RenderedLine[] {
+function renderLoaderOverloads(
+  info: ClassInfo,
+  aliases?: ReadonlyMap<string, string>,
+): RenderedLine[] {
   const belongsToOverloads: string[] = [];
   const hasOneOverloads: string[] = [];
   for (const call of info.calls) {
     if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
-    const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call);
+    const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call, aliases);
     const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
     if (call.kind === "belongsTo") belongsToOverloads.push(overload);
     else hasOneOverloads.push(overload);
@@ -193,16 +216,21 @@ interface RenderedLine {
   skipIfPresent: boolean;
 }
 
-function renderCall(info: ClassInfo, call: RuntimeCall): RenderedLine[] {
+function renderCall(
+  info: ClassInfo,
+  call: RuntimeCall,
+  aliases: ReadonlyMap<string, string> | undefined,
+  attributesNullable: boolean,
+): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
-      return renderAttribute(call);
+      return renderAttribute(call, attributesNullable);
     case "hasMany":
     case "hasAndBelongsToMany":
-      return renderCollectionAssoc(call);
+      return renderCollectionAssoc(call, aliases);
     case "belongsTo":
     case "hasOne":
-      return renderSingularAssoc(call);
+      return renderSingularAssoc(call, aliases);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -212,33 +240,48 @@ function renderCall(info: ClassInfo, call: RuntimeCall): RenderedLine[] {
   }
 }
 
-function renderAttribute(call: AttributeCall): RenderedLine[] {
+function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[] {
+  // Base already defines an `id` accessor (PrimaryKeyValue, composite-key
+  // aware); re-declaring it here as an instance property is a TS2610 error.
+  // Skip it, matching how renderSchemaColumnDeclares skips the `id` column.
+  if (call.name === "id") return [];
   const tsType = tsTypeFor(call.railsType);
   const memberName = renderDeclaredMemberName(call.name);
-  return [line(`declare ${memberName}: ${tsType};`, call.name, false)];
+  const rendered = nullable
+    ? tsType.includes("|")
+      ? `(${tsType}) | null`
+      : `${tsType} | null`
+    : tsType;
+  return [line(`declare ${memberName}: ${rendered};`, call.name, false)];
 }
 
-function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
+function renderCollectionAssoc(
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+): RenderedLine[] {
   // Post-Phase-R.2: collection readers return an AssociationProxy,
   // not a plain `Target[]`. The proxy is awaitable — `await blog.posts`
   // hydrates and returns `Post[]` — so we don't emit a loader for
   // collections. Singular associations (belongsTo / hasOne) are
   // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
   // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
-  const target = resolveTarget(call);
+  const target = resolveTarget(call, aliases);
   const memberName = renderDeclaredMemberName(call.name);
   return [
     line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
   ];
 }
 
-function renderSingularAssoc(call: AssociationCall): RenderedLine[] {
+function renderSingularAssoc(
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+): RenderedLine[] {
   // `polymorphic: true` on belongsTo can't be narrowed statically — any
   // Base-rooted class could be on the other end. Fall back to `Base | null`.
   // Per-association loader declarations are aggregated into
   // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
   // by `renderLoaderOverloads` below.
-  const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call);
+  const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call, aliases);
   const memberName = renderDeclaredMemberName(call.name);
   return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
 }
@@ -303,8 +346,9 @@ function readAffix(raw: string | undefined, attr: string, side: "prefix" | "suff
   return side === "prefix" ? `${value}_` : `_${value}`;
 }
 
-function resolveTarget(call: AssociationCall): string {
-  return resolveAssociationTarget(call);
+function resolveTarget(call: AssociationCall, aliases?: ReadonlyMap<string, string>): string {
+  const target = resolveAssociationTarget(call);
+  return aliases?.get(target) ?? target;
 }
 
 function pascal(s: string): string {

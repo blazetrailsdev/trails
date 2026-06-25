@@ -518,6 +518,51 @@ describe("virtualize — multiple classes", () => {
   });
 });
 
+describe("virtualize — materializing-generator gaps", () => {
+  test('skips `declare id` for an explicit this.attribute("id", ...)', () => {
+    // Base owns the `id` accessor (composite-key aware); re-declaring it as
+    // an instance property is a TS2610 error. The schema-merge path already
+    // skips `id`; the attribute() path must too.
+    const src =
+      "class Reply extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("id", "integer");\n' +
+      '    this.attribute("content", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).not.toMatch(/declare id:/);
+    expect(text).toContain("declare content: string;");
+  });
+
+  test("attributesNullable renders attribute declares as `T | null`", () => {
+    const src =
+      "class Reply extends Base {\n" +
+      '  static { this.attribute("content", "string"); }\n' +
+      "}\n";
+    expect(virtualize(src, "file.ts").text).toContain("declare content: string;");
+    expect(virtualize(src, "file.ts", { attributesNullable: true }).text).toContain(
+      "declare content: string | null;",
+    );
+  });
+
+  test("classNameAliases resolves association targets registered under an alias", () => {
+    // `belongsTo("octopus", { className: "EsOctopus" })` where the in-file
+    // class is `Octopus` registered as `"EsOctopus"`. Without the alias the
+    // declare references a non-existent `EsOctopus` type (TS2304).
+    const src =
+      "class Virus extends Base {\n" +
+      '  static { this.belongsTo("octopus", { className: "EsOctopus" }); }\n' +
+      "}\n";
+    const aliases = new Map([["EsOctopus", "Octopus"]]);
+    const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
+    expect(text).toContain("declare octopus: Octopus | null;");
+    expect(text).toContain('declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;');
+    // The injected declares reference `Octopus`, not the non-existent alias.
+    expect(text).not.toMatch(/declare octopus: EsOctopus/);
+  });
+});
+
 function indexOfNthNewline(text: string, n: number): number {
   let idx = 0;
   for (let i = 0; i < n; i++) {

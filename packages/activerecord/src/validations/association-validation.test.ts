@@ -35,6 +35,9 @@ describe("AssociationValidationTest", () => {
     let cidx = 0;
     const idx = ++cidx;
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
@@ -42,6 +45,8 @@ describe("AssociationValidationTest", () => {
       }
     }
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -60,6 +65,8 @@ describe("AssociationValidationTest", () => {
 
   it("validates associated one", async () => {
     class Widget extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -73,6 +80,9 @@ describe("AssociationValidationTest", () => {
 
   it("validates associated missing", async () => {
     class MissingChild extends Base {
+      declare name: string | null;
+      declare parent_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
@@ -87,11 +97,18 @@ describe("AssociationValidationTest", () => {
 
   it("validates presence of belongs to association  parent is new record", async () => {
     class ValBtParent extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class ValBtChild extends Base {
+      declare title: string | null;
+      declare val_bt_parent_id: number | null;
+      declare valBtParent: ValBtParent | null;
+      declare loadBelongsTo: (name: "valBtParent") => Promise<ValBtParent | null>;
+
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent_id", "integer");
@@ -111,11 +128,18 @@ describe("AssociationValidationTest", () => {
 
   it("validates presence of belongs to association  existing parent", async () => {
     class ValBtParent2 extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class ValBtChild2 extends Base {
+      declare title: string | null;
+      declare val_bt_parent2_id: number | null;
+      declare valBtParent2: ValBtParent2 | null;
+      declare loadBelongsTo: (name: "valBtParent2") => Promise<ValBtParent2 | null>;
+
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent2_id", "integer");
@@ -145,6 +169,8 @@ describe("AssociationValidationTest", () => {
       }
     }
     class TopicMD extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validatesAssociated("replies");
@@ -166,6 +192,8 @@ describe("AssociationValidationTest", () => {
       }
     }
     class TopicWAD extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validatesAssociated("replies");
@@ -183,6 +211,8 @@ describe("AssociationValidationTest", () => {
       }
     }
     class ReplyMsg extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validatesAssociated("topic", {
@@ -206,6 +236,8 @@ describe("AssociationValidationTest", () => {
       }
     }
     class ReplyCtx extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validatesAssociated("topic", { on: "custom" });
@@ -223,6 +255,9 @@ describe("AssociationValidationTest", () => {
     // records directly and wire the association cache, since the behavior under
     // test is the `on: :create` gating, not CollectionProxy.create itself.
     class ReplyCreateTopic extends Base {
+      declare title: string | null;
+      declare content: string | null;
+
       static {
         this._tableName = "reply_create_topics";
         this.attribute("id", "integer");
@@ -232,6 +267,9 @@ describe("AssociationValidationTest", () => {
       }
     }
     class ReplyCreate extends Base {
+      declare title: string | null;
+      declare content: string | null;
+
       static {
         this._tableName = "reply_creates";
         this.attribute("id", "integer");

@@ -1,3 +1,4 @@
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
@@ -34,6 +35,11 @@ describe("EagerSingularizationTest", () => {
 
   function makeModels() {
     class Virus extends Base {
+      declare octopus_id: number | null;
+      declare species: string | null;
+      declare octopus: Octopus | null;
+      declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;
+
       static {
         this._tableName = "viri";
         this.attribute("octopus_id", "integer");
@@ -45,6 +51,10 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Octopus extends Base {
+      declare species: string | null;
+      declare virus: Virus | null;
+      declare loadHasOne: (name: "virus") => Promise<Virus | null>;
+
       static {
         this._tableName = "octopi";
         this.attribute("species", "string");
@@ -55,6 +65,11 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Pass extends Base {
+      declare bus_id: number | null;
+      declare rides: number | null;
+      declare bus: Bus | null;
+      declare loadBelongsTo: (name: "bus") => Promise<Bus | null>;
+
       static {
         this._tableName = "passes";
         this.attribute("bus_id", "integer");
@@ -66,6 +81,9 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Bus extends Base {
+      declare name: string | null;
+      declare passes: AssociationProxy<Pass>;
+
       static {
         this._tableName = "buses";
         this.attribute("name", "string");
@@ -76,6 +94,9 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Mess extends Base {
+      declare name: string | null;
+      declare crises: AssociationProxy<Crisis>;
+
       static {
         this._tableName = "messes";
         this.attribute("name", "string");
@@ -88,6 +109,13 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Crisis extends Base {
+      declare name: string | null;
+      declare messes: AssociationProxy<Mess>;
+      declare analyses: AssociationProxy<Analysis>;
+      declare successes: AssociationProxy<Success>;
+      declare dresses: AssociationProxy<Dress>;
+      declare compresses: AssociationProxy<Compress>;
+
       static {
         this._tableName = "crises";
         this.attribute("name", "string");
@@ -120,6 +148,10 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Success extends Base {
+      declare name: string | null;
+      declare analyses: AssociationProxy<Analysis>;
+      declare crises: AssociationProxy<Crisis>;
+
       static {
         this._tableName = "successes";
         this.attribute("name", "string");
@@ -136,6 +168,13 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Analysis extends Base {
+      declare crisis_id: number | null;
+      declare success_id: number | null;
+      declare crisis: Crisis | null;
+      declare success: Success | null;
+      declare loadBelongsTo: ((name: "crisis") => Promise<Crisis | null>) &
+        ((name: "success") => Promise<Success | null>);
+
       static {
         this._tableName = "analyses";
         this.attribute("crisis_id", "integer");
@@ -151,6 +190,11 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Dress extends Base {
+      declare crisis_id: number | null;
+      declare crisis: Crisis | null;
+      declare compresses: AssociationProxy<Compress>;
+      declare loadBelongsTo: (name: "crisis") => Promise<Crisis | null>;
+
       static {
         this._tableName = "dresses";
         this.attribute("crisis_id", "integer");
@@ -165,6 +209,10 @@ describe("EagerSingularizationTest", () => {
       }
     }
     class Compress extends Base {
+      declare dress_id: number | null;
+      declare dress: Dress | null;
+      declare loadBelongsTo: (name: "dress") => Promise<Dress | null>;
+
       static {
         this._tableName = "compresses";
         this.attribute("dress_id", "integer");
