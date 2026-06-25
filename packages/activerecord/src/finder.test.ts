@@ -3605,9 +3605,9 @@ describe("FinderTest", () => {
         this.attribute("name", "string");
       }
     }
-    await User.create({ name: "Alice" });
-    await expect(User.find([1, 999])).rejects.toThrow(
-      "Couldn't find all Users with 'id': (1, 999) (found 1 results, but was looking for 2).",
+    const alice = await User.create({ name: "Alice" });
+    await expect(User.find([alice.id, 999])).rejects.toThrow(
+      `Couldn't find all Users with 'id': (${alice.id}, 999) (found 1 results, but was looking for 2).`,
     );
   });
 });
