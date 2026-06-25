@@ -42,6 +42,7 @@ import {
   setGenerateSecureTokenOn,
   setMaintainTestSchema,
   setQueues,
+  setRaiseOnAssignToAttrReadonly,
 } from "./ar-config.js";
 
 export const ControllerRuntime = { processAction, cleanupViewRuntime, appendInfoToPayload };
@@ -224,6 +225,7 @@ export class Trailtie extends BaseRailtie {
       // source of truth at runtime.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       setMaintainTestSchema(cfg.maintainTestSchema);
+      setRaiseOnAssignToAttrReadonly(cfg.raiseOnAssignToAttrReadonly);
       setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
       setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
       setQueues(cfg.queues);

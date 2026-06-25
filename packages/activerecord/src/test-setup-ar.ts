@@ -15,6 +15,7 @@ import { beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { DelegateCache } from "./relation/delegation.js";
 import { loadDefaults } from "./trailtie.js";
+import { setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 
@@ -33,6 +34,11 @@ DelegateCache.delegateBaseMethods = false;
 
 // Mirror Rails activerecord/test/cases/helper.rb:40
 Base.automaticallyInvertPluralAssociations = true;
+
+// Mirror Rails activerecord/test/cases/helper.rb:42 — the AR test suite enables
+// raise-on-assign-to-readonly globally; the framework default (active_record.rb:343)
+// is false, flipped to true by load_defaults 7.1 (configuration.rb:286).
+setRaiseOnAssignToAttrReadonly(true);
 
 // Wipe shared test-adapter state before every test so each test starts
 // from a clean slate.

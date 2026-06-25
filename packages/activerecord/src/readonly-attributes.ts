@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { Model, MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
+import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 
 /**
  * Raised when a persisted record attempts to write to a column declared
@@ -15,20 +16,18 @@ import { ActiveRecordError } from "./errors.js";
  * HasReadonlyAttributes in Rails' readonly_attributes.rb).
  */
 /**
- * When false, assigning to a readonly attribute silently skips the write
- * instead of raising ReadonlyAttributeError.
+ * Reads `ActiveRecord.raise_on_assign_to_attr_readonly` — the canonical module
+ * flag lives in `ar-config.ts` (default false, active_record.rb:343). Re-exported
+ * here so the historic `getRaiseOnAssignToAttrReadonly`/`setRaiseOnAssignToAttrReadonly`
+ * public surface stays put while the home is the single ar-config binding.
  *
  * Mirrors: ActiveRecord.raise_on_assign_to_attr_readonly
  */
-let _raiseOnAssignToAttrReadonly = true;
-
 export function getRaiseOnAssignToAttrReadonly(): boolean {
-  return _raiseOnAssignToAttrReadonly;
+  return raiseOnAssignToAttrReadonly;
 }
 
-export function setRaiseOnAssignToAttrReadonly(value: boolean): void {
-  _raiseOnAssignToAttrReadonly = value;
-}
+export { setRaiseOnAssignToAttrReadonly };
 
 export class ReadonlyAttributeError extends ActiveRecordError {
   readonly attribute: string;
@@ -136,7 +135,7 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     }
   }
   if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
-    if (_raiseOnAssignToAttrReadonly) {
+    if (raiseOnAssignToAttrReadonly) {
       throw new ReadonlyAttributeError(canonical);
     }
     return; // silently skip — mirrors Rails' non-raising mode
@@ -159,7 +158,7 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
 export function _writeAttribute(this: Base, name: string, value: unknown): void {
   const ctor = this.constructor as typeof Base;
   if (this._newRecord === false && ctor.readonlyAttributeQ(String(name))) {
-    if (_raiseOnAssignToAttrReadonly) {
+    if (raiseOnAssignToAttrReadonly) {
       throw new ReadonlyAttributeError(String(name));
     }
     return;
