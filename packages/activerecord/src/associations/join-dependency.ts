@@ -36,6 +36,28 @@ import { AliasTracker } from "./alias-tracker.js";
  */
 const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
 
+/**
+ * Stable per-reflection ids used to key `@joined_tables` by the remaining
+ * reflection chain. Rails uses the `reflection_chain[index..]` array as the hash
+ * key (join_dependency.rb:194); Ruby compares those arrays element-wise by the
+ * reflections' object identity (no `eql?` override). A JS array can't be a value
+ * key, so we intern each reflection to a number and join the suffix's ids.
+ */
+let _reflectionIdCounter = 0;
+const _reflectionIds = new WeakMap<object, number>();
+function reflectionChainKey(chain: readonly object[]): string {
+  let key = "";
+  for (const refl of chain) {
+    let id = _reflectionIds.get(refl);
+    if (id === undefined) {
+      id = ++_reflectionIdCounter;
+      _reflectionIds.set(refl, id);
+    }
+    key += key ? `,${id}` : `${id}`;
+  }
+  return key;
+}
+
 /** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
   column: string;
@@ -140,17 +162,20 @@ export class JoinDependency {
    */
   private _references: Map<string, string> = new Map();
   /**
-   * Mirrors Rails' `@joined_tables` (join_dependency.rb:193-200): the per-emit
-   * memo of `[table, terminated]` keyed by chain-link reflection object. A
-   * chain-tail reflection shared across two through paths (e.g. two `through:
-   * :posts` associations both carrying the owner's single `posts` reflection in
-   * their chains) reuses the first path's resolved alias and terminates the walk
-   * there, so the second path keys off that one alias instead of minting a
-   * spurious `{candidate}_join`. Reset every emit in `joinConstraints`.
+   * Mirrors Rails' `@joined_tables` (join_dependency.rb:193-209): the per-emit
+   * memo of `[table, terminated]` keyed by the remaining reflection chain
+   * (`reflectionChainKey`). A chain tail shared across two through paths (e.g.
+   * two `through: :posts` associations both carrying the owner's single `posts`
+   * reflection in their chains) reuses the first path's resolved alias and
+   * terminates the walk there, so the second path keys off that one alias
+   * instead of minting a spurious `{candidate}_join`. Reset every emit in
+   * `joinConstraints`.
    * @internal
    */
-  private _joinedTables: Map<any, { aliased: Table; effectiveName: string; terminated: boolean }> =
-    new Map();
+  private _joinedTables: Map<
+    string,
+    { aliased: Table; effectiveName: string; terminated: boolean }
+  > = new Map();
   /**
    * Manual-join tables this dependency must treat as already-claimed when it
    * builds a fresh emit-time AliasTracker (the eager-load path emits with no
@@ -855,13 +880,14 @@ export class JoinDependency {
         const idx = chainLen - remaining.length;
         const tableName = group.chainTables[idx].tableName;
         const root = idx === 0;
-        // Rails make_constraints memoizes `[table, terminated]` per chain-link
-        // reflection (join_dependency.rb:193-200). A reflection already resolved
-        // by an earlier through/include path reuses that alias and terminates
-        // the walk here (`next table, true`) — the second path keys off the one
-        // shared alias rather than minting a fresh `{candidate}_join`. Only the
-        // target link (root) updates the memo's `terminated` flag.
-        const memo = this._joinedTables.get(refl);
+        // Rails make_constraints memoizes `[table, terminated]` keyed by the
+        // remaining reflection chain (join_dependency.rb:194). A chain tail
+        // already resolved by an earlier through/include path reuses that alias
+        // and terminates the walk here (`next table, true`) — the second path
+        // keys off the one shared alias rather than minting a fresh
+        // `{candidate}_join`. Only the target link (root) updates `terminated`.
+        const chainKey = reflectionChainKey(remaining);
+        const memo = this._joinedTables.get(chainKey);
         if (memo && (!root || !memo.terminated)) {
           if (root) memo.terminated = true;
           return [memo.aliased, true];
@@ -879,9 +905,9 @@ export class JoinDependency {
             ? new Table(tableName)
             : new Table(tableName, { as: effectiveName });
         resolvedByIdx[idx] = { effectiveName, aliased };
-        // Rails: `@joined_tables[reflection] ||= [table, root] if OuterJoin`.
-        if (this._joinType === Nodes.OuterJoin && !this._joinedTables.has(refl)) {
-          this._joinedTables.set(refl, { aliased, effectiveName, terminated: root });
+        // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`.
+        if (this._joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
+          this._joinedTables.set(chainKey, { aliased, effectiveName, terminated: root });
         }
         return [aliased, false];
       },
