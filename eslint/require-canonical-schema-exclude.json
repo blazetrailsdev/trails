@@ -1,5 +1,4 @@
 [
-  "packages/activerecord/src/aggregations.test.ts",
   "packages/activerecord/src/associations.test.ts",
   "packages/activerecord/src/associations/association-relation.test.ts",
   "packages/activerecord/src/associations/association-scope-alias-tracker.test.ts",
