@@ -2002,4 +2002,23 @@ describe("RelationTest", () => {
     expect(sql).toMatch(/IN \(SELECT/i);
     expect(sql).toMatch(/GROUP BY/i);
   });
+
+  // Rails resolves nested-hash/array eager specs through
+  // construct_join_dependency(eager_load_values | includes_values).reflections
+  // (finder_methods.rb:457-470, join_dependency.rb:81-82) before
+  // using_limitable_reflections?. A spec whose whole tree is singular
+  // (Author hasOne post → Post belongsTo author) stays limitable, so a
+  // limit/offset relation is NOT deferred to distinct_relation_for_primary_key.
+  it("where with a singular nested-hash eager-loading limited subquery does not defer materialization", () => {
+    const subquery = CanonAuthor.eagerLoad({ post: "author" }).order("id").limit(2);
+    expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(false);
+  });
+
+  // A collection anywhere in the nested eager tree (Author hasOne post → Post
+  // hasMany comments) makes the reflection set non-limitable, so the relation
+  // defers to distinct-PK materialization just as a top-level collection does.
+  it("where with a collection nested-hash eager-loading limited subquery defers materialization", () => {
+    const subquery = CanonAuthor.eagerLoad({ post: "comments" }).order("id").limit(2);
+    expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
+  });
 });

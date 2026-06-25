@@ -4884,20 +4884,20 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve eager-load specs to reflections then apply the Rails limitable
-   * rule. A non-string (nested-hash) or unresolvable spec is treated
-   * conservatively as non-limitable, so it short-circuits to `false` before
-   * `usingLimitableReflections` (which only sees resolved reflections).
+   * Limitability of Rails' first `using_limitable_reflections?` clause: the
+   * reflections of `construct_join_dependency(eager_load_values | includes_values)`
+   * (finder_methods.rb:457-470, join_dependency.rb:81-82). Specs are resolved
+   * through a JoinDependency so nested-hash/array eager chains
+   * (`eagerLoad({ author: "profile" })`) contribute every reflection in the tree
+   * — matching Rails' `JoinDependency#reflections` — rather than short-circuiting
+   * to non-limitable on the first non-string spec. Shares the resolution path
+   * with `_joinsReflectionsAreLimitable`.
    */
   private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
-    const reflections: Array<{ isCollection(): boolean }> = [];
-    for (const spec of specs) {
-      if (typeof spec !== "string") return false;
-      const refl = (this._modelClass as any)._reflectOnAssociation?.(spec);
-      if (!refl) return false;
-      reflections.push(refl);
-    }
-    return this.usingLimitableReflections(reflections);
+    if (specs.length === 0) return true;
+    const jd = new JoinDependency(this._modelClass);
+    for (const spec of specs) jd.addAssociationSpec(spec);
+    return this.usingLimitableReflections(jd.reflections);
   }
 
   /**
