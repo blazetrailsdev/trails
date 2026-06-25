@@ -747,7 +747,6 @@ describe("PersistenceTest", () => {
       cb_posts: { title: "string" },
       special_posts: { title: "string", body: "string" },
       ts_posts: { title: "string", created_at: "datetime" },
-      timed_posts: { title: "string", updated_at: "datetime" },
     });
     class PostClass extends Base {
       static {
@@ -790,47 +789,10 @@ describe("PersistenceTest", () => {
     expect(results.length).toBe(0);
   });
 
-  it("update column with model having primary key other than id", async () => {
-    class Item extends Base {
-      static {
-        this.primaryKey = "uuid";
-        this.attribute("uuid", "string");
-        this.attribute("name", "string");
-      }
-    }
-    expect(Item.primaryKey).toBe("uuid");
-  });
-
-  it("update column should not modify updated at", async () => {
-    class TimedPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const p = await TimedPost.create({ title: "timed" });
-    await p.updateColumn("title", "changed");
-    expect(p.title).toBe("changed");
-  });
-
-  it("update parameters", async () => {
-    const p = await Post.create({ title: "params" });
-    await Post.update(p.id, { title: "updated-params" });
-    const found = await Post.find(p.id);
-    expect(found.title).toBe("updated-params");
-  });
-
   it("instantiate creates a new instance", () => {
     const p = new Post({ title: "inst" });
     expect(p).toBeInstanceOf(Base);
     expect(p.isNewRecord()).toBe(true);
-  });
-
-  it("update sti type", async () => {
-    const p = await Post.create({ title: "sti" });
-    p.title = "updated-sti";
-    await p.save();
-    expect(p.title).toBe("updated-sti");
   });
 
   it("update attribute in before validation respects callback chain", async () => {
@@ -848,11 +810,10 @@ describe("PersistenceTest", () => {
     expect(p.title).toBe("default");
   });
 
-  it("delete isnt affected by scoping", async () => {
-    const p = await Post.create({ title: "scoped-del" });
-    await Post.delete(p.id);
-    const count = await Post.all().count();
-    expect(count).toBe(0);
+  it("update columns with default scope", async () => {
+    const p = await Post.create({ title: "scope-cols" });
+    await p.updateColumns({ title: "updated-scope-cols" });
+    expect(p.title).toBe("updated-scope-cols");
   });
 
   it("persist inherited class with different table name", async () => {
@@ -883,12 +844,6 @@ describe("PersistenceTest", () => {
     },
   );
 
-  it("update columns with default scope", async () => {
-    const p = await Post.create({ title: "scope-cols" });
-    await p.updateColumns({ title: "updated-scope-cols" });
-    expect(p.title).toBe("updated-scope-cols");
-  });
-
   it("create with custom timestamps", async () => {
     class TSPost extends Base {
       static {
@@ -905,14 +860,82 @@ describe("PersistenceTest", () => {
     const p = new Post({ title: "base" });
     expect(p).toBeInstanceOf(Base);
   });
+});
 
+// ==========================================================================
+// PersistenceTest — slice of the bespoke posts block converted to canonical
+// Topic / Minivan / Developer + fixtures.
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const Topic = CanonicalTopic;
+  const Developer = CanonicalDeveloper;
+  const { topics } = useHandlerFixtures(["topics", "minivans", "developers"], {
+    schema: canonicalSchema,
+  });
+
+  // Rails: test_update_column_should_not_modify_updated_at
+  // Developer aliases updated_at → legacy_updated_at (developer.rb), so the
+  // alias-aware updateColumn path resolves the public name.
+  it("update column should not modify updated at", async () => {
+    const developer = await Developer.find(1);
+    const prevMonth = instant("2026-05-25T12:00:00Z");
+    await developer.updateColumn("updated_at", prevMonth);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    await developer.updateColumn("salary", 80001);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    await developer.reload();
+    expect(Math.floor(epochMs(developer.readAttribute("updated_at")) / 1000)).toBe(
+      Math.floor(prevMonth.epochMilliseconds / 1000),
+    );
+  });
+
+  // Rails: test_update_parameters
+  // Rails raises ArgumentError for `update(nil)`; trails surfaces the same
+  // "raises on nil" behavior as a TypeError (Object.entries(null)), so the
+  // assertion checks that *something* is raised rather than the class.
+  it("update parameters", async () => {
+    const topic = await Topic.find(1);
+    await topic.update({});
+    let raised = false;
+    try {
+      await topic.update(null as any);
+    } catch {
+      raised = true;
+    }
+    expect(raised).toBe(true);
+  });
+
+  // Rails: test_update_sti_type
+  it("update sti type", async () => {
+    expect(topics("second")).toBeInstanceOf(Reply);
+    const topic = topics("second").becomesBang(Topic);
+    expect(topic).toBeInstanceOf(Topic);
+    await topic.saveBang();
+    expect(await Topic.find(topic.id)).toBeInstanceOf(Topic);
+  });
+
+  // Rails: test_delete_isnt_affected_by_scoping
+  it("delete isnt affected by scoping", async () => {
+    const topic = await Topic.find(1);
+    const before = Number(await Topic.count());
+    await Topic.where("1=0").scoping(() => topic.delete());
+    expect(Number(await Topic.count())).toBe(before - 1);
+  });
+
+  // Rails: test_update_column_with_model_having_primary_key_other_than_id
+  it("update column with model having primary key other than id", async () => {
+    const minivan = await Minivan.find("m1");
+    const newName = "sebavan";
+    await minivan.updateColumn("name", newName);
+    expect(minivan.readAttribute("name")).toBe(newName);
+  });
+
+  // Rails: test_duped_becomes_persists_changes_from_the_original
   it("duped becomes persists changes from the original", async () => {
-    const p = await Post.create({ title: "original" });
-    const d = p.dup();
-    d.title = "duped";
-    await d.save();
-    expect(d.isPersisted()).toBe(true);
-    expect(d.id).not.toBe(p.id);
+    const original = topics("first");
+    const copy = original.dup().becomes(Reply);
+    await copy.saveBang();
+    expect((await Topic.find(copy.id)).title).toBe("The First Topic");
   });
 });
 
