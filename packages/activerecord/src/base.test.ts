@@ -2088,15 +2088,17 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changeable");
 
-      // write_attribute silently skips the readonly attr, applies to other attrs
+      // Rails: the value changes in memory but is not persisted on save. After
+      // reload the readonly column is unchanged; the writable one persists.
       post.writeAttribute("title", "changed via write_attribute");
       post.writeAttribute("body", "changed via write_attribute");
+      // The readonly write is NOT skipped: the value lands in memory (Rails super).
+      expect(post.readAttribute("title")).toBe("changed via write_attribute");
       await post.saveBang();
       await post.reload();
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via write_attribute");
 
-      // assignAttributes silently skips readonly attr
       post.assignAttributes({
         title: "changed via assign_attributes",
         body: "changed via assign_attributes",
@@ -2106,7 +2108,6 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via assign_attributes");
 
-      // update() silently skips readonly attr
       await post.update({ title: "changed via update", body: "changed via update" });
       await post.reload();
       expect(post.readAttribute("title")).toBe("cannot change this");
