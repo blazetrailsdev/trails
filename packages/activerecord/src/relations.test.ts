@@ -2184,7 +2184,9 @@ describe("RelationTest", () => {
   });
 
   it("firstBang throws when empty", async () => {
-    await expect(Widget.all().where({ color: "purple" }).firstBang()).rejects.toThrow("not found");
+    await expect(Widget.all().where({ color: "purple" }).firstBang()).rejects.toThrow(
+      "Couldn't find Widget",
+    );
   });
 
   it("lastBang returns last or throws", async () => {
@@ -2193,7 +2195,9 @@ describe("RelationTest", () => {
   });
 
   it("lastBang throws when empty", async () => {
-    await expect(Widget.all().where({ color: "purple" }).lastBang()).rejects.toThrow("not found");
+    await expect(Widget.all().where({ color: "purple" }).lastBang()).rejects.toThrow(
+      "Couldn't find Widget",
+    );
   });
 
   // -- whereNot --
@@ -4264,7 +4268,9 @@ describe("RelationTest", () => {
   });
 
   it("firstBang throws on empty result", async () => {
-    await expect(Product.where({ category: "meat" }).firstBang()).rejects.toThrow("not found");
+    await expect(Product.where({ category: "meat" }).firstBang()).rejects.toThrow(
+      "Couldn't find Product",
+    );
   });
 
   it("last returns the last record by primary key", async () => {
@@ -4286,7 +4292,9 @@ describe("RelationTest", () => {
   });
 
   it("lastBang throws on empty result", async () => {
-    await expect(Product.where({ category: "meat" }).lastBang()).rejects.toThrow("not found");
+    await expect(Product.where({ category: "meat" }).lastBang()).rejects.toThrow(
+      "Couldn't find Product",
+    );
   });
 
   // -- pluck --

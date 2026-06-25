@@ -363,7 +363,7 @@ export async function performFirst(this: FinderRelation, n?: number): Promise<an
 export async function performFirstBang(this: FinderRelation): Promise<any> {
   const record = await performFirst.call(this);
   if (!record) {
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    raiseRecordNotFoundExceptionBang.call(this);
   }
   return record;
 }
@@ -407,7 +407,7 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
 export async function performLastBang(this: FinderRelation): Promise<any> {
   const record = await performLast.call(this);
   if (!record) {
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    raiseRecordNotFoundExceptionBang.call(this);
   }
   return record;
 }
@@ -439,7 +439,7 @@ export async function performTake(this: FinderRelation, limit?: number): Promise
 export async function performTakeBang(this: FinderRelation): Promise<any> {
   const record = await performTake.call(this);
   if (!record) {
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    raiseRecordNotFoundExceptionBang.call(this);
   }
   return record;
 }
@@ -513,7 +513,7 @@ function bangFinder(finder: (this: FinderRelation) => Promise<any | null>) {
   return async function (this: FinderRelation): Promise<any> {
     const record = await finder.call(this);
     if (!record) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+      raiseRecordNotFoundExceptionBang.call(this);
     }
     return record;
   };

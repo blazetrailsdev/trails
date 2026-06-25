@@ -151,6 +151,7 @@ describe("FinderTest", () => {
       }
     }
     await expect(Topic.all().takeBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.all().takeBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("sole", async () => {
@@ -223,6 +224,7 @@ describe("FinderTest", () => {
       }
     }
     await expect(Topic.all().firstBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.all().firstBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("first have primary key order by default", async () => {
@@ -424,6 +426,7 @@ describe("FinderTest", () => {
       }
     }
     await expect(Topic.all().lastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.all().lastBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("take and first and last with integer should return an array", async () => {
@@ -732,8 +735,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    // secondBang should exist (or similar)
-    expect(typeof Topic.all().second).toBe("function");
+    expect(typeof Topic.all().secondBang).toBe("function");
+    await expect(Topic.all().secondBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to third bang", async () => {
@@ -742,7 +745,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(typeof Topic.all().third).toBe("function");
+    expect(typeof Topic.all().thirdBang).toBe("function");
+    await expect(Topic.all().thirdBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to fourth bang", async () => {
@@ -751,7 +755,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(typeof Topic.all().fourth).toBe("function");
+    expect(typeof Topic.all().fourthBang).toBe("function");
+    await expect(Topic.all().fourthBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to fifth bang", async () => {
@@ -760,7 +765,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(typeof Topic.all().fifth).toBe("function");
+    expect(typeof Topic.all().fifthBang).toBe("function");
+    await expect(Topic.all().fifthBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to last bang", async () => {
@@ -778,7 +784,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(typeof Topic.all().secondToLast).toBe("function");
+    expect(typeof Topic.all().secondToLastBang).toBe("function");
+    await expect(Topic.all().secondToLastBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to third to last bang", async () => {
@@ -787,7 +794,8 @@ describe("FinderTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(typeof Topic.all().thirdToLast).toBe("function");
+    expect(typeof Topic.all().thirdToLastBang).toBe("function");
+    await expect(Topic.all().thirdToLastBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("unexisting record exception handling", async () => {
@@ -3163,7 +3171,7 @@ describe("FinderTest", () => {
   });
 
   it("first! throws on empty", async () => {
-    await expect(User.where({ name: "Nobody" }).firstBang()).rejects.toThrow("not found");
+    await expect(User.where({ name: "Nobody" }).firstBang()).rejects.toThrow("Couldn't find User");
   });
 
   it("last returns the last record", async () => {
@@ -3179,7 +3187,7 @@ describe("FinderTest", () => {
   });
 
   it("last! throws on empty", async () => {
-    await expect(User.where({ name: "Nobody" }).lastBang()).rejects.toThrow("not found");
+    await expect(User.where({ name: "Nobody" }).lastBang()).rejects.toThrow("Couldn't find User");
   });
 
   it("second returns the second record", async () => {
