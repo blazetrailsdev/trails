@@ -51,12 +51,12 @@ describe("NamedScopingTest", () => {
 
   it("implements enumerable", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
-    expect((await (Topic as any).base().first()).id).toBe(((await Topic.first()) as any).id);
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
   });
 
   it("found items are cached", async () => {
-    const allPosts = (Topic as any).base();
+    const allPosts = Topic.base();
     const sql = await capSql(async () => {
       await allPosts.toArray();
       await allPosts.toArray();
@@ -65,7 +65,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("reload expires cache of found items", async () => {
-    const allPosts = (Topic as any).base();
+    const allPosts = Topic.base();
     await allPosts.toArray();
 
     const newPost = (await Topic.create({})) as any;
@@ -76,14 +76,14 @@ describe("NamedScopingTest", () => {
 
   it("delegates finds and calculations to the base class", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
-    expect((await Topic.count()) as number).toBe(await (Topic as any).base().count());
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.count()) as number).toBe(await Topic.base().count());
   });
 
   it("calling merge at first in scope", async () => {
-    Topic.scope("callingMergeAtFirstInScope", (q: any) => q.merge((Topic as any).replied()));
+    Topic.scope("callingMergeAtFirstInScope", (q: any) => q.merge(Topic.replied()));
     expect(ids(await (Topic as any).callingMergeAtFirstInScope().toArray())).toEqual(
-      ids(await (Topic as any).replied().toArray()),
+      ids(await Topic.replied().toArray()),
     );
   });
 
@@ -100,28 +100,22 @@ describe("NamedScopingTest", () => {
   });
 
   it("define scope for reserved words", async () => {
-    expect((await (Topic as any).true().toArray()).every((t: any) => t.approved === true)).toBe(
-      true,
-    );
-    expect((await (Topic as any).false().toArray()).every((t: any) => t.approved !== true)).toBe(
-      true,
-    );
+    expect((await Topic.true().toArray()).every((t: any) => t.approved === true)).toBe(true);
+    expect((await Topic.false().toArray()).every((t: any) => t.approved !== true)).toBe(true);
   });
 
   it("scope should respond to own methods and methods of the proxy", () => {
-    const approved = (Topic as any).approved();
+    const approved = Topic.approved();
     expect(typeof approved.limit).toBe("function");
     expect(typeof approved.count).toBe("function");
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
     expect((await Topic.where({ approved: true }).toArray()).length).toBeGreaterThan(0);
-    expect(sortedIds(await (Topic as any).approved().toArray())).toEqual(
+    expect(sortedIds(await Topic.approved().toArray())).toEqual(
       sortedIds(await Topic.where({ approved: true }).toArray()),
     );
-    expect(await (Topic as any).approved().count()).toBe(
-      await Topic.where({ approved: true }).count(),
-    );
+    expect(await Topic.approved().count()).toBe(await Topic.where({ approved: true }).count());
   });
 
   it("scopes with string name can be composed", async () => {
@@ -147,16 +141,12 @@ describe("NamedScopingTest", () => {
       await Topic.where("written_on < ?", second.written_on).toArray(),
     );
     expect(beforeThird).not.toEqual(beforeSecond);
-    expect(sortedIds(await (Topic as any).writtenBefore(third.written_on).toArray())).toEqual(
-      beforeThird,
-    );
-    expect(sortedIds(await (Topic as any).writtenBefore(second.written_on).toArray())).toEqual(
-      beforeSecond,
-    );
+    expect(sortedIds(await Topic.writtenBefore(third.written_on).toArray())).toEqual(beforeThird);
+    expect(sortedIds(await Topic.writtenBefore(second.written_on).toArray())).toEqual(beforeSecond);
   });
 
   it("procedural scopes returning nil", async () => {
-    expect(sortedIds(await (Topic as any).writtenBefore(null).toArray())).toEqual(
+    expect(sortedIds(await Topic.writtenBefore(null).toArray())).toEqual(
       sortedIds(await Topic.all().toArray()),
     );
   });
@@ -180,17 +170,17 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with object", async () => {
-    const objects = await (Topic as any).withObject().toArray();
+    const objects = await Topic.withObject().toArray();
     expect(objects.length).toBeGreaterThan(0);
     expect(objects.every((t: any) => t.approved === true)).toBe(true);
   });
 
   it("scope with kwargs", async () => {
-    const approved = await (Topic as any).withKwargs(true).toArray();
+    const approved = await Topic.withKwargs(true).toArray();
     expect(approved.length).toBeGreaterThan(0);
     expect(approved.every((t: any) => t.approved === true)).toBe(true);
 
-    const none = await (Topic as any).withKwargs().toArray();
+    const none = await Topic.withKwargs().toArray();
     expect(none.every((t: any) => t.approved !== true)).toBe(true);
   });
 
@@ -237,7 +227,7 @@ describe("NamedScopingTest", () => {
     const david = (await Author.find(authors("david").id)) as any;
     const postRanked = await (Post as any).rankedByComments().limitBy(5).toArray();
     const davidRanked = await david.posts.rankedByComments().limitBy(5).toArray();
-    const postTop = await (Post as any).top(5).toArray();
+    const postTop = await Post.top(5).toArray();
     const davidTop = await david.posts.top(5).toArray();
 
     expect(postRanked.length).toBeGreaterThan(0);
@@ -268,7 +258,7 @@ describe("NamedScopingTest", () => {
 
   it("active records have scope named  all  ", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await (Topic as any).base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
   });
 
   it("active records have scope named  scoped  ", async () => {
@@ -277,15 +267,15 @@ describe("NamedScopingTest", () => {
   });
 
   it("first and last should allow integers for limit", async () => {
-    const ordered = await (Topic as any).base().order("id").toArray();
-    const first2 = await (Topic as any).base().first(2);
+    const ordered = await Topic.base().order("id").toArray();
+    const first2 = await Topic.base().first(2);
     expect(ids(first2)).toEqual(ids(ordered.slice(0, 2)));
-    const last2 = await (Topic as any).base().last(2);
+    const last2 = await Topic.base().last(2);
     expect(ids(last2)).toEqual(ids(ordered.slice(-2)));
   });
 
   it("first and last should not use query when results are loaded", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     await t.load();
     const sql = await capSql(async () => {
       await t.first();
@@ -295,7 +285,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("empty should not load results", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isEmpty(); // count query
       await t.load(); // force load
@@ -305,7 +295,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("any should not load results", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isAny(); // count query
       await t.load(); // force load
@@ -316,7 +306,7 @@ describe("NamedScopingTest", () => {
 
   it("any should call proxy found if using a block", async () => {
     // Rails: `topics.any? { true }` runs one query and never calls `empty?`.
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isAny();
     });
@@ -324,7 +314,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("any should not fire query if scope loaded", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     await t.load();
     const sql = await capSql(async () => {
       expect(await t.isAny()).toBe(true);
@@ -339,7 +329,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should not load results", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isMany(); // count query
       await t.load(); // force load
@@ -349,7 +339,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should call proxy found if using a block", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.isMany();
     });
@@ -357,7 +347,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should not fire query if scope loaded", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     await t.load();
     const sql = await capSql(async () => {
       expect(await t.isMany()).toBe(true);
@@ -366,12 +356,12 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should return false if none or one", async () => {
-    expect(await (Topic as any).base().where({ id: 0 }).isMany()).toBe(false);
-    expect(await (Topic as any).base().where({ id: 1 }).isMany()).toBe(false);
+    expect(await Topic.base().where({ id: 0 }).isMany()).toBe(false);
+    expect(await Topic.base().where({ id: 1 }).isMany()).toBe(false);
   });
 
   it("many should return true if more than one", async () => {
-    expect(await (Topic as any).base().isMany()).toBe(true);
+    expect(await Topic.base().isMany()).toBe(true);
   });
 
   it("model class should respond to many", async () => {
@@ -384,22 +374,22 @@ describe("NamedScopingTest", () => {
   });
 
   it("should build on top of scope", async () => {
-    const topic = (Topic as any).approved().build({});
+    const topic = Topic.approved().build({});
     expect(topic.approved).toBe(true);
   });
 
   it("should build new on top of scope", async () => {
-    const topic = (Topic as any).approved().new({});
+    const topic = Topic.approved().new({});
     expect(topic.approved).toBe(true);
   });
 
   it("should create on top of scope", async () => {
-    const topic = await (Topic as any).approved().create({});
+    const topic = await Topic.approved().create({});
     expect(topic.approved).toBe(true);
   });
 
   it("should create with bang on top of scope", async () => {
-    const topic = await (Topic as any).approved().create({});
+    const topic = await Topic.approved().create({});
     expect(topic.approved).toBe(true);
   });
 
@@ -461,9 +451,7 @@ describe("NamedScopingTest", () => {
     expect(got).toEqual(expected);
     // (2) chained onto an already-constrained relation: the space-named scope
     // must not reset the prior `approved` condition.
-    const chainedExpected = sortedIds(
-      await (Topic as any).approved().where("title LIKE '% %'").toArray(),
-    );
+    const chainedExpected = sortedIds(await Topic.approved().where("title LIKE '% %'").toArray());
     const chainedGot = sortedIds(
       await (Topic as any).approved()["title containing space"]({ space: " " }).toArray(),
     );
@@ -479,20 +467,20 @@ describe("NamedScopingTest", () => {
 
   it("rand should select a random object from proxy", async () => {
     const randomFn = adapterType === "mysql" ? "RAND()" : "RANDOM()";
-    const sample = await (Topic as any).approved().order(randomFn).first();
+    const sample = await Topic.approved().order(randomFn).first();
     expect(sample).toBeInstanceOf(Topic);
   });
 
   it("should use where in query for scope", async () => {
     const byName = sortedIds(await Developer.where({ name: "Jamis" }).toArray());
     const byScope = sortedIds(
-      await Developer.where({ id: (Developer as any).jamises().select("id") }).toArray(),
+      await Developer.where({ id: Developer.jamises().select("id") }).toArray(),
     );
     expect(byScope).toEqual(byName);
   });
 
   it("size should use count when results are not loaded", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     const sql = await capSql(async () => {
       await t.size();
     });
@@ -501,7 +489,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("size should use length when results are loaded", async () => {
-    const t = (Topic as any).base();
+    const t = Topic.base();
     await t.load();
     const sql = await capSql(async () => {
       await t.size();
@@ -526,7 +514,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining applies last conditions when creating", () => {
-    expect((Topic as any).rejected().new({}).approved).toBe(false);
+    expect(Topic.rejected().new({}).approved).toBe(false);
     expect((Topic as any).rejected().approved().new({}).approved).toBe(true);
     expect((Topic as any).approved().rejected().new({}).approved).toBe(false);
     expect((Topic as any).approved().rejected().approved().new({}).approved).toBe(true);
@@ -561,7 +549,7 @@ describe("NamedScopingTest", () => {
 
   it("chaining doesnt leak conditions to another scopes", async () => {
     const expected = Topic.where({ approved: false }).where({
-      id: (Topic as any).children().select("parent_id"),
+      id: Topic.children().select("parent_id"),
     });
     expect(sortedIds(await (Topic as any).rejected().hasChildren().toArray())).toEqual(
       sortedIds(await expected.toArray()),
@@ -573,15 +561,15 @@ describe("NamedScopingTest", () => {
   // on the `rejected` relation, returns `scope.base` (the passed relation under
   // its own `base`/`all` scope) — independent of the receiver's `rejected` scope.
   it("nested scoping", async () => {
-    const expected = (Reply as any).approved();
+    const expected = Reply.approved();
     const got = await (Topic as any).rejected().nestedScoping(expected).toArray();
     expect(ids(got)).toEqual(ids(await expected.toArray()));
   });
 
   it("scopes batch finders", async () => {
-    const approvedCount = await (Topic as any).approved().count();
+    const approvedCount = await Topic.approved().count();
     const collected: any[] = [];
-    for await (const t of (Topic as any).approved().findEach({ batchSize: 1 })) {
+    for await (const t of Topic.approved().findEach({ batchSize: 1 })) {
       expect(t.approved).toBe(true);
       collected.push(t);
     }
@@ -589,7 +577,7 @@ describe("NamedScopingTest", () => {
 
     // Rails also exercises find_in_batches(batch_size: 2) over the same scope.
     const grouped: any[] = [];
-    for await (const group of (Topic as any).approved().findInBatches({ batchSize: 2 })) {
+    for await (const group of Topic.approved().findInBatches({ batchSize: 2 })) {
       for (const t of group) {
         expect(t.approved).toBe(true);
         grouped.push(t);
@@ -613,7 +601,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("index on scope", async () => {
-    const approved = (Topic as any).approved().order("id ASC");
+    const approved = Topic.approved().order("id ASC");
     const arr = await approved.toArray();
     expect(arr[0].id).toBe(topics("second").id);
     expect(approved.isLoaded).toBe(true);

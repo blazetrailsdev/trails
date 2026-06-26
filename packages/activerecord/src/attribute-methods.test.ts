@@ -745,7 +745,7 @@ describe("AttributeMethodsTest", () => {
 
   it("set attributes", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({});
+    const t = new Topic({});
     t.assignAttributes({ title: "Set", author_name: "Alice" });
     expect(t.title).toBe("Set");
     expect(t.author_name).toBe("Alice");
@@ -753,7 +753,7 @@ describe("AttributeMethodsTest", () => {
 
   it("read attributes_before_type_cast on a datetime", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ written_on: "2023-01-15" });
+    const t = new Topic({ written_on: "2023-01-15" });
     const raw = t.readAttributeBeforeTypeCast("written_on");
     // Raw value is the string before casting
     expect(raw).toBeDefined();
@@ -761,42 +761,42 @@ describe("AttributeMethodsTest", () => {
 
   it("write_attribute", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({});
+    const t = new Topic({});
     t.writeAttribute("title", "Written");
     expect(t.readAttribute("title")).toBe("Written");
   });
 
   it("read_attribute", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Read" });
+    const t = new Topic({ title: "Read" });
     expect(t.readAttribute("title")).toBe("Read");
   });
 
   it("read_attribute when false", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ approved: false });
+    const t = new Topic({ approved: false });
     expect(t.readAttribute("approved")).toBe(false);
   });
 
   it("read_attribute when true", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ approved: true });
+    const t = new Topic({ approved: true });
     expect(t.readAttribute("approved")).toBe(true);
   });
 
   it("string attribute predicate", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ title: "Hello" });
+    const t = new Topic({ title: "Hello" });
     expect(t.attributePresent("title")).toBe(true);
-    const empty = new (Topic as any)({ title: "" });
+    const empty = new Topic({ title: "" });
     expect(empty.attributePresent("title")).toBe(false);
   });
 
   it("boolean attribute predicate", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ approved: true });
+    const t = new Topic({ approved: true });
     expect(t.approved).toBe(true);
-    const f = new (Topic as any)({ approved: false });
+    const f = new Topic({ approved: false });
     expect(f.approved).toBe(false);
   });
 
@@ -812,7 +812,7 @@ describe("AttributeMethodsTest", () => {
 
   it("write nil to time attribute", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ bonus_time: Temporal.Now.instant() });
+    const t = new Topic({ bonus_time: Temporal.Now.instant() });
     t.bonus_time = null;
     expect(t.bonus_time).toBeNull();
   });
@@ -834,7 +834,7 @@ describe("AttributeMethodsTest", () => {
 
   it("non-attribute read and write", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({});
+    const t = new Topic({});
     // Writing to a non-attribute should throw or be ignored
     try {
       t.nonexistent = "value";
