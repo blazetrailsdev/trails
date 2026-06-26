@@ -4144,13 +4144,20 @@ export class Relation<T extends Base> {
 
     const now = Temporal.Now.instant();
     const updates: Record<string, unknown> = {};
+    const aliases = this._modelClass._attributeAliases ?? {};
 
-    // Always touch updated_at if defined on the model
-    if (this._modelClass._attributeDefinitions.has("updated_at")) {
-      updates.updated_at = now;
+    // Mirrors Rails timestamp_attributes_for_update: ["updated_at", "updated_on"]
+    // each resolved through attribute_aliases, then intersected with column_names.
+    for (const tsName of ["updated_at", "updated_on"]) {
+      const col = aliases[tsName] ?? tsName;
+      if (this._modelClass._attributeDefinitions.has(col)) {
+        updates[col] = now;
+      }
     }
+    // Mirrors Rails touch_attributes_with_time: explicit names also resolved through aliases.
     for (const name of names) {
-      updates[name] = now;
+      const col = aliases[name] ?? name;
+      updates[col] = now;
     }
 
     if (Object.keys(updates).length === 0) return 0;
@@ -4761,18 +4768,55 @@ export class Relation<T extends Base> {
     const cursorArr = Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor];
     _ensureValidOptionsForBatchingBang(cursorArr, start, finish, (order ?? "asc") as any);
 
+    // Mirrors Rails ensure_valid_options_for_batching!: when the cursor doesn't
+    // include all PK columns, require a full unique (non-partial) index.
+    const pkArr = Array.isArray(pk) ? pk : [pk];
+    const cursorIncludesPk = pkArr.every((k) => cursorArr.includes(k));
+    const ensureCursorUniqueness = async () => {
+      if (!cursorIncludesPk) {
+        const cache = self._modelClass.schemaCache();
+        const pool = self._modelClass.connectionPool();
+        const idxs = (await cache.indexes(pool, self._modelClass.tableName)) as Array<{
+          unique: boolean;
+          where?: string | null;
+          columns: string[];
+        }>;
+        const hasUniqueIndex = idxs.some(
+          (idx) => idx.unique && !idx.where && idx.columns.every((c) => cursorArr.includes(c)),
+        );
+        if (!hasUniqueIndex) {
+          throw new Error(":cursor must include a primary key or other unique column(s)");
+        }
+      }
+    };
+
     if (this._orderClauses.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
     const batchOrders = _buildBatchOrders(cursorArr, order as any);
 
+    // Mirrors Rails: when use_ranges is nil, auto-enable range mode for
+    // unconstrained single-cursor whole-table batching (no WHERE, no LIMIT,
+    // no OFFSET). Constrained queries keep the safe IN-list path.
+    const effectiveUseRanges =
+      useRanges ??
+      (!load &&
+        cursorArr.length === 1 &&
+        this._whereClause.predicates.length === 0 &&
+        this._limitValue === null &&
+        this._offsetValue === null);
+
     let remaining: number | null = null;
     let effectiveBatchSize = batchSize;
     if (this._limitValue !== null) {
       remaining = this._limitValue;
       if (remaining === 0) {
-        return new BatchEnumerator(async function* () {}, batchSize);
+        return new BatchEnumerator(async function* () {}, batchSize, {
+          start,
+          finish,
+          relation: self,
+        });
       }
       if (remaining < effectiveBatchSize) effectiveBatchSize = remaining;
     }
@@ -4786,21 +4830,27 @@ export class Relation<T extends Base> {
         order: (order ?? "asc") as any,
         batchLimit: effectiveBatchSize,
       });
-      return new BatchEnumerator(async function* () {
-        for (const batchRows of loadedBatches) {
-          const batchRel = self._clone();
-          batchRel._orderClauses = batchOrders.map(
-            ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
-          );
-          (batchRel as any)._records = batchRows;
-          (batchRel as any)._loaded = true;
-          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
-        }
-      }, effectiveBatchSize);
+      return new BatchEnumerator(
+        async function* () {
+          await ensureCursorUniqueness();
+          for (const batchRows of loadedBatches) {
+            const batchRel = self._clone();
+            batchRel._orderClauses = batchOrders.map(
+              ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+            );
+            (batchRel as any)._records = batchRows;
+            (batchRel as any)._loaded = true;
+            yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
+          }
+        },
+        effectiveBatchSize,
+        { start, finish, relation: self },
+      );
     }
 
     return new BatchEnumerator(
       async function* () {
+        await ensureCursorUniqueness();
         const rel = self._clone();
         rel._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
 
@@ -4819,7 +4869,7 @@ export class Relation<T extends Base> {
             ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
           );
           const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
-          if (useRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
+          if (effectiveUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
             // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
             // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
             const col = cursorArr[0];
@@ -4847,6 +4897,7 @@ export class Relation<T extends Base> {
         }
       } as () => AsyncGenerator<LoadedRelation<Relation<T>>>,
       effectiveBatchSize,
+      { start, finish, relation: self },
     );
   }
 

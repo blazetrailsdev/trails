@@ -20,7 +20,6 @@
   "packages/activerecord/src/associations/source-type-validation.test.ts",
   "packages/activerecord/src/associations/through-association-scope.test.ts",
   "packages/activerecord/src/autosave-association.test.ts",
-  "packages/activerecord/src/batches.test.ts",
   "packages/activerecord/src/calculations.test.ts",
   "packages/activerecord/src/counter-cache.trails.test.ts",
   "packages/activerecord/src/inheritance.test.ts",

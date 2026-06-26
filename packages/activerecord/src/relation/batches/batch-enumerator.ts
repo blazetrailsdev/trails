@@ -100,13 +100,13 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  async destroyAll(): Promise<any[]> {
-    const destroyed: any[] = [];
+  async destroyAll(): Promise<number> {
+    let total = 0;
     for await (const batchRelation of this) {
       const records = await batchRelation.destroyAll();
-      destroyed.push(...records);
+      total += records.filter((r) => r.isDestroyed?.()).length;
     }
-    return destroyed;
+    return total;
   }
 
   async touchAll(...names: string[]): Promise<number> {

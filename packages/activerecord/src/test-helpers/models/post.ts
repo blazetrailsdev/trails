@@ -932,8 +932,8 @@ export class PostWithDestroyCallback extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.beforeDestroy(async function (this: any) {
-      if (this.id === 1) throwAbort();
+    this.beforeDestroy(function (this: any) {
+      if (Number(this.id) === 1) throwAbort();
     });
   }
 }
