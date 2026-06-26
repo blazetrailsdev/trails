@@ -1,7 +1,7 @@
 /**
- * Ports vendor/rails/activerecord/test/cases/serialized_attribute_test.rb onto
- * canonical tables (topics / people / traffic_lights). No bespoke defineSchema
- * calls — all rows flow through the canonical TEST_SCHEMA tables.
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/serialized_attribute_test.rb
  */
 import { describe, it, expect, vi } from "vitest";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
@@ -15,8 +15,8 @@ import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
-// Rails: MyObject = Struct.new(:attribute1, :attribute2)
-// Used as a custom coder: dump/load round-trips via JSON.
+// Rails: MyObject = Struct.new(:attribute1, :attribute2) — a two-field value object.
+// Here: JSON coder so it round-trips through DB (YAML not available in JS).
 class MyObject {
   attribute1: string;
   attribute2: string;
@@ -40,14 +40,11 @@ describe("SerializedAttributeTest", () => {
     schema: canonicalSchema,
   });
 
-  // test_serialize_does_not_eagerly_load_columns
   it("serialize does not eagerly load columns", () => {
     class LocalTopic extends Topic {}
-    // serialize should register without hitting the DB
     serialize(LocalTopic, "content");
   });
 
-  // test_serialized_attribute
   it("serialized attribute", async () => {
     class MyObjectTopic extends Topic {
       static {
@@ -61,7 +58,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toEqual(myobj);
   });
 
-  // test_serialized_attribute_on_alias_attribute
   it("serialized attribute on alias attribute", async () => {
     class AliasTopic extends Topic {
       static {
@@ -77,11 +73,12 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).object).toEqual(myobj);
   });
 
-  // test_serialized_attribute_with_default
   it("serialized attribute with default", () => {
     class DefaultTopic extends Topic {
       static {
         this._tableName = "topics";
+        // Rails: serialize(:content, type: Hash, default: { key: "value" }).
+        // trails' serialize() has no `default:` option, so we pre-register via attribute().
         this.attribute("content", "text", { default: '{"key":"value"}' });
         serialize(this, "content", { type: HashObject });
       }
@@ -90,7 +87,6 @@ describe("SerializedAttributeTest", () => {
     expect((t as any).content).toEqual({ key: "value" });
   });
 
-  // test_serialized_attribute_on_custom_attribute_with_default
   it("serialized attribute on custom attribute with default", () => {
     class CustomDefaultTopic extends Topic {
       static {
@@ -103,7 +99,6 @@ describe("SerializedAttributeTest", () => {
     expect((t as any).content).toEqual({ key: "value" });
   });
 
-  // test_serialized_attribute_in_base_class
   it("serialized attribute in base class", async () => {
     class HashContentTopic extends Topic {
       static {
@@ -118,7 +113,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toEqual(hash);
   });
 
-  // test_serialized_attributes_from_database_on_subclass
   it("serialized attributes from database on subclass", async () => {
     class HashBaseTopic extends Topic {
       static {
@@ -133,7 +127,6 @@ describe("SerializedAttributeTest", () => {
     expect((last as any).content).toEqual({ foo: "bar" });
   });
 
-  // test_serialized_attribute_calling_dup_method
   it("serialized attribute calling dup method", () => {
     class JsonTopic extends Topic {
       static {
@@ -145,7 +138,6 @@ describe("SerializedAttributeTest", () => {
     expect((orig as any).content).toEqual((clone as any).content);
   });
 
-  // test_serialized_json_attribute_returns_unserialized_value
   it("serialized json attribute returns unserialized value", async () => {
     class JsonTopic extends Topic {
       static {
@@ -162,7 +154,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content.title).toEqual(myPost.title);
   });
 
-  // test_json_read_legacy_null
   // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies raw "null" string decoding via raw SQL update
   it("json read legacy null", async () => {
     class JsonTopic extends Topic {
@@ -170,7 +161,8 @@ describe("SerializedAttributeTest", () => {
         serialize(this, "content", { coder: "json" });
       }
     }
-    // Create a record, then store the JSON literal "null" string (not SQL NULL) directly.
+    // Rails: id = Topic.lease_connection.insert "INSERT INTO topics (content) VALUES('null')"
+    // We create a normal record then overwrite content with the JSON literal "null" string.
     const t = (await JsonTopic.create({ title: "test" } as any)) as unknown as InstanceType<
       typeof JsonTopic
     >;
@@ -181,7 +173,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toBeNull();
   });
 
-  // test_json_read_db_null
   // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies SQL NULL decoding via raw SQL update
   it("json read db null", async () => {
     class JsonTopic extends Topic {
@@ -189,7 +180,8 @@ describe("SerializedAttributeTest", () => {
         serialize(this, "content", { coder: "json" });
       }
     }
-    // Create a record, then store SQL NULL directly (not the string "null").
+    // Rails: id = Topic.lease_connection.insert "INSERT INTO topics (content) VALUES(NULL)"
+    // We create a normal record then overwrite content with SQL NULL.
     const t = await JsonTopic.create({ title: "test", content: "placeholder" as any });
     await (Base.connection as any).executeMutation(
       `UPDATE topics SET content = NULL WHERE id = ${(t as any).id}`,
@@ -198,7 +190,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toBeNull();
   });
 
-  // test_serialized_attribute_declared_in_subclass
   it("serialized attribute declared in subclass", async () => {
     class LocalImportantTopic extends Topic {
       static {
@@ -213,7 +204,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).readAttribute("important")).toEqual(hash);
   });
 
-  // test_serialized_time_attribute
   it("serialized time attribute", async () => {
     class JsonTopic extends Topic {
       static {
@@ -228,7 +218,6 @@ describe("SerializedAttributeTest", () => {
     expect((topic as any).content).toEqual(myobj);
   });
 
-  // test_serialized_string_attribute
   it("serialized string attribute", async () => {
     class JsonTopic extends Topic {
       static {
@@ -236,6 +225,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const myobj = "Yes";
+    // Pass as pre-serialized JSON so the JSON coder can deserialize it on read.
     const topic = await (
       await JsonTopic.create({ content: JSON.stringify(myobj) as any })
     ).reload();
@@ -250,13 +240,11 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: Ruby-only — frozen? concept has no JS equivalent.
   });
 
-  // test_nil_serialized_attribute_without_class_constraint
   it("nil serialized attribute without class constraint", () => {
     const topic = new Topic();
     expect((topic as any).content).toBeNull();
   });
 
-  // test_nil_not_serialized_without_class_constraint
   it("nil not serialized without class constraint", async () => {
     class JsonTopic extends Topic {
       static {
@@ -268,7 +256,6 @@ describe("SerializedAttributeTest", () => {
     expect(Number(count)).toBeGreaterThanOrEqual(1);
   });
 
-  // test_nil_not_serialized_with_class_constraint
   it("nil not serialized with class constraint", async () => {
     class HashTopic extends Topic {
       static {
@@ -281,12 +268,12 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
-    // PERMANENT-SKIP: write-time type validation (assert_valid_value on dump) not yet ported.
+    // PERMANENT-SKIP: trails accepts raw strings as pre-serialized payloads on assignment
+    // (Serialized#assertValidValue bails early for strings), so assigning "string" with
+    // type: Hash does NOT raise at write time the way Rails does.
   });
 
-  // test_should_raise_exception_on_serialized_attribute_with_type_mismatch
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    // Mirrors Rails: save with hash content, switch type expectation to Array, read throws.
     class FlexTopic extends Topic {
       static {
         serialize(this, "content", { type: HashObject });
@@ -298,7 +285,6 @@ describe("SerializedAttributeTest", () => {
     expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
   });
 
-  // test_serialized_attribute_with_class_constraint
   it("serialized attribute with class constraint", async () => {
     class HashTopic extends Topic {
       static {
@@ -323,7 +309,6 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: needs serialized-attribute where support.
   });
 
-  // test_serialized_default_class
   it("serialized default class", async () => {
     class HashTopic extends Topic {
       static {
@@ -341,13 +326,11 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content["beer"]).toBe("MadridRb");
   });
 
-  // test_serialized_no_default_class_for_object
   it("serialized no default class for object", () => {
     const topic = new Topic();
     expect((topic as any).content).toBeNull();
   });
 
-  // test_serialized_boolean_value_true
   it("serialized boolean value true", async () => {
     class JsonTopic extends Topic {
       static {
@@ -358,7 +341,6 @@ describe("SerializedAttributeTest", () => {
     expect((topic as any).content).toBe(true);
   });
 
-  // test_serialized_boolean_value_false
   it("serialized boolean value false", async () => {
     class JsonTopic extends Topic {
       static {
@@ -369,7 +351,6 @@ describe("SerializedAttributeTest", () => {
     expect((topic as any).content).toBe(false);
   });
 
-  // test_serialize_with_coder
   it("serialize with coder", async () => {
     const someClass = {
       dump(value: { foo: string } | null): string | null {
@@ -396,7 +377,6 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: timezone-aware attributes not yet ported.
   });
 
-  // test_serialize_attribute_can_be_serialized_in_an_integer_column
   it("serialize attribute can be serialized in an integer column", async () => {
     const insures = ["life"];
     const person = new SerializedPerson({ first_name: "David", insures: insures as any });
@@ -405,23 +385,19 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).insures).toEqual(insures);
   });
 
-  // test_regression_serialized_default_on_text_column_with_null_false
   it("regression serialized default on text column with null false", () => {
     const light = new TrafficLight();
     expect((light as any).state).toEqual([]);
     expect((light as any).long_state).toEqual([]);
   });
 
-  // test_unexpected_serialized_type
   it("unexpected serialized type", async () => {
-    // Mirrors Rails: serialize content as Hash, then switch to Array type, read throws.
     class FlexTopic extends Topic {
       static {
         serialize(this, "content", { type: HashObject });
       }
     }
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
-    // Switch to Array type — re-reading the Hash value should throw.
     serialize(FlexTopic, "content", { type: Array });
     const reloaded = await FlexTopic.find(topic.id as number);
     const error = (() => {
@@ -432,11 +408,12 @@ describe("SerializedAttributeTest", () => {
       }
     })();
     expect(error).toBeInstanceOf(SerializationTypeMismatch);
+    // Rails: error.to_s == "can't load `content`: was supposed to be a Array, but was a Hash. -- ..."
+    // In JS the stored value is a plain Object (not a Hash class), so the message says "Object".
     const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
     expect((error as Error).message).toBe(expected);
   });
 
-  // test_serialized_column_should_unserialize_after_update_column
   it("serialized column should unserialize after update column", async () => {
     class JsonTopic extends Topic {
       static {
@@ -450,7 +427,6 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toEqual(["second"]);
   });
 
-  // test_serialized_column_should_unserialize_after_update_attribute
   it("serialized column should unserialize after update attribute", async () => {
     class JsonTopic extends Topic {
       static {
@@ -465,16 +441,16 @@ describe("SerializedAttributeTest", () => {
     expect((reloaded as any).content).toBe("second");
   });
 
-  // test_nil_is_not_changed_when_serialized_with_a_class
   it("nil is not changed when serialized with a class", () => {
     class ArrayTopic extends Topic {
       static {
         serialize(this, "content", { type: Array });
       }
     }
-    // Rails: Topic.new(content: nil) — nil casts to [] (the default for Array type),
-    // so content_changed? returns false. We mirror by checking the initial nil
-    // default does not mark the attribute changed.
+    // Rails: Topic.new(content: nil) — nil casts to [] (the Array default), so
+    // content_changed? is false. Trails marks explicitly-assigned nil as changed
+    // before the value is cast, so we mirror by omitting the argument; a fresh
+    // record with no explicit content assignment is also not changed.
     const topic = new ArrayTopic();
     expect(topic.attributeChanged("content")).toBe(false);
   });
@@ -483,7 +459,6 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: Ruby-only — Regexp constructor arity check has no JS equivalent.
   });
 
-  // test_newly_emptied_serialized_hash_is_changed
   it("newly emptied serialized hash is changed", async () => {
     class HashTopic extends Topic {
       static {
@@ -492,7 +467,8 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await HashTopic.create({ content: { things: "stuff" } as any });
     const reloaded = await HashTopic.find(topic.id as number);
-    (reloaded as any).content = {};
+    // Rails: topic.content.delete("things") — in-place mutation triggers isChangedInPlace?.
+    delete (reloaded as any).content["things"];
     await reloaded.save();
     const found = await HashTopic.find(topic.id as number);
     expect((found as any).content).toEqual({});
@@ -506,21 +482,23 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: blob frozen payload not yet ported.
   });
 
-  // test_values_cast_from_nil_are_persisted_as_nil
   it("values cast from nil are persisted as nil", async () => {
     class HashTopic extends Topic {
       static {
         serialize(this, "content", { type: HashObject });
       }
     }
+    // Rails: assert_equal [topic, topic2], Topic.where(content: nil).sort_by(&:id)
+    // Empty hash {} is the default value and serializes to SQL NULL, so BOTH
+    // topic (content: {}) and topic2 (content: nil) appear in where(content: nil).
     const topic = await HashTopic.create({ content: {} as any });
     const topic2 = await HashTopic.create({ content: null as any });
     const found = await HashTopic.where({ content: null }).order("id").toArray();
     const ids = found.map((t: any) => t.id as number);
+    expect(ids).toContain(topic.id);
     expect(ids).toContain(topic2.id);
   });
 
-  // test_serialized_attribute_can_be_defined_in_abstract_classes
   it("serialized attribute can be defined in abstract classes", async () => {
     class AbstractBase extends Base {
       static {
@@ -540,7 +518,6 @@ describe("SerializedAttributeTest", () => {
     expect((found[0] as any).content).toEqual({ foo: 1 });
   });
 
-  // test_nil_is_always_persisted_as_null
   it("nil is always persisted as null", async () => {
     class HashTopic extends Topic {
       static {
@@ -561,7 +538,6 @@ describe("SerializedAttributeTest", () => {
     // PERMANENT-SKIP: decorate_attributes block form not yet ported.
   });
 
-  // test_mutation_detection_does_not_double_serialize
   it("mutation detection does not double serialize", async () => {
     const coder = {
       dump(value: string | null): string | null {
@@ -595,7 +571,6 @@ describe("SerializedAttributeTest", () => {
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   useHandlerFixtures(["topics"], { schema: canonicalSchema });
 
-  // test_serialized_attribute (safe-load variant uses type: String/Hash)
   it("serialized attribute", async () => {
     class HashTopic extends Topic {
       static {
@@ -609,7 +584,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((reloaded as any).content).toEqual(myobj);
   });
 
-  // test_serialized_attribute_on_custom_attribute_with_default
   it("serialized attribute on custom attribute with default", () => {
     class DefaultTopic extends Topic {
       static {
@@ -622,7 +596,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((t as any).content).toEqual({ key: "value" });
   });
 
-  // test_nil_is_always_persisted_as_null
   it("nil is always persisted as null", async () => {
     class HashTopic extends Topic {
       static {
@@ -635,7 +608,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect(found.map((t: any) => t.id as number)).toContain(topic.id);
   });
 
-  // test_serialized_attribute_with_default
   it("serialized attribute with default", () => {
     class DefaultTopic extends Topic {
       static {
@@ -648,7 +620,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((t as any).content).toEqual({ key: "value" });
   });
 
-  // test_serialized_attributes_from_database_on_subclass
   it("serialized attributes from database on subclass", async () => {
     class HashBaseTopic extends Topic {
       static {
@@ -663,7 +634,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((last as any).content).toEqual({ foo: "bar" });
   });
 
-  // test_serialized_attribute_on_alias_attribute
   it("serialized attribute on alias attribute", async () => {
     class AliasTopic extends Topic {
       static {
@@ -679,7 +649,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((reloaded as any).object).toEqual(myobj);
   });
 
-  // test_unexpected_serialized_type
   it("unexpected serialized type", async () => {
     class FlexTopic extends Topic {
       static {
@@ -699,7 +668,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect(error).toBeInstanceOf(SerializationTypeMismatch);
   });
 
-  // test_serialize_attribute_via_select_method_when_time_zone_available
   it("serialize attribute via select method when time zone available", async () => {
     class HashTopic extends Topic {
       static {
@@ -712,7 +680,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     expect((found as any).content).toEqual(myobj);
   });
 
-  // test_should_raise_exception_on_serialized_attribute_with_type_mismatch
   it("should raise exception on serialized attribute with type mismatch", async () => {
     class FlexTopic extends Topic {
       static {
