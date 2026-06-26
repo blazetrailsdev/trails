@@ -3,7 +3,6 @@ import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
-import { SelectManager as SelectManagerCtor } from "../select-manager.js";
 
 interface TypeCastable {
   name?: string;
@@ -56,24 +55,6 @@ export class TableAlias extends Binary {
   /** The alias as a bare string, unwrapping a `SqlLiteral` name. */
   private get nameString(): string {
     return this.name instanceof SqlLiteral ? this.name.value : this.name;
-  }
-
-  // Mirrors Arel::Table#star — projects every column of the aliased relation
-  // (`omg_developers.*`). The `"*"` sentinel skips column-name quoting in the
-  // visitor, exactly as on a plain Table.
-  get star(): Attribute {
-    return new Attribute(this, "*");
-  }
-
-  // Mirrors Arel::Table#project: an aliased table can seed a SelectManager whose
-  // FROM is the alias (`developers omg_developers`), so a `Relation` built on a
-  // table alias threads that alias through projections, FROM, and ORDER BY.
-  project(...projections: (Node | string)[]): SelectManagerCtor {
-    const manager = new SelectManagerCtor(this as unknown as never);
-    if (projections.length > 0) {
-      manager.project(...projections);
-    }
-    return manager;
   }
 
   get(columnName: string): Attribute {

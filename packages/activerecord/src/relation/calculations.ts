@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Calculations
  */
 
-import { Nodes, Table } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { Base } from "../base.js";
@@ -827,11 +827,20 @@ export async function performCount(
   // predicate builder qualified the conditions with.
   const baseTable = this._modelClass.arelTable;
   const table = (this as unknown as { table?: typeof baseTable }).table ?? baseTable;
+  // `Table#project` seeds a SelectManager FROM the table; a table ALIAS
+  // (Nodes.TableAlias) is a bare AST node without that helper, so seed the
+  // manager directly — `new SelectManager(node)` sets FROM to the alias.
+  const project = (...projections: unknown[]): SelectManager => {
+    if (table instanceof Table) return table.project(...(projections as never[]));
+    const m = new SelectManager(table as never);
+    m.project(...(projections as never[]));
+    return m;
+  };
   const effectiveColumn = column === "*" ? undefined : column;
 
   if (effectiveColumn) {
     const countNode = (aggregateColumn(this, effectiveColumn) as any).count(this._isDistinct);
-    const manager = table.project(countNode.as("count"));
+    const manager = project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
@@ -851,14 +860,14 @@ export async function performCount(
     if (Array.isArray(pk)) {
       // Multi-column DISTINCT COUNT requires a subquery since
       // COUNT(DISTINCT col1, col2) isn't valid on SQLite/PG
-      const innerManager = table.project(...pk.map((c: string) => table.get(c)));
+      const innerManager = project(...pk.map((c: string) => table.get(c)));
       innerManager.distinct();
       this._applyJoinsToManager(innerManager);
       this._applyWheresToManager(innerManager, table);
       applyFromToManager(this, innerManager);
       const [innerSqlWithFrom, allInnerBinds] = compileManagerWithBinds(this, innerManager);
       const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-      const outerManager = table.project(countAll.as("count"));
+      const outerManager = project(countAll.as("count"));
       outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
       const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
       const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
@@ -871,7 +880,7 @@ export async function performCount(
       return Number(rows[0]?.count ?? 0);
     }
     const countNode = table.get(pk).count(true);
-    const manager = table.project(countNode.as("count"));
+    const manager = project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     applyFromToManager(this, manager);
@@ -887,7 +896,7 @@ export async function performCount(
   }
 
   const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-  const manager = table.project(countAll.as("count"));
+  const manager = project(countAll.as("count"));
   this._applyJoinsToManager(manager);
   this._applyWheresToManager(manager, table);
   applyFromToManager(this, manager);

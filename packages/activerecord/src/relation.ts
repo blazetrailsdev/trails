@@ -5502,7 +5502,17 @@ export class Relation<T extends Base> {
     // so they stay consistent with the WHERE clause the predicate builder wrote.
     const table = this.table;
     const projections = this._buildProjections(table);
-    const manager = table.project(...(projections as any));
+    // `Table#project` seeds a SelectManager whose FROM is the table. A table
+    // ALIAS (Nodes.TableAlias, from `Relation.create(Model, table: alias)`) is a
+    // plain AST node without that factory helper, so seed the manager directly —
+    // `new SelectManager(node)` sets FROM to the alias (`developers omg_developers`).
+    const manager =
+      table instanceof Table
+        ? table.project(...(projections as any))
+        : ((m) => {
+            if (projections.length > 0) m.project(...(projections as any));
+            return m;
+          })(new SelectManager(table as any));
 
     this._applyJoinsToManager(manager);
 
