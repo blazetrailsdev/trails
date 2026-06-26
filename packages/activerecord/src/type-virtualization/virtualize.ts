@@ -8,7 +8,7 @@
 // directly against fixture pairs.
 
 import ts from "typescript";
-import { walk, findIncludeCalls, type WalkOptions } from "./walker.js";
+import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";
 
 // Aliased name used in the auto-injected `import type` line and the
@@ -88,6 +88,12 @@ export interface VirtualizeOptions extends WalkOptions {
    * {@link import("./synthesize.js").SynthesizeOptions.attributesNullable}.
    */
   attributesNullable?: boolean;
+  /**
+   * Pre-resolved `through:` association targets keyed `"<ClassName>#<assocName>"`.
+   * Forwarded to `synthesizeDeclares`. See
+   * {@link import("./synthesize.js").SynthesizeOptions.associationTargets}.
+   */
+  associationTargets?: ReadonlyMap<string, string>;
 }
 
 export function virtualize(
@@ -97,6 +103,9 @@ export function virtualize(
 ): VirtualizeResult {
   const sf = ts.createSourceFile(fileName, originalText, ts.ScriptTarget.ES2022, true);
   const classes = walk(sf, options);
+  // In-file superclass graph + per-class ancestor chains (for inherited
+  // loader overloads and incompatible-override detection — see synthesize).
+  const { superNameOf, ancestorsOf } = buildInheritance(classes);
 
   interface Edit {
     pos: number;
@@ -113,6 +122,9 @@ export function virtualize(
       schemaColumnsByTable: options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
+      associationTargets: options.associationTargets,
+      ancestors: ancestorsOf.get(info),
+      superNameOf,
     });
     if (decls.length === 0) continue;
     const block = "\n" + decls.join("\n") + "\n";
@@ -252,6 +264,47 @@ export function virtualize(
   }
 
   return { text, deltas };
+}
+
+/**
+ * From the walked classes, build a class-name → direct-superclass-name map and
+ * each `ClassInfo`'s ancestor chain (nearest first), resolving `extends X` to
+ * the in-file `ClassInfo` named `X`. Only in-file ancestors are tracked.
+ */
+function buildInheritance(classes: readonly ClassInfo[]): {
+  superNameOf: ReadonlyMap<string, string>;
+  ancestorsOf: ReadonlyMap<ClassInfo, ClassInfo[]>;
+} {
+  const superNameOf = new Map<string, string>();
+  const byName = new Map<string, ClassInfo>();
+  for (const info of classes) {
+    if (!byName.has(info.name)) byName.set(info.name, info);
+    const superName = directSuperName(info.classDecl);
+    if (superName && !superNameOf.has(info.name)) superNameOf.set(info.name, superName);
+  }
+  const ancestorsOf = new Map<ClassInfo, ClassInfo[]>();
+  for (const info of classes) {
+    const chain: ClassInfo[] = [];
+    const seen = new Set<string>([info.name]);
+    let superName = superNameOf.get(info.name);
+    while (superName && !seen.has(superName)) {
+      seen.add(superName);
+      const anc = byName.get(superName);
+      if (anc) chain.push(anc);
+      superName = superNameOf.get(superName);
+    }
+    ancestorsOf.set(info, chain);
+  }
+  return { superNameOf, ancestorsOf };
+}
+
+function directSuperName(cls: ts.ClassDeclaration): string | undefined {
+  for (const hc of cls.heritageClauses ?? []) {
+    if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
+    const expr = hc.types[0]?.expression;
+    if (expr && ts.isIdentifier(expr)) return expr.text;
+  }
+  return undefined;
 }
 
 type AliasBindingState = "absent" | "matches" | "different";

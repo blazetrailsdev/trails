@@ -19,19 +19,23 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { virtualize } from "../src/type-virtualization/virtualize.js";
-import { walk, type ClassInfo } from "../src/type-virtualization/walker.js";
-import { resolveAssociationTarget } from "../src/type-virtualization/resolve-target.js";
+import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
+import {
+  resolveAssociationTarget,
+  resolveThroughTarget,
+  type ModelAssociationLookup,
+} from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
 import type { TableSchema, WrappedTableSchema } from "../src/test-helpers/define-schema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
 
-// Models proven to materialize typecheck-green. post.ts / author.ts /
-// comment.ts are intentionally NOT here: each hits an unresolved-target,
-// subclass-loader-override, or `_tableName` gap (see tasks story
-// 0014/materialize-declares-rollout) and would write broken declares.
-// Pass them explicitly as args once those gaps are fixed.
+// Default pilot set processed with no args. Bulk roll-out (baking declares
+// into every canonical model) is a separate story; the through-target and
+// subclass-loader gaps that broke post.ts/author.ts/comment.ts are fixed
+// (see `resolveThroughTarget` + ancestor-aware loader overloads), so those
+// three now materialize green when passed explicitly.
 const PILOT = ["topic.ts", "developer.ts"];
 
 type SchemaColumnsByTable = Record<string, Record<string, SchemaColumnValue>>;
@@ -88,6 +92,67 @@ function buildModelRegistry(): Map<string, string> {
     }
   }
   return registry;
+}
+
+const ASSOC_KINDS = new Set<string>(["hasMany", "hasAndBelongsToMany", "belongsTo", "hasOne"]);
+
+function associationCalls(info: ClassInfo): AssociationCall[] {
+  return info.calls.filter((c): c is AssociationCall => ASSOC_KINDS.has(c.kind));
+}
+
+/**
+ * Cross-file lookup of a model's association calls by class name (parse each
+ * registered file on demand, cached) for `resolveThroughTarget`. Walks ALL
+ * classes since a through target may be an STI subclass.
+ */
+function buildModelAssociationLookup(
+  registry: ReadonlyMap<string, string>,
+): ModelAssociationLookup {
+  const byClassName = new Map<string, AssociationCall[] | null>();
+  const walkedFiles = new Set<string>();
+  return (className) => {
+    if (byClassName.has(className)) return byClassName.get(className) ?? undefined;
+    const file = registry.get(className);
+    if (!file) {
+      byClassName.set(className, null);
+      return undefined;
+    }
+    if (!walkedFiles.has(file)) {
+      walkedFiles.add(file);
+      const sf = ts.createSourceFile(
+        file,
+        fs.readFileSync(file, "utf8"),
+        ts.ScriptTarget.ES2022,
+        true,
+      );
+      for (const info of walk(sf, { isModelClass: () => true })) {
+        if (!byClassName.has(info.name)) byClassName.set(info.name, associationCalls(info));
+      }
+    }
+    return byClassName.get(className) ?? undefined;
+  };
+}
+
+/**
+ * Resolve every `through:` association on the file's models to its source
+ * class, keyed `"<ClassName>#<assocName>"`. Unresolvable chains fall back to
+ * `Base` (always in scope) — keeps output green.
+ */
+function buildAssociationTargets(
+  modelClasses: readonly ClassInfo[],
+  lookup: ModelAssociationLookup,
+  aliases: ReadonlyMap<string, string>,
+): Map<string, string> {
+  const targets = new Map<string, string>();
+  for (const info of modelClasses) {
+    const defining = associationCalls(info);
+    for (const call of defining) {
+      if (!call.options["through"]) continue;
+      const resolved = resolveThroughTarget(defining, call, lookup, aliases) ?? "Base";
+      targets.set(`${info.name}#${call.name}`, resolved);
+    }
+  }
+  return targets;
 }
 
 /**
@@ -174,13 +239,14 @@ function resolveAutoImports(
   registry: ReadonlyMap<string, string>,
   isModelClass: (cls: ts.ClassDeclaration) => boolean,
   aliases: ReadonlyMap<string, string>,
+  associationTargets: ReadonlyMap<string, string>,
 ): string[] {
   const classes = walk(sf, { isModelClass });
   const moduleScope = collectNamesInScope(sf);
   const imports = new Map<string, string>();
   for (const info of classes) {
     const needed = new Set<string>();
-    collectTargets(info, needed, aliases);
+    collectTargets(info, needed, aliases, associationTargets);
     if (needed.size === 0) continue;
     // A declare spliced into THIS class can only reference a bare
     // `Target` that is lexically visible from the class — module-scope
@@ -229,6 +295,7 @@ function collectTargets(
   info: ClassInfo,
   out: Set<string>,
   aliases: ReadonlyMap<string, string>,
+  associationTargets: ReadonlyMap<string, string>,
 ): void {
   for (const call of info.calls) {
     if (
@@ -239,6 +306,12 @@ function collectTargets(
     )
       continue;
     if (call.kind === "belongsTo" && call.options["polymorphic"] === "true") continue;
+    // Import the pre-resolved `through:` source class, not classify-of-name.
+    const override = associationTargets.get(`${info.name}#${call.name}`);
+    if (override) {
+      out.add(override);
+      continue;
+    }
     const target = resolveAssociationTarget(call);
     out.add(aliases.get(target) ?? target);
   }
@@ -398,6 +471,7 @@ async function main(): Promise<void> {
     const { isWrappedSchema } = await import("../src/test-helpers/define-schema.js");
     schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
   }
+  const associationLookup = buildModelAssociationLookup(registry);
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
@@ -410,7 +484,21 @@ async function main(): Promise<void> {
     const isModelClass = (cls: ts.ClassDeclaration): boolean =>
       modelSpans.has(`${cls.pos}:${cls.end}`);
     const classNameAliases = buildClassNameAliases(sf);
-    const prependImports = resolveAutoImports(sf, file, registry, isModelClass, classNameAliases);
+    // Pre-resolve `through:` targets so declares + auto-imports name the real
+    // source class, not `classify`-of-the-association-name.
+    const associationTargets = buildAssociationTargets(
+      walk(sf, { isModelClass }),
+      associationLookup,
+      classNameAliases,
+    );
+    const prependImports = resolveAutoImports(
+      sf,
+      file,
+      registry,
+      isModelClass,
+      classNameAliases,
+      associationTargets,
+    );
     // The schema-column merge maps each model to a table by `tableName` (or
     // `pluralize(underscore(className))` when unset) and bakes that table's
     // canonical columns into the declares. That is correct for the canonical
@@ -427,6 +515,7 @@ async function main(): Promise<void> {
       prependImports,
       schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
       classNameAliases,
+      associationTargets,
       // Baked attribute declares allow null assignment (Rails attributes
       // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
       attributesNullable: true,
