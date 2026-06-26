@@ -56,7 +56,6 @@ describe("EachTest", () => {
   it("each should not return query chain and execute only one query", async () => {
     await assertQueriesCount(1, false, async () => {
       for await (const _post of Post.findEach({ batchSize: 100000 })) {
-        // consume
       }
     });
   });
@@ -144,13 +143,11 @@ describe("EachTest", () => {
 
   it("warn if order scope is set", async () => {
     for await (const _post of Post.order("title").findEach({})) {
-      // consume; no error expected
     }
   });
 
   it("logger not required", async () => {
     for await (const _post of Post.order("legacy_comments_count DESC").findEach({})) {
-      // consume; no error expected
     }
   });
 
@@ -240,7 +237,6 @@ describe("EachTest", () => {
   it("in batches without block should raise if order is invalid", async () => {
     await expect(async () => {
       for await (const _rel of Post.select("title").inBatches({ order: "invalid" as any })) {
-        // consume
       }
     }).rejects.toThrow();
   });
@@ -267,7 +263,6 @@ describe("EachTest", () => {
   it("find in batches should error on ignore the order", async () => {
     await expect(async () => {
       for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: true })) {
-        // consume
       }
     }).rejects.toThrow();
   });
@@ -278,7 +273,6 @@ describe("EachTest", () => {
     let threw = false;
     try {
       for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: false })) {
-        // consume
       }
     } catch {
       threw = true;
@@ -294,7 +288,6 @@ describe("EachTest", () => {
     try {
       await expect(async () => {
         for await (const _b of PostWithDefaultScope.findInBatches({})) {
-          // consume
         }
       }).rejects.toThrow();
     } finally {
@@ -306,7 +299,6 @@ describe("EachTest", () => {
     let threw = false;
     try {
       for await (const _b of PostWithDefaultScope.findInBatches({})) {
-        // consume
       }
     } catch {
       threw = true;
@@ -320,8 +312,10 @@ describe("EachTest", () => {
     for await (const batch of SpecialPostWithDefaultScope.findInBatches({})) {
       batchPosts.push(...batch);
     }
-    const defaultIds = defaultScope.map((p: any) => p.id).sort((a: any, b: any) => a - b);
-    const batchIds = batchPosts.map((p: any) => p.id).sort((a: any, b: any) => a - b);
+    const defaultIds = defaultScope
+      .map((p: any) => Number(p.id))
+      .sort((a: number, b: number) => a - b);
+    const batchIds = batchPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b);
     expect(batchIds).toEqual(defaultIds);
   });
 
@@ -386,15 +380,17 @@ describe("EachTest", () => {
   it("in batches should error on ignore the order", async () => {
     await expect(async () => {
       for await (const _rel of PostWithDefaultScope.inBatches({ errorOnIgnore: true })) {
-        // consume
       }
     }).rejects.toThrow();
   });
 
   it("in batches has attribute readers", async () => {
-    const enumerator = Post.all().inBatches({ batchSize: 2, start: 42, finish: 84 });
-    expect(enumerator).toBeDefined();
-    expect(typeof enumerator[Symbol.asyncIterator]).toBe("function");
+    const relation = Post.all();
+    const enumerator = relation.inBatches({ batchSize: 2, start: 42, finish: 84 });
+    expect(enumerator.relation).toBe(relation);
+    expect(enumerator.batchSize).toBe(2);
+    expect(enumerator.start).toBe(42);
+    expect(enumerator.finish).toBe(84);
   });
 
   it("in batches should yield relation if block given", async () => {
@@ -443,50 +439,38 @@ describe("EachTest", () => {
 
   it("in batches update all affect all records", async () => {
     await assertQueriesCount(6 + 6, false, async () => {
-      for await (const batch of Post.inBatches({ batchSize: 2 })) {
-        await batch.updateAll({ title: "updated-title" });
-      }
+      await Post.inBatches({ batchSize: 2 }).updateAll({ title: "updated-title" });
     });
     const all = await Post.all().toArray();
     expect(all.every((p: any) => p.readAttribute("title") === "updated-title")).toBe(true);
   });
 
   it("in batches update all returns rows affected", async () => {
-    let total = 0;
-    for await (const batch of Post.inBatches({ batchSize: 2 })) {
-      total += await batch.updateAll({ title: "updated-title" });
-    }
-    expect(total).toBe(11);
+    const result = await Post.inBatches({ batchSize: 2 }).updateAll({ title: "updated-title" });
+    expect(result).toBe(11);
   });
 
   it("in batches update all returns zero when no batches", async () => {
-    let total = 0;
-    for await (const batch of Post.where("1=0").inBatches({ batchSize: 2 })) {
-      total += await batch.updateAll({ title: "updated-title" });
-    }
-    expect(total).toBe(0);
+    const result = await Post.where("1=0")
+      .inBatches({ batchSize: 2 })
+      .updateAll({ title: "updated-title" });
+    expect(result).toBe(0);
   });
 
   it("in batches touch all affect all records", async () => {
-    for await (const batch of Developer.inBatches({ batchSize: 2 })) {
-      await batch.touchAll();
-    }
+    await assertQueriesCount(6 + 6, false, async () => {
+      await Developer.inBatches({ batchSize: 2 }).touchAll();
+    });
   });
 
   it("in batches touch all returns rows affected", async () => {
-    let total = 0;
-    for await (const batch of Developer.inBatches({ batchSize: 2 })) {
-      total += await batch.touchAll();
-    }
-    expect(total).toBe(11);
+    const result = await Developer.inBatches({ batchSize: 2 }).touchAll();
+    expect(result).toBe(11);
   });
 
   it("in batches touch all returns zero when no batches", async () => {
-    let total = 0;
-    for await (const batch of Developer.where("1=0").inBatches({ batchSize: 2 })) {
-      total += await batch.touchAll();
-    }
-    expect(total).toBe(0);
+    const result = await Developer.where("1=0").inBatches({ batchSize: 2 }).touchAll();
+    expect(result).toBe(0);
   });
 
   it("in batches delete all should not delete records in other batches", async () => {
@@ -552,24 +536,28 @@ describe("EachTest", () => {
   it("in batches when loaded runs no queries", async () => {
     const posts = Post.all();
     await posts.toArray(); // load
-    let batchCount = 0;
-    for await (const relation of posts.inBatches({ batchSize: 1 })) {
-      batchCount++;
-      expect(relation).toBeInstanceOf(Relation);
-    }
     const total = Number(await Post.count());
+    let batchCount = 0;
+    await assertQueriesCount(0, false, async () => {
+      for await (const relation of posts.inBatches({ batchSize: 1 })) {
+        batchCount++;
+        expect(relation).toBeInstanceOf(Relation);
+      }
+    });
     expect(batchCount).toBe(total);
   });
 
   it("in batches when loaded runs no queries with order argument", async () => {
     const allPosts = Post.all().order("id asc");
     await allPosts.toArray(); // load
-    let batchCount = 0;
-    for await (const relation of allPosts.inBatches({ batchSize: 1, order: "desc" })) {
-      batchCount++;
-      expect(relation).toBeInstanceOf(Relation);
-    }
     const total = Number(await Post.count());
+    let batchCount = 0;
+    await assertQueriesCount(0, false, async () => {
+      for await (const relation of allPosts.inBatches({ batchSize: 1, order: "desc" })) {
+        batchCount++;
+        expect(relation).toBeInstanceOf(Relation);
+      }
+    });
     expect(batchCount).toBe(total);
   });
 
@@ -579,14 +567,16 @@ describe("EachTest", () => {
     const startId = loadedPosts[1].id as number;
     const finishId = loadedPosts[loadedPosts.length - 2].id as number;
     let batchCount = 0;
-    for await (const relation of allPosts.inBatches({
-      batchSize: 1,
-      start: startId,
-      finish: finishId,
-    })) {
-      batchCount++;
-      expect(relation).toBeInstanceOf(Relation);
-    }
+    await assertQueriesCount(0, false, async () => {
+      for await (const relation of allPosts.inBatches({
+        batchSize: 1,
+        start: startId,
+        finish: finishId,
+      })) {
+        batchCount++;
+        expect(relation).toBeInstanceOf(Relation);
+      }
+    });
     expect(batchCount).toBe(loadedPosts.length - 2);
   });
 
@@ -596,27 +586,31 @@ describe("EachTest", () => {
     const startId = loadedPosts[loadedPosts.length - 2].id as number;
     const finishId = loadedPosts[1].id as number;
     let batchCount = 0;
-    for await (const relation of allPosts.inBatches({
-      batchSize: 1,
-      start: startId,
-      finish: finishId,
-      order: "desc",
-    })) {
-      batchCount++;
-      expect(relation).toBeInstanceOf(Relation);
-    }
+    await assertQueriesCount(0, false, async () => {
+      for await (const relation of allPosts.inBatches({
+        batchSize: 1,
+        start: startId,
+        finish: finishId,
+        order: "desc",
+      })) {
+        batchCount++;
+        expect(relation).toBeInstanceOf(Relation);
+      }
+    });
     expect(batchCount).toBe(loadedPosts.length - 2);
   });
 
   it("in batches when loaded can return an enum", async () => {
     const allPosts = Post.all();
     await allPosts.toArray(); // load
-    let batchCount = 0;
-    for await (const relation of allPosts.inBatches({ batchSize: 1 })) {
-      batchCount++;
-      expect(relation).toBeInstanceOf(Relation);
-    }
     const total = Number(await Post.count());
+    let batchCount = 0;
+    await assertQueriesCount(0, false, async () => {
+      for await (const relation of allPosts.inBatches({ batchSize: 1 })) {
+        batchCount++;
+        expect(relation).toBeInstanceOf(Relation);
+      }
+    });
     expect(batchCount).toBe(total);
   });
 
@@ -628,17 +622,17 @@ describe("EachTest", () => {
     const startId = (expected[0] as any).id;
     const finishId = (expected[expected.length - 1] as any).id;
     const collected: any[] = [];
-    for await (const order of incorrectlySorted.findEach({
-      batchSize: 1,
-      start: startId,
-      finish: finishId,
-      order: ["desc", "asc"] as any,
-    })) {
-      collected.push(order);
-    }
-    expect(collected.map((o: any) => JSON.stringify(o.id))).toEqual(
-      expected.map((o: any) => JSON.stringify(o.id)),
-    );
+    await assertQueriesCount(0, false, async () => {
+      for await (const order of incorrectlySorted.findEach({
+        batchSize: 1,
+        start: startId,
+        finish: finishId,
+        order: ["desc", "asc"] as any,
+      })) {
+        collected.push(order);
+      }
+    });
+    expect(collected.map((o: any) => String(o.id))).toEqual(expected.map((o: any) => String(o.id)));
   });
 
   it("in batches when loaded iterates using custom column", async () => {
@@ -705,8 +699,8 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        for await (const relation of Post.inBatches({ batchSize: 2, useRanges: true })) {
-          await relation.toArray(); // execute the query
+        for await (const relation of Post.inBatches({ batchSize: 2 })) {
+          await relation.toArray();
           break;
         }
       },
@@ -721,7 +715,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const relation of Post.inBatches({ batchSize: 2, useRanges: false })) {
-          await relation.toArray(); // execute the query
+          await relation.toArray();
           break;
         }
       },
@@ -736,7 +730,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const relation of Post.where("id < ?", 5).inBatches({ batchSize: 2 })) {
-          await relation.toArray(); // execute the query
+          await relation.toArray();
           break;
         }
       },
@@ -754,7 +748,7 @@ describe("EachTest", () => {
           batchSize: 2,
           useRanges: true,
         })) {
-          await relation.toArray(); // execute the query
+          await relation.toArray();
           break;
         }
       },
@@ -768,7 +762,7 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        await Post.inBatches({ batchSize: 2, useRanges: true }).deleteAll();
+        await Post.inBatches({ batchSize: 2 }).deleteAll();
       },
     );
   });
@@ -860,8 +854,10 @@ describe("EachTest", () => {
       const records = await relation.toArray();
       batchPosts.push(...records);
     }
-    const defaultIds = defaultScope.map((p: any) => p.id).sort((a: any, b: any) => a - b);
-    const batchIds = batchPosts.map((p: any) => p.id).sort((a: any, b: any) => a - b);
+    const defaultIds = defaultScope
+      .map((p: any) => Number(p.id))
+      .sort((a: number, b: number) => a - b);
+    const batchIds = batchPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b);
     expect(batchIds).toEqual(defaultIds);
   });
 
@@ -919,8 +915,10 @@ describe("EachTest", () => {
       const records = await batch.where({ author_id: authorId }).toArray();
       seenPosts.push(...records);
     }
-    const expectedIds = postsByAuthor.map((p: any) => p.id).sort((a: any, b: any) => a - b);
-    const seenIds = seenPosts.map((p: any) => p.id).sort((a: any, b: any) => a - b);
+    const expectedIds = postsByAuthor
+      .map((p: any) => Number(p.id))
+      .sort((a: number, b: number) => a - b);
+    const seenIds = seenPosts.map((p: any) => Number(p.id)).sort((a: number, b: number) => a - b);
     expect(seenIds).toEqual(expectedIds);
   });
 
@@ -939,7 +937,6 @@ describe("EachTest", () => {
   it("in batches with custom columns raises when start missing items", async () => {
     await expect(async () => {
       for await (const _rel of Post.inBatches({ start: 1, cursor: ["author_id", "id"] as any })) {
-        // consume
       }
     }).rejects.toThrow();
   });
@@ -947,7 +944,6 @@ describe("EachTest", () => {
   it("in batches with custom columns raises when finish missing items", async () => {
     await expect(async () => {
       for await (const _rel of Post.inBatches({ finish: 10, cursor: ["author_id", "id"] as any })) {
-        // consume
       }
     }).rejects.toThrow();
   });
@@ -1005,98 +1001,61 @@ describe("EachTest", () => {
     expect(c2).toBe(Math.ceil(total / 2));
   });
 
-  it("in_batches should return limit records when limit is less than batch size and load is true", async () => {
+  it("in_batches should return limit records when limit is less than batch size and load is", async () => {
     const limit = 3;
     const batchSize = 5;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: true })) {
-      count += Number(await batch.count());
+    for (const load of [true, false]) {
+      let count = 0;
+      for await (const batch of Post.limit(limit).inBatches({ batchSize, load })) {
+        count += Number(await batch.count());
+      }
+      expect(count).toBe(limit);
     }
-    expect(count).toBe(limit);
   });
 
-  it("in_batches should return limit records when limit is greater than batch size and load is true", async () => {
+  it("in_batches should return limit records when limit is greater than batch size and load is", async () => {
     const limit = 5;
     const batchSize = 3;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: true })) {
-      count += Number(await batch.count());
+    for (const load of [true, false]) {
+      let count = 0;
+      for await (const batch of Post.limit(limit).inBatches({ batchSize, load })) {
+        count += Number(await batch.count());
+      }
+      expect(count).toBe(limit);
     }
-    expect(count).toBe(limit);
   });
 
-  it("in_batches should return limit records when limit is a multiple of the batch size and load is true", async () => {
+  it("in_batches should return limit records when limit is a multiple of the batch size and load is", async () => {
     const limit = 6;
     const batchSize = 3;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: true })) {
-      count += Number(await batch.count());
+    for (const load of [true, false]) {
+      let count = 0;
+      for await (const batch of Post.limit(limit).inBatches({ batchSize, load })) {
+        count += Number(await batch.count());
+      }
+      expect(count).toBe(limit);
     }
-    expect(count).toBe(limit);
   });
 
-  it("in_batches should return no records if the limit is 0 and load is true", async () => {
-    let count = 0;
-    for await (const batch of Post.limit(0).inBatches({ batchSize: 1, load: true })) {
-      count += Number(await batch.count());
+  it("in_batches should return no records if the limit is 0 and load is", async () => {
+    for (const load of [true, false]) {
+      let count = 0;
+      for await (const batch of Post.limit(0).inBatches({ batchSize: 1, load })) {
+        count += Number(await batch.count());
+      }
+      expect(count).toBe(0);
     }
-    expect(count).toBe(0);
   });
 
-  it("in_batches should return all if the limit is greater than the number of records when load is true", async () => {
+  it("in_batches should return all if the limit is greater than the number of records when load is", async () => {
     const total = Number(await Post.count());
-    let count = 0;
-    for await (const batch of Post.limit(total + 1).inBatches({ batchSize: 1, load: true })) {
-      count += Number(await batch.count());
+    for (const load of [true, false]) {
+      let count = 0;
+      for await (const batch of Post.limit(total + 1).inBatches({ batchSize: 1, load })) {
+        count += Number(await batch.count());
+      }
+      expect(count).toBe(total);
     }
-    expect(count).toBe(total);
-  });
-
-  it("in_batches should return limit records when limit is less than batch size and load is false", async () => {
-    const limit = 3;
-    const batchSize = 5;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: false })) {
-      count += Number(await batch.count());
-    }
-    expect(count).toBe(limit);
-  });
-
-  it("in_batches should return limit records when limit is greater than batch size and load is false", async () => {
-    const limit = 5;
-    const batchSize = 3;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: false })) {
-      count += Number(await batch.count());
-    }
-    expect(count).toBe(limit);
-  });
-
-  it("in_batches should return limit records when limit is a multiple of the batch size and load is false", async () => {
-    const limit = 6;
-    const batchSize = 3;
-    let count = 0;
-    for await (const batch of Post.limit(limit).inBatches({ batchSize, load: false })) {
-      count += Number(await batch.count());
-    }
-    expect(count).toBe(limit);
-  });
-
-  it("in_batches should return no records if the limit is 0 and load is false", async () => {
-    let count = 0;
-    for await (const batch of Post.limit(0).inBatches({ batchSize: 1, load: false })) {
-      count += Number(await batch.count());
-    }
-    expect(count).toBe(0);
-  });
-
-  it("in_batches should return all if the limit is greater than the number of records when load is false", async () => {
-    const total = Number(await Post.count());
-    let count = 0;
-    for await (const batch of Post.limit(total + 1).inBatches({ batchSize: 1, load: false })) {
-      count += Number(await batch.count());
-    }
-    expect(count).toBe(total);
   });
 
   it(".find_each respects table alias", async () => {
@@ -1104,7 +1063,6 @@ describe("EachTest", () => {
       const tableAlias = Post.arelTable.alias("omg_posts");
       const postRel = new Relation(Post, tableAlias as any);
       for await (const _post of postRel.findEach({})) {
-        // consume
       }
     });
   });
@@ -1112,10 +1070,8 @@ describe("EachTest", () => {
   it(".find_each bypasses the query cache for its own queries", async () => {
     await assertQueriesCount(2, false, async () => {
       for await (const _post of Post.findEach({})) {
-        // consume
       }
       for await (const _post of Post.findEach({})) {
-        // consume
       }
     });
   });
@@ -1134,10 +1090,8 @@ describe("EachTest", () => {
   it(".find_in_batches bypasses the query cache for its own queries", async () => {
     await assertQueriesCount(2, false, async () => {
       for await (const _b of Post.findInBatches({})) {
-        // consume
       }
       for await (const _b of Post.findInBatches({})) {
-        // consume
       }
     });
   });
@@ -1156,10 +1110,8 @@ describe("EachTest", () => {
   it(".in_batches bypasses the query cache for its own queries", async () => {
     await assertQueriesCount(2, false, async () => {
       for await (const _rel of Post.inBatches({})) {
-        // consume
       }
       for await (const _rel of Post.inBatches({})) {
-        // consume
       }
     });
   });

@@ -4771,12 +4771,27 @@ export class Relation<T extends Base> {
 
     const batchOrders = _buildBatchOrders(cursorArr, order as any);
 
+    // Mirrors Rails: when use_ranges is nil, auto-enable range mode for
+    // unconstrained single-cursor whole-table batching (no WHERE, no LIMIT,
+    // no OFFSET). Constrained queries keep the safe IN-list path.
+    const effectiveUseRanges =
+      useRanges ??
+      (!load &&
+        cursorArr.length === 1 &&
+        this._whereClause.predicates.length === 0 &&
+        this._limitValue === null &&
+        this._offsetValue === null);
+
     let remaining: number | null = null;
     let effectiveBatchSize = batchSize;
     if (this._limitValue !== null) {
       remaining = this._limitValue;
       if (remaining === 0) {
-        return new BatchEnumerator(async function* () {}, batchSize);
+        return new BatchEnumerator(async function* () {}, batchSize, {
+          start,
+          finish,
+          relation: self,
+        });
       }
       if (remaining < effectiveBatchSize) effectiveBatchSize = remaining;
     }
@@ -4790,17 +4805,21 @@ export class Relation<T extends Base> {
         order: (order ?? "asc") as any,
         batchLimit: effectiveBatchSize,
       });
-      return new BatchEnumerator(async function* () {
-        for (const batchRows of loadedBatches) {
-          const batchRel = self._clone();
-          batchRel._orderClauses = batchOrders.map(
-            ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
-          );
-          (batchRel as any)._records = batchRows;
-          (batchRel as any)._loaded = true;
-          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
-        }
-      }, effectiveBatchSize);
+      return new BatchEnumerator(
+        async function* () {
+          for (const batchRows of loadedBatches) {
+            const batchRel = self._clone();
+            batchRel._orderClauses = batchOrders.map(
+              ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+            );
+            (batchRel as any)._records = batchRows;
+            (batchRel as any)._loaded = true;
+            yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
+          }
+        },
+        effectiveBatchSize,
+        { start, finish, relation: self },
+      );
     }
 
     return new BatchEnumerator(
@@ -4823,7 +4842,7 @@ export class Relation<T extends Base> {
             ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
           );
           const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
-          if (useRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
+          if (effectiveUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
             // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
             // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
             const col = cursorArr[0];
@@ -4851,6 +4870,7 @@ export class Relation<T extends Base> {
         }
       } as () => AsyncGenerator<LoadedRelation<Relation<T>>>,
       effectiveBatchSize,
+      { start, finish, relation: self },
     );
   }
 
