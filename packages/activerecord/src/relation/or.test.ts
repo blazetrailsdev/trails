@@ -233,16 +233,19 @@ describe("OrTest", () => {
 
   it("or with annotate", () => {
     const quotedPosts = Post.quotedTableName();
-    const tail = (sql: string) => sql.replace(/\s+/g, " ");
-    expect(tail(Post.annotate("foo").or(Post.all()).toSql())).toContain(`${quotedPosts} /* foo */`);
-    expect(tail(Post.annotate("foo").or(Post.annotate("foo")).toSql())).toContain(
-      `${quotedPosts} /* foo */`,
+    // Rails anchors each match at `\z`: the annotation comment is the SQL tail.
+    const tail = (sql: string) => sql.replace(/\s+/g, " ").trimEnd();
+    expect(tail(Post.annotate("foo").or(Post.all()).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
     );
-    expect(tail(Post.annotate("foo").or(Post.annotate("bar")).toSql())).toContain(
-      `${quotedPosts} /* foo */`,
+    expect(tail(Post.annotate("foo").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
     );
-    expect(tail(Post.annotate("foo", "bar").or(Post.annotate("foo")).toSql())).toContain(
-      `${quotedPosts} /* foo */ /* bar */`,
+    expect(tail(Post.annotate("foo").or(Post.annotate("bar")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo", "bar").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/ /\\* bar \\*/$`),
     );
   });
 
