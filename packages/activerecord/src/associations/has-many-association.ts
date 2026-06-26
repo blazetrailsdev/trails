@@ -282,14 +282,35 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
   }
 }
 
-/** @internal */
+/**
+ * Mirrors ActiveRecord::Associations::CollectionAssociation#update_counter_in_memory:
+ * only the has_many bumps the owner's counter in memory, and only when
+ * `counter_must_be_updated_by_has_many?` holds — i.e. the inverse belongs_to
+ * does NOT already update the same counter in memory. Without this guard, an
+ * association declaring `counter_cache` on BOTH sides (e.g. Car has_many :tyres
+ * + Tyre belongs_to :car, both custom_tyres_count) double-bumps the in-memory
+ * value, which then leaks into the belongs_to's `increment!` delta
+ * (`in_memory - in_database`) on the next insert, persisting an inflated
+ * counter. Rails also clears the attribute change so the in-memory bump isn't
+ * re-persisted on a later owner save.
+ * @internal
+ */
 function updateCounterInMemory(assoc: HasManyAssociation, difference: number): void {
   const counterCol = assoc.reflection.options.counterCache;
-  if (counterCol) {
-    const owner = assoc.owner as any;
-    const current = Number(owner.readAttribute?.(String(counterCol)) ?? 0);
-    owner.writeAttribute?.(String(counterCol), current + difference);
-  }
+  if (!counterCol) return;
+  // `assoc.reflection` is the raw association definition, not the rich
+  // AbstractReflection that carries `isCounterMustBeUpdatedByHasMany`; resolve
+  // it through the owner class the same way `deleteRecords` does above.
+  const ctor = assoc.owner.constructor as typeof Base & {
+    _reflectOnAssociation?: (n: string) => { isCounterMustBeUpdatedByHasMany?: () => boolean };
+  };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  if (refl?.isCounterMustBeUpdatedByHasMany?.() === false) return;
+  const owner = assoc.owner as any;
+  const column = String(counterCol);
+  const current = Number(owner.readAttribute?.(column) ?? 0);
+  owner.writeAttribute?.(column, current + difference);
+  owner.clearAttributeChange?.(column);
 }
 
 /** @internal */

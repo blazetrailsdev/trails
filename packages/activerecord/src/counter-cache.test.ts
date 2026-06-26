@@ -792,21 +792,9 @@ describe("CounterCacheTest", () => {
   });
 
   it("active counter cache", async () => {
-    // Rails builds `Car.new` then `car.tyres = [...]; car.save!`, deferring the
-    // tyre inserts until owner save (collection_association.rb#concat_records
-    // skips insertion while `owner.new_record?`). trails' new-record collection
-    // assignment is broken for an association carrying counter_cache on BOTH
-    // sides (Tyre belongs_to :car + Car has_many :tyres, both
-    // custom_tyres_count): the literal Rails shape persists THREE tyre rows and
-    // leaves custom_tyres_count at 4 in memory / 3 reloaded. Tracked for
-    // convergence in story `counter-cache-new-owner-dual-counter-concat`. The
-    // counter-cache-on-create behavior itself is still covered faithfully by the
-    // sibling "counters are updated both in memory and in the database on
-    // create" test (engines, single counter), which DOES use new+assign+save.
-    // Here the create shape is only setup to stage custom_tyres_count = 2; the
-    // test's real subject is the queryless active-cache reads below.
-    const car = await Car.create();
+    const car = new Car();
     await association(car, "tyres").replace([new Tyre(), new Tyre()]);
+    await car.save();
 
     expect(car.custom_tyres_count).toBe(2);
     await car.reload();
