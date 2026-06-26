@@ -6763,22 +6763,34 @@ export class Relation<T extends Base> {
         rel._eagerLoadAssociations = [];
         rel._includesAssociations = [];
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
-        if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+        const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
+        if (
+          hasLimitOrOffset &&
+          !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
+          !Array.isArray(pk)
+        ) {
           // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
           // materialize the limited DISTINCT primary keys, rewrite as
-          // `WHERE pk IN (ids)`, and clear limit/offset.
-          const basePk =
-            (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
+          // `WHERE pk IN (ids)`, and clear limit/offset. Single-column PK only —
+          // `_materializeLimitedIds` (shared with the pluck eager-limit path) has
+          // no composite-PK support (Rails' zip/transpose over
+          // `Array(primary_key)`), so a composite PK falls through to the
+          // synchronous applyJoinDependencyForArel below, which surfaces the
+          // unsupported combination as an explicit NotImplementedError rather
+          // than emitting a wrong single-column `"col1,col2"` predicate.
           const jd = new JoinDependency(this._modelClass);
           this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
           if (jd.nodes.length > 0) {
-            const limitedIds = await this._materializeLimitedIds(jd, basePk as string);
-            collection = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
+            const limitedIds = await this._materializeLimitedIds(jd, pk);
+            collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
             collection._limitValue = null;
             collection._offsetValue = null;
           } else {
             collection = rel.leftOuterJoins(eagerSpecs);
           }
+        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+          // Composite-PK, non-limitable eager limit/offset: unsupported here.
+          collection = this.applyJoinDependencyForArel();
         } else {
           collection = rel.leftOuterJoins(eagerSpecs);
         }
