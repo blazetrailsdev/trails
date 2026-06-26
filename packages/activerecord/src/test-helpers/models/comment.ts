@@ -30,6 +30,8 @@ export class Comment extends Base {
     this.scope("allAsScope", (q: any) => q.all());
     // Rails: `scope :oops_comments, -> { extending OopsExtension }`.
     this.scope("oopsComments", (q: any) => q.all(), OopsExtension);
+    // Rails: `default_scope { extending OopsExtension }`.
+    this.defaultScope((q: any) => q.extending(OopsExtension));
 
     this.belongsTo("post", { counterCache: true });
     this.belongsTo("author", { polymorphic: true });
