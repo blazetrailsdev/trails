@@ -577,12 +577,14 @@ describe("HasManyAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  // SKIP: CollectionProxy#destroy does not yet wrap the batch in a transaction
-  // (Rails delete_or_destroy → transaction { remove_records }), so a mid-batch
-  // raise leaves a partial delete instead of rolling back. Tracked by impl story
-  // collection-proxy-destroy-transaction + unskip story
-  // unskip-has-many-collection-destroy-transaction (RFC 0019).
   it.skip("transaction when deleting persisted", async () => {
+    // BLOCKED: CollectionProxy#destroy does not wrap the batch in a transaction
+    // (Rails delete_or_destroy → transaction { remove_records }), so a mid-batch
+    // raise leaves a partial delete instead of rolling back.
+    // ROOT-CAUSE: associations/collection-proxy.ts#destroy not wrapping the loop
+    // in this.transaction when any record is persisted (cf. #delete which does).
+    // SCOPE: ~15 LOC fix; tracked by collection-proxy-destroy-transaction +
+    // unskip-has-many-collection-destroy-transaction (RFC 0019).
     const good = Client.new({ name: "Good" }) as any;
     const bad = Client.new({ name: "Bad" }) as any;
     bad.raiseOnDestroy = true;
@@ -7458,12 +7460,14 @@ describe("AsyncHasManyAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  // SKIP: association(...).asyncLoadTarget() does not leave the dotted
-  // `firm.clients` proxy in a loaded state, so the post-load `size()`/`toArray()`
-  // re-query instead of reading the prefetched target. Tracked by impl story
-  // assoc-async-load-target-shares-proxy-state + unskip story
-  // unskip-async-load-has-many (RFC 0019).
   it.skip("async load has many", async () => {
+    // BLOCKED: association(...).asyncLoadTarget() does not leave the dotted
+    // `firm.clients` proxy loaded, so the post-load size()/toArray() re-query
+    // instead of reading the prefetched target.
+    // ROOT-CAUSE: associations/association.ts#asyncLoadTarget not sharing the
+    // loaded target with the dotted collection proxy.
+    // SCOPE: tracked by assoc-async-load-target-shares-proxy-state +
+    // unskip-async-load-has-many (RFC 0019).
     // Rails has_many_associations_test.rb:3261 test_async_load_has_many:
     //   firm.association(:clients).async_load_target; then clients.size == 3
     //   and clients[2] is reachable with no further queries.
