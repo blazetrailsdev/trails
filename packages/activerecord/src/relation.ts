@@ -4043,7 +4043,7 @@ export class Relation<T extends Base> {
   }
 
   private async _execUpdateAll(
-    updateValues: [Nodes.Node, unknown][] | string | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
+    updateValues: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
   ): Promise<number> {
     const table = this._modelClass.arelTable;
     const primaryKey = this._modelClass.primaryKey;
