@@ -29,7 +29,12 @@ function asJsonValue(value: unknown, options: EncodeOptions): unknown {
 
   if (Array.isArray(value)) return value.map((v) => asJsonValue(v, options));
 
-  if (typeof value === "object") {
+  // Only true Hashes (plain objects / Maps) get `only`/`except` key filtering.
+  // Other objects (Date, RegExp, BigNumber-likes, …) carry their own `as_json`
+  // string form, so leave them for `JSON.stringify` to serialize via `toJSON`
+  // rather than recursing into them as if they were attribute bags (which would
+  // emit `{}` for a `Date`).
+  if (value instanceof Map || isPlainObject(value)) {
     const entries = value instanceof Map ? [...value.entries()] : Object.entries(value);
     const keep = filterHashKeys(
       entries.map(([k]) => k),
@@ -43,6 +48,13 @@ function asJsonValue(value: unknown, options: EncodeOptions): unknown {
   }
 
   return value;
+}
+
+// A Hash-shaped object: a bare object literal (`Object.prototype` or null
+// prototype), not a class instance like `Date` that defines its own JSON form.
+function isPlainObject(value: object): boolean {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 // Mirrors `Hash#as_json`'s key filtering: `only` keeps the listed keys, `except`
