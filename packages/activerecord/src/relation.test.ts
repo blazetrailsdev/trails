@@ -160,15 +160,15 @@ describe("RelationTest", () => {
     expect(attrs.title).toBe("scoped");
   });
 
-  // SKIP: trails `updateAll` passes scalar SET values raw; the UPDATE-SET
-  // visitor (to-sql.ts visitArelNodesAssignment) quotes them by *column* type,
-  // so an attribute-declared custom type's cast/serialize is bypassed — unlike
-  // Rails `_substitute_values`, which binds via `type_for_attribute`. Routing
-  // SET values through `buildBindAttribute` here breaks 24 update-all tests
-  // because the SET-clause bind path is not threaded like WHERE. Tracked by
-  // story 0023-surfaced-deviations/updateall-routes-values-through-attribute-type;
-  // un-skip when that converges.
-  it.skip("update all goes through normal type casting", async () => {
+  // it.fails (active, not skipped): trails `updateAll` passes scalar SET values
+  // raw; the UPDATE-SET visitor (to-sql.ts visitArelNodesAssignment) quotes them
+  // by *column* type, so an attribute-declared custom type's cast/serialize is
+  // bypassed — unlike Rails `_substitute_values`, which binds via
+  // `type_for_attribute`. Marked `it.fails` so CI keeps running the faithful Rails
+  // assertion and flips red the moment the deviation is fixed (signalling the
+  // marker should be removed). Tracked by story
+  // 0023-surfaced-deviations/updateall-routes-values-through-attribute-type.
+  it.fails("update all goes through normal type casting", async () => {
     await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
 
     const first = await UpdateAllTestModel.first();
@@ -350,14 +350,15 @@ describe("RelationTest", () => {
     expect(merged.toSql()).toContain("SELECT");
   });
 
-  it("merging a hash with unknown keys raises", () => {
-    // Rails `Relation::HashMerger.new(nil, omg: "lol")` raises ArgumentError via
-    // `assert_valid_keys` against VALUE_METHODS (relation_test.rb:164-166). trails'
-    // `merge(Hash)` has different semantics — it treats the hash as `where`
-    // conditions (merger.ts HashMerger#merge → `relation.where(hash)`), so any key
-    // is a column predicate and none is validated. Asserting trails' actual
-    // behavior: an unknown-key hash merge does not raise.
-    expect(() => CanonPost.all().merge({ omg: "lol" } as any)).not.toThrow();
+  // it.fails (active, not skipped): Rails `Relation::HashMerger#initialize`
+  // validates keys with `assert_valid_keys(*Relation::VALUE_METHODS)`, so
+  // `merge(omg: "lol")` raises ArgumentError (merger.rb:7-12,
+  // relation_test.rb:164-166). trails' `merge(Hash)` instead treats the hash as
+  // `where` conditions (merger.ts HashMerger#merge → `relation.where(hash)`) and
+  // validates nothing, so it does not raise. Marked `it.fails` so CI tracks the
+  // mismatch and flips red once HashMerger gains key validation.
+  it.fails("merging a hash with unknown keys raises", () => {
+    expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
   });
 
   it("merging nil or false raises", () => {
