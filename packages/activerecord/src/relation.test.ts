@@ -160,12 +160,14 @@ describe("RelationTest", () => {
     expect(attrs.title).toBe("scoped");
   });
 
-  // SKIP: trails `updateAll` passes scalar values raw and lets the connection
-  // cast by the *column* type, so an attribute-declared custom type's
-  // serialize/deserialize is bypassed — unlike Rails `_substitute_values`, which
-  // casts via `type_for_attribute`. Surfaced by this faithful port; tracked by
-  // story 0023-surfaced-deviations/updateall-routes-values-through-attribute-type.
-  // Un-skip when that converges.
+  // SKIP: trails `updateAll` passes scalar SET values raw; the UPDATE-SET
+  // visitor (to-sql.ts visitArelNodesAssignment) quotes them by *column* type,
+  // so an attribute-declared custom type's cast/serialize is bypassed — unlike
+  // Rails `_substitute_values`, which binds via `type_for_attribute`. Routing
+  // SET values through `buildBindAttribute` here breaks 24 update-all tests
+  // because the SET-clause bind path is not threaded like WHERE. Tracked by
+  // story 0023-surfaced-deviations/updateall-routes-values-through-attribute-type;
+  // un-skip when that converges.
   it.skip("update all goes through normal type casting", async () => {
     await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
 
@@ -311,7 +313,10 @@ describe("RelationTest", () => {
   });
 
   it("bad constants raise errors", () => {
-    expect(() => CanonPost.where({ title: "test" })).not.toThrow();
+    // Rails asserts `ActiveRecord::Relation::HelloWorld` raises `NameError`
+    // (relation_test.rb:122-125). TypeScript has no constant-resolution / NameError;
+    // the faithful analogue is that no such member exists on `Relation`.
+    expect((Relation as any).HelloWorld).toBeUndefined();
   });
 
   it("empty eager loading?", () => {
@@ -346,11 +351,19 @@ describe("RelationTest", () => {
   });
 
   it("merging a hash with unknown keys raises", () => {
-    expect(() => CanonPost.where({ title: "a" })).not.toThrow();
+    // Rails `Relation::HashMerger.new(nil, omg: "lol")` raises ArgumentError via
+    // `assert_valid_keys` against VALUE_METHODS (relation_test.rb:164-166). trails'
+    // `merge(Hash)` has different semantics — it treats the hash as `where`
+    // conditions (merger.ts HashMerger#merge → `relation.where(hash)`), so any key
+    // is a column predicate and none is validated. Asserting trails' actual
+    // behavior: an unknown-key hash merge does not raise.
+    expect(() => CanonPost.all().merge({ omg: "lol" } as any)).not.toThrow();
   });
 
   it("merging nil or false raises", () => {
-    expect(() => CanonPost.all().toSql()).not.toThrow();
+    const relation = CanonPost.all();
+    expect(() => relation.merge(null as any)).toThrow("invalid argument: nil.");
+    expect(() => relation.merge(false as any)).toThrow("invalid argument: false.");
   });
 
   it("relations can be created with a values hash", () => {
@@ -365,10 +378,11 @@ describe("RelationTest", () => {
   });
 
   it("merging readonly false", () => {
-    const rel = CanonPost.all().readonly();
-    expect(rel.isReadonly).toBe(true);
-    const merged = rel.merge(CanonPost.all());
-    expect(merged.toSql()).toContain("SELECT");
+    const relation = CanonPost.all();
+    const readonlyFalseRelation = CanonPost.all().readonly(false);
+    // test merging in both directions
+    expect(relation.merge(readonlyFalseRelation).isReadonly).toBe(false);
+    expect(readonlyFalseRelation.merge(relation).isReadonly).toBe(false);
   });
 
   it("relation merging with joins as join dependency pick proper parent", async () => {
@@ -387,9 +401,13 @@ describe("RelationTest", () => {
     expect(() => rel.merge(true as any)).toThrow();
   });
 
-  it("respond to for non selected element", () => {
-    expect(typeof CanonPost.all().count).toBe("function");
-    expect(typeof CanonPost.all().first).toBe("function");
+  it("respond to for non selected element", async () => {
+    const post: any = await CanonPost.select("title").first();
+    // Rails: a partially-selected record does not respond to unloaded attributes
+    // "since invoking it raises exception" (relation_test.rb:284-289). trails has
+    // no `respond_to?`, but enforces the same contract — invoking the unselected
+    // attribute raises MissingAttributeError.
+    expect(() => post.body).toThrow();
   });
 
   it("selecting aliased attribute quotes column name when from is used", () => {
@@ -404,15 +422,20 @@ describe("RelationTest", () => {
     expect(sql).toContain("WHERE");
   });
 
-  it("relation with annotation includes comment in sql", () => {
-    const sql = CanonPost.all().annotate("my annotation").toSql();
-    expect(sql).toContain("my annotation");
+  it("relation with annotation includes comment in sql", async () => {
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo");
+    const queries = await captureSql(async () => {
+      expect(await postWithAnnotation.first()).not.toBeNull();
+    });
+    expect(queries.some((sql) => /\/\* foo \*\//.test(sql))).toBe(true);
   });
 
-  it("relation with annotation chains sql comments", () => {
-    const sql = CanonPost.all().annotate("first").annotate("second").toSql();
-    expect(sql).toContain("first");
-    expect(sql).toContain("second");
+  it("relation with annotation chains sql comments", async () => {
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo").annotate("bar");
+    const queries = await captureSql(async () => {
+      expect(await postWithAnnotation.first()).not.toBeNull();
+    });
+    expect(queries.some((sql) => /\/\* foo \*\/ \/\* bar \*\//.test(sql))).toBe(true);
   });
 
   it("relation with annotation filters sql comment delimiters", () => {
@@ -432,12 +455,14 @@ describe("RelationTest", () => {
     expect(postWithHint.toSql()).toContain("/*+ BADHINT */");
   });
 
-  it("skip preloading after arel has been generated", async () => {
-    const rel = CanonPost.all();
-    const sql = rel.toSql();
-    expect(sql).toContain("SELECT");
-    const results = await rel.toArray();
-    expect(Array.isArray(results)).toBe(true);
+  it("skip preloading after arel has been generated", () => {
+    // Rails (relation_test.rb:414-419): build a Comment relation, generate its
+    // arel, then `skip_preloading!` without raising.
+    expect(() => {
+      const relation = CanonComment.all();
+      relation.arel();
+      relation.skipPreloadingBang();
+    }).not.toThrow();
   });
 
   it("no queries on empty IN", async () => {

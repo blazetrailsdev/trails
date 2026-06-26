@@ -32,7 +32,9 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
   // Relation through Merger, and a proc/lambda is instance-exec'd against
   // the spawned relation. A bare Relation is detected by its `_whereClause`.
   if (other == null) {
-    throw argumentError(`invalid argument: ${String(other)}.`);
+    // Rails `merge!`'s final `else` raises `invalid argument: #{other.inspect}.`
+    // (spawn_methods.rb); `nil.inspect == "nil"`.
+    throw argumentError(`invalid argument: nil.`);
   }
   if (typeof other === "function") {
     // Mirrors merge!'s `instance_exec(&other)` (spawn_methods.rb:48-49): the
@@ -48,7 +50,9 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
   if (typeof other === "object") {
     return new HashMerger(this, other).merge() as T;
   }
-  throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
+  // Rails `merge!`'s final `else` for a non-Hash/Relation/proc argument:
+  // `raise ArgumentError, "invalid argument: #{other.inspect}."` (spawn_methods.rb).
+  throw argumentError(`invalid argument: ${String(other)}.`);
 }
 
 /**
