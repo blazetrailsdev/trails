@@ -1,294 +1,176 @@
 /**
- * Tests to increase Rails test coverage matching.
+ * Mirrors: activerecord/test/cases/validations/association_validation_test.rb
+ *
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Rails uses `repair_validations(Topic, Reply)` to add validators to the
+ * canonical models inside a test body and clear them afterward; we mirror that
+ * with `clearValidatorsBang()` in `afterEach` (Topic, Reply, Interest) and
+ * `repairValidations(...)` for the block-form cases.
+ *
+ * trails validations are synchronous, so where Rails appends in-memory
+ * associated records (`t.replies << r`) we build them through the real
+ * association (no insert on an unsaved/just-built target) or seed the
+ * association cache — the behavior under test is the cascading `valid?`, not
+ * collection persistence.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { afterEach, describe, expect, it, beforeAll } from "vitest";
+import { registerModel } from "../index.js";
+import { association } from "../associations.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { repairValidations } from "../test-helpers/repair-validations.js";
 import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string" },
-    comments: { body: "string", post_id: "integer" },
-    widgets: { name: "string" },
-    missing_children: { name: "string", parent_id: "integer" },
-    val_bt_parents: { name: "string" },
-    val_bt_children: { title: "string", val_bt_parent_id: "integer" },
-    val_bt_parent2s: { name: "string" },
-    val_bt_child2s: { title: "string", val_bt_parent2_id: "integer" },
-    topic_m_ds: { title: "string" },
-    topic_w_a_ds: { title: "string" },
-    reply_msgs: { title: "string" },
-    reply_ctxs: { title: "string" },
-    reply_create_topics: { title: "string", content: "string" },
-    reply_creates: { title: "string", content: "string" },
-  });
-});
+import { Topic } from "../test-helpers/models/topic.js";
+import { Reply } from "../test-helpers/models/reply.js";
+import { Human } from "../test-helpers/models/human.js";
+import { Interest } from "../test-helpers/models/interest.js";
 
 describe("AssociationValidationTest", () => {
+  // Rails `fixtures :topics` — needed by test_validates_associated_missing's
+  // `Topic.first`. Loading the set also registers Topic/Reply (STI).
+  useHandlerFixtures(["topics"]);
+
+  beforeAll(() => {
+    registerModel("Topic", Topic);
+    registerModel("Reply", Reply);
+    registerModel("Human", Human);
+    registerModel("Interest", Interest);
+  });
+
+  // Rails `repair_validations(Topic, Reply)` — clear validators added to the
+  // canonical models so per-test `validates_*` calls do not leak.
+  afterEach(() => {
+    Topic.clearValidatorsBang();
+    Reply.clearValidatorsBang();
+    Interest.clearValidatorsBang();
+  });
+
   it("validates associated many", async () => {
-    let cidx = 0;
-    const idx = ++cidx;
-    class Comment extends Base {
-      declare body: string | null;
-      declare post_id: number | null;
+    Topic.validatesAssociated("replies");
+    Reply.validatesPresenceOf("content");
+    const t = await Topic.create({ title: "uhohuhoh", content: "whatever" });
+    // Rails `t.replies << [r, r2, r3, r4]`. On a persisted owner `<<` saves the
+    // valid replies; the cascading `valid?` is what's under test, so we build
+    // them in-memory through the real association instead.
+    const r = association(t, "replies").build({ title: "A reply" }) as Reply;
+    const r2 = association(t, "replies").build({
+      title: "Another reply",
+      content: "non-empty",
+    }) as Reply;
+    const r3 = association(t, "replies").build({ title: "Yet another reply" }) as Reply;
+    const r4 = association(t, "replies").build({
+      title: "The last reply",
+      content: "non-empty",
+    }) as Reply;
 
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.validates("body", { presence: true });
-      }
-    }
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-      }
-      static {
-        this.validatesAssociated("comments");
-      }
-    }
-    registerModel(`Comment${idx}`, Comment);
-    registerModel(`Post${idx}`, Post);
-
-    const post = await Post.create({ title: "Test" });
-    const invalidComment = new Comment({ body: "", post_id: post.id });
-    await invalidComment.isValid();
-    expect(invalidComment.errors.empty).toBe(false);
+    expect(t.isValid()).toBe(false);
+    expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
+    expect(r.errors.count).toBe(1); // make sure all associated objects have been validated
+    expect(r2.errors.count).toBe(0);
+    expect(r3.errors.count).toBe(1);
+    expect(r4.errors.count).toBe(0);
+    r.writeAttribute("content", "non-empty");
+    r3.writeAttribute("content", "non-empty");
+    expect(t.isValid()).toBe(true);
   });
 
   it("validates associated one", async () => {
-    class Widget extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const w = new Widget({ name: "" });
-    const valid = await w.isValid();
-    expect(valid).toBe(false);
-    expect(w.errors.empty).toBe(false);
-  });
-
-  it("validates associated missing", async () => {
-    class MissingChild extends Base {
-      declare name: string | null;
-      declare parent_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("parent_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("MissingChild", MissingChild);
-    const child = new MissingChild({ name: "", parent_id: 999 });
-    const valid = await child.isValid();
-    expect(valid).toBe(false);
-  });
-
-  it("validates presence of belongs to association  parent is new record", async () => {
-    class ValBtParent extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ValBtChild extends Base {
-      declare title: string | null;
-      declare val_bt_parent_id: number | null;
-      declare valBtParent: ValBtParent | null;
-      declare loadBelongsTo: (name: "valBtParent") => Promise<ValBtParent | null>;
-
-      static {
-        this.attribute("title", "string");
-        this.attribute("val_bt_parent_id", "integer");
-        this.belongsTo("valBtParent", {
-          required: true,
-          foreignKey: "val_bt_parent_id",
-          className: "ValBtParent",
-        });
-      }
-    }
-    registerModel("ValBtParent", ValBtParent);
-    registerModel("ValBtChild", ValBtChild);
-    const child = new ValBtChild({ title: "orphan" });
-    const valid = child.isValid();
-    expect(valid).toBe(false);
-  });
-
-  it("validates presence of belongs to association  existing parent", async () => {
-    class ValBtParent2 extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ValBtChild2 extends Base {
-      declare title: string | null;
-      declare val_bt_parent2_id: number | null;
-      declare valBtParent2: ValBtParent2 | null;
-      declare loadBelongsTo: (name: "valBtParent2") => Promise<ValBtParent2 | null>;
-
-      static {
-        this.attribute("title", "string");
-        this.attribute("val_bt_parent2_id", "integer");
-        this.belongsTo("valBtParent2", {
-          required: true,
-          foreignKey: "val_bt_parent2_id",
-          className: "ValBtParent2",
-        });
-      }
-    }
-    registerModel("ValBtParent2", ValBtParent2);
-    registerModel("ValBtChild2", ValBtChild2);
-    const parent = await ValBtParent2.create({ name: "exists" });
-    const child = new ValBtChild2({ title: "with parent", val_bt_parent2_id: parent.id });
-    const valid = child.isValid();
-    expect(valid).toBe(true);
+    // Rails `Reply.validates :topic, associated: true` — the `associated: true`
+    // form registers the same AssociatedValidator as `validates_associated`.
+    Reply.validatesAssociated("topic");
+    Topic.validatesPresenceOf("content");
+    const r = new Reply({ title: "A reply", content: "with content!" });
+    const topic = await Topic.create({ title: "uhohuhoh" });
+    seedAssociationCache(r, "topic", topic);
+    expect(r.isValid()).toBe(false);
+    expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
+    topic.writeAttribute("content", "non-empty");
+    expect(r.isValid()).toBe(true);
   });
 
   it("validates associated marked for destruction", () => {
-    class FakeReply {
-      _destroyed = false;
-      isValid() {
-        return false;
-      }
-      markedForDestruction() {
-        return this._destroyed;
-      }
-    }
-    class TopicMD extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-        this.validatesAssociated("replies");
-      }
-    }
-    registerModel("TopicMD_destruction", TopicMD);
-    const reply = new FakeReply();
-    const t = new TopicMD({ title: "test" });
-    seedAssociationCache(t as any, "replies", [reply]);
-    expect(t.isValid()).toBe(false);
-    reply._destroyed = true;
-    t.errors.clear();
+    Topic.validatesAssociated("replies");
+    Reply.validatesPresenceOf("content");
+    const t = new Topic();
+    const reply = association(t, "replies").build() as Reply;
+    expect(t.isInvalid()).toBe(true);
+    reply.markForDestruction();
     expect(t.isValid()).toBe(true);
   });
+
   it("validates associated without marked for destruction", () => {
-    class FakeReply {
-      isValid() {
-        return true;
-      }
-    }
-    class TopicWAD extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-        this.validatesAssociated("replies");
-      }
-    }
-    registerModel("TopicWAD_without_destruction", TopicWAD);
-    const t = new TopicWAD({ title: "test" });
-    (t as any).replies = [new FakeReply()];
+    // Rails defines an anonymous class whose `valid?` is always true and stubs
+    // `t.replies` to return `[reply.new]`; we seed the same shape into the cache.
+    const reply = { isValid: () => true };
+    Topic.validatesAssociated("replies");
+    const t = new Topic();
+    seedAssociationCache(t, "replies", [reply]);
     expect(t.isValid()).toBe(true);
   });
-  it("validates associated with custom message using quotes", () => {
-    class FakeTopic {
-      isValid() {
-        return false;
-      }
-    }
-    class ReplyMsg extends Base {
-      declare title: string | null;
 
-      static {
-        this.attribute("title", "string");
-        this.validatesAssociated("topic", {
-          message: "This string contains 'single' and \"double\" quotes",
-        });
-      }
-    }
-    registerModel("ReplyMsg", ReplyMsg);
-    const r = new ReplyMsg({ title: "A reply" });
-    seedAssociationCache(r as any, "topic", new FakeTopic());
+  it("validates associated with custom message using quotes", async () => {
+    Reply.validatesAssociated("topic", {
+      message: "This string contains 'single' and \"double\" quotes",
+    });
+    Topic.validatesPresenceOf("content");
+    const r = await Reply.create({ title: "A reply", content: "with content!" });
+    const topic = await Topic.create({ title: "uhohuhoh" });
+    seedAssociationCache(r, "topic", topic);
     expect(r.isValid()).toBe(false);
-    expect(r.errors.fullMessagesFor("topic")).toContain(
-      "Topic This string contains 'single' and \"double\" quotes",
-    );
+    expect(r.errors.messagesFor("topic")).toEqual([
+      "This string contains 'single' and \"double\" quotes",
+    ]);
   });
-  it("validates associated with custom context", () => {
-    class FakeTopic {
-      isValid(context?: string) {
-        if (context === "custom") return false;
-        return true;
-      }
-    }
-    class ReplyCtx extends Base {
-      declare title: string | null;
 
-      static {
-        this.attribute("title", "string");
-        this.validatesAssociated("topic", { on: "custom" });
-      }
-    }
-    registerModel("ReplyCtx", ReplyCtx);
-    const r = new ReplyCtx({ title: "A reply" });
-    seedAssociationCache(r as any, "topic", new FakeTopic());
+  it("validates associated missing", async () => {
+    Reply.validatesPresenceOf("topic");
+    const r = await Reply.create({ title: "A reply", content: "with content!" });
+    expect(r.isValid()).toBe(false);
+    expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
+
+    seedAssociationCache(r, "topic", await Topic.first());
+    expect(r.isValid()).toBe(true);
+  });
+
+  it("validates presence of belongs to association  parent is new record", async () => {
+    // Note that Interest and Human have the :inverse_of option set
+    await repairValidations(Interest, () => {
+      Interest.validatesPresenceOf("human");
+      const human = new Human({ name: "John" });
+      const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
+      expect(interest.isValid()).toBe(true);
+    });
+  });
+
+  it("validates presence of belongs to association  existing parent", async () => {
+    await repairValidations(Interest, async () => {
+      Interest.validatesPresenceOf("human");
+      const human = await Human.createBang({ name: "John" });
+      const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
+      expect(interest.isValid()).toBe(true);
+    });
+  });
+
+  it("validates associated with custom context", async () => {
+    Reply.validatesAssociated("topic", { on: "custom" });
+    Topic.validatesPresenceOf("content", { on: "custom" });
+    const r = await Reply.create({ title: "A reply", content: "with content!" });
+    const topic = await Topic.create({ title: "uhohuhoh" });
+    seedAssociationCache(r, "topic", topic);
     expect(r.isValid()).toBe(true);
     expect(r.isValid("custom")).toBe(false);
-    expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
+    expect(r.errors.messagesFor("topic")).toEqual(["is invalid"]);
   });
+
   it("validates associated with create context", async () => {
-    // Rails builds `r` via `t.replies.create(...)`; we construct the persisted
-    // records directly and wire the association cache, since the behavior under
-    // test is the `on: :create` gating, not CollectionProxy.create itself.
-    class ReplyCreateTopic extends Base {
-      declare title: string | null;
-      declare content: string | null;
-
-      static {
-        this._tableName = "reply_create_topics";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("content", "string");
-        this.validates("content", { presence: true, on: "create" });
-      }
-    }
-    class ReplyCreate extends Base {
-      declare title: string | null;
-      declare content: string | null;
-
-      static {
-        this._tableName = "reply_creates";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("content", "string");
-        this.validatesAssociated("topic", { on: "create" });
-      }
-    }
-    registerModel("ReplyCreateTopic", ReplyCreateTopic);
-    registerModel("ReplyCreate", ReplyCreate);
-
-    const t = await ReplyCreateTopic.create({ title: "uhoh", content: "stuff" });
-    // update! succeeds despite null content — presence is validated on :create only.
-    t.content = null;
-    expect(await t.save()).toBe(true);
-
-    const r = await ReplyCreate.create({ title: "A reply", content: "with content!" });
+    Reply.validatesAssociated("topic", { on: "create" });
+    Topic.validatesPresenceOf("content", { on: "create" });
+    const t = await Topic.create({ title: "uhoh", content: "stuff" });
+    t.writeAttribute("content", null);
+    expect(await t.save()).toBe(true); // update! succeeds: presence is validated on :create only
+    const r = await Reply.create({ title: "A reply", content: "with content!" });
     // NOTE: Does not pass along :create context from reply to Topic validation.
-    seedAssociationCache(r as any, "topic", t);
+    seedAssociationCache(r, "topic", t);
 
     expect(t.isValid()).toBe(true);
     expect(r.isValid()).toBe(true);
