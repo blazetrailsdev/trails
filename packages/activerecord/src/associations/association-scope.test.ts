@@ -43,10 +43,13 @@ describe("AssociationScope", () => {
     await defineSchema(TEST_SCHEMA);
     // A polymorphic source whose target has a non-`id` (uuid) primary key has
     // no schema.rb analog, so the np_* tables stay bespoke but file-unique
-    // (RFC 0019 sanctions uuid-PK shapes as bespoke). DDL must run here in
-    // beforeAll — never inside a test — because on MySQL/MariaDB DDL forces an
-    // implicit COMMIT that destroys the transactional-fixtures savepoint.
-    /* eslint-disable blazetrails/require-canonical-schema -- uuid-PK polymorphic source has no schema.rb analog; file-unique np_* scratch */
+    // (RFC 0019 sanctions uuid-PK shapes as bespoke). This is the one reason
+    // the file remains on the require-canonical-schema exclude list; the
+    // follow-up story `association-scope-test-np-uuid-canonical` tracks
+    // converging or relocating it so the file can drop off the list. DDL must
+    // run here in beforeAll — never inside a test — because on MySQL/MariaDB
+    // DDL forces an implicit COMMIT that destroys the transactional-fixtures
+    // savepoint.
     await defineSchema({
       np_authors: { name: "string" },
       np_galleries: {
@@ -59,7 +62,6 @@ describe("AssociationScope", () => {
         primaryKey: ["uuid"],
       },
     });
-    /* eslint-enable blazetrails/require-canonical-schema */
   });
   afterAll(async () => {
     // Drop the file-unique uuid-PK scratch tables built in beforeAll (used by
