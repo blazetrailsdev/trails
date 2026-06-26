@@ -42773,13 +42773,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "rewhere",
-    "call": "unscope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "rewhere",
     "call": "unscope!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
