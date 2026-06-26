@@ -136,6 +136,11 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("overloaded default but keeping its own type", () => {
+    // Rails declares `attribute :overloaded_string_with_limit, default: ...` with
+    // no type to keep the existing (schema) type; trails' `attribute()` requires a
+    // concrete type, so we pass the column's own type ("string"). The no-type
+    // preserve path is tracked by RFC 0023
+    // attribute-optional-type-preserve-existing.
     class WithDefault extends UnoverloadedType {
       static {
         this.attribute("overloaded_string_with_limit", "string", {
@@ -159,6 +164,11 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes with overridden types keep their type when a default value is configured separately", () => {
+    // Rails uses `attribute :overloaded_float, default: "123"` (no type) to keep
+    // the existing type; trails requires a type, so we pass the inherited
+    // "integer". The type-equality assertion below still verifies the type is
+    // preserved. No-type preserve path tracked by RFC 0023
+    // attribute-optional-type-preserve-existing.
     class Child extends OverloadedType {
       static {
         this.attribute("overloaded_float", "integer", { default: "123" });
@@ -261,7 +271,8 @@ describe("CustomPropertiesTest", () => {
     // declared overrides in declaration order rather than column order, so the
     // sequence differs; assert the same membership and that the virtual
     // `non_existent_decimal` is excluded from column_names but present in
-    // attribute_names.
+    // attribute_names. Exact-order convergence tracked by RFC 0023
+    // attribute-names-column-order.
     expect(new Set(attributeNames)).toEqual(new Set(expected));
     expect(OverloadedType.columnNames()).not.toContain("non_existent_decimal");
     expect(attributeNames).toContain("non_existent_decimal");
@@ -424,6 +435,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns keep their type when a default value is configured separately", () => {
+    // Rails uses no-type `attribute :non_existent_decimal, default: "123"`; trails
+    // requires a type, so pass the inherited "decimal". Type equality is still
+    // asserted below. No-type preserve path tracked by RFC 0023
+    // attribute-optional-type-preserve-existing.
     class Child extends OverloadedType {
       static {
         this.attribute("non_existent_decimal", "decimal", { default: "123" });
