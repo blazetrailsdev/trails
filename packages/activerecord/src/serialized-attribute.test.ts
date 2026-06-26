@@ -4,6 +4,7 @@
  * Mirrors: activerecord/test/cases/serialized_attribute_test.rb
  */
 import { describe, it, expect, vi } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./serialize.js";
 
@@ -41,8 +42,13 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialize does not eagerly load columns", () => {
+    // Rails: assert_no_queries { Topic.serialize(:content) }
+    // We spy on leaseConnection to confirm no DB access occurs during registration.
+    const spy = vi.spyOn(Base, "leaseConnection" as any);
     class LocalTopic extends Topic {}
     serialize(LocalTopic, "content");
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it("serialized attribute", async () => {
@@ -150,7 +156,9 @@ describe("SerializedAttributeTest", () => {
     const reloaded = await JsonTopic.find(t.id as number);
     expect(typeof (reloaded as any).content).toBe("object");
     expect((reloaded as any).content).not.toBeNull();
-    expect((reloaded as any).content.id).toEqual(myPost.id);
+    // Rails: assert_equal(my_post.id, t.content["id"]) — integer equality.
+    // On PG, id is BigInt; after JSON round-trip it becomes a string. Compare as strings.
+    expect(String((reloaded as any).content.id)).toBe(String(myPost.id));
     expect((reloaded as any).content.title).toEqual(myPost.title);
   });
 
@@ -423,6 +431,7 @@ describe("SerializedAttributeTest", () => {
     const t = await JsonTopic.create({ content: JSON.stringify("first") as any });
     expect((t as any).content).toBe("first");
     await t.updateColumn("content", JSON.stringify(["second"]));
+    expect((t as any).content).toEqual(["second"]); // in-memory, before reload
     const reloaded = await JsonTopic.find(t.id as number);
     expect((reloaded as any).content).toEqual(["second"]);
   });
@@ -447,10 +456,12 @@ describe("SerializedAttributeTest", () => {
         serialize(this, "content", { type: Array });
       }
     }
-    // Rails: Topic.new(content: nil) — nil casts to [] (the Array default), so
-    // content_changed? is false. Trails marks explicitly-assigned nil as changed
-    // before the value is cast, so we mirror by omitting the argument; a fresh
-    // record with no explicit content assignment is also not changed.
+    // Rails: Topic.new(content: nil) with content_changed? → false.
+    // In Rails, nil casts to [] (the Array default) and the record is not dirty.
+    // Deviation: trails marks explicitly-assigned nil as changed before casting,
+    // so new ArrayTopic({ content: null }) returns attributeChanged("content") = true.
+    // This mirrors only the partial invariant (fresh record with no explicit
+    // content assignment is not dirty). The explicit-nil case is a tracked deviation.
     const topic = new ArrayTopic();
     expect(topic.attributeChanged("content")).toBe(false);
   });
@@ -513,9 +524,13 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const topic = await Subclass.create({ content: { foo: 1 } as any });
-    const found = await Subclass.where({ id: topic.id }).toArray();
-    expect(found.length).toBe(1);
-    expect((found[0] as any).content).toEqual({ foo: 1 });
+    // Verify the abstract-class serializer is inherited and round-trips correctly.
+    const byId = await Subclass.where({ id: topic.id }).toArray();
+    expect(byId.length).toBe(1);
+    expect((byId[0] as any).content).toEqual({ foo: 1 });
+    // Rails also asserts: subclass.where(content: { foo: 1 }).to_a == [topic]
+    // That requires serialized-attribute WHERE support (blocked — same limitation as
+    // "where by serialized attribute with hash/array"; see those PERMANENT-SKIPs).
   });
 
   it("nil is always persisted as null", async () => {
@@ -539,6 +554,13 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("mutation detection does not double serialize", async () => {
+    // Rails: uses a custom ActiveModel::Type::Value subclass with `include Mutable`
+    // (changed_in_place? via serialize) stacked under a separate coder.
+    // The double-serialize regression occurs when isChangedInPlace passes the
+    // coder-encoded new value to the subtype's isChangedInPlace, which then
+    // serializes it again. Trails' Serialized#isChangedInPlace passes
+    // encoded(coder.dump(value)) to subtype.isChangedInPlace, so the subtype
+    // must compare serialize(newEncoded) against rawOldValue — not re-serialize both.
     const coder = {
       dump(value: string | null): string | null {
         if (value == null) return null;
@@ -549,14 +571,34 @@ describe("SerializedAttributeTest", () => {
         return (value as string).replace(" encoded", "");
       },
     };
+    // Rails: Class.new(ActiveModel::Type::Value) { include Mutable; def serialize... }
+    class MutableStringType extends ValueType {
+      readonly name = "mutable_string" as const;
+      override serialize(value: unknown): unknown {
+        if (value == null) return null;
+        return (value as string) + " serialized";
+      }
+      override deserialize(value: unknown): string | null {
+        if (value == null) return null;
+        return (value as string).replace(" serialized", "");
+      }
+      override isMutable(): boolean {
+        return true;
+      }
+      // Rails Mutable#changed_in_place?: serialize(new_value) != raw_old_value
+      override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+        return this.serialize(newValue) !== rawOldValue;
+      }
+    }
     class CoderTopic extends Topic {
       static {
-        this.attribute("content", "text");
+        // attribute() accepts a Type instance directly
+        this.attribute("content", new MutableStringType());
         serialize(this, "content", { coder });
       }
     }
     const topic = await CoderTopic.create({ content: "bar" as any });
-    void (topic as any).content; // read to trigger deserialization
+    void (topic as any).content; // read to trigger isChangedInPlace check
     expect(topic.changed).toBe(false);
   });
 
@@ -572,15 +614,17 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   useHandlerFixtures(["topics"], { schema: canonicalSchema });
 
   it("serialized attribute", async () => {
-    class HashTopic extends Topic {
+    // Rails SafeLoad override: type: String (safe under Psych safe_load; base class uses MyObject which isn't).
+    // JS equivalent: type: Array (similarly safe; base class uses a custom MyObject coder).
+    class ArrayTopic extends Topic {
       static {
-        serialize(this, "content", { type: HashObject });
+        serialize(this, "content", { type: Array });
       }
     }
-    const myobj = { somevalue: "thevalue" };
-    const topic = await HashTopic.create({ content: myobj as any });
+    const myobj = ["value1"];
+    const topic = await ArrayTopic.create({ content: myobj as any });
     expect((topic as any).content).toEqual(myobj);
-    const reloaded = await HashTopic.find(topic.id as number);
+    const reloaded = await ArrayTopic.find(topic.id as number);
     expect((reloaded as any).content).toEqual(myobj);
   });
 
