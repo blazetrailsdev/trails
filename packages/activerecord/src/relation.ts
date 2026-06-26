@@ -3713,6 +3713,12 @@ export class Relation<T extends Base> {
     // before compiling the probe (Rails materializes at `.where()`-build time).
     await rel._materializeDeferredDistinctPkPredicates();
     if (rel._whereClause.isContradiction()) return false;
+    // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
+    // when includes are promoted to a JOIN strategy, re-execute on the join-dependency
+    // relation so the LEFT OUTER JOIN is emitted into the probe query.
+    if (rel._eagerLoadingForSql()) {
+      return rel.applyJoinDependencyForArel(rel._groupColumns.length === 0).exists();
+    }
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
     // existence probe that never instantiates records (no after_find /
     // association loading) and doesn't go through count()'s limit
@@ -3996,7 +4002,33 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update_all
    */
-  async updateAll(updates: Record<string, unknown>): Promise<number> {
+  async updateAll(
+    updates: Record<string, unknown> | string | [string, ...unknown[]],
+  ): Promise<number> {
+    // Mirrors Rails relation.rb#update_all: accepts a Hash, a SQL string, or an
+    // Array [sql, *binds] (sanitize_sql_for_assignment). The blank/none checks
+    // mirror Rails' order (blank precedes none?).
+    if (Array.isArray(updates)) {
+      const [sql, ...binds] = updates;
+      if (!sql || typeof sql !== "string")
+        throw new ArgumentError("Empty list of attributes to change");
+      if (this._isNone) return 0;
+      await this._materializeDeferredDistinctPkPredicates();
+      const boundSql = new Nodes.BoundSqlLiteral(
+        sql,
+        binds.map((v) => {
+          return _qm.normalizeBoundValue.call(this as any, v);
+        }),
+        {},
+      );
+      return this._execUpdateAll(boundSql);
+    }
+    if (typeof updates === "string") {
+      if (!updates) throw new ArgumentError("Empty list of attributes to change");
+      if (this._isNone) return 0;
+      await this._materializeDeferredDistinctPkPredicates();
+      return this._execUpdateAll(new Nodes.SqlLiteral(updates));
+    }
     // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
     if (Object.keys(updates).length === 0)
       throw new ArgumentError("Empty list of attributes to change");
@@ -4030,16 +4062,16 @@ export class Relation<T extends Base> {
         updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
       }
     }
+    return this._execUpdateAll(updateValues);
+  }
+
+  private async _execUpdateAll(
+    updateValues: [Nodes.Node, unknown][] | string | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
+  ): Promise<number> {
+    const table = this._modelClass.arelTable;
     const primaryKey = this._modelClass.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      // Mirrors Rails `update_all` (relation.rb:606-617): build the arel from
-      // `apply_join_dependency.arel` when eager-loading, else `build_arel`, then
-      // `compile_update`. The join sources are preserved so the visitor rewrites
-      // a joined UPDATE into `UPDATE ... WHERE pk IN (SELECT pk ... JOIN ...)`,
-      // honoring a default_scope JOIN predicate (`projects.name`) that a bare
-      // UpdateManager would drop. `arel.source.left = table` forces the UPDATE
-      // target back to the model table.
       const arel = this._eagerLoadingForSql()
         ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
         : this._buildArel();
@@ -4051,14 +4083,12 @@ export class Relation<T extends Base> {
         : table.get(primaryKey);
       stmtAst = arel.compileUpdate(updateValues, key, havingAst, groupColumns).ast;
     } else {
-      // No primary key — fall back to a plain UpdateManager.
       const um = new UpdateManager().table(table).set(updateValues);
       for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
         um.where(node);
       }
       stmtAst = um.ast;
     }
-
     const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execUpdate(
       updateSql,

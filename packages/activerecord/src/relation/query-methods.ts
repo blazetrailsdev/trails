@@ -1733,7 +1733,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * rendered to SQL the same way (trails passes nodes here where Rails would not).
  * @internal
  */
-function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
+export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
     return arelSql(this._modelClass.connection.toSql(value));
   }

@@ -149,7 +149,7 @@ describe("UpdateAllTest", () => {
 
   // TRACKED DEVIATION: includes + where referencing included table should switch to JOIN strategy.
   // Trails `includes` does a separate SELECT so toys.name is not available in the WHERE clause.
-  it.skip("update all with includes", async () => {
+  it("update all with includes", async () => {
     const petsScope = Pet.includes("toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.exists()).toBe(true);
@@ -476,8 +476,8 @@ describe("UpdateAllTest", () => {
   // TRACKED DEVIATION: updateAll on an association scope that includes("comments", "categories")
   // generates malformed SQL (`no such column: 0`). Rails strips the ORDER clause and uses a
   // subselect strategy; the trails path fails when includes + order are combined with updateAll.
-  it.skip("update all ignores order without limit from association", async () => {
-    const david = await Author.find(1);
+  it("update all ignores order without limit from association", async () => {
+    const david = await Author.find(authors("david").id);
     const postsWithCats = await (david as any).postsWithCommentsAndCategories.toArray();
     expect(postsWithCats.length).toBeGreaterThan(0);
     const count = await (david as any).postsWithCommentsAndCategories.updateAll([
