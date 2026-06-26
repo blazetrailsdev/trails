@@ -13,6 +13,15 @@ describe("EagerSingularizationTest", () => {
     // These tables are deliberately irregular plurals (viri/octopi/messes/
     // crises/…) to exercise singularization edge cases; they are test-local by
     // design and have no canonical-schema counterpart.
+    //
+    // Rails' eager_singularization_test.rb creates a conventional `crises_messes`
+    // HABTM join table dynamically in setup/teardown (no schema.rb analog). Per
+    // RFC 0019 collision-table convergence, bespoke join tables with no canonical
+    // analog are renamed file-unique (`es_crises_messes`) so they can never
+    // clobber a shared join table re-primed by a divergent sibling under parallel
+    // forks. The model tables (`messes`/`crises`) keep their Rails names; only the
+    // join table is namespaced. The association still wires via an explicit
+    // `joinTable:`, so behavior is identical to Rails.
     /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema({
       viri: { octopus_id: "integer", species: "string" },
