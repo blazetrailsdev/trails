@@ -928,7 +928,7 @@ export function annotate<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#excluding */
 export function excluding<T extends typeof Base>(
   this: T,
-  ...records: InstanceType<T>[]
+  ...records: unknown[]
 ): Relation<InstanceType<T>> {
   return this.all().excluding(...records);
 }
@@ -983,7 +983,7 @@ export function invertWhere<T extends typeof Base>(this: T): Relation<InstanceTy
 /** Mirrors: ActiveRecord::Querying#without — alias for excluding */
 export function without<T extends typeof Base>(
   this: T,
-  ...records: InstanceType<T>[]
+  ...records: unknown[]
 ): Relation<InstanceType<T>> {
   return this.all().without(...records);
 }

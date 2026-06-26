@@ -1153,10 +1153,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#excluding / #without
    */
-  excluding(...records: T[]): Relation<T> {
-    const ids = records.map((r) => r.id).filter((id) => id != null);
-    if (ids.length === 0) return this;
-    return this._clone().excludingBang(ids);
+  excluding(...records: unknown[]): Relation<T> {
+    return this._excludingImpl(records, "excluding");
   }
 
   /**
@@ -1164,8 +1162,36 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#without
    */
-  without(...records: T[]): Relation<T> {
-    return this.excluding(...records);
+  without(...records: unknown[]): Relation<T> {
+    return this._excludingImpl(records, "without");
+  }
+
+  /**
+   * Shared body for `excluding` / `without`. Mirrors Rails
+   * `QueryMethods#excluding` (query_methods.rb:1574): extract Relation
+   * arguments, flatten one level of array nesting, compact nils, then validate
+   * that every remaining record and relation belongs to this model — raising
+   * the same ArgumentError keyed on the public `__callee__`.
+   */
+  private _excludingImpl(records: unknown[], callee: string): Relation<T> {
+    const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
+    const recs = records
+      .filter((r) => !(r instanceof Relation))
+      .flat(1)
+      .filter((r) => r != null);
+
+    const model = this._modelClass;
+    const recordsOk = recs.every((r) => r instanceof model);
+    const relationsOk = relations.every((rel) => rel._modelClass === model);
+    if (!recordsOk || !relationsOk) {
+      throw new ArgumentError(
+        `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
+      );
+    }
+
+    const combined = [...recs, ...relations];
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**

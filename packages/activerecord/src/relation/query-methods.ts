@@ -1451,8 +1451,13 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
     throw new Error("excluding does not support models with composite primary keys");
   }
   const pk = primaryKey;
-  const ids = records.map((r: any) => (typeof r === "object" && r !== null ? (r.id ?? r) : r));
-  this._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash({ [pk]: ids }));
+  // Rails `excluding!`: `predicate_builder[primary_key, records].invert`. The
+  // array handler dereferences AR records to their ids and routes Relation
+  // arguments through the subquery handler, so pass the mixed collection
+  // straight through rather than pre-mapping.
+  this._whereClause.predicates.push(
+    ...this.predicateBuilder.buildNegatedFromHash({ [pk]: records }),
+  );
   return this;
 }
 
