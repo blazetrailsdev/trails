@@ -248,12 +248,18 @@ describe("RelationScopingTest", () => {
   });
 
   it("find with annotation unscoped", async () => {
-    await Developer.unscoped(async () => {
-      const sql = Developer.where("name = 'David'").toSql();
-      expect(sql).not.toContain("/* scoped */");
-      const developer = (await Developer.where("name = 'David'").first()) as Base;
-      expect(developer.name).toBe("David");
-    });
+    // Rails: Developer.annotate("scoped").unscoped { ... }
+    // Relation#unscoped (0-arg) delegates to klass.unscoped(); we then call
+    // .scoping(callback) on that unscoped relation — the TS equivalent of
+    // passing a Ruby block to Relation#unscoped.
+    await Developer.annotate("scoped")
+      .unscoped()
+      .scoping(async () => {
+        const sql = Developer.where("name = 'David'").toSql();
+        expect(sql).not.toContain("/* scoped */");
+        const developer = (await Developer.where("name = 'David'").first()) as Base;
+        expect(developer.name).toBe("David");
+      });
   });
 
   it("find with annotation unscope", async () => {
