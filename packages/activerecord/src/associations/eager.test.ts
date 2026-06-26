@@ -5368,50 +5368,10 @@ describe("EagerAssociationTest", () => {
     }
   });
 
-  // Skipped pending RFC 0019 story
-  // `habtm-classname-aliased-shared-jointable-source`: trails derives the HABTM
-  // target FK / source name from the association name (`other_post_id` /
-  // `otherPost`) rather than the resolved class name (`post_id` / `post`), so
-  // `Category.other_posts`/`special_posts` (HABTM aliases for `posts` over the
-  // shared `categories_posts` join, `class_name: "Post"`) fail to preload.
-  it.skip("eager with multiple associations with same table has many and habtm", async () => {
-    const byId = (a: Base, b: Base) => Number(a.id) - Number(b.id);
-    const sortedIds = (arr: Base[]) => [...arr].sort(byId).map((x) => x.id);
-    const loadAssoc = async (record: Base, name: string) =>
-      (await record.association(name).loadTarget()) as Base[];
-    const assertEqualAfterSort = (item1: Base[], item2: Base[], item3?: Base[]) => {
-      expect(sortedIds(item1)).toEqual(sortedIds(item2));
-      if (item3) expect(sortedIds(item3)).toEqual(sortedIds(item2));
-    };
-
-    const postTypes = ["posts", "otherPosts", "specialPosts"];
-    const findAllOrdered = async (klass: any, order: string, include?: string[]) => {
-      let rel = klass.all().order(order);
-      if (include) rel = rel.includes(...include);
-      return (await rel.toArray()) as Base[];
-    };
-
-    for (const [klass, order] of [
-      [Author, "authors.id"],
-      [Category, "categories.id"],
-    ] as const) {
-      const d1 = await findAllOrdered(klass, order);
-      const d2 = await findAllOrdered(klass, order, postTypes);
-      for (let i = 0; i < d1.length; i++) {
-        expect(d1[i].id).toBe(d2[i].id);
-        assertEqualAfterSort(await loadAssoc(d1[i], "posts"), await loadAssoc(d2[i], "posts"));
-        for (const postType of postTypes.slice(1)) {
-          const d3 = await findAllOrdered(klass, order, ["posts", postType]);
-          expect(d1[i].id).toBe(d3[i].id);
-          assertEqualAfterSort(await loadAssoc(d1[i], "posts"), await loadAssoc(d3[i], "posts"));
-          assertEqualAfterSort(
-            await loadAssoc(d1[i], postType),
-            await loadAssoc(d2[i], postType),
-            await loadAssoc(d3[i], postType),
-          );
-        }
-      }
-    }
+  it.skip("eager with multiple associations with same table has many and habtm", () => {
+    // BLOCKED: associations — HABTM class_name-aliased shared-join-table gap
+    // ROOT-CAUSE: associations/builder/has-and-belongs-to-many.ts + associations.ts createHabtmJoinModel derive the target FK / source name from the association name (other_post_id / otherPost) not the resolved class name (post_id / post)
+    // SCOPE: ~30–80 LOC fix; RFC 0019 story habtm-classname-aliased-shared-jointable-source; Category.other_posts/special_posts (HABTM aliases over categories_posts) fail to preload
   });
 
   it("preconfigured includes with habtm", async () => {
