@@ -70,13 +70,12 @@ describe("StoreTest", () => {
   });
 
   it("overriding a read accessor", () => {
-    (john as any).phoneNumber = "1234567890";
+    (john.settings as HashWithIndifferentAccess).set("phoneNumber", "1234567890");
 
     expect((john as any).phoneNumber).toBe("(123) 456-7890");
   });
 
   it("overriding a read accessor using super", () => {
-    john.color = "black";
     (john.settings as HashWithIndifferentAccess).set("color", null);
 
     expect(john.color).toBe("red");
@@ -155,7 +154,6 @@ describe("StoreTest", () => {
   });
 
   it("dirty methods for suffixed accessors", () => {
-    // In-place HWIA mutation is detected by Serialized#isChangedInPlace
     (john.configs as HashWithIndifferentAccess).set("twoFactorAuth", true);
     expect((john as any).twoFactorAuth_configsChanged()).toBe(true);
     expect((john as any).twoFactorAuth_configsWas()).toBeNull();
@@ -188,7 +186,6 @@ describe("StoreTest", () => {
     expect((john as any).enableFriendRequestsChange()).toBeUndefined();
     expect((john as any).savedChangeToEnableFriendRequests()).toBe(true);
     expect((john as any).savedChangeToEnableFriendRequestsValues()).toEqual([null, true]);
-    // Make a second change to test key_before_last_save
     (john as any).enableFriendRequests = false;
     await john.save();
     expect((john as any).enableFriendRequestsBeforeLastSave()).toBe(true);
@@ -289,7 +286,6 @@ describe("StoreTest", () => {
 
   it("accessing attributes not exposed by accessors encoded with JSON", async () => {
     ((john as any).json_data as HashWithIndifferentAccess).set("somestuff", "somecoolstuff");
-    (john as any).json_data = (john as any).json_data;
     await john.save();
 
     expect(
