@@ -1,3 +1,30 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { BestHardback } from "./hardback.js";
+import type { Book } from "./book.js";
+import type { Categorization } from "./categorization.js";
+import type { Category } from "./category.js";
+import type { Comment } from "./comment.js";
+import type { Essay } from "./essay.js";
+import type { LazyReader } from "./reader.js";
+import type { Member } from "./member.js";
+import type { OrderedTag } from "./tag.js";
+import type { Owner } from "./owner.js";
+import type { Post } from "./post.js";
+import type { PostWithDefaultInclude } from "./post.js";
+import type { PostWithSpecialCategorization } from "./post.js";
+import type { PublishedBook } from "./book.js";
+import type { Rating } from "./rating.js";
+import type { SerializedPost } from "./post.js";
+import type { SpecialCategorization } from "./categorization.js";
+import type { SpecialPost } from "./post.js";
+import type { SpecialPostWithDefaultScope } from "./post.js";
+import type { StiPost } from "./post.js";
+import type { Subscriber } from "./subscriber.js";
+import type { Subscription } from "./subscription.js";
+import type { Tag } from "./tag.js";
+import type { Tagging } from "./tagging.js";
+import type { Topic } from "./topic.js";
+import type { VerySpecialComment } from "./comment.js";
 import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/author.rb
 import { Base } from "../../base.js";
@@ -5,6 +32,165 @@ import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
 
 export class Author extends Base {
+  declare posts: AssociationProxy<Post>;
+  declare serializedPosts: AssociationProxy<SerializedPost>;
+  declare post: Post | null;
+  declare verySpecialComments: AssociationProxy<VerySpecialComment>;
+  declare postsWithComments: AssociationProxy<Post>;
+  declare popularGroupedPosts: AssociationProxy<Post>;
+  declare postsWithCommentsSortedByCommentId: AssociationProxy<Post>;
+  declare postsSortedById: AssociationProxy<Post>;
+  declare postsSortedByIdLimited: AssociationProxy<Post>;
+  declare postsWithCategories: AssociationProxy<Post>;
+  declare postsWithCommentsAndCategories: AssociationProxy<Post>;
+  declare postsWithSpecialCategorizations: AssociationProxy<PostWithSpecialCategorization>;
+  declare postAboutThinking: Post | null;
+  declare postAboutThinkingWithLastComment: Post | null;
+  declare comments: AssociationProxy<Comment>;
+  declare commentsWithOrder: AssociationProxy<Comment>;
+  declare noJoinsComments: AssociationProxy<Comment>;
+  declare commentsWithForeignKey: AssociationProxy<Comment>;
+  declare noJoinsCommentsWithForeignKey: AssociationProxy<Comment>;
+  declare members: AssociationProxy<Member>;
+  declare noJoinsMembers: AssociationProxy<Member>;
+  declare orderedMembers: AssociationProxy<Member>;
+  declare noJoinsOrderedMembers: AssociationProxy<Member>;
+  declare ratings: AssociationProxy<Rating>;
+  declare goodRatings: AssociationProxy<Rating>;
+  declare noJoinsRatings: AssociationProxy<Rating>;
+  declare noJoinsGoodRatings: AssociationProxy<Rating>;
+  declare commentsContainingTheLetterE: AssociationProxy<Comment>;
+  declare commentsWithOrderAndConditions: AssociationProxy<Comment>;
+  declare commentsWithInclude: AssociationProxy<Comment>;
+  declare commentsForFirstAuthor: AssociationProxy<Comment>;
+  declare commentsOnFirstPosts: AssociationProxy<Comment>;
+  declare firstPost: FirstPost | null;
+  declare commentOnFirstPost: Comment | null;
+  declare thinkingPosts: AssociationProxy<Post>;
+  declare welcomePosts: AssociationProxy<Post>;
+  declare welcomePostsWithOneComment: AssociationProxy<Post>;
+  declare welcomePostsWithComments: AssociationProxy<Post>;
+  declare commentsDesc: AssociationProxy<Comment>;
+  declare unorderedComments: AssociationProxy<Comment>;
+  declare funkyComments: AssociationProxy<Comment>;
+  declare orderedUniqComments: AssociationProxy<Comment>;
+  declare orderedUniqCommentsDesc: AssociationProxy<Comment>;
+  declare readonlyComments: AssociationProxy<Comment>;
+  declare specialPosts: AssociationProxy<SpecialPost>;
+  declare specialPostComments: AssociationProxy<Comment>;
+  declare specialPostsWithDefaultScope: AssociationProxy<SpecialPostWithDefaultScope>;
+  declare stiPosts: AssociationProxy<StiPost>;
+  declare stiPostComments: AssociationProxy<Comment>;
+  declare specialNonexistentPosts: AssociationProxy<SpecialPost>;
+  declare specialNonexistentPostComments: AssociationProxy<Comment>;
+  declare nonexistentComments: AssociationProxy<Comment>;
+  declare helloPosts: AssociationProxy<Post>;
+  declare helloPostComments: AssociationProxy<Comment>;
+  declare postsWithNoComments: AssociationProxy<Post>;
+  declare postsWithNoComments_2: AssociationProxy<Post>;
+  declare helloPostsWithHashConditions: AssociationProxy<Post>;
+  declare helloPostCommentsWithHashConditions: AssociationProxy<Comment>;
+  declare otherPosts: AssociationProxy<Post>;
+  declare postsWithCallbacks: AssociationProxy<Post>;
+  declare postsWithThrownCallbacks: AssociationProxy<Post>;
+  declare postsWithProcCallbacks: AssociationProxy<Post>;
+  declare postsWithMultipleCallbacks: AssociationProxy<Post>;
+  declare unchangeablePosts: AssociationProxy<Post>;
+  declare categorizations: AssociationProxy<Categorization>;
+  declare categories: AssociationProxy<Category>;
+  declare namedCategories: AssociationProxy<Category>;
+  declare specialCategorizations: AssociationProxy<SpecialCategorization>;
+  declare specialCategories: AssociationProxy<Category>;
+  declare specialCategory: Category | null;
+  declare generalCategorizations: AssociationProxy<Categorization>;
+  declare generalPosts: AssociationProxy<Post>;
+  declare specialCategoriesWithConditions: AssociationProxy<Category>;
+  declare nonspecialCategoriesWithConditions: AssociationProxy<Category>;
+  declare categoriesLikeGeneral: AssociationProxy<Category>;
+  declare categorizedPosts: AssociationProxy<Post>;
+  declare uniqueCategorizedPosts: AssociationProxy<Post>;
+  declare nothings: AssociationProxy<Base>;
+  declare authorFavorites: AssociationProxy<AuthorFavorite>;
+  declare favoriteAuthors: AssociationProxy<Author>;
+  declare taggings: AssociationProxy<Tagging>;
+  declare taggings_2: AssociationProxy<Tagging>;
+  declare tags: AssociationProxy<Tag>;
+  declare orderedTags: AssociationProxy<OrderedTag>;
+  declare postCategories: AssociationProxy<Category>;
+  declare taggingTags: AssociationProxy<Tag>;
+  declare similarPosts: AssociationProxy<Post>;
+  declare orderedPosts: AssociationProxy<Post>;
+  declare distinctTags: AssociationProxy<Tag>;
+  declare tagsWithPrimaryKey: AssociationProxy<Tag>;
+  declare books: AssociationProxy<Book>;
+  declare bestHardbacks: AssociationProxy<BestHardback>;
+  declare publishedBooks: AssociationProxy<PublishedBook>;
+  declare unpublishedBooks: AssociationProxy<Book>;
+  declare unreadListing: Book | null;
+  declare readingListing: Book | null;
+  declare subscriptions: AssociationProxy<Subscription>;
+  declare subscribers: AssociationProxy<Subscriber>;
+  declare distinctSubscribers: AssociationProxy<Subscriber>;
+  declare essay: Essay | null;
+  declare essayCategory: Category | null;
+  declare essayOwner: Owner | null;
+  declare essay_2: Essay | null;
+  declare essayCategory_2: Category | null;
+  declare essays: AssociationProxy<Essay>;
+  declare essayCategories: AssociationProxy<Category>;
+  declare essayOwners: AssociationProxy<Owner>;
+  declare essays_2: AssociationProxy<Essay>;
+  declare essayCategories_2: AssociationProxy<Category>;
+  declare ownedEssay: Essay | null;
+  declare ownedEssayCategory: Category | null;
+  declare authorAddress: AuthorAddress | null;
+  declare authorAddressExtra: AuthorAddress | null;
+  declare categoryPostComments: AssociationProxy<Comment>;
+  declare miscPosts: AssociationProxy<Post>;
+  declare miscPostFirstBlueTags: AssociationProxy<Tag>;
+  declare miscPostFirstBlueTags_2: AssociationProxy<Tag>;
+  declare postsWithDefaultInclude: AssociationProxy<PostWithDefaultInclude>;
+  declare commentsOnPostsWithDefaultInclude: AssociationProxy<Comment>;
+  declare postsWithSignature: AssociationProxy<Post>;
+  declare postsMentioningAuthor: AssociationProxy<Post>;
+  declare commentsOnPostsMentioningAuthor: AssociationProxy<Comment>;
+  declare commentsMentioningAuthor: AssociationProxy<Comment>;
+  declare recentPost: Post | null;
+  declare recentResponse: Comment | null;
+  declare postsWithExtension: AssociationProxy<Post>;
+  declare postsWithExtensionAndInstance: AssociationProxy<Post>;
+  declare topPosts: AssociationProxy<Post>;
+  declare otherTopPosts: AssociationProxy<Post>;
+  declare topics: AssociationProxy<Topic>;
+  declare topicsWithoutType: AssociationProxy<Topic>;
+  declare lazyReadersSkimmersOrNot: AssociationProxy<LazyReader>;
+  declare lazyReadersSkimmersOrNot_2: AssociationProxy<LazyReader>;
+  declare lazyReadersSkimmersOrNot_3: AssociationProxy<LazyReader>;
+  declare loadBelongsTo: ((name: "ownedEssay") => Promise<Essay | null>) &
+    ((name: "authorAddress") => Promise<AuthorAddress | null>) &
+    ((name: "authorAddressExtra") => Promise<AuthorAddress | null>);
+  declare loadHasOne: ((name: "post") => Promise<Post | null>) &
+    ((name: "postAboutThinking") => Promise<Post | null>) &
+    ((name: "postAboutThinkingWithLastComment") => Promise<Post | null>) &
+    ((name: "firstPost") => Promise<FirstPost | null>) &
+    ((name: "commentOnFirstPost") => Promise<Comment | null>) &
+    ((name: "specialCategory") => Promise<Category | null>) &
+    ((name: "unreadListing") => Promise<Book | null>) &
+    ((name: "readingListing") => Promise<Book | null>) &
+    ((name: "essay") => Promise<Essay | null>) &
+    ((name: "essayCategory") => Promise<Category | null>) &
+    ((name: "essayOwner") => Promise<Owner | null>) &
+    ((name: "essay_2") => Promise<Essay | null>) &
+    ((name: "essayCategory_2") => Promise<Category | null>) &
+    ((name: "ownedEssayCategory") => Promise<Category | null>) &
+    ((name: "recentPost") => Promise<Post | null>) &
+    ((name: "recentResponse") => Promise<Comment | null>);
+  declare author_address_extra_id: number;
+  declare author_address_id: number;
+  declare name: string;
+  declare organization_id: string;
+  declare owned_essay_id: string;
+
   declare firstPosts: CollectionProxy<FirstPost>;
 
   static namedExtension = {
@@ -514,6 +700,9 @@ export class Author extends Base {
 }
 
 export class AuthorAddress extends Base {
+  declare author: Author | null;
+  declare loadHasOne: (name: "author") => Promise<Author | null>;
+
   static destroyedAuthorAddressIds: number[] = [];
 
   static {
@@ -525,6 +714,13 @@ export class AuthorAddress extends Base {
 }
 
 export class AuthorFavorite extends Base {
+  declare author: Author | null;
+  declare favoriteAuthor: Author | null;
+  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
+    ((name: "favoriteAuthor") => Promise<Author | null>);
+  declare author_id: number;
+  declare favorite_author_id: number;
+
   static {
     this.belongsTo("author");
     this.belongsTo("favoriteAuthor", { className: "Author" });
@@ -532,6 +728,11 @@ export class AuthorFavorite extends Base {
 }
 
 export class AuthorFavoriteWithScope extends Base {
+  declare author: Author | null;
+  declare favoriteAuthor: Author | null;
+  declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
+    ((name: "favoriteAuthor") => Promise<Author | null>);
+
   static {
     this._tableName = "author_favorites";
     this.defaultScope((q: any) => q.order({ id: "asc" }));

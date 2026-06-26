@@ -1,3 +1,19 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Relation } from "../../relation.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Author } from "./author.js";
+import type { BadReference } from "./reference.js";
+import type { Comment } from "./comment.js";
+import type { Essay } from "./essay.js";
+import type { FirstPost } from "./post.js";
+import type { Friendship } from "./friendship.js";
+import type { Job } from "./job.js";
+import type { PersonalLegacyThing } from "./personal-legacy-thing.js";
+import type { Post } from "./post.js";
+import type { Reader } from "./reader.js";
+import type { Reference } from "./reference.js";
+import type { SecureReader } from "./reader.js";
+import type { Treasure } from "./treasure.js";
 // vendor/rails/activerecord/test/models/person.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Base } from "../../base.js";
@@ -5,6 +21,55 @@ import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
 export class Person extends Base {
+  declare readers: AssociationProxy<Reader>;
+  declare secureReaders: AssociationProxy<SecureReader>;
+  declare reader: Reader | null;
+  declare posts: AssociationProxy<Post>;
+  declare securePosts: AssociationProxy<Post>;
+  declare postsWithNoComments: AssociationProxy<Post>;
+  declare friendships: AssociationProxy<Friendship>;
+  declare friendsToo: AssociationProxy<Friendship>;
+  declare references: AssociationProxy<Reference>;
+  declare badReferences: AssociationProxy<BadReference>;
+  declare fixedBadReferences: AssociationProxy<BadReference>;
+  declare favoriteReference: Reference | null;
+  declare favoriteReferenceJob: Job | null;
+  declare postsWithCommentsSortedByCommentId: AssociationProxy<Post>;
+  declare firstPosts: AssociationProxy<FirstPost>;
+  declare jobs: AssociationProxy<Job>;
+  declare jobsWithDependentDestroy: AssociationProxy<Job>;
+  declare jobsWithDependentDeleteAll: AssociationProxy<Job>;
+  declare jobsWithDependentNullify: AssociationProxy<Job>;
+  declare primaryContact: Person | null;
+  declare agents: AssociationProxy<Person>;
+  declare agentsOfAgents: AssociationProxy<Person>;
+  declare number1Fan: Person | null;
+  declare personalLegacyThings: AssociationProxy<PersonalLegacyThing>;
+  declare agentsPosts: AssociationProxy<Post>;
+  declare agentsPostsAuthors: AssociationProxy<Author>;
+  declare essays: AssociationProxy<Essay>;
+  declare static males: () => Relation<Person>;
+  declare loadBelongsTo: ((name: "primaryContact") => Promise<Person | null>) &
+    ((name: "number1Fan") => Promise<Person | null>);
+  declare loadHasOne: ((name: "reader") => Promise<Reader | null>) &
+    ((name: "favoriteReference") => Promise<Reference | null>) &
+    ((name: "favoriteReferenceJob") => Promise<Job | null>);
+  declare best_friend_id: number;
+  declare best_friend_of_id: number;
+  declare born_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare cars_count: number | null;
+  declare comments: string;
+  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare first_name: string;
+  declare followers_count: number | null;
+  declare friends_too_count: number | null;
+  declare gender: string | null;
+  declare insures: number;
+  declare lock_version: number;
+  declare number1_fan_id: number;
+  declare primary_contact_id: number;
+  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+
   declare followers: CollectionProxy<Person>;
 
   static {
@@ -77,6 +142,9 @@ export class Person extends Base {
 }
 
 export class PersonWithDependentDestroyJobs extends Base {
+  declare references: AssociationProxy<Reference>;
+  declare jobs: AssociationProxy<Job>;
+
   static {
     this._tableName = "people";
     this.hasMany("references", { foreignKey: "person_id" });
@@ -85,6 +153,9 @@ export class PersonWithDependentDestroyJobs extends Base {
 }
 
 export class PersonWithDependentDeleteAllJobs extends Base {
+  declare references: AssociationProxy<Reference>;
+  declare jobs: AssociationProxy<Job>;
+
   static {
     this._tableName = "people";
     this.hasMany("references", { foreignKey: "person_id" });
@@ -93,6 +164,9 @@ export class PersonWithDependentDeleteAllJobs extends Base {
 }
 
 export class PersonWithDependentNullifyJobs extends Base {
+  declare references: AssociationProxy<Reference>;
+  declare jobs: AssociationProxy<Job>;
+
   static {
     this._tableName = "people";
     this.hasMany("references", { foreignKey: "person_id" });
@@ -101,6 +175,8 @@ export class PersonWithDependentNullifyJobs extends Base {
 }
 
 export class PersonWithPolymorphicDependentNullifyComments extends Base {
+  declare comments: AssociationProxy<Comment>;
+
   static {
     this._tableName = "people";
     this.hasMany("comments", { as: "author", dependent: "nullify" });
@@ -108,6 +184,12 @@ export class PersonWithPolymorphicDependentNullifyComments extends Base {
 }
 
 export class LoosePerson extends Base {
+  declare bestFriend: LoosePerson | null;
+  declare bestFriendOf: LoosePerson | null;
+  declare bestFriends: AssociationProxy<LoosePerson>;
+  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
+  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
+
   static {
     this._tableName = "people";
     this.abstractClass = true;
@@ -121,9 +203,18 @@ acceptsNestedAttributesFor(LoosePerson, "bestFriend");
 acceptsNestedAttributesFor(LoosePerson, "bestFriendOf");
 acceptsNestedAttributesFor(LoosePerson, "bestFriends");
 
-export class LooseDescendant extends LoosePerson {}
+export class LooseDescendant extends LoosePerson {
+  declare loadBelongsTo: (name: "bestFriendOf") => Promise<LoosePerson | null>;
+  declare loadHasOne: (name: "bestFriend") => Promise<LoosePerson | null>;
+}
 
 export class TightPerson extends Base {
+  declare bestFriend: TightPerson | null;
+  declare bestFriendOf: TightPerson | null;
+  declare bestFriends: AssociationProxy<TightPerson>;
+  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
+  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
+
   static {
     this._tableName = "people";
 
@@ -136,9 +227,14 @@ acceptsNestedAttributesFor(TightPerson, "bestFriend");
 acceptsNestedAttributesFor(TightPerson, "bestFriendOf");
 acceptsNestedAttributesFor(TightPerson, "bestFriends");
 
-export class TightDescendant extends TightPerson {}
+export class TightDescendant extends TightPerson {
+  declare loadBelongsTo: (name: "bestFriendOf") => Promise<TightPerson | null>;
+  declare loadHasOne: (name: "bestFriend") => Promise<TightPerson | null>;
+}
 
 export class RichPerson extends Base {
+  declare treasures: AssociationProxy<Treasure>;
+
   static {
     this._tableName = "people";
 
@@ -166,6 +262,9 @@ export class RichPerson extends Base {
 }
 
 export class NestedPerson extends Base {
+  declare bestFriend: NestedPerson | null;
+  declare loadHasOne: (name: "bestFriend") => Promise<NestedPerson | null>;
+
   static {
     this._tableName = "people";
 

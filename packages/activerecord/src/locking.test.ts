@@ -304,7 +304,7 @@ describe("OptimisticLockingTest", () => {
 
   it("touch with dirty primary key", async () => {
     const before = await Person.find(1);
-    const beforeLockVersion = before.lock_version as number;
+    const beforeLockVersion = before.lock_version;
 
     const person = await Person.find(1);
     person.id = 42;

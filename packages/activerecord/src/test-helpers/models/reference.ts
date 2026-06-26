@@ -1,7 +1,22 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Author } from "./author.js";
+import type { Job } from "./job.js";
+import type { Person } from "./person.js";
 // vendor/rails/activerecord/test/models/reference.rb
 import { Base } from "../../base.js";
 
 export class Reference extends Base {
+  declare person: Person | null;
+  declare job: Job | null;
+  declare idealJobs: AssociationProxy<Job>;
+  declare agentsPostsAuthors: AssociationProxy<Author>;
+  declare loadBelongsTo: ((name: "person") => Promise<Person | null>) &
+    ((name: "job") => Promise<Job | null>);
+  declare favorite: boolean;
+  declare job_id: number;
+  declare lock_version: number | null;
+  declare person_id: number;
+
   static makeComments = false;
 
   static {

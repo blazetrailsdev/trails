@@ -1,7 +1,78 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Relation } from "../../relation.js";
+import type { Category } from "./category.js";
+import type { Club } from "./club.js";
+import type { CurrentMembership } from "./membership.js";
+import type { MemberDetail } from "./member-detail.js";
+import type { Membership } from "./membership.js";
+import type { MemberType } from "./member-type.js";
+import type { Organization } from "./organization.js";
+import type { SelectedMembership } from "./membership.js";
+import type { Sponsor } from "./sponsor.js";
+import type { SuperMembership } from "./membership.js";
+import type { TenantMembership } from "./membership.js";
 // vendor/rails/activerecord/test/models/member.rb
 import { Base } from "../../base.js";
 
 export class Member extends Base {
+  declare currentMembership: CurrentMembership | null;
+  declare selectedMembership: SelectedMembership | null;
+  declare membership: Membership | null;
+  declare club: Club | null;
+  declare clubWithoutJoins: Club | null;
+  declare selectedClub: Club | null;
+  declare favoriteClub: Club | null;
+  declare hairyClub: Club | null;
+  declare sponsor: Sponsor | null;
+  declare sponsorClub: Club | null;
+  declare memberDetail: MemberDetail | null;
+  declare organization: Organization | null;
+  declare organizationWithoutJoins: Organization | null;
+  declare memberType: MemberType | null;
+  declare nestedMemberTypes: AssociationProxy<MemberType>;
+  declare nestedMemberType: MemberType | null;
+  declare nestedSponsors: AssociationProxy<Sponsor>;
+  declare nestedSponsor: Sponsor | null;
+  declare organizationMemberDetails: AssociationProxy<MemberDetail>;
+  declare organizationMemberDetails_2: AssociationProxy<MemberDetail>;
+  declare clubCategory: Category | null;
+  declare generalClub: Club | null;
+  declare superMemberships: AssociationProxy<SuperMembership>;
+  declare favoriteMemberships: AssociationProxy<Membership>;
+  declare clubs: AssociationProxy<Club>;
+  declare tenantMemberships: AssociationProxy<TenantMembership>;
+  declare tenantClubs: AssociationProxy<Club>;
+  declare clubThroughMany: Club | null;
+  declare admittable: Base | null;
+  declare premiumClub: Base | null;
+  declare static unnamed: () => Relation<Member>;
+  declare static withMemberTypeId: (id: number) => Relation<Member>;
+  declare loadBelongsTo: ((name: "memberType") => Promise<MemberType | null>) &
+    ((name: "admittable") => Promise<Base | null>);
+  declare loadHasOne: ((name: "currentMembership") => Promise<CurrentMembership | null>) &
+    ((name: "selectedMembership") => Promise<SelectedMembership | null>) &
+    ((name: "membership") => Promise<Membership | null>) &
+    ((name: "club") => Promise<Club | null>) &
+    ((name: "clubWithoutJoins") => Promise<Club | null>) &
+    ((name: "selectedClub") => Promise<Club | null>) &
+    ((name: "favoriteClub") => Promise<Club | null>) &
+    ((name: "hairyClub") => Promise<Club | null>) &
+    ((name: "sponsor") => Promise<Sponsor | null>) &
+    ((name: "sponsorClub") => Promise<Club | null>) &
+    ((name: "memberDetail") => Promise<MemberDetail | null>) &
+    ((name: "organization") => Promise<Organization | null>) &
+    ((name: "organizationWithoutJoins") => Promise<Organization | null>) &
+    ((name: "nestedMemberType") => Promise<MemberType | null>) &
+    ((name: "nestedSponsor") => Promise<Sponsor | null>) &
+    ((name: "clubCategory") => Promise<Category | null>) &
+    ((name: "generalClub") => Promise<Club | null>) &
+    ((name: "clubThroughMany") => Promise<Club | null>) &
+    ((name: "premiumClub") => Promise<Base | null>);
+  declare admittable_id: number;
+  declare admittable_type: string;
+  declare member_type_id: number;
+  declare name: string;
+
   static {
     this.hasOne("currentMembership");
     this.hasOne("selectedMembership");
@@ -78,6 +149,8 @@ export class Member extends Base {
 }
 
 export class SelfMember extends Base {
+  declare friends: AssociationProxy<SelfMember>;
+
   static {
     this._tableName = "members";
     this.hasAndBelongsToMany("friends", {

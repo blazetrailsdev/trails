@@ -1,7 +1,35 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Relation } from "../../relation.js";
+import type { Developer } from "./developer.js";
+import type { Firm } from "./company.js";
+import type { Mentor } from "./mentor.js";
 // vendor/rails/activerecord/test/models/project.rb
 import { Base } from "../../base.js";
 
 export class Project extends Base {
+  declare mentor: Mentor | null;
+  declare developers: AssociationProxy<Developer>;
+  declare readonlyDevelopers: AssociationProxy<Developer>;
+  declare nonUniqueDevelopers: AssociationProxy<Developer>;
+  declare limitedDevelopers: AssociationProxy<Developer>;
+  declare developersNamedDavid: AssociationProxy<Developer>;
+  declare developersNamedDavidWithHashConditions: AssociationProxy<Developer>;
+  declare salariedDevelopers: AssociationProxy<Developer>;
+  declare developersWithCallbacks: AssociationProxy<Developer>;
+  declare wellPaidSalaryGroups: AssociationProxy<Developer>;
+  declare firm: Firm | null;
+  declare leadDeveloper: Developer | null;
+  declare leadDeveloperDisableJoins: Developer | null;
+  declare static allAsScope: () => Relation<Project>;
+  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
+    ((name: "firm") => Promise<Firm | null>);
+  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
+    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
+  declare firm_id: number;
+  declare mentor_id: number;
+  declare name: string;
+  declare "type": string;
+
   developersLog: string[] = [];
 
   static {
@@ -81,4 +109,9 @@ export class Project extends Base {
   }
 }
 
-export class SpecialProject extends Project {}
+export class SpecialProject extends Project {
+  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
+    ((name: "firm") => Promise<Firm | null>);
+  declare loadHasOne: ((name: "leadDeveloper") => Promise<Developer | null>) &
+    ((name: "leadDeveloperDisableJoins") => Promise<Developer | null>);
+}
