@@ -233,11 +233,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
     const posts = json.posts as Array<Record<string, unknown>>;
     expect(Array.isArray(posts)).toBe(true);
-    expect(json.id).toBe(1);
+    // Postgres returns bigint ids as strings; compare numerically (Rails emits
+    // an integer either way).
+    expect(Number(json.id)).toBe(1);
     expect(json.name).toBe("David");
 
     const welcome = posts.find((p) => p.title === "Welcome to the weblog")!;
-    expect(welcome.author_id).toBe(1);
+    expect(Number(welcome.author_id)).toBe(1);
     expect(welcome.body).toBe("Such a lovely day");
 
     const thinking = posts.find((p) => p.title === "So I was thinking")!;
@@ -337,7 +339,13 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
           "owned_essay_id",
         ],
       });
-      expect(encoded).toBe('[{"id":1},{"id":2}]');
+      // Rails emits `[{"id":1},{"id":2}]`; Postgres serializes bigint ids as
+      // strings, so normalize the id values before comparing (the single-key
+      // `except` shape is still pinned).
+      const decoded = (JSON.parse(encoded) as Array<{ id: unknown }>).map((o) => ({
+        id: Number(o.id),
+      }));
+      expect(decoded).toEqual([{ id: 1 }, { id: 2 }]);
     });
   });
 
@@ -347,11 +355,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       [david, mary].map((a) => a.asJson({ only: ["name"], include: { posts: { only: ["id"] } } })),
     );
 
-    const davidPosts = (json[0].posts as Array<Record<string, unknown>>).map((p) => p.id);
+    const davidPosts = (json[0].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
     expect(json[0].name).toBe("David");
     for (const id of [1, 2, 4, 5, 6]) expect(davidPosts).toContain(id);
 
-    const maryPosts = (json[1].posts as Array<Record<string, unknown>>).map((p) => p.id);
+    const maryPosts = (json[1].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
     expect(json[1].name).toBe("Mary");
     for (const id of [7, 9]) expect(maryPosts).toContain(id);
   });
@@ -425,7 +433,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       include: { comments: { only: ["id", "body"], include: { children: { only: ["body"] } } } },
     });
     const comments = json.comments as Array<Record<string, unknown>>;
-    const greetings = comments.find((c) => c.id === 1)!;
+    const greetings = comments.find((c) => Number(c.id) === 1)!;
     expect(greetings.body).toBe("Thank you for the welcome");
     const children = greetings.children as Array<Record<string, unknown>>;
     expect(children[0].body).toBe("Thank you again for the welcome");
