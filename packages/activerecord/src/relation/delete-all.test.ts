@@ -134,11 +134,8 @@ describe("DeleteAllTest", () => {
     expect(await pets.deleteAll()).toBe(countBefore);
   });
 
-  // TRACKED DEVIATION: includes + where referencing included table should switch to JOIN strategy
-  // (Rails auto-detects table reference and uses LEFT OUTER JOIN). Trails `includes` does a
-  // separate SELECT so toys.name is not available in the WHERE clause.
   it("delete all with includes", async () => {
-    const pets = Pet.includes("toys").where("toys.name = ?", "Bone");
+    const pets = Pet.includes("toys").where({ toys: { name: "Bone" } });
 
     expect(await pets.exists()).toBe(true);
     const countBefore = await pets.count();

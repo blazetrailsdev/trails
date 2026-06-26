@@ -2988,18 +2988,16 @@ export class Relation<T extends Base> {
 
   private referencesEagerLoadedTables(): boolean {
     if (this._includesAssociations.length === 0) return false;
-    if (this._referencesValues.length === 0 && this._whereClause.predicates.length === 0) {
-      return false;
-    }
+    if (this._referencesValues.length === 0) return false;
 
-    // Rails references_eager_loaded_tables? (relation.rb) calls build_joins([]) and
-    // iterates the returned nodes: StringJoin → tables_in_string(join.left),
-    // other joins → join.left.name. Mirror that: strings become StringJoin and we
-    // extract via tablesInString; Arel nodes expose their table via left.name when
-    // available (InnerJoin/OuterJoin/LeadingJoin all have left: Table).
+    // Mirrors Rails references_eager_loaded_tables? (relation.rb:1474-1488): calls
+    // build_joins([]) and extracts table names from the returned join nodes
+    // (StringJoin → tables_in_string(join.left), other → join.left.name), then checks
+    // whether any references_values are NOT in that joined-tables set. Only
+    // references_values are consulted; Rails does not scan WHERE predicates.
     // _leftOuterJoinsValues holds association names (not table names). Rails
     // build_joins([]) processes left_outer_joins_values and extracts table names
-    // from the resulting join nodes. We resolve via _resolveAssociationJoin to
+    // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
     const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
@@ -3027,31 +3025,7 @@ export class Relation<T extends Base> {
       String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
 
-    // Check explicit references() values
-    if (this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()))) return true;
-
-    // Rails string_references: also extract table names from SQL-literal WHERE
-    // predicates (mirrors Rails relation.rb#string_references → references_eager_loaded_tables?).
-    // When where("table.col = ?", val) references an included association's table,
-    // Rails auto-promotes includes to eager_load without requiring explicit .references().
-    const includedTables = new Set(this._resolveAssocTables(this._includesAssociations));
-    for (const node of this._whereClause.predicates) {
-      // Extract SQL text from raw-SQL WHERE predicates. Mirrors Rails' string_references
-      // which inspects `where_clause` for SQL literals referencing non-joined tables.
-      const n = node as any;
-      const sqlText: string | undefined =
-        typeof n.value === "string" && typeof n.sqlWithPlaceholders === "undefined"
-          ? n.value // SqlLiteral
-          : typeof n.sqlWithPlaceholders === "string"
-            ? n.sqlWithPlaceholders // BoundSqlLiteral
-            : undefined;
-      if (sqlText) {
-        for (const tbl of this.tablesInString(sqlText)) {
-          if (includedTables.has(tbl) && !joinedTables.has(tbl)) return true;
-        }
-      }
-    }
-    return false;
+    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
   }
 
   /**
@@ -3717,7 +3691,10 @@ export class Relation<T extends Base> {
     // when includes are promoted to a JOIN strategy, re-execute on the join-dependency
     // relation so the LEFT OUTER JOIN is emitted into the probe query.
     if (rel._eagerLoadingForSql()) {
-      return rel.applyJoinDependencyForArel(rel._groupColumns.length === 0).exists();
+      // Mirrors Rails FinderMethods#exists? (finder_methods.rb:370):
+      // `apply_join_dependency(eager_loading: false)` — hardcoded false skips
+      // the limit/offset+non-limitable-collection guard in apply_join_dependency.
+      return rel.applyJoinDependencyForArel(false).exists();
     }
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
     // existence probe that never instantiates records (no after_find /
