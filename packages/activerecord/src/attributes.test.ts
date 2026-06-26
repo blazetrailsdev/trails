@@ -1,54 +1,69 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Ports vendor/rails/activerecord/test/cases/attributes_test.rb. The Rails file
+ * declares OverloadedType / UnoverloadedType on the `overloaded_types` table
+ * (canonical TEST_SCHEMA) and exercises `attribute` overrides over it; we mirror
+ * that layout rather than inventing a bespoke table.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 import { typeRegistry } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+
+// attributes_test.rb:5-21 — three classes layered over the canonical
+// `overloaded_types` table.
+class OverloadedType extends Base {
+  static {
+    this.tableName = "overloaded_types";
+    this.attribute("overloaded_float", "integer");
+    this.attribute("overloaded_string_with_limit", "string", { limit: 50 });
+    this.attribute("non_existent_decimal", "decimal");
+    this.attribute("string_with_default", "string", { default: "the overloaded default" });
+    registerModel(this);
+  }
+}
+
+class ChildOfOverloadedType extends OverloadedType {}
+
+class GrandchildOfOverloadedType extends ChildOfOverloadedType {
+  static {
+    this.attribute("overloaded_float", "float");
+  }
+}
+
+class UnoverloadedType extends Base {
+  static {
+    this.tableName = "overloaded_types";
+    registerModel(this);
+  }
+}
 
 describe("CustomPropertiesTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", priority: "integer", status: "string" },
-      overloaded_types: {
-        overloaded_float: { type: "float", default: 500 },
-        unoverloaded_float: "float",
-        overloaded_string_with_limit: { type: "string", limit: 255 },
-        string_with_default: { type: "string", default: "the original default" },
-        inferred_string: { type: "string", limit: 255 },
-        starts_at: "datetime",
-        ends_at: "datetime",
-      },
-    });
+    // Reflect the canonical `overloaded_types` columns onto each class that
+    // rides the table (Rails does this implicitly on first access). AR_NO_AUTO_SCHEMA
+    // suppresses the lazy load so the bespoke virtual-attribute tests below stay
+    // connection-free.
+    await loadSchemaFromAdapter.call(OverloadedType);
+    await loadSchemaFromAdapter.call(UnoverloadedType);
   });
 
-  // Mirrors OverloadedType (attributes_test.rb:5-10): an explicit
-  // `attribute :string_with_default, :string` over a schema-inferred table.
-  class OverloadedType extends Base {
-    static {
-      this.tableName = "overloaded_types";
-      this.attribute("string_with_default", "string", {
-        default: "the overloaded default",
-      });
-      registerModel(this);
-    }
-  }
-
-  // Mirrors attributes_test.rb#with_immutable_strings: toggle the flag, run,
-  // then restore. resetColumnInformation + reflection runs on each side so the
-  // schema-inferred types are recomputed under the active flag (the async
-  // reflect mirrors Rails' reset_column_information, which re-reads the schema).
+  // attributes_test.rb#with_immutable_strings — toggle the flag, reset column
+  // information so schema-inferred types are recomputed under the active flag,
+  // then restore.
   const withImmutableStrings = async (fn: () => void): Promise<void> => {
     const old = Base.immutableStringsByDefault;
     Base.immutableStringsByDefault = true;
@@ -63,448 +78,421 @@ describe("CustomPropertiesTest", () => {
     }
   };
 
-  it("overloading types", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "string");
-      }
-    }
-    // Override the type of score from string to integer
-    class CustomPost extends (Post as any) {
-      static {
-        this.attribute("score", "integer");
-      }
-    }
-    const p = new (CustomPost as any)({ title: "hi", score: "42" });
-    expect(p.score).toBe(42);
+  it("overloading types", () => {
+    const data = new OverloadedType();
+
+    data.overloaded_float = "1.1";
+    (data as any).unoverloaded_float = "1.1";
+
+    expect(data.overloaded_float).toBe(1);
+    expect((data as any).unoverloaded_float).toBe(1.1);
   });
+
   it("overloaded properties save", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("priority", "integer", { default: 1 });
-      }
-    }
-    const p = await Post.create({ title: "test" });
-    expect(p.priority).toBe(1);
-    p.priority = 5;
-    await p.save();
-    const reloaded = await Post.find(p.id);
-    expect(reloaded.priority).toBe(5);
+    const data = new OverloadedType();
+
+    data.overloaded_float = "2.2";
+    await data.save();
+    await data.reload();
+
+    expect(data.overloaded_float).toBe(2);
+    // Rails distinguishes Integer vs Float kind; JS numbers do not, so assert
+    // the overloaded column stays integer-valued and the unoverloaded one keeps
+    // its fractional float value.
+    const lastOverloaded = await OverloadedType.last();
+    expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
+    expect(((await UnoverloadedType.last()) as any).overloaded_float).toBe(2.0);
   });
 
   it("properties assigned in constructor", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer", { default: 0 });
-      }
-    }
-    const p = new Post({ title: "hello", score: 42 });
-    expect(p.title).toBe("hello");
-    expect(p.score).toBe(42);
+    const data = new OverloadedType({ overloaded_float: "3.3" });
+
+    expect(data.overloaded_float).toBe(3);
   });
 
-  it(".type_for_attribute supports attribute aliases", async () => {
-    class Post extends Base {
+  it(".type_for_attribute supports attribute aliases", () => {
+    class WithAlias extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.aliasAttribute("heading", "title");
+        this.aliasAttribute("overloaded_float", "x");
       }
     }
-    const p = new Post({ title: "hello" });
-    expect((p as any).heading).toBe("hello");
+
+    expect(WithAlias.typeForAttribute("overloaded_float")).toEqual(WithAlias.typeForAttribute("x"));
   });
-  it("overloaded properties with limit", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("short_title", "string");
-      }
-    }
-    const p = new Post({ short_title: "abcdefghij" });
-    expect(p.short_title).toBe("abcdefghij");
+
+  it("overloaded properties with limit", () => {
+    // Rails asserts the cast type carries the declared limit (50) vs the schema
+    // limit (255); trails never threads `limit` into the cast type, so assert
+    // retention on the reflected column instead. Known gap, tracked by RFC 0043
+    // thread-column-limit-into-cast-type (a dependent of this story).
+    expect(
+      (OverloadedType.columnsHash() as Record<string, { limit?: number }>)
+        .overloaded_string_with_limit.limit,
+    ).toBe(255);
+    expect(
+      (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
+        .overloaded_string_with_limit.limit,
+    ).toBe(255);
   });
-  it("overloaded default but keeping its own type", async () => {
-    class Post extends Base {
+
+  it("overloaded default but keeping its own type", () => {
+    class WithDefault extends UnoverloadedType {
       static {
-        this.attribute("count", "integer", { default: 10 });
+        this.attribute("overloaded_string_with_limit", "string", {
+          default: "the overloaded default",
+        });
       }
     }
-    const p = new Post({});
-    expect(p.count).toBe(10);
-    expect(typeof p.count).toBe("number");
+
+    // Limit retention asserted on the reflected column (see RFC 0043 note above).
+    expect(
+      (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
+        .overloaded_string_with_limit.limit,
+    ).toBe(255);
+    expect(
+      (WithDefault.columnsHash() as Record<string, { limit?: number }>).overloaded_string_with_limit
+        .limit,
+    ).toBe(255);
+
+    expect((new UnoverloadedType() as any).overloaded_string_with_limit).toBeNull();
+    expect((new WithDefault() as any).overloaded_string_with_limit).toBe("the overloaded default");
   });
-  it("attributes with overridden types keep their type when a default value is configured separately", async () => {
-    class Post extends Base {
+
+  it("attributes with overridden types keep their type when a default value is configured separately", () => {
+    class Child extends OverloadedType {
       static {
-        this.attribute("score", "integer");
+        this.attribute("overloaded_float", "integer", { default: "123" });
       }
     }
-    class CustomPost extends (Post as any) {
-      static {
-        this.attribute("score", "integer", { default: 99 });
-      }
-    }
-    const p = new (CustomPost as any)({});
-    expect(p.score).toBe(99);
-    expect(typeof p.score).toBe("number");
+
+    expect(Child.typeForAttribute("overloaded_float")).toEqual(
+      OverloadedType.typeForAttribute("overloaded_float"),
+    );
+    expect(new Child().overloaded_float).toBe(123);
   });
-  it("extra options are forwarded to the type caster constructor", async () => {
-    class Post extends Base {
+
+  it("extra options are forwarded to the type caster constructor", () => {
+    class WithStartsAt extends OverloadedType {
       static {
-        this.attribute("title", "string", { default: "forwarded" });
+        this.attribute("starts_at", "datetime", { default: () => new Date() });
       }
     }
-    const p = new Post({});
-    expect(p.title).toBe("forwarded");
+
+    const startsAtType = WithStartsAt.typeForAttribute("starts_at");
+    // Rails asserts precision/limit/scale forwarded to the Type::DateTime
+    // constructor; trails' `attribute()` doesn't accept precision/scale, so assert
+    // the datetime type plus a materialized time value.
+    expect(startsAtType.constructor.name).toMatch(/DateTime/);
+    expect((new WithStartsAt() as any).starts_at).toBeDefined();
   });
+
   it("time zone aware attribute", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("created_at", "string");
+    await inTimeZone("Pacific Time (US & Canada)", async () => {
+      class WithTimes extends OverloadedType {
+        static {
+          this.attribute("starts_at", "datetime", { default: () => new Date() });
+          this.attribute("ends_at", "datetime", { default: () => new Date() });
+        }
       }
-    }
-    const now = new Date().toISOString();
-    const p = new Post({ created_at: now });
-    expect(p.created_at).toBe(now);
+
+      const startsAtType = WithTimes.typeForAttribute("starts_at");
+      const endsAtType = WithTimes.typeForAttribute("ends_at");
+
+      expect(startsAtType.constructor.name).toMatch(/TimeZoneConverter/);
+      expect(endsAtType.constructor.name).toMatch(/TimeZoneConverter/);
+      expect((new WithTimes() as any).starts_at).toBeDefined();
+      expect((new WithTimes() as any).ends_at).toBeDefined();
+    });
   });
-  it("nonexistent attribute", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "hi" });
-    expect(p.readAttribute("nonexistent")).toBeNull();
+
+  it("nonexistent attribute", () => {
+    const data = new OverloadedType({ non_existent_decimal: 1 });
+
+    expect(data.non_existent_decimal).toEqual(new BigDecimal(1));
+    // Rails raises UnknownAttributeError constructing UnoverloadedType with a key
+    // that has no attribute; trails currently ignores unknown construction keys.
+    // Tracked by RFC 0046 converge-construction-unknown-attribute-strict.
+    const u = new UnoverloadedType({ non_existent_decimal: 1 } as any);
+    expect((u as any).non_existent_decimal).toBeUndefined();
   });
 
   it("model with nonexistent attribute with default value can be saved", async () => {
-    class Post extends Base {
+    class WithNonexistentDefault extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.attribute("virtual_field", "string", { default: "computed" });
+        this.attribute("non_existent_string_with_default", "string", { default: "nonexistent" });
       }
     }
-    const p = await Post.create({ title: "test" });
-    expect(p.isPersisted()).toBe(true);
-    expect(p.virtual_field).toBe("computed");
+
+    const model = new WithNonexistentDefault();
+    expect(await model.save()).toBe(true);
   });
 
-  it("changing defaults", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string", { default: "draft" });
-      }
-    }
-    const p = new Post({});
-    expect(p.status).toBe("draft");
+  it("changing defaults", () => {
+    const data = new OverloadedType();
+    const unoverloadedData = new UnoverloadedType();
+
+    expect((data as any).string_with_default).toBe("the overloaded default");
+    expect((unoverloadedData as any).string_with_default).toBe("the original default");
   });
 
-  it("defaults are not touched on the columns", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string", { default: "active" });
-      }
-    }
-    // The column itself should not have the default baked in; only instances get it
-    const p = new Post({});
-    expect(p.status).toBe("active");
+  it("defaults are not touched on the columns", () => {
+    expect(
+      (OverloadedType.columnsHash() as Record<string, { default?: unknown }>).string_with_default
+        .default,
+    ).toBe("the original default");
   });
 
-  it("children inherit custom properties", async () => {
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("legs", "integer", { default: 4 });
-      }
-    }
-    class Dog extends (Animal as any) {}
-    const d = new (Dog as any)({ name: "Rex" });
-    expect(d.legs).toBe(4);
-    expect(d.name).toBe("Rex");
+  it("children inherit custom properties", () => {
+    const data = new ChildOfOverloadedType({ overloaded_float: "4.4" });
+
+    expect(data.overloaded_float).toBe(4);
   });
 
-  it("children can override parents", async () => {
-    class Vehicle extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("speed", "integer", { default: 60 });
-      }
-    }
-    class Bicycle extends (Vehicle as any) {
-      static {
-        this.attribute("speed", "integer", { default: 15 });
-      }
-    }
-    const b = new (Bicycle as any)({ name: "Trek" });
-    expect(b.speed).toBe(15);
+  it("children can override parents", () => {
+    const data = new GrandchildOfOverloadedType({ overloaded_float: "4.4" });
+
+    expect(data.overloaded_float).toBe(4.4);
   });
 
-  it("overloading properties does not attribute method order", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("non_existent_decimal", "decimal");
-      }
-    }
-    // Rails: `attribute_names == column_names + ["non_existent_decimal"]`.
-    // `column_names` is always DB-sourced (`columns.map(&:name)`), so the
-    // virtual `attribute()` declaration with no backing column is excluded from
-    // it while `attribute_names` still includes it. A persistence round-trip
-    // loads the schema (the async analogue of Rails' synchronous schema load).
-    await Post.create({ title: "hi" });
-    const columnNames = (Post as any).columnNames();
-    const attributeNames = (Post as any).attributeNames();
-    expect(columnNames).not.toContain("non_existent_decimal");
+  it("overloading properties does not attribute method order", () => {
+    const attributeNames = OverloadedType.attributeNames();
+    const expected = [...OverloadedType.columnNames(), "non_existent_decimal"];
+    // Rails asserts exact order (column_names + the virtual attr). trails keeps
+    // declared overrides in declaration order rather than column order, so the
+    // sequence differs; assert the same membership and that the virtual
+    // `non_existent_decimal` is excluded from column_names but present in
+    // attribute_names.
+    expect(new Set(attributeNames)).toEqual(new Set(expected));
+    expect(OverloadedType.columnNames()).not.toContain("non_existent_decimal");
     expect(attributeNames).toContain("non_existent_decimal");
-    expect(new Set(attributeNames)).toEqual(new Set([...columnNames, "non_existent_decimal"]));
   });
+
   it("caches are cleared", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("count", "integer", { default: 0 });
-      }
-    }
-    const p1 = new Post({});
-    expect(p1.count).toBe(0);
-    // Creating a new subclass with different defaults should not affect the parent
-    class SpecialPost extends (Post as any) {
-      static {
-        this.attribute("count", "integer", { default: 100 });
-      }
-    }
-    const p2 = new (SpecialPost as any)({});
-    expect(p2.count).toBe(100);
-    // Original class still has its own default
-    const p3 = new Post({});
-    expect(p3.count).toBe(0);
+    class Klass extends OverloadedType {}
+    await loadSchemaFromAdapter.call(Klass);
+    const columnCount = Klass.columns().length;
+
+    // Rails counts `attribute_types` (column-inclusive) alongside column_defaults
+    // and attribute_names. trails' `attributeTypes()` is the ActiveModel
+    // declared-only registry (it omits schema-reflected columns); the
+    // column-inclusive analogue is `columnDefaults` / `attributeNames`, so assert
+    // the cache invalidation there.
+    expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
+    expect(Klass.attributeNames().length).toBe(columnCount + 1);
+    expect(Klass.attributeNames()).not.toContain("wibble");
+
+    Klass.attribute("wibble", typeRegistry.lookup("value"));
+
+    expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
+    expect(Klass.attributeNames().length).toBe(columnCount + 2);
+    expect(Klass.attributeNames()).toContain("wibble");
   });
 
-  it("the given default value is cast from user", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("count", "integer", { default: 0 });
+  it("the given default value is cast from user", () => {
+    const ValueType = typeRegistry.lookup("value").constructor as new () => any;
+    class CustomType extends ValueType {
+      cast(): unknown {
+        return "from user";
+      }
+      deserialize(): unknown {
+        return "from database";
       }
     }
-    const p = new Post({});
-    expect(typeof p.count).toBe("number");
-    expect(p.count).toBe(0);
+
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("wibble", new CustomType() as any, { default: "default" });
+      }
+    }
+    const model = new Klass();
+
+    expect((model as any).wibble).toBe("from user");
   });
 
-  it("procs for default values", async () => {
-    const calls: number[] = [];
-    class Post extends Base {
+  it("procs for default values", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
       static {
-        this.attribute("token", "string", {
-          default: () => {
-            calls.push(1);
-            return "generated";
-          },
-        });
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
       }
     }
-    const p1 = new Post({});
-    const p2 = new Post({});
-    expect(p1.token).toBe("generated");
-    expect(p2.token).toBe("generated");
-    // Each instance calls the proc independently
-    expect(calls.length).toBeGreaterThanOrEqual(2);
+
+    expect((new Klass() as any).counter).toBe(1);
+    expect((new Klass() as any).counter).toBe(2);
   });
 
-  it("procs for default values are evaluated even after column_defaults is called", async () => {
-    class Post extends Base {
+  it("procs for default values are evaluated even after column_defaults is called", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
       static {
-        this.attribute("seq", "integer", { default: () => Math.floor(Math.random() * 1000) });
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
       }
     }
-    // column_defaults evaluates the proc
-    const defaults = Post.columnDefaults;
-    expect(typeof defaults["seq"]).toBe("number");
-    // New instances still get their own evaluation
-    const p = new Post({});
-    expect(typeof p.seq).toBe("number");
+
+    expect((new Klass() as any).counter).toBe(1);
+
+    // column_defaults will increment the counter since the proc is called
+    void Klass.columnDefaults;
+
+    expect((new Klass() as any).counter).toBe(3);
   });
 
-  it("procs are memoized before type casting", async () => {
-    let callCount = 0;
-    class Post extends Base {
+  it("procs are memoized before type casting", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
       static {
-        this.attribute("token", "string", {
-          default: () => {
-            callCount++;
-            return "tok_" + callCount;
-          },
-        });
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
       }
     }
-    const p = new Post({});
-    const val1 = p.token;
-    const val2 = p.token;
-    // The default proc result should be consistent for the same instance
-    expect(val1).toBe(val2);
+
+    const model = new Klass();
+    expect((model as any).readAttributeBeforeTypeCast("counter")).toBe(1);
+    expect((model as any).readAttributeBeforeTypeCast("counter")).toBe(1);
   });
 
   it("user provided defaults are persisted even if unchanged", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string", { default: "draft" });
-      }
-    }
-    const p = await Post.create({ title: "test" });
-    const reloaded = await Post.find(p.id);
-    // The default should have been persisted
-    expect(reloaded.status).toBe("draft");
+    const model = await OverloadedType.create();
+
+    expect(((await model.reload()) as any).string_with_default).toBe("the overloaded default");
   });
 
-  it.skipIf(adapterType !== "postgres")("array types can be specified", async () => {
-    class Post extends Base {
+  it.skipIf(adapterType !== "postgres")("array types can be specified", () => {
+    class Klass extends OverloadedType {
       static {
-        this.attribute("tags", "string", { default: "[]" });
+        this.attribute("my_array", "string", { limit: 50, array: true } as any);
+        this.attribute("my_int_array", "integer", { array: true } as any);
       }
     }
-    const p = new Post({});
-    expect(p.tags).toBe("[]");
-    p.tags = '["a","b"]';
-    expect(p.tags).toBe('["a","b"]');
-  });
-  it.skipIf(adapterType !== "postgres")("range types can be specified", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("price_range", "string", { default: "0-100" });
-      }
-    }
-    const p = new Post({});
-    expect(p.price_range).toBe("0-100");
-  });
-  it("attributes added after subclasses load are inherited", async () => {
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Dog extends (Animal as any) {}
-    // Add attribute to parent after subclass is defined
-    (Animal as any).attribute("color", "string", { default: "brown" });
-    const d = new (Dog as any)({ name: "Rex" });
-    expect(d.name).toBe("Rex");
+
+    const stringArray = Klass.typeForAttribute("my_array");
+    const intArray = Klass.typeForAttribute("my_int_array");
+    expect(stringArray).not.toEqual(intArray);
   });
 
-  it("attributes not backed by database columns are not dirty when unchanged", async () => {
-    class Post extends Base {
+  it.skipIf(adapterType !== "postgres")("range types can be specified", () => {
+    class Klass extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.attribute("virtual", "string");
+        this.attribute("my_range", "string", { limit: 50, range: true } as any);
+        this.attribute("my_int_range", "integer", { range: true } as any);
       }
     }
-    const p = new Post({ title: "hello" });
-    (p as any)._dirty.snapshot(p._attributes);
-    expect(p.changed).toBe(false);
+
+    const stringRange = Klass.typeForAttribute("my_range");
+    const intRange = Klass.typeForAttribute("my_int_range");
+    expect(stringRange).not.toEqual(intRange);
+  });
+
+  it("attributes added after subclasses load are inherited", () => {
+    class Parent extends Base {
+      static {
+        this.tableName = "topics";
+        registerModel(this);
+      }
+    }
+
+    class Child extends Parent {}
+    new Child(); // force a schema load
+
+    Parent.attribute("foo", typeRegistry.lookup("value"));
+
+    expect((new Child({ foo: "bar" } as any) as any).foo).toBe("bar");
+  });
+
+  it("attributes not backed by database columns are not dirty when unchanged", () => {
+    expect((new OverloadedType() as any).attributeChanged("non_existent_decimal")).toBe(false);
   });
 
   it("attributes not backed by database columns are always initialized", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("memo", "string", { default: "" });
-      }
-    }
-    const p = new Post({});
-    expect(p.memo).toBe("");
+    await OverloadedType.create();
+    const model = (await OverloadedType.last())!;
+
+    expect(model.non_existent_decimal).toBeNull();
+    model.non_existent_decimal = "123";
+    expect(model.non_existent_decimal).toEqual(new BigDecimal(123));
   });
 
   it("attributes not backed by database columns return the default on models loaded from database", async () => {
-    class Post extends Base {
+    class Child extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.attribute("virtual_status", "string", { default: "pending" });
+        this.attribute("non_existent_decimal", "decimal", { default: 123 });
       }
     }
-    const p = await Post.create({ title: "test" });
-    const reloaded = await Post.find(p.id);
-    expect(reloaded.virtual_status).toBe("pending");
+    await Child.create();
+    const model = (await Child.last())!;
+
+    expect(model.non_existent_decimal).toEqual(new BigDecimal(123));
   });
-  it("attributes not backed by database columns keep their type when a default value is configured separately", async () => {
-    class Post extends Base {
+
+  it("attributes not backed by database columns keep their type when a default value is configured separately", () => {
+    class Child extends OverloadedType {
       static {
-        this.attribute("score", "integer");
+        this.attribute("non_existent_decimal", "decimal", { default: "123" });
       }
     }
-    class CustomPost extends (Post as any) {
-      static {
-        this.attribute("score", "integer", { default: 42 });
-      }
-    }
-    const p = new (CustomPost as any)({});
-    expect(p.score).toBe(42);
-    expect(typeof p.score).toBe("number");
+
+    expect(Child.typeForAttribute("non_existent_decimal")).toEqual(
+      OverloadedType.typeForAttribute("non_existent_decimal"),
+    );
+    expect(new Child().non_existent_decimal).toEqual(new BigDecimal(123));
   });
 
   it("attributes not backed by database columns properly interact with mutation and dirty", async () => {
-    class Post extends Base {
+    class Child extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("note", "string");
+        this.tableName = "topics";
+        this.attribute("foo", "string", { default: "lol" });
+        registerModel(this);
       }
     }
-    const p = new Post({ title: "hello" });
-    (p as any)._dirty.snapshot(p._attributes);
-    p.note = "added";
-    expect(p.changed).toBe(true);
-    expect(p.changedAttributes).toContain("note");
+    await Child.create();
+    const model = (await Child.last())!;
+
+    expect((model as any).foo).toBe("lol");
+
+    // Ruby's `<<` mutates the String in place; JS strings are immutable, so
+    // reassign to exercise the same dirty-tracking behavior.
+    (model as any).foo = (model as any).foo + "asdf";
+    expect((model as any).foo).toBe("lolasdf");
+    expect((model as any).fooChanged()).toBe(true);
+
+    await model.reload();
+    expect((model as any).foo).toBe("lol");
+
+    (model as any).foo = "lol";
+    expect(model.changed).toBe(false);
   });
 
-  it("attributes not backed by database columns appear in inspect", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("virtual_field", "string", { default: "v" });
-      }
-    }
-    const p = new Post({ title: "hi" });
-    // The attribute is accessible
-    expect(p.virtual_field).toBe("v");
+  it("attributes not backed by database columns appear in inspect", () => {
+    const inspection = (new OverloadedType() as any).fullInspect() as string;
+
+    expect(inspection).toContain("non_existent_decimal");
   });
 
-  it("attributes do not require a type", async () => {
-    class Post extends Base {
+  it("attributes do not require a type", () => {
+    class Klass extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.attribute("metadata", "string");
+        this.attribute("no_type", typeRegistry.lookup("value"));
       }
     }
-    const p = new Post({ metadata: "anything" });
-    expect(p.metadata).toBe("anything");
+    expect((new Klass({ no_type: 1 } as any) as any).no_type).toBe(1);
+    expect((new Klass({ no_type: "foo" } as any) as any).no_type).toBe("foo");
   });
+
   it("attributes do not require a connection is established", () => {
-    // Rails parity: assert_not_called(ActiveRecord::Base, :lease_connection).
-    // Use a bare adapter (no defineSchema / no DDL) so the test still exercises
-    // the "no connection needed" guarantee. No defineSchema call here —
-    // that would mask the "no connection needed" regression.
-    class Post extends Base {
+    // Rails: assert_not_called(ActiveRecord::Base, :lease_connection). Declaring
+    // an attribute must not touch the connection.
+    class Klass extends OverloadedType {
       static {
-        this.attribute("title", "string");
-        this.attribute("cached", "string", { default: "yes" });
+        this.attribute("foo", "string");
       }
     }
-    const p = new Post({});
-    expect(p.cached).toBe("yes");
+    expect(Klass).toBeDefined();
   });
-  it("unknown type error is raised", async () => {
-    // Using a type that doesn't have special casting should still work as pass-through
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "test" });
-    expect(p.title).toBe("test");
+
+  it("unknown type error is raised", () => {
+    expect(() => OverloadedType.attribute("foo", "unknown")).toThrow();
   });
+
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
     await withImmutableStrings(() => {
       const immutableStringType = typeRegistry.lookup("immutable_string").constructor;
@@ -513,22 +501,19 @@ describe("CustomPropertiesTest", () => {
       );
     });
   });
+
   it("immutable_strings_by_default retains limit information", async () => {
     await withImmutableStrings(() => {
-      // Rails asserts `type_for_attribute("inferred_string").limit == 255`,
-      // but in trails `typeForAttribute(col).limit` is `undefined`:
-      // `lookupCastTypeFromColumn` builds the StringType via a bare
-      // `lookupCastType(sqlType)` that never threads `column.limit` into the
-      // type constructor, so `toImmutableString()` (which does copy
-      // `limit: this.limit`) inherits an undefined limit. trails keeps limit on
-      // the reflected column, so assert retention there. Known gap, tracked by
-      // story 0043 thread-column-limit-into-cast-type (wire column.limit into
-      // the cast type so the Rails type-level assertion can be restored).
+      // Rails asserts `type_for_attribute("inferred_string").limit == 255`, but in
+      // trails the cast type never threads `column.limit`, so assert retention on
+      // the reflected column instead. Known gap, tracked by story 0043
+      // thread-column-limit-into-cast-type.
       expect(
         (OverloadedType.columnsHash() as Record<string, { limit?: number }>).inferred_string.limit,
       ).toBe(255);
     });
   });
+
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
     await withImmutableStrings(() => {
       const defaultStringType = typeRegistry.lookup("string").constructor;
@@ -537,16 +522,12 @@ describe("CustomPropertiesTest", () => {
       );
     });
   });
-  it("serialize boolean for both string types", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("active", "integer");
-      }
-    }
-    const p1 = new Post({ active: 1 });
-    expect(p1.active).toBe(1);
-    const p2 = new Post({ active: 0 });
-    expect(p2.active).toBe(0);
+
+  it("serialize boolean for both string types", () => {
+    const defaultStringType = typeRegistry.lookup("string");
+    const immutableStringType = typeRegistry.lookup("immutable_string");
+    expect(defaultStringType.serialize(true)).toBe(immutableStringType.serialize(true));
+    expect(defaultStringType.serialize(false)).toBe(immutableStringType.serialize(false));
   });
 });
 
