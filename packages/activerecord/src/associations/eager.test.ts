@@ -49,6 +49,8 @@ import { Club } from "../test-helpers/models/club.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Essay } from "../test-helpers/models/essay.js";
+import { Job } from "../test-helpers/models/job.js";
+import { Reference } from "../test-helpers/models/reference.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -104,8 +106,6 @@ const TEST_SCHEMA: Schema = {
   eager_edges: { label: "string", eager_node_id: "integer" },
   eager_empty_bt_children: { value: "string", eager_empty_bt_parent_id: "integer" },
   eager_empty_bt_parents: { name: "string" },
-  eager_float_details: { info: "string", eager_float_item_id: "integer" },
-  eager_float_items: { price: "float" },
   eager_hm_cond_comments: { body: "string", eager_hm_cond_post_id: "integer" },
   eager_hm_cond_posts: { title: "string" },
   eager_hm_ho_comments: { body: "string", eager_hm_ho_post_id: "integer" },
@@ -212,17 +212,6 @@ const TEST_SCHEMA: Schema = {
   eager_poly_child2s: { name: "string", parent_id: "integer", parent_type: "string" },
   eager_poly_children: { name: "string", parent_id: "integer", parent_type: "string" },
   eager_posts: { title: "string" },
-  eager_pre_ho_children: { value: "string", eager_pre_ho_parent_id: "integer" },
-  eager_pre_ho_parents: { name: "string" },
-  eager_qt_clients: { name: "string", eager_qt_company_id: "integer" },
-  eager_qt_companies: { name: "string" },
-  eager_qt_hm_children: { value: "string", eager_qt_hm_parent_id: "integer" },
-  eager_qt_hm_parents: { name: "string" },
-  eager_qt_ho_children: { value: "string", eager_qt_ho_parent_id: "integer" },
-  eager_qt_ho_parents: { name: "string" },
-  eager_qt_thr_items: { label: "string" },
-  eager_qt_thr_joins: { eager_qt_thr_owner_id: "integer", eager_qt_thr_item_id: "integer" },
-  eager_qt_thr_owners: { name: "string" },
   eager_reord_children: { value: "string", eager_reord_parent_id: "integer" },
   eager_reord_parents: { name: "string" },
   eager_sti_authors: { name: "string" },
@@ -317,9 +306,6 @@ const TEST_SCHEMA: Schema = {
   psta_clubs: { name: "string" },
   psta_members: { name: "string" },
   psta_memberships: { psta_member_id: "integer", psta_club_id: "integer", active: "boolean" },
-  ptc_posts: { title: "string" },
-  ptc_taggings: { taggable_id: "integer", taggable_type: "string", ptc_tag_id: "integer" },
-  ptc_tags: { name: "string" },
   sg_authors: { name: "string" },
   sg_comments: { body: "string", sg_post_id: "integer" },
   sg_posts: { title: "string", sg_author_id: "integer" },
@@ -1270,118 +1256,6 @@ describe("EagerAssociationTest", () => {
     expect(post?.title).toBe("Grace Post");
   });
 
-  it("eager load belongs to quotes table and column names", async () => {
-    class EagerQtCompany extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerQtClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_qt_company_id", "integer");
-        this.belongsTo("eagerQtCompany", {
-          className: "EagerQtCompany",
-          foreignKey: "eager_qt_company_id",
-        });
-      }
-    }
-    registerModel("EagerQtCompany", EagerQtCompany);
-    registerModel("EagerQtClient", EagerQtClient);
-    const co = await EagerQtCompany.create({ name: "Acme" });
-    await EagerQtClient.create({ name: "C1", eager_qt_company_id: co.id });
-    const clients = await EagerQtClient.all().includes("eagerQtCompany").toArray();
-    expect((clients[0] as any).association("eagerQtCompany").target?.name).toBe("Acme");
-  });
-  it("eager load has one quotes table and column names", async () => {
-    class EagerQtHoParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("eagerQtHoChild", {
-          className: "EagerQtHoChild",
-          foreignKey: "eager_qt_ho_parent_id",
-        });
-      }
-    }
-    class EagerQtHoChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_qt_ho_parent_id", "integer");
-      }
-    }
-    registerModel("EagerQtHoParent", EagerQtHoParent);
-    registerModel("EagerQtHoChild", EagerQtHoChild);
-    const p = await EagerQtHoParent.create({ name: "P" });
-    await EagerQtHoChild.create({ value: "V", eager_qt_ho_parent_id: p.id });
-    const parents = await EagerQtHoParent.all().includes("eagerQtHoChild").toArray();
-    expect((parents[0] as any).association("eagerQtHoChild").target?.value).toBe("V");
-  });
-  it("eager load has many quotes table and column names", async () => {
-    class EagerQtHmParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerQtHmChildren", {
-          className: "EagerQtHmChild",
-          foreignKey: "eager_qt_hm_parent_id",
-        });
-      }
-    }
-    class EagerQtHmChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_qt_hm_parent_id", "integer");
-      }
-    }
-    registerModel("EagerQtHmParent", EagerQtHmParent);
-    registerModel("EagerQtHmChild", EagerQtHmChild);
-    const p = await EagerQtHmParent.create({ name: "P" });
-    await EagerQtHmChild.create({ value: "C1", eager_qt_hm_parent_id: p.id });
-    const parents = await EagerQtHmParent.all().includes("eagerQtHmChildren").toArray();
-    expect((parents[0] as any).association("eagerQtHmChildren").target).toHaveLength(1);
-  });
-  it("eager load has many through quotes table and column names", async () => {
-    class EagerQtThrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerQtThrJoins", {
-          className: "EagerQtThrJoin",
-          foreignKey: "eager_qt_thr_owner_id",
-        });
-        this.hasMany("eagerQtThrItems", {
-          className: "EagerQtThrItem",
-          through: "eagerQtThrJoins",
-          source: "eagerQtThrItem",
-        });
-      }
-    }
-    class EagerQtThrJoin extends Base {
-      static {
-        this.attribute("eager_qt_thr_owner_id", "integer");
-        this.attribute("eager_qt_thr_item_id", "integer");
-        this.belongsTo("eagerQtThrItem", {
-          className: "EagerQtThrItem",
-          foreignKey: "eager_qt_thr_item_id",
-        });
-      }
-    }
-    class EagerQtThrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("EagerQtThrOwner", EagerQtThrOwner);
-    registerModel("EagerQtThrJoin", EagerQtThrJoin);
-    registerModel("EagerQtThrItem", EagerQtThrItem);
-    const owner = await EagerQtThrOwner.create({ name: "O" });
-    const item = await EagerQtThrItem.create({ label: "I1" });
-    await EagerQtThrJoin.create({
-      eager_qt_thr_owner_id: owner.id,
-      eager_qt_thr_item_id: item.id,
-    });
-    const owners = await EagerQtThrOwner.all().includes("eagerQtThrItems").toArray();
-    expect((owners[0] as any).association("eagerQtThrItems").target).toHaveLength(1);
-  });
   it("eager load has many with string keys", async () => {
     class EagerStrParent extends Base {
       static {
@@ -2470,37 +2344,6 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].rating).toBe(4.5);
   });
-  it("polymorphic type condition", async () => {
-    class PtcPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("ptcTaggings", { as: "taggable", className: "PtcTagging" });
-      }
-    }
-    class PtcTagging extends Base {
-      static {
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.attribute("ptc_tag_id", "integer");
-      }
-    }
-    class PtcTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("PtcPost", PtcPost);
-    registerModel("PtcTagging", PtcTagging);
-    registerModel("PtcTag", PtcTag);
-    const post = await PtcPost.create({ title: "Poly" });
-    await PtcTagging.create({ taggable_id: post.id, taggable_type: "PtcPost", ptc_tag_id: 1 });
-    await PtcTagging.create({ taggable_id: post.id, taggable_type: "OtherType", ptc_tag_id: 2 });
-    const posts = await PtcPost.all().includes("ptcTaggings").toArray();
-    expect(posts).toHaveLength(1);
-    const taggings = (posts[0] as any).association("ptcTaggings").target ?? [];
-    expect(taggings).toHaveLength(1);
-    expect(taggings[0].taggable_type).toBe("PtcPost");
-  });
   it("eager with multiple associations with same table has one", async () => {
     class EagerMultiHoParent extends Base {
       static {
@@ -2608,67 +2451,6 @@ describe("EagerAssociationTest", () => {
     expect(nodes).toHaveLength(1);
   });
 
-  it("eager with floating point numbers", async () => {
-    class EagerFloatItem extends Base {
-      static {
-        this.attribute("price", "float");
-        this.hasMany("eagerFloatDetails", {
-          className: "EagerFloatDetail",
-          foreignKey: "eager_float_item_id",
-        });
-      }
-    }
-    class EagerFloatDetail extends Base {
-      static {
-        this.attribute("info", "string");
-        this.attribute("eager_float_item_id", "integer");
-      }
-    }
-    registerModel("EagerFloatItem", EagerFloatItem);
-    registerModel("EagerFloatDetail", EagerFloatDetail);
-
-    const item = await EagerFloatItem.create({ price: 19.99 });
-    await EagerFloatDetail.create({
-      info: "detail",
-      eager_float_item_id: item.id,
-    });
-
-    const items = await EagerFloatItem.all().includes("eagerFloatDetails").toArray();
-    expect(items).toHaveLength(1);
-    expect(items[0].price).toBe(19.99);
-    const details = (items[0] as any).association("eagerFloatDetails").target;
-    expect(details).toHaveLength(1);
-  });
-  it("preconfigured includes with has one", async () => {
-    class EagerPreHoParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("eagerPreHoChild", {
-          className: "EagerPreHoChild",
-          foreignKey: "eager_pre_ho_parent_id",
-        });
-      }
-    }
-    class EagerPreHoChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_pre_ho_parent_id", "integer");
-      }
-    }
-    registerModel("EagerPreHoParent", EagerPreHoParent);
-    registerModel("EagerPreHoChild", EagerPreHoChild);
-
-    const parent = await EagerPreHoParent.create({ name: "P" });
-    await EagerPreHoChild.create({
-      value: "V",
-      eager_pre_ho_parent_id: parent.id,
-    });
-
-    const results = await EagerPreHoParent.all().includes("eagerPreHoChild").toArray();
-    expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any).association("eagerPreHoChild").target;
-    expect(preloaded?.value).toBe("V");
-  });
   it.skip("eager association with scope with joins", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -5022,6 +4804,21 @@ describe("EagerAssociationTest", () => {
     });
   });
 
+  it("preconfigured includes with has one", async () => {
+    const post = await Post.find(posts("sti_comments").id);
+    const comment = (await post.association("verySpecialCommentWithPost").loadTarget()) as Base;
+    await assertNoQueries(false, () => {
+      expect((comment.association("post").target as Base).id).toBe(posts("sti_comments").id);
+    });
+  });
+
+  it("eager with floating point numbers", async () => {
+    await assertQueriesCount(2, false, async () => {
+      // Before changes, the floating-point numbers will be interpreted as table names and will cause this to run in one query
+      await Comment.all().where("123.456 = 123.456").includes("post").toArray();
+    });
+  });
+
   it("eager association loading with belongs to and limit", async () => {
     const loaded = await Comment.all().includes("post").limit(5).order("comments.id").toArray();
     expect(loaded).toHaveLength(5);
@@ -5569,7 +5366,7 @@ describe("EagerAssociationTest", () => {
 // that reference the joined `tags` table via `references`/`eager_load`.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { posts } = useHandlerFixtures(["posts", "tags", "taggings"]);
+  const { posts, taggings } = useHandlerFixtures(["posts", "tags", "taggings"]);
   beforeAll(async () => {
     await defineSchema(
       {
@@ -5581,8 +5378,20 @@ describe("EagerAssociationTest", () => {
     );
   });
   registerModel(Post);
+  registerModel(SpecialPost);
   registerModel(Tag);
   registerModel(Tagging);
+
+  it("polymorphic type condition", async () => {
+    let post = await Post.all().includes("taggings").find(posts("thinking").id);
+    expect((post.association("taggings").target as Base[]).map((t) => t.id)).toContain(
+      taggings("thinking_general").id,
+    );
+    post = await SpecialPost.all().includes("taggings").find(posts("thinking").id);
+    expect((post.association("taggings").target as Base[]).map((t) => t.id)).toContain(
+      taggings("thinking_general").id,
+    );
+  });
 
   it("preloading a polymorphic association with references to the associated table", async () => {
     const post = (await Post.includes("tags")
@@ -5595,6 +5404,70 @@ describe("EagerAssociationTest", () => {
   it("eager-loading a polymorphic association with references to the associated table", async () => {
     const post = (await Post.eagerLoad("tags").where("tags.name = ?", "General").first()) as Post;
     expect(post.id).toBe(posts("welcome").id);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Job/Person/Reference fixtures) — ports the
+// eager_test.rb cases that exercise eager loading over quoted table and column
+// names. Same describe name as the other EagerAssociationTest blocks so
+// test:compare matches the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { jobs, references, people } = useHandlerFixtures(["jobs", "references", "people"]);
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        jobs: canonicalSchema.jobs,
+        references: canonicalSchema.references,
+        people: canonicalSchema.people,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Job);
+  registerModel(Reference);
+  registerModel(Person);
+
+  it("eager load belongs to quotes table and column names", async () => {
+    const job = await Job.includes("idealReference").find(jobs("unicyclist").id);
+    await assertNoQueries(false, () => {
+      expect((job.association("idealReference").target as Base).id).toBe(
+        references("michael_unicyclist").id,
+      );
+    });
+  });
+
+  it("eager load has one quotes table and column names", async () => {
+    const michael = await Person.all().includes("favoriteReference").find(people("michael").id);
+    await assertNoQueries(false, () => {
+      expect((michael.association("favoriteReference").target as Base).id).toBe(
+        references("michael_unicyclist").id,
+      );
+    });
+  });
+
+  it("eager load has many quotes table and column names", async () => {
+    const michael = await Person.all().includes("references").find(people("michael").id);
+    await assertNoQueries(false, () => {
+      const sorted = (michael.association("references").target as Base[])
+        .slice()
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      expect(sorted.map((r) => r.id)).toEqual([
+        references("michael_magician").id,
+        references("michael_unicyclist").id,
+      ]);
+    });
+  });
+
+  it("eager load has many through quotes table and column names", async () => {
+    const michael = await Person.all().includes("jobs").find(people("michael").id);
+    await assertNoQueries(false, () => {
+      const sorted = (michael.association("jobs").target as Base[])
+        .slice()
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      expect(sorted.map((j) => j.id)).toEqual([jobs("unicyclist").id, jobs("magician").id]);
+    });
   });
 });
 
