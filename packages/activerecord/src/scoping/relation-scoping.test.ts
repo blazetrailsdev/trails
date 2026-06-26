@@ -504,15 +504,6 @@ describe("RelationScopingTest", () => {
       );
     });
   });
-
-  describe("HasManyScopingTest", () => {
-    it("should maintain default scope on associations", async () => {
-      const magician = (await BadReference.find(1)) as Base;
-      const michael = (await Person.find(people("michael").id)) as Base;
-      const refs = await (michael as any).badReferences.toArray();
-      expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
-    });
-  });
 });
 
 describe("NestedRelationScopingTest", () => {
@@ -592,6 +583,13 @@ describe("NestedRelationScopingTest", () => {
 });
 
 describe("HasManyScopingTest", () => {
+  it("should maintain default scope on associations", async () => {
+    const magician = (await BadReference.find(1)) as Base;
+    const michael = (await Person.find(people("michael").id)) as Base;
+    const refs = await (michael as any).badReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
+  });
+
   it("forwarding of static methods", async () => {
     const welcome = (await Post.find(1)) as Base;
     expect((Comment as any).whatAreYou()).toBe("a comment...");
