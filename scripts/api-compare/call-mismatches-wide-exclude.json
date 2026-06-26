@@ -60247,5 +60247,33 @@
     "rubyName": "before_initialize",
     "call": "on_load",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "compile_update",
+    "reason": "Delegated to private _execUpdateAll helper which calls arel.compileUpdate(); split avoids repeating the arel-build block across hash/string/array overload forms."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "empty?",
+    "reason": "Delegated to private _execUpdateAll helper which checks having_clause emptiness; split avoids repeating the arel-build block across hash/string/array overload forms."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "reset",
+    "reason": "Delegated to private _execUpdateAll helper which calls this.reset() after execution; split avoids repeating the arel-build block across hash/string/array overload forms."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "table",
+    "reason": "Delegated to private _execUpdateAll helper which sets arel.source.left = table; split avoids repeating the arel-build block across hash/string/array overload forms."
   }
 ]
