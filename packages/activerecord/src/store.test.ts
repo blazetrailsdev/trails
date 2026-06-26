@@ -253,7 +253,7 @@ describe("StoreTest", () => {
     const user = adminUsers("jamis");
     // trails: Rails YAML loads :symbol as a Ruby Symbol → HWIA normalizes to "symbol".
     // Our JSON fixture stores it as ":symbol" (JS-YAML-parsed literal), so the HWIA
-    // key is ":symbol" not "symbol". The fixture comparison script expects this form.
+    // key is ":symbol" not "symbol". Tracked: hwia-symbol-key-normalization.
     expect((user.settings as HashWithIndifferentAccess).get(":symbol")).toBe("symbol");
     expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
