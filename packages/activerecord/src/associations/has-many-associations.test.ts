@@ -483,13 +483,6 @@ const UNIVERSAL_HM_SCHEMA: Schema = {
   r_containers: { name: "string" },
 } as const;
 
-// Schema for the small head-of-file describes migrated to defineSchema
-// under TM Phase 5. The main `HasManyAssociationsTest` block further down
-// in this file still relies on auto-derived schema and is a follow-up.
-const HEAD_SCHEMA: Schema = {
-  posts: { title: "string" },
-};
-
 describe("HasManyAssociationsTestPrimaryKeys", () => {
   const { people } = useHandlerFixtures([
     "authors",
@@ -570,35 +563,50 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { companies } = useHandlerFixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
-    await defineSchema(HEAD_SCHEMA);
+    registerModel(Company);
+    registerModel(HmFirm);
+    registerModel(Client);
+    registerModel(Account);
+    enableSti(Company);
+    registerSubclass(HmFirm);
+    registerSubclass(Client);
+    await Company.loadSchema();
+    await Account.loadSchema();
   });
 
-  it("transaction when deleting persisted", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+  // SKIP: CollectionProxy#destroy does not yet wrap the batch in a transaction
+  // (Rails delete_or_destroy → transaction { remove_records }), so a mid-batch
+  // raise leaves a partial delete instead of rolling back. Tracked by impl story
+  // collection-proxy-destroy-transaction + unskip story
+  // unskip-has-many-collection-destroy-transaction (RFC 0019).
+  it.skip("transaction when deleting persisted", async () => {
+    const good = Client.new({ name: "Good" }) as any;
+    const bad = Client.new({ name: "Bad" }) as any;
+    bad.raiseOnDestroy = true;
+
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.replace([good, bad]);
+
+    try {
+      await firstFirm.clientsOfFirm.destroy(good, bad);
+    } catch (e) {
+      if (!(e instanceof Client.RaisedOnDestroy)) throw e;
     }
-    const p = await Post.create({ title: "to delete" });
-    expect(p.isPersisted()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
+
+    const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
+    expect(reloaded.map((c) => c.id).sort()).toEqual([good.id, bad.id].sort());
   });
 
   it("transaction when deleting new record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({ title: "new" });
-    expect(p.isNewRecord()).toBe(true);
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
+    const firm = HmFirm.new() as any;
+    await assertQueriesCount(0, false, async () => {
+      const client = Client.new({ name: "New Client" });
+      await firm.clientsOfFirm.concat(client);
+      await firm.clientsOfFirm.destroy(client);
+    });
   });
 });
 
@@ -7435,41 +7443,40 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-const TAIL_ASYNC_SCHEMA: Schema = {
-  async_authors: { name: "string" },
-  async_posts: { author_id: "integer", title: "string" },
-};
-
 describe("AsyncHasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { companies } = useHandlerFixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
-    await defineSchema(TAIL_ASYNC_SCHEMA);
+    registerModel(Company);
+    registerModel(HmFirm);
+    registerModel(Client);
+    registerModel(Account);
+    enableSti(Company);
+    registerSubclass(HmFirm);
+    registerSubclass(Client);
+    await Company.loadSchema();
+    await Account.loadSchema();
   });
 
-  it("async load has many", async () => {
-    class AsyncAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class AsyncPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(AsyncAuthor);
-    registerModel(AsyncPost);
-    const author = await AsyncAuthor.create({ name: "Alice" });
-    await AsyncPost.create({ author_id: author.id, title: "A" });
-    await AsyncPost.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "async_posts", {
-      className: "AsyncPost",
-      foreignKey: "author_id",
+  // SKIP: association(...).asyncLoadTarget() does not leave the dotted
+  // `firm.clients` proxy in a loaded state, so the post-load `size()`/`toArray()`
+  // re-query instead of reading the prefetched target. Tracked by impl story
+  // assoc-async-load-target-shares-proxy-state + unskip story
+  // unskip-async-load-has-many (RFC 0019).
+  it.skip("async load has many", async () => {
+    // Rails has_many_associations_test.rb:3261 test_async_load_has_many:
+    //   firm.association(:clients).async_load_target; then clients.size == 3
+    //   and clients[2] is reachable with no further queries.
+    const firm = companies("first_firm") as any;
+
+    await firm.association("clients").asyncLoadTarget();
+
+    expect(await firm.clients.size()).toBe(3);
+
+    await assertNoQueries(false, async () => {
+      const all = await firm.clients.toArray();
+      expect(all[2]).not.toBeNull();
     });
-    expect(posts.length).toBe(2);
   });
 });
 
