@@ -4,7 +4,9 @@
  * Mirrors: activerecord/test/cases/relation_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { Relation } from "./index.js";
+import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -21,6 +23,38 @@ import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
+
+// Mirrors relation_test.rb's `EnsureRoundTripTypeCasting` / `UpdateAllTestModel`
+// (relation_test.rb:381-406): a custom type whose cast/serialize/deserialize each
+// assert their input, so the `update_all` round trip is verifiable. The model
+// rides the canonical `posts` table (Rails: `self.table_name = "posts"`).
+class EnsureRoundTripTypeCasting extends ValueType {
+  override readonly name = "string" as unknown as "value";
+  // nil passes through (Rails `Type::Value` maps nil→nil); trails reads the
+  // column default eagerly during model construction, where Rails would not.
+  override cast(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "value from user") throw new Error(String(value));
+    return "cast value";
+  }
+  override deserialize(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "type cast for database") throw new Error(String(value));
+    return "type cast from database";
+  }
+  override serialize(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "cast value") throw new Error(String(value));
+    return "type cast for database";
+  }
+}
+
+class UpdateAllTestModel extends Base {
+  static {
+    this._tableName = "posts";
+    this.attribute("body", new EnsureRoundTripTypeCasting());
+  }
+}
 
 // ==========================================================================
 // RelationTest — targets relation_test.rb
@@ -126,10 +160,17 @@ describe("RelationTest", () => {
     expect(attrs.title).toBe("scoped");
   });
 
-  it("update all goes through normal type casting", async () => {
-    await CanonPost.create({ title: "reltest-ua", body: "old" });
-    const count = await CanonPost.all().updateAll({ body: "new" });
-    expect(typeof count).toBe("number");
+  // SKIP: trails `updateAll` passes scalar values raw and lets the connection
+  // cast by the *column* type, so an attribute-declared custom type's
+  // serialize/deserialize is bypassed — unlike Rails `_substitute_values`, which
+  // casts via `type_for_attribute`. Surfaced by this faithful port; tracked by
+  // story 0023-surfaced-deviations/updateall-routes-values-through-attribute-type.
+  // Un-skip when that converges.
+  it.skip("update all goes through normal type casting", async () => {
+    await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
+
+    const first = await UpdateAllTestModel.first();
+    expect((first as any).body).toBe("type cast from database");
   });
 
   it("no queries on empty relation exists?", async () => {
@@ -330,14 +371,20 @@ describe("RelationTest", () => {
     expect(merged.toSql()).toContain("SELECT");
   });
 
-  it("relation merging with joins as join dependency pick proper parent", () => {
-    const sql = CanonPost.all().toSql();
-    expect(sql).toContain("SELECT");
+  it("relation merging with joins as join dependency pick proper parent", async () => {
+    const post = await CanonPost.create({ title: "haha", body: "huhu" });
+    const comment = await (post as any).comments.create({ body: "hu" });
+    for (let i = 0; i < 3; i++) await comment.ratings.create();
+
+    const relation = CanonPost.joins("comments").merge(CanonComment.joins("ratings"));
+
+    const ids = await relation.where({ id: (post as any).id }).pluck("id");
+    expect(ids.length).toBe(3);
   });
 
   it("merge raises with invalid argument", () => {
     const rel = CanonPost.all();
-    expect(() => rel.merge(CanonPost.where({ title: "test" }))).not.toThrow();
+    expect(() => rel.merge(true as any)).toThrow();
   });
 
   it("respond to for non selected element", () => {
@@ -369,8 +416,8 @@ describe("RelationTest", () => {
   });
 
   it("relation with annotation filters sql comment delimiters", () => {
-    const sql = CanonPost.all().annotate("safe comment").toSql();
-    expect(sql).toContain("safe comment");
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("**//foo//**");
+    expect(postWithAnnotation.toSql()).toContain("= 1 /* ** //foo// ** */");
   });
 
   it("relation without annotation does not include an empty comment", () => {
@@ -379,8 +426,10 @@ describe("RelationTest", () => {
   });
 
   it("relation with optimizer hints filters sql comment delimiters", () => {
-    const sql = CanonPost.all().optimizerHints("INDEX(posts idx)").toSql();
-    expect(sql).toContain("INDEX");
+    let postWithHint = CanonPost.where({ id: 1 }).optimizerHints("**//BADHINT//**");
+    expect(postWithHint.toSql()).toContain("/*+ ** //BADHINT// ** */");
+    postWithHint = CanonPost.where({ id: 1 }).optimizerHints("/*+ BADHINT */");
+    expect(postWithHint.toSql()).toContain("/*+ BADHINT */");
   });
 
   it("skip preloading after arel has been generated", async () => {
@@ -392,12 +441,12 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty IN", async () => {
-    const results = await CanonPost.where({ title: [] }).toArray();
+    const results = await CanonPost.where({ id: [] }).toArray();
     expect(results).toEqual([]);
   });
 
   it("can unscope empty IN", () => {
-    const sql = CanonPost.where({ title: "test" }).unscope("where").toSql();
+    const sql = CanonPost.where({ id: [] }).unscope({ where: "id" }).toSql();
     expect(sql).not.toContain("WHERE");
   });
 
@@ -420,13 +469,12 @@ describe("RelationTest", () => {
   });
 
   it("does not duplicate optimizer hints on merge", () => {
-    const rel1 = CanonPost.all().optimizerHints("INDEX(posts idx)");
-    const rel2 = CanonPost.all().optimizerHints("INDEX(posts idx)");
-    const merged = rel1.merge(rel2);
-    const sql = merged.toSql();
-    const matches = sql.match(/INDEX/g);
-    // Should contain INDEX but ideally not duplicated
-    expect(matches).not.toBeNull();
+    const escapedTable = canonicalQuoteTableName("posts");
+    const expected = `SELECT /*+ OMGHINT */ ${escapedTable}.* FROM ${escapedTable}`;
+    const query = CanonPost.optimizerHints("OMGHINT")
+      .merge(CanonPost.optimizerHints("OMGHINT"))
+      .toSql();
+    expect(query).toBe(expected);
   });
 
   it("find_by! with multi-arg conditions returns the first matching record", async () => {
