@@ -25,7 +25,7 @@ describe("NumericalityValidationTest", () => {
     };
   }
 
-  it("test_column_with_precision", () => {
+  it("column with precision", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("unscaled_bank_balance", {
       equalTo: 10_000_000.12,
@@ -36,7 +36,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_column_with_precision_higher_than_double_fig", () => {
+  it("column with precision higher than double fig", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("decimal_number_big_precision", {
       equalTo: 10_000_000.3,
@@ -47,7 +47,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_column_with_scale", () => {
+  it("column with scale", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 10 });
 
@@ -56,7 +56,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(false);
   });
 
-  it("test_no_column_precision", () => {
+  it("no column precision", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("decimal_number", {
       equalTo: 1_000_000_000.123454,
@@ -67,7 +67,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_virtual_attribute", () => {
+  it("virtual attribute", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType());
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
@@ -79,7 +79,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_on_abstract_class", () => {
+  it("on abstract class", () => {
     class AbstractClass extends Base {
       static {
         this.abstractClass = true;
@@ -96,7 +96,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_virtual_attribute_without_precision", () => {
+  it("virtual attribute without precision", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType());
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
@@ -108,7 +108,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_virtual_attribute_with_precision_round_down", () => {
+  it("virtual attribute with precision round down", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
@@ -118,7 +118,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(true);
   });
 
-  it("test_virtual_attribute_with_precision_round_half_even", () => {
+  it("virtual attribute with precision round half even", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
@@ -131,7 +131,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(false);
   });
 
-  it("test_virtual_attribute_with_precision_round_up", () => {
+  it("virtual attribute with precision round up", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
@@ -141,7 +141,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(false);
   });
 
-  it("test_virtual_attribute_with_scale", () => {
+  it("virtual attribute with scale", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ scale: 2 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { greaterThan: 1 });
@@ -151,7 +151,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(false);
   });
 
-  it("test_virtual_attribute_with_precision_and_scale", () => {
+  it("virtual attribute with precision and scale", () => {
     const modelClassVar = modelClass();
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 4, scale: 2 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
@@ -175,7 +175,7 @@ describe("NumericalityValidationTest", () => {
     }
   });
 
-  it("test_aliased_attribute", () => {
+  it("aliased attribute", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("newBankBalance", { greaterOrEqualThan: 0 });
 
@@ -184,7 +184,7 @@ describe("NumericalityValidationTest", () => {
     expect(subject.isValid()).toBe(false);
   });
 
-  it("test_allow_nil_works_for_casted_value", () => {
+  it("allow nil works for casted value", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 0, allowNil: true });
 
