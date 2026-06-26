@@ -33,7 +33,6 @@
   "packages/activerecord/src/relation/update-all.test.ts",
   "packages/activerecord/src/relation/where.test.ts",
   "packages/activerecord/src/relations.test.ts",
-  "packages/activerecord/src/scoping/relation-scoping.test.ts",
   "packages/activerecord/src/serialized-attribute.test.ts",
   "packages/activerecord/src/store.test.ts",
   "packages/activerecord/src/strict-loading-sync-reader.test.ts",

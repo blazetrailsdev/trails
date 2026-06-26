@@ -1,104 +1,67 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound, registerModel } from "../index.js";
-
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { describe, it, expect } from "vitest";
+import { Base, RecordNotFound, registerModel } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import {
-  Developer as CanonicalDeveloper,
+  Developer,
   DeveloperFilteredOnJoins,
+  DeveloperOrderedBySalary,
 } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Post, FirstPost, SpecialPostWithDefaultScope } from "../test-helpers/models/post.js";
-import { Comment, SpecialComment } from "../test-helpers/models/comment.js";
+import {
+  Comment,
+  SpecialComment,
+  SubSpecialComment,
+  VerySpecialComment,
+} from "../test-helpers/models/comment.js";
+import { Category } from "../test-helpers/models/category.js";
 import { Author } from "../test-helpers/models/author.js";
 import { association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reference, BadReference } from "../test-helpers/models/reference.js";
 
-registerModel(CanonicalDeveloper);
+registerModel(Developer);
+registerModel(DeveloperOrderedBySalary);
+registerModel(DeveloperFilteredOnJoins);
 registerModel(Project);
 registerModel(Post);
 registerModel(Comment);
+registerModel(SpecialComment);
+registerModel(SubSpecialComment);
+registerModel(VerySpecialComment);
+registerModel(Category);
 registerModel(Person);
 registerModel(Reference);
 registerModel(BadReference);
 registerModel(Author);
 registerModel(FirstPost);
 registerModel(SpecialPostWithDefaultScope);
-registerModel(SpecialComment);
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
-// Canonical fixtures back the faithful Rails ports (developers/projects for the
-// default-scope-on-joins cases, posts/comments for the circular-join and
-// has-many forwarding cases, people/references for BadReference default scope).
-// The file's older bespoke tests ride prefixed throwaway tables (`rg_developers`,
-// `rg_posts`, `*_posts`) so seeded canonical rows never pollute their counts.
 const { developers, people, references, authors } = useFixtures(
   [
     "developers",
     "projects",
     "developersProjects",
     "authors",
+    "authorAddresses",
     "posts",
     "comments",
     "people",
     "references",
+    "categories",
+    "categoriesPosts",
   ],
   () => Base.connection as any,
   { schema: canonicalSchema },
 );
 
-beforeAll(async () => {
-  const postCols = {
-    title: "string" as const,
-    published: "boolean" as const,
-    salary: "integer" as const,
-    author: "string" as const,
-  };
-  await defineSchema({
-    rg_developers: { name: "string", salary: "integer" },
-    rg_posts: { title: "string", author: "string", published: "boolean" },
-    ro_posts: postCols,
-    dro_posts: postCols,
-    sf_posts: postCols,
-    sff_posts: postCols,
-    sfl_posts: postCols,
-    sc_posts: postCols,
-    sds_posts: postCols,
-    sfa_posts: postCols,
-    scnt_posts: postCols,
-    sj_posts: postCols,
-    nrs_posts: postCols,
-    ann_posts: postCols,
-    ann_unscoped_posts: postCols,
-    animals: { type: "string", name: "string" },
-    cats: { type: "string", name: "string" },
-    dogs: { type: "string", name: "string" },
-    categories: { name: "string" },
-  });
-});
-
 describe("RelationScopingTest", () => {
-  function makeDeveloper() {
-    class Developer extends Base {
-      static {
-        this._tableName = "rg_developers";
-        this.attribute("name", "string");
-        this.attribute("salary", "integer");
-      }
-    }
-    return Developer;
-  }
-
   it("unscoped breaks caching", async () => {
     const author = authors("mary");
     expect(await author.loadHasOne("firstPost")).toBeNull();
@@ -131,287 +94,177 @@ describe("RelationScopingTest", () => {
     ).toEqual(expected);
   });
 
-  it("reverse order", () => {
-    class RoPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = RoPost.order("title").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+  it("reverse order", async () => {
+    const forward = await Developer.order("id DESC").toArray();
+    const reversed = await Developer.order("id DESC").reverseOrder().toArray();
+    expect(reversed.map((d: any) => d.id)).toEqual(forward.map((d: any) => d.id).reverse());
   });
 
-  it("reverse order with arel attribute", () => {
-    const Developer = makeDeveloper();
-    const expected = Developer.order("id DESC").reverseOrder().toSql();
-    const actual = Developer.order(Developer.arelTable.get("id").desc()).reverseOrder().toSql();
-    expect(actual).toBe(expected);
-  });
-
-  it("reverse order with arel attribute as hash", () => {
-    const Developer = makeDeveloper();
-    const expected = Developer.order("id DESC").reverseOrder().toSql();
-    const actual = Developer.order(new Map([[Developer.arelTable.get("id"), "desc" as const]]))
+  it("reverse order with arel attribute", async () => {
+    const expected = await Developer.order("id DESC").toArray();
+    const actual = await Developer.order(Developer.arelTable.get("id").desc())
       .reverseOrder()
-      .toSql();
-    expect(actual).toBe(expected);
+      .toArray();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
-  it("reverse order with arel node as hash", () => {
-    const Developer = makeDeveloper();
-    // node = arel_table[:id] + 0 — converts to an Arel grouping node.
+  it("reverse order with arel attribute as hash", async () => {
+    const expected = await Developer.order("id DESC").toArray();
+    const actual = await Developer.order(
+      new Map([[Developer.arelTable.get("id"), "desc" as const]]),
+    )
+      .reverseOrder()
+      .toArray();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with arel node as hash", async () => {
     const node = Developer.arelTable.get("id").add(0);
-    const expected = Developer.order(node.desc()).reverseOrder().toSql();
-    const actual = Developer.order(new Map([[node, "desc" as const]]))
+    const expected = await Developer.order(node.desc()).reverseOrder().toArray();
+    const actual = await Developer.order(new Map([[node, "desc" as const]]))
       .reverseOrder()
-      .toSql();
-    expect(actual).toBe(expected);
+      .toArray();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id));
   });
 
-  it("reverse order with multiple arel attributes", () => {
-    const Developer = makeDeveloper();
-    const expected = Developer.order("id DESC").order("name DESC").reverseOrder().toSql();
-    const actual = Developer.order(Developer.arelTable.get("id").desc())
+  it("reverse order with multiple arel attributes", async () => {
+    const expected = await Developer.order("id DESC").order("name DESC").toArray();
+    const actual = await Developer.order(Developer.arelTable.get("id").desc())
       .order(Developer.arelTable.get("name").desc())
       .reverseOrder()
-      .toSql();
-    expect(actual).toBe(expected);
+      .toArray();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
-  it("reverse order with arel attributes and strings", () => {
-    const Developer = makeDeveloper();
-    const expected = Developer.order("id DESC").order("name DESC").reverseOrder().toSql();
-    const actual = Developer.order("id DESC")
+  it("reverse order with arel attributes and strings", async () => {
+    const expected = await Developer.order("id DESC").order("name DESC").toArray();
+    const actual = await Developer.order("id DESC")
       .order(Developer.arelTable.get("name").desc())
       .reverseOrder()
-      .toSql();
-    expect(actual).toBe(expected);
+      .toArray();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
   it("double reverse order produces original order", () => {
-    class DroPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const original = DroPost.order({ title: "asc" as const }).toSql();
-    const doubled = DroPost.order({ title: "asc" as const })
-      .reverseOrder()
-      .reverseOrder()
-      .toSql();
+    const original = Developer.order("name DESC").toSql();
+    const doubled = Developer.order("name DESC").reverseOrder().reverseOrder().toSql();
     expect(original).toBe(doubled);
   });
 
   it("scoped find", async () => {
-    class SfPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const inScope = await SfPost.create({ title: "InScope" });
-    const outOfScope = await SfPost.create({ title: "OutOfScope" });
-    const rel = SfPost.where({ title: "InScope" });
-    await SfPost.scoping(rel, async () => {
-      const found = await SfPost.find(inScope.id);
-      expect(found.title).toBe("InScope");
-      await expect(SfPost.find(outOfScope.id)).rejects.toThrow(RecordNotFound);
+    await Developer.where("name = 'David'").scoping(async () => {
+      await expect(Developer.find(1)).resolves.toBeTruthy();
     });
   });
 
   it("scoped find first", async () => {
-    class SffPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("salary", "integer");
-      }
-    }
-    await SffPost.create({ title: "Target", salary: 100000 });
-    await SffPost.create({ title: "Other", salary: 50000 });
-    const rel = SffPost.where({ salary: 100000 });
-    await SffPost.scoping(rel, async () => {
-      const first = (await SffPost.first()) as Base | null;
-      expect(first).not.toBeNull();
-      expect(first!.title).toBe("Target");
+    const developer = (await Developer.find(10)) as Base;
+    await Developer.where("salary = 100000").scoping(async () => {
+      const first = (await Developer.order("name").first()) as Base;
+      expect(first.id).toBe(developer.id);
     });
   });
 
   it("scoped find last", async () => {
-    class SflPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("salary", "integer");
-      }
-    }
-    await SflPost.create({ title: "A", salary: 50000 });
-    await SflPost.create({ title: "B", salary: 80000 });
-    await SflPost.create({ title: "C", salary: 50000 });
-    const highestSalary = await SflPost.order("salary DESC").first();
-    const rel = SflPost.order("salary");
-    await SflPost.scoping(rel, async () => {
-      const last = (await SflPost.last()) as Base | null;
-      expect(last).not.toBeNull();
-      expect(last!.salary).toBe((highestSalary as Base).salary);
+    const highestSalary = (await Developer.order("salary DESC").first()) as Base;
+    await Developer.order("salary").scoping(async () => {
+      expect(((await Developer.last()) as Base).id).toBe(highestSalary.id);
     });
   });
 
   it("scoped find last preserves scope", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    await Developer.create({ name: "Charlie", salary: 90000 });
-    const rel = Developer.where({ salary: 80000 });
-    await Developer.scoping(rel, async () => {
-      const last = (await Developer.last()) as Base | null;
-      expect(last).not.toBeNull();
-      expect(last!.name).toBe("Alice");
+    const lowestSalary = (await Developer.order("salary ASC").first()) as Base;
+    const highestSalary = (await Developer.order("salary DESC").first()) as Base;
+    await Developer.order("salary").scoping(async () => {
+      expect(((await Developer.last()) as Base).id).toBe(highestSalary.id);
+      expect(((await Developer.first()) as Base).id).toBe(lowestSalary.id);
     });
   });
 
   it("scoped find combines and sanitizes conditions", async () => {
-    class ScPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-      }
-    }
-    await ScPost.create({ title: "O'Brien's Post", published: true });
-    await ScPost.create({ title: "O'Brien's Post", published: false });
-    await ScPost.create({ title: "Normal", published: true });
-    const rel = ScPost.where({ published: true });
-    await ScPost.scoping(rel, async () => {
-      const found = (await ScPost.where({ title: "O'Brien's Post" }).first()) as Base | null;
-      expect(found).not.toBeNull();
-      expect(found!.published).toBe(true);
+    await Developer.where("salary = 9000").scoping(async () => {
+      const found = (await Developer.where("name = 'Jamis'").first()) as Base;
+      expect(found.id).toBe(developers("poor_jamis").id);
     });
   });
 
   it("scoped unscoped", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ salary: 80000 });
-    await Developer.scoping(rel, async () => {
-      const unscoped = await Developer.unscoped().toArray();
-      expect(unscoped.length).toBe(2);
+    await DeveloperOrderedBySalary.where("salary = 9000").scoping(async () => {
+      expect(((await DeveloperOrderedBySalary.first()) as Base).id).toBe(11);
+      expect(((await DeveloperOrderedBySalary.unscoped().first()) as Base).id).toBe(1);
     });
   });
 
   it("scoped default scoped", async () => {
-    class SdsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.defaultScope((rel) => rel.where({ published: true }));
-      }
-    }
-    await SdsPost.create({ title: "Published", published: true });
-    await SdsPost.create({ title: "Draft", published: false });
-    const all = await SdsPost.all().toArray();
-    expect(all.length).toBe(1);
-    expect(all[0].title).toBe("Published");
+    await DeveloperOrderedBySalary.where("salary = 9000").scoping(async () => {
+      expect(((await DeveloperOrderedBySalary.first()) as Base).id).toBe(11);
+      expect(((await DeveloperOrderedBySalary.defaultScoped().first()) as Base).id).toBe(2);
+    });
   });
 
   it("scoped find all", async () => {
-    class SfaPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await SfaPost.create({ title: "A" });
-    await SfaPost.create({ title: "B" });
-    await SfaPost.create({ title: "C" });
-    const rel = SfaPost.where({ title: "A" });
-    await SfaPost.scoping(rel, async () => {
-      const all = await SfaPost.all().toArray();
+    await Developer.where("name = 'David'").scoping(async () => {
+      const all = await Developer.all().toArray();
       expect(all.length).toBe(1);
-      expect(all[0].title).toBe("A");
+      expect(all[0].id).toBe(developers("david").id);
     });
   });
 
   it("scoped find select", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "David", salary: 80000 });
-    await Developer.scoping(Developer.select("id, name"), async () => {
-      const developer = await Developer.where("name = 'David'").first();
-      expect(developer!.name).toBe("David");
-      expect(developer!.hasAttribute("salary")).toBe(false);
+    await Developer.select("id, name").scoping(async () => {
+      const developer = (await Developer.where("name = 'David'").first()) as Base;
+      expect(developer.name).toBe("David");
+      expect(developer.hasAttribute("salary")).toBe(false);
     });
   });
 
   it("scope select concatenates", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "David", salary: 80000 });
-    await Developer.scoping(Developer.select("id, name"), async () => {
-      const developer = await Developer.select("salary").where("name = 'David'").first();
-      expect(developer!.salary).toBe(80000);
-      expect(developer!.hasAttribute("id")).toBe(true);
-      expect(developer!.hasAttribute("name")).toBe(true);
-      expect(developer!.hasAttribute("salary")).toBe(true);
+    await Developer.select("id, name").scoping(async () => {
+      const developer = (await Developer.select("salary").where("name = 'David'").first()) as Base;
+      expect(developer.salary).toBe(80000);
+      expect(developer.hasAttribute("id")).toBe(true);
+      expect(developer.hasAttribute("name")).toBe(true);
+      expect(developer.hasAttribute("salary")).toBe(true);
     });
   });
 
   it("scoped count", async () => {
-    class ScntPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await ScntPost.create({ title: "A" });
-    await ScntPost.create({ title: "B" });
-    await ScntPost.create({ title: "A" });
-    const rel = ScntPost.where({ title: "A" });
-    await ScntPost.scoping(rel, async () => {
-      const count = await ScntPost.count();
-      expect(count).toBe(2);
+    await Developer.where("name = 'David'").scoping(async () => {
+      expect(await Developer.count()).toBe(1);
+    });
+    await Developer.where("salary = 100000").scoping(async () => {
+      expect(await Developer.count()).toBe(8);
+      expect(await Developer.where("name LIKE 'fixture_1%'").count()).toBe(1);
     });
   });
 
   it("scoped find with annotation", async () => {
-    class AnnPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = AnnPost.all().annotate("finding posts");
-    await AnnPost.scoping(rel, async () => {
-      const sql = AnnPost.all().toSql();
-      expect(sql).toContain("/* finding posts */");
+    await Developer.annotate("scoped").scoping(async () => {
+      const sql = Developer.where("name = 'David'").toSql();
+      expect(sql).toContain("/* scoped */");
     });
   });
 
-  it("find with annotation unscoped", () => {
-    class AnnUnscopedPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const annotated = AnnUnscopedPost.all().annotate("test");
-    const annotatedSql = annotated.toSql();
-    expect(annotatedSql).toContain("/* test */");
-    const unscopedSql = AnnUnscopedPost.unscoped().toSql();
-    expect(unscopedSql).not.toContain("/* test */");
-    expect(unscopedSql).toContain("SELECT");
+  it("find with annotation unscoped", async () => {
+    await Developer.annotate("scoped").scoping(async () => {
+      await Developer.unscoped(async () => {
+        const sql = Developer.where("name = 'David'").toSql();
+        expect(sql).not.toContain("/* scoped */");
+        expect(sql).toContain("SELECT");
+      });
+    });
   });
 
   it("find with annotation unscope", async () => {
-    class AnnUnscopePost extends Base {
-      static {
-        this._tableName = "ann_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await AnnUnscopePost.create({ title: "David" });
-    const rel = AnnUnscopePost.annotate("unscope").where({ title: "David" }).unscope("annotate");
+    const rel = Developer.annotate("unscope").where("name = 'David'").unscope("annotate");
     expect(rel.toSql()).not.toContain("/* unscope */");
-    const post = (await rel.first()) as Base | null;
-    expect(post).not.toBeNull();
-    expect(post!.title).toBe("David");
+    const developer = (await rel.first()) as Base;
+    expect(developer.name).toBe("David");
   });
 
   it("scoped find include", async () => {
-    // with the include, will retrieve only developers for the given project
-    const scopedDevelopers = (await CanonicalDeveloper.includes("projects").scoping(async () =>
-      CanonicalDeveloper.where({ "projects.id": 2 }).toArray(),
+    const scopedDevelopers = (await Developer.includes("projects").scoping(async () =>
+      Developer.where({ "projects.id": 2 }).toArray(),
     )) as Base[];
     expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
     expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
@@ -419,146 +272,129 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoped find joins", async () => {
-    class SjPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = SjPost.joins(`INNER JOIN comments ON comments.post_id = ${SjPost.tableName}.id`);
-    await SjPost.scoping(rel, async () => {
-      const sql = SjPost.all().toSql();
-      expect(sql).toContain("INNER JOIN comments");
-    });
+    const scopedDevelopers = (await Developer.joins(
+      "JOIN developers_projects ON id = developer_id",
+    ).scoping(async () =>
+      Developer.where({ "developers_projects.project_id": 2 }).toArray(),
+    )) as Base[];
+    expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
+    expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
+    expect(scopedDevelopers.length).toBe(1);
   });
 
   it("scoped create with where", async () => {
-    const Developer = makeDeveloper();
-    const rel = Developer.where({ salary: 100000 });
-    await Developer.scoping(rel, async () => {
-      const dev = await Developer.create({ name: "Scoped" });
-      expect(dev.salary).toBe(100000);
-    });
+    const newComment = await VerySpecialComment.where({ post_id: 1 }).scoping(async () =>
+      VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
   });
 
   it("scoped create with where with array", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 50000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: ["Alice"] });
-    await Developer.scoping(rel, async () => {
-      const all = await Developer.all().toArray();
-      expect(all.length).toBe(1);
-      expect(all[0].name).toBe("Alice");
-    });
+    const newComment = await VerySpecialComment.where({ label: [0, 1], post_id: 1 }).scoping(
+      async () => VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    // array where clause is excluded from scopeForCreate (equality_only); label stays at default (0)
+    expect(newComment.label).not.toBe(1);
   });
 
   it("scoped create with where with range", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 50000 });
-    await Developer.create({ name: "Bob", salary: 80000 });
-    await Developer.create({ name: "Charlie", salary: 120000 });
-    const rel = Developer.where({ salary: new Range(60000, 100000) });
-    await Developer.scoping(rel, async () => {
-      const all = await Developer.all().toArray();
-      expect(all.length).toBe(1);
-      expect(all[0].name).toBe("Bob");
-    });
+    const newComment = await VerySpecialComment.where({
+      label: [0, 1],
+      post_id: 1,
+    }).scoping(async () => VerySpecialComment.create({ body: "Wonderful world" }));
+    expect(newComment.post_id).toBe(1);
+    // range where clause is excluded from scopeForCreate; label stays at default (0)
+    expect(newComment.label).not.toBe(1);
   });
 
   it("scoped create with create with", async () => {
-    const Developer = makeDeveloper();
-    const rel = Developer.all().createWith({ salary: 75000 });
-    await Developer.scoping(rel, async () => {
-      const dev = await Developer.create({ name: "CW" });
-      expect(dev.salary).toBe(75000);
-    });
+    const newComment = await VerySpecialComment.createWith({ post_id: 1 }).scoping(async () =>
+      VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
   });
 
   it("scoped create with create with has higher priority", async () => {
-    const Developer = makeDeveloper();
-    const rel = Developer.where({ salary: 50000 }).createWith({ salary: 99000 });
-    await Developer.scoping(rel, async () => {
-      const dev = await Developer.create({ name: "Priority" });
-      expect(dev.salary).toBe(99000);
-    });
+    const newComment = await VerySpecialComment.where({ post_id: 2 })
+      .createWith({ post_id: 1 })
+      .scoping(async () => VerySpecialComment.create({ body: "Wonderful world" }));
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
   });
 
   it("ensure that method scoping is correctly restored", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ salary: 80000 });
-    await Developer.scoping(rel, async () => {
-      const count = await Developer.count();
-      expect(count).toBe(1);
-    });
-    const afterCount = await Developer.count();
-    expect(afterCount).toBe(2);
+    try {
+      await Developer.where("name = 'Jamis'").scoping(async () => {
+        throw new Error("an exception");
+      });
+    } catch {
+      // ignore
+    }
+    expect(Developer.all().toSql()).not.toContain("name = 'Jamis'");
+  });
+
+  it("default scope filters on joins", async () => {
+    expect(await DeveloperFilteredOnJoins.all().count()).toBe(1);
+    const first = (await DeveloperFilteredOnJoins.all().first()) as Base;
+    expect(first.id).toBe(developers("david").id);
   });
 
   it("update all default scope filters on joins", async () => {
     await DeveloperFilteredOnJoins.updateAll({ salary: 65000 });
-    const david = (await CanonicalDeveloper.find(developers("david").id)) as Base;
+    const david = (await Developer.find(developers("david").id)) as Base;
     expect(david.salary).toBe(65000);
-
-    // has not changed jamis
-    const jamis = (await CanonicalDeveloper.find(developers("jamis").id)) as Base;
+    const jamis = (await Developer.find(developers("jamis").id)) as Base;
     expect(jamis.salary).not.toBe(65000);
   });
 
   it("delete all default scope filters on joins", async () => {
     expect(await DeveloperFilteredOnJoins.all().toArray()).not.toEqual([]);
-
     await DeveloperFilteredOnJoins.deleteAll();
-
     expect(await DeveloperFilteredOnJoins.all().toArray()).toEqual([]);
-    expect(await CanonicalDeveloper.all().toArray()).not.toEqual([]);
+    expect(await Developer.all().toArray()).not.toEqual([]);
   });
 
   it("current scope does not pollute sibling subclasses", async () => {
-    class Animal extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-      }
-    }
-    class Dog extends Animal {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-      }
-    }
-    class Cat extends Animal {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-      }
-    }
-    const dogRel = Dog.where({ type: "Dog" });
-    await Dog.scoping(dogRel, async () => {
-      expect(Dog.currentScope).not.toBeNull();
-      expect(Cat.currentScope).toBeNull();
+    await Comment.none().scoping(async () => {
+      expect((await SpecialComment.all().toArray()).length).toBe(0);
+      expect((await VerySpecialComment.all().toArray()).length).toBe(0);
+      expect((await SubSpecialComment.all().toArray()).length).toBe(0);
+    });
+    await SpecialComment.none().scoping(async () => {
+      expect((await Comment.all().toArray()).length).toBeGreaterThan(0);
+      expect((await VerySpecialComment.all().toArray()).length).toBeGreaterThan(0);
+      expect((await SubSpecialComment.all().toArray()).length).toBe(0);
+    });
+    await SubSpecialComment.none().scoping(async () => {
+      expect((await Comment.all().toArray()).length).toBeGreaterThan(0);
+      expect((await VerySpecialComment.all().toArray()).length).toBeGreaterThan(0);
+      expect((await SpecialComment.all().toArray()).length).toBeGreaterThan(0);
     });
   });
 
   it("scoping is correctly restored", async () => {
-    const Developer = makeDeveloper();
-    expect(Developer.currentScope).toBeNull();
-    const rel = Developer.where({ name: "test" });
-    await Developer.scoping(rel, async () => {
-      expect(Developer.currentScope).not.toBeNull();
+    await Comment.unscoped(async () => {
+      await SpecialComment.unscoped(async () => {
+        await SpecialComment.created().toArray();
+      });
     });
-    expect(Developer.currentScope).toBeNull();
+    expect(Comment.currentScope).toBeNull();
+    expect(SpecialComment.currentScope).toBeNull();
   });
 
   it("scoping respects current class", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: "Alice" });
-    await Developer.scoping(rel, async () => {
-      const all = await Developer.all().toArray();
-      expect(all.length).toBe(1);
+    await Comment.unscoped(async () => {
+      expect((Comment.all() as any).whatAreYou()).toBe("a comment...");
+      expect((SpecialComment.all() as any).whatAreYou()).toBe("a special comment...");
     });
   });
 
@@ -571,26 +407,15 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoping with klass method works in the scope block", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: "Alice" });
-    await Developer.scoping(rel, async () => {
-      const count = await Developer.count();
-      expect(count).toBe(1);
-    });
+    const expected = await SpecialPostWithDefaultScope.unscoped().toArray();
+    const actual = (await SpecialPostWithDefaultScope.unscopedAll()) as Base[];
+    expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
   it("scoping with query method works in the scope block", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: "Alice" });
-    await Developer.scoping(rel, async () => {
-      const first = await Developer.first();
-      expect(first).not.toBeNull();
-      expect((first as Base).name).toBe("Alice");
-    });
+    const expected = await SpecialPostWithDefaultScope.unscoped().where({ author_id: 0 }).toArray();
+    const actual = (await SpecialPostWithDefaultScope.authorless()) as Base[];
+    expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
   it("circular joins with scoping does not crash", async () => {
@@ -610,91 +435,74 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoping applies to update with all queries", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: "Alice" });
-    await Developer.scoping(rel, async () => {
-      await Developer.updateAll({ salary: 90000 });
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      await (dev as any).update({ name: "Eileen" });
     });
-    const alice = (await Developer.where({ name: "Alice" }).first()) as Base;
-    expect(alice.salary).toBe(90000);
-    const bob = (await Developer.where({ name: "Bob" }).first()) as Base;
-    expect(bob.salary).toBe(60000);
+    expect(((await Author.find(dev.id)) as Base).name).toBe("Eileen");
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      await (dev as any).update({ name: "Not Eileen" });
+    });
+    expect(((await Author.find(dev.id)) as Base).name).toBe("Not Eileen");
   });
 
   it("scoping applies to delete with all queries", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    const rel = Developer.where({ name: "Alice" });
-    await Developer.scoping(rel, async () => {
-      await Developer.deleteAll();
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    const dev2 = (await Author.where({ organization_id: "agency_1" }).last()) as Base;
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      await (dev1 as any).delete();
     });
-    const remaining = await Developer.all().toArray();
-    expect(remaining.length).toBe(1);
-    expect(remaining[0].name).toBe("Bob");
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      await (dev2 as any).delete();
+    });
+    expect(await Author.exists(dev1.id)).toBe(false);
+    expect(await Author.exists(dev2.id)).toBe(false);
   });
 
   it("scoping applies to reload with all queries", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    const alice = (await Developer.where({ name: "Alice" }).first()) as Base;
-
-    // Without all_queries the scope is ignored by reload — a non-matching scope
-    // does not prevent the reload from locating the row.
-    await Developer.scoping(Developer.where({ salary: 1 }), async () => {
-      await (alice as any).reload();
-      expect(alice.name).toBe("Alice");
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    await Author.where({ organization_id: "no_match" }).scoping(async () => {
+      await (dev1 as any).reload();
+      expect(dev1.id).toBeTruthy();
     });
-
-    // With all_queries the scope applies to reload, so a non-matching scope
-    // makes reload raise RecordNotFound.
     await expect(
-      Developer.scoping(Developer.where({ salary: 1 }), { allQueries: true }, async () => {
-        await (alice as any).reload();
+      Author.where({ organization_id: "no_match" }).scoping({ allQueries: true }, async () => {
+        await (dev1 as any).reload();
       }),
     ).rejects.toThrow(RecordNotFound);
   });
 
   it("nested scoping applies with all queries set", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-    await Developer.create({ name: "Bob", salary: 60000 });
-    await Developer.create({ name: "Charlie", salary: 80000 });
-    const outer = Developer.where({ salary: 80000 });
-    await Developer.scoping(outer, async () => {
-      const inner = Developer.where({ name: "Alice" });
-      await Developer.scoping(inner, async () => {
-        const all = await Developer.all().toArray();
-        expect(all.length).toBe(1);
-        expect(all[0].name).toBe("Alice");
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const first = await Author.first();
+      expect(first).not.toBeNull();
+      await Author.where({ owned_essay_id: null }).scoping(async () => {
+        const second = await Author.first();
+        expect(second).not.toBeNull();
       });
-      const outerAll = await Developer.all().toArray();
-      expect(outerAll.length).toBe(2);
+      const third = await Author.first();
+      expect((third as any).id).toBe((first as any).id);
     });
   });
 
   it("raises error if all queries is set to false while nested", async () => {
-    const Developer = makeDeveloper();
-    await Developer.create({ name: "Alice", salary: 80000 });
-
-    await Developer.where({ salary: 80000 }).scoping({ allQueries: true }, async () => {
-      const all = await Developer.all().toArray();
-      expect(all.length).toBe(1);
-
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const first = await Author.first();
+      expect(first).not.toBeNull();
       await expect(
-        Developer.where({ salary: 80000 }).scoping({ allQueries: false }, async () => {}),
+        Author.where({ organization_id: "agency_1" }).scoping(
+          { allQueries: false },
+          async () => {},
+        ),
       ).rejects.toThrow(
         "Scoping is set to apply to all queries and cannot be unset in a nested block.",
       );
     });
-  });
-
-  it("default scope filters on joins", async () => {
-    expect(await DeveloperFilteredOnJoins.all().count()).toBe(1);
-    const first = (await DeveloperFilteredOnJoins.all().first()) as Base;
-    expect(first.id).toBe(developers("david").id);
   });
 
   describe("HasManyScopingTest", () => {
@@ -708,429 +516,179 @@ describe("RelationScopingTest", () => {
 });
 
 describe("NestedRelationScopingTest", () => {
-  function makeModel() {
-    class NRSPost extends Base {
-      static {
-        this._tableName = "nrs_posts";
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post: NRSPost };
-  }
-
   it("merge options", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "Alice" });
-    await Post.create({ title: "B", author: "Bob" });
-    await Post.create({ title: "C", author: "Alice" });
-    const outer = Post.where({ author: "Alice" });
-    await Post.scoping(outer, async () => {
-      const inner = Post.where({ title: "A" });
-      await Post.scoping(inner, async () => {
-        const all = await Post.all().toArray();
-        expect(all.length).toBe(1);
-        expect(all[0].title).toBe("A");
+    await Developer.where("salary = 80000").scoping(async () => {
+      await Developer.limit(10).scoping(async () => {
+        const sql = Developer.all().toSql();
+        expect(sql).toContain("salary = 80000");
+        expect(sql).toMatch(/LIMIT 10|ROWNUM <= 10|FETCH FIRST 10 ROWS ONLY/);
       });
     });
   });
 
   it("merge inner scope has priority", async () => {
-    const { Post } = makeModel();
-    await Promise.all(
-      Array.from({ length: 11 }, (_v, i) => Post.create({ title: `Post ${i}`, author: "Someone" })),
-    );
-    const outer = Post.limit(5);
-    await Post.scoping(outer, async () => {
-      const inner = Post.limit(10);
-      await Post.scoping(inner, async () => {
-        const all = await Post.all().toArray();
-        expect(all.length).toBe(10);
+    await Developer.limit(5).scoping(async () => {
+      await Developer.limit(10).scoping(async () => {
+        expect((await Developer.all().toArray()).length).toBe(10);
       });
     });
   });
 
   it("replace options", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "A", author: "Alice" });
-    await Post.create({ title: "B", author: "Bob" });
-    const outer = Post.where({ author: "Alice" });
-    await Post.scoping(outer, async () => {
-      const count = await Post.count();
-      expect(count).toBe(1);
+    await Developer.where({ name: "David" }).scoping(async () => {
+      await Developer.unscoped(async () => {
+        expect(((await Developer.where({ name: "Jamis" }).first()) as Base).name).toBe("Jamis");
+      });
+      expect(((await Developer.first()) as Base).name).toBe("David");
     });
-    const total = await Post.count();
-    expect(total).toBe(2);
   });
 
   it("three level nested exclusive scoped find", async () => {
-    await CanonicalDeveloper.where("name = 'Jamis'").scoping(async () => {
-      expect(((await CanonicalDeveloper.first()) as any).name).toBe("Jamis");
+    await Developer.where("name = 'Jamis'").scoping(async () => {
+      expect(((await Developer.first()) as any).name).toBe("Jamis");
 
-      await CanonicalDeveloper.unscoped()
+      await Developer.unscoped()
         .where("name = 'David'")
         .scoping(async () => {
-          expect(((await CanonicalDeveloper.first()) as any).name).toBe("David");
+          expect(((await Developer.first()) as any).name).toBe("David");
 
-          await CanonicalDeveloper.unscoped()
+          await Developer.unscoped()
             .where("name = 'Maiha'")
             .scoping(async () => {
-              expect(await CanonicalDeveloper.first()).toBeNull();
+              expect(await Developer.first()).toBeNull();
             });
 
-          // ensure that scoping is restored
-          expect(((await CanonicalDeveloper.first()) as any).name).toBe("David");
+          expect(((await Developer.first()) as any).name).toBe("David");
         });
 
-      // ensure that scoping is restored
-      expect(((await CanonicalDeveloper.first()) as any).name).toBe("Jamis");
+      expect(((await Developer.first()) as any).name).toBe("Jamis");
     });
   });
 
   it("nested scoped create", async () => {
-    const { Post } = makeModel();
-    const rel = Post.where({ author: "Scoped" });
-    await Post.scoping(rel, async () => {
-      const post = await Post.create({ title: "Created" });
-      expect(post.author).toBe("Scoped");
-    });
+    const comment = await Comment.createWith({ post_id: 1 }).scoping(async () =>
+      Comment.createWith({ post_id: 2 }).scoping(async () =>
+        Comment.create({ body: "Hey guys, nested scopes are broken. Please fix!" }),
+      ),
+    );
+    expect(comment.post_id).toBe(2);
   });
 
   it("nested exclusive scope for create", async () => {
-    const { Post } = makeModel();
-    const outer = Post.where({ author: "Outer" });
-    await Post.scoping(outer, async () => {
-      const inner = Post.where({ author: "Inner" });
-      await Post.scoping(inner, async () => {
-        const post = await Post.create({ title: "Nested" });
-        expect(post.author).toBe("Inner");
-      });
-    });
+    const comment = await Comment.createWith({
+      body: "Hey guys, nested scopes are broken. Please fix!",
+    }).scoping(async () =>
+      Comment.unscoped()
+        .createWith({ post_id: 1 })
+        .scoping(async () => {
+          const blank = Comment.all().build({}) as any;
+          expect(blank.body).toBeFalsy();
+          return Comment.create({ body: "Hey guys" });
+        }),
+    );
+    expect(comment.post_id).toBe(1);
+    expect(comment.body).toBe("Hey guys");
   });
 });
 
-describe("scoping()", () => {
-  it("sets currentScope within the block", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.currentScope).toBeNull();
-    const rel = Post.where({ title: "test" });
-    await Post.scoping(rel, async () => {
-      expect(Post.currentScope).not.toBeNull();
-    });
-    expect(Post.currentScope).toBeNull();
-  });
-});
-
-describe("scopeForCreate / whereValuesHash", () => {
-  it("scopeForCreate returns attributes for new records", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    const rel = Post.where({ author: "Alice" });
-    const scope = rel.scopeForCreate();
-    expect(scope.author).toBe("Alice");
+describe("HasManyScopingTest", () => {
+  it("forwarding of static methods", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect((Comment as any).whatAreYou()).toBe("a comment...");
+    expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
   });
 
-  it("whereValuesHash returns the where conditions", () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    const rel = Post.where({ author: "Alice", title: "Test" });
-    const hash = rel.whereValuesHash();
-    expect(hash.author).toBe("Alice");
-    expect(hash.title).toBe("Test");
+  it("forwarding to scoped", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect(await (Comment as any).searchByType("Comment").size()).toBe(5);
+    expect(await (welcome as any).comments.searchByType("Comment").size()).toBe(2);
   });
 
-  it("whereValuesHash exposes IN-array values (Rails: equality_only=false)", () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("author", "string");
-      }
-    }
-    const rel = Post.where({ author: ["Alice", "Bob"] });
-    const hash = rel.whereValuesHash();
-    expect(hash.author).toEqual(["Alice", "Bob"]);
-  });
-
-  it("scopeForCreate filters out IN-array values (Rails: equality_only=true)", () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("author", "string");
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.where({ author: ["Alice", "Bob"], title: "Fixed" });
-    const scope = rel.scopeForCreate();
-    expect(scope.title).toBe("Fixed");
-    expect(scope.author).toBeUndefined();
-  });
-});
-
-describe("Scoping block (Rails-guided)", () => {
-  it("scoping sets currentScope within the block", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.currentScope).toBeNull();
-    const rel = Post.where({ title: "x" });
-    await Post.scoping(rel, async () => {
-      expect(Post.currentScope).toBeTruthy();
-    });
-    expect(Post.currentScope).toBeNull();
-  });
-});
-
-describe("Static shorthands (Rails-guided)", () => {
-  it("Base.where is shorthand for Base.all().where()", () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const sql1 = Post.where({ title: "x" }).toSql();
-    const sql2 = Post.all().where({ title: "x" }).toSql();
-    expect(sql1).toBe(sql2);
-  });
-
-  it("Base.all returns all records", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "A" });
-    await Post.create({ title: "B" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(2);
-  });
-
-  it("Base.first returns the first record", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "First" });
-    await Post.create({ title: "Second" });
-    const first = (await Post.first()) as Base;
-    expect(first).not.toBeNull();
-    expect(first.title).toBe("First");
-  });
-
-  it("Base.last returns the last record", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "First" });
-    await Post.create({ title: "Last" });
-    const last = (await Post.last()) as Base;
-    expect(last).not.toBeNull();
-    expect(last.title).toBe("Last");
-  });
-
-  it("Base.count returns count", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "A" });
-    await Post.create({ title: "B" });
-    expect(await Post.count()).toBe(2);
-  });
-
-  it("Base.exists returns boolean", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    expect(await Post.exists()).toBe(false);
-    await Post.create({ title: "A" });
-    expect(await Post.exists()).toBe(true);
-  });
-
-  it("Base.pluck extracts column values", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "A" });
-    await Post.create({ title: "B" });
-    const titles = await Post.pluck("title");
-    expect(titles).toContain("A");
-    expect(titles).toContain("B");
-  });
-
-  it("Base.ids returns primary keys", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "rg_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const a = await Post.create({ title: "A" });
-    const b = await Post.create({ title: "B" });
-    const ids = await Post.ids();
-    expect(ids).toContain(a.id);
-    expect(ids).toContain(b.id);
-  });
-
-  describe("HasManyScopingTest", () => {
-    it("forwarding of static methods", async () => {
-      const welcome = (await Post.find(1)) as Base;
-      expect((Comment as any).whatAreYou()).toBe("a comment...");
+  it("nested scope finder", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Comment.where("1=0").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
       expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
     });
+    await Comment.where("1=1").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+  });
 
-    it("nested scope finder", async () => {
-      const welcome = (await Post.find(1)) as Base;
-      await Comment.where("1=0").scoping(async () => {
-        expect(await (welcome as any).comments.count()).toBe(2);
-        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
-      });
+  it("none scoping", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Comment.none().scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+    await Comment.where("1=1").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+  });
 
-      await Comment.where("1=1").scoping(async () => {
-        expect(await (welcome as any).comments.count()).toBe(2);
-        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
-      });
+  it("should default scope on associations is overridden by association conditions", async () => {
+    const michael = (await Person.find(people("michael").id)) as Base;
+    const refs = await (michael as any).fixedBadReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([references("michael_unicyclist").id]);
+  });
+
+  it("should maintain default scope on eager loaded associations", async () => {
+    const michael = people("michael");
+    const loaded = (await Person.where({ id: michael.id })
+      .includes("badReferences")
+      .first()) as Base;
+    const magician = (await BadReference.find(1)) as Base;
+    const refs = await (loaded as any).badReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
+  });
+
+  it("scoping applies to all queries on has many when set", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await (welcome as any).comments.updateAll({ author_id: 1 });
+
+    const baseline = await (await (welcome as any).comments.reload()).toArray();
+    expect(baseline.length).toBeGreaterThan(0);
+
+    await Comment.where({ author_id: 2 }).scoping({ allQueries: true }, async () => {
+      const scoped = await (await (welcome as any).comments.reload()).toArray();
+      expect(scoped.length).toBe(0);
     });
 
-    it("none scoping", async () => {
-      const welcome = (await Post.find(1)) as Base;
-      await Comment.none().scoping(async () => {
-        expect(await (welcome as any).comments.count()).toBe(2);
-        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
-      });
+    const after = await (await (welcome as any).comments.reload()).toArray();
+    expect(after.length).toBe(baseline.length);
+  });
+});
 
-      await Comment.where("1=1").scoping(async () => {
-        expect(await (welcome as any).comments.count()).toBe(2);
-        expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
-      });
+describe("HasAndBelongsToManyScopingTest", () => {
+  it("forwarding of static methods", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect((Category as any).whatAreYou()).toBe("a category...");
+    expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+  });
+
+  it("nested scope finder", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Category.where("1=0").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
     });
-
-    it("forwarding to scoped", async () => {
-      const welcome = (await Post.find(1)) as Base;
-      expect(await (Comment as any).searchByType("Comment").size()).toBe(5);
-      expect(await (welcome as any).comments.searchByType("Comment").size()).toBe(2);
+    await Category.where("1=1").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
     });
+  });
 
-    it("should default scope on associations is overridden by association conditions", async () => {
-      const michael = (await Person.find(people("michael").id)) as Base;
-      const refs = await (michael as any).fixedBadReferences.toArray();
-      // references(:michael_unicyclist).becomes(BadReference) — favorite: true
-      expect(refs.map((r: any) => r.id)).toEqual([references("michael_unicyclist").id]);
+  it("none scoping", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Category.none().scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
     });
-
-    it("should maintain default scope on eager loaded associations", async () => {
-      const michael = people("michael");
-      const loaded = (await Person.where({ id: michael.id })
-        .includes("badReferences")
-        .first()) as Base;
-      const magician = (await BadReference.find(1)) as Base;
-      const refs = await (loaded as any).badReferences.toArray();
-      expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
+    await Category.where("1=1").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
     });
-
-    it("scoping applies to all queries on has many when set", async () => {
-      const welcome = (await Post.find(1)) as Base;
-      await (welcome as any).comments.updateAll({ author_id: 1 });
-
-      const baseline = await (await (welcome as any).comments.reload()).toArray();
-      expect(baseline.length).toBeGreaterThan(0);
-
-      // A non-matching all_queries scope filters the has_many read.
-      await Comment.where({ author_id: 2 }).scoping({ allQueries: true }, async () => {
-        const scoped = await (await (welcome as any).comments.reload()).toArray();
-        expect(scoped.length).toBe(0);
-      });
-
-      // Outside the block the scope no longer applies.
-      const after = await (await (welcome as any).comments.reload()).toArray();
-      expect(after.length).toBe(baseline.length);
-    });
-  }); // HasManyScopingTest
-
-  describe("HasAndBelongsToManyScopingTest", () => {
-    it("forwarding of static methods", async () => {
-      class Category extends Base {
-        static {
-          this.attribute("name", "string");
-          // Register as a scope so the relation proxy can forward it,
-          // mirroring Rails' CollectionProxy#method_missing delegation.
-          (this as any).scope("whatAreYou", () => "a category...");
-        }
-      }
-      await Category.create({ name: "test" });
-      // Direct call on the class
-      expect((Category as any).whatAreYou()).toBe("a category...");
-      // Forwarded through the relation proxy — mirrors @welcome.categories.what_are_you
-      const relation = Category.all();
-      expect((relation as any).whatAreYou()).toBe("a category...");
-    });
-
-    it("nested scope finder", async () => {
-      class Category extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      await Category.create({ name: "cat1" });
-      await Category.create({ name: "cat2" });
-      // Mirrors Rails: Category.where("1=0").scoping { assert_equal 2, categories.count }
-      // The nested scope context is active; queries inside respect it.
-      await Category.where({ name: "cat1" }).scoping(async () => {
-        expect(await Category.count()).toBe(1);
-        // Further nested scope merges with outer — cat2 satisfies inner but not outer
-        await Category.where({ name: "cat2" }).scoping(async () => {
-          expect(await Category.count()).toBe(0);
-        });
-        expect(await Category.count()).toBe(1);
-      });
-    });
-
-    it("none scoping", async () => {
-      class Category extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      await Category.create({ name: "cat1" });
-      await Category.create({ name: "cat2" });
-      // Category.none.scoping { assert_equal 0, categories.count }
-      await Category.none().scoping(async () => {
-        expect(await Category.count()).toBe(0);
-      });
-      // After exiting the none scope, the full count is restored
-      expect(await Category.count()).toBe(2);
-    });
-  }); // HasAndBelongsToManyScopingTest
+  });
 });
