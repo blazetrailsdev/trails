@@ -26,7 +26,12 @@ import {
   PostWithDefaultInclude,
 } from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
-import { Comment, VerySpecialComment, SpecialComment } from "../test-helpers/models/comment.js";
+import {
+  Comment,
+  VerySpecialComment,
+  SpecialComment,
+  SubSpecialComment,
+} from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Reader, LazyReader } from "../test-helpers/models/reader.js";
@@ -131,8 +136,6 @@ const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
   eager_hm_no_pk_parents: { name: "string" },
-  eager_hmi_authors: { name: "string" },
-  eager_hmi_posts: { title: "string", type: "string", eager_hmi_author_id: "integer" },
   eager_hmt_authors: { name: "string" },
   eager_hmt_authorships: { eager_hmt_author_id: "integer", eager_hmt_book_id: "integer" },
   eager_hmt_books: { title: "string" },
@@ -154,13 +157,9 @@ const TEST_SCHEMA: Schema = {
   eager_ho_parents: { name: "string" },
   eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
   eager_ho_ref_parents: { name: "string" },
-  eager_hoi_parents: { name: "string" },
-  eager_hoi_profiles: { bio: "string", type: "string", eager_hoi_parent_id: "integer" },
   eager_imp_items: { label: "string" },
   eager_imp_joins: { eager_imp_owner_id: "integer", eager_imp_item_id: "integer" },
   eager_imp_owners: { name: "string" },
-  eager_inh_clients: { name: "string", eager_inh_company_id: "integer" },
-  eager_inh_companies: { name: "string", type: "string" },
   eager_inv_children: { value: "string", eager_inv_parent_id: "integer" },
   eager_inv_parents: { name: "string" },
   eager_leo_comments: { body: "string", eager_leo_post_id: "integer" },
@@ -1522,106 +1521,6 @@ describe("EagerAssociationTest", () => {
       className: "EagerImpItem",
     });
     expect(items).toHaveLength(1);
-  });
-  it("eager with inheritance", async () => {
-    class EagerInhCompany extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.hasMany("eagerInhClients", {
-          className: "EagerInhClient",
-          foreignKey: "eager_inh_company_id",
-        });
-      }
-    }
-    class EagerInhFirm extends EagerInhCompany {}
-    class EagerInhClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("eager_inh_company_id", "integer");
-      }
-    }
-    registerModel("EagerInhCompany", EagerInhCompany);
-    registerModel("EagerInhFirm", EagerInhFirm);
-    registerModel("EagerInhClient", EagerInhClient);
-    enableSti(EagerInhCompany);
-    registerSubclass(EagerInhFirm);
-    const firm = await EagerInhFirm.create({ name: "Firm1" });
-    await EagerInhClient.create({ name: "Client1", eager_inh_company_id: firm.id });
-    const companies = await EagerInhCompany.all().includes("eagerInhClients").toArray();
-    expect(companies.length).toBeGreaterThanOrEqual(1);
-    const loaded = (companies[0] as any).association("eagerInhClients").target;
-    expect(loaded).toBeDefined();
-  });
-  it("eager has one with association inheritance", async () => {
-    class EagerHoiParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("eagerHoiProfile", {
-          className: "EagerHoiProfile",
-          foreignKey: "eager_hoi_parent_id",
-        });
-      }
-    }
-    class EagerHoiProfile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("type", "string");
-        this.attribute("eager_hoi_parent_id", "integer");
-      }
-    }
-    class EagerHoiSpecialProfile extends EagerHoiProfile {}
-    registerModel("EagerHoiParent", EagerHoiParent);
-    registerModel("EagerHoiProfile", EagerHoiProfile);
-    registerModel("EagerHoiSpecialProfile", EagerHoiSpecialProfile);
-    enableSti(EagerHoiProfile);
-    registerSubclass(EagerHoiSpecialProfile);
-    const parent = await EagerHoiParent.create({ name: "P" });
-    await EagerHoiSpecialProfile.create({
-      bio: "Special",
-      eager_hoi_parent_id: parent.id,
-      type: "EagerHoiSpecialProfile",
-    });
-    const parents = await EagerHoiParent.all().includes("eagerHoiProfile").toArray();
-    expect(parents).toHaveLength(1);
-    const profile = (parents[0] as any).association("eagerHoiProfile").target;
-    expect(profile).not.toBeNull();
-    expect(profile.bio).toBe("Special");
-  });
-  it("eager has many with association inheritance", async () => {
-    class EagerHmiAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmiPosts", {
-          className: "EagerHmiPost",
-          foreignKey: "eager_hmi_author_id",
-        });
-      }
-    }
-    class EagerHmiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("eager_hmi_author_id", "integer");
-      }
-    }
-    class EagerHmiSpecialPost extends EagerHmiPost {}
-    registerModel("EagerHmiAuthor", EagerHmiAuthor);
-    registerModel("EagerHmiPost", EagerHmiPost);
-    registerModel("EagerHmiSpecialPost", EagerHmiSpecialPost);
-    enableSti(EagerHmiPost);
-    registerSubclass(EagerHmiSpecialPost);
-    const author = await EagerHmiAuthor.create({ name: "A" });
-    await EagerHmiPost.create({ title: "Normal", eager_hmi_author_id: author.id });
-    await EagerHmiSpecialPost.create({
-      title: "Special",
-      eager_hmi_author_id: author.id,
-      type: "EagerHmiSpecialPost",
-    });
-    const authors = await EagerHmiAuthor.all().includes("eagerHmiPosts").toArray();
-    expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any).association("eagerHmiPosts").target;
-    expect(posts).toHaveLength(2);
   });
   it("eager with invalid association reference", async () => {
     class EagerWidget extends Base {
@@ -5186,6 +5085,60 @@ describe("EagerAssociationTest", () => {
       .order("authors.id")
       .first()) as Author;
     expect(author.association("specialNonexistentPostComments").target).toEqual([]);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical STI Post/Comment fixtures) — ports the
+// inheritance / association-inheritance cases over the real STI
+// Post/SpecialPost and Comment/SpecialComment/VerySpecialComment models +
+// their fixtures. Same describe name as the other EagerAssociationTest blocks
+// so test:compare matches the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { posts } = useHandlerFixtures(["authors", "posts", "comments"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Author);
+  enableSti(Post);
+  registerModel(Post);
+  registerModel(SpecialPost);
+  registerSubclass(SpecialPost);
+  enableSti(Comment);
+  registerModel(Comment);
+  registerModel(SpecialComment);
+  registerSubclass(SpecialComment);
+  registerModel(SubSpecialComment);
+  registerSubclass(SubSpecialComment);
+  registerModel(VerySpecialComment);
+  registerSubclass(VerySpecialComment);
+
+  it("eager with inheritance", async () => {
+    const loaded = await SpecialPost.all().includes("comments").toArray();
+    expect(loaded).toHaveLength(1);
+  });
+
+  it("eager has one with association inheritance", async () => {
+    const post = await Post.all().includes("verySpecialComment").find(posts("sti_comments").id);
+    expect((post.association("verySpecialComment").target as Base).constructor.name).toBe(
+      "VerySpecialComment",
+    );
+  });
+
+  it("eager has many with association inheritance", async () => {
+    const post = await Post.all().includes("specialComments").find(posts("sti_comments").id);
+    for (const specialComment of post.association("specialComments").target as Base[]) {
+      expect(specialComment).toBeInstanceOf(SpecialComment);
+    }
   });
 });
 
