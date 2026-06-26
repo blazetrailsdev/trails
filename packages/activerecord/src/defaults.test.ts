@@ -32,12 +32,16 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// Rails builds these adapter-specific tables dynamically in `setup`
-// (`@connection.create_table ...`) — they are not in `schema.rb` and have no
-// canonical home — so we mirror that by building them per-test through the
-// migration DSL on a pool-leased adapter and dropping them in `afterEach`.
-// (Building in `beforeEach`, not `beforeAll`, because the shared per-worker DB
-// is reset by the global `beforeEach` in test-setup-ar.ts.)
+// Most suites below build their adapter-specific tables dynamically in
+// `beforeEach` (mirroring Rails' `setup` `@connection.create_table ...`): these
+// tables are not in `schema.rb` and have no canonical home, so they are created
+// per-test through the migration DSL on a pool-leased adapter and dropped in
+// `afterEach`. Building in `beforeEach` (not `beforeAll`) because the shared
+// per-worker DB is reset by the global `beforeEach` in test-setup-ar.ts.
+
+// Rails asserts string equality on binary-column defaults; a binary column
+// deserializes to bytes in trails (BinaryType → Uint8Array), so decode the
+// faithful analog of Ruby's binary string before comparing.
 function decodeBinaryDefault(value: unknown): string {
   if (typeof value === "string") return value;
   return new TextDecoder().decode(value as Uint8Array);
@@ -199,6 +203,16 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
     expect(decodeBinaryDefault((new DefaultBinary() as any).varbinary_col)).toBe(
       "varbinary_default",
     );
+  });
+
+  // Rails nests `test_default_binary_string` under a further
+  // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?` guard
+  // *inside* the sqlite/pg gate — a combination that can never hold — and
+  // `binary_col` is declared in no schema, so the test is dead on every adapter.
+  // Ported verbatim under the same MySQL guard for name parity; it never runs.
+  it.skipIf(adapterType !== "mysql")("default binary string", () => {
+    // Rails: assert_equal "binary_default", DefaultBinary.new.binary_col
+    expect(decodeBinaryDefault((new DefaultBinary() as any).binary_col)).toBe("binary_default");
   });
 
   it("default varbinary string that looks like hex", () => {
