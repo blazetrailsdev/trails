@@ -14,11 +14,7 @@ class Coder {
 
   load(s: string | null | undefined): Record<string, unknown> {
     if (!s) return { ...this.#default };
-    try {
-      return JSON.parse(s);
-    } catch {
-      return {};
-    }
+    return JSON.parse(s);
   }
 }
 

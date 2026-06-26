@@ -9,6 +9,6 @@ export const adminUsersFixtureData = {
   jamis: {
     name: "Jamis",
     account_id: ref("admin_accounts", "signals37"),
-    settings: { ":symbol": "symbol", string: "string" },
+    settings: { symbol: "symbol", string: "string" },
   },
 };

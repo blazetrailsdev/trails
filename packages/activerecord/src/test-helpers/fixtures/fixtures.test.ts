@@ -511,7 +511,7 @@ describe("admin/users (slash-keyed subdir fixture)", () => {
     const acctRef = adminUsersFixtureData.jamis.account_id;
     expect(isFixtureRef(acctRef)).toBe(true);
     expect(acctRef.fixtureName).toBe("signals37");
-    expect((adminUsersFixtureData.jamis.settings as Record<string, string>)[":symbol"]).toBe(
+    expect((adminUsersFixtureData.jamis.settings as Record<string, string>)["symbol"]).toBe(
       "symbol",
     );
   });
