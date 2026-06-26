@@ -3120,7 +3120,7 @@ export class Base extends Model {
    */
   private async _runAsyncValidations(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
-    const asyncValidators: Array<{ attribute: string; options: any }> =
+    const asyncValidators: Array<{ attribute: string; options: any; declaringClass?: any }> =
       (ctor as any)._asyncValidations ?? [];
 
     // The sync validation pass (performValidations) restores _validationContext
@@ -3129,12 +3129,32 @@ export class Base extends Model {
     // deferred validators honor on:/if:/unless: like Rails' callback chain.
     const context = this._validationContext ?? defaultValidationContext.call(this);
 
-    for (const { attribute, options } of asyncValidators) {
+    for (const { attribute, options, declaringClass } of asyncValidators) {
       if (!asyncValidationContextMatches(context, options.on)) continue;
       if (!shouldValidate(this, options)) continue;
-      const value = this.readAttribute(attribute);
-      if (value === null || value === undefined) continue;
-      const validator = new UniquenessValidator({ ...options, attributes: attribute, class: ctor });
+      // For an association attribute (`validates :event, uniqueness: true`), the
+      // presence check reads the underlying foreign key (Rails reads the
+      // association object; the FK carries the same value and avoids a lazy
+      // load). The error is still reported on the original attribute name.
+      const refl = (ctor as any)._reflectOnAssociation?.(attribute);
+      const valueAttr = refl
+        ? Array.isArray(refl.foreignKey)
+          ? refl.foreignKey[0]
+          : refl.foreignKey
+        : attribute;
+      const value = this.readAttribute(valueAttr);
+      // Rails' UniquenessValidator has no nil early-return — a nil value is
+      // checked as `IS NULL` (and the STI/scope filter usually makes it pass).
+      // Only allowNil/allowBlank short-circuit, matching EachValidator#validate's
+      // `value.nil? && allow_nil` / `value.blank? && allow_blank` guard.
+      if (value === undefined) continue;
+      if (value == null && options.allowNil === true) continue;
+      if (_isBlankValue(value) && options.allowBlank === true) continue;
+      const validator = new UniquenessValidator({
+        ...options,
+        attributes: attribute,
+        class: declaringClass ?? ctor,
+      });
       validator.validateEach(this, attribute, value);
     }
 
@@ -3159,6 +3179,20 @@ export class Base extends Model {
    * Mirrors: validates uniqueness: true
    */
   declare static validatesUniqueness: typeof _Validations.validatesUniqueness;
+
+  /**
+   * Clear all validators — including the deferred uniqueness validators kept off
+   * the synchronous validator chain in `_asyncValidations`. Rails'
+   * `clear_validators!` empties every validator on the class; without resetting
+   * `_asyncValidations` here, uniqueness declarations would leak across the
+   * `repair_validations(Topic, Reply)` boundary that test cases rely on.
+   */
+  static clearValidatorsBang(): void {
+    super.clearValidatorsBang();
+    if (Object.prototype.hasOwnProperty.call(this, "_asyncValidations")) {
+      (this as { _asyncValidations?: unknown[] })._asyncValidations = [];
+    }
+  }
 
   // save / saveBang extracted to persistence.ts; wired via include() below.
 

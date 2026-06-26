@@ -6,6 +6,8 @@
  * with the same value, optionally scoped to other columns.
  */
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
+import { isBlank } from "@blazetrails/activesupport";
+import { UnknownPrimaryKey } from "../errors.js";
 
 /**
  * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
@@ -58,7 +60,11 @@ export function validatesUniqueness(
   if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
     klass._asyncValidations = [...(klass._asyncValidations ?? [])];
   }
-  (klass._asyncValidations as Array<unknown>).push({ attribute, options });
+  // Capture the declaring class so the deferred runner can reproduce Rails'
+  // `find_finder_class_for` (the existence query must target the class the
+  // validation was declared on — e.g. an abstract STI base — not the leaf
+  // subclass of the record being validated).
+  (klass._asyncValidations as Array<unknown>).push({ attribute, options, declaringClass: this });
 }
 
 export class UniquenessValidator extends EachValidator {
@@ -92,7 +98,12 @@ export class UniquenessValidator extends EachValidator {
   }
 
   validateEach(record: any, attribute: string, value: unknown): void {
-    if (value == null) return;
+    // Mirror EachValidator#validate's allow_nil/allow_blank guard (the deferred
+    // runner calls validateEach directly, bypassing EachValidator#validate).
+    if (value === undefined) return;
+    const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
+    if (value == null && o.allowNil === true) return;
+    if (isBlank(value) && o.allowBlank === true) return;
 
     const finderClass = findFinderClassFor(record, this._klass);
     const modelClass = finderClass ?? record.constructor;
@@ -123,7 +134,16 @@ export class UniquenessValidator extends EachValidator {
       let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);
 
       if (record.isPersisted?.()) {
-        const pk = modelClass.primaryKey ?? "id";
+        const pk = modelClass.primaryKey;
+        // Rails raises UnknownPrimaryKey rather than excluding the record by id
+        // when a persisted record's finder class has no primary key — there is
+        // no way to exclude the row itself from the existence check.
+        if (pk == null) {
+          throw new UnknownPrimaryKey(
+            modelClass,
+            "Cannot validate uniqueness for persisted record without primary key.",
+          );
+        }
         if (Array.isArray(pk)) {
           const dbVals = pk.map((col: string) =>
             record._dirty?.attributeChanged(col)
@@ -297,6 +317,37 @@ async function buildRelation(
   // Wrapped in a tuple because Relation is thenable — a bare `await` would
   // execute the query and resolve to the row array.
   const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
+
+  // Resolve an attribute alias (`alias_attribute :new_content, :content`) to its
+  // underlying column before building the comparison — Rails routes the bind
+  // through the predicate builder, which resolves aliases.
+  attribute = (klass._attributeAliases?.[attribute] as string) ?? attribute;
+
+  // Resolve an association attribute (`validates :event`) to its foreign-key
+  // column for the comparison. `value` already arrives as the FK scalar; if a
+  // record is passed (Rails routes the association object through), read its
+  // primary key. Mirrors build_relation's reflection branch.
+  const refl = klass._reflectOnAssociation?.(attribute);
+  if (refl) {
+    const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
+    if (
+      value != null &&
+      typeof value === "object" &&
+      typeof (value as any).readAttribute === "function"
+    ) {
+      const pk = refl.klass?.primaryKey ?? "id";
+      value = (value as any).readAttribute(Array.isArray(pk) ? pk[0] : pk);
+    }
+    attribute = fk;
+  }
+
+  // A nil value must compare as `IS NULL`, not `= NULL` (which never matches).
+  // `where({ col: null })` emits the IS NULL form; Rails routes nil through the
+  // predicate builder for the same effect.
+  if (value == null) {
+    return [base.where({ [attribute]: null })];
+  }
+
   const arel = klass.arelTable as { get?: (n: string) => any } | null;
   const pb = (base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } })
     .predicateBuilder;
@@ -304,6 +355,22 @@ async function buildRelation(
   const hasCsKey = Object.prototype.hasOwnProperty.call(options, "caseSensitive");
   const typeObj =
     typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
+
+  // Serialized columns (`serialize :content`) store the coder-dumped form, so
+  // the comparison must bind the serialized value — Rails produces it via the
+  // attribute type during `bind_attribute` and still flows it through
+  // `default_uniqueness_comparison`. The decorated (coder-wrapping) type lives
+  // on `attributeTypes()` (the base.ts `typeForAttribute` override returns the
+  // undecorated cast type), and on an STI subclass it is inherited via the
+  // replayed pending decorators. We serialize the value here and fall through to
+  // the comparison path below (rather than short-circuiting), so a serialized
+  // column with `case_sensitive:` still picks the right SQL comparison.
+  const decorated = klass.attributeTypes?.()?.[attribute] as
+    | { coder?: unknown; serialize?: (v: unknown) => unknown }
+    | undefined;
+  if (decorated?.coder && typeof decorated.serialize === "function") {
+    value = decorated.serialize(value);
+  }
 
   // When the attribute supports unencrypted data alongside encrypted values, the
   // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
@@ -363,8 +430,10 @@ function scopeRelation(record: any, relation: any, options: Record<string, unkno
   if (scope == null) return relation;
   const scopes = Array.isArray(scope) ? (scope as string[]) : [scope as string];
   let r = relation;
-  for (const item of scopes) {
+  for (const rawItem of scopes) {
     const ctor = record.constructor;
+    // Resolve an alias scope (`scope: :new_parent_id`) to the real column.
+    const item = (ctor._attributeAliases?.[rawItem] as string) ?? rawItem;
     const refl = ctor._reflectOnAssociation?.(item);
     if (refl) {
       // Read FK (and foreignType for polymorphic) directly off the record —

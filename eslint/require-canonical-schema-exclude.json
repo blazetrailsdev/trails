@@ -40,6 +40,5 @@
   "packages/activerecord/src/store.test.ts",
   "packages/activerecord/src/strict-loading-sync-reader.test.ts",
   "packages/activerecord/src/strict-loading.test.ts",
-  "packages/activerecord/src/timestamp.test.ts",
-  "packages/activerecord/src/validations/uniqueness-validation.test.ts"
+  "packages/activerecord/src/timestamp.test.ts"
 ]
