@@ -4596,6 +4596,10 @@ include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
+// TouchLater#touch must override Timestamp#touch (include() won't replace): it
+// merges any deferred touch_later attrs into the immediate touch, mirroring
+// Ruby's ancestry where TouchLater is included after Timestamp.
+(Base.prototype as any).touch = TouchLater.touch;
 include(Base, _Aggregations.InstanceMethods);
 // Aggregations#reload must override Persistence#reload (include() won't replace).
 (Base.prototype as any).reload = _Aggregations.reload;
