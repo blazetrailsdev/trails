@@ -31,7 +31,6 @@ export class Contact extends Base {
 }
 
 export class ContactSti extends Base {
-  declare "type": string;
   declare alternative: ContactSti | null;
   declare loadBelongsTo: (name: "alternative") => Promise<ContactSti | null>;
 
@@ -41,5 +40,12 @@ export class ContactSti extends Base {
     this.attribute("type", "string");
     this.serialize("preferences");
     this.belongsTo("alternative", { className: "ContactSti" });
+  }
+
+  // Rails: `def type; "ContactSti" end` — ContactSti overrides the `type`
+  // reader to a constant so serialization still sees an inheritance-column
+  // value to exclude. Defined after the attribute reader so it wins.
+  get type(): string {
+    return "ContactSti";
   }
 }

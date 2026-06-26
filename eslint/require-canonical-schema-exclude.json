@@ -29,7 +29,6 @@
   "packages/activerecord/src/defaults.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
-  "packages/activerecord/src/json-serialization.test.ts",
   "packages/activerecord/src/modules.test.ts",
   "packages/activerecord/src/persistence.test.ts",
   "packages/activerecord/src/querying-methods-delegation.test.ts",
