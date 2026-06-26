@@ -2987,8 +2987,10 @@ export class Relation<T extends Base> {
   }
 
   private referencesEagerLoadedTables(): boolean {
-    if (this._referencesValues.length === 0) return false;
     if (this._includesAssociations.length === 0) return false;
+    if (this._referencesValues.length === 0 && this._whereClause.predicates.length === 0) {
+      return false;
+    }
 
     // Rails references_eager_loaded_tables? (relation.rb) calls build_joins([]) and
     // iterates the returned nodes: StringJoin → tables_in_string(join.left),
@@ -3025,7 +3027,31 @@ export class Relation<T extends Base> {
       String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
 
-    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+    // Check explicit references() values
+    if (this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()))) return true;
+
+    // Rails string_references: also extract table names from SQL-literal WHERE
+    // predicates (mirrors Rails relation.rb#string_references → references_eager_loaded_tables?).
+    // When where("table.col = ?", val) references an included association's table,
+    // Rails auto-promotes includes to eager_load without requiring explicit .references().
+    const includedTables = new Set(this._resolveAssocTables(this._includesAssociations));
+    for (const node of this._whereClause.predicates) {
+      // Extract SQL text from raw-SQL WHERE predicates. Mirrors Rails' string_references
+      // which inspects `where_clause` for SQL literals referencing non-joined tables.
+      const n = node as any;
+      const sqlText: string | undefined =
+        typeof n.value === "string" && typeof n.sqlWithPlaceholders === "undefined"
+          ? n.value // SqlLiteral
+          : typeof n.sqlWithPlaceholders === "string"
+            ? n.sqlWithPlaceholders // BoundSqlLiteral
+            : undefined;
+      if (sqlText) {
+        for (const tbl of this.tablesInString(sqlText)) {
+          if (includedTables.has(tbl) && !joinedTables.has(tbl)) return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**

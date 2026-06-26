@@ -43129,13 +43129,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "touch_all",
-    "call": "update_all",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "type_cast_calculated_value",
     "call": "deserialize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

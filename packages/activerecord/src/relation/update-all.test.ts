@@ -90,7 +90,12 @@ describe("UpdateAllTest", () => {
       "cpkOrders",
       "cpkOrderAgreements",
     ],
-    { schema: canonicalSchema },
+    {
+      schema: canonicalSchema,
+      // "update all doesnt ignore order" deliberately raises a DB error to test
+      // ORDER BY semantics; on PG this aborts the transaction, poisoning teardown.
+      usesTransaction: ["update all doesnt ignore order"],
+    },
   );
 
   it("update all with scope", async () => {
