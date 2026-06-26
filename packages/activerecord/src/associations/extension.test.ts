@@ -151,7 +151,7 @@ describe("AssociationsExtensionsTest", () => {
   // `posts(:welcome).comments` association proxy.
   it("association with default scope", async () => {
     const proxy = association(posts("welcome"), "comments") as unknown as {
-      destroyAll: () => Promise<unknown>;
+      destroyAll: () => never;
     };
     expect(() => proxy.destroyAll()).toThrow(OopsError);
   });
