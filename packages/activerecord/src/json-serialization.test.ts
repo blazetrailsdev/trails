@@ -320,7 +320,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     const [david, mary] = [await getDavid(), await getMary()];
     setIncludeRootInJson(false, () => {
       const authorsList = [david, mary];
-      expect(ActiveSupportJSON.encode(authorsList, { only: ["name"] })).toBe(
+      expect(ActiveSupportJSON.encode(authorsList, { only: "name" })).toBe(
         '[{"name":"David"},{"name":"Mary"}]',
       );
     });
@@ -382,7 +382,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       const relation = await Author.where({ id: [david.id, mary.id] })
         .order("id")
         .toArray();
-      const encoded = ActiveSupportJSON.encode(relation, { only: ["name"] });
+      const encoded = ActiveSupportJSON.encode(relation, { only: "name" });
       expect(encoded).toBe('[{"author":{"name":"David"}},{"author":{"name":"Mary"}}]');
     });
   });
