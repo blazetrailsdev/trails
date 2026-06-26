@@ -2,18 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import { Comment, OopsError } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 
@@ -40,14 +37,13 @@ describe("AssociationsExtensionsTest", () => {
   // the posts fixture INSERT (which carries a `body` value) finds the column.
   // Registered after `useHandlerFixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
-    const s = canonicalSchema;
     await defineSchema(
       {
-        posts: s.posts,
-        comments: s.comments,
-        developers: s.developers,
-        projects: s.projects,
-        developers_projects: s.developers_projects,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        developers: canonicalSchema.developers,
+        projects: canonicalSchema.projects,
+        developers_projects: canonicalSchema.developers_projects,
       },
       { dropExisting: true },
     );
@@ -148,74 +144,16 @@ describe("AssociationsExtensionsTest", () => {
     expect((await proxy.findMostRecent())!.id).toBe(projects("action_controller").id);
     expect((await proxy.findLeastRecent())!.id).toBe(projects("active_record").id);
   });
-});
 
-const TEST_SCHEMA: Schema = {
-  ext_posts: { title: "string" },
-  ext_comments: { body: "string", ext_post_id: "integer" },
-};
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
-// `association with default scope` still rides inline models: it needs a
-// Comment `OopsExtension` default scope whose `destroyAll` override raises
-// `OopsError` through `posts(:welcome).comments.destroy_all`, which trails does
-// not yet propagate (relation `extending` in a default scope). That is a
-// follow-up pass, so this file stays on eslint/test-fixture-parity-exclude.json
-// until then. (`extension with scopes` migrated to canonical Post + comments
-// fixtures once `scope()` began carrying the association's `extend:` modules.)
-describe("AssociationsExtensionsTest", () => {
-  let extAdapter: TestDatabaseAdapter;
-
-  beforeAll(async () => {
-    extAdapter = await freshAdapter();
-  });
-  withTransactionalFixtures(() => extAdapter);
-
-  function setupExtModels() {
-    class ExtComment extends Base {
-      declare body: string;
-      declare ext_post_id: number;
-
-      static {
-        this._tableName = "ext_comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("ext_post_id", "integer");
-        this.adapter = extAdapter;
-      }
-    }
-    class ExtPost extends Base {
-      declare title: string;
-      declare extComments: AssociationProxy<ExtComment>;
-
-      static {
-        this._tableName = "ext_posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.adapter = extAdapter;
-        this.hasMany("extComments", {
-          foreignKey: "ext_post_id",
-          className: "ExtComment",
-        });
-      }
-    }
-    registerModel("ExtPost", ExtPost);
-    registerModel("ExtComment", ExtComment);
-    return { ExtPost, ExtComment };
-  }
-
+  // Rails: `posts(:welcome).comments.destroy_all` raises `OopsError` — the
+  // canonical Comment `default_scope { extending OopsExtension }` overrides
+  // `destroy_all` on every Comment relation, including the one spawned by the
+  // `posts(:welcome).comments` association proxy.
   it("association with default scope", async () => {
-    const { ExtPost, ExtComment } = setupExtModels();
-    const post = await ExtPost.create({ title: "default scope" });
-    await ExtComment.create({ body: "scoped", ext_post_id: post.id });
-    const proxy = association(post, "extComments");
-    const all = await proxy.toArray();
-    expect(all.length).toBe(1);
+    const proxy = association(posts("welcome"), "comments") as unknown as {
+      destroyAll: () => never;
+    };
+    expect(() => proxy.destroyAll()).toThrow(OopsError);
   });
 
   it.skip("marshalling extensions", () => {
