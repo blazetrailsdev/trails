@@ -1,22 +1,19 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation_test.rb
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
-import { Base, Relation } from "./index.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
+import { Relation } from "./index.js";
+import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { quoteTableName as canonicalQuoteTableName } from "./test-helpers/quote-regex.js";
-// Aliased to avoid clobbering the bespoke in-function `class Post` / `class Comment`
-// declarations elsewhere in this file (esbuild would otherwise rename those and
-// break their table-name inference).
+// Aliased so the canonical models read clearly alongside the merge-block usage
+// below and so the `test:compare` `RelationTest` matcher stays unambiguous.
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
   Comment as CanonComment,
@@ -27,50 +24,70 @@ import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+// Mirrors relation_test.rb's `EnsureRoundTripTypeCasting` / `UpdateAllTestModel`
+// (relation_test.rb:381-406): a custom type whose cast/serialize/deserialize each
+// assert their input, so the `update_all` round trip is verifiable. The model
+// rides the canonical `posts` table (Rails: `self.table_name = "posts"`).
+class EnsureRoundTripTypeCasting extends ValueType {
+  override readonly name = "string" as unknown as "value";
+  // nil passes through (Rails `Type::Value` maps nil→nil); trails reads the
+  // column default eagerly during model construction, where Rails would not.
+  override cast(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "value from user") throw new Error(String(value));
+    return "cast value";
+  }
+  override deserialize(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "type cast for database") throw new Error(String(value));
+    return "type cast from database";
+  }
+  override serialize(value: unknown): unknown {
+    if (value == null) return value;
+    if (value !== "cast value") throw new Error(String(value));
+    return "type cast for database";
+  }
 }
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+class UpdateAllTestModel extends Base {
+  static {
+    this._tableName = "posts";
+    this.attribute("body", new EnsureRoundTripTypeCasting());
+  }
+}
 
 // ==========================================================================
-// RelationTest — targets relations_test.rb
+// RelationTest — targets relation_test.rb
+//
+// Converged onto the canonical schema (RFC 0019): rows come from canonical
+// fixtures via `useHandlerFixtures`, never `defineSchema`. Rails'
+// `fixtures :posts, :comments, :authors, :author_addresses, :ratings,
+// :categorizations` maps to the registry-name array below.
+//
+// Tests whose names have no relation_test.rb counterpart (e.g. `reload`,
+// `count`, `build`, `last`) are trails-only smoke tests retained per RFC 0019;
+// their bodies ride the canonical `posts` table. Because the canonical `posts`
+// fixtures preload rows, trails-only count/id assertions measure a delta or
+// scope to records they create under the rolled-back transactional fixture.
 // ==========================================================================
 describe("RelationTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string", status: "string", author_id: "integer" },
-      developers: { commits: "integer" },
-      orders: { created_at: "string", total: "integer" },
-      books: {
-        author_id: "integer",
-        published_year: "integer",
-        title: "string",
-        active: "boolean",
-      },
-      authors: { name: "string" },
-      comments: { post_id: "integer", author_id: "integer" },
-      users: { name: "string" },
-      eager_comments: { body: "string", eager_article_id: "integer" },
-      eager_articles: { title: "string" },
-    });
+  useHandlerFixtures(
+    ["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"],
+    { schema: canonicalSchema },
+  );
+
+  beforeAll(() => {
+    registerModel(CanonAuthor);
+    registerModel(CanonPost);
+    registerModel(CanonComment);
+    registerModel(CanonSpecialComment);
+    registerModel(CanonRating);
+    registerModel(CanonCategorization);
   });
+
   it("reload", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const rel = Post.all();
+    await CanonPost.create({ title: "reltest-reload", body: "b" });
+    const rel = CanonPost.all();
     await rel.toArray();
     expect(rel.isLoaded).toBe(true);
     await rel.reload();
@@ -78,553 +95,399 @@ describe("RelationTest", () => {
   });
 
   it("count", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const count = await Post.all().count();
-    expect(count).toBe(2);
+    const before = (await CanonPost.all().count()) as number;
+    await CanonPost.create({ title: "reltest-count-a", body: "b" });
+    await CanonPost.create({ title: "reltest-count-b", body: "b" });
+    const count = (await CanonPost.all().count()) as number;
+    expect(count).toBe(before + 2);
   });
 
-  it("count with distinct", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "a" });
-    const sql = Post.all().distinct().toSql();
+  it("count with distinct", () => {
+    const sql = CanonPost.all().distinct().toSql();
     expect(sql).toContain("DISTINCT");
   });
 
-  it("build", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = Post.where({ title: "hello" }).build();
+  it("build", () => {
+    const post = CanonPost.where({ title: "hello" }).build();
     expect(post.isNewRecord()).toBe(true);
   });
 
   it("create", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = await Post.where({ title: "new" }).create();
+    const post = await CanonPost.where({ title: "reltest-new" }).createWith({ body: "b" }).create();
     expect(post.isPersisted()).toBe(true);
   });
 
   it("multiple selects", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
     // reselect replaces previous select
-    const sql = Post.select("title").reselect("body").toSql();
+    const sql = CanonPost.select("title").reselect("body").toSql();
     expect(sql).toContain("body");
   });
 
   it("find_by with hash conditions returns the first matching record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const created = await Post.create({ title: "target" });
-    const found = await Post.findBy({ title: "target" });
+    await CanonPost.create({ title: "reltest-target", body: "b" });
+    const found = await CanonPost.findBy({ title: "reltest-target" });
     expect(found).not.toBeNull();
   });
 
   it("find_by doesn't have implicit ordering", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const found = await Post.findBy({ title: "a" });
+    await CanonPost.create({ title: "reltest-fa", body: "b" });
+    await CanonPost.create({ title: "reltest-fb", body: "b" });
+    const found = await CanonPost.findBy({ title: "reltest-fa" });
     expect(found).not.toBeNull();
   });
 
   it("find ids", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const ids = await Post.all().ids();
-    expect(ids.length).toBe(2);
+    const before = (await CanonPost.all().ids()).length;
+    await CanonPost.create({ title: "reltest-ids-a", body: "b" });
+    await CanonPost.create({ title: "reltest-ids-b", body: "b" });
+    const ids = await CanonPost.all().ids();
+    expect(ids.length).toBe(before + 2);
   });
 
   it("select quotes when using from clause", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.select("title").from("posts").toSql();
+    const sql = CanonPost.select("title").from("posts").toSql();
     expect(sql).toContain("FROM");
   });
 
   it("relation with annotation includes comment in to sql", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("my comment").toSql();
+    const sql = CanonPost.all().annotate("my comment").toSql();
     expect(sql).toContain("my comment");
   });
 
-  it("scope for create", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.where({ title: "scoped" });
+  it("scope for create", () => {
+    const rel = CanonPost.where({ title: "scoped" });
     const attrs = (rel as any)._scopeAttributes ? (rel as any)._scopeAttributes() : {};
     expect(attrs.title).toBe("scoped");
   });
 
-  it("update all goes through normal type casting", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "old" });
-    const count = await Post.all().updateAll({ title: "new" });
-    expect(typeof count).toBe("number");
+  // it.fails (active, not skipped): trails `updateAll` passes scalar SET values
+  // raw; the UPDATE-SET visitor (to-sql.ts visitArelNodesAssignment) quotes them
+  // by *column* type, so an attribute-declared custom type's cast/serialize is
+  // bypassed — unlike Rails `_substitute_values`, which binds via
+  // `type_for_attribute`. Marked `it.fails` so CI keeps running the faithful Rails
+  // assertion and flips red the moment the deviation is fixed (signalling the
+  // marker should be removed). Tracked by story
+  // 0023-surfaced-deviations/updateall-routes-values-through-attribute-type.
+  it.fails("update all goes through normal type casting", async () => {
+    await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
+
+    const first = await UpdateAllTestModel.first();
+    expect((first as any).body).toBe("type cast from database");
   });
 
   it("no queries on empty relation exists?", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const exists = await Post.all().none().exists();
+    const exists = await CanonPost.all().none().exists();
     expect(exists).toBe(false);
   });
 
   it("last", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const last = await Post.all().last();
+    await CanonPost.create({ title: "reltest-last", body: "b" });
+    const last = await CanonPost.all().last();
     expect(last).not.toBeNull();
   });
 
-  it("find with readonly option", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all().readonly();
+  it("find with readonly option", () => {
+    const rel = CanonPost.all().readonly();
     expect(rel.isReadonly).toBe(true);
   });
 
   it("to a should dup target", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const arr = await Post.all().toArray();
+    const arr = await CanonPost.all().toArray();
     expect(Array.isArray(arr)).toBe(true);
   });
 
   it("empty where values hash", () => {
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.all().whereValuesHash()).toEqual({});
+    expect(CanonPost.all().whereValuesHash()).toEqual({});
 
-    const notEq = Post.all().where(Post.arelTable.get("id").notEq(10)).whereValuesHash();
+    const notEq = CanonPost.all().where(CanonPost.arelTable.get("id").notEq(10)).whereValuesHash();
     expect(notEq).toEqual({});
 
-    const distinctFrom = Post.all()
-      .where(Post.arelTable.get("id").isDistinctFrom(10))
+    const distinctFrom = CanonPost.all()
+      .where(CanonPost.arelTable.get("id").isDistinctFrom(10))
       .whereValuesHash();
     expect(distinctFrom).toEqual({});
   });
 
   it("create with value", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const rel = Post.all().createWith({ body: "default" });
-    const post = await rel.findOrCreateBy({ title: "new" });
+    const rel = CanonPost.all().createWith({ body: "default" });
+    const post = await rel.findOrCreateBy({ title: "reltest-cwv" });
     expect(post.body).toBe("default");
   });
 
   it("no queries on empty condition exists?", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const exists = await Post.all().exists();
+    const exists = await CanonPost.all().exists();
     expect(exists).toBe(true);
   });
 
   it("finding with subquery", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     // Subquery in where
-    const subquery = Post.where({ title: "a" }).select("id");
-    const sql = Post.where({ id: subquery }).toSql();
+    const subquery = CanonPost.where({ title: "a" }).select("id");
+    const sql = CanonPost.where({ id: subquery }).toSql();
     expect(sql).toContain("IN");
   });
 
   it("find on hash conditions", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const results = await Post.where({ title: "a" }).toArray();
+    await CanonPost.create({ title: "reltest-onhash", body: "b" });
+    const results = await CanonPost.where({ title: "reltest-onhash" }).toArray();
     expect(results.length).toBe(1);
   });
 
   it("count with block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    const count = await Post.all().count();
+    const count = await CanonPost.all().count();
     expect(typeof count).toBe("number");
   });
 
   it("create with block", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "test" });
+    const p = await CanonPost.create({ title: "reltest-block", body: "b" });
     expect(p.isPersisted()).toBe(true);
   });
 
   it("relation with annotation includes comment in count query", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("counting").toSql();
+    const sql = CanonPost.all().annotate("counting").toSql();
     expect(sql).toContain("counting");
   });
 
   it("joins with string array", () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    const sql = Post.joins(
+    const sql = CanonPost.joins(
       "INNER JOIN comments ON comments.post_id = posts.id",
-      "INNER JOIN tags ON tags.post_id = posts.id",
+      "INNER JOIN taggings ON taggings.post_id = posts.id",
     ).toSql();
     expect(sql).toContain("INNER JOIN");
   });
 
   it("find_by with multi-arg conditions returns the first matching record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    await Post.create({ title: "t", body: "b" });
-    const result = await Post.findBy({ title: "t", body: "b" });
+    await CanonPost.create({ title: "reltest-multi", body: "b" });
+    const result = await CanonPost.findBy({ title: "reltest-multi", body: "b" });
     expect(result).not.toBeNull();
   });
 
-  function makePost() {
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    return Post;
-  }
-
   it("construction", () => {
-    const Post = makePost();
-    const rel = Post.all();
+    const rel = CanonPost.all();
     expect(rel).toBeDefined();
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("initialize single values", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "test" });
+    const rel = CanonPost.where({ title: "test" });
     expect(rel.toSql()).toContain("WHERE");
   });
 
   it("multi value initialize", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "test" }).order("title").limit(5);
+    const rel = CanonPost.where({ title: "test" }).order("title").limit(5);
     expect(rel.toSql()).toContain("WHERE");
     expect(rel.toSql()).toContain("ORDER BY");
     expect(rel.toSql()).toContain("LIMIT");
   });
 
   it("extensions", () => {
-    const Post = makePost();
-    expect(typeof Post.all().where).toBe("function");
-    expect(typeof Post.all().order).toBe("function");
-    expect(typeof Post.all().limit).toBe("function");
+    expect(typeof CanonPost.all().where).toBe("function");
+    expect(typeof CanonPost.all().order).toBe("function");
+    expect(typeof CanonPost.all().limit).toBe("function");
   });
 
   it("has values", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "test" });
+    const rel = CanonPost.where({ title: "test" });
     expect(rel.whereValuesHash()).toEqual({ title: "test" });
   });
 
   it("values wrong table", () => {
-    const Post = makePost();
-    class Comment extends Base {
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-      }
-    }
-    const rel = Post.all().where(Comment.arelTable.get("id").eq(10));
+    const rel = CanonPost.all().where(CanonComment.arelTable.get("id").eq(10));
     expect(rel.whereValuesHash()).toEqual({});
   });
 
   it("tree is not traversed", () => {
-    const Post = makePost();
-    const left = Post.arelTable.get("id").eq(10);
-    const right = Post.arelTable.get("id").eq(10);
-    const rel = Post.all().where(left.or(right));
+    const left = CanonPost.arelTable.get("id").eq(10);
+    const right = CanonPost.arelTable.get("id").eq(10);
+    const rel = CanonPost.all().where(left.or(right));
     expect(rel.whereValuesHash()).toEqual({});
   });
 
-  it("create with value with wheres", async () => {
-    const Post = makePost();
-    const rel = Post.where({ status: "published" }).createWith({ title: "Default" });
+  it("create with value with wheres", () => {
+    const rel = CanonPost.where({ body: "published" }).createWith({ title: "Default" });
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("empty scope", async () => {
-    const Post = makePost();
-    const count = await Post.all().count();
+    const count = await CanonPost.all().count();
     expect(typeof count).toBe("number");
   });
 
   it("bad constants raise errors", () => {
-    const Post = makePost();
-    expect(() => Post.where({ title: "test" })).not.toThrow();
+    // Rails asserts `ActiveRecord::Relation::HelloWorld` raises `NameError`
+    // (relation_test.rb:122-125). TypeScript has no constant-resolution / NameError;
+    // the faithful analogue is that no such member exists on `Relation`.
+    expect((Relation as any).HelloWorld).toBeUndefined();
   });
 
   it("empty eager loading?", () => {
-    const Post = makePost();
-    const rel = Post.all();
+    const rel = CanonPost.all();
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("eager load values", () => {
-    const Post = makePost();
-    const rel = Post.all().includes("comments");
+    const rel = CanonPost.all().includes("comments");
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("references values", () => {
-    const Post = makePost();
-    const sql = Post.all().includes("comments").toSql();
+    const sql = CanonPost.all().includes("comments").toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("references values dont duplicate", () => {
-    const Post = makePost();
-    const sql = Post.all().includes("comments").includes("comments").toSql();
+    const sql = CanonPost.all().includes("comments").includes("comments").toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("merging a hash into a relation", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "a" }).merge(Post.where({ status: "x" }));
+    const rel = CanonPost.where({ title: "a" }).merge(CanonPost.where({ body: "x" }));
     expect(rel.toSql()).toContain("WHERE");
   });
 
   it("merging an empty hash into a relation", () => {
-    const Post = makePost();
-    const base = Post.where({ title: "a" });
-    const merged = base.merge(Post.all());
+    const base = CanonPost.where({ title: "a" });
+    const merged = base.merge(CanonPost.all());
     expect(merged.toSql()).toContain("SELECT");
   });
 
-  it("merging a hash with unknown keys raises", () => {
-    const Post = makePost();
-    expect(() => Post.where({ title: "a" })).not.toThrow();
+  // it.fails (active, not skipped): Rails `Relation::HashMerger#initialize`
+  // validates keys with `assert_valid_keys(*Relation::VALUE_METHODS)`, so
+  // `merge(omg: "lol")` raises ArgumentError (merger.rb:7-12,
+  // relation_test.rb:164-166). trails' `merge(Hash)` instead treats the hash as
+  // `where` conditions (merger.ts HashMerger#merge → `relation.where(hash)`) and
+  // validates nothing, so it does not raise. Marked `it.fails` so CI tracks the
+  // mismatch and flips red once HashMerger gains key validation.
+  it.fails("merging a hash with unknown keys raises", () => {
+    expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
   });
 
   it("merging nil or false raises", () => {
-    const Post = makePost();
-    expect(() => Post.all().toSql()).not.toThrow();
+    const relation = CanonPost.all();
+    expect(() => relation.merge(null as any)).toThrow("invalid argument: nil.");
+    expect(() => relation.merge(false as any)).toThrow("invalid argument: false.");
   });
 
   it("relations can be created with a values hash", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "test" });
+    const rel = CanonPost.where({ title: "test" });
     expect(rel.toSql()).toContain("test");
   });
 
   it("merging a hash interpolates conditions", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "a" }).merge(Post.where({ status: "b" }));
+    const rel = CanonPost.where({ title: "a" }).merge(CanonPost.where({ body: "b" }));
     const sql = rel.toSql();
     expect(sql).toContain("a");
   });
 
   it("merging readonly false", () => {
-    const Post = makePost();
-    const rel = Post.all().readonly();
-    expect(rel.isReadonly).toBe(true);
-    const merged = rel.merge(Post.all());
-    expect(merged.toSql()).toContain("SELECT");
+    const relation = CanonPost.all();
+    const readonlyFalseRelation = CanonPost.all().readonly(false);
+    // test merging in both directions
+    expect(relation.merge(readonlyFalseRelation).isReadonly).toBe(false);
+    expect(readonlyFalseRelation.merge(relation).isReadonly).toBe(false);
   });
 
-  it("relation merging with joins as join dependency pick proper parent", () => {
-    const Post = makePost();
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
+  it("relation merging with joins as join dependency pick proper parent", async () => {
+    const post = await CanonPost.create({ title: "haha", body: "huhu" });
+    const comment = await (post as any).comments.create({ body: "hu" });
+    for (let i = 0; i < 3; i++) await comment.ratings.create();
+
+    const relation = CanonPost.joins("comments").merge(CanonComment.joins("ratings"));
+
+    const ids = await relation.where({ id: (post as any).id }).pluck("id");
+    expect(ids.length).toBe(3);
   });
 
   it("merge raises with invalid argument", () => {
-    const Post = makePost();
-    const rel = Post.all();
-    expect(() => rel.merge(Post.where({ title: "test" }))).not.toThrow();
+    const rel = CanonPost.all();
+    expect(() => rel.merge(true as any)).toThrow();
   });
 
-  it("respond to for non selected element", () => {
-    const Post = makePost();
-    expect(typeof Post.all().count).toBe("function");
-    expect(typeof Post.all().first).toBe("function");
+  it("respond to for non selected element", async () => {
+    const post: any = await CanonPost.select("title").first();
+    // Rails: a partially-selected record does not respond to unloaded attributes
+    // "since invoking it raises exception" (relation_test.rb:284-289). trails has
+    // no `respond_to?`, but enforces the same contract — invoking the unselected
+    // attribute raises MissingAttributeError.
+    expect(() => post.body).toThrow();
   });
 
   it("selecting aliased attribute quotes column name when from is used", () => {
-    const Post = makePost();
-    const sql = Post.select("title").from("posts").toSql();
+    const sql = CanonPost.select("title").from("posts").toSql();
     expect(sql).toContain("title");
   });
 
   it("relation merging keeps joining order", () => {
-    const Post = makePost();
-    const r1 = Post.where({ title: "a" });
-    const r2 = Post.where({ status: "b" });
+    const r1 = CanonPost.where({ title: "a" });
+    const r2 = CanonPost.where({ body: "b" });
     const sql = r1.merge(r2).toSql();
     expect(sql).toContain("WHERE");
   });
 
-  it("relation with annotation includes comment in sql", () => {
-    const Post = makePost();
-    const sql = Post.all().annotate("my annotation").toSql();
-    expect(sql).toContain("my annotation");
+  it("relation with annotation includes comment in sql", async () => {
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo");
+    const queries = await captureSql(async () => {
+      expect(await postWithAnnotation.first()).not.toBeNull();
+    });
+    expect(queries.some((sql) => /\/\* foo \*\//.test(sql))).toBe(true);
   });
 
-  it("relation with annotation chains sql comments", () => {
-    const Post = makePost();
-    const sql = Post.all().annotate("first").annotate("second").toSql();
-    expect(sql).toContain("first");
-    expect(sql).toContain("second");
+  it("relation with annotation chains sql comments", async () => {
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo").annotate("bar");
+    const queries = await captureSql(async () => {
+      expect(await postWithAnnotation.first()).not.toBeNull();
+    });
+    expect(queries.some((sql) => /\/\* foo \*\/ \/\* bar \*\//.test(sql))).toBe(true);
   });
 
   it("relation with annotation filters sql comment delimiters", () => {
-    const Post = makePost();
-    const sql = Post.all().annotate("safe comment").toSql();
-    expect(sql).toContain("safe comment");
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("**//foo//**");
+    expect(postWithAnnotation.toSql()).toContain("= 1 /* ** //foo// ** */");
   });
 
   it("relation without annotation does not include an empty comment", () => {
-    const Post = makePost();
-    const sql = Post.all().toSql();
+    const sql = CanonPost.all().toSql();
     expect(sql).not.toContain("/*  */");
   });
 
   it("relation with optimizer hints filters sql comment delimiters", () => {
-    const Post = makePost();
-    const sql = Post.all().optimizerHints("INDEX(posts idx)").toSql();
-    expect(sql).toContain("INDEX");
+    let postWithHint = CanonPost.where({ id: 1 }).optimizerHints("**//BADHINT//**");
+    expect(postWithHint.toSql()).toContain("/*+ ** //BADHINT// ** */");
+    postWithHint = CanonPost.where({ id: 1 }).optimizerHints("/*+ BADHINT */");
+    expect(postWithHint.toSql()).toContain("/*+ BADHINT */");
   });
 
-  it("skip preloading after arel has been generated", async () => {
-    const Post = makePost();
-    const rel = Post.all();
-    const sql = rel.toSql();
-    expect(sql).toContain("SELECT");
-    const results = await rel.toArray();
-    expect(Array.isArray(results)).toBe(true);
+  it("skip preloading after arel has been generated", () => {
+    // Rails (relation_test.rb:414-419): build a Comment relation, generate its
+    // arel, then `skip_preloading!` without raising.
+    expect(() => {
+      const relation = CanonComment.all();
+      relation.arel();
+      relation.skipPreloadingBang();
+    }).not.toThrow();
   });
 
   it("no queries on empty IN", async () => {
-    const Post = makePost();
-    const results = await Post.where({ title: [] }).toArray();
+    const results = await CanonPost.where({ id: [] }).toArray();
     expect(results).toEqual([]);
   });
 
   it("can unscope empty IN", () => {
-    const Post = makePost();
-    const sql = Post.where({ title: "test" }).unscope("where").toSql();
+    const sql = CanonPost.where({ id: [] }).unscope({ where: "id" }).toSql();
     expect(sql).not.toContain("WHERE");
   });
 
   it("responds to model and returns klass", () => {
-    const Post = makePost();
-    const rel = Post.all();
-    expect(rel.model).toBe(Post);
+    const rel = CanonPost.all();
+    expect(rel.model).toBe(CanonPost);
   });
 
   it("where values hash with in clause", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: ["foo", "bar", "hello"] });
+    const rel = CanonPost.where({ title: ["foo", "bar", "hello"] });
     expect(rel.whereValuesHash()).toEqual({ title: ["foo", "bar", "hello"] });
   });
 
   it("#values returns a dup of the values", () => {
-    const Post = makePost();
-    const rel = Post.where({ title: "test" });
+    const rel = CanonPost.where({ title: "test" });
     const vals1 = rel.whereValuesHash();
     const vals2 = rel.whereValuesHash();
     expect(vals1).toEqual(vals2);
@@ -632,48 +495,29 @@ describe("RelationTest", () => {
   });
 
   it("does not duplicate optimizer hints on merge", () => {
-    const Post = makePost();
-    const rel1 = Post.all().optimizerHints("INDEX(posts idx)");
-    const rel2 = Post.all().optimizerHints("INDEX(posts idx)");
-    const merged = rel1.merge(rel2);
-    const sql = merged.toSql();
-    const matches = sql.match(/INDEX/g);
-    // Should contain INDEX but ideally not duplicated
-    expect(matches).not.toBeNull();
-  });
-
-  let SharedPost: typeof Base;
-  beforeEach(() => {
-    class PostClass extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    SharedPost = PostClass;
+    const escapedTable = canonicalQuoteTableName("posts");
+    const expected = `SELECT /*+ OMGHINT */ ${escapedTable}.* FROM ${escapedTable}`;
+    const query = CanonPost.optimizerHints("OMGHINT")
+      .merge(CanonPost.optimizerHints("OMGHINT"))
+      .toSql();
+    expect(query).toBe(expected);
   });
 
   it("find_by! with multi-arg conditions returns the first matching record", async () => {
-    await SharedPost.create({ title: "multi-arg" });
-    const found = await SharedPost.findByBang({ title: "multi-arg" });
+    await CanonPost.create({ title: "reltest-bang", body: "b" });
+    const found = await CanonPost.findByBang({ title: "reltest-bang" });
     expect(found).not.toBeNull();
   });
 
   it("eager association loading of stis with multiple references", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.all()).toBeInstanceOf(Relation);
+    expect(CanonPost.all()).toBeInstanceOf(Relation);
   });
 });
 
 // Canonical-model coverage for RelationTest cross-model merge — kept in a
-// dedicated describe so it can run on the canonical schema/fixtures (the legacy
-// RelationTest block above uses bespoke handler tables). Same describe name so
-// `test:compare` matches it to Ruby's `RelationTest` in relation_test.rb.
+// dedicated describe so it can run on the canonical schema/fixtures. Same
+// describe name so `test:compare` matches it to Ruby's `RelationTest` in
+// relation_test.rb.
 describe("RelationTest", () => {
   const { authors } = useHandlerFixtures(
     ["authors", "posts", "comments", "ratings", "categorizations", "categories"],
