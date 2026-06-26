@@ -1,464 +1,399 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: vendor/rails/activerecord/test/cases/json_serialization_test.rb
+ *
+ * Faithful port of Rails' JsonSerializationTest and
+ * DatabaseConnectedJsonEncodingTest. Rides the canonical models
+ * (Contact / ContactSti / Author / Post / Comment / Tag / Tagging) — declares
+ * NO bespoke `defineSchema`. The first suite exercises the in-memory `Contact`
+ * (a fake-adapter model in Rails, never persisted); the second drives the real
+ * `authors`/`posts`/`comments`/`tags`/`taggings` fixtures via the handler suite,
+ * loading rows through `name(:label)` registry lookups exactly like Rails'
+ * `authors(:david)`.
+ *
+ * Test names mirror the Ruby method names verbatim (`test:compare` matches on
+ * them). The trailing trails-specific cases (sync fail-loud / awaitable
+ * contract) have no Rails analog but ride the same canonical tables.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+
+import { Contact, ContactSti } from "./test-helpers/models/contact.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { Tag } from "./test-helpers/models/tag.js";
+import { Tagging } from "./test-helpers/models/tagging.js";
+
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import "./associations/collection-proxy.js";
+import "./association-relation.js";
 
-// The generated has_many reader (`record.comments`) is defined dynamically, so
-// it isn't on `Base`'s static type. This narrows it to the proxy surface these
-// tests use — `.load()` to hydrate, iteration to read the loaded targets.
-function collection(record: Base, name: string): { load(): Promise<unknown> } & Iterable<Base> {
-  return (record as unknown as Record<string, { load(): Promise<unknown> } & Iterable<Base>>)[name];
+// Establish the worker's canonical template DB for the whole file so the
+// in-memory `Contact` suite below doesn't lazily initialize a bare connection
+// that would shadow the handler clone for the fixture-backed suite.
+setupHandlerSuite();
+
+registerModel(Author);
+registerModel(Post);
+registerModel(Comment);
+registerModel(Tag);
+registerModel(Tagging);
+
+// Rails' `JsonSerializationHelpers#set_include_root_in_json` — toggle the
+// class-level flag for the duration of the block, then restore.
+function setIncludeRootInJson(value: boolean, fn: () => void): void {
+  const original = Base.includeRootInJson;
+  Base.includeRootInJson = value;
+  try {
+    fn();
+  } finally {
+    Base.includeRootInJson = original;
+  }
 }
-
-// Simulate an eager-preload by seeding the real association holder (RFC 0022:
-// `record.association(name).target` is the source of truth) the way the
-// `Preloader` does — `setTarget(...)` + the preload provenance flag.
-function seedPreloadedHolder(record: Base, name: string, value: unknown): void {
-  const holder = (record as any).association(name);
-  holder.setTarget(value);
-  holder._loadedFromPreload = true;
-}
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
 
 describe("JsonSerializationTest", () => {
-  let Contact: typeof Base;
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // Rails: `class NamespacedContact < Contact; column :name, "string"; end`.
+  class NamespacedContact extends Contact {}
 
-  beforeAll(async () => {
-    await defineSchema({
-      contacts: { name: "string", age: "integer", created_at: "string", type: "string" },
+  function newContact(): Contact {
+    return new Contact({
+      name: "Konata Izumi",
+      age: 16,
+      avatar: "binarydata",
+      created_at: new Date(Date.UTC(2006, 7, 1)),
+      awesome: true,
+      preferences: { shows: "anime" },
+    });
+  }
+
+  it("should demodulize root in json", () => {
+    setIncludeRootInJson(true, () => {
+      const contact = new NamespacedContact({ name: "whatever" });
+      const json = contact.asJson();
+      const keys = Object.keys(json);
+      expect(keys.length).toBe(1);
+      expect(keys[0]).toBe("namespaced_contact");
     });
   });
-  beforeEach(() => {
-    Contact = class extends Base {};
-    Contact._tableName = "contacts";
-    Contact.attribute("id", "integer");
-    Contact.attribute("name", "string");
-    Contact.attribute("age", "integer");
-    Contact.attribute("created_at", "string");
+
+  it("should include root in json", () => {
+    setIncludeRootInJson(true, () => {
+      const json = newContact().asJson();
+      const keys = Object.keys(json);
+      expect(keys).toEqual(["contact"]);
+      const root = json.contact as Record<string, unknown>;
+      expect(root.name).toBe("Konata Izumi");
+      expect(root.age).toBe(16);
+      expect(root.created_at).toBeDefined();
+      expect(root.awesome).toBe(true);
+      expect(root.preferences).toEqual({ shows: "anime" });
+    });
   });
 
-  it("should demodulize root in json", async () => {
-    (Contact as any).includeRootInJson = true;
-    const contact = await Contact.create({ name: "David", age: 30 });
+  it("should encode all encodable attributes", () => {
+    const json = newContact().asJson();
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.age).toBe(16);
+    expect(json.created_at).toBeDefined();
+    expect(json.awesome).toBe(true);
+    expect(json.preferences).toEqual({ shows: "anime" });
+  });
+
+  it("should allow attribute filtering with only", () => {
+    const json = newContact().asJson({ only: ["name", "age"] });
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.age).toBe(16);
+    expect(json.awesome).toBeUndefined();
+    expect(json.created_at).toBeUndefined();
+    expect(json.preferences).toBeUndefined();
+  });
+
+  it("should allow attribute filtering with except", () => {
+    const json = newContact().asJson({ except: ["name", "age"] });
+    expect(json.name).toBeUndefined();
+    expect(json.age).toBeUndefined();
+    expect(json.awesome).toBe(true);
+    expect(json.created_at).toBeDefined();
+    expect(json.preferences).toEqual({ shows: "anime" });
+  });
+
+  it("methods are called on object", () => {
+    const contact = newContact();
+    (contact as unknown as { label: () => string }).label = () => "Has cheezburger";
+    (contact as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
+      "Constraints are liberating";
+
+    // Single method.
+    const single = contact.asJson({ only: ["name"], methods: ["label"] });
+    expect(single.label).toBe("Has cheezburger");
+
+    // Both methods.
+    const both = contact.asJson({ only: ["name"], methods: ["label", "favoriteQuote"] });
+    expect(both.label).toBe("Has cheezburger");
+    expect(both.favoriteQuote).toBe("Constraints are liberating");
+  });
+
+  it("uses serializable hash with frozen hash", () => {
+    const contact = newContact();
+    (
+      contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
+    ).serializableHash = function () {
+      return Base.prototype.serializableHash.call(this, Object.freeze({ only: ["name"] }));
+    };
+
     const json = contact.asJson();
-    // Root key should be the demodulized model name
-    const keys = Object.keys(json);
-    expect(keys.length).toBe(1);
-    (Contact as any).includeRootInJson = false;
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.awesome).toBeUndefined();
+    expect(json.age).toBeUndefined();
   });
 
-  it("should include root in json", async () => {
-    (Contact as any).includeRootInJson = true;
-    const contact = await Contact.create({ name: "David", age: 30 });
+  it("uses serializable hash with only option", () => {
+    const contact = newContact();
+    (
+      contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
+    ).serializableHash = function () {
+      return Base.prototype.serializableHash.call(this, { only: ["name"] });
+    };
+
     const json = contact.asJson();
-    const keys = Object.keys(json);
-    expect(keys.length).toBe(1);
-    const root = keys[0];
-    expect(json[root]).toHaveProperty("name", "David");
-    (Contact as any).includeRootInJson = false;
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.awesome).toBeUndefined();
+    expect(json.age).toBeUndefined();
   });
 
-  it("should encode all encodable attributes", async () => {
-    const contact = await Contact.create({ name: "David", age: 30, created_at: "2023-01-01" });
-    const hash = contact.asJson();
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBe(30);
-    expect(hash.created_at).toBe("2023-01-01");
+  it("uses serializable hash with except option", () => {
+    const contact = newContact();
+    (
+      contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
+    ).serializableHash = function () {
+      return Base.prototype.serializableHash.call(this, { except: ["age"] });
+    };
+
+    const json = contact.asJson();
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.awesome).toBe(true);
+    expect(json.age).toBeUndefined();
   });
 
-  it("should allow attribute filtering with only", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.asJson({ only: ["name"] });
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBeUndefined();
-    expect(hash.id).toBeUndefined();
+  it("does not include inheritance column from sti", () => {
+    const contact = new ContactSti(newContact().attributes);
+    expect(contact.type).toBe("ContactSti");
+
+    const json = contact.asJson();
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.type).toBeUndefined();
+    expect(Object.values(json)).not.toContain("ContactSti");
   });
 
-  it("should allow attribute filtering with except", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.asJson({ except: ["age", "id"] });
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBeUndefined();
+  it("serializable hash with default except option and excluding inheritance column from sti", () => {
+    const contact = new ContactSti(newContact().attributes);
+    expect(contact.type).toBe("ContactSti");
+
+    (
+      contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
+    ).serializableHash = function (options?: unknown) {
+      return Base.prototype.serializableHash.call(this, {
+        except: ["age"],
+        ...((options as Record<string, unknown>) ?? {}),
+      });
+    };
+
+    const json = contact.asJson();
+    expect(json.name).toBe("Konata Izumi");
+    expect(json.age).toBeUndefined();
+    expect(json.type).toBeUndefined();
+    expect(Object.values(json)).not.toContain("ContactSti");
   });
 
-  it("methods are called on object", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    (contact as any).label = () => `${contact.name} (${contact.age})`;
-    const hash = contact.asJson({ methods: ["label"] });
-    expect(hash.label).toBe("David (30)");
-  });
-
-  it("uses serializable hash with frozen hash", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const opts = Object.freeze({ only: ["name"] });
-    // Should not throw when options are frozen
-    const hash = contact.serializableHash({ ...opts });
-    expect(hash.name).toBe("David");
-  });
-
-  it("uses serializable hash with only option", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.serializableHash({ only: ["name"] });
-    expect(Object.keys(hash)).toEqual(["name"]);
-  });
-
-  it("uses serializable hash with except option", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.serializableHash({ except: ["name", "age"] });
-    expect(hash.name).toBeUndefined();
-    expect(hash.age).toBeUndefined();
-  });
-
-  it("does not include inheritance column from sti", async () => {
-    Contact.attribute("type", "string");
-    const contact = await Contact.create({ name: "David", age: 30, type: "SpecialContact" });
-    const hash = contact.serializableHash({ except: ["type"] });
-    expect(hash.type).toBeUndefined();
-    expect(hash.name).toBe("David");
-  });
-
-  it("serializable hash with default except option and excluding inheritance column from sti", async () => {
-    Contact.attribute("type", "string");
-    const contact = await Contact.create({ name: "David", age: 30, type: "Special" });
-    const hash = contact.serializableHash({ except: ["type", "id"] });
-    expect(hash.type).toBeUndefined();
-    expect(hash.id).toBeUndefined();
-    expect(hash.name).toBe("David");
-  });
-
-  it("serializable hash should not modify options in argument", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const options = { only: ["name"] };
-    const optionsBefore = { ...options, only: [...options.only] };
-    contact.serializableHash(options);
-    expect(options.only).toEqual(optionsBefore.only);
+  it("serializable hash should not modify options in argument", () => {
+    const contact = newContact();
+    const options = Object.freeze({ only: ["name"] });
+    expect(() => contact.serializableHash(options)).not.toThrow();
   });
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      post_j1s: { title: "string" },
-      comment_j1s: { body: "string", post_id: "integer" },
-      post_j2s: { title: "string" },
-      comment_j2s: { body: "string", post_id: "integer" },
-      post_j3s: { title: "string" },
-      comment_j3s: { body: "string", post_id: "integer" },
-      reply_j3s: { text: "string", comment_id: "integer" },
-      top_j4s: { val: "string" },
-      mid_j4s: { val: "string" },
-      deep_j4s: { val: "string" },
-      post_j5s: { title: "string", author: "string" },
-      comment_j5s: { body: "string", post_id: "integer" },
-      post_j6s: { title: "string", author_id: "integer" },
-      author_j6s: { name: "string" },
-      author_j7s: { name: "string", age: "integer" },
-      author_j8s: { name: "string", age: "integer" },
-      author_j9s: { name: "string" },
-      book_j9s: { title: "string", author_id: "integer" },
-      author_j10s: { name: "string", age: "integer" },
-      book_j10s: { title: "string", author_id: "integer" },
-      post_j11s: { title: "string" },
-      post_j12s: { title: "string" },
-      comment_j12s: { body: "string", post_id: "integer" },
-      post_a0s: { title: "string" },
-      post_a2s: { title: "string" },
-      comment_a2s: { body: "string", post_id: "integer" },
-      post_a4s: { title: "string" },
-      comment_a4s: { body: "string", post_id: "integer" },
-      reply_a4s: { text: "string", comment_id: "integer" },
-    });
-  });
+  const { authors } = useHandlerFixtures([
+    "authors",
+    "authorAddresses",
+    "posts",
+    "comments",
+    "tags",
+    "taggings",
+  ]);
+
+  const getDavid = () => Author.find(authors("david").id);
+  const getMary = () => Author.find(authors("mary").id);
+
   it("includes uses association name", async () => {
-    class CommentJ1 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class PostJ1 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("comments", { className: "CommentJ1", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentJ1);
-    const post = await PostJ1.create({ title: "Hello" });
-    await CommentJ1.create({ body: "Great", post_id: post.id });
-    await CommentJ1.create({ body: "Nice", post_id: post.id });
-    await collection(post, "comments").load();
-    const json = post.asJson({ include: "comments" });
-    expect(json.comments).toBeDefined();
-    expect((json.comments as any[]).length).toBe(2);
-    expect((json.comments as any[])[0].body).toBe("Great");
+    const david = await getDavid();
+    const json = await david.asJson({ include: "posts" });
+
+    const posts = json.posts as Array<Record<string, unknown>>;
+    expect(Array.isArray(posts)).toBe(true);
+    // Postgres returns bigint ids as strings; compare numerically (Rails emits
+    // an integer either way).
+    expect(Number(json.id)).toBe(1);
+    expect(json.name).toBe("David");
+
+    const welcome = posts.find((p) => p.title === "Welcome to the weblog")!;
+    expect(Number(welcome.author_id)).toBe(1);
+    expect(welcome.body).toBe("Such a lovely day");
+
+    const thinking = posts.find((p) => p.title === "So I was thinking")!;
+    expect(thinking.body).toBe("Like I hopefully always am");
   });
 
   it("includes uses association name and applies attribute filters", async () => {
-    class CommentJ2 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class PostJ2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("comments", { className: "CommentJ2", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentJ2);
-    const post = await PostJ2.create({ title: "Hello" });
-    await CommentJ2.create({ body: "Great", post_id: post.id });
-    await collection(post, "comments").load();
-    const json = post.asJson({ include: { comments: { only: ["body"] } } });
-    expect((json.comments as any[])[0].body).toBe("Great");
-    expect((json.comments as any[])[0].post_id).toBeUndefined();
+    const david = await getDavid();
+    const json = await david.asJson({ include: { posts: { only: ["title"] } } });
+
+    expect(json.name).toBe("David");
+    const posts = json.posts as Array<Record<string, unknown>>;
+    expect(Array.isArray(posts)).toBe(true);
+
+    const welcome = posts.find((p) => p.title === "Welcome to the weblog")!;
+    expect(welcome.title).toBe("Welcome to the weblog");
+    expect(welcome.body).toBeUndefined();
+
+    expect(posts.some((p) => p.title === "So I was thinking")).toBe(true);
   });
 
   it("includes fetches second level associations", async () => {
-    class ReplyJ3 extends Base {
-      static {
-        this.attribute("text", "string");
-        this.attribute("comment_id", "integer");
+    const david = await getDavid();
+    const json = await david.asJson({
+      include: { posts: { include: { comments: { only: ["body"] } } } },
+    });
+
+    expect(json.name).toBe("David");
+    const posts = json.posts as Array<Record<string, unknown>>;
+    const bodies = posts.flatMap((p) =>
+      (p.comments as Array<Record<string, unknown>>).map((c) => c.body),
+    );
+    expect(bodies).toContain("Thank you again for the welcome");
+    expect(bodies).toContain("Don't think too hard");
+    // `only: :body` filters out post_id on the nested comments.
+    for (const p of posts) {
+      for (const c of p.comments as Array<Record<string, unknown>>) {
+        expect(c.post_id).toBeUndefined();
       }
     }
-    class CommentJ3 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.hasMany("replies", { className: "ReplyJ3", foreignKey: "comment_id" });
-      }
-    }
-    class PostJ3 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("comments", { className: "CommentJ3", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentJ3);
-    registerModel(ReplyJ3);
-    const post = await PostJ3.create({ title: "Hello" });
-    const c = await CommentJ3.create({ body: "Great", post_id: post.id });
-    await ReplyJ3.create({ text: "Indeed", comment_id: c.id });
-    await collection(post, "comments").load();
-    for (const comment of collection(post, "comments")) await collection(comment, "replies").load();
-    const json = post.asJson({ include: { comments: { include: "replies" } } });
-    const comments = json.comments as any[];
-    expect(comments[0].replies).toBeDefined();
-    expect(comments[0].replies[0].text).toBe("Indeed");
   });
 
   it("includes fetches nth level associations", async () => {
-    class DeepJ4 extends Base {
-      static {
-        this.attribute("val", "string");
-      }
-    }
-    class MidJ4 extends Base {
-      static {
-        this.attribute("val", "string");
-        this.hasMany("deeps", { className: "DeepJ4", foreignKey: "mid_id" });
-      }
-    }
-    class TopJ4 extends Base {
-      static {
-        this.attribute("val", "string");
-        this.hasMany("mids", { className: "MidJ4", foreignKey: "top_id" });
-      }
-    }
-    registerModel(MidJ4);
-    registerModel(DeepJ4);
-    const top = await TopJ4.create({ val: "top" });
-    const mid = await MidJ4.create({ val: "mid" });
-    const deep = await DeepJ4.create({ val: "deep" });
-    // This invented Top→Mid→Deep hierarchy has no fixtures to query, so the
-    // proxies are eager-loaded (Rails' `includes`) by seeding the real holder
-    // rather than a DB read. Serialization still resolves them through the
-    // real `send`/proxy reader, off each proxy's loaded target.
-    seedPreloadedHolder(mid, "deeps", [deep]);
-    seedPreloadedHolder(top, "mids", [mid]);
-    const json = top.asJson({ include: { mids: { include: { deeps: {} } } } });
-    expect((json.mids as any[])[0].deeps[0].val).toBe("deep");
+    const david = await getDavid();
+    const json = await david.asJson({
+      include: { posts: { include: { taggings: { include: { tag: { only: ["name"] } } } } } },
+    });
+
+    expect(json.name).toBe("David");
+    const posts = json.posts as Array<Record<string, unknown>>;
+    const tags = posts.flatMap((p) =>
+      (p.taggings as Array<Record<string, unknown>>).map((t) => t.tag as Record<string, unknown>),
+    );
+    expect(tags).toContainEqual({ name: "General" });
   });
 
   it("includes doesnt merge opts from base", async () => {
-    class CommentJ5 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class PostJ5 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-        this.hasMany("comments", { className: "CommentJ5", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentJ5);
-    const post = await PostJ5.create({ title: "Hello", author: "Alice" });
-    await CommentJ5.create({ body: "Great", post_id: post.id });
-    await collection(post, "comments").load();
-    const json = post.asJson({ only: ["title"], include: "comments" });
-    expect(json.title).toBe("Hello");
-    expect(json.author).toBeUndefined();
-    expect((json.comments as any[])[0].body).toBe("Great");
-    expect(Number((json.comments as any[])[0].post_id)).toBe(Number(post.id));
+    const david = await getDavid();
+    const json = await david.asJson({ only: ["id"], include: "posts" });
+    const posts = json.posts as Array<Record<string, unknown>>;
+    expect(posts.some((p) => p.title === "Welcome to the weblog")).toBe(true);
   });
 
   it("should not call methods on associations that dont respond", async () => {
-    // Rails defines `favorite_quote` on the author (not on Post), then
-    // `to_json(include: :posts, methods: :favorite_quote)`. The method is
-    // applied to the root author and NOT propagated to the included posts,
-    // which don't respond to it.
-    class PostJ6 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class AuthorJ6 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("posts", { className: "PostJ6", foreignKey: "author_id" });
-      }
-    }
-    registerModel(PostJ6);
-    const author = await AuthorJ6.create({ name: "David" });
-    await PostJ6.create({ title: "Welcome", author_id: author.id });
-    await collection(author, "posts").load();
-    (author as any).favoriteQuote = () => "Constraints are liberating";
-    const json = author.asJson({ include: "posts", methods: ["favoriteQuote"] });
+    const david = await getDavid();
+    (david as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
+      "Constraints are liberating";
+    const json = await david.asJson({ include: "posts", methods: ["favoriteQuote"] });
+
     expect(json.favoriteQuote).toBe("Constraints are liberating");
-    expect((json.posts as any[])[0].favoriteQuote).toBeUndefined();
+    const posts = json.posts as Array<Record<string, unknown>>;
+    for (const p of posts) {
+      expect(p.favoriteQuote).toBeUndefined();
+    }
   });
 
   it("should allow only option for list of authors", async () => {
-    class AuthorJ7 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const a1 = await AuthorJ7.create({ name: "Alice", age: 30 });
-    const a2 = await AuthorJ7.create({ name: "Bob", age: 25 });
-    const result = [a1, a2].map((a) => a.asJson({ only: ["name"] }));
-    expect(result[0].name).toBe("Alice");
-    expect(result[0].age).toBeUndefined();
-    expect(result[1].name).toBe("Bob");
+    const [david, mary] = [await getDavid(), await getMary()];
+    setIncludeRootInJson(false, () => {
+      const authorsList = [david, mary];
+      expect(ActiveSupportJSON.encode(authorsList, { only: "name" })).toBe(
+        '[{"name":"David"},{"name":"Mary"}]',
+      );
+    });
   });
 
   it("should allow except option for list of authors", async () => {
-    class AuthorJ8 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const a1 = await AuthorJ8.create({ name: "Alice", age: 30 });
-    const result = a1.asJson({ except: ["age", "id"] });
-    expect(result.name).toBe("Alice");
-    expect(result.age).toBeUndefined();
+    const [david, mary] = [await getDavid(), await getMary()];
+    setIncludeRootInJson(false, () => {
+      const authorsList = [david, mary];
+      const encoded = ActiveSupportJSON.encode(authorsList, {
+        except: [
+          "name",
+          "author_address_id",
+          "author_address_extra_id",
+          "organization_id",
+          "owned_essay_id",
+        ],
+      });
+      // Rails emits `[{"id":1},{"id":2}]`; Postgres serializes bigint ids as
+      // strings, so normalize the id values before comparing (the single-key
+      // `except` shape is still pinned).
+      const decoded = (JSON.parse(encoded) as Array<{ id: unknown }>).map((o) => ({
+        id: Number(o.id),
+      }));
+      expect(decoded).toEqual([{ id: 1 }, { id: 2 }]);
+    });
   });
 
   it("should allow includes for list of authors", async () => {
-    class BookJ9 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class AuthorJ9 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("books", { className: "BookJ9", foreignKey: "author_id" });
-      }
-    }
-    registerModel(BookJ9);
-    const a1 = await AuthorJ9.create({ name: "Alice" });
-    await BookJ9.create({ title: "Book1", author_id: a1.id });
-    await collection(a1, "books").load();
-    const result = [a1].map((a) => a.asJson({ include: "books" }));
-    expect(result[0].books).toBeDefined();
-    expect((result[0].books as any[])[0].title).toBe("Book1");
+    const [david, mary] = [await getDavid(), await getMary()];
+    const json = await Promise.all(
+      [david, mary].map((a) => a.asJson({ only: ["name"], include: { posts: { only: ["id"] } } })),
+    );
+
+    const davidPosts = (json[0].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
+    expect(json[0].name).toBe("David");
+    for (const id of [1, 2, 4, 5, 6]) expect(davidPosts).toContain(id);
+
+    const maryPosts = (json[1].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
+    expect(json[1].name).toBe("Mary");
+    for (const id of [7, 9]) expect(maryPosts).toContain(id);
   });
 
   it("should allow options for hash of authors", async () => {
-    class BookJ10 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    class AuthorJ10 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.hasMany("books", { className: "BookJ10", foreignKey: "author_id" });
-      }
-    }
-    registerModel(BookJ10);
-    const a1 = await AuthorJ10.create({ name: "Alice", age: 30 });
-    await BookJ10.create({ title: "Book1", author_id: a1.id });
-    await collection(a1, "books").load();
-    const json = a1.asJson({ only: ["name"], include: { books: { only: ["title"] } } });
-    expect(json.name).toBe("Alice");
-    expect(json.age).toBeUndefined();
-    expect((json.books as any[])[0].title).toBe("Book1");
-    expect((json.books as any[])[0].author_id).toBeUndefined();
+    const [david, mary] = [await getDavid(), await getMary()];
+    setIncludeRootInJson(true, () => {
+      const authorsHash: Record<number, Author> = { 1: david, 2: mary };
+      // Rails filters the hash by key (`only: [1, :name]` keeps key 1 only),
+      // then serializes each surviving author with the same options (`:name`).
+      expect(ActiveSupportJSON.encode(authorsHash, { only: [1, "name"] })).toBe(
+        '{"1":{"author":{"name":"David"}}}',
+      );
+    });
   });
 
   it("should be able to encode relation", async () => {
-    class PostJ11 extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await PostJ11.create({ title: "First" });
-    await PostJ11.create({ title: "Second" });
-    const posts = await PostJ11.all().toArray();
-    const encoded = posts.map((p: any) => p.asJson());
-    expect(encoded.length).toBe(2);
-    expect(encoded[0].title).toBe("First");
-    expect(encoded[1].title).toBe("Second");
+    const [david, mary] = [await getDavid(), await getMary()];
+    await setIncludeRootInJsonAsync(true, async () => {
+      const relation = await Author.where({ id: [david.id, mary.id] })
+        .order("id")
+        .toArray();
+      const encoded = ActiveSupportJSON.encode(relation, { only: "name" });
+      expect(encoded).toBe('[{"author":{"name":"David"}},{"author":{"name":"Mary"}}]');
+    });
   });
+
+  // -- trails-specific: synchronous fail-loud / awaitable contract --
 
   it("raises when including an unloaded has_many (sync serialization cannot query)", async () => {
     // Rails' `to_ary` would lazily load the rows; trails serialization is
     // synchronous and must not query, so an unloaded collection fails loud
     // rather than silently serializing as `[]`.
-    class CommentJ12 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    class PostJ12 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("comments", { className: "CommentJ12", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentJ12);
-    const post = await PostJ12.create({ title: "Hello" });
-    await CommentJ12.create({ body: "Hi", post_id: post.id });
-    // No load() — `post.comments` is unloaded. The thenable defers the throw to
-    // synchronous access (so `await` can still reach the async path).
+    const post = await Post.find(1);
     expect(() => post.asJson({ include: "comments" }).comments).toThrow(/not loaded/);
     expect(() => JSON.stringify(post.asJson({ include: "comments" }))).toThrow(/not loaded/);
     // Fail-loud is all-or-nothing: reading any key (not just the include) throws.
@@ -466,12 +401,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
   });
 
   it("without an include the hash is plain (no awaitable contract)", async () => {
-    class PostA0 extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = await PostA0.create({ title: "Hello" });
+    const post = await Post.find(1);
     // No `:include` → Rails-plain Hash with no `then` for assimilation to catch.
     expect((post.asJson() as { then?: unknown }).then).toBeUndefined();
     expect((post.serializableHash() as { then?: unknown }).then).toBeUndefined();
@@ -479,67 +409,46 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   // Awaiting runs the async path: lazy-load unloaded includes (Rails' `to_ary`).
   it("awaiting loads an unloaded belongs_to and serializes the row", async () => {
-    class PostA2 extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class CommentA2 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.belongsTo("post", { className: "PostA2", foreignKey: "post_id" });
-      }
-    }
-    registerModel(PostA2);
-    const post = await PostA2.create({ title: "Hello" });
-    const comment = await CommentA2.create({ body: "Great", post_id: post.id });
-    // Reload so the belongs_to target is unloaded, then `await` lazy-loads it.
-    const fresh = await CommentA2.findBy({ id: comment.id });
-    const json = await fresh!.asJson({ include: "post" });
-    expect((json.post as any).title).toBe("Hello");
+    const comment = await Comment.find(1);
+    const json = await comment.asJson({ only: ["body"], include: "post" });
+    expect((json.post as Record<string, unknown>).title).toBe("Welcome to the weblog");
+
     // root + include on the async path exercises the `element()` thunk.
-    (CommentA2 as any).includeRootInJson = true;
+    Comment.includeRootInJson = true;
     try {
-      const rooted = await fresh!.asJson({ include: "post" });
+      const rooted = await comment.asJson({ only: ["body"], include: "post" });
       const rootKey = Object.keys(rooted)[0];
       expect(Object.keys(rooted).length).toBe(1);
-      expect((rooted[rootKey] as any).post.title).toBe("Hello");
+      expect((rooted[rootKey] as { post: { title: string } }).post.title).toBe(
+        "Welcome to the weblog",
+      );
     } finally {
-      (CommentA2 as any).includeRootInJson = false;
+      Comment.includeRootInJson = false;
     }
   });
 
   it("awaiting loads unloaded has_many and nested includes", async () => {
-    class ReplyA4 extends Base {
-      static {
-        this.attribute("text", "string");
-        this.attribute("comment_id", "integer");
-      }
-    }
-    class CommentA4 extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.hasMany("replies", { className: "ReplyA4", foreignKey: "comment_id" });
-      }
-    }
-    class PostA4 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("comments", { className: "CommentA4", foreignKey: "post_id" });
-      }
-    }
-    registerModel(CommentA4);
-    registerModel(ReplyA4);
-    const post = await PostA4.create({ title: "Hello" });
-    const c = await CommentA4.create({ body: "Great", post_id: post.id });
-    await ReplyA4.create({ text: "Indeed", comment_id: c.id });
-    const json = await post.asJson({ include: { comments: { include: "replies" } } });
-    const comments = json.comments as any[];
-    expect(comments[0].body).toBe("Great");
-    expect(comments[0].replies[0].text).toBe("Indeed");
+    const post = await Post.find(1);
+    const json = await post.asJson({
+      include: { comments: { only: ["id", "body"], include: { children: { only: ["body"] } } } },
+    });
+    const comments = json.comments as Array<Record<string, unknown>>;
+    const greetings = comments.find((c) => Number(c.id) === 1)!;
+    expect(greetings.body).toBe("Thank you for the welcome");
+    const children = greetings.children as Array<Record<string, unknown>>;
+    expect(children[0].body).toBe("Thank you again for the welcome");
     // The awaited value is a plain object — JSON.stringify works normally.
-    expect(JSON.parse(JSON.stringify(json)).comments[0].replies[0].text).toBe("Indeed");
+    expect(typeof JSON.stringify(json)).toBe("string");
   });
 });
+
+// Async sibling of `setIncludeRootInJson` for the relation-encoding case.
+async function setIncludeRootInJsonAsync(value: boolean, fn: () => Promise<void>): Promise<void> {
+  const original = Base.includeRootInJson;
+  Base.includeRootInJson = value;
+  try {
+    await fn();
+  } finally {
+    Base.includeRootInJson = original;
+  }
+}
