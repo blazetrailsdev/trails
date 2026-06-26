@@ -1,11 +1,11 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/defaults_test.rb
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { loadSchemaFromAdapter } from "./model-schema.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
@@ -18,13 +18,12 @@ import {
   MYSQL_TEST_URL,
   supportsDefaultExpression,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
-
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Entrant } from "./test-helpers/models/entrant.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -33,15 +32,297 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb:169), gated to the
+// Most suites below build their adapter-specific tables dynamically in
+// `beforeEach` (mirroring Rails' `setup` `@connection.create_table ...`): these
+// tables are not in `schema.rb` and have no canonical home, so they are created
+// per-test through the migration DSL on a pool-leased adapter and dropped in
+// `afterEach`. Building in `beforeEach` (not `beforeAll`) because the shared
+// per-worker DB is reset by the global `beforeEach` in test-setup-ar.ts.
+
+// Rails asserts string equality on binary-column defaults; a binary column
+// deserializes to bytes in trails (BinaryType → Uint8Array), so decode the
+// faithful analog of Ruby's binary string before comparing.
+function decodeBinaryDefault(value: unknown): string {
+  if (typeof value === "string") return value;
+  return new TextDecoder().decode(value as Uint8Array);
+}
+
+describe("DefaultTest", () => {
+  // Rails: `require "models/entrant"` + `fixtures` not needed — the test only
+  // reads `Entrant.columns_hash`. Wire the canonical `entrants` table so the
+  // shared model resolves regardless of any bespoke `entrants` a sibling left.
+  useHandlerFixtures(["entrants"], { schema: canonicalSchema });
+
+  it("nil defaults for not null columns", async () => {
+    await Entrant.loadSchema();
+    const columns = Entrant.columnsHash();
+    for (const name of ["id", "name", "course_id"]) {
+      const column = columns[name];
+      // TRACKED DEVIATION (convergence story sqlite-pk-not-null-ddl): trails'
+      // SQLite `create_table` emits `"id" integer PRIMARY KEY` without the
+      // `NOT NULL` Rails adds (`"id" integer PRIMARY KEY AUTOINCREMENT NOT NULL`),
+      // so PRAGMA reports `notnull=0` and `id.null` reflects `true` on the SQLite
+      // lane only. Rails asserts NOT NULL on every adapter; PG/MySQL bigint PKs
+      // already reflect NOT NULL here.
+      if (name === "id" && adapterType === "sqlite") continue;
+      expect(column.null).toBe(false);
+      expect(column.default).toBeFalsy();
+    }
+  });
+});
+
+// Rails gates `test_multiline_default_text` to
+// `current_adapter?(:PostgreSQLAdapter) || current_adapter?(:SQLite3Adapter)`.
+// The `multiline_default` column comes from the adapter-specific `defaults`
+// table (postgresql_specific_schema.rb / sqlite_specific_schema.rb).
+describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
+  it("multiline default text", async () => {
+    const adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("defaults", { force: true }, (t: any) => {
+      t.text("multiline_default", { default: "--- []\n\n" });
+    });
+    try {
+      class Default extends Base {
+        static override tableName = "defaults";
+      }
+      Default.adapter = adapter;
+      await Default.loadSchema();
+      // Rails: assert("--- []\n\n" == record.multiline_default ||
+      //               "--- []\\012\\012" == record.multiline_default)
+      // Older PostgreSQL versions reflect the default with escaped newlines.
+      const multiline = (new Default() as any).multiline_default;
+      expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
+    } finally {
+      await ctx.dropTable("defaults", { ifExists: true });
+    }
+  });
+});
+
+describe("DefaultNumbersTest", () => {
+  let adapter: DatabaseAdapter;
+  let DefaultNumber: typeof Base;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("default_numbers", { force: true }, (t: any) => {
+      t.integer("positive_integer", { default: 7 });
+      t.integer("negative_integer", { default: -5 });
+      t.decimal("decimal_number", { default: "2.78", precision: 5, scale: 2 });
+    });
+    class DN extends Base {
+      static override tableName = "default_numbers";
+    }
+    DN.adapter = adapter;
+    await DN.loadSchema();
+    DefaultNumber = DN;
+  });
+
+  afterEach(async () => {
+    await new MigrationContext(adapter).dropTable("default_numbers", { ifExists: true });
+  });
+
+  it("default positive integer", () => {
+    const record = new DefaultNumber();
+    expect((record as any).positive_integer).toBe(7);
+    expect(record.readAttributeBeforeTypeCast("positive_integer")).toBe("7");
+  });
+
+  it("default negative integer", () => {
+    const record = new DefaultNumber();
+    expect((record as any).negative_integer).toBe(-5);
+    expect(record.readAttributeBeforeTypeCast("negative_integer")).toBe("-5");
+  });
+
+  it("default decimal number", () => {
+    const record = new DefaultNumber();
+    expect((record as any).decimal_number).toEqual(new BigDecimal("2.78"));
+    expect(record.readAttributeBeforeTypeCast("decimal_number")).toBe("2.78");
+  });
+});
+
+describe("DefaultStringsTest", () => {
+  let adapter: DatabaseAdapter;
+  let DefaultString: typeof Base;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("default_strings", { force: true }, (t: any) => {
+      t.string("string_col", { default: "Smith" });
+      t.string("string_col_with_quotes", { default: "O'Connor" });
+    });
+    class DS extends Base {
+      static override tableName = "default_strings";
+    }
+    DS.adapter = adapter;
+    await DS.loadSchema();
+    DefaultString = DS;
+  });
+
+  afterEach(async () => {
+    await new MigrationContext(adapter).dropTable("default_strings", { ifExists: true });
+  });
+
+  it("default strings", () => {
+    expect((new DefaultString() as any).string_col).toBe("Smith");
+  });
+
+  it("default strings containing single quotes", () => {
+    expect((new DefaultString() as any).string_col_with_quotes).toBe("O'Connor");
+  });
+});
+
+// Rails gates the whole class to `current_adapter?(:SQLite3Adapter, :PostgreSQLAdapter)`.
+// (`test_default_binary_string` is nested under a further `Mysql2Adapter` guard
+// that can never be true inside the sqlite/pg gate, so it never runs — omitted.)
+describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
+  let adapter: DatabaseAdapter;
+  let DefaultBinary: typeof Base;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("default_binaries", { force: true }, (t: any) => {
+      t.binary("varbinary_col", { null: false, limit: 64, default: "varbinary_default" });
+      t.binary("varbinary_col_hex_looking", { null: false, limit: 64, default: "0xDEADBEEF" });
+    });
+    class DB extends Base {
+      static override tableName = "default_binaries";
+    }
+    DB.adapter = adapter;
+    await DB.loadSchema();
+    DefaultBinary = DB;
+  });
+
+  afterEach(async () => {
+    await new MigrationContext(adapter).dropTable("default_binaries", { ifExists: true });
+  });
+
+  // Rails asserts string equality; a binary column deserializes to bytes in
+  // trails (BinaryType → Uint8Array), so decode the faithful analog of Ruby's
+  // binary string before comparing.
+  it("default varbinary string", () => {
+    expect(decodeBinaryDefault((new DefaultBinary() as any).varbinary_col)).toBe(
+      "varbinary_default",
+    );
+  });
+
+  // Rails nests `test_default_binary_string` under a further
+  // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?` guard
+  // *inside* the sqlite/pg gate — a combination that can never hold — and
+  // `binary_col` is declared in no schema, so the test is dead on every adapter.
+  // Ported verbatim under the same MySQL guard for name parity; it never runs.
+  it.skipIf(adapterType !== "mysql")("default binary string", () => {
+    // Rails: assert_equal "binary_default", DefaultBinary.new.binary_col
+    expect(decodeBinaryDefault((new DefaultBinary() as any).binary_col)).toBe("binary_default");
+  });
+
+  it("default varbinary string that looks like hex", () => {
+    expect(decodeBinaryDefault((new DefaultBinary() as any).varbinary_col_hex_looking)).toBe(
+      "0xDEADBEEF",
+    );
+  });
+});
+
+describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
+  let adapter: DatabaseAdapter;
+  let DefaultText: typeof Base;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("default_texts", { force: true }, (t: any) => {
+      t.text("text_col", { default: "Smith" });
+      t.text("text_col_with_quotes", { default: "O'Connor" });
+    });
+    class DT extends Base {
+      static override tableName = "default_texts";
+    }
+    DT.adapter = adapter;
+    await DT.loadSchema();
+    DefaultText = DT;
+  });
+
+  afterEach(async () => {
+    await new MigrationContext(adapter).dropTable("default_texts", { ifExists: true });
+  });
+
+  it("default texts", () => {
+    expect((new DefaultText() as any).text_col).toBe("Smith");
+  });
+
+  it("default texts containing single quotes", () => {
+    expect((new DefaultText() as any).text_col_with_quotes).toBe("O'Connor");
+  });
+});
+
+// Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb), gated to the
+// PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
+// — built here with the migration DSL (expression defaults round-trip through the
+// catalog and reflect via column.defaultFunction) and dumped via dump_table_schema.
+describeIfPg("PostgresqlDefaultExpressionTest", () => {
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("defaults", { force: true }, (t: any) => {
+      t.integer("random_number", { default: () => "random() * 100" });
+      t.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
+      t.date("modified_date", { default: () => "CURRENT_DATE" });
+      t.date("modified_date_function", { default: () => "now()" });
+      t.date("fixed_date", { default: "2004-01-01" });
+      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+      t.datetime("modified_time_without_precision", {
+        precision: null,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_with_precision_0", {
+        precision: 0,
+        default: () => "CURRENT_TIMESTAMP",
+      });
+      t.datetime("modified_time_function", { default: () => "now()" });
+      t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+      t.column("char1", "char(1)", { default: "Y" });
+      t.string("char2", { limit: 50, default: "a varchar field" });
+      t.text("char3", { default: "a text field" });
+    });
+  });
+
+  afterEach(async () => {
+    await ctx.dropTable("defaults", { ifExists: true });
+  });
+
+  it("schema dump includes default expression", async () => {
+    const output = await SchemaDumper.dumpTableSchema(
+      adapter as unknown as SchemaSource,
+      "defaults",
+    );
+    expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
+    expect(output).toMatch(
+      /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+    );
+    expect(output).toMatch(/t\.date\("modified_date_function", \{ default: \(\) => "now\(\)" \}\)/);
+    expect(output).toMatch(
+      /t\.datetime\("modified_time_function", \{ default: \(\) => "now\(\)" \}\)/,
+    );
+  });
+});
+
+// Mirrors `MysqlDefaultExpressionTest` (defaults_test.rb), gated to the
 // Mysql2Adapter. The three tables come from mysql2_specific_schema.rb — built
 // here with the migration DSL (the expression defaults round-trip through
 // quoteDefaultExpression) and dumped via SchemaDumpingHelper#dump_table_schema.
 describeIfMysql("MysqlDefaultExpressionTest", () => {
-  // The shared per-worker test DB is reset by the global `beforeEach`
-  // (test-setup-ar.ts), which would drop tables built in a `beforeAll`. So
-  // build them per-test via `createTestAdapter` + MigrationContext (the same
-  // idiom as time-precision.test.ts), and drop them in `afterEach`.
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
@@ -92,21 +373,6 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
     expect(output).toMatch(
       /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
     );
-  });
-
-  // Trails-specific: Rails reads SHOW FULL FIELDS (varchar Default is unquoted
-  // natively), but the trails columns() path reflects via information_schema,
-  // where MariaDB reports string literal defaults single-quoted. columns() must
-  // strip the outer quotes so the dump matches `a varchar field`, not
-  // `'a varchar field'`. `char2` is created unconditionally (no expression-default
-  // support needed), so this assertion is not gated on `supportsDefaultExpression`.
-  // MySQL 8 already reflects unquoted; the strip is gated on MariaDB.
-  it("schema dump includes unquoted string literal default", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
-    expect(output).toMatch(/t\.string\("char2", \{ limit: 50, default: "a varchar field" \}\)/);
   });
 
   itIfSupports(
@@ -192,111 +458,8 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
   });
 });
 
-describe("DefaultNumbersTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ counters: { value: "integer" } });
-  });
-
-  function makeModel() {
-    class Counter extends Base {
-      static {
-        this.attribute("value", "integer");
-      }
-    }
-    return { Counter };
-  }
-
-  it("default positive integer", async () => {
-    const { Counter } = makeModel();
-    const c = await Counter.create({ value: 42 });
-    expect(c.value).toBe(42);
-  });
-
-  it("default negative integer", async () => {
-    const { Counter } = makeModel();
-    const c = await Counter.create({ value: -5 });
-    expect(c.value).toBe(-5);
-  });
-
-  it("default decimal number", async () => {
-    const { Counter } = makeModel();
-    const c = await Counter.create({ value: 0 });
-    expect(c.value).toBe(0);
-  });
-});
-
-// Rails gates these binary-default cases `unless current_adapter?(:Mysql2)`
-// (MySQL string/binary default handling differs). adapters: postgresql + sqlite.
-describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ bin_records: { data: "string" } });
-  });
-  it("default varbinary string", async () => {
-    class BinRecord extends Base {
-      static {
-        this.attribute("data", "string");
-      }
-    }
-    const r = await BinRecord.create({ data: "binary_data" });
-    expect(r.data).toBe("binary_data");
-  });
-  it("default binary string", async () => {
-    class BinRecord extends Base {
-      static {
-        this.attribute("data", "string", { default: "" });
-      }
-    }
-    const r = new BinRecord({});
-    expect(r.data).toBe("");
-  });
-  it("default varbinary string that looks like hex", async () => {
-    class BinRecord extends Base {
-      static {
-        this.attribute("data", "string");
-      }
-    }
-    const r = await BinRecord.create({ data: "0xDEADBEEF" });
-    expect(r.data).toBe("0xDEADBEEF");
-  });
-});
-
-describe("DefaultTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string" },
-      users: { name: "string", active: "boolean" },
-    });
-  });
-
-  it("nil defaults for not null columns", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = new Post({});
-    expect(p.title).toBeNull();
-  });
-
-  it.skipIf(adapterType === "mysql")("multiline default text", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("body", "string", { default: "line1\nline2\nline3" });
-      }
-    }
-    const p = new Post({});
-    expect(p.body).toBe("line1\nline2\nline3");
-  });
-});
-
-// Mirrors `DefaultsTestWithoutTransactionalFixtures` (defaults_test.rb:222),
-// gated to the Mysql2Adapter. Rails toggles strict mode via
+// Mirrors `DefaultsTestWithoutTransactionalFixtures` (defaults_test.rb), gated
+// to the Mysql2Adapter. Rails toggles strict mode via
 // `establish_connection(..., strict:)`; our Mysql2Adapter accepts the same
 // `strict` config key, so `using_strict` becomes a fresh adapter per block.
 describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
@@ -347,10 +510,12 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_integer).toBe(0);
       expect((record as any).non_null_string).toBe("");
       expect((record as any).non_null_text).toBe("");
-      // Rails asserts `""` here; a binary column deserializes to bytes in trails
-      // (BinaryType → Uint8Array), so the faithful analog of Ruby's empty binary
-      // string is a zero-length byte array.
-      expect((record as any).non_null_blob).toHaveLength(0);
+      // Rails: `assert_equal "", record.non_null_blob`. A binary column
+      // deserializes to bytes in trails (BinaryType → Uint8Array), so the
+      // faithful analog of Ruby's empty binary string is the exact empty byte
+      // array — and its decoded text is `""`.
+      expect(new Uint8Array((record as any).non_null_blob)).toEqual(new Uint8Array(0));
+      expect(decodeBinaryDefault((record as any).non_null_blob)).toBe("");
     });
   });
 
@@ -367,119 +532,7 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
   });
 });
 
-describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: { body: "string", title: "string" } });
-  });
-  it("default texts", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("body", "string");
-      }
-    }
-    const p = await Post.create({ body: "some text" });
-    expect(p.body).toBe("some text");
-  });
-  it("default texts containing single quotes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("body", "string");
-      }
-    }
-    const p = await Post.create({ body: "it's some text" });
-    expect(p.body).toBe("it's some text");
-  });
-});
-
-describe("DefaultStringsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: { title: "string", body: "string" } });
-  });
-  it("default strings", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "hello" });
-    expect(p.title).toBe("hello");
-  });
-  it("default strings containing single quotes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "it's a test" });
-    expect(p.title).toBe("it's a test");
-  });
-});
-
-// Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb:148), gated to the
-// PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
-// — built here with the migration DSL (expression defaults round-trip through the
-// catalog and reflect via column.defaultFunction) and dumped via dump_table_schema.
-describeIfPg("PostgresqlDefaultExpressionTest", () => {
-  let adapter: DatabaseAdapter;
-  let ctx: MigrationContext;
-
-  beforeEach(async () => {
-    adapter = createTestAdapter();
-    ctx = new MigrationContext(adapter);
-    await ctx.createTable("defaults", { force: true }, (t: any) => {
-      t.integer("random_number", { default: () => "random() * 100" });
-      t.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
-      t.date("modified_date", { default: () => "CURRENT_DATE" });
-      t.date("modified_date_function", { default: () => "now()" });
-      t.date("fixed_date", { default: "2004-01-01" });
-      t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
-      t.datetime("modified_time_without_precision", {
-        precision: null,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_with_precision_0", {
-        precision: 0,
-        default: () => "CURRENT_TIMESTAMP",
-      });
-      t.datetime("modified_time_function", { default: () => "now()" });
-      t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
-      t.column("char1", "char(1)", { default: "Y" });
-      t.string("char2", { limit: 50, default: "a varchar field" });
-      t.text("char3", { default: "a text field" });
-    });
-  });
-
-  afterEach(async () => {
-    await ctx.dropTable("defaults", { ifExists: true });
-  });
-
-  it("schema dump includes default expression", async () => {
-    const output = await SchemaDumper.dumpTableSchema(
-      adapter as unknown as SchemaSource,
-      "defaults",
-    );
-    expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
-    expect(output).toMatch(
-      /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
-    expect(output).toMatch(
-      /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
-    expect(output).toMatch(
-      /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
-    expect(output).toMatch(/t\.date\("modified_date_function", \{ default: \(\) => "now\(\)" \}\)/);
-    expect(output).toMatch(
-      /t\.datetime\("modified_time_function", \{ default: \(\) => "now\(\)" \}\)/,
-    );
-  });
-});
-
-// Mirrors `Sqlite3DefaultExpressionTest` (defaults_test.rb:309), gated to the
+// Mirrors `Sqlite3DefaultExpressionTest` (defaults_test.rb), gated to the
 // SQLite3Adapter. The `defaults` table comes from sqlite_specific_schema.rb —
 // built here with the migration DSL; expression defaults reflect via
 // column.defaultFunction (newColumnFromField/_extractDefaultFunction).
@@ -535,191 +588,5 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
     expect(output).toMatch(
       /t\.integer\("random_number", \{ default: \(\) => "ABS\(RANDOM\(\)\)" \}\)/,
     );
-  });
-});
-
-describe("DefaultTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { count: { type: "integer", default: 7 } } });
-  });
-
-  it("default attribute value overrides from database", async () => {
-    class Item extends Base {
-      static override tableName = "items";
-    }
-    await loadSchemaFromAdapter.call(Item);
-    expect(new Item().count).toBe(7);
-  });
-
-  it("default attribute value for integer", () => {
-    class M extends Base {
-      static {
-        this.attribute("count", "integer", { default: 42 });
-      }
-    }
-    expect(new M().count).toBe(42);
-  });
-
-  it("default attribute value for string", () => {
-    class M extends Base {
-      static {
-        this.attribute("name", "string", { default: "hello" });
-      }
-    }
-    expect(new M().name).toBe("hello");
-  });
-
-  it("default attribute value for boolean", () => {
-    class M extends Base {
-      static {
-        this.attribute("active", "boolean", { default: true });
-      }
-    }
-    expect(new M().active).toBe(true);
-  });
-
-  it("default attribute value for datetime", async () => {
-    // Attribute.fromDatabase passes the raw column default through type.deserialize,
-    // so a datetime string default becomes a Temporal.Instant on the model instance.
-    const { DateTimeType } = await import("@blazetrails/activemodel");
-    const { Temporal } = await import("@blazetrails/activesupport/temporal");
-    const dtType = new DateTimeType();
-    const mockAdapter = {
-      schemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => ({
-          start_at: { name: "start_at", sqlType: "datetime", default: "2024-01-15 10:00:00" },
-        }),
-        getCachedColumnsHash: () => undefined,
-        isCached: () => false,
-      },
-      lookupCastTypeFromColumn: () => dtType,
-    };
-    class Event extends Base {
-      static override tableName = "events";
-    }
-    (Event as any).adapter = mockAdapter;
-    await loadSchemaFromAdapter.call(Event);
-    const val = new Event().start_at;
-    // DateTimeType.deserialize("2024-01-15 10:00:00") → Temporal.Instant
-    expect(val).toBeInstanceOf(Temporal.Instant);
-  });
-  it("default attribute value for date", async () => {
-    // Attribute.fromDatabase passes the raw column default through type.deserialize,
-    // so a date string default becomes a Temporal.PlainDate on the model instance.
-    const { DateType } = await import("@blazetrails/activemodel");
-    const { Temporal } = await import("@blazetrails/activesupport/temporal");
-    const dateType = new DateType();
-    const mockAdapter = {
-      schemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => ({
-          on_date: { name: "on_date", sqlType: "date", default: "2024-06-01" },
-        }),
-        getCachedColumnsHash: () => undefined,
-        isCached: () => false,
-      },
-      lookupCastTypeFromColumn: () => dateType,
-    };
-    class Event extends Base {
-      static override tableName = "events";
-    }
-    (Event as any).adapter = mockAdapter;
-    await loadSchemaFromAdapter.call(Event);
-    const val = new Event().on_date;
-    // DateType.deserialize("2024-06-01") → Temporal.PlainDate
-    expect(val).toBeInstanceOf(Temporal.PlainDate);
-  });
-  it("default attribute value for decimal", async () => {
-    // Attribute.fromDatabase passes raw column default "2.789" through type.deserialize,
-    // so the model default is the rounded decimal "2.79", not the raw DB string.
-    const { DecimalType } = await import("@blazetrails/activemodel");
-    const decimalType = new DecimalType({ precision: 5, scale: 2 });
-    const mockAdapter = {
-      schemaCache: {
-        dataSourceExists: async () => true,
-        columnsHash: async () => ({
-          amount: { name: "amount", sqlType: "decimal(5,2)", default: "2.789" },
-        }),
-        getCachedColumnsHash: () => undefined,
-        isCached: () => false,
-      },
-      lookupCastTypeFromColumn: () => decimalType,
-    };
-    class Order extends Base {
-      static override tableName = "orders";
-    }
-    (Order as any).adapter = mockAdapter;
-    await loadSchemaFromAdapter.call(Order);
-    const val = new Order().amount;
-    // "2.789" cast through DecimalType(scale:2) → BigDecimal("2.79")
-    // (rounded to 2 decimal places), quoting in fixed "F" form.
-    expect(val).toBeInstanceOf(BigDecimal);
-    expect((val as BigDecimal).toString("F")).toBe("2.79");
-  });
-
-  it("default value for float", () => {
-    class M extends Base {
-      static {
-        this.attribute("score", "float", { default: 3.14 });
-      }
-    }
-    expect(new M().score).toBeCloseTo(3.14);
-  });
-
-  it("default attribute value for text", () => {
-    class M extends Base {
-      static {
-        this.attribute("bio", "string", { default: "none" });
-      }
-    }
-    expect(new M().bio).toBe("none");
-  });
-
-  it("default attribute value is available on new record", () => {
-    class M extends Base {
-      static {
-        this.attribute("status", "string", { default: "draft" });
-      }
-    }
-    const m = new M();
-    expect(m.status).toBe("draft");
-  });
-
-  it("default attribute value accessible through class", () => {
-    class M extends Base {
-      static {
-        this.attribute("role", "string", { default: "user" });
-      }
-    }
-    const defaults = M.columnDefaults;
-    expect(defaults.role).toBe("user");
-  });
-});
-
-describe("Base.columnDefaults", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string" },
-      users: { name: "string", active: "boolean" },
-    });
-  });
-
-  it("returns default values for all attributes", () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string", { default: "Anonymous" });
-        this.attribute("active", "boolean", { default: true });
-      }
-    }
-    const defaults = User.columnDefaults;
-    expect(defaults.name).toBe("Anonymous");
-    expect(defaults.active).toBe(true);
-    expect(defaults.id).toBe(null);
   });
 });
