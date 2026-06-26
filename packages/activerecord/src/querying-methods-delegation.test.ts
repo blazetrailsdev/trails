@@ -2,149 +2,85 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { Topic } from "./test-helpers/models/topic.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+// Rails `fixtures :topics`. Recreate the canonical topics table empty; each test
+// seeds its own rows and the transactional wrapper rolls them back.
+useHandlerFixtures({ topics: [Topic, {}] }, { schema: canonicalSchema });
 
 describe("Base static query delegations", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ users: { name: "string" } });
-  });
   it("Base.first() returns the first record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
+    await Topic.create({ title: "Alice" });
+    await Topic.create({ title: "Bob" });
 
-    const first = await User.first();
+    const first = await Topic.first();
     expect(first).not.toBeNull();
-    expect((first as any).name).toBe("Alice");
+    expect(first!.title).toBe("Alice");
   });
 
   it("Base.last() returns the last record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
+    await Topic.create({ title: "Alice" });
+    await Topic.create({ title: "Bob" });
 
-    const last = await User.last();
+    const last = await Topic.last();
     expect(last).not.toBeNull();
-    expect((last as any).name).toBe("Bob");
+    expect(last!.title).toBe("Bob");
   });
 
   it("Base.take() returns any record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
+    await Topic.create({ title: "Alice" });
 
-    const taken = await User.take();
+    const taken = await Topic.take();
     expect(taken).not.toBeNull();
   });
 
   it("Base.select() returns a relation with selected columns", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
+    await Topic.create({ title: "Alice" });
 
-    const rel = User.select("name");
+    const rel = Topic.select("title");
     const results = await rel.toArray();
     expect(results.length).toBe(1);
   });
 
   it("Base.order() returns an ordered relation", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Bob" });
-    await User.create({ name: "Alice" });
+    await Topic.create({ title: "Bob" });
+    await Topic.create({ title: "Alice" });
 
-    const results = await User.order("name").toArray();
-    expect(results[0].name).toBe("Alice");
+    const results = await Topic.order("title").toArray();
+    expect(results[0].title).toBe("Alice");
   });
 
   it("Base.limit() limits results", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-    await User.create({ name: "Charlie" });
+    await Topic.create({ title: "Alice" });
+    await Topic.create({ title: "Bob" });
+    await Topic.create({ title: "Charlie" });
 
-    const results = await User.limit(2).toArray();
+    const results = await Topic.limit(2).toArray();
     expect(results.length).toBe(2);
   });
 
   it("Base.distinct() returns distinct results", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
+    await Topic.create({ title: "Alice" });
+    await Topic.create({ title: "Bob" });
 
-    const rel = User.distinct();
+    const rel = Topic.distinct();
     expect(rel.distinctValue).toBe(true);
   });
 
   it("Base.none() returns empty relation", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
+    await Topic.create({ title: "Alice" });
 
-    const results = await User.none().toArray();
+    const results = await Topic.none().toArray();
     expect(results.length).toBe(0);
   });
 
   it("Base.sole() returns the sole record", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    await User.create({ name: "Alice" });
+    await Topic.create({ title: "Alice" });
 
-    const record = await User.sole();
-    expect(record.name).toBe("Alice");
+    const record = await Topic.sole();
+    expect(record.title).toBe("Alice");
   });
 });
