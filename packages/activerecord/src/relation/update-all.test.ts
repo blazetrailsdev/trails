@@ -485,12 +485,10 @@ describe("UpdateAllTest", () => {
     expect(count).toBe(postsWithCats.length);
   });
 
-  // TRACKED DEVIATION: Relation#updateAll only accepts Record<string, unknown>; Rails also
-  // supports raw SQL strings ("id = id + 1") to trigger PK-collision tests for order semantics.
-  it.skip("update all doesnt ignore order", async () => {
+  it("update all doesnt ignore order", async () => {
     const david = authors("david");
     const mary = authors("mary");
-    expect(mary.id).toBe((david.id as number) + 1);
+    expect(Number(mary.id)).toBe(Number(david.id) + 1);
 
     try {
       await (Author.order("id DESC").updateAll as any)("id = id + 1");
