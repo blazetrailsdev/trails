@@ -80,7 +80,7 @@ export class Post extends Base {
       q.joins("taggings").where({ taggings: { comment } }),
     );
     this.scope("typographicallyInteresting", (q: any) =>
-      q._modelClass.containingTheLetterA().or(q._modelClass.titledWithAnApostrophe()),
+      q.merge(q._modelClass.containingTheLetterA().or(q._modelClass.titledWithAnApostrophe())),
     );
 
     this.belongsTo("author");

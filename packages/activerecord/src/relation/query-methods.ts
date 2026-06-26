@@ -1113,16 +1113,15 @@ export function structurallyIncompatibleValuesFor(
     // i.e. when the *other* relation never set this value (Ruby `nil`) the
     // pair is compatible regardless of `self`'s value. trails represents an
     // unset multi-value as an empty array, so an empty `b` stands in for nil.
-    // The one case trails can't distinguish from a representation alone is
-    // `unscope(<dim>)`, which *explicitly* empties the array (Rails keeps it an
-    // Array, so the comparison proceeds → incompatible). We recover that
-    // distinction from `_unscopeValues` (unscope! records the reset dim there):
-    // an empty `b` is "never set" → compatible only when the other relation did
-    // not unscope this dimension. Matching values are compared after `uniq`.
+    // `unscope(<dim>)` is no exception: Rails `unscope!` *deletes* the value
+    // key (`@values.delete(scope)`), so an unscoped dimension on the other
+    // relation also reads back as `nil` → compatible. trails represents both
+    // "never set" and "unscoped" as an empty array, so an empty `b` always
+    // stands in for that `nil`. Matching populated values are compared after
+    // `uniq` (see relation/or_test.rb `test_or_with_unscope_order`).
     if (Array.isArray(a)) {
       if (!Array.isArray(b)) continue;
-      const otherUnscoped = ((other._unscopeValues as unknown[]) ?? []).includes(label);
-      if (b.length === 0 && !otherUnscoped) continue;
+      if (b.length === 0) continue;
       if (!deepEqual(uniqArray(a), uniqArray(b as unknown[]))) incompat.push(label);
       continue;
     }
