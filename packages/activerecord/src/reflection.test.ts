@@ -86,7 +86,7 @@ const TEST_SCHEMA: Schema = {
   hot_owners: { name: "string" },
   hot_profiles: { hot_account_id: "integer" },
   hotels: { name: "string" },
-  items: { tenant_id: "integer" },
+  refl_items: { tenant_id: "integer" },
   jt_categories: { name: "string" },
   jt_products: { name: "string" },
   libraries: { name: "string" },

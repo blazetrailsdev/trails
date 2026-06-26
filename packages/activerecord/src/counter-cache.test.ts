@@ -32,7 +32,7 @@ const TEST_SCHEMA: Schema = {
     name: "string",
     items_count: { type: "integer", default: 0 },
   },
-  items: {
+  cc_items: {
     name: "string",
     container_id: "integer",
   },
@@ -280,6 +280,7 @@ describe("CounterCacheTest", () => {
     }
     class Item extends Base {
       static {
+        this._tableName = "cc_items";
         this.attribute("name", "string");
         this.attribute("container_id", "integer");
         this.belongsTo("container", { counterCache: true });

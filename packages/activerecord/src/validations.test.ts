@@ -13,7 +13,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 const TEST_SCHEMA = {
   topics: { title: "string", score: "integer" },
   users: { name: "string", email: "string", invite_code: "string", reason: "string" },
-  items: { price: "integer" },
+  val_items: { price: "integer" },
   emails: { address: "string" },
   permissions: { user_id: "integer", resource_id: "integer" },
 } as const;

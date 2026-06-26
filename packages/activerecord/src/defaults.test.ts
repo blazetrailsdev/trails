@@ -542,12 +542,12 @@ describe("DefaultTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ items: { count: { type: "integer", default: 7 } } });
+    await defineSchema({ def_items: { count: { type: "integer", default: 7 } } });
   });
 
   it("default attribute value overrides from database", async () => {
     class Item extends Base {
-      static override tableName = "items";
+      static override tableName = "def_items";
     }
     await loadSchemaFromAdapter.call(Item);
     expect(new Item().count).toBe(7);

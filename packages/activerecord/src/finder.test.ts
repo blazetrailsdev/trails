@@ -30,7 +30,7 @@ const TEST_SCHEMA = {
     role: "string",
     score: "integer",
   },
-  items: {
+  finder_items: {
     name: "string",
     color: "string",
     category: "string",
@@ -2325,6 +2325,7 @@ describe("FinderTest", () => {
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {
       static {
+        this._tableName = "finder_items";
         this.attribute("name", "string");
       }
     }

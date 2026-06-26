@@ -33,6 +33,7 @@ describe("RelationTest", () => {
 
   class Item extends Base {
     static {
+      this._tableName = "rel_items";
       this.attribute("name", "string");
       this.attribute("price", "integer");
       this.attribute("category", "string");
@@ -41,7 +42,7 @@ describe("RelationTest", () => {
 
   beforeAll(async () => {
     await defineSchema({
-      items: {
+      rel_items: {
         name: "string",
         price: "integer",
         category: "string",
@@ -105,17 +106,17 @@ describe("RelationTest", () => {
   });
 
   it("pluck with from includes original table name", () => {
-    const sql = Item.from("items").select("name").toSql();
-    expect(sql).toContain("items");
+    const sql = Item.from("rel_items").select("name").toSql();
+    expect(sql).toContain("rel_items");
   });
 
   it("pluck with from includes quoted original table name", () => {
-    const sql = Item.from("items").select("name").toSql();
-    expect(sql).toContain("items");
+    const sql = Item.from("rel_items").select("name").toSql();
+    expect(sql).toContain("rel_items");
   });
 
   it("select with subquery in from does not use original table name", () => {
-    const sql = Item.from("(SELECT * FROM items) AS subquery").select("name").toSql();
+    const sql = Item.from("(SELECT * FROM rel_items) AS subquery").select("name").toSql();
     expect(sql).toContain("subquery");
   });
 
@@ -265,7 +266,7 @@ describe("RelationTest", () => {
     // Rails: Author.where(id: Author.joins(:posts).where(id: david.id))
     // A relation with joins used as a subquery for WHERE id IN (...)
     const fruitRelWithJoin = Item.where({ category: "fruit" }).joins(
-      `INNER JOIN "items" AS "items2" ON "items2"."id" = "items"."id"`,
+      `INNER JOIN "rel_items" AS "items2" ON "items2"."id" = "rel_items"."id"`,
     );
     const items = await Item.where({ id: fruitRelWithJoin }).toArray();
     expect(items).toHaveLength(2);

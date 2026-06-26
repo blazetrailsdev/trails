@@ -27,7 +27,7 @@ afterEach(async () => {
     "animals",
     "foo",
     "bar_table",
-    "items",
+    "invertible_items",
     "first_table",
     "second_table",
     "up_test",
@@ -181,7 +181,7 @@ describe("InvertibleMigrationTest", () => {
   it("migrate revert transaction", async () => {
     class CreateItems extends Migration {
       async change() {
-        await this.createTable("items", (t) => {
+        await this.createTable("invertible_items", (t) => {
           t.string("label");
         });
       }
@@ -189,7 +189,7 @@ describe("InvertibleMigrationTest", () => {
     const m = makeMigration(new CreateItems());
     await m.up();
     await m.down();
-    expect(await tableExists("items")).toBe(false);
+    expect(await tableExists("invertible_items")).toBe(false);
   });
 
   it("migrate revert change column default", async () => {

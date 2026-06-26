@@ -30,7 +30,7 @@ beforeAll(async () => {
       updated_at: "datetime",
       author_id: "integer",
     },
-    items: { name: "string", status: "string", active: "boolean" },
+    da_items: { name: "string", status: "string", active: "boolean" },
     users: { name: "string", active: "boolean" },
     delete_all_authors: { name: "string" },
     delete_all_posts: { title: "string", author_id: "integer" },
@@ -383,6 +383,7 @@ describe("DeleteAllTest", () => {
   it("delete all removes all matching records", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
         this.attribute("active", "boolean");
       }
@@ -400,6 +401,7 @@ describe("DeleteAllTest", () => {
     const log: string[] = [];
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
         this.afterDestroy((r: any) => {
           log.push(r.name);
@@ -418,6 +420,7 @@ describe("DeleteAllTest", () => {
     const log: string[] = [];
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
         this.beforeDestroy(() => {
           log.push("destroyed");
@@ -433,6 +436,7 @@ describe("DeleteAllTest", () => {
     const log: string[] = [];
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
         this.beforeSave(() => {
           log.push("saved");
@@ -448,6 +452,7 @@ describe("DeleteAllTest", () => {
   it("updateAll returns count", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("active", "boolean");
       }
     }
@@ -460,6 +465,7 @@ describe("DeleteAllTest", () => {
   it("deleteAll on empty table returns 0", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
       }
     }
@@ -469,6 +475,7 @@ describe("DeleteAllTest", () => {
   it("destroyBy destroys matching records with callbacks", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
       }
     }
@@ -483,6 +490,7 @@ describe("DeleteAllTest", () => {
   it("deleteBy deletes matching records without callbacks", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
       }
     }
@@ -495,6 +503,7 @@ describe("DeleteAllTest", () => {
   it("static updateAll updates all records", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("status", "string");
       }
     }
@@ -507,6 +516,7 @@ describe("DeleteAllTest", () => {
   it("destroy all", async () => {
     class Item extends Base {
       static {
+        this._tableName = "da_items";
         this.attribute("name", "string");
       }
     }

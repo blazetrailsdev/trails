@@ -16,7 +16,7 @@ useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({
     posts: { title: "string", author: "string" },
-    items: { name: "string", status: "string" },
+    merging_items: { name: "string", status: "string" },
     users: { name: "string", age: "integer", active: "boolean" },
   });
 });
@@ -303,7 +303,7 @@ describe("RelationMergingTest", () => {
 describe("merge()", () => {
   it("combines conditions from two relations", async () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
@@ -325,7 +325,7 @@ describe("merge()", () => {
     // mirror the sticky behavior on `_isNone` and it has to hold
     // whichever side the `.none()` is on.
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
@@ -359,7 +359,7 @@ describe("merge()", () => {
 
   it("merges order from other relation", async () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
@@ -376,20 +376,20 @@ describe("merge()", () => {
 describe("from()", () => {
   it("changes the FROM clause in SQL", () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
 
     const sql = Item.all().from('"other_items"').toSql();
     expect(sql).toContain('FROM "other_items"');
-    expect(sql).not.toContain('FROM "items"');
+    expect(sql).not.toContain('FROM "merging_items"');
   });
 });
 
 describe("unscope()", () => {
   it("removes where conditions", async () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
@@ -403,7 +403,7 @@ describe("unscope()", () => {
 
   it("removes order", async () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
@@ -417,7 +417,7 @@ describe("unscope()", () => {
 
   it("removes limit and offset", () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "merging_items";
     }
     Item.attribute("id", "integer");
 

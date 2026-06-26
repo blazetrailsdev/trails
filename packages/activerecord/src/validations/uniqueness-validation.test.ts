@@ -30,7 +30,7 @@ const MERGED_SCHEMA: Schema = {
     slug: "string",
     published: "integer",
   },
-  items: { code: "integer", name: "string" },
+  uv_items: { code: "integer", name: "string" },
   comments: {
     body: "string",
     commentable_type: "string",
@@ -100,6 +100,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness when integer out of range", async () => {
     class Item extends Base {
       static {
+        this._tableName = "uv_items";
         this.attribute("code", "integer");
         this.validatesUniqueness("code");
       }
@@ -112,6 +113,7 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness when integer out of range show order does not matter", async () => {
     class Item extends Base {
       static {
+        this._tableName = "uv_items";
         this.attribute("code", "integer");
         this.attribute("name", "string");
         this.validatesUniqueness("code");

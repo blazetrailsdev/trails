@@ -630,11 +630,11 @@ describe("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ items: { updated_at: "string" } });
+    await defineSchema({ ts_items: { updated_at: "string" } });
   });
   it("updates timestamps on all matching records", async () => {
     class Item extends Base {
-      static _tableName = "items";
+      static _tableName = "ts_items";
     }
     Item.attribute("id", "integer");
     Item.attribute("updated_at", "datetime");
@@ -823,11 +823,12 @@ describe("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema({ items: { updated_at: "string" } });
+    await defineSchema({ ts_items: { updated_at: "string" } });
   });
   it("touchAll updates timestamps on all records", async () => {
     class Item extends Base {
       static {
+        this._tableName = "ts_items";
         this.attribute("updated_at", "datetime");
       }
     }

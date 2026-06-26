@@ -139,7 +139,7 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   nb_children: { val: "string", nb_owner_id: "integer" },
   hv_parents: { name: "string" },
   hv_tags: { label: "string" },
-  items: { name: "string", label: "string" },
+  asa_items: { name: "string", label: "string" },
   addresses: { street: "string" },
   hot_orgs: { name: "string" },
   hot_members: { name: "string" },

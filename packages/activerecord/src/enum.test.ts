@@ -36,7 +36,7 @@ const TEST_SCHEMA = {
     status: "integer",
     priority: "integer",
   },
-  items: {
+  enum_items: {
     status: "integer",
     role: "integer",
     name: "string",

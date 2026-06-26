@@ -37,7 +37,7 @@ const TEST_SCHEMA = {
     views: "integer",
     content: "string",
   },
-  items: {
+  am_items: {
     name: "string",
     count: "integer",
     code: "string",

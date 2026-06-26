@@ -16,7 +16,7 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
-  items: {
+  amt_items: {
     name: "string",
     count: "integer",
     code: "string",
@@ -96,6 +96,7 @@ describe("AttributeMethodsTest (trails)", () => {
     // attribute isn't updated because the write itself is rejected.
     class Item extends Base {
       static {
+        this._tableName = "amt_items";
         this.attribute("code", "string");
         this.attribute("name", "string");
         this.attrReadonly("code");
