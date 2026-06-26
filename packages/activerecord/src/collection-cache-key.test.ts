@@ -45,7 +45,15 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 describe("CollectionCacheKeyTest", () => {
   const { topics, projects } = useHandlerFixtures(
     ["developers", "developersProjects", "projects", "topics", "comments", "posts"],
-    { schema: canonicalSchema },
+    {
+      schema: canonicalSchema,
+      // This test deliberately runs `cache_key(:published_at)` against a column
+      // that doesn't exist. On Postgres the resulting StatementInvalid aborts
+      // the surrounding transaction, which would poison the shared
+      // transactional-fixtures rollback for every later test in the file. Give
+      // it its own transaction so the abort stays isolated.
+      usesTransaction: ["cache_key with unknown timestamp column"],
+    },
   );
 
   it("collection_cache_key on model", async () => {

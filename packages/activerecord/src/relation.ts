@@ -6739,7 +6739,15 @@ export class Relation<T extends Base> {
           }, null);
       }
     } else {
-      const collection: Relation<T> = this;
+      // Rails: `collection = eager_loading? ? apply_join_dependency : self`
+      // (relation.rb:481). An eager-loaded relation must have its includes/
+      // eager_load converted to plain JOINs first, so the COUNT(*)/MAX(...)
+      // projection below replaces the relation's columns instead of being mixed
+      // with the eager-load's `comments.*` projection — which Postgres rejects
+      // ("column must appear in the GROUP BY clause") and SQLite silently allows.
+      const collection: Relation<T> = this._eagerLoadingForSql()
+        ? this.applyJoinDependencyForArel()
+        : this;
       const tsColumn = this.table.get(timestampColumn);
       // Build COUNT(*) and MAX(col) projections via Arel nodes.
       const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
