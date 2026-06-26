@@ -4,6 +4,7 @@ import { isBlank, RoundingHelper, BigDecimal } from "@blazetrails/activesupport"
 import { errorOptions } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, TypeError as RubyTypeError } from "../attribute-assignment.js";
+import { roundFloatToSignificantDigits } from "../type/decimal.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 
@@ -182,7 +183,8 @@ export class NumericalityValidator extends EachValidator {
         val !== undefined &&
         typeof val !== "number" &&
         typeof val !== "function" &&
-        typeof val !== "string"
+        typeof val !== "string" &&
+        !(val instanceof BigDecimal)
       ) {
         throw new ArgumentError(`:${key} must be a number, a symbol or a proc`);
       }
@@ -194,24 +196,26 @@ export class NumericalityValidator extends EachValidator {
 
   // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
   /**
-   * Override EachValidator.validate so prepareValueForValidation runs
-   * BEFORE the allow_nil short-circuit. Rails' EachValidator
-   * normally would skip nil values when allow_nil: true, but
-   * Numericality wants to validate what the user actually typed —
-   * an integer column casting "abc" to null mustn't bypass the check
-   * (numericality.rb's validate_each operates on raw input).
+   * Override EachValidator.validate so the allowNil/allowBlank short-circuits
+   * test the CAST value (what `read_attribute_for_validation` returns), while
+   * `validateEach` still receives the prepared raw value.
+   *
+   * This mirrors Rails' EachValidator#validate exactly: the `allow_nil` /
+   * `allow_blank` skip runs against `read_attribute_for_validation(attribute)`
+   * (the cast value) BEFORE `prepare_value_for_validation` swaps in the raw
+   * `*_before_type_cast` input. That's what
+   * `test_allow_nil_works_for_casted_value` asserts — assigning `""` to a
+   * decimal column casts to nil, so `allow_nil: true` skips it even though the
+   * raw value is `""`. An integer column casting `"abc"` to nil WITHOUT
+   * `allow_nil` still falls through to `validateEach`, which sees the raw
+   * `"abc"` and flags `not_a_number`.
    */
   override validate(record: ValidatableRecord): void {
     for (const attribute of this.attributes) {
-      // Reuses EachValidator.readAttributeForValidation so the lookup
-      // chain stays in one place. The flow then runs through
-      // prepareValueForValidation BEFORE the allowNil/allowBlank
-      // short-circuits so raw user input ('abc' → cast null) still
-      // gets validated.
       const cast = this.readAttributeForValidation(record, attribute);
+      if (cast == null && this.options.allowNil === true) continue;
+      if (isBlank(cast) && this.options.allowBlank === true) continue;
       const value = this.prepareValueForValidation(cast, record, attribute);
-      if (value == null && this.options.allowNil === true) continue;
-      if (isBlank(value) && this.options.allowBlank === true) continue;
       this.validateEach(record, attribute, value);
     }
   }
@@ -273,8 +277,13 @@ export function optionAsNumber(
   precision: number,
   scale?: number,
 ): number | undefined {
-  const resolved = this.resolveValue(record, optionValue);
+  let resolved = this.resolveValue(record, optionValue);
   if (resolved === undefined || resolved === null) return undefined;
+  // Rails passes BigDecimal compare options straight through parse_as_number
+  // (`raw_value.is_a?(BigDecimal)` → `round(raw_value, scale)`, still a
+  // Numeric). trails normalizes to its fixed-form string so the numeric path
+  // below treats it the same as a number literal.
+  if (resolved instanceof BigDecimal) resolved = resolved.toString("F");
   // Rails option_as_number → parse_as_number → Kernel.Float would raise
   // TypeError on non-Numeric/non-String input (Date, boolean, object).
   // Throw the consistent validator error rather than silently accepting
@@ -594,12 +603,17 @@ export function isRecordAttributeChangedInPlace(
  *
  * Rounds to `scale` decimal places, then rounds to `precision`
  * significant digits — matches Ruby's `BigDecimal(float.round(scale), precision)`.
- * (Number.prototype.toPrecision performs rounding, not truncation.)
+ *
+ * `to_d(precision)` (BigDecimal 3.1.4+) rounds the float's shortest decimal
+ * string, not its binary form, so we route through
+ * {@link roundFloatToSignificantDigits} rather than `Number#toPrecision`
+ * (which rounds the binary value and diverges on exact half-way decimals like
+ * `123.455`). See ruby/bigdecimal#70.
  *
  * @internal Rails-private helper.
  */
 export function parseFloatRails(num: number, precision: number, scale?: number): number {
-  return +round(num, scale).toPrecision(precision);
+  return Number(roundFloatToSignificantDigits(round(num, scale), precision));
 }
 
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;

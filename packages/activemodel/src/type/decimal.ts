@@ -189,18 +189,41 @@ export class DecimalType extends NumericValueType {
  * Ruby's `BigDecimal(value, precision)`. Returns `String(value)` when
  * `precision <= 0` (Rails treats `precision: nil` as no rounding).
  */
-function roundFloatToSignificantDigits(value: number, precision: number): string {
+export function roundFloatToSignificantDigits(value: number, precision: number): string {
   if (precision <= 0 || !Number.isFinite(value)) return String(value);
-  // Number#toPrecision may emit scientific notation for very small / large
-  // magnitudes. Re-parse to a JS number for canonical rounding, then expand
-  // any exponent form back into a plain decimal string so the emitted value
-  // matches the rest of the cast pipeline (which feeds applyScale's regex
-  // matcher — that one rejects exponent forms).
-  const rounded = Number(value.toPrecision(precision));
-  const parts = splitDecimal(String(rounded));
-  if (!parts) return String(rounded);
+  // Ruby's `BigDecimal(float, n)` (BigDecimal 3.1.4+, an Active Support
+  // dependency) rounds the float's SHORTEST round-trip decimal string — what
+  // `String(value)` yields — to `n` significant digits, half-up. JS
+  // `Number#toPrecision` instead rounds the binary representation, which
+  // diverges on exact half-way decimals (`123.455` → `123.45` via the binary
+  // form, but `123.46` per BigDecimal). Round the decimal string directly so
+  // we match Ruby; see ruby/bigdecimal#70.
+  const parts = splitDecimal(String(value));
+  if (!parts) return String(value);
   const { sign, intPart, fracPart } = parts;
-  return fracPart.length > 0 ? `${sign}${intPart}.${fracPart}` : `${sign}${intPart}`;
+  // Significant-digit rounding maps to a fractional-scale round: subtract the
+  // count of leading significant integer digits (for |x| >= 1), or add the
+  // run of leading fractional zeros (for |x| < 1), from/to `precision`.
+  if (intPart !== "0" && precision < intPart.length) {
+    // Fewer significant digits than integer digits: round WITHIN the integer
+    // part and zero-fill the dropped places (e.g. 1234.5 @ 3 → "1230").
+    const kept = intPart.slice(0, precision);
+    const roundDigit = intPart.charCodeAt(precision) - 48; // '0' → 0
+    const droppedZeros = "0".repeat(intPart.length - precision);
+    const outDigits = roundDigit < 5 ? kept : incrementDecimalDigits(kept);
+    return `${sign}${outDigits}${droppedZeros}`;
+  }
+  let scale: number;
+  if (intPart !== "0") {
+    scale = precision - intPart.length;
+  } else {
+    let leadingZeros = 0;
+    while (leadingZeros < fracPart.length && fracPart.charCodeAt(leadingZeros) === 48) {
+      leadingZeros += 1;
+    }
+    scale = precision + leadingZeros;
+  }
+  return roundHalfUpToScale(`${sign}${intPart}.${fracPart}`, scale);
 }
 
 const MAX_EXPONENT_EXPANSION = 4000;
