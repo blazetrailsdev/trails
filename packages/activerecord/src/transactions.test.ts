@@ -156,17 +156,18 @@ describe("TransactionTest", () => {
     });
     expect(called).toBe(0);
 
-    // OMITTED SUBCASE (transactions_test.rb:71): Rails invalidates the internal
-    // transaction (`@internal_transaction.invalidate!`) then registers an
-    // after_all_transactions_commit and asserts it runs *immediately*
-    // (`assert_equal 1, called` inside the block). trails models an invalidated
-    // transaction as finalized (`TransactionState#finalized` is `_state != null`,
-    // and `invalidateBang` sets `_state = "invalidated"`), so the public
-    // `afterCommit` delegates and the internal transaction *raises* "Cannot
-    // register callbacks on a finalized transaction" rather than running the
-    // block. Converging the invalidated→run-immediately path is tracked by
-    // [[transactions-test-rollback-restores-record-state]]'s sibling work; the
-    // five supported subcases above are ported faithfully.
+    // Invalidating the internal transaction removes it from
+    // `all_open_transactions`, so after_all_transactions_commit yields
+    // immediately (transactions_test.rb:71).
+    called = 0;
+    await Topic.transaction(async (tx) => {
+      tx._internalTransaction.invalidateBang();
+      afterAllTransactionsCommit(() => {
+        called += 1;
+      });
+      expect(called).toBe(1);
+    });
+    expect(called).toBe(1);
   });
 
   it.skip("after current transaction commit multidb nested transactions", () => {

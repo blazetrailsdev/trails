@@ -51,13 +51,22 @@ export function currentTransactionPublic(): PublicTransaction {
 /**
  * Run a callback after all currently open transactions have committed.
  * If there is no open transaction, the callback is called immediately.
- * Delegates through currentTransactionPublic() so NULL_TRANSACTION semantics
- * (afterCommit runs immediately) apply consistently.
  *
- * Mirrors: ActiveRecord.after_all_transactions_commit
+ * Mirrors: ActiveRecord.after_all_transactions_commit (active_record.rb:527),
+ * which collects `all_open_transactions` (active_record.rb:553) — only
+ * transactions that are `open? && joinable? && !state.invalidated?` — and
+ * yields immediately when none are open. A *finalized* or *invalidated*
+ * transaction is therefore not "open" here and the block runs immediately; this
+ * deliberately does NOT route through the per-transaction
+ * `Transaction#afterCommit`, which (per transaction.rb:85) raises on a finalized
+ * transaction.
  */
 export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void | Promise<void> {
-  return currentTransactionPublic().afterCommit(fn);
+  const tx = currentTransactionPublic();
+  if (tx.isClosed()) {
+    return fn();
+  }
+  return tx.afterCommit(fn);
 }
 
 /**
