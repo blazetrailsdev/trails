@@ -1,57 +1,54 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { Associations } from "../associations.js";
+import { Associations, loadHasMany, loadHasOne } from "../associations.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Category } from "../test-helpers/models/category.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
+import { Tag } from "../test-helpers/models/tag.js";
+import { Tagging } from "../test-helpers/models/tagging.js";
+import { Member } from "../test-helpers/models/member.js";
+import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
+import { Club } from "../test-helpers/models/club.js";
+import { MemberDetail } from "../test-helpers/models/member-detail.js";
 
 describe("AssociationScope", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  // The DB-roundtrip cases ride the canonical Author/Post/Comment,
+  // Categorization/Category, Tag/Tagging and Member/Membership/Club models —
+  // every STI / polymorphic-source-type / has-many-through / has-one-through
+  // shape this resolver harness exercises already lives on those models. The
+  // pure `toSql()` cases below build inline single-purpose classes that never
+  // touch the DB, so they need no schema.
+  registerModel(Author);
+  registerModel(Post);
+  registerModel(Comment);
+  registerModel(Category);
+  registerModel(Categorization);
+  registerModel(Tag);
+  registerModel(Tagging);
+  registerModel(Member);
+  registerModel(Membership);
+  void CurrentMembership; // self-registers as an STI subclass on import
+  registerModel(Club);
+  registerModel(MemberDetail);
   beforeAll(async () => {
-    await defineSchema({
-      wr_authors: {},
-      wr_posts: { wr_author_id: "integer", kind: "string" },
-      st_authors: { name: "string" },
-      st_galleries: {
-        st_author_id: "integer",
-        imageable_id: "integer",
-        imageable_type: "string",
-      },
-      st_photos: { title: "string" },
-      st_videos: { title: "string" },
-      np_authors: { name: "string" },
-      np_galleries: {
-        np_author_id: "integer",
-        imageable_uuid: "string",
-        imageable_type: "string",
-      },
-      np_photos: {
-        columns: { uuid: "string", title: "string" },
-        primaryKey: ["uuid"],
-      },
-      ho1_users: { name: "string" },
-      ho1_accounts: { ho1_user_id: "integer" },
-      ho1_prefs: { ho1_account_id: "integer", theme: "string" },
-      hs_authors: { name: "string" },
-      hs_posts: { hs_author_id: "integer" },
-      hs_comments: { hs_post_id: "integer", body: "string" },
-      hot_posts: {},
-      hot_post_hooks: { hot_post_id: "integer", hot_review_id: "integer" },
-      hot_reviews: { body: "string" },
-      mg_authors: { name: "string" },
-      mg_postings: { mg_author_id: "integer", mg_tag_id: "integer" },
-      mg_tags: { label: "string" },
-      int_authors: { name: "string" },
-      int_memberships: { int_author_id: "integer", int_tag_id: "integer" },
-      int_tags: { label: "string" },
-      pst_galleries: {
-        pst_gallery_id: "integer",
-        imageable_id: "integer",
-        imageable_type: "string",
-      },
-    });
+    await defineSchema(TEST_SCHEMA);
+  });
+  afterAll(async () => {
+    // Drop the file-unique uuid-PK scratch tables the non-id-target-PK
+    // polymorphic-source case builds (see its `defineSchema` below) so they
+    // never leak onto a shared worker DB.
+    for (const t of ["np_galleries", "np_photos", "np_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
   });
 
   function makeModels() {
@@ -275,38 +272,21 @@ describe("AssociationScope", () => {
     // with sourceType filtering before calling loadHasMany. The migrated
     // path skips re-applying when options.scope === reflection.scope
     // (avoid double-application), but augmented scopes must still run.
-    const { loadHasMany } = await import("../associations.js");
-    class WrAuthor extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasMany("wr_posts", {
-          className: "WrPost",
-          foreignKey: "wr_author_id",
-        });
-      }
-    }
-    class WrPost extends Base {
-      static {
-        this.attribute("wr_author_id", "integer");
-        this.attribute("kind", "string");
-      }
-    }
-    registerModel(WrAuthor);
-    registerModel(WrPost);
-
-    const author = await WrAuthor.create({});
-    await WrPost.create({ wr_author_id: author.id, kind: "draft" });
-    await WrPost.create({ wr_author_id: author.id, kind: "published" });
+    // Canonical Author has_many :posts carries no macro scope, so the
+    // caller-supplied `where(title:)` is necessarily an augmented scope.
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "draft", body: "x" });
+    await Post.create({ author_id: author.id, title: "published", body: "y" });
 
     // Augmented options.scope — NOT equal to the reflection's macro
     // scope (which is null here). Loader must still apply it.
-    const results = await loadHasMany(author, "wr_posts", {
-      className: "WrPost",
-      foreignKey: "wr_author_id",
-      scope: (rel: any) => rel.where({ kind: "published" }),
+    const results = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      scope: (rel: any) => rel.where({ title: "published" }),
     });
     expect(results).toHaveLength(1);
-    expect((results[0] as any).kind).toBe("published");
+    expect((results[0] as any).title).toBe("published");
   });
 
   it("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
@@ -640,81 +620,35 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasMany through with sourceType filters by polymorphic source type (PR 3c)", async () => {
-    // Gallery belongsTo :imageable, polymorphic: true (the Gallery
-    // model holds the polymorphic FK + type pair). When we hop through
-    // galleries with a sourceType filter, PolymorphicReflection wraps
-    // the chain entry and adds a type constraint
-    // `where(imageable_type: sourceType)`. PR 3c's
+    // Tagging belongs_to :taggable, polymorphic: true (the Tagging model
+    // holds the polymorphic FK + type pair). When we hop through taggings
+    // with a sourceType filter (Tag has_many :taggedPosts, through:
+    // :taggings, source: :taggable, sourceType: "Post"),
+    // PolymorphicReflection wraps the chain entry and adds a type
+    // constraint `where(taggable_type: sourceType)`. PR 3c's
     // _mergeReflectionScopeChain detects PolymorphicReflection and
     // applies its constraints() — including the source_type_scope —
     // to the chain JOIN so only the right polymorphic rows match.
-    const { loadHasMany } = await import("../associations.js");
-    class StAuthor extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-        this.hasMany("st_galleries", {
-          className: "StGallery",
-          foreignKey: "st_author_id",
-        });
-        this.hasMany("st_photos", {
-          className: "StPhoto",
-          through: "st_galleries",
-          source: "imageable",
-          sourceType: "StPhoto",
-        });
-      }
-    }
-    class StGallery extends Base {
-      static {
-        this.attribute("st_author_id", "integer");
-        this.attribute("imageable_id", "integer");
-        this.attribute("imageable_type", "string");
-        this.belongsTo("imageable", { polymorphic: true });
-      }
-    }
-    class StPhoto extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class StVideo extends Base {
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(StAuthor);
-    registerModel(StGallery);
-    registerModel(StPhoto);
-    registerModel(StVideo);
-    // Through with sourceType — only StPhoto galleries should match.
-
-    const author = await StAuthor.create({ name: "Alice" });
-    const photo = await StPhoto.create({ title: "p1" });
-    const video = await StVideo.create({ title: "v1" });
-    await StGallery.create({
-      st_author_id: author.id,
-      imageable_id: photo.id,
-      imageable_type: "StPhoto",
-    });
-    await StGallery.create({
-      st_author_id: author.id,
-      imageable_id: video.id,
-      imageable_type: "StVideo",
+    const tag = await Tag.create({ name: "ruby" });
+    const post = await Post.create({ title: "p1", body: "b" });
+    const comment = await Comment.create({ post_id: post.id, body: "c1" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({
+      tag_id: tag.id,
+      taggable_id: comment.id,
+      taggable_type: "Comment",
     });
 
-    const photos = (await loadHasMany(author, "st_photos", {
-      className: "StPhoto",
-      through: "st_galleries",
-      source: "imageable",
-      sourceType: "StPhoto",
-    })) as StPhoto[];
+    const posts = (await loadHasMany(tag, "taggedPosts", {
+      className: "Post",
+      through: "taggings",
+      source: "taggable",
+      sourceType: "Post",
+    })) as Post[];
     // Without sourceType filtering, the through join would return BOTH
-    // gallery rows; we'd then JOIN to the wrong rows in st_photos.
-    // With the filter, only the StPhoto-typed gallery participates.
-    expect(photos.map((p) => p.title)).toEqual(["p1"]);
+    // tagging rows; we'd then JOIN to the wrong rows. With the filter,
+    // only the Post-typed tagging participates.
+    expect(posts.map((p) => p.title)).toEqual(["p1"]);
   });
 
   it("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {
@@ -722,7 +656,25 @@ describe("AssociationScope", () => {
     // for polymorphic sources, but the sourceType target may use a
     // different PK. Without per-klass JOIN routing, we'd emit
     // target."id" = through."<fk>" instead of target."<custom_pk>".
-    const { loadHasMany } = await import("../associations.js");
+    //
+    // A polymorphic source whose target has a non-`id` (uuid) primary key
+    // has no schema.rb analog, so the np_* tables stay bespoke but
+    // file-unique (RFC 0019 sanctions uuid-PK shapes as bespoke). They are
+    // torn down in afterAll so they never perturb a shared worker DB.
+    /* eslint-disable blazetrails/require-canonical-schema -- uuid-PK polymorphic source has no schema.rb analog; file-unique np_* scratch */
+    await defineSchema({
+      np_authors: { name: "string" },
+      np_galleries: {
+        np_author_id: "integer",
+        imageable_uuid: "string",
+        imageable_type: "string",
+      },
+      np_photos: {
+        columns: { uuid: "string", title: "string" },
+        primaryKey: ["uuid"],
+      },
+    });
+    /* eslint-enable blazetrails/require-canonical-schema */
     class NpAuthor extends Base {
       declare name: string;
       static {
@@ -780,289 +732,118 @@ describe("AssociationScope", () => {
   });
 
   it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
-    // PR 3c also covers hasOne source on the through model. e.g.,
-    // User has_one :account; Account has_one :preferences;
-    // User has_one :preferences through :account (source is hasOne,
-    // not belongsTo). Verifies the join direction differs from
-    // belongsTo-source — target's FK back to through, not the other
-    // way — and that loadHasOne returns exactly one record.
-    const { loadHasOne } = await import("../associations.js");
-    class Ho1User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("ho1_account", {
-          className: "Ho1Account",
-          foreignKey: "ho1_user_id",
-        });
-        this.hasOne("ho1_pref", {
-          className: "Ho1Pref",
-          through: "ho1_account",
-          source: "ho1_pref",
-        });
-      }
-    }
-    class Ho1Account extends Base {
-      static {
-        this.attribute("ho1_user_id", "integer");
-        this.hasOne("ho1_pref", {
-          className: "Ho1Pref",
-          foreignKey: "ho1_account_id",
-        });
-      }
-    }
-    class Ho1Pref extends Base {
-      declare theme: string;
-      static {
-        this.attribute("ho1_account_id", "integer");
-        this.attribute("theme", "string");
-      }
-    }
-    registerModel(Ho1User);
-    registerModel(Ho1Account);
-    registerModel(Ho1Pref);
+    // PR 3c also covers hasOne source on the through model. Canonical
+    // MemberDetail has_one :membership through :member, where Member
+    // has_one :membership — so the source (`membership`) is a hasOne, not
+    // a belongsTo. Verifies the join direction differs from belongsTo-
+    // source — target's FK back to through, not the other way — and that
+    // loadHasOne returns exactly one record.
+    const member = await Member.create({ name: "Alice" });
+    const membership = await Membership.create({ member_id: member.id });
+    const memberDetail = await MemberDetail.create({ member_id: member.id });
 
-    const user = await Ho1User.create({ name: "Alice" });
-    const account = await Ho1Account.create({ ho1_user_id: user.id });
-    await Ho1Pref.create({ ho1_account_id: account.id, theme: "dark" });
-
-    const pref = (await loadHasOne(user, "ho1_pref", {
-      className: "Ho1Pref",
-      through: "ho1_account",
-      source: "ho1_pref",
-    })) as Ho1Pref | null;
-    expect(pref).not.toBeNull();
-    expect(pref!.theme).toBe("dark");
+    const loaded = (await loadHasOne(memberDetail, "membership", {
+      className: "Membership",
+      through: "member",
+      source: "membership",
+    })) as Membership | null;
+    expect(loaded).not.toBeNull();
+    expect(loaded!.id).toBe(membership.id);
   });
 
   it("loadHasMany through with has_many source routes via AssociationScope (PR 3c widening)", async () => {
-    // Author has_many :posts; Post has_many :comments; Author has_many
-    // :comments, through: :posts (source: :comments → has_many on Post,
-    // NOT belongsTo). PR 3b only routed belongsTo-source shapes; PR 3c
-    // widens to has_many source — the chain machinery already handles
+    // Canonical Author has_many :posts; Post has_many :comments; Author
+    // has_many :comments, through: :posts (source: :comments → has_many on
+    // Post, NOT belongsTo). PR 3b only routed belongsTo-source shapes; PR
+    // 3c widens to has_many source — the chain machinery already handles
     // the join direction via reflection.joinPrimaryKey/joinForeignKey
     // delegation, the gate just needed dropping.
-    const { loadHasMany } = await import("../associations.js");
-    class HsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hs_posts", {
-          className: "HsPost",
-          foreignKey: "hs_author_id",
-        });
-        this.hasMany("hs_comments", {
-          className: "HsComment",
-          through: "hs_posts",
-          source: "hs_comments",
-        });
-      }
-    }
-    class HsPost extends Base {
-      static {
-        this.attribute("hs_author_id", "integer");
-        this.hasMany("hs_comments", {
-          className: "HsComment",
-          foreignKey: "hs_post_id",
-        });
-      }
-    }
-    class HsComment extends Base {
-      declare body: string;
-      static {
-        this.attribute("hs_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    registerModel(HsAuthor);
-    registerModel(HsPost);
-    registerModel(HsComment);
-
-    const author = await HsAuthor.create({ name: "Alice" });
-    const p1 = await HsPost.create({ hs_author_id: author.id });
-    const p2 = await HsPost.create({ hs_author_id: author.id });
-    await HsComment.create({ hs_post_id: p1.id, body: "first" });
-    await HsComment.create({ hs_post_id: p2.id, body: "second" });
+    const author = await Author.create({ name: "Alice" });
+    const p1 = await Post.create({ author_id: author.id, title: "p1", body: "b" });
+    const p2 = await Post.create({ author_id: author.id, title: "p2", body: "b" });
+    await Comment.create({ post_id: p1.id, body: "first" });
+    await Comment.create({ post_id: p2.id, body: "second" });
     // Another author's comment shouldn't show up
-    const other = await HsAuthor.create({ name: "Bob" });
-    const op = await HsPost.create({ hs_author_id: other.id });
-    await HsComment.create({ hs_post_id: op.id, body: "other" });
+    const other = await Author.create({ name: "Bob" });
+    const op = await Post.create({ author_id: other.id, title: "op", body: "b" });
+    await Comment.create({ post_id: op.id, body: "other" });
 
-    const comments = (await loadHasMany(author, "hs_comments", {
-      className: "HsComment",
-      through: "hs_posts",
-      source: "hs_comments",
-    })) as HsComment[];
+    const comments = (await loadHasMany(author, "comments", {
+      className: "Comment",
+      through: "posts",
+      source: "comments",
+    })) as Comment[];
     expect(comments.map((c) => c.body).sort()).toEqual(["first", "second"]);
   });
 
   it("loadHasOne through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
-    // PR 3b migration covers loadHasOne too. End-to-end: insert,
-    // call loadHasOne with a through reflection, assert single result.
-    const { loadHasOne } = await import("../associations.js");
-    class HotPost extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasOne("hot_post_hook", {
-          className: "HotPostHook",
-          foreignKey: "hot_post_id",
-        });
-        this.hasOne("hot_review", {
-          className: "HotReview",
-          through: "hot_post_hook",
-          source: "hot_review",
-        });
-      }
-    }
-    class HotPostHook extends Base {
-      static {
-        this.attribute("hot_post_id", "integer");
-        this.attribute("hot_review_id", "integer");
-        this.belongsTo("hot_review", {
-          className: "HotReview",
-          foreignKey: "hot_review_id",
-        });
-      }
-    }
-    class HotReview extends Base {
-      declare body: string;
-      static {
-        this.attribute("body", "string");
-      }
-    }
-    registerModel(HotPost);
-    registerModel(HotPostHook);
-    registerModel(HotReview);
+    // PR 3b migration covers loadHasOne too. Canonical Member has_one
+    // :club through :currentMembership, where CurrentMembership
+    // belongs_to :club — the source (`club`) is a belongsTo. End-to-end:
+    // insert, call loadHasOne with the through reflection, assert single
+    // result.
+    const member = await Member.create({ name: "Alice" });
+    const club = await Club.create({ name: "Great club" });
+    await CurrentMembership.create({ member_id: member.id, club_id: club.id });
 
-    const post = await HotPost.create({});
-    const review = await HotReview.create({ body: "Great post" });
-    await HotPostHook.create({ hot_post_id: post.id, hot_review_id: review.id });
-
-    const loaded = (await loadHasOne(post, "hot_review", {
-      className: "HotReview",
-      through: "hot_post_hook",
-      source: "hot_review",
-    })) as HotReview | null;
+    const loaded = (await loadHasOne(member, "club", {
+      className: "Club",
+      through: "currentMembership",
+      source: "club",
+    })) as Club | null;
     expect(loaded).not.toBeNull();
-    expect(loaded!.body).toBe("Great post");
+    expect(loaded!.name).toBe("Great club");
   });
 
   it("loadHasMany through chain (belongsTo source, no sourceType) routes via AssociationScope", async () => {
     // PR 3b migration: loadHasMany for has_many :through where source
     // is non-polymorphic belongsTo (no sourceType) now routes through
     // AssociationScope's JOIN-based path instead of the 2-step IN-list
-    // loader. End-to-end: insert records, call loadHasMany, assert the
-    // right rows return — exercises the migrated path through real DB.
-    const { loadHasMany } = await import("../associations.js");
-    class MgAuthor extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-        this.hasMany("mg_postings", {
-          className: "MgPosting",
-          foreignKey: "mg_author_id",
-        });
-        this.hasMany("mg_tags", {
-          className: "MgTag",
-          through: "mg_postings",
-          source: "mg_tag",
-        });
-      }
-    }
-    class MgPosting extends Base {
-      static {
-        this.attribute("mg_author_id", "integer");
-        this.attribute("mg_tag_id", "integer");
-        this.belongsTo("mg_tag", {
-          className: "MgTag",
-          foreignKey: "mg_tag_id",
-        });
-      }
-    }
-    class MgTag extends Base {
-      declare label: string;
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel(MgAuthor);
-    registerModel(MgPosting);
-    registerModel(MgTag);
+    // loader. Canonical Author has_many :categories through
+    // :categorizations, where Categorization belongs_to :category.
+    // End-to-end: insert records, call loadHasMany, assert the right rows
+    // return — exercises the migrated path through real DB.
+    const alice = await Author.create({ name: "Alice" });
+    const bob = await Author.create({ name: "Bob" });
+    const ruby = await Category.create({ name: "ruby" });
+    const ts = await Category.create({ name: "typescript" });
+    const go = await Category.create({ name: "go" });
+    await Categorization.create({ author_id: alice.id, category_id: ruby.id });
+    await Categorization.create({ author_id: alice.id, category_id: ts.id });
+    await Categorization.create({ author_id: bob.id, category_id: go.id });
 
-    const alice = await MgAuthor.create({ name: "Alice" });
-    const bob = await MgAuthor.create({ name: "Bob" });
-    const ruby = await MgTag.create({ label: "ruby" });
-    const ts = await MgTag.create({ label: "typescript" });
-    const go = await MgTag.create({ label: "go" });
-    await MgPosting.create({ mg_author_id: alice.id, mg_tag_id: ruby.id });
-    await MgPosting.create({ mg_author_id: alice.id, mg_tag_id: ts.id });
-    await MgPosting.create({ mg_author_id: bob.id, mg_tag_id: go.id });
-
-    const tags = (await loadHasMany(alice, "mg_tags", {
-      className: "MgTag",
-      through: "mg_postings",
-      source: "mg_tag",
-    })) as MgTag[];
-    expect(tags.map((t) => t.label).sort()).toEqual(["ruby", "typescript"]);
+    const categories = (await loadHasMany(alice, "categories", {
+      className: "Category",
+      through: "categorizations",
+      source: "category",
+    })) as Category[];
+    expect(categories.map((c) => c.name).sort()).toEqual(["ruby", "typescript"]);
   });
 
   it("through chain query loads actual records end-to-end (Author -> Memberships -> Tags)", async () => {
     // Real DB roundtrip: insert records, build the through scope via
     // AssociationScope, execute it, assert the right rows come back.
     // Proves the chain-walking machinery isn't just generating valid-
-    // looking SQL — it actually returns the correct records.
-    class IntAuthor extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("int_memberships", {
-          className: "IntMembership",
-          foreignKey: "int_author_id",
-        });
-        this.hasMany("int_tags", {
-          className: "IntTag",
-          through: "int_memberships",
-          source: "int_tag",
-        });
-      }
-    }
-    class IntMembership extends Base {
-      static {
-        this.attribute("int_author_id", "integer");
-        this.attribute("int_tag_id", "integer");
-        this.belongsTo("int_tag", {
-          className: "IntTag",
-          foreignKey: "int_tag_id",
-        });
-      }
-    }
-    class IntTag extends Base {
-      declare label: string;
-      static {
-        this.attribute("id", "integer");
-        this.attribute("label", "string");
-      }
-    }
-    registerModel(IntAuthor);
-    registerModel(IntMembership);
-    registerModel(IntTag);
+    // looking SQL — it actually returns the correct records. Canonical
+    // Author has_many :categories through :categorizations.
+    const alice = await Author.create({ name: "Alice" });
+    const bob = await Author.create({ name: "Bob" });
+    const ruby = await Category.create({ name: "ruby" });
+    const ts = await Category.create({ name: "typescript" });
+    const go = await Category.create({ name: "go" });
+    await Categorization.create({ author_id: alice.id, category_id: ruby.id });
+    await Categorization.create({ author_id: alice.id, category_id: ts.id });
+    await Categorization.create({ author_id: bob.id, category_id: go.id });
 
-    const alice = await IntAuthor.create({ name: "Alice" });
-    const bob = await IntAuthor.create({ name: "Bob" });
-    const ruby = await IntTag.create({ label: "ruby" });
-    const ts = await IntTag.create({ label: "typescript" });
-    const go = await IntTag.create({ label: "go" });
-    await IntMembership.create({ int_author_id: alice.id, int_tag_id: ruby.id });
-    await IntMembership.create({ int_author_id: alice.id, int_tag_id: ts.id });
-    await IntMembership.create({ int_author_id: bob.id, int_tag_id: go.id });
-
-    const reflection = (IntAuthor as any)._reflectOnAssociation("int_tags");
-    const tags: IntTag[] = await (
+    const reflection = (Author as any)._reflectOnAssociation("categories");
+    const categories: Category[] = await (
       AssociationScope.scope({
         owner: alice,
         reflection,
         klass: reflection.klass,
       }) as any
     ).toArray();
-    expect(tags.map((t) => t.label).sort()).toEqual(["ruby", "typescript"]);
+    expect(categories.map((c) => c.name).sort()).toEqual(["ruby", "typescript"]);
   });
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
