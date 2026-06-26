@@ -90,7 +90,9 @@ export function mergeBang(this: any, other: any): any {
     if (
       (!this._fromClause || this._fromClause.isEmpty?.()) &&
       other._fromClause &&
-      !other._fromClause.isEmpty?.()
+      !other._fromClause.isEmpty?.() &&
+      // Rails replace_from_clause? also requires same base_class (see Merger).
+      this._modelClass?.baseClass === other._modelClass?.baseClass
     ) {
       this._fromClause = other._fromClause;
     }
@@ -121,6 +123,8 @@ export function mergeBang(this: any, other: any): any {
     }
     this._namedInnerJoinDeps.push(...(other._namedInnerJoinDeps ?? []));
     this._leftOuterJoinDeps.push(...(other._leftOuterJoinDeps ?? []));
+    // mergeCtes — append the other relation's common table expressions
+    if (other._ctes?.length > 0) this._ctes = [...this._ctes, ...other._ctes];
     // sticky none
     if (other._isNone) this._isNone = true;
   } else if (typeof other === "object" && other !== null) {

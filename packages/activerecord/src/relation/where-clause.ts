@@ -65,7 +65,7 @@ export class WhereClause {
     return new WhereClause([new Nodes.Not(this.ast)]);
   }
 
-  except(...columns: (string | Nodes.Attribute)[]): WhereClause {
+  except(...columns: (string | Nodes.Attribute | Nodes.Node)[]): WhereClause {
     return new WhereClause(exceptPredicates(this.predicates, columns));
   }
 
@@ -125,11 +125,20 @@ export class WhereClause {
     return false;
   }
 
-  extractAttributes(): (string | Nodes.Attribute)[] {
-    const attrs: (string | Nodes.Attribute)[] = [];
+  extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
+    const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
     for (const node of this.predicates) {
       const attr = fetchAttributeNode(node);
-      if (attr !== null) attrs.push(attr);
+      if (attr !== null) {
+        attrs.push(attr);
+        continue;
+      }
+      // Mirrors Rails each_attributes' fallback: when no plain Attribute is
+      // found but the predicate is an equality whose left is an Arel expression
+      // (e.g. a NamedFunction like `abs(salary)`), use that expression node so a
+      // later equality on the same expression replaces this one.
+      const expr = predicationLeft(node);
+      if (expr !== null) attrs.push(expr);
     }
     return attrs;
   }
@@ -163,6 +172,17 @@ function subtractNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
     }
   }
   return result;
+}
+
+// Mirrors Rails: `node.left if equality_node?(node) && node.left.is_a?(Arel::Predications)`.
+// Returns the left-hand expression of an equality predicate when it is a
+// non-Attribute Arel node (a NamedFunction, etc.), else null.
+function predicationLeft(node: Nodes.Node): Nodes.Node | null {
+  const isEquality = typeof (node as any).isEquality === "function" && (node as any).isEquality();
+  if (!isEquality) return null;
+  const left = (node as any).left;
+  if (left instanceof Nodes.Node && !(left instanceof Nodes.Attribute)) return left;
+  return null;
 }
 
 function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
@@ -224,6 +244,7 @@ function exceptPredicates(
   // Rails: separate Attribute objects from string column names.
   // Attributes compared via eql() (table-qualified), strings by name only.
   const attrNodes: Nodes.Attribute[] = [];
+  const exprNodes: Nodes.Node[] = [];
   const colStrings = new Set<string>();
   for (const c of columns) {
     if (typeof c === "string") colStrings.add(c);
@@ -233,11 +254,20 @@ function exceptPredicates(
       // even when two Table instances for the same table have different klass/
       // typeCaster (and thus different stableSerialize outputs, breaking eql).
       colStrings.add(`${relationName(c.relation.name)}.${c.name}`);
+    } else if (c instanceof Nodes.Node) {
+      // Non-Attribute expression LHS (e.g. NamedFunction) — Rails' `non_attrs`.
+      exprNodes.push(c);
     }
   }
   return predicates.filter((node) => {
     const attr = fetchAttributeNode(node);
-    if (attr === null) return true;
+    if (attr === null) {
+      // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
+      // whose left expression matches one being merged in (last equality wins).
+      const left = predicationLeft(node);
+      if (left !== null && exprNodes.some((e) => e.eql(left))) return false;
+      return true;
+    }
     if (attrNodes.some((a) => a.eql(attr))) return false;
     if (colStrings.has(attr.name)) return false;
     // Match qualified "table.column" strings against the attribute's relation + name

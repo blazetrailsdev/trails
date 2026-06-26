@@ -90,7 +90,9 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
       foreignKey: "post_id",
     });
     this.afterSave(async function (this: any) {
-      const post = this.post;
+      // Rails: `comment.post.update(...)`. trails belongsTo readers are async,
+      // so await the target before updating it.
+      const post = await this.post;
       if (post) await post.update({ body: "Automatically altered" });
     });
   }

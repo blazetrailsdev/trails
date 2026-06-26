@@ -197,10 +197,7 @@ describe("RelationMergingTest", () => {
     expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
   });
 
-  // TODO(story merge-where-nonattribute-equality): where-merge "keeps last
-  // equality" only replaces predicates with a plain Attribute LHS; an Arel
-  // NamedFunction LHS isn't recognized so both predicates survive (→ no rows).
-  it.skip("relation merging with arel equalities keeps last equality with non attribute left hand", async () => {
+  it("relation merging with arel equalities keeps last equality with non attribute left hand", async () => {
     const salaryAttr = Developer.arelTable.get("salary");
     const absSalary = new Nodes.NamedFunction("abs", [salaryAttr]);
 
@@ -213,20 +210,20 @@ describe("RelationMergingTest", () => {
     expect(await ids(devs)).toEqual([developers("poor_jamis").id]);
   });
 
-  // TODO(story merge-eager-load-association-target): merging an eagerLoad(...)
-  // relation doesn't carry the hasOne (lastComment) target through to the
-  // merged result, so the eager association reads back undefined.
-  it.skip("relation merging with eager load", async () => {
+  it("relation merging with eager load", async () => {
     const relations = [
       Post.order("comments.id DESC").merge(Post.eagerLoad("lastComment")).merge(Post.all()),
       Post.eagerLoad("lastComment").merge(Post.order("comments.id DESC")).merge(Post.all()),
     ];
 
-    const expected = (await Post.find(1)).lastComment;
+    // `lastComment` is a lazy hasOne: on a freshly-found record it returns a
+    // Promise, while on an eager-loaded row it's already materialized — await
+    // both so the comparison is between records, mirroring Rails' sync read.
+    const expected = await (await Post.find(1)).lastComment;
     for (const rel of relations) {
       const posts = await rel.toArray();
       const post = posts.find((p: any) => p.id === 1);
-      expect((post as any).lastComment?.id).toEqual((expected as any)?.id);
+      expect((await (post as any).lastComment)?.id).toEqual((expected as any)?.id);
     }
   });
 
@@ -299,10 +296,7 @@ describe("RelationMergingTest", () => {
     expect((await merged.first())!.id).toBe(post!.id);
   });
 
-  // TODO(story merge-belongsto-target-in-after-save-hook): the canonical
-  // CommentThatAutomaticallyAltersPostBody after_save hook does `this.post.update(...)`,
-  // but the in-memory belongsTo target isn't a record here (`post.update` is undefined).
-  it.skip("merging compares symbols and strings as equal", async () => {
+  it("merging compares symbols and strings as equal", async () => {
     const post = await PostThatLoadsCommentsInAnAfterSaveHook.create({
       title: "First Post",
       body: "Blah blah blah.",
@@ -318,10 +312,7 @@ describe("RelationMergingTest", () => {
     expect(relation.fromClause.isEmpty()).toBe(false);
   });
 
-  // TODO(story merge-from-clause-different-class): merging Post.from("posts")
-  // into a Comment relation builds SQL that still references the `comments`
-  // table under the swapped FROM clause (→ "no such table: comments").
-  it.skip("merging with from clause on different class", async () => {
+  it("merging with from clause on different class", async () => {
     expect(await Comment.joins("post").merge(Post.from("posts")).first()).toBeTruthy();
   });
 
@@ -412,11 +403,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(helloByBob).toEqual([posts("misc_by_bob").id, posts("other_by_bob").id]);
   });
 
-  // TODO(story merge-cross-model-order-qualification): when merging a relation
-  // from a different model, its order columns must be qualified against *its*
-  // table (authors.name) like mergeSelectValues does; trails qualifies late
-  // against the receiver → "no such column: posts.name".
-  it.skip("merging order relations", async () => {
+  it("merging order relations", async () => {
     let postsByAuthorName = await Post.limit(3)
       .joins("author")
       .whereNot({ "authors.name": "David" })
@@ -432,9 +419,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(postsByAuthorName).toEqual(["Bob", "Bob", "Mary"]);
   });
 
-  // TODO(story merge-cross-model-order-qualification): same cross-model order
-  // qualification gap, here with a hash order argument (Author.order({name})).
-  it.skip("merging order relations (using a hash argument)", async () => {
+  it("merging order relations (using a hash argument)", async () => {
     const postsByAuthorName = await Post.limit(4)
       .joins("author")
       .whereNot({ "authors.name": "David" })
@@ -462,10 +447,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(await ids((dev as any).ratings)).toEqual([rating1.id]);
   });
 
-  // TODO(story merge-cte-with-from): merging relations that carry `with(...)`
-  // CTE definitions doesn't fold the other relation's CTEs into the result, so
-  // the merged query references an undefined CTE ("no such table: posts_with_tags").
-  it.skip("merging relation with common table expression", async () => {
+  it("merging relation with common table expression", async () => {
     const postsWithTags = Post.with({
       posts_with_tags: Post.where("tags_count > 0"),
     }).from("posts_with_tags AS posts");
@@ -475,8 +457,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(await relation.pluck("id")).toEqual([1, 2, 7]);
   });
 
-  // TODO(story merge-cte-with-from): see above — CTE merge folding.
-  it.skip("merging multiple relations with common table expression", async () => {
+  it("merging multiple relations with common table expression", async () => {
     const postsWithTags = Post.with({ posts_with_tags: Post.where("tags_count > 0") });
     const postsWithComments = Post.with({
       posts_with_comments: Post.where("legacy_comments_count > 0"),
@@ -491,8 +472,7 @@ describe("MergingDifferentRelationsTest", () => {
     expect(await relation.pluck("id")).toEqual([1, 2, 7]);
   });
 
-  // TODO(story merge-cte-with-from): see above — CTE merge folding.
-  it.skip("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", async () => {
+  it("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", async () => {
     const postsWithTags = Post.with({ popular_posts: Post.where("tags_count > 0") });
     const postsWithComments = Post.with({
       popular_posts: Post.where("legacy_comments_count > 0"),

@@ -27,11 +27,19 @@ export class Merger {
     this.mergeMultiValues(rel);
     this.mergeSingleValues(rel);
     this.mergeClauses(rel);
+    this.mergeCtes(rel);
     this.mergePreloads(rel);
     this.mergeJoins(rel);
     this.mergeOuterJoins(rel);
     if (this.other._isNone) rel._isNone = true;
     return rel;
+  }
+
+  // Rails merges `with` through the NORMAL_VALUES loop (`relation.with!(*value)`),
+  // appending the other relation's CTEs. trails stores them in `_ctes`; mirror
+  // the append so a merged relation keeps both sides' common table expressions.
+  private mergeCtes(rel: any): void {
+    if (this.other._ctes?.length > 0) rel._ctes = [...rel._ctes, ...this.other._ctes];
   }
 
   // Rails merger.rb processes :unscope as a NORMAL_VALUE: before the clauses are
@@ -141,9 +149,40 @@ export class Merger {
     rel._leftOuterJoinDeps.push(...(this.other._leftOuterJoinDeps ?? []));
   }
 
+  // Rails stores order_values as Arel nodes already qualified against the
+  // origin model's table (preprocess_order_args at order! time), so a
+  // cross-model merge carries `authors.name` rather than re-resolving the bare
+  // column against the receiver. trails defers qualification to SQL build
+  // (against the *receiver* table), so a bare-column order from another model
+  // would wrongly bind to the receiver (`posts.name`). Mirror Rails by
+  // qualifying the other relation's bare-column order clauses against ITS table
+  // before copying. Dotted refs, raw SQL, and existing Arel nodes pass through.
+  private qualifyOrderForOther(clause: unknown): unknown {
+    if (clause instanceof Nodes.Node) return clause;
+    const table: any = this.other._modelClass?.arelTable;
+    if (!table) return clause;
+    const asNode = (col: string, dir: string): unknown => {
+      const attr = table.get(col);
+      return dir.toLowerCase() === "desc" ? new Nodes.Descending(attr) : new Nodes.Ascending(attr);
+    };
+    const bareColumn = (s: string): RegExpMatchArray | null =>
+      s.trim().match(/^([A-Za-z_$][\w$]*)(?:\s+(ASC|DESC))?$/i);
+    if (typeof clause === "string") {
+      const m = bareColumn(clause);
+      return m ? asNode(m[1], m[2] ?? "asc") : clause;
+    }
+    if (Array.isArray(clause) && typeof clause[0] === "string" && !clause[0].includes(".")) {
+      return asNode(clause[0], String(clause[1] ?? "asc"));
+    }
+    return clause;
+  }
+
   private mergeMultiValues(rel: any): void {
     if (this.other._orderClauses && this.other._orderClauses.length > 0) {
-      rel._orderClauses = [...this.other._orderClauses];
+      const sameKlass = this.other._modelClass === rel._modelClass;
+      rel._orderClauses = sameKlass
+        ? [...this.other._orderClauses]
+        : this.other._orderClauses.map((c: unknown) => this.qualifyOrderForOther(c));
     }
     if (this.other._groupColumns && this.other._groupColumns.length > 0) {
       rel._groupColumns.push(...this.other._groupColumns);
@@ -195,7 +234,15 @@ export class Merger {
   private isReplaceFromClause(): boolean {
     const relationFrom = this.relation._fromClause;
     const otherFrom = this.other._fromClause;
-    return (!relationFrom || relationFrom.isEmpty()) && !!otherFrom && !otherFrom.isEmpty();
+    // Rails replace_from_clause? also requires same base_class, so a cross-model
+    // merge (e.g. Comment.merge(Post.from("posts"))) keeps the receiver's own
+    // FROM (its base table) rather than swapping in the other model's table.
+    return (
+      (!relationFrom || relationFrom.isEmpty()) &&
+      !!otherFrom &&
+      !otherFrom.isEmpty() &&
+      this.relation._modelClass?.baseClass === this.other._modelClass?.baseClass
+    );
   }
 }
 

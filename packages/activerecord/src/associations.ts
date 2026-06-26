@@ -3217,6 +3217,20 @@ export async function updateCounterCaches(
   for (const assoc of associations) {
     if (assoc.type !== "belongsTo" || !assoc.options.counterCache) continue;
 
+    // Rails reflections are keyed by name, so a subclass that redefines
+    // `belongs_to :post` (without counter_cache) replaces the inherited one. In
+    // trails `_associations` keeps both, so an inherited counter_cache definition
+    // can shadow-fire even though the leaf override dropped it. Skip this assoc
+    // when a later (more-derived) belongsTo definition redefines the same name.
+    const shadowedByOverride = associations.some(
+      (a, i) =>
+        a !== assoc &&
+        a.type === "belongsTo" &&
+        a.name === assoc.name &&
+        i > associations.indexOf(assoc),
+    );
+    if (shadowedByOverride) continue;
+
     const rawForeignKey =
       assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
     const fkCols = Array.isArray(rawForeignKey) ? rawForeignKey : [rawForeignKey];
