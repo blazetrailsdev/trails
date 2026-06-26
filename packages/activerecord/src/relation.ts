@@ -648,7 +648,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#rewhere
    */
-  rewhere(conditions: Record<string, unknown>): Relation<T> {
+  rewhere(conditions: Record<string, unknown> | null): Relation<T> {
+    // Mirrors rewhere (query_methods.rb): `return unscope(:where) if conditions.nil?`.
+    if (conditions == null) return this.unscope("where");
     conditions = sanitizeForbiddenAttributes(conditions);
     const rel = this._clone();
     // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
