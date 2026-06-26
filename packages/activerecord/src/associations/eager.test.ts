@@ -10,7 +10,7 @@ import {
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
 } from "../index.js";
-import { association, loadHasMany, loadHasManyThrough } from "../associations.js";
+import { association, loadHasManyThrough } from "../associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -18,7 +18,13 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { Post, FirstPost, SpecialPost, StiPost } from "../test-helpers/models/post.js";
+import {
+  Post,
+  FirstPost,
+  SpecialPost,
+  StiPost,
+  PostWithDefaultInclude,
+} from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment, VerySpecialComment, SpecialComment } from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
@@ -130,28 +136,6 @@ const TEST_SCHEMA: Schema = {
   eager_hmt_authors: { name: "string" },
   eager_hmt_authorships: { eager_hmt_author_id: "integer", eager_hmt_book_id: "integer" },
   eager_hmt_books: { title: "string" },
-  eager_hmt_bt_authors: { name: "string" },
-  eager_hmt_bt_comments: { body: "string", eager_hmt_bt_post_id: "integer" },
-  eager_hmt_bt_posts: { title: "string", eager_hmt_bt_author_id: "integer" },
-  eager_hmt_cj_authors: { name: "string" },
-  eager_hmt_cj_authorships: { eager_hmt_cj_author_id: "integer", eager_hmt_cj_book_id: "integer" },
-  eager_hmt_cj_books: { title: "string" },
-  eager_hmt_cond_authors: { name: "string" },
-  eager_hmt_cond_authorships: {
-    eager_hmt_cond_author_id: "integer",
-    eager_hmt_cond_book_id: "integer",
-  },
-  eager_hmt_cond_books: { title: "string" },
-  eager_hmt_di_authors: { name: "string" },
-  eager_hmt_di_authorships: { eager_hmt_di_author_id: "integer", eager_hmt_di_book_id: "integer" },
-  eager_hmt_di_books: { title: "string" },
-  eager_hmt_inc_authors: { name: "string" },
-  eager_hmt_inc_authorships: {
-    eager_hmt_inc_author_id: "integer",
-    eager_hmt_inc_book_id: "integer",
-  },
-  eager_hmt_inc_books: { title: "string" },
-  eager_hmt_magazines: { title: "string" },
   eager_hmt_mo_authors: { name: "string" },
   eager_hmt_mo_authorships: { eager_hmt_mo_author_id: "integer", eager_hmt_mo_book_id: "integer" },
   eager_hmt_mo_books: { title: "string" },
@@ -161,14 +145,6 @@ const TEST_SCHEMA: Schema = {
     eager_hmt_ord_book_id: "integer",
   },
   eager_hmt_ord_books: { title: "string" },
-  eager_hmt_readers: { name: "string" },
-  eager_hmt_subscriptions: { eager_hmt_reader_id: "integer", eager_hmt_magazine_id: "integer" },
-  eager_hmt_top_authors: { name: "string" },
-  eager_hmt_top_authorships: {
-    eager_hmt_top_author_id: "integer",
-    eager_hmt_top_book_id: "integer",
-  },
-  eager_hmt_top_books: { title: "string" },
   eager_ho_children: { value: "string", eager_ho_parent_id: "integer" },
   eager_ho_no_pk_children: {
     columns: { value: "string", eager_ho_no_pk_parent_id: "integer" },
@@ -225,9 +201,6 @@ const TEST_SCHEMA: Schema = {
   eager_qt_thr_owners: { name: "string" },
   eager_reord_children: { value: "string", eager_reord_parent_id: "integer" },
   eager_reord_parents: { name: "string" },
-  eager_sti_authors: { name: "string" },
-  eager_sti_comments: { body: "string", eager_sti_post_id: "integer" },
-  eager_sti_posts: { title: "string", type: "string", eager_sti_author_id: "integer" },
   eager_str_bt_children: { value: "string", eager_str_bt_parent_id: "integer" },
   eager_str_bt_parents: { name: "string" },
   eager_str_children: { value: "string", eager_str_parent_id: "integer" },
@@ -1629,180 +1602,6 @@ describe("EagerAssociationTest", () => {
     expect(proxy.loaded).toBe(true);
     expect(proxy.target).toEqual([]);
   });
-  it("eager with has many through", async () => {
-    class EagerHmtReader extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtSubscriptions", {
-          className: "EagerHmtSubscription",
-          foreignKey: "eager_hmt_reader_id",
-        });
-        this.hasMany("eagerHmtMagazines", {
-          through: "eagerHmtSubscriptions",
-          source: "eagerHmtMagazine",
-          className: "EagerHmtMagazine",
-        });
-      }
-    }
-    class EagerHmtSubscription extends Base {
-      static {
-        this.attribute("eager_hmt_reader_id", "integer");
-        this.attribute("eager_hmt_magazine_id", "integer");
-        this.belongsTo("eagerHmtMagazine", {
-          className: "EagerHmtMagazine",
-          foreignKey: "eager_hmt_magazine_id",
-        });
-      }
-    }
-    class EagerHmtMagazine extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtReader", EagerHmtReader);
-    registerModel("EagerHmtSubscription", EagerHmtSubscription);
-    registerModel("EagerHmtMagazine", EagerHmtMagazine);
-
-    const reader = await EagerHmtReader.create({ name: "Alice" });
-    const mag1 = await EagerHmtMagazine.create({ title: "Wired" });
-    const mag2 = await EagerHmtMagazine.create({ title: "Time" });
-    await EagerHmtSubscription.create({
-      eager_hmt_reader_id: reader.id,
-      eager_hmt_magazine_id: mag1.id,
-    });
-    await EagerHmtSubscription.create({
-      eager_hmt_reader_id: reader.id,
-      eager_hmt_magazine_id: mag2.id,
-    });
-
-    const mags = await loadHasManyThrough(reader, "eagerHmtMagazines", {
-      through: "eagerHmtSubscriptions",
-      source: "eagerHmtMagazine",
-      className: "EagerHmtMagazine",
-    });
-    expect(mags).toHaveLength(2);
-  });
-  it("eager with has many through a belongs to association", async () => {
-    class EagerHmtBtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtBtPosts", {
-          className: "EagerHmtBtPost",
-          foreignKey: "eager_hmt_bt_author_id",
-        });
-        this.hasMany("eagerHmtBtComments", {
-          through: "eagerHmtBtPosts",
-          source: "eagerHmtBtComment",
-          className: "EagerHmtBtComment",
-        });
-      }
-    }
-    class EagerHmtBtPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("eager_hmt_bt_author_id", "integer");
-        this.hasMany("eagerHmtBtComment", {
-          className: "EagerHmtBtComment",
-          foreignKey: "eager_hmt_bt_post_id",
-        });
-      }
-    }
-    class EagerHmtBtComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_hmt_bt_post_id", "integer");
-      }
-    }
-
-    registerModel("EagerHmtBtAuthor", EagerHmtBtAuthor);
-    registerModel("EagerHmtBtPost", EagerHmtBtPost);
-    registerModel("EagerHmtBtComment", EagerHmtBtComment);
-
-    const author = await EagerHmtBtAuthor.create({ name: "Bob" });
-    const post = await EagerHmtBtPost.create({
-      title: "Hello",
-      eager_hmt_bt_author_id: author.id,
-    });
-    await EagerHmtBtComment.create({
-      body: "Great",
-      eager_hmt_bt_post_id: post.id,
-    });
-
-    const posts = await loadHasMany(author, "eagerHmtBtPosts", {
-      className: "EagerHmtBtPost",
-      foreignKey: "eager_hmt_bt_author_id",
-    });
-    expect(posts).toHaveLength(1);
-    const comments = await loadHasMany(posts[0], "eagerHmtBtComment", {
-      className: "EagerHmtBtComment",
-      foreignKey: "eager_hmt_bt_post_id",
-    });
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("Great");
-  });
-  it("eager with has many through an sti join model", async () => {
-    // Author -> SpecialPost (STI) -> Comments (through)
-    class EagerStiAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerSpecialPosts", {
-          className: "EagerSpecialPost",
-          foreignKey: "eager_sti_author_id",
-        });
-        this.hasMany("specialPostComments", {
-          className: "EagerStiComment",
-          through: "eagerSpecialPosts",
-          source: "eagerStiComment",
-        });
-      }
-    }
-    class EagerStiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("eager_sti_author_id", "integer");
-        this._tableName = "eager_sti_posts";
-        enableSti(EagerStiPost);
-      }
-    }
-    class EagerSpecialPost extends EagerStiPost {
-      static {
-        registerModel(EagerSpecialPost);
-        registerSubclass(EagerSpecialPost);
-        this.hasMany("eagerStiComment", {
-          className: "EagerStiComment",
-          foreignKey: "eager_sti_post_id",
-        });
-      }
-    }
-    class EagerStiComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_sti_post_id", "integer");
-      }
-    }
-    registerModel(EagerStiAuthor);
-    registerModel(EagerStiPost);
-    registerModel(EagerStiComment);
-
-    const author = await EagerStiAuthor.create({ name: "David" });
-    const normalPost = await EagerStiPost.create({
-      title: "Normal",
-      eager_sti_author_id: author.id,
-    });
-    const specialPost = await EagerSpecialPost.create({
-      title: "Special",
-      eager_sti_author_id: author.id,
-    });
-    await EagerStiComment.create({ body: "on normal", eager_sti_post_id: normalPost.id });
-    await EagerStiComment.create({ body: "does it hurt", eager_sti_post_id: specialPost.id });
-
-    const authors = await EagerStiAuthor.all().includes("specialPostComments").toArray();
-    const comments = (authors[0] as any).association("specialPostComments").target;
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("does it hurt");
-  });
   it("preloading has many through with implicit source", async () => {
     class EagerImpOwner extends Base {
       static {
@@ -1849,276 +1648,6 @@ describe("EagerAssociationTest", () => {
       className: "EagerImpItem",
     });
     expect(items).toHaveLength(1);
-  });
-  it("eager with has many through join model with conditions", async () => {
-    class EagerHmtCondAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtCondAuthorships", {
-          className: "EagerHmtCondAuthorship",
-          foreignKey: "eager_hmt_cond_author_id",
-        });
-        this.hasMany("eagerHmtCondBooks", {
-          through: "eagerHmtCondAuthorships",
-          source: "eagerHmtCondBook",
-          className: "EagerHmtCondBook",
-        });
-      }
-    }
-    class EagerHmtCondAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_cond_author_id", "integer");
-        this.attribute("eager_hmt_cond_book_id", "integer");
-        this.belongsTo("eagerHmtCondBook", {
-          className: "EagerHmtCondBook",
-          foreignKey: "eager_hmt_cond_book_id",
-        });
-      }
-    }
-    class EagerHmtCondBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtCondAuthor", EagerHmtCondAuthor);
-    registerModel("EagerHmtCondAuthorship", EagerHmtCondAuthorship);
-    registerModel("EagerHmtCondBook", EagerHmtCondBook);
-
-    const author = await EagerHmtCondAuthor.create({ name: "Author1" });
-    const book1 = await EagerHmtCondBook.create({ title: "Book1" });
-    const book2 = await EagerHmtCondBook.create({ title: "Book2" });
-    await EagerHmtCondAuthorship.create({
-      eager_hmt_cond_author_id: author.id,
-      eager_hmt_cond_book_id: book1.id,
-    });
-    await EagerHmtCondAuthorship.create({
-      eager_hmt_cond_author_id: author.id,
-      eager_hmt_cond_book_id: book2.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtCondBooks", {
-      through: "eagerHmtCondAuthorships",
-      source: "eagerHmtCondBook",
-      className: "EagerHmtCondBook",
-    });
-    expect(books).toHaveLength(2);
-  });
-  it("eager with has many through join model with conditions on top level", async () => {
-    class EagerHmtTopAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtTopAuthorships", {
-          className: "EagerHmtTopAuthorship",
-          foreignKey: "eager_hmt_top_author_id",
-        });
-        this.hasMany("eagerHmtTopBooks", {
-          through: "eagerHmtTopAuthorships",
-          source: "eagerHmtTopBook",
-          className: "EagerHmtTopBook",
-        });
-      }
-    }
-    class EagerHmtTopAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_top_author_id", "integer");
-        this.attribute("eager_hmt_top_book_id", "integer");
-        this.belongsTo("eagerHmtTopBook", {
-          className: "EagerHmtTopBook",
-          foreignKey: "eager_hmt_top_book_id",
-        });
-      }
-    }
-    class EagerHmtTopBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtTopAuthor", EagerHmtTopAuthor);
-    registerModel("EagerHmtTopAuthorship", EagerHmtTopAuthorship);
-    registerModel("EagerHmtTopBook", EagerHmtTopBook);
-
-    const a1 = await EagerHmtTopAuthor.create({ name: "A1" });
-    const a2 = await EagerHmtTopAuthor.create({ name: "A2" });
-    const book = await EagerHmtTopBook.create({ title: "Shared" });
-    await EagerHmtTopAuthorship.create({
-      eager_hmt_top_author_id: a1.id,
-      eager_hmt_top_book_id: book.id,
-    });
-    await EagerHmtTopAuthorship.create({
-      eager_hmt_top_author_id: a2.id,
-      eager_hmt_top_book_id: book.id,
-    });
-
-    const books1 = await loadHasManyThrough(a1, "eagerHmtTopBooks", {
-      through: "eagerHmtTopAuthorships",
-      source: "eagerHmtTopBook",
-      className: "EagerHmtTopBook",
-    });
-    expect(books1).toHaveLength(1);
-    const books2 = await loadHasManyThrough(a2, "eagerHmtTopBooks", {
-      through: "eagerHmtTopAuthorships",
-      source: "eagerHmtTopBook",
-      className: "EagerHmtTopBook",
-    });
-    expect(books2).toHaveLength(1);
-  });
-  it("eager with has many through join model with include", async () => {
-    class EagerHmtIncAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtIncAuthorships", {
-          className: "EagerHmtIncAuthorship",
-          foreignKey: "eager_hmt_inc_author_id",
-        });
-        this.hasMany("eagerHmtIncBooks", {
-          through: "eagerHmtIncAuthorships",
-          source: "eagerHmtIncBook",
-          className: "EagerHmtIncBook",
-        });
-      }
-    }
-    class EagerHmtIncAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_inc_author_id", "integer");
-        this.attribute("eager_hmt_inc_book_id", "integer");
-        this.belongsTo("eagerHmtIncBook", {
-          className: "EagerHmtIncBook",
-          foreignKey: "eager_hmt_inc_book_id",
-        });
-      }
-    }
-    class EagerHmtIncBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtIncAuthor", EagerHmtIncAuthor);
-    registerModel("EagerHmtIncAuthorship", EagerHmtIncAuthorship);
-    registerModel("EagerHmtIncBook", EagerHmtIncBook);
-
-    const author = await EagerHmtIncAuthor.create({ name: "Author1" });
-    const book1 = await EagerHmtIncBook.create({ title: "Book1" });
-    const book2 = await EagerHmtIncBook.create({ title: "Book2" });
-    await EagerHmtIncAuthorship.create({
-      eager_hmt_inc_author_id: author.id,
-      eager_hmt_inc_book_id: book1.id,
-    });
-    await EagerHmtIncAuthorship.create({
-      eager_hmt_inc_author_id: author.id,
-      eager_hmt_inc_book_id: book2.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtIncBooks", {
-      through: "eagerHmtIncAuthorships",
-      source: "eagerHmtIncBook",
-      className: "EagerHmtIncBook",
-    });
-    expect(books).toHaveLength(2);
-    const titles = books.map((b) => b.title);
-    expect(titles).toContain("Book1");
-    expect(titles).toContain("Book2");
-  });
-  it("eager with has many through with conditions join model with include", async () => {
-    class EagerHmtCjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtCjAuthorships", {
-          className: "EagerHmtCjAuthorship",
-          foreignKey: "eager_hmt_cj_author_id",
-        });
-        this.hasMany("eagerHmtCjBooks", {
-          through: "eagerHmtCjAuthorships",
-          source: "eagerHmtCjBook",
-          className: "EagerHmtCjBook",
-        });
-      }
-    }
-    class EagerHmtCjAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_cj_author_id", "integer");
-        this.attribute("eager_hmt_cj_book_id", "integer");
-        this.belongsTo("eagerHmtCjBook", {
-          className: "EagerHmtCjBook",
-          foreignKey: "eager_hmt_cj_book_id",
-        });
-      }
-    }
-    class EagerHmtCjBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtCjAuthor", EagerHmtCjAuthor);
-    registerModel("EagerHmtCjAuthorship", EagerHmtCjAuthorship);
-    registerModel("EagerHmtCjBook", EagerHmtCjBook);
-
-    const author = await EagerHmtCjAuthor.create({ name: "A" });
-    const book = await EagerHmtCjBook.create({ title: "B" });
-    await EagerHmtCjAuthorship.create({
-      eager_hmt_cj_author_id: author.id,
-      eager_hmt_cj_book_id: book.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtCjBooks", {
-      through: "eagerHmtCjAuthorships",
-      source: "eagerHmtCjBook",
-      className: "EagerHmtCjBook",
-    });
-    expect(books).toHaveLength(1);
-    expect(books[0].title).toBe("B");
-  });
-  it("eager with has many through join model ignores default includes", async () => {
-    class EagerHmtDiAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtDiAuthorships", {
-          className: "EagerHmtDiAuthorship",
-          foreignKey: "eager_hmt_di_author_id",
-        });
-        this.hasMany("eagerHmtDiBooks", {
-          through: "eagerHmtDiAuthorships",
-          source: "eagerHmtDiBook",
-          className: "EagerHmtDiBook",
-        });
-      }
-    }
-    class EagerHmtDiAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_di_author_id", "integer");
-        this.attribute("eager_hmt_di_book_id", "integer");
-        this.belongsTo("eagerHmtDiBook", {
-          className: "EagerHmtDiBook",
-          foreignKey: "eager_hmt_di_book_id",
-        });
-      }
-    }
-    class EagerHmtDiBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtDiAuthor", EagerHmtDiAuthor);
-    registerModel("EagerHmtDiAuthorship", EagerHmtDiAuthorship);
-    registerModel("EagerHmtDiBook", EagerHmtDiBook);
-
-    const author = await EagerHmtDiAuthor.create({ name: "A" });
-    const book = await EagerHmtDiBook.create({ title: "B" });
-    await EagerHmtDiAuthorship.create({
-      eager_hmt_di_author_id: author.id,
-      eager_hmt_di_book_id: book.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtDiBooks", {
-      through: "eagerHmtDiAuthorships",
-      source: "eagerHmtDiBook",
-      className: "EagerHmtDiBook",
-    });
-    expect(books).toHaveLength(1);
   });
   it("eager with inheritance", async () => {
     class EagerInhCompany extends Base {
@@ -5784,6 +5313,163 @@ describe("EagerAssociationTest", () => {
       .order("authors.id")
       .first()) as Author;
     expect(author.association("specialNonexistentPostComments").target).toEqual([]);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Author/Post/Comment/Tag has_many-through
+// fixtures) — ports the `eager with has many through *` cluster over the real
+// Author / Post (+ STI SpecialPost/StiPost) / Comment / Person / Tag models and
+// their fixtures. Same describe name as the other EagerAssociationTest blocks so
+// test:compare matches the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { authors, comments, people, posts } = useHandlerFixtures([
+    "authors",
+    "posts",
+    "comments",
+    "people",
+    "readers",
+    "authorFavorites",
+    "taggings",
+    "tags",
+  ]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        people: canonicalSchema.people,
+        readers: canonicalSchema.readers,
+        author_favorites: canonicalSchema.author_favorites,
+        taggings: canonicalSchema.taggings,
+        tags: canonicalSchema.tags,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  enableSti(Post);
+  registerModel(Author);
+  registerModel(Post);
+  registerModel(SpecialPost);
+  registerSubclass(SpecialPost);
+  registerModel(StiPost);
+  registerSubclass(StiPost);
+  registerModel(PostWithDefaultInclude);
+  registerModel(Comment);
+  registerModel(Person);
+  registerModel(Reader);
+  registerModel(Tag);
+  registerModel(Tagging);
+  registerModel(AuthorFavorite);
+
+  it("eager with has many through", async () => {
+    const michael = people("michael") as any;
+    const postsWithComments = (await michael.posts
+      .includes("comments")
+      .order("posts.id")
+      .toArray()) as Base[];
+    const postsWithAuthor = (await michael.posts
+      .includes("author")
+      .order("posts.id")
+      .toArray()) as Base[];
+    const postsWithCommentsAndAuthor = (await michael.posts
+      .includes("comments", "author")
+      .order("posts.id")
+      .toArray()) as Base[];
+    const commentCount = postsWithComments.reduce(
+      (sum, post) => sum + (post.association("comments").target as Base[]).length,
+      0,
+    );
+    expect(commentCount).toBe(2);
+    await assertNoQueries(false, () => {
+      expect((postsWithAuthor[0].association("author").target as Base).id).toBe(
+        authors("david").id,
+      );
+    });
+    await assertNoQueries(false, () => {
+      expect((postsWithCommentsAndAuthor[0].association("author").target as Base).id).toBe(
+        authors("david").id,
+      );
+    });
+  });
+
+  it("eager with has many through a belongs to association", async () => {
+    const author = authors("mary") as any;
+    await Post.create({ author_id: author.id, title: "TITLE", body: "BODY" });
+    await author.authorFavorites.create({ favorite_author_id: 1 });
+    await author.authorFavorites.create({ favorite_author_id: 2 });
+    const postsWithAuthorFavorites = (await author.posts
+      .includes("authorFavorites")
+      .toArray()) as Base[];
+    await assertNoQueries(false, () => {
+      const favorites = postsWithAuthorFavorites[0].association("authorFavorites").target as Base[];
+      expect(favorites[0].readAttribute("author_id")).toBeDefined();
+    });
+  });
+
+  it("eager with has many through an sti join model", async () => {
+    const author = (await Author.all()
+      .includes("specialPostComments")
+      .order("authors.id")
+      .first()) as Author;
+    await assertNoQueries(false, () => {
+      const specialPostComments = author.association("specialPostComments").target as Base[];
+      expect(specialPostComments.map((c) => c.id)).toEqual([comments("does_it_hurt").id]);
+    });
+  });
+
+  it("eager with has many through join model with conditions", async () => {
+    const eagerAuthor = (await Author.all()
+      .includes("helloPostComments")
+      .order("authors.id")
+      .first()) as Author;
+    const eagerComments = (eagerAuthor.association("helloPostComments").target as Base[])
+      .slice()
+      .sort((a, b) => Number(a.id) - Number(b.id));
+    const lazyAuthor = (await Author.all().order("authors.id").first()) as any;
+    const lazyComments = ((await lazyAuthor.helloPostComments.toArray()) as Base[])
+      .slice()
+      .sort((a, b) => Number(a.id) - Number(b.id));
+    expect(eagerComments.map((c) => c.id)).toEqual(lazyComments.map((c) => c.id));
+  });
+
+  it("eager with has many through join model with conditions on top level", async () => {
+    const author = await Author.all()
+      .includes("commentsWithOrderAndConditions")
+      .find(authors("david").id);
+    const first = (author.association("commentsWithOrderAndConditions").target as Base[])[0];
+    expect(first.id).toBe(comments("more_greetings").id);
+  });
+
+  it("eager with has many through join model with include", async () => {
+    const author = await Author.all().includes("commentsWithInclude").find(authors("david").id);
+    const authorComments = author.association("commentsWithInclude").target as Base[];
+    await assertNoQueries(false, () => {
+      const post = authorComments[0].association("post").target as Base;
+      expect(post.readAttribute("title")).toBeDefined();
+    });
+  });
+
+  it("eager with has many through with conditions join model with include", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const postTags = (await (post as any).miscTags.toArray()) as Base[];
+    const eagerPost = await Post.all().includes("miscTags").find(posts("welcome").id);
+    const eagerPostTags = eagerPost.association("miscTags").target as Base[];
+    expect(eagerPostTags.map((t) => t.id)).toEqual(postTags.map((t) => t.id));
+  });
+
+  it("eager with has many through join model ignores default includes", async () => {
+    const david = authors("david") as any;
+    let error: unknown;
+    try {
+      await david.commentsOnPostsWithDefaultInclude.toArray();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeUndefined();
   });
 });
 
