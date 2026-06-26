@@ -1103,7 +1103,10 @@ export class Base extends Model {
    */
   static override typeForAttribute(name: string): Type {
     (ModelSchema.loadSchema as any).call(this);
-    return (this._attributeDefinitions as any)?.get(name)?.type ?? typeRegistry.lookup("value");
+    // Rails resolves attribute aliases first
+    // (`attr_name = attribute_aliases[attr_name] || attr_name`).
+    const resolved = (this as any)._attributeAliases?.[name] ?? name;
+    return (this._attributeDefinitions as any)?.get(resolved)?.type ?? typeRegistry.lookup("value");
   }
 
   /**
