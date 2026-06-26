@@ -710,6 +710,8 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       }
     })();
     expect(error).toBeInstanceOf(SerializationTypeMismatch);
+    const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
+    expect((error as Error).message).toBe(expected);
   });
 
   it("serialize attribute via select method when time zone available", async () => {
