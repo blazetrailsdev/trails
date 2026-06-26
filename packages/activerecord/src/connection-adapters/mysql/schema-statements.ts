@@ -489,13 +489,14 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     [schema ?? null, table],
   );
 
-  // The bare-string "NULL" default below is a MariaDB-only reflection quirk and the
-  // disambiguation is engine-specific (see the coercion comment). Ensure the cached
-  // version/_mariadb flag is populated before the map needs it — but only when a row
-  // actually carries that token, so the common path adds no round-trip.
-  if (rows.some((r) => (r.default_value ?? r.DEFAULT_VALUE) === "NULL")) {
-    await this.getFullVersion();
-  }
+  // Several default-reflection branches below are MariaDB-only and keyed on
+  // `isMariadb()` (the "NULL" → null coercion, the bare-expression function
+  // default, and the quoted string-literal strip). On a freshly leased
+  // connection the engine flag is unset until the version is fetched, so a cold
+  // adapter would mis-reflect e.g. a `'Smith'` varchar default as the literal
+  // `'Smith'`. Warm it once up front — `getFullVersion()` memoizes the version
+  // string, so this is a no-op after the first call.
+  await this.getFullVersion();
 
   return rows.map((r) => {
     const name = String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
