@@ -178,10 +178,14 @@ class CallbackHaltedDeveloper extends Base {
   afterCreateCalled = false;
   afterUpdateCalled = false;
   afterDestroyCalled = false;
-  cancelBeforeSave = false;
-  cancelBeforeCreate = false;
-  cancelBeforeUpdate = false;
-  cancelBeforeDestroy = false;
+  // `attr_accessor` ivars are undefined until assigned. `before_save` mirrors
+  // Rails' `defined?(@cancel_before_save)` (halts on ANY assignment, even
+  // `false`); the create/update/destroy guards mirror the truthy
+  // `@cancel_before_*` checks. (callbacks_test.rb:135-149)
+  declare cancelBeforeSave?: boolean;
+  cancelBeforeCreate?: boolean;
+  cancelBeforeUpdate?: boolean;
+  cancelBeforeDestroy?: boolean;
 
   static {
     this.tableName = "developers";
@@ -189,7 +193,7 @@ class CallbackHaltedDeveloper extends Base {
     this.attribute("salary", "integer");
 
     this.beforeSave((r: CallbackHaltedDeveloper) => {
-      if (r.cancelBeforeSave) throwAbort();
+      if (r.cancelBeforeSave !== undefined) throwAbort();
     });
     this.beforeCreate((r: CallbackHaltedDeveloper) => {
       if (r.cancelBeforeCreate) throwAbort();
