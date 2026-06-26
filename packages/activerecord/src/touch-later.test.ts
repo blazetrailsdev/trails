@@ -10,6 +10,7 @@ import { travel, travelBack } from "@blazetrails/activesupport";
 import { registerModel } from "./index.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import { Node } from "./test-helpers/models/node.js";
@@ -142,16 +143,9 @@ describe("TouchLaterTest", () => {
 
   it("touch later dont hit the db", async () => {
     const invoice = await Invoice.create();
-    // surreptitiouslyTouch writes updated_at in-memory without dirty tracking.
-    // Verify the in-memory value is updated synchronously (before any DB flush)
-    // and that the attribute is not marked dirty.
-    const before = invoice.updated_at as Temporal.Instant;
-    await invoice.touchLater();
-    const afterInMemory = invoice.updated_at as Temporal.Instant;
-    expect(afterInMemory).not.toBeNull();
-    expect(afterInMemory.epochMilliseconds).toBeGreaterThanOrEqual(before?.epochMilliseconds ?? 0);
-    // No dirty tracking — the attribute change was cleared by surreptitiouslyTouch.
-    expect(invoice.changed).toBe(false);
+    await assertNoQueries(false, async () => {
+      await invoice.touchLater();
+    });
   });
 
   it("touching three deep", async () => {
