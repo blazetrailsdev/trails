@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/serialized_attribute_test.rb
  */
 import { describe, it, expect, vi } from "vitest";
-import { ValueType } from "@blazetrails/activemodel";
+import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./serialize.js";
 
@@ -722,6 +722,10 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     const topic = await HashTopic.create({ content: myobj as any });
     const found = await HashTopic.select("id", "content").find(topic.id as number);
     expect((found as any).content).toEqual(myobj);
+    // Rails: assert_raise(ActiveModel::MissingAttributeError) { Topic.select(:id).find(...).content }
+    // Accessing a serialized attribute not included in SELECT raises MissingAttributeError.
+    const partial = await HashTopic.select("id").find(topic.id as number);
+    expect(() => (partial as any).content).toThrow(MissingAttributeError);
   });
 
   it("should raise exception on serialized attribute with type mismatch", async () => {
