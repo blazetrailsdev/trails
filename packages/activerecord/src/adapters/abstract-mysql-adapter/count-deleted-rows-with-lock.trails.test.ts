@@ -1,5 +1,10 @@
 /**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb
+ * Trails-specific invariant for the MySQL adapter: deleting rows in one
+ * connection while another connection concurrently inserts must report the
+ * correct deleted-row count. Relocated from
+ * count-deleted-rows-with-lock.test.ts (RFC 0043) -- the paired Rails file
+ * adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb is an
+ * adapter-gated case that maps zero in test:compare.
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
