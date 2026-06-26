@@ -25,7 +25,6 @@
   "packages/activerecord/src/calculations.test.ts",
   "packages/activerecord/src/counter-cache.test.ts",
   "packages/activerecord/src/counter-cache.trails.test.ts",
-  "packages/activerecord/src/defaults.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
   "packages/activerecord/src/modules.test.ts",
