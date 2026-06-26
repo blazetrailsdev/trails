@@ -464,13 +464,7 @@ describe("CallbacksTest", () => {
     ]);
   });
 
-  // Skipped pending RFC 0019 story
-  // `save-callback-halt-propagation-on-inner-abort`: trails' `_createOrUpdate`
-  // runs `after_save` even when an inner `before_create`/`before_update`
-  // chain halts via `throw :abort` (the halt isn't propagated to the enclosing
-  // `save` chain), so `assert_save_callbacks_not_called` fails. Faithful body
-  // kept; un-skip once the engine propagates the halt.
-  it.skip("before create throwing abort", async () => {
+  it("before create throwing abort", async () => {
     const someone = new CallbackHaltedDeveloper();
     someone.cancelBeforeCreate = true;
     expect(await someone.isValid()).toBe(true);
@@ -502,10 +496,7 @@ describe("CallbacksTest", () => {
     assertSaveCallbacksNotCalled(someone);
   });
 
-  // Skipped pending RFC 0019 story
-  // `save-callback-halt-propagation-on-inner-abort` (see `before create
-  // throwing abort` above).
-  it.skip("before update throwing abort", async () => {
+  it("before update throwing abort", async () => {
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);
     someone.cancelBeforeUpdate = true;
     expect(await someone.isValid()).toBe(true);

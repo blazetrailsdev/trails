@@ -3194,6 +3194,13 @@ export class Base extends Model {
         (this as any)._newRecordBeforeLastCommit = wasNewRecord;
         (this as any)._triggerUpdateCallback = !wasNewRecord;
       }
+
+      // Rails Callbacks#create_or_update is `_run_save_callbacks { super }`,
+      // where `super` (Persistence#create_or_update) returns `result != false`.
+      // Threading that boolean back as the run_callbacks block value lets the
+      // after-model-callback `value != false` conditional skip after_save when
+      // an inner before_create/before_update chain halted via throw(:abort).
+      return saved;
     });
 
     this._skipTouch = false;
