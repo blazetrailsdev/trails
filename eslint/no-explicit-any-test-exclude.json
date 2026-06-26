@@ -204,7 +204,6 @@
   "packages/activerecord/src/primary-keys.test.ts",
   "packages/activerecord/src/query-cache.test.ts",
   "packages/activerecord/src/query-logs.test.ts",
-  "packages/activerecord/src/querying-methods-delegation.test.ts",
   "packages/activerecord/src/readonly.test.ts",
   "packages/activerecord/src/reaper.test.ts",
   "packages/activerecord/src/reflection.test.ts",

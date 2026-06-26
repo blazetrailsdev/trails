@@ -31,8 +31,6 @@
   "packages/activerecord/src/json-serialization.test.ts",
   "packages/activerecord/src/modules.test.ts",
   "packages/activerecord/src/persistence.test.ts",
-  "packages/activerecord/src/querying-methods-delegation.test.ts",
-  "packages/activerecord/src/querying.test.ts",
   "packages/activerecord/src/reflection.test.ts",
   "packages/activerecord/src/relation.test.ts",
   "packages/activerecord/src/relation.trails.test.ts",
