@@ -6759,7 +6759,11 @@ export class Relation<T extends Base> {
           tsColumn.as("collection_cache_key_timestamp"),
         ];
         if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
-          inner._selectColumns = [this.table.star, ...inner._selectColumns];
+          // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
+          // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
+          // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
+          const star = (this.table as { star?: Nodes.Node }).star ?? this.table.get("*");
+          inner._selectColumns = [star, ...inner._selectColumns];
         }
         // Build a proper Arel SelectManager for the outer COUNT/MAX query so
         // quoting and adapter differences are handled by the AST visitor.
