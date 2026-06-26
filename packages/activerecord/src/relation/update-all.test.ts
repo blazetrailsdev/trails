@@ -393,10 +393,7 @@ describe("UpdateAllTest", () => {
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
   });
 
-  // TRACKED DEVIATION: updateCounters({ touch: { time: now } }) is the Rails API for
-  // "touch all with a specific time and no counter updates". Trails updateCounters does not
-  // support the `touch: { time: }` hash shorthand (only `touch: boolean | string | string[]`).
-  it.skip("update counters cares about optimistic locking", async () => {
+  it("update counters cares about optimistic locking", async () => {
     const david = people("david");
 
     const now = instant("2015-01-01T12:00:00Z");
