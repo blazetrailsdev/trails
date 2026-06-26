@@ -98,9 +98,8 @@ function buildPkPredicate(
     for (const tuple of tuples) {
       if (!Array.isArray(tuple) || tuple.length !== pk.length) return arelSql("1=0");
       // A null component is an IS NULL match (Rails Arel `where(pk => [nil, n])`
-      // → `shop_id IS NULL AND id = n`), not a no-op. trails composite-PK fixtures
-      // whose table keeps a single autoincrement id (e.g. CpkOrder) leave the
-      // extra key column NULL, so the counter predicate must address it as such.
+      // → `shop_id IS NULL AND id = n`), not a no-op — composite-PK fixtures on
+      // a single-id table (e.g. CpkOrder) leave the extra key column NULL.
       const conditions = pk.map((col, i) =>
         tuple[i] === null || tuple[i] === undefined
           ? table.get(col).eq(null)
