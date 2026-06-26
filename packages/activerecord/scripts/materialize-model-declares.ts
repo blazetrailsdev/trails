@@ -100,37 +100,81 @@ function associationCalls(info: ClassInfo): AssociationCall[] {
   return info.calls.filter((c): c is AssociationCall => ASSOC_KINDS.has(c.kind));
 }
 
+/** The `extends X` superclass identifier of a class declaration, if any. */
+function superClassNameOf(cls: ts.ClassDeclaration): string | undefined {
+  for (const hc of cls.heritageClauses ?? []) {
+    if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
+    const expr = hc.types[0]?.expression;
+    if (expr && ts.isIdentifier(expr)) return expr.text;
+  }
+  return undefined;
+}
+
 /**
  * Cross-file lookup of a model's association calls by class name (parse each
  * registered file on demand, cached) for `resolveThroughTarget`. Walks ALL
  * classes since a through target may be an STI subclass.
+ *
+ * The lookup is inheritance-aware: a class's calls include those of its
+ * ancestor chain, because Rails source reflections resolve against the whole
+ * class hierarchy. An STI subclass used as a `through` target — `SpecialPost`
+ * / `StiPost` (source `comments` on `Post`), `SelectedMembership` (source
+ * `club` on `Membership`), or `SpecialComment` (through `post` on `Comment`) —
+ * carries no association calls of its own, so without merging the parent's the
+ * source reflection is unresolvable and the declare degrades to `Base`.
+ * Subclass calls come first so an override wins the `.find` in
+ * `resolveThroughTarget`.
  */
 function buildModelAssociationLookup(
   registry: ReadonlyMap<string, string>,
 ): ModelAssociationLookup {
-  const byClassName = new Map<string, AssociationCall[] | null>();
+  const ownByClassName = new Map<string, AssociationCall[] | null>();
+  const superByClassName = new Map<string, string | undefined>();
   const walkedFiles = new Set<string>();
-  return (className) => {
-    if (byClassName.has(className)) return byClassName.get(className) ?? undefined;
+  const mergedCache = new Map<string, AssociationCall[] | null>();
+
+  const ensureWalked = (className: string): void => {
+    if (ownByClassName.has(className)) return;
     const file = registry.get(className);
     if (!file) {
-      byClassName.set(className, null);
-      return undefined;
+      ownByClassName.set(className, null);
+      return;
     }
-    if (!walkedFiles.has(file)) {
-      walkedFiles.add(file);
-      const sf = ts.createSourceFile(
-        file,
-        fs.readFileSync(file, "utf8"),
-        ts.ScriptTarget.ES2022,
-        true,
-      );
-      for (const info of walk(sf, { isModelClass: () => true })) {
-        if (!byClassName.has(info.name)) byClassName.set(info.name, associationCalls(info));
+    if (walkedFiles.has(file)) return;
+    walkedFiles.add(file);
+    const sf = ts.createSourceFile(
+      file,
+      fs.readFileSync(file, "utf8"),
+      ts.ScriptTarget.ES2022,
+      true,
+    );
+    for (const info of walk(sf, { isModelClass: () => true })) {
+      if (!ownByClassName.has(info.name)) {
+        ownByClassName.set(info.name, associationCalls(info));
+        superByClassName.set(info.name, superClassNameOf(info.classDecl));
       }
     }
-    return byClassName.get(className) ?? undefined;
   };
+
+  const merged = (className: string, seen: Set<string>): AssociationCall[] | null => {
+    const cached = mergedCache.get(className);
+    if (cached !== undefined) return cached;
+    if (seen.has(className)) return null; // guard cyclic `extends` chains
+    seen.add(className);
+    ensureWalked(className);
+    const own = ownByClassName.get(className);
+    if (own == null) {
+      mergedCache.set(className, null);
+      return null;
+    }
+    const superName = superByClassName.get(className);
+    const inherited = superName ? merged(superName, seen) : null;
+    const result = inherited && inherited.length > 0 ? [...own, ...inherited] : own;
+    mergedCache.set(className, result);
+    return result;
+  };
+
+  return (className) => merged(className, new Set()) ?? undefined;
 }
 
 /**
@@ -145,8 +189,13 @@ function buildAssociationTargets(
 ): Map<string, string> {
   const targets = new Map<string, string>();
   for (const info of modelClasses) {
-    const defining = associationCalls(info);
-    for (const call of defining) {
+    const own = associationCalls(info);
+    // Resolve `through:` against the class's inheritance-merged association
+    // set so a subclass whose `through` target is an INHERITED association
+    // (e.g. `SpecialComment.has_one :author, through: :post`, where `post` is
+    // `Comment`'s `belongs_to`) finds it instead of degrading to `Base`.
+    const defining = lookup(info.name) ?? own;
+    for (const call of own) {
       if (!call.options["through"]) continue;
       const resolved = resolveThroughTarget(defining, call, lookup, aliases) ?? "Base";
       targets.set(`${info.name}#${call.name}`, resolved);

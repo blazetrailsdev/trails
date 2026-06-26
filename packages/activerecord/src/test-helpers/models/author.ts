@@ -77,12 +77,12 @@ export class Author extends Base {
   declare orderedUniqCommentsDesc: AssociationProxy<Comment>;
   declare readonlyComments: AssociationProxy<Comment>;
   declare specialPosts: AssociationProxy<SpecialPost>;
-  declare specialPostComments: AssociationProxy<Base>;
+  declare specialPostComments: AssociationProxy<Comment>;
   declare specialPostsWithDefaultScope: AssociationProxy<SpecialPostWithDefaultScope>;
   declare stiPosts: AssociationProxy<StiPost>;
-  declare stiPostComments: AssociationProxy<Base>;
+  declare stiPostComments: AssociationProxy<Comment>;
   declare specialNonexistentPosts: AssociationProxy<SpecialPost>;
-  declare specialNonexistentPostComments: AssociationProxy<Base>;
+  declare specialNonexistentPostComments: AssociationProxy<Comment>;
   declare nonexistentComments: AssociationProxy<Comment>;
   declare helloPosts: AssociationProxy<Post>;
   declare helloPostComments: AssociationProxy<Comment>;

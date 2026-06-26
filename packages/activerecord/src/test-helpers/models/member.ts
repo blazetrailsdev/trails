@@ -20,7 +20,7 @@ export class Member extends Base {
   declare membership: Membership | null;
   declare club: Club | null;
   declare clubWithoutJoins: Club | null;
-  declare selectedClub: Base | null;
+  declare selectedClub: Club | null;
   declare favoriteClub: Club | null;
   declare hairyClub: Club | null;
   declare sponsor: Sponsor | null;
@@ -54,7 +54,7 @@ export class Member extends Base {
     ((name: "membership") => Promise<Membership | null>) &
     ((name: "club") => Promise<Club | null>) &
     ((name: "clubWithoutJoins") => Promise<Club | null>) &
-    ((name: "selectedClub") => Promise<Base | null>) &
+    ((name: "selectedClub") => Promise<Club | null>) &
     ((name: "favoriteClub") => Promise<Club | null>) &
     ((name: "hairyClub") => Promise<Club | null>) &
     ((name: "sponsor") => Promise<Sponsor | null>) &

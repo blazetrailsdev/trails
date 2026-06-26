@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Author } from "./author.js";
 import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
 import type { FirstPost } from "./post.js";
@@ -131,7 +132,6 @@ export class Comment extends Base {
 
 export class SpecialComment extends Comment {
   declare ordinaryPost: Post | null;
-  declare author: Base | null;
   declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
     ((name: "author") => Promise<Base | null>) &
     ((name: "resource") => Promise<Base | null>) &
@@ -141,7 +141,7 @@ export class SpecialComment extends Comment {
     ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
     ((name: "parent") => Promise<Comment | null>) &
     ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Base | null>;
+  declare loadHasOne: (name: "author") => Promise<Author | null>;
 
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
@@ -164,7 +164,7 @@ export class SubSpecialComment extends SpecialComment {
     ((name: "specialPostWithDefaultScope") => Promise<SpecialPostWithDefaultScope | null>) &
     ((name: "parent") => Promise<Comment | null>) &
     ((name: "ordinaryPost") => Promise<Post | null>);
-  declare loadHasOne: (name: "author") => Promise<Base | null>;
+  declare loadHasOne: (name: "author") => Promise<Author | null>;
 }
 
 export class VerySpecialComment extends Comment {

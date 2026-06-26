@@ -85,8 +85,8 @@ export class Post extends Base {
   declare ratingsViaStringJoinComments: AssociationProxy<Rating>;
   declare specialComments: AssociationProxy<SpecialComment>;
   declare nonexistentComments: AssociationProxy<Comment>;
-  declare specialCommentsRatings: AssociationProxy<Base>;
-  declare specialCommentsRatingsTaggings: AssociationProxy<Base>;
+  declare specialCommentsRatings: AssociationProxy<Rating>;
+  declare specialCommentsRatingsTaggings: AssociationProxy<Tagging>;
   declare categoryPosts: AssociationProxy<CategoryPost>;
   declare scategories: AssociationProxy<Category>;
   declare hmtSpecialCategories: AssociationProxy<Category>;
@@ -96,7 +96,7 @@ export class Post extends Base {
   declare authorsOfEssaysNamedBob: AssociationProxy<Author>;
   declare tags: AssociationProxy<Tag>;
   declare indestructibleTaggings: AssociationProxy<IndestructibleTagging>;
-  declare indestructibleTags: AssociationProxy<Base>;
+  declare indestructibleTags: AssociationProxy<Tag>;
   declare tagsWithDestroy: AssociationProxy<Tag>;
   declare tagsWithNullify: AssociationProxy<Tag>;
   declare miscTags: AssociationProxy<Tag>;
