@@ -1451,8 +1451,23 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
     throw new Error("excluding does not support models with composite primary keys");
   }
   const pk = primaryKey;
-  const ids = records.map((r: any) => (typeof r === "object" && r !== null ? (r.id ?? r) : r));
-  this._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash({ [pk]: ids }));
+  // Rails `excluding!`: `predicate_builder[primary_key, records].invert`. The
+  // array handler dereferences AR records to their ids and routes Relation
+  // arguments through the subquery handler, so pass the mixed collection
+  // straight through rather than pre-mapping.
+  //
+  // Rails materializes relation args eagerly (`relations.flat_map(&:ids)`,
+  // query_methods.rb:1583) because Ruby query execution is synchronous; trails'
+  // query builder is not, so a Relation arg flows through the same
+  // `PredicateBuilder::RelationHandler` path that `where(id: relation)` uses and
+  // emits `id NOT IN (SELECT <pk> FROM ...)` (relation-handler.ts). Same result
+  // set; the subquery's `SELECT posts.id FROM` still satisfies Rails'
+  // `assert_queries_match` shape check. Eager id-materialization would require
+  // an async `excluding`, breaking the chainable contract and diverging from
+  // every other relation-valued predicate.
+  this._whereClause.predicates.push(
+    ...this.predicateBuilder.buildNegatedFromHash({ [pk]: records }),
+  );
   return this;
 }
 

@@ -1,222 +1,146 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/excluding_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import "./index.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { registerModel } from "./associations.js";
+import type { Relation } from "./relation.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 
-// -- Helpers --
-// ==========================================================================
-// ExcludingTest — targets excluding_test.rb
-// ==========================================================================
+registerModel(Post);
+registerModel(Comment);
+
 describe("ExcludingTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: { title: "string" } });
+  // Rails: `fixtures :posts, :comments`. The canonical `posts`/`comments`
+  // tables are pre-built per worker; seed them so each `excluding` relation has
+  // rows to read back, and so the shared models resolve regardless of any
+  // bespoke table a sibling file left in the worker DB.
+  const { posts, comments } = useHandlerFixtures(["posts", "comments"], {
+    schema: canonicalSchema,
   });
+
+  const ids = (records: { id: unknown }[]) => records.map((r) => r.id);
+
   it("result set does not include single excluded record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const sql = Post.all().excluding(p1).toSql();
-    expect(sql).toContain("NOT IN");
-  });
+    const post = posts("welcome");
 
-  it("does not exclude records when no arguments", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel = Post.all().excluding();
-    expect(rel.toSql()).toContain("SELECT");
-  });
-});
+    expect(ids(await Post.excluding(post).toArray())).not.toContain(post.id);
+    expect(ids(await Post.excluding(post).toArray())).not.toContain(post.id);
 
-describe("ExcludingTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: { title: "string", score: "integer" } });
-  });
-
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    return { Post };
-  }
-
-  it("result set does not include collection of excluded records from a query", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "a", score: 1 });
-    await Post.create({ title: "b", score: 2 });
-    const results = await Post.where({ title: "b" }).toArray();
-    const ids = results.map((r: Base) => r.id);
-    expect(ids).not.toContain(p1.id);
-  });
-
-  it("result set does not include collection of excluded records from a loaded query", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "x" });
-    const p2 = await Post.create({ title: "y" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(2);
-    expect(all.map((r: Base) => r.id)).toContain(p1.id);
-    expect(all.map((r: Base) => r.id)).toContain(p2.id);
-  });
-
-  it("result set does not include collection of excluded records and queries", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "keep", score: 10 });
-    await Post.create({ title: "exclude", score: 5 });
-    const results = await Post.where({ title: "keep" }).toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].title).toBe("keep");
-  });
-
-  it("result set through association does not include single excluded record", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "incl" });
-    await Post.create({ title: "excl" });
-    const results = await Post.where({ title: "incl" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("result set through association does not include collection of excluded records", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const results = await Post.all().toArray();
-    expect(results.length).toBe(2);
-  });
-
-  it("result set through association does not include collection of excluded records from a relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "rel", score: 1 });
-    const results = await Post.where({ title: "rel" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("result set through association does not include collection of excluded records from a loaded relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "loaded" });
-    const rel = Post.all();
-    await rel.toArray();
-    const results = await rel.where({ title: "loaded" }).toArray();
-    expect(results.length).toBe(1);
-  });
-
-  it("raises on record from different class", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "diff" });
-    const results = await Post.all().toArray();
-    expect(results.length).toBe(1);
+    expect(ids(await Post.without(post).toArray())).not.toContain(post.id);
   });
 
   it("result set does not include collection of excluded records", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "first" });
-    const p2 = await Post.create({ title: "second" });
-    await Post.create({ title: "third" });
-    const results = await Post.all().excluding(p1, p2).toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].title).toBe("third");
-  });
-});
+    const post = posts("welcome");
+    const thinking = posts("thinking");
 
-describe("excluding() / without()", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
-  });
-  it("excludes specific records by PK", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    const a = await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    await Item.create({ name: "C" });
-
-    const remaining = await Item.all().excluding(a).toArray();
-    expect(remaining).toHaveLength(2);
-    expect(remaining.every((r: any) => r.name !== "A")).toBe(true);
+    const relationIds = ids(await Post.excluding(post, thinking).toArray());
+    expect(relationIds).not.toContain(post.id);
+    expect(relationIds).not.toContain(thinking.id);
   });
 
-  it("without() is an alias for excluding()", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    const a = await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
+  it("result set does not include collection of excluded records from a query", async () => {
+    const post = posts("welcome");
+    const query = Post.where({ id: post });
 
-    const remaining = await Item.all().without(a).toArray();
-    expect(remaining).toHaveLength(1);
-  });
-});
-
-describe("Excluding (Rails-guided)", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { name: "string" } });
-  });
-  it("excluding removes specific records", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const a = await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    await Item.create({ name: "C" });
-
-    const result = await Item.all().excluding(a).toArray();
-    expect(result).toHaveLength(2);
-    expect(result.every((r: any) => r.name !== "A")).toBe(true);
+    const records = await Post.excluding(query).toArray();
+    expect(ids(records)).not.toContain(post.id);
   });
 
-  it("without is an alias for excluding", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const a = await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
+  it("result set does not include collection of excluded records from a loaded query", async () => {
+    const post = posts("welcome");
+    const query = await Post.where({ id: post }).load();
 
-    const result = await Item.all().without(a).toArray();
-    expect(result).toHaveLength(1);
+    const records = await Post.excluding(query).toArray();
+    expect(ids(records)).not.toContain(post.id);
   });
 
-  it("excluding multiple records", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const a = await Item.create({ name: "A" });
-    const b = await Item.create({ name: "B" });
-    await Item.create({ name: "C" });
+  it("result set does not include collection of excluded records and queries", async () => {
+    const post = posts("welcome");
+    const thinking = posts("thinking");
 
-    const result = await Item.all().excluding(a, b).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("C");
+    const records = await Post.excluding(post, Post.where({ id: thinking })).toArray();
+    expect(ids(records)).not.toContain(post.id);
+    expect(ids(records)).not.toContain(thinking.id);
+  });
+
+  it("result set through association does not include single excluded record", async () => {
+    const post = posts("welcome");
+    const commentGreetings = comments("greetings");
+    const commentMoreGreetings = comments("more_greetings");
+
+    const relationIds = ids(await post.comments.excluding(commentGreetings).toArray());
+    expect(relationIds).not.toContain(commentGreetings.id);
+    expect(relationIds).toContain(commentMoreGreetings.id);
+  });
+
+  it("result set through association does not include collection of excluded records", async () => {
+    const post = posts("welcome");
+    const commentGreetings = comments("greetings");
+    const commentMoreGreetings = comments("more_greetings");
+
+    const relationIds = ids(
+      await post.comments.excluding([commentGreetings, commentMoreGreetings]).toArray(),
+    );
+    expect(relationIds).not.toContain(commentGreetings.id);
+    expect(relationIds).not.toContain(commentMoreGreetings.id);
+  });
+
+  it("result set through association does not include collection of excluded records from a relation", async () => {
+    const post = posts("welcome");
+    const relation = post.comments;
+
+    const records = await Comment.excluding(relation).toArray();
+    const postComments = await post.comments.toArray();
+
+    expect(records.length).toBeGreaterThan(0);
+    expect(postComments.length).toBeGreaterThan(0);
+    const postCommentIds = new Set(ids(postComments));
+    expect(records.filter((r) => postCommentIds.has(r.id))).toHaveLength(0);
+  });
+
+  it("result set through association does not include collection of excluded records from a loaded relation", async () => {
+    const post = posts("welcome");
+    const relation = await post.comments.load();
+
+    const records = await Comment.excluding(relation).toArray();
+    const postComments = await post.comments.toArray();
+
+    expect(records.length).toBeGreaterThan(0);
+    expect(postComments.length).toBeGreaterThan(0);
+    const postCommentIds = new Set(ids(postComments));
+    expect(records.filter((r) => postCommentIds.has(r.id))).toHaveLength(0);
+  });
+
+  it("does not exclude records when no arguments", async () => {
+    const post = posts("welcome");
+
+    const assertNoExcludes = async (relation: Relation<Post>) => {
+      expect(ids(await relation.toArray())).toContain(post.id);
+      expect(await relation.count()).toBe(await Post.count());
+    };
+
+    await assertNoExcludes(Post.excluding());
+    await assertNoExcludes(Post.excluding(null));
+    await assertNoExcludes(Post.excluding([]));
+    await assertNoExcludes(Post.excluding([null]));
+  });
+
+  it("raises on record from different class", () => {
+    const post = posts("welcome");
+    const commentGreetings = comments("greetings");
+
+    expect(() => Post.excluding(post, commentGreetings)).toThrow(
+      "You must only pass a single or collection of Post objects to #excluding.",
+    );
+
+    expect(() => Post.without(post, commentGreetings)).toThrow(
+      "You must only pass a single or collection of Post objects to #without.",
+    );
   });
 });

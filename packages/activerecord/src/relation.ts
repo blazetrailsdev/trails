@@ -1162,10 +1162,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#excluding / #without
    */
-  excluding(...records: T[]): Relation<T> {
-    const ids = records.map((r) => r.id).filter((id) => id != null);
-    if (ids.length === 0) return this;
-    return this._clone().excludingBang(ids);
+  excluding(...records: unknown[]): Relation<T> {
+    const combined = this._excludingArgs(records, "excluding");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**
@@ -1173,8 +1173,48 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#without
    */
-  without(...records: T[]): Relation<T> {
-    return this.excluding(...records);
+  without(...records: unknown[]): Relation<T> {
+    const combined = this._excludingArgs(records, "without");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
+  }
+
+  /**
+   * Normalize the arguments for `excluding` / `without`. Mirrors Rails
+   * `QueryMethods#excluding` (query_methods.rb:1574): extract Relation
+   * arguments, flatten one level of array nesting, compact nils, then validate
+   * that every remaining record and relation belongs to this model — raising
+   * the same ArgumentError keyed on the public `__callee__`. Returns the
+   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`.
+   */
+  private _excludingArgs(records: unknown[], callee: string): unknown[] {
+    const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
+    const recs = records
+      .filter((r) => !(r instanceof Relation))
+      .flat(1)
+      .filter((r) => r != null);
+
+    const model = this._modelClass;
+    const recordsOk = recs.every((r) => r instanceof model);
+    const relationsOk = relations.every((rel) => rel._modelClass === model);
+    if (!recordsOk || !relationsOk) {
+      throw new ArgumentError(
+        `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
+      );
+    }
+
+    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
+    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
+    // and re-queries otherwise. A loaded relation's records are already in
+    // memory, so spread them in to match Rails exactly; an unloaded relation
+    // flows through `excludingBang` as a `NOT IN (subquery)` since trails'
+    // synchronous builder cannot run its id-select here.
+    const combined: unknown[] = [...recs];
+    for (const rel of relations) {
+      if (rel.isLoaded) combined.push(...rel._records);
+      else combined.push(rel);
+    }
+    return combined;
   }
 
   /**
