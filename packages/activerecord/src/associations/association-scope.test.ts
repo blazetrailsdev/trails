@@ -41,11 +41,30 @@ describe("AssociationScope", () => {
   registerModel(MemberDetail);
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
+    // A polymorphic source whose target has a non-`id` (uuid) primary key has
+    // no schema.rb analog, so the np_* tables stay bespoke but file-unique
+    // (RFC 0019 sanctions uuid-PK shapes as bespoke). DDL must run here in
+    // beforeAll — never inside a test — because on MySQL/MariaDB DDL forces an
+    // implicit COMMIT that destroys the transactional-fixtures savepoint.
+    /* eslint-disable blazetrails/require-canonical-schema -- uuid-PK polymorphic source has no schema.rb analog; file-unique np_* scratch */
+    await defineSchema({
+      np_authors: { name: "string" },
+      np_galleries: {
+        np_author_id: "integer",
+        imageable_uuid: "string",
+        imageable_type: "string",
+      },
+      np_photos: {
+        columns: { uuid: "string", title: "string" },
+        primaryKey: ["uuid"],
+      },
+    });
+    /* eslint-enable blazetrails/require-canonical-schema */
   });
   afterAll(async () => {
-    // Drop the file-unique uuid-PK scratch tables the non-id-target-PK
-    // polymorphic-source case builds (see its `defineSchema` below) so they
-    // never leak onto a shared worker DB.
+    // Drop the file-unique uuid-PK scratch tables built in beforeAll (used by
+    // the non-id-target-PK polymorphic-source case) so they never leak onto a
+    // shared worker DB.
     for (const t of ["np_galleries", "np_photos", "np_authors"]) {
       await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
     }
@@ -656,25 +675,8 @@ describe("AssociationScope", () => {
     // for polymorphic sources, but the sourceType target may use a
     // different PK. Without per-klass JOIN routing, we'd emit
     // target."id" = through."<fk>" instead of target."<custom_pk>".
-    //
-    // A polymorphic source whose target has a non-`id` (uuid) primary key
-    // has no schema.rb analog, so the np_* tables stay bespoke but
-    // file-unique (RFC 0019 sanctions uuid-PK shapes as bespoke). They are
-    // torn down in afterAll so they never perturb a shared worker DB.
-    /* eslint-disable blazetrails/require-canonical-schema -- uuid-PK polymorphic source has no schema.rb analog; file-unique np_* scratch */
-    await defineSchema({
-      np_authors: { name: "string" },
-      np_galleries: {
-        np_author_id: "integer",
-        imageable_uuid: "string",
-        imageable_type: "string",
-      },
-      np_photos: {
-        columns: { uuid: "string", title: "string" },
-        primaryKey: ["uuid"],
-      },
-    });
-    /* eslint-enable blazetrails/require-canonical-schema */
+    // The bespoke np_* tables (uuid-PK polymorphic source, no schema.rb
+    // analog) are built in beforeAll and torn down in afterAll.
     class NpAuthor extends Base {
       declare name: string;
       static {
