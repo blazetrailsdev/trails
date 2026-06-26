@@ -491,7 +491,12 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-    this.defaultScope((q: any) => q.includes("projects"));
+  }
+
+  // Method-form `default_scope` override (Rails: `def self.default_scope`),
+  // not the `default_scope { }` macro registry.
+  static defaultScope(this: any): any {
+    return this.includes("projects");
   }
 }
 
