@@ -35,11 +35,12 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
     throw argumentError(`invalid argument: ${String(other)}.`);
   }
   if (typeof other === "function") {
-    const rel = this._clone();
-    // Rails: `instance_exec(&other) || self`. The proc runs with the
-    // relation as receiver; an arity>=1 proc also receives it positionally.
-    const result: T = other.length === 0 ? other.call(rel) : other.call(rel, rel);
-    return result ?? rel;
+    // Mirrors merge!'s `instance_exec(&other)` (spawn_methods.rb:48-49): the
+    // block runs with the spawned relation as receiver (`this`), receives no
+    // positional args (an arity>=1 proc's first param is `undefined`, as Ruby
+    // passes `nil`), and its return value is used verbatim — Rails does NOT
+    // `|| self`.
+    return (other as (this: T) => T).call(this._clone());
   }
   if (typeof other === "object" && "_whereClause" in other) {
     return new Merger(this, other).merge() as T;
