@@ -29,7 +29,14 @@ import { Pet } from "../test-helpers/models/pet.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import {
+  Developer,
+  EagerDeveloperWithDefaultScope,
+  EagerDeveloperWithClassMethodDefaultScope,
+  EagerDeveloperWithLambdaDefaultScope,
+  EagerDeveloperWithBlockDefaultScope,
+  EagerDeveloperWithCallableDefaultScope,
+} from "../test-helpers/models/developer.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Citation } from "../test-helpers/models/citation.js";
@@ -90,18 +97,6 @@ const TEST_SCHEMA: Schema = {
   eager_dist_items: { label: "string" },
   eager_dist_joins: { eager_dist_owner_id: "integer", eager_dist_item_id: "integer" },
   eager_dist_owners: { name: "string" },
-  eager_ds_b_comments: { body: "string", eager_ds_b_post_id: "integer" },
-  eager_ds_b_posts: { title: "string" },
-  eager_ds_call_comments: { body: "string", eager_ds_call_post_id: "integer" },
-  eager_ds_call_posts: { title: "string" },
-  eager_ds_cm_comments: { body: "string", eager_ds_cm_post_id: "integer" },
-  eager_ds_cm_posts: { title: "string" },
-  eager_ds_comments: { body: "string", eager_ds_post_id: "integer" },
-  eager_ds_fb_posts: { title: "string" },
-  eager_ds_fm_posts: { title: "string" },
-  eager_ds_l_comments: { body: "string", eager_ds_l_post_id: "integer" },
-  eager_ds_l_posts: { title: "string" },
-  eager_ds_posts: { title: "string" },
   eager_dup_authors: { name: "string" },
   eager_dup_children: { label: "string", eager_dup_parent_id: "integer" },
   eager_dup_parents: { name: "string" },
@@ -2659,146 +2654,6 @@ describe("EagerAssociationTest", () => {
     expect(books2).toHaveLength(1);
     expect(books1[0].id).toBe(books2[0].id);
   });
-  it("eager with default scope", async () => {
-    class EagerDsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerDsComments", {
-          className: "EagerDsComment",
-          foreignKey: "eager_ds_post_id",
-        });
-      }
-    }
-    class EagerDsComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_ds_post_id", "integer");
-      }
-    }
-    registerModel("EagerDsPost", EagerDsPost);
-    registerModel("EagerDsComment", EagerDsComment);
-    const post = await EagerDsPost.create({ title: "P" });
-    await EagerDsComment.create({ body: "c1", eager_ds_post_id: post.id });
-    const posts = await EagerDsPost.all().includes("eagerDsComments").toArray();
-    expect((posts[0] as any).association("eagerDsComments").target).toHaveLength(1);
-  });
-  it("eager with default scope as class method", async () => {
-    class EagerDsCmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerDsCmComments", {
-          className: "EagerDsCmComment",
-          foreignKey: "eager_ds_cm_post_id",
-        });
-      }
-    }
-    class EagerDsCmComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_ds_cm_post_id", "integer");
-      }
-    }
-    registerModel("EagerDsCmPost", EagerDsCmPost);
-    registerModel("EagerDsCmComment", EagerDsCmComment);
-    const post = await EagerDsCmPost.create({ title: "P" });
-    await EagerDsCmComment.create({ body: "c1", eager_ds_cm_post_id: post.id });
-    const posts = await EagerDsCmPost.all().includes("eagerDsCmComments").toArray();
-    expect((posts[0] as any).association("eagerDsCmComments").target).toHaveLength(1);
-  });
-  it("eager with default scope as class method using find method", async () => {
-    class EagerDsFmPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("EagerDsFmPost", EagerDsFmPost);
-    const post = await EagerDsFmPost.create({ title: "P" });
-    const found = await EagerDsFmPost.find(post.id);
-    expect(found.title).toBe("P");
-  });
-  it("eager with default scope as class method using find by method", async () => {
-    class EagerDsFbPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("EagerDsFbPost", EagerDsFbPost);
-    await EagerDsFbPost.create({ title: "Unique" });
-    const found = await EagerDsFbPost.findBy({ title: "Unique" });
-    expect(found?.title).toBe("Unique");
-  });
-  it("eager with default scope as lambda", async () => {
-    class EagerDsLPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerDsLComments", {
-          className: "EagerDsLComment",
-          foreignKey: "eager_ds_l_post_id",
-        });
-      }
-    }
-    class EagerDsLComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_ds_l_post_id", "integer");
-      }
-    }
-    registerModel("EagerDsLPost", EagerDsLPost);
-    registerModel("EagerDsLComment", EagerDsLComment);
-    const post = await EagerDsLPost.create({ title: "P" });
-    await EagerDsLComment.create({ body: "c1", eager_ds_l_post_id: post.id });
-    const posts = await EagerDsLPost.all().includes("eagerDsLComments").toArray();
-    expect((posts[0] as any).association("eagerDsLComments").target).toHaveLength(1);
-  });
-  it("eager with default scope as block", async () => {
-    class EagerDsBPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerDsBComments", {
-          className: "EagerDsBComment",
-          foreignKey: "eager_ds_b_post_id",
-        });
-      }
-    }
-    class EagerDsBComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_ds_b_post_id", "integer");
-      }
-    }
-    registerModel("EagerDsBPost", EagerDsBPost);
-    registerModel("EagerDsBComment", EagerDsBComment);
-    const post = await EagerDsBPost.create({ title: "P" });
-    await EagerDsBComment.create({ body: "c1", eager_ds_b_post_id: post.id });
-    const posts = await EagerDsBPost.all().includes("eagerDsBComments").toArray();
-    expect((posts[0] as any).association("eagerDsBComments").target).toHaveLength(1);
-  });
-  it("eager with default scope as callable", async () => {
-    class EagerDsCallPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerDsCallComments", {
-          className: "EagerDsCallComment",
-          foreignKey: "eager_ds_call_post_id",
-        });
-      }
-    }
-    class EagerDsCallComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_ds_call_post_id", "integer");
-      }
-    }
-    registerModel("EagerDsCallPost", EagerDsCallPost);
-    registerModel("EagerDsCallComment", EagerDsCallComment);
-    const post = await EagerDsCallPost.create({ title: "P" });
-    await EagerDsCallComment.create({
-      body: "c1",
-      eager_ds_call_post_id: post.id,
-    });
-    const posts = await EagerDsCallPost.all().includes("eagerDsCallComments").toArray();
-    expect((posts[0] as any).association("eagerDsCallComments").target).toHaveLength(1);
-  });
   it("limited eager with order", async () => {
     class EagerLeoPost extends Base {
       static {
@@ -5055,6 +4910,113 @@ describe("EagerAssociationTest", () => {
       .limit(5)
       .toArray();
     expect(developers).toHaveLength(5);
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical developers/projects fixtures) — ports of the
+// eager_test.rb `default_scope { includes(:projects) }` cluster. Each
+// EagerDeveloperWith*DefaultScope model uses `developers` with a HABTM
+// `projects` association eager-loaded by its default scope, so accessing
+// `developer.projects` after the initial load issues no further queries.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { developers } = useHandlerFixtures(["developers", "projects", "developersProjects"]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        developers: canonicalSchema.developers,
+        projects: canonicalSchema.projects,
+        developers_projects: canonicalSchema.developers_projects,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Project);
+  registerModel(EagerDeveloperWithDefaultScope);
+  registerModel(EagerDeveloperWithClassMethodDefaultScope);
+  registerModel(EagerDeveloperWithLambdaDefaultScope);
+  registerModel(EagerDeveloperWithBlockDefaultScope);
+  registerModel(EagerDeveloperWithCallableDefaultScope);
+
+  async function projectIds(): Promise<unknown[]> {
+    return (await Project.order("id").toArray()).map((p) => p.id);
+  }
+
+  it("eager with default scope", async () => {
+    const developer = await EagerDeveloperWithDefaultScope.where({ name: "David" }).first();
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as class method", async () => {
+    const developer = await EagerDeveloperWithClassMethodDefaultScope.where({
+      name: "David",
+    }).first();
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as class method using find method", async () => {
+    const david = developers("david");
+    const developer = await EagerDeveloperWithClassMethodDefaultScope.find(david.id);
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as class method using find by method", async () => {
+    const developer = await EagerDeveloperWithClassMethodDefaultScope.findBy({ name: "David" });
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as lambda", async () => {
+    const developer = await EagerDeveloperWithLambdaDefaultScope.where({ name: "David" }).first();
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as block", async () => {
+    // warm up the habtm cache
+    await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
+    const developer = await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
+  });
+
+  it("eager with default scope as callable", async () => {
+    const developer = await EagerDeveloperWithCallableDefaultScope.where({ name: "David" }).first();
+    const projects = await projectIds();
+    await assertNoQueries(false, () => {
+      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
+        projects,
+      );
+    });
   });
 });
 

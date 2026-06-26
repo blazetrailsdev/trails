@@ -777,9 +777,15 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // prepared_statements in cachedFindByStatement); the unprepared PartialQuery
   // path inlines its binds into the SQL and runs with an empty bind list,
   // matching Rails' unprepared query-log shape (see StatementCache#execute).
+  // Rails Core#find: `return super if scope_attributes?` — a default scope can
+  // add includes/references/order the StatementCache fast path can't reproduce
+  // (it builds a bare `where(pk).limit(1)`), so defer to the relation path,
+  // which applies the default scope's eager joins. Mirrors the `findBy` guard.
   if (
     ids.length === 1 &&
     !(this as any).currentScope &&
+    ((this as any).defaultScopes?.length ?? 0) === 0 &&
+    !hasDefaultScopeOverride(this) &&
     this.primaryKey != null &&
     !this.compositePrimaryKey &&
     !Array.isArray(ids[0]) &&
