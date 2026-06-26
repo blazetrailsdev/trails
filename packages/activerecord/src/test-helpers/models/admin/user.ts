@@ -13,7 +13,12 @@ class Coder {
   }
 
   load(s: string | null | undefined): Record<string, unknown> {
-    return s ? JSON.parse(s) : { ...this.#default };
+    if (!s) return { ...this.#default };
+    try {
+      return JSON.parse(s);
+    } catch {
+      return {};
+    }
   }
 }
 
@@ -35,9 +40,9 @@ export class AdminUser extends Base {
     this.store("configs", { accessors: ["twoFactorAuth"], suffix: true });
     this.storeAccessor("configs", { accessors: ["loginRetry"], suffix: "config" });
     this.store("preferences", { accessors: ["rememberLogin"] });
-    this.store("jsonData", { accessors: ["height", "weight"], coder: new Coder() });
-    this.store("jsonDataEmpty", { accessors: ["isAGoodGuy"], coder: new Coder() });
-    this.storeAccessor("jsonOptions", { accessors: ["enableFriendRequests"] });
+    this.store("json_data", { accessors: ["height", "weight"], coder: new Coder() });
+    this.store("json_data_empty", { accessors: ["isAGoodGuy"], coder: new Coder() });
+    this.storeAccessor("json_options", { accessors: ["enableFriendRequests"] });
   }
 
   get color(): unknown {
