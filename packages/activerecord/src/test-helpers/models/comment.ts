@@ -132,6 +132,7 @@ export class Comment extends Base {
 
 export class SpecialComment extends Comment {
   declare ordinaryPost: Post | null;
+  declare author: Author | null;
   declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &
     ((name: "author") => Promise<Base | null>) &
     ((name: "resource") => Promise<Base | null>) &

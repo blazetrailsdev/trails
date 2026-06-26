@@ -267,7 +267,14 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
     const base = inherited.get(call.name);
     if (base === undefined) continue;
     const ownTarget = target(info, call);
-    if (ownTarget === base || classExtends(ownTarget, base, superNameOf)) continue;
+    // Every association target is an AR model that extends `Base`, so when the
+    // inherited target is `Base` itself (e.g. an inherited polymorphic
+    // `belongsTo` like `Comment.author`) a concrete override (`SpecialComment`'s
+    // `hasOne :author, through: :post` → `Author`) is always assignable and
+    // never a TS2416 conflict — even though `classExtends` is in-file-only and
+    // can't follow the cross-file `Author → Base` chain.
+    if (ownTarget === base || base === "Base" || classExtends(ownTarget, base, superNameOf))
+      continue;
     out.add(call.name);
   }
   return out;
