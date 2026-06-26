@@ -332,9 +332,7 @@ describe("UpdateAllTest", () => {
     expect(topic2.author_name).toBe("David");
   });
 
-  // TRACKED DEVIATION: Relation#update does not guard against being passed an AR object as the
-  // ID argument (Rails raises ArgumentError). This guard is not yet implemented in trails.
-  it.skip("update on relation passing active record object is not permitted", async () => {
+  it("update on relation passing active record object is not permitted", async () => {
     const topic = await Topic.createBang({ title: "Foo", author_name: null });
     await expect(
       Topic.where({ id: topic.id }).update(topic as any, { title: "Bar" } as any),

@@ -6140,6 +6140,16 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#update
    */
   async update(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
+    if (
+      id !== null &&
+      typeof id === "object" &&
+      attrs !== undefined &&
+      "_isActiveRecordBase" in ((id as any).constructor ?? {})
+    ) {
+      throw new ArgumentError(
+        `You are passing an instance of ActiveRecord::Base to \`update\`. Please pass the id of the object by calling \`.id\`.`,
+      );
+    }
     if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
       // update(attrs) form — update all matching records
       const updates = (id ?? {}) as Record<string, unknown>;
