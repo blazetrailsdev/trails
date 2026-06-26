@@ -1154,7 +1154,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#excluding / #without
    */
   excluding(...records: unknown[]): Relation<T> {
-    return this._excludingImpl(records, "excluding");
+    const combined = this._excludingArgs(records, "excluding");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**
@@ -1163,17 +1165,20 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#without
    */
   without(...records: unknown[]): Relation<T> {
-    return this._excludingImpl(records, "without");
+    const combined = this._excludingArgs(records, "without");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**
-   * Shared body for `excluding` / `without`. Mirrors Rails
+   * Normalize the arguments for `excluding` / `without`. Mirrors Rails
    * `QueryMethods#excluding` (query_methods.rb:1574): extract Relation
    * arguments, flatten one level of array nesting, compact nils, then validate
    * that every remaining record and relation belongs to this model — raising
-   * the same ArgumentError keyed on the public `__callee__`.
+   * the same ArgumentError keyed on the public `__callee__`. Returns the
+   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`.
    */
-  private _excludingImpl(records: unknown[], callee: string): Relation<T> {
+  private _excludingArgs(records: unknown[], callee: string): unknown[] {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
     const recs = records
       .filter((r) => !(r instanceof Relation))
@@ -1189,19 +1194,18 @@ export class Relation<T extends Base> {
       );
     }
 
-    // Rails `excluding!(records + relations.flat_map(&:ids))`. `Relation#ids`
-    // returns the cached `records.map(&:id)` when the relation is loaded
-    // (calculations.rb:371) and re-queries otherwise. A loaded relation's
-    // records are already in memory, so spread them in to match Rails exactly;
-    // an unloaded relation flows through `excludingBang` as a `NOT IN (subquery)`
-    // since trails' synchronous builder cannot run its id-select here.
+    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
+    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
+    // and re-queries otherwise. A loaded relation's records are already in
+    // memory, so spread them in to match Rails exactly; an unloaded relation
+    // flows through `excludingBang` as a `NOT IN (subquery)` since trails'
+    // synchronous builder cannot run its id-select here.
     const combined: unknown[] = [...recs];
     for (const rel of relations) {
       if (rel.isLoaded) combined.push(...rel._records);
       else combined.push(rel);
     }
-    if (combined.length === 0) return this;
-    return this._clone().excludingBang(combined);
+    return combined;
   }
 
   /**
