@@ -38,8 +38,8 @@ describe("SecureTokenTest", () => {
     await user.save();
     expect(user.token).not.toBeNull();
     expect(user.auth_token).not.toBeNull();
-    expect((user.token as string).length).toBe(24);
-    expect((user.auth_token as string).length).toBe(36);
+    expect(user.token.length).toBe(24);
+    expect(user.auth_token.length).toBe(36);
   });
 
   it("generating token on initialize does not affect reading from the column", async () => {
@@ -84,8 +84,8 @@ describe("SecureTokenTest", () => {
     expect(user.token).not.toBe(oldToken);
     expect(user.auth_token).not.toBe(oldAuthToken);
 
-    expect((user.token as string).length).toBe(24);
-    expect((user.auth_token as string).length).toBe(36);
+    expect(user.token.length).toBe(24);
+    expect(user.auth_token.length).toBe(36);
   });
 
   it("token value not overwritten when present", async () => {
