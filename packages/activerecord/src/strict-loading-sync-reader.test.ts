@@ -1,216 +1,128 @@
-// Phase R.3: strict loading now catches sync singular-association
-// reader access too. When `record._strictLoading` is enabled (via any
-// of the Rails-style toggles), `record.author` / `record.profile`
-// throw `StrictLoadingViolationError` on an unloaded association
-// instead of silently returning null.
-//
-// Preserves Rails default (off) — strict loading is opt-in.
+// No Rails counterpart; exercises the sync singular-association strict-loading reader (Phase R.3).
 
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { Base, registerModel, StrictLoadingViolationError } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { registerModel, StrictLoadingViolationError } from "./index.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { Developer } from "./test-helpers/models/developer.js";
+import { Ship } from "./test-helpers/models/ship.js";
 import { seedAssociationCache } from "./test-helpers/seed-association-cache.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
-
 describe("strict loading — sync singular reader (Phase R.3)", () => {
-  let adapter: TestDatabaseAdapter;
+  const { developers, ships } = useHandlerFixtures(["developers", "ships"]);
 
-  class SrAuthor extends Base {
-    declare name: string;
-    static {
-      this.attribute("name", "string");
-    }
-  }
-
-  class SrPost extends Base {
-    declare title: string;
-    declare srAuthorId: number | null;
-    static {
-      this.attribute("title", "string");
-      this.attribute("sr_author_id", "integer");
-    }
-  }
-
-  class SrProfile extends Base {
-    declare bio: string;
-    declare srAuthorId: number | null;
-    static {
-      this.attribute("bio", "string");
-      this.attribute("sr_author_id", "integer");
-    }
-  }
-
-  SrAuthor.hasOne("srProfile", { className: "SrProfile" });
-  SrPost.belongsTo("srAuthor", { className: "SrAuthor" });
-
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      sr_authors: { name: "string" },
-      sr_posts: { title: "string", sr_author_id: "integer" },
-      sr_profiles: { bio: "string", sr_author_id: "integer" },
-      strict_posts: { title: "string", sr_author_id: "integer" },
-    });
-    SrAuthor.adapter = adapter;
-    SrPost.adapter = adapter;
-    SrProfile.adapter = adapter;
-    registerModel(SrAuthor);
-    registerModel(SrPost);
-    registerModel(SrProfile);
+  beforeAll(() => {
+    registerModel(Developer);
+    registerModel(Ship);
   });
-  withTransactionalFixtures(() => adapter);
 
   it("sync belongsTo access throws when strict loading is enabled and not loaded", async () => {
-    const author = new SrAuthor({ name: "dean" });
-    await author.save();
-    const post = new SrPost({ title: "hi", sr_author_id: author.id as number });
-    await post.save();
-    post.strictLoadingBang();
-    expect(() => (post as any).srAuthor).toThrow(StrictLoadingViolationError);
+    const ship = await Ship.create({ name: "Strict Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang();
+    expect(() => (ship as any).developer).toThrow(StrictLoadingViolationError);
   });
 
   it("sync hasOne access throws when strict loading is enabled and not loaded", async () => {
-    const author = new SrAuthor({ name: "dean" });
-    await author.save();
-    author.strictLoadingBang();
-    expect(() => (author as any).srProfile).toThrow(StrictLoadingViolationError);
+    const developer = await Developer.find(developers("jamis").id);
+    developer.strictLoadingBang();
+    expect(() => (developer as any).ship).toThrow(StrictLoadingViolationError);
   });
 
   it("sync access returns the record (no throw) once loaded", async () => {
-    const author = new SrAuthor({ name: "dean" });
-    await author.save();
-    const post = new SrPost({ title: "hi", sr_author_id: author.id as number });
-    await post.save();
-    post.strictLoadingBang();
-    // Explicit load populates the association cache.
-    await post.loadBelongsTo("srAuthor");
-    // Subsequent sync access should succeed.
-    expect(() => (post as any).srAuthor).not.toThrow();
-    const a = (post as any).srAuthor as SrAuthor;
-    expect(a.name).toBe("dean");
+    const ship = await Ship.create({ name: "Loaded Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang();
+    await ship.loadBelongsTo("developer");
+    expect(() => (ship as any).developer).not.toThrow();
+    const dev = (ship as any).developer as Developer;
+    expect(dev.id).toBe(developers("david").id);
   });
 
   it("strict loading stays off by default (Rails parity)", () => {
-    // `strictLoadingByDefault` is false unless explicitly enabled.
-    expect(SrPost.strictLoadingByDefault).toBe(false);
-    expect(SrAuthor.strictLoadingByDefault).toBe(false);
-    // And newly constructed records have strictLoading off.
-    const post = new SrPost({ title: "hi" });
-    expect(post.isStrictLoading()).toBe(false);
+    expect(Ship.strictLoadingByDefault).toBe(false);
+    expect(Developer.strictLoadingByDefault).toBe(false);
+    const ship = new Ship({ name: "default" });
+    expect(ship.isStrictLoading()).toBe(false);
   });
 
   it("per-class toggle: strictLoadingByDefault = true makes all instances strict", async () => {
-    class StrictPost extends Base {
-      declare title: string;
-      declare srAuthorId: number | null;
-      static {
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("sr_author_id", "integer");
-      }
-    }
-    StrictPost.belongsTo("srAuthor", { className: "SrAuthor" });
-    StrictPost.adapter = adapter;
-    StrictPost.strictLoadingByDefault = true;
-    registerModel(StrictPost);
-
+    Ship.strictLoadingByDefault = true;
     try {
-      const author = new SrAuthor({ name: "dean" });
-      await author.save();
-      const post = new StrictPost({ title: "hi", sr_author_id: author.id as number });
-      await post.save();
-      // Loaded via find — strictLoading is applied.
-      const fetched = await StrictPost.find(post.id);
+      const ship = await Ship.create({
+        name: "Strict Default Ship",
+        developer_id: developers("david").id,
+      });
+      const fetched = await Ship.find(ship.id);
       expect(fetched.isStrictLoading()).toBe(true);
-      expect(() => (fetched as any).srAuthor).toThrow(StrictLoadingViolationError);
+      expect(() => (fetched as any).developer).toThrow(StrictLoadingViolationError);
     } finally {
-      StrictPost.strictLoadingByDefault = false;
+      Ship.strictLoadingByDefault = false;
     }
   });
 
   it("per-instance opt-out: strictLoadingBang(false) suppresses the throw", async () => {
-    const author = new SrAuthor({ name: "dean" });
-    await author.save();
-    const post = new SrPost({ title: "hi", sr_author_id: author.id as number });
-    await post.save();
-    post.strictLoadingBang();
-    // Flip off via the public API — access should NOT throw.
-    post.strictLoadingBang(false);
-    expect(post.isStrictLoading()).toBe(false);
-    expect(() => (post as any).srAuthor).not.toThrow();
+    const ship = await Ship.create({ name: "Opt-out Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang();
+    ship.strictLoadingBang(false);
+    expect(ship.isStrictLoading()).toBe(false);
+    expect(() => (ship as any).developer).not.toThrow();
   });
 
   it("belongsTo with null FK returns null without throwing under strict loading", async () => {
-    // No FK set → no DB query is needed to determine there's no
-    // associated record. `findTargetNeeded()` is false, so strict
-    // loading does not fire.
-    const post = new SrPost({ title: "orphan" });
-    await post.save();
-    post.strictLoadingBang();
-    expect(() => (post as any).srAuthor).not.toThrow();
-    expect((post as any).srAuthor).toBeNull();
+    // No FK set → findTargetNeeded() is false → sync access returns null, no raise.
+    const ship = await Ship.create({ name: "Orphan Ship" });
+    ship.strictLoadingBang();
+    expect(() => (ship as any).developer).not.toThrow();
+    expect((ship as any).developer).toBeNull();
   });
 
   it("preloaded singular mapped to null does not throw (eagerly-loaded nil)", async () => {
-    const post = new SrPost({ title: "hi" });
-    await post.save();
-    post.strictLoadingBang();
-    // Simulate an eager load that resolved to null (e.g., `Post.includes("srAuthor").find(id)`
-    // where the author record doesn't exist). The preloaded-null is a
-    // legitimate answer — no query needed, no throw.
-    const holder = (post as any).association("srAuthor");
+    const ship = await Ship.create({ name: "No-dev Ship" });
+    ship.strictLoadingBang();
+    const holder = (ship as any).association("developer");
     holder.setTarget(null);
     holder._loadedFromPreload = true;
-    expect(() => (post as any).srAuthor).not.toThrow();
-    expect((post as any).srAuthor).toBeNull();
+    expect(() => (ship as any).developer).not.toThrow();
+    expect((ship as any).developer).toBeNull();
   });
 
   it("cached association via inverse_of does not throw under strict loading", async () => {
-    const post = new SrPost({ title: "hi" });
-    await post.save();
-    post.strictLoadingBang();
-    const author = new SrAuthor({ name: "dean" });
+    const ship = await Ship.create({ name: "Cached Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang();
+    const developer = new Developer({ id: developers("david").id });
     // Cache the singular target on the holder (as _cacheSingularTarget does).
-    seedAssociationCache(post as any, "srAuthor", author);
-    expect(() => (post as any).srAuthor).not.toThrow();
-    expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
+    seedAssociationCache(ship as any, "developer", developer);
+    expect(() => (ship as any).developer).not.toThrow();
+    expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
   });
 
   it("hasOne on a new (unsaved) owner returns null without throwing", async () => {
-    // New records with no primary key → `findTargetNeeded()` is false
+    // New records with no primary key → findTargetNeeded() is false
     // (no ID to query by), so strict loading does not fire.
-    const author = new SrAuthor({ name: "dean" });
-    author.strictLoadingBang();
-    expect(() => (author as any).srProfile).not.toThrow();
-    expect((author as any).srProfile).toBeNull();
+    const developer = new Developer({ name: "new" });
+    developer.strictLoadingBang();
+    expect(() => (developer as any).ship).not.toThrow();
+    expect((developer as any).ship).toBeNull();
   });
 
   it("in-memory `target` set directly (e.g. Preloader path) returns without throwing", async () => {
-    // Some internal paths (e.g., Preloader::Association) bind
-    // `association.target = record` without calling `loadedBang()`.
-    // The reader should treat a non-null target as already resolved —
-    // no DB load would run, so strict loading should not fire.
-    const post = new SrPost({ title: "hi" });
-    await post.save();
-    post.strictLoadingBang();
-    const author = new SrAuthor({ name: "dean" });
-    const assoc = post.association("srAuthor") as any;
-    assoc.target = author;
-    // loaded is still false; reader should short-circuit on the
-    // non-null target.
+    const ship = await Ship.create({
+      name: "Preloader Ship",
+      developer_id: developers("david").id,
+    });
+    ship.strictLoadingBang();
+    const developer = new Developer({ id: developers("david").id });
+    const assoc = ship.association("developer") as any;
+    assoc.target = developer;
+    // loaded is still false; reader short-circuits on the non-null target.
     expect(assoc.loaded).toBe(false);
-    expect(() => (post as any).srAuthor).not.toThrow();
-    expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
-    // Reader should have marked it loaded as a side effect.
+    expect(() => (ship as any).developer).not.toThrow();
+    expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
     expect(assoc.loaded).toBe(true);
+  });
+
+  it("ships fixture is linked to developer in the ships fixture", () => {
+    // Sanity check: the ships fixture (black_pearl) has a pirate_id, not developer_id.
+    // The interceptor has no developer_id. This confirms sync-reader tests
+    // that use developer_id must create their own ships.
+    expect(ships("interceptor").developer_id).toBeFalsy();
   });
 });

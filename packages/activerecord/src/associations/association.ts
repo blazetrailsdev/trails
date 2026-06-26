@@ -247,7 +247,7 @@ export class Association {
     if (
       typeof ownerAny.isStrictLoadingNPlusOneOnly === "function" &&
       ownerAny.isStrictLoadingNPlusOneOnly() &&
-      this.reflection.type === "hasMany"
+      (this.reflection.type === "hasMany" || this.reflection.type === "hasAndBelongsToMany")
     ) {
       recordAny.strictLoadingBang();
     } else {
