@@ -15,6 +15,7 @@
  * contract) have no Rails analog but ride the same canonical tables.
  */
 import { describe, it, expect } from "vitest";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 
 import { Contact, ContactSti } from "./test-helpers/models/contact.js";
@@ -316,26 +317,27 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
   it("should allow only option for list of authors", async () => {
     const [david, mary] = [await getDavid(), await getMary()];
     setIncludeRootInJson(false, () => {
-      const encoded = [david, mary].map((a) => a.asJson({ only: ["name"] }));
-      expect(encoded).toEqual([{ name: "David" }, { name: "Mary" }]);
+      const authorsList = [david, mary];
+      expect(ActiveSupportJSON.encode(authorsList, { only: ["name"] })).toBe(
+        '[{"name":"David"},{"name":"Mary"}]',
+      );
     });
   });
 
   it("should allow except option for list of authors", async () => {
     const [david, mary] = [await getDavid(), await getMary()];
     setIncludeRootInJson(false, () => {
-      const encoded = [david, mary].map((a) =>
-        a.asJson({
-          except: [
-            "name",
-            "author_address_id",
-            "author_address_extra_id",
-            "organization_id",
-            "owned_essay_id",
-          ],
-        }),
-      );
-      expect(encoded).toEqual([{ id: 1 }, { id: 2 }]);
+      const authorsList = [david, mary];
+      const encoded = ActiveSupportJSON.encode(authorsList, {
+        except: [
+          "name",
+          "author_address_id",
+          "author_address_extra_id",
+          "organization_id",
+          "owned_essay_id",
+        ],
+      });
+      expect(encoded).toBe('[{"id":1},{"id":2}]');
     });
   });
 
@@ -358,14 +360,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     const [david, mary] = [await getDavid(), await getMary()];
     setIncludeRootInJson(true, () => {
       const authorsHash: Record<number, Author> = { 1: david, 2: mary };
-      const encoded: Record<string, unknown> = {};
-      for (const [key, author] of Object.entries(authorsHash)) {
-        encoded[key] = author.asJson({ only: ["name"] });
-      }
-      expect(encoded).toEqual({
-        1: { author: { name: "David" } },
-        2: { author: { name: "Mary" } },
-      });
+      // Rails filters the hash by key (`only: [1, :name]` keeps key 1 only),
+      // then serializes each surviving author with the same options (`:name`).
+      expect(ActiveSupportJSON.encode(authorsHash, { only: [1, "name"] })).toBe(
+        '{"1":{"author":{"name":"David"}}}',
+      );
     });
   });
 
@@ -375,8 +374,8 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       const relation = await Author.where({ id: [david.id, mary.id] })
         .order("id")
         .toArray();
-      const encoded = relation.map((a) => a.asJson({ only: ["name"] }));
-      expect(encoded).toEqual([{ author: { name: "David" } }, { author: { name: "Mary" } }]);
+      const encoded = ActiveSupportJSON.encode(relation, { only: ["name"] });
+      expect(encoded).toBe('[{"author":{"name":"David"}},{"author":{"name":"Mary"}}]');
     });
   });
 

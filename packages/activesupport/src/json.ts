@@ -7,9 +7,64 @@
  * since the behavior is equivalent for all standard types.
  */
 
+/**
+ * Serialization options threaded through `as_json` — only the subset Rails'
+ * `ActiveSupport::JSON.encode(value, options)` forwards to collections.
+ */
+interface EncodeOptions {
+  only?: Array<string | number>;
+  except?: Array<string | number>;
+  [key: string]: unknown;
+}
+
+// Rails: `ActiveSupport::JSON.encode(value, options)` calls `value.as_json(options)`.
+// Arrays map each element through `as_json(options)`; Hashes filter their keys by
+// `only`/`except` (mirroring `Hash#as_json`) and recurse the surviving values with
+// the same options; objects responding to `as_json` (our `asJson`) delegate.
+function asJsonValue(value: unknown, options: EncodeOptions): unknown {
+  if (value == null) return value;
+
+  const asJson = (value as { asJson?: (o?: unknown) => unknown }).asJson;
+  if (typeof asJson === "function") return asJson.call(value, options);
+
+  if (Array.isArray(value)) return value.map((v) => asJsonValue(v, options));
+
+  if (typeof value === "object") {
+    const entries = value instanceof Map ? [...value.entries()] : Object.entries(value);
+    const keep = filterHashKeys(
+      entries.map(([k]) => k),
+      options,
+    );
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of entries) {
+      if (keep.has(k)) out[String(k)] = asJsonValue(v, options);
+    }
+    return out;
+  }
+
+  return value;
+}
+
+// Mirrors `Hash#as_json`'s key filtering: `only` keeps the listed keys, `except`
+// drops them, comparing by stringified key (Rails compares the raw keys, but our
+// option lists arrive as strings/numbers, so normalize both sides).
+function filterHashKeys(keys: unknown[], options: EncodeOptions): Set<unknown> {
+  const norm = (v: unknown) => String(v);
+  if (options.only != null) {
+    const only = new Set(options.only.map(norm));
+    return new Set(keys.filter((k) => only.has(norm(k))));
+  }
+  if (options.except != null) {
+    const except = new Set(options.except.map(norm));
+    return new Set(keys.filter((k) => !except.has(norm(k))));
+  }
+  return new Set(keys);
+}
+
 export namespace ActiveSupportJSON {
-  export function encode(value: unknown): string {
-    return JSON.stringify(value) ?? "null";
+  export function encode(value: unknown, options?: EncodeOptions): string {
+    const resolved = options === undefined ? value : asJsonValue(value, options);
+    return JSON.stringify(resolved) ?? "null";
   }
 
   export function decode(value: string): unknown {
