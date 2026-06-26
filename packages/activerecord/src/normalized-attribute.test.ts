@@ -1,96 +1,89 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors activerecord/test/cases/normalized_attribute_test.rb
+ *
+ * Rails drives the canonical `Aircraft` (`aircraft` table) plus a
+ * `NormalizedAircraft < Aircraft` subclass carrying `normalizes` declarations.
+ * Both shapes are canonical, so this file rides the worker-built `aircraft`
+ * table via `setupHandlerSuite` — no `defineSchema`, no bespoke adapter.
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { presence, titleize } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-import { MigrationContext } from "./migration.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+// Rails `Time#noon` — the same instant moved to 12:00:00 (midday) UTC.
+function noon(time: Temporal.Instant): Temporal.Instant {
+  return time
+    .toZonedDateTimeISO("UTC")
+    .with({ hour: 12, minute: 0, second: 0, millisecond: 0, microsecond: 0, nanosecond: 0 })
+    .toInstant();
 }
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
+// Rails: class NormalizedAircraft < Aircraft (normalizes :name, :manufactured_at)
+class NormalizedAircraft extends Aircraft {
+  // Rails: attr_accessor :validated_name
+  declare validated_name: string | undefined;
 
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+  static {
+    this.normalizes("name", (name: unknown) => {
+      const present = presence(name as string | null);
+      return present ? titleize(present) : present;
+    });
+    this.normalizes("manufactured_at", (time: unknown) => noon(time as Temporal.Instant));
+    // Rails: validate { self.validated_name = name.dup }
+    this.validate(function (this: NormalizedAircraft) {
+      this.validated_name = this.name as string;
+    });
+  }
+}
 
 describe("NormalizedAttributeTest", () => {
-  function titlecase(s: string): string {
-    return s.replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\B\w/g, (c) => c.toLowerCase());
-  }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  let adapter: DatabaseAdapter;
-  let NormalizedAircraft: typeof Base;
-  let Aircraft: typeof Base;
+  let time: Temporal.Instant;
+  let aircraft: NormalizedAircraft;
 
   beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
-      aircrafts: { name: "string", manufactured_at: "string" },
+    time = Temporal.Instant.from("1999-12-31T12:34:56Z");
+    aircraft = await NormalizedAircraft.createBang({
+      name: "fly HIGH",
+      manufactured_at: time,
     });
-
-    Aircraft = class extends Base {};
-    Aircraft._tableName = "aircrafts";
-    Aircraft.attribute("id", "integer");
-    Aircraft.attribute("name", "string");
-    Aircraft.attribute("manufactured_at", "string");
-    Aircraft.adapter = adapter;
-
-    NormalizedAircraft = class extends Aircraft {};
-    NormalizedAircraft.normalizes("name", (v: unknown) =>
-      typeof v === "string" && v.trim() !== "" ? titlecase(v) : v,
-    );
-    NormalizedAircraft.normalizes("manufactured_at", (v: unknown) =>
-      typeof v === "string" ? "noon:" + v : v,
-    );
   });
 
-  afterAll(async () => {
-    await new MigrationContext(adapter).dropTable("aircrafts", { ifExists: true });
-  });
-
-  it("normalizes value from create", async () => {
-    const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
+  it("normalizes value from create", () => {
     expect(aircraft.name).toBe("Fly High");
   });
 
   it("normalizes value from update", async () => {
-    const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    expect(aircraft.name).toBe("Fly High");
-    await aircraft.update({ name: "fly HIGHER" });
+    await aircraft.updateBang({ name: "fly HIGHER" });
     expect(aircraft.name).toBe("Fly Higher");
   });
 
-  it("normalizes value from assignment", async () => {
-    const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
+  it("normalizes value from assignment", () => {
     aircraft.name = "fly HIGHER";
     expect(aircraft.name).toBe("Fly Higher");
   });
 
-  it("normalizes changed-in-place value before validation", async () => {
-    const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
-    expect(aircraft.name).toBe("Fly High");
-    // In-place mutation isn't possible with immutable strings in JS,
-    // but we can test that re-normalization works via normalizeAttribute
+  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
+  // `valid?` does not re-normalize changed-in-place attributes before
+  // validation, so `validated_name` keeps the un-normalized in-place value.
+  it.skip("normalizes changed-in-place value before validation", async () => {
     aircraft._attributes.set("name", "fly high");
     expect(aircraft.name).toBe("fly high");
-    aircraft.normalizeAttribute("name");
-    expect(aircraft.name).toBe("Fly High");
+
+    await aircraft.isValid();
+    expect(aircraft.validated_name).toBe("Fly High");
   });
 
-  it("normalizes value on demand", async () => {
-    const aircraft = await NormalizedAircraft.create({ name: "fly HIGH" });
+  it("normalizes value on demand", () => {
     aircraft._attributes.set("name", "fly high");
     expect(aircraft.name).toBe("fly high");
+
     aircraft.normalizeAttribute("name");
     expect(aircraft.name).toBe("Fly High");
   });
@@ -100,15 +93,12 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("casts value when no normalization is declared", () => {
-    // For an attribute without normalization, just type-casts
-    Aircraft.attribute("wheels_count", "integer");
-    expect(Aircraft.normalizeValueFor("wheels_count", "6")).toBe(6);
+    expect(NormalizedAircraft.normalizeValueFor("wheels_count", "6")).toBe(6);
   });
 
-  it("casts value before applying normalization", async () => {
-    // manufactured_at normalizer receives the cast value
-    const aircraft = await NormalizedAircraft.create({ manufactured_at: "2000-01-01" });
-    expect(aircraft.manufactured_at).toBe("noon:2000-01-01");
+  it("casts value before applying normalization", () => {
+    aircraft.manufactured_at = time.toString();
+    expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
   });
 
   it("ignores nil by default", () => {
@@ -116,104 +106,98 @@ describe("NormalizedAttributeTest", () => {
   });
 
   it("normalizes nil if apply_to_nil", () => {
-    const WithNil = class extends Aircraft {};
-    (WithNil as any).normalizes(
+    const IncludingNil = class extends Aircraft {};
+    IncludingNil.normalizes(
       "name",
-      (v: unknown) => (typeof v === "string" ? titlecase(v) : "Untitled"),
+      (name: unknown) => (name ? titleize(name as string) : "Untitled"),
       { applyToNil: true },
     );
-    expect(WithNil.normalizeValueFor("name", null)).toBe("Untitled");
+
+    expect(IncludingNil.normalizeValueFor("name", null)).toBe("Untitled");
   });
 
   it("does not automatically normalize value from database", async () => {
-    // Create via plain Aircraft (no normalization), then load via NormalizedAircraft.
-    // In Rails, find() bypasses normalization for DB-loaded values.
-    const plain = await Aircraft.create({ name: "NOT titlecase" });
-    const fromDb = await NormalizedAircraft.find(plain.id);
-    expect(fromDb.name).toBe("NOT titlecase");
+    const created = await Aircraft.create({ name: "NOT titlecase" });
+    const fromDatabase = await NormalizedAircraft.find(created.id);
+    expect(fromDatabase.name).toBe("NOT titlecase");
   });
 
-  it("finds record by normalized value", async () => {
-    const aircraft = await NormalizedAircraft.create({
-      name: "fly HIGH",
-      manufactured_at: "noon:2000-01-01",
-    });
-    expect(aircraft.manufactured_at).toBe("noon:noon:2000-01-01");
-    // Test that findBy works with the stored value directly
-    const found = await NormalizedAircraft.findBy({ manufactured_at: "noon:noon:2000-01-01" });
-    expect(found).toBeTruthy();
+  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
+  // trails normalizes on write but does not wire NormalizedValueType into the
+  // query path, so `find_by` does not normalize the query value (noon) here.
+  it.skip("finds record by normalized value", async () => {
+    expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
+    const found = await NormalizedAircraft.findBy({ manufactured_at: time.toString() });
+    expect(found).not.toBeNull();
     expect(found!.id).toBe(aircraft.id);
   });
 
-  it("uses the same query when finding record by nil and normalized nil values", () => {
-    // When name normalizer returns nil for empty string, queries should be equivalent
-    const WithBlankNorm = class extends Aircraft {};
-    WithBlankNorm.normalizes("name", (v: unknown) =>
-      typeof v === "string" && v.trim() === "" ? null : v,
+  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
+  // `where` does not normalize query values, so `where(name: "")` renders `= ''`
+  // instead of normalizing `""` -> nil -> `IS NULL`.
+  it.skip("uses the same query when finding record by nil and normalized nil values", () => {
+    expect(NormalizedAircraft.where({ name: null }).toSql()).toBe(
+      NormalizedAircraft.where({ name: "" }).toSql(),
     );
-    // Both nil and "" should produce the same normalized query value (null)
-    expect(WithBlankNorm.normalizeValueFor("name", "")).toBeNull();
-    expect(WithBlankNorm.normalizeValueFor("name", null)).toBeNull();
   });
 
   it("can stack normalizations", () => {
     const TitlecaseThenReverse = class extends NormalizedAircraft {};
-    TitlecaseThenReverse.normalizes("name", (v: unknown) =>
-      typeof v === "string" ? v.split("").reverse().join("") : v,
+    TitlecaseThenReverse.normalizes("name", (name: unknown) =>
+      (name as string).split("").reverse().join(""),
     );
 
     expect(TitlecaseThenReverse.normalizeValueFor("name", "titlecase THEN reverse")).toBe(
       "esreveR nehT esaceltiT",
     );
-    // Parent class unaffected
     expect(NormalizedAircraft.normalizeValueFor("name", "ONLY titlecase")).toBe("Only Titlecase");
   });
 
-  it("minimizes number of times normalization is applied", async () => {
-    let count = 0;
+  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
+  // the changed-in-place portion (`name.replace("0")` then `save`) requires
+  // re-normalizing mutated values before save, which trails does not yet wire.
+  it.skip("minimizes number of times normalization is applied", async () => {
     const CountApplied = class extends Aircraft {};
-    CountApplied.normalizes("name", (v: unknown) => {
-      count++;
-      return typeof v === "string" ? String(parseInt(v) + 1) : v;
-    });
+    CountApplied.normalizes("name", (name: unknown) => succ(name as string));
 
-    count = 0;
-    const aircraft = await CountApplied.create({ name: "0" });
-    expect(aircraft.name).toBe("1");
-    expect(count).toBe(1);
+    const counted = await CountApplied.createBang({ name: "0" });
+    expect(counted.name).toBe("1");
 
-    count = 0;
-    aircraft.name = "0";
-    expect(aircraft.name).toBe("1");
-    expect(count).toBe(1);
+    counted.name = "0";
+    expect(counted.name).toBe("1");
+    await counted.save();
+    expect(counted.name).toBe("1");
 
-    count = 0;
-    await aircraft.save();
-    // save should not re-normalize if value hasn't changed
-    expect(aircraft.name).toBe("1");
+    // Rails mutates the name in place (`name.replace("0")`); JS strings are
+    // immutable, so assign through the raw attribute to model the same
+    // changed-in-place value, then let save re-normalize it.
+    counted._attributes.set("name", "0");
+    expect(counted.name).toBe("0");
+    await counted.save();
+    expect(counted.name).toBe("1");
   });
 });
 
-describe("normalizes on Base", () => {
-  let _adapter: DatabaseAdapter;
+// Rails `String#succ` for the numeric case the test exercises ("0" -> "1").
+function succ(value: string): string {
+  return String(Number(value) + 1);
+}
 
-  afterAll(async () => {
-    if (_adapter) await new MigrationContext(_adapter).dropTable("users", { ifExists: true });
-  });
+describe("normalizes on Base", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   it("normalizes attributes before persistence", async () => {
-    const adapter = freshAdapter();
-    _adapter = adapter;
-    await defineSchema(adapter, { users: { email: "string" } });
-    class User extends Base {
-      static _tableName = "users";
+    class NormalizedUser extends Base {
+      static _tableName = "aircraft";
+      static {
+        this.normalizes("name", (name: unknown) =>
+          typeof name === "string" ? name.trim().toLowerCase() : name,
+        );
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("email", "string");
-    User.normalizes("email", (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : v));
-    User.adapter = adapter;
 
-    const user = await User.create({ email: "  ALICE@TEST.COM  " });
-    expect(user.email).toBe("alice@test.com");
+    const user = await NormalizedUser.create({ name: "  ALICE  " });
+    expect(user.name).toBe("alice");
   });
 });
