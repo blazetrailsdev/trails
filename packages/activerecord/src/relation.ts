@@ -6789,7 +6789,9 @@ export class Relation<T extends Base> {
             collection = rel.leftOuterJoins(eagerSpecs);
           }
         } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
-          // Composite-PK, non-limitable eager limit/offset: unsupported here.
+          // Composite-PK, non-limitable eager limit/offset: unsupported here —
+          // surfaces NotImplementedError rather than a wrong predicate. Tracked
+          // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
           collection = this.applyJoinDependencyForArel();
         } else {
           collection = rel.leftOuterJoins(eagerSpecs);
