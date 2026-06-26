@@ -4050,12 +4050,11 @@ export class Relation<T extends Base> {
    */
   async destroyAll(): Promise<T[]> {
     const recs = await this.records();
-    const destroyed: T[] = [];
     for (const record of recs) {
-      if (await record.destroy()) destroyed.push(record);
+      await record.destroy();
     }
     this.reset();
-    return destroyed;
+    return recs;
   }
 
   /**
@@ -4145,16 +4144,20 @@ export class Relation<T extends Base> {
 
     const now = Temporal.Now.instant();
     const updates: Record<string, unknown> = {};
+    const aliases = this._modelClass._attributeAliases ?? {};
 
-    // Always touch updated_at if defined on the model (or aliased to a real column)
-    const updatedAtAlias = this._modelClass._attributeAliases?.["updated_at"];
-    if (this._modelClass._attributeDefinitions.has("updated_at")) {
-      updates.updated_at = now;
-    } else if (updatedAtAlias && this._modelClass._attributeDefinitions.has(updatedAtAlias)) {
-      updates[updatedAtAlias] = now;
+    // Mirrors Rails timestamp_attributes_for_update: ["updated_at", "updated_on"]
+    // each resolved through attribute_aliases, then intersected with column_names.
+    for (const tsName of ["updated_at", "updated_on"]) {
+      const col = aliases[tsName] ?? tsName;
+      if (this._modelClass._attributeDefinitions.has(col)) {
+        updates[col] = now;
+      }
     }
+    // Mirrors Rails touch_attributes_with_time: explicit names also resolved through aliases.
     for (const name of names) {
-      updates[name] = now;
+      const col = aliases[name] ?? name;
+      updates[col] = now;
     }
 
     if (Object.keys(updates).length === 0) return 0;

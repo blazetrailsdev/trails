@@ -499,13 +499,13 @@ describe("EachTest", () => {
 
   it("in batches destroy all returns rows affected", async () => {
     // 1 record is not destroyed because of the callback (id === 1 throws abort)
-    const destroyed = await PostWithDestroyCallback.inBatches({ batchSize: 2 }).destroyAll();
-    expect(destroyed.length).toBe(10);
+    const count = await PostWithDestroyCallback.inBatches({ batchSize: 2 }).destroyAll();
+    expect(count).toBe(10);
   });
 
   it("in batches destroy all returns zero when no batches", async () => {
-    const destroyed = await Post.where("1=0").inBatches({ batchSize: 2 }).destroyAll();
-    expect(destroyed.length).toBe(0);
+    const count = await Post.where("1=0").inBatches({ batchSize: 2 }).destroyAll();
+    expect(count).toBe(0);
   });
 
   it("in batches should not be loaded", async () => {
