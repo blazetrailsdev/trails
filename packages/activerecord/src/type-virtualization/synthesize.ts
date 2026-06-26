@@ -65,11 +65,24 @@ export interface SynthesizeOptions {
    * generator opts in so baked declares allow null assignment (no TS2322).
    */
   attributesNullable?: boolean;
+  /**
+   * Pre-resolved targets keyed `"<ClassName>#<assocName>"` overriding
+   * `resolveAssociationTarget` — generator-set for `through:` associations.
+   */
+  associationTargets?: ReadonlyMap<string, string>;
+  /** In-file ancestors of `info`, nearest first (inherited loader overloads + override conflicts). */
+  ancestors?: readonly ClassInfo[];
+  /** In-file class name → direct superclass name (subtype-vs-conflict check). */
+  superNameOf?: ReadonlyMap<string, string>;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
   const out: string[] = [];
   const aliases = opts.classNameAliases;
+  const targets = opts.associationTargets;
+  // Subclass singular associations whose target isn't assignable to the
+  // ancestor's (TS2416): suppress the property declare (loader overload kept).
+  const conflictingSingulars = collectConflictingSingulars(info, opts);
   // Track ALL synthesized instance member names so schema-reflected
   // declares don't collide with attribute() / hasMany() / belongsTo() /
   // hasOne() / scope() etc. Rails allows an association named "comments"
@@ -77,14 +90,20 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
   // emitting two `declare comments: ...` members is a TS error.
   const synthesizedInstanceNames = new Set<string>();
   for (const call of info.calls) {
-    for (const line of renderCall(info, call, aliases, opts.attributesNullable ?? false)) {
+    if (
+      (call.kind === "belongsTo" || call.kind === "hasOne") &&
+      conflictingSingulars.has(call.name)
+    ) {
+      continue;
+    }
+    for (const line of renderCall(info, call, aliases, targets, opts.attributesNullable ?? false)) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         out.push(line.text);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
     }
   }
-  for (const l of renderLoaderOverloads(info, aliases)) {
+  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors)) {
     if (!info.existingMembers.has(l.declaredName)) {
       out.push(l.text);
       synthesizedInstanceNames.add(l.declaredName);
@@ -179,16 +198,27 @@ function isValidIdentifier(name: string): boolean {
  */
 function renderLoaderOverloads(
   info: ClassInfo,
-  aliases?: ReadonlyMap<string, string>,
+  aliases: ReadonlyMap<string, string> | undefined,
+  targets: ReadonlyMap<string, string> | undefined,
+  ancestors: readonly ClassInfo[] | undefined,
 ): RenderedLine[] {
   const belongsToOverloads: string[] = [];
   const hasOneOverloads: string[] = [];
-  for (const call of info.calls) {
-    if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
-    const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call, aliases);
-    const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
-    if (call.kind === "belongsTo") belongsToOverloads.push(overload);
-    else hasOneOverloads.push(overload);
+  // Inherited overloads first (base→derived) then own, so the subclass
+  // intersection includes every ancestor overload (assignable, no TS2416).
+  const sources: ClassInfo[] = [...(ancestors ?? [])].reverse();
+  sources.push(info);
+  for (const source of sources) {
+    for (const call of source.calls) {
+      if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+      const target =
+        call.options["polymorphic"] === "true"
+          ? "Base"
+          : resolveTarget(source, call, aliases, targets);
+      const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
+      const bucket = call.kind === "belongsTo" ? belongsToOverloads : hasOneOverloads;
+      if (!bucket.includes(overload)) bucket.push(overload);
+    }
   }
   const out: RenderedLine[] = [];
   if (belongsToOverloads.length > 0) {
@@ -200,6 +230,67 @@ function renderLoaderOverloads(
     out.push(line(`declare loadHasOne: ${joinOverloads(hasOneOverloads)};`, "loadHasOne", false));
   }
   return out;
+}
+
+/**
+ * `belongsTo`/`hasOne` names on `info` that override an in-file ancestor's
+ * with an incompatible target (a sibling, not a subtype) — not assignable to
+ * the ancestor property (TS2416), so the caller omits the redeclare.
+ */
+function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
+  const out = new Set<string>();
+  const ancestors = opts.ancestors;
+  if (!ancestors || ancestors.length === 0) return out;
+  const aliases = opts.classNameAliases;
+  const targets = opts.associationTargets;
+  const superNameOf = opts.superNameOf;
+
+  const target = (host: ClassInfo, call: AssociationCall): string =>
+    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(host, call, aliases, targets);
+  // Effective inherited target per association, folded base→derived
+  // (`ancestors` is nearest-first, so reverse). A suppressed ancestor override
+  // (target not assignable to what it inherits) does NOT change the effective
+  // target, so an intermediate suppressed override can't mask a grandparent's.
+  const inherited = new Map<string, string>();
+  for (const anc of [...ancestors].reverse()) {
+    for (const call of anc.calls) {
+      if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+      const prev = inherited.get(call.name);
+      const t = target(anc, call);
+      if (prev === undefined || t === prev || classExtends(t, prev, superNameOf)) {
+        inherited.set(call.name, t);
+      }
+    }
+  }
+  for (const call of info.calls) {
+    if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+    const base = inherited.get(call.name);
+    if (base === undefined) continue;
+    const ownTarget = target(info, call);
+    if (ownTarget === base || classExtends(ownTarget, base, superNameOf)) continue;
+    out.add(call.name);
+  }
+  return out;
+}
+
+/**
+ * Whether `sub` transitively extends `sup` per `superNameOf`. IN-FILE ONLY: a
+ * cross-file subtype returns false → its narrowing override is suppressed.
+ */
+function classExtends(
+  sub: string,
+  sup: string,
+  superNameOf: ReadonlyMap<string, string> | undefined,
+): boolean {
+  if (!superNameOf) return false;
+  const seen = new Set<string>();
+  let current: string | undefined = superNameOf.get(sub);
+  while (current && !seen.has(current)) {
+    if (current === sup) return true;
+    seen.add(current);
+    current = superNameOf.get(current);
+  }
+  return false;
 }
 
 function joinOverloads(overloads: string[]): string {
@@ -220,6 +311,7 @@ function renderCall(
   info: ClassInfo,
   call: RuntimeCall,
   aliases: ReadonlyMap<string, string> | undefined,
+  targets: ReadonlyMap<string, string> | undefined,
   attributesNullable: boolean,
 ): RenderedLine[] {
   switch (call.kind) {
@@ -227,10 +319,10 @@ function renderCall(
       return renderAttribute(call, attributesNullable);
     case "hasMany":
     case "hasAndBelongsToMany":
-      return renderCollectionAssoc(call, aliases);
+      return renderCollectionAssoc(info, call, aliases, targets);
     case "belongsTo":
     case "hasOne":
-      return renderSingularAssoc(call, aliases);
+      return renderSingularAssoc(info, call, aliases, targets);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -256,8 +348,10 @@ function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[]
 }
 
 function renderCollectionAssoc(
+  info: ClassInfo,
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
 ): RenderedLine[] {
   // Post-Phase-R.2: collection readers return an AssociationProxy,
   // not a plain `Target[]`. The proxy is awaitable — `await blog.posts`
@@ -265,7 +359,7 @@ function renderCollectionAssoc(
   // collections. Singular associations (belongsTo / hasOne) are
   // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
   // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
-  const target = resolveTarget(call, aliases);
+  const target = resolveTarget(info, call, aliases, targets);
   const memberName = renderDeclaredMemberName(call.name);
   return [
     line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
@@ -273,15 +367,18 @@ function renderCollectionAssoc(
 }
 
 function renderSingularAssoc(
+  info: ClassInfo,
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
 ): RenderedLine[] {
   // `polymorphic: true` on belongsTo can't be narrowed statically — any
   // Base-rooted class could be on the other end. Fall back to `Base | null`.
   // Per-association loader declarations are aggregated into
   // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
   // by `renderLoaderOverloads` below.
-  const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call, aliases);
+  const target =
+    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(info, call, aliases, targets);
   const memberName = renderDeclaredMemberName(call.name);
   return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
 }
@@ -346,7 +443,14 @@ function readAffix(raw: string | undefined, attr: string, side: "prefix" | "suff
   return side === "prefix" ? `${value}_` : `_${value}`;
 }
 
-function resolveTarget(call: AssociationCall, aliases?: ReadonlyMap<string, string>): string {
+function resolveTarget(
+  info: ClassInfo,
+  call: AssociationCall,
+  aliases?: ReadonlyMap<string, string>,
+  targets?: ReadonlyMap<string, string>,
+): string {
+  const override = targets?.get(`${info.name}#${call.name}`);
+  if (override) return override;
   const target = resolveAssociationTarget(call);
   return aliases?.get(target) ?? target;
 }

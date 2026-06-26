@@ -561,6 +561,62 @@ describe("virtualize — materializing-generator gaps", () => {
     // The injected declares reference `Octopus`, not the non-existent alias.
     expect(text).not.toMatch(/declare octopus: EsOctopus/);
   });
+
+  test("associationTargets overrides the through-association element type", () => {
+    // Otherwise `classify("commentsWithOrder")` → `CommentsWithOrder` (TS2304).
+    const src =
+      "class Author extends Base {\n" +
+      '  static { this.hasMany("commentsWithOrder", { through: "posts", source: "comments" }); }\n' +
+      "}\n";
+    const targets = new Map([["Author#commentsWithOrder", "Comment"]]);
+    const { text } = virtualize(src, "file.ts", { associationTargets: targets });
+    expect(text).toContain(
+      'declare commentsWithOrder: import("@blazetrails/activerecord").AssociationProxy<Comment>;',
+    );
+    expect(text).not.toMatch(/CommentsWithOrder/);
+  });
+
+  test("subclass loader overloads include inherited base overloads", () => {
+    // Subclass `loadBelongsTo` must keep the base overloads in its
+    // intersection or it isn't assignable to the base (TS2416).
+    const src =
+      "class Comment extends Base {\n" +
+      '  static { this.belongsTo("post"); }\n' +
+      "}\n" +
+      "class SpecialComment extends Comment {\n" +
+      '  static { this.belongsTo("ordinaryPost", { className: "Post" }); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
+    expect(text).toContain(
+      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "ordinaryPost") => Promise<Post | null>);',
+    );
+  });
+
+  test("subclass association overrides across a 3-level chain (suppress, keep subtype, effective target)", () => {
+    // Mid.post → Sibling isn't assignable to Root's `post: Post` → suppressed
+    // (loader overload kept). Leaf.post → SpecialPost (extends Post): Mid was
+    // suppressed so Leaf's effective inherited target is still Post → kept.
+    const src =
+      "class Post extends Base {}\n" +
+      "class SpecialPost extends Post {}\n" +
+      "class Sibling extends Base {}\n" +
+      "class Root extends Base {\n" +
+      '  static { this.belongsTo("post"); }\n' +
+      "}\n" +
+      "class Mid extends Root {\n" +
+      '  static { this.belongsTo("post", { className: "Sibling" }); }\n' +
+      "}\n" +
+      "class Leaf extends Mid {\n" +
+      '  static { this.belongsTo("post", { className: "SpecialPost" }); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
+    const midBody = text.slice(text.indexOf("class Mid"), text.indexOf("class Leaf"));
+    expect(midBody).not.toMatch(/declare post:/);
+    expect(midBody).toContain(
+      'declare loadBelongsTo: ((name: "post") => Promise<Post | null>) & ((name: "post") => Promise<Sibling | null>);',
+    );
+    expect(text.slice(text.indexOf("class Leaf"))).toContain("declare post: SpecialPost | null;");
+  });
 });
 
 function indexOfNthNewline(text: string, n: number): number {
