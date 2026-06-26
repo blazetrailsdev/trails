@@ -304,6 +304,9 @@ describe("RelationScopingTest", () => {
       async () => VerySpecialComment.create({ body: "Wonderful world" }),
     );
     expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
     // Rails: assert_equal "default", new_comment.label (enum cast of DB default 0).
     // trails: label is null — enum() registers the type as user-provided, which
     // suppresses the DB-default-sourced attribute default; tracked fidelity gap.
@@ -316,6 +319,9 @@ describe("RelationScopingTest", () => {
       post_id: 1,
     }).scoping(async () => VerySpecialComment.create({ body: "Wonderful world" }));
     expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
     // Rails: assert_equal "default", new_comment.label (enum cast of DB default 0).
     // trails: label is null — enum() registers the type as user-provided, which
     // suppresses the DB-default-sourced attribute default; tracked fidelity gap.
