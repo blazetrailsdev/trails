@@ -4050,11 +4050,12 @@ export class Relation<T extends Base> {
    */
   async destroyAll(): Promise<T[]> {
     const recs = await this.records();
+    const destroyed: T[] = [];
     for (const record of recs) {
-      await record.destroy();
+      if (await record.destroy()) destroyed.push(record);
     }
     this.reset();
-    return recs;
+    return destroyed;
   }
 
   /**
@@ -4145,9 +4146,12 @@ export class Relation<T extends Base> {
     const now = Temporal.Now.instant();
     const updates: Record<string, unknown> = {};
 
-    // Always touch updated_at if defined on the model
+    // Always touch updated_at if defined on the model (or aliased to a real column)
+    const updatedAtAlias = this._modelClass._attributeAliases?.["updated_at"];
     if (this._modelClass._attributeDefinitions.has("updated_at")) {
       updates.updated_at = now;
+    } else if (updatedAtAlias && this._modelClass._attributeDefinitions.has(updatedAtAlias)) {
+      updates[updatedAtAlias] = now;
     }
     for (const name of names) {
       updates[name] = now;
