@@ -13,13 +13,22 @@ describe("EagerSingularizationTest", () => {
     // These tables are deliberately irregular plurals (viri/octopi/messes/
     // crises/…) to exercise singularization edge cases; they are test-local by
     // design and have no canonical-schema counterpart.
+    //
+    // Rails' eager_singularization_test.rb creates a conventional `crises_messes`
+    // HABTM join table dynamically in setup/teardown (no schema.rb analog). Per
+    // RFC 0019 collision-table convergence, bespoke join tables with no canonical
+    // analog are renamed file-unique (`es_crises_messes`) so they can never
+    // clobber a shared join table re-primed by a divergent sibling under parallel
+    // forks. The model tables (`messes`/`crises`) keep their Rails names; only the
+    // join table is namespaced. The association still wires via an explicit
+    // `joinTable:`, so behavior is identical to Rails.
     /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema({
       viri: { octopus_id: "integer", species: "string" },
       octopi: { species: "string" },
       passes: { bus_id: "integer", rides: "integer" },
       buses: { name: "string" },
-      crises_messes: {
+      es_crises_messes: {
         columns: { crisis_id: "integer", mess_id: "integer" },
         primaryKey: false,
       },
@@ -102,7 +111,7 @@ describe("EagerSingularizationTest", () => {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("crises", {
           className: "EsCrisis",
-          joinTable: "crises_messes",
+          joinTable: "es_crises_messes",
           foreignKey: "mess_id",
           associationForeignKey: "crisis_id",
         });
@@ -121,7 +130,7 @@ describe("EagerSingularizationTest", () => {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("messes", {
           className: "EsMess",
-          joinTable: "crises_messes",
+          joinTable: "es_crises_messes",
           foreignKey: "crisis_id",
           associationForeignKey: "mess_id",
         });
