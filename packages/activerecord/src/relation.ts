@@ -4768,6 +4768,28 @@ export class Relation<T extends Base> {
     const cursorArr = Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor];
     _ensureValidOptionsForBatchingBang(cursorArr, start, finish, (order ?? "asc") as any);
 
+    // Mirrors Rails ensure_valid_options_for_batching!: when the cursor doesn't
+    // include all PK columns, require a full unique (non-partial) index.
+    const pkArr = Array.isArray(pk) ? pk : [pk];
+    const cursorIncludesPk = pkArr.every((k) => cursorArr.includes(k));
+    const ensureCursorUniqueness = async () => {
+      if (!cursorIncludesPk) {
+        const cache = self._modelClass.schemaCache();
+        const pool = self._modelClass.connectionPool();
+        const idxs = (await cache.indexes(pool, self._modelClass.tableName)) as Array<{
+          unique: boolean;
+          where?: string | null;
+          columns: string[];
+        }>;
+        const hasUniqueIndex = idxs.some(
+          (idx) => idx.unique && !idx.where && cursorArr.every((c) => idx.columns.includes(c)),
+        );
+        if (!hasUniqueIndex) {
+          throw new Error(":cursor must include a primary key or other unique column(s)");
+        }
+      }
+    };
+
     if (this._orderClauses.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
@@ -4810,6 +4832,7 @@ export class Relation<T extends Base> {
       });
       return new BatchEnumerator(
         async function* () {
+          await ensureCursorUniqueness();
           for (const batchRows of loadedBatches) {
             const batchRel = self._clone();
             batchRel._orderClauses = batchOrders.map(
@@ -4827,6 +4850,7 @@ export class Relation<T extends Base> {
 
     return new BatchEnumerator(
       async function* () {
+        await ensureCursorUniqueness();
         const rel = self._clone();
         rel._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
 

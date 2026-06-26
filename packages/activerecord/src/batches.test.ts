@@ -949,7 +949,14 @@ describe("EachTest", () => {
   });
 
   it("in batches with custom columns raises when non unique columns", async () => {
-    // primary key column: should not raise
+    // non-unique column: must raise
+    await expect(async () => {
+      for await (const _rel of Post.inBatches({ cursor: "title" })) {
+        break;
+      }
+    }).rejects.toThrow();
+
+    // primary key column: must not raise
     let threw = false;
     try {
       for await (const _rel of Post.inBatches({ cursor: "id" })) {
@@ -1128,10 +1135,10 @@ describe("EachTest", () => {
 
   it(".find_each iterates over composite primary key", async () => {
     const orders = await CpkOrder.order(...(CpkOrder.primaryKey as string[])).toArray();
-    const orderIds = orders.map((o: any) => JSON.stringify(o.id));
+    const orderIds = orders.map((o: any) => String(o.id));
     let index = 0;
     for await (const order of CpkOrder.findEach({ batchSize: 1 })) {
-      expect(JSON.stringify((order as any).id)).toBe(orderIds[index]);
+      expect(String((order as any).id)).toBe(orderIds[index]);
       index++;
     }
     expect(index).toBe(orders.length);
@@ -1152,7 +1159,7 @@ describe("EachTest", () => {
       break;
     }
     const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((order as any).id));
+    expect(String(first.id)).toBe(String((order as any).id));
   });
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
@@ -1169,7 +1176,7 @@ describe("EachTest", () => {
     const lastBatch = batches[batches.length - 1];
     const records = await lastBatch.toArray();
     const last = records[records.length - 1];
-    expect(JSON.stringify(last.id)).toBe(JSON.stringify((order as any).id));
+    expect(String(last.id)).toBe(String((order as any).id));
   });
 
   it(".in_batches with scope and using composite primary key", async () => {
@@ -1192,7 +1199,7 @@ describe("EachTest", () => {
     }
     expect(firstRelation).not.toBeNull();
     const first = await firstRelation.first();
-    expect(JSON.stringify(first.id)).toBe(JSON.stringify((order2 as any).id));
+    expect(String(first.id)).toBe(String((order2 as any).id));
   });
 
   it(".find_each with multiple column ordering and using composite primary key", async () => {
