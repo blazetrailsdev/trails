@@ -9,19 +9,36 @@
 
 /**
  * Serialization options threaded through `as_json` — only the subset Rails'
- * `ActiveSupport::JSON.encode(value, options)` forwards to collections.
+ * `ActiveSupport::JSON.encode(value, options)` forwards to collections. `only`
+ * / `except` accept a scalar or list, mirroring Rails' `Array(attrs)` coercion.
  */
 interface EncodeOptions {
+  only?: string | number | Array<string | number>;
+  except?: string | number | Array<string | number>;
+  [key: string]: unknown;
+}
+
+// Normalized form after `Array(attrs)` coercion: `only`/`except` are always lists.
+interface NormalizedOptions {
   only?: Array<string | number>;
   except?: Array<string | number>;
   [key: string]: unknown;
+}
+
+// Ruby `Array(x)`: nil → absent (default = all attrs), scalar → [scalar],
+// list → list. Coerced once up front so the Hash filter and every forwarded
+// `asJson(options)` (whose `only`/`except` filters assume a list) agree.
+function normalizeOptions(options: EncodeOptions): NormalizedOptions {
+  const wrap = (v: string | number | Array<string | number> | undefined) =>
+    v == null ? undefined : Array.isArray(v) ? v : [v];
+  return { ...options, only: wrap(options.only), except: wrap(options.except) };
 }
 
 // Rails: `ActiveSupport::JSON.encode(value, options)` calls `value.as_json(options)`.
 // Arrays map each element through `as_json(options)`; Hashes filter their keys by
 // `only`/`except` (mirroring `Hash#as_json`) and recurse the surviving values with
 // the same options; objects responding to `as_json` (our `asJson`) delegate.
-function asJsonValue(value: unknown, options: EncodeOptions): unknown {
+function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
   if (value == null) return value;
 
   const asJson = (value as { asJson?: (o?: unknown) => unknown }).asJson;
@@ -60,7 +77,7 @@ function isPlainObject(value: object): boolean {
 // Mirrors `Hash#as_json`'s key filtering: `only` keeps the listed keys, `except`
 // drops them, comparing by stringified key (Rails compares the raw keys, but our
 // option lists arrive as strings/numbers, so normalize both sides).
-function filterHashKeys(keys: unknown[], options: EncodeOptions): Set<unknown> {
+function filterHashKeys(keys: unknown[], options: NormalizedOptions): Set<unknown> {
   const norm = (v: unknown) => String(v);
   if (options.only != null) {
     const only = new Set(options.only.map(norm));
@@ -75,7 +92,7 @@ function filterHashKeys(keys: unknown[], options: EncodeOptions): Set<unknown> {
 
 export namespace ActiveSupportJSON {
   export function encode(value: unknown, options?: EncodeOptions): string {
-    const resolved = options === undefined ? value : asJsonValue(value, options);
+    const resolved = options === undefined ? value : asJsonValue(value, normalizeOptions(options));
     return JSON.stringify(resolved) ?? "null";
   }
 
