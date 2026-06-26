@@ -88,7 +88,11 @@ describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
       }
       Default.adapter = adapter;
       await Default.loadSchema();
-      expect(new Default().multiline_default).toBe("--- []\n\n");
+      // Rails: assert("--- []\n\n" == record.multiline_default ||
+      //               "--- []\\012\\012" == record.multiline_default)
+      // Older PostgreSQL versions reflect the default with escaped newlines.
+      const multiline = (new Default() as any).multiline_default;
+      expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
     } finally {
       await ctx.dropTable("defaults", { ifExists: true });
     }
@@ -281,7 +285,7 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
         default: () => "CURRENT_TIMESTAMP",
       });
       t.datetime("modified_time_function", { default: () => "now()" });
-      t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+      t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
       t.column("char1", "char(1)", { default: "Y" });
       t.string("char2", { limit: 50, default: "a varchar field" });
       t.text("char3", { default: "a text field" });
@@ -506,10 +510,12 @@ describeIfMysql("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_integer).toBe(0);
       expect((record as any).non_null_string).toBe("");
       expect((record as any).non_null_text).toBe("");
-      // Rails asserts `""` here; a binary column deserializes to bytes in trails
-      // (BinaryType → Uint8Array), so the faithful analog of Ruby's empty binary
-      // string is a zero-length byte array.
-      expect((record as any).non_null_blob).toHaveLength(0);
+      // Rails: `assert_equal "", record.non_null_blob`. A binary column
+      // deserializes to bytes in trails (BinaryType → Uint8Array), so the
+      // faithful analog of Ruby's empty binary string is the exact empty byte
+      // array — and its decoded text is `""`.
+      expect(new Uint8Array((record as any).non_null_blob)).toEqual(new Uint8Array(0));
+      expect(decodeBinaryDefault((record as any).non_null_blob)).toBe("");
     });
   });
 
