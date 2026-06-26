@@ -4947,10 +4947,9 @@ describe("EagerAssociationTest", () => {
   it("eager with default scope", async () => {
     const developer = await EagerDeveloperWithDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
@@ -4959,10 +4958,9 @@ describe("EagerAssociationTest", () => {
       name: "David",
     }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
@@ -4970,30 +4968,27 @@ describe("EagerAssociationTest", () => {
     const david = developers("david");
     const developer = await EagerDeveloperWithClassMethodDefaultScope.find(david.id);
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
   it("eager with default scope as class method using find by method", async () => {
     const developer = await EagerDeveloperWithClassMethodDefaultScope.findBy({ name: "David" });
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
   it("eager with default scope as lambda", async () => {
     const developer = await EagerDeveloperWithLambdaDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
@@ -5002,20 +4997,18 @@ describe("EagerAssociationTest", () => {
     await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const developer = await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 
   it("eager with default scope as callable", async () => {
     const developer = await EagerDeveloperWithCallableDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, () => {
-      expect((developer!.association("projects").target as Base[]).map((p) => p.id)).toEqual(
-        projects,
-      );
+    await assertNoQueries(false, async () => {
+      const loaded = await developer!.projects;
+      expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
 });
