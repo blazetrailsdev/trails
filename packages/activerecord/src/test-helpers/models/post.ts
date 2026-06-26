@@ -79,8 +79,19 @@ export class Post extends Base {
     this.scope("taggedWithComment", (q: any, comment: string) =>
       q.joins("taggings").where({ taggings: { comment } }),
     );
+    // Rails: `-> { containing_the_letter_a.or(titled_with_an_apostrophe) }` —
+    // each bare scope call resolves against the lambda's `self` (the current
+    // relation), so both `or` branches inherit `q`'s accumulated scope. trails
+    // passes the *unwrapped* relation as `q` to scope bodies (the scope proxy
+    // calls `scopeFn(target, ...)` with the proxy's raw target — verified:
+    // `typeof q.containingTheLetterA === "undefined"` inside a scope body), so
+    // the two named scopes can't be re-invoked on `q` directly. Inline their
+    // predicates on `q` — exactly what `q.containingTheLetterA()` would expand
+    // to (`q.where(A)`) — which keeps the per-branch scoping `q.where(A).or(
+    // q.where(B))` without evaluating the scopes from `Post.all()` (avoids
+    // re-applying any future default scope).
     this.scope("typographicallyInteresting", (q: any) =>
-      q._modelClass.containingTheLetterA().or(q._modelClass.titledWithAnApostrophe()),
+      q.where("body LIKE '%a%'").or(q.where("title LIKE '%''%'")),
     );
 
     this.belongsTo("author");

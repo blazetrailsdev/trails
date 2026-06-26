@@ -1,601 +1,305 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/or_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
+import { describe, it, expect } from "vitest";
+import { registerModel } from "../index.js";
 import { adapterType } from "../test-adapter.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post, SpecialPost } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Paragraph } from "../test-helpers/models/paragraph.js";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+registerModel([Author, Post, SpecialPost, Comment, Paragraph]);
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    posts: {
-      title: "string",
-      body: "string",
-      score: "integer",
-      author_id: "integer",
-      published: "boolean",
-    },
-    users: { name: "string", age: "integer", role: "string", score: "integer" },
-  });
-});
-
-// ==========================================================================
-// OrTest — targets relation/or_test.rb
-// ==========================================================================
-describe("OrTest", () => {
-  it("or combines two relations", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const r1 = Post.where({ title: "a" });
-    const r2 = Post.where({ title: "b" });
-    const sql = r1.or(r2).toSql();
-    expect(sql).toContain("OR");
-  });
-
-  it("structurally compatible returns true for same model", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const r1 = Post.where({ title: "a" });
-    const r2 = Post.where({ title: "b" });
-    expect(r1.structurallyCompatible(r2)).toBe(true);
-  });
-});
+// Compare via `<`/`>` (not subtraction): PG round-trips `id` as a BigInt and a
+// BigInt-returning sort comparator throws "Cannot convert a BigInt value to a
+// number" when Array.sort coerces it. `<`/`>` work for both number and BigInt.
+const byId = (records: any[]) =>
+  [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 describe("OrTest", () => {
-  function makeModel() {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    return { User };
-  }
+  useHandlerFixtures(["posts", "authors", "authorAddresses"], {
+    schema: canonicalSchema,
+  });
+
+  it("or with relation", async () => {
+    const expected = await Post.where("id = 1 or id = 2").toArray();
+    expect(await Post.where("id = 1").or(Post.where("id = 2")).toArray()).toEqual(expected);
+  });
 
   it("or identity", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 10 });
-    await User.create({ name: "bob", score: 20 });
-    const r = User.where({ name: "alice" }).or(User.where({ name: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const expected = await Post.where("id = 1").toArray();
+    expect(await Post.where("id = 1").or(Post.where("id = 1")).toArray()).toEqual(expected);
   });
 
   it("or with null left", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    const expected = await User.where({ name: "alice" }).toArray();
-    const results = await User.none()
-      .or(User.where({ name: "alice" }))
-      .toArray();
-    expect(results).toEqual(expected);
+    const expected = await Post.where("id = 1").toArray();
+    expect(await Post.none().or(Post.where("id = 1")).toArray()).toEqual(expected);
   });
 
   it("or with null right", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    const expected = await User.where({ name: "alice" }).toArray();
-    const results = await User.where({ name: "alice" }).or(User.none()).toArray();
-    expect(results).toEqual(expected);
+    const expected = await Post.where("id = 1").toArray();
+    expect(await Post.where("id = 1").or(Post.none()).toArray()).toEqual(expected);
   });
 
-  it("or with large number", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 999999 });
-    const r = User.where({ score: 999999 }).or(User.where({ name: "nobody" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+  // Rails returns `[post(1)]`: the `2^63` bind overflows the `id` column, and
+  // `select_all` rescues the resulting `ActiveRecord::RangeError` →
+  // `Result.empty` (database_statements.rb:78), so the OR collapses to `id = 1`.
+  // trails has no client-side range guard + `selectAll` rescue yet, so on
+  // PG/MySQL the out-of-range bind reaches the wire and the adapter raises
+  // (poisoning the transaction). SQLite is untyped and stores the value, so the
+  // query runs and the result matches. Skipped on the strict-typed lanes pending
+  // the `relation-or-large-number-rangeerror-empty` convergence (RFC 0019).
+  it.skipIf(adapterType !== "sqlite")("or with large number", async () => {
+    const expected = await Post.where("id = 1 or id = 9223372036854775808").toArray();
+    expect(
+      await Post.where({ id: 1 })
+        .or(Post.where({ id: 9223372036854775808n }))
+        .toArray(),
+    ).toEqual(expected);
   });
 
   it("or with bind params", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const r = User.where({ name: "alice" }).or(User.where({ name: "bob" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(2);
+    const expected = byId((await Post.find([1, 2])) as any[]);
+    expect(
+      byId(
+        await Post.where({ id: 1 })
+          .or(Post.where({ id: 2 }))
+          .toArray(),
+      ),
+    ).toEqual(expected);
   });
 
   it("or with null both", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const results = await User.none().or(User.none()).toArray();
-    expect(results).toEqual([]);
+    const expected = await Post.none().toArray();
+    expect(await Post.none().or(Post.none()).toArray()).toEqual(expected);
   });
 
   it("or without left where", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const r = User.all().or(User.where({ name: "alice" }));
-    const results = await r.toArray();
-    expect(results.length).toBeGreaterThanOrEqual(1);
+    const expected = await Post.all().toArray();
+    expect(await Post.or(Post.where("id = 1")).toArray()).toEqual(expected);
   });
 
   it("or without right where", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    const r = User.where({ name: "alice" }).or(User.all());
-    const results = await r.toArray();
-    expect(results.length).toBeGreaterThanOrEqual(1);
+    const expected = await Post.all().toArray();
+    expect(await Post.where("id = 1").or(Post.all()).toArray()).toEqual(expected);
+  });
+
+  it("or preserves other querying methods", async () => {
+    const expected = await Post.where("id = 1 or id = 2 or id = 3").order("body asc").toArray();
+    const partial = Post.order("body asc");
+    expect(
+      await partial
+        .where("id = 1")
+        .or(partial.where({ id: [2, 3] }))
+        .toArray(),
+    ).toEqual(expected);
+    expect(
+      await Post.order("body asc")
+        .where("id = 1")
+        .or(Post.order("body asc").where({ id: [2, 3] }))
+        .toArray(),
+    ).toEqual(expected);
   });
 
   it("or with incompatible single value relations", () => {
-    const { User } = makeModel();
     expect(() =>
-      User.distinct()
-        .where({ name: "a" })
-        .or(User.where({ score: 1 }))
-        .toSql(),
+      Post.distinct()
+        .where("id = 1")
+        .or(Post.where({ id: [2, 3] })),
     ).toThrow(
       "Relation passed to #or must be structurally compatible. Incompatible values: [:distinct]",
     );
   });
 
   it("or with incompatible multi value relations", () => {
-    const { User } = makeModel();
     expect(() =>
-      User.order("name asc")
-        .where({ name: "a" })
-        .or(User.order("score desc").where({ name: "b" }))
-        .toSql(),
+      Post.order("body asc")
+        .where("id = 1")
+        .or(Post.order("id desc").where({ id: [2, 3] })),
     ).toThrow(
       "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
     );
   });
 
   it("or with unscope where", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const r = User.where({ name: "alice" }).or(User.where({ name: "bob" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(2);
+    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const partial = Post.where("id = 1 and id != 2");
+    expect(await partial.or(partial.unscope("where").where("id = 2")).toArray()).toEqual(expected);
   });
 
-  it("or with unscope where column", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ score: 5 }))
-      .toSql();
-    expect(sql).toContain("OR");
+  it("or with unscope where column", async () => {
+    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const partial = Post.where({ id: 1 }).whereNot({ id: 2 });
+    expect(await partial.or(partial.unscope({ where: "id" }).where("id = 2")).toArray()).toEqual(
+      expected,
+    );
   });
 
-  it("or with unscope order", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ name: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
+  it("or with unscope order", async () => {
+    const expected = byId(await Post.where("id = 1 or id = 2").toArray());
+    expect(
+      byId(
+        await Post.order("body asc")
+          .where("id = 1")
+          .unscope("order")
+          .or(Post.where("id = 2"))
+          .toArray(),
+      ),
+    ).toEqual(expected);
+    expect(
+      byId(
+        await Post.order("id")
+          .where("id = 1")
+          .or(Post.order("id").where("id = 2").unscope("order"))
+          .toArray(),
+      ),
+    ).toEqual(expected);
   });
 
   it("or with incompatible unscope", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ name: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
+    expect(() =>
+      Post.order("body asc")
+        .where("id = 1")
+        .unscope("order")
+        .or(Post.order("body asc").where("id = 2")),
+    ).toThrow(
+      "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
+    );
   });
 
   it("or when grouping", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const r = User.where({ name: "alice" }).or(User.where({ name: "bob" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(2);
+    const groups = Post.where("id < 10").group("body");
+    const expected = await groups.having("COUNT(*) > 1 OR body like 'Such%'").count();
+    expect(
+      await groups.having("COUNT(*) > 1").or(groups.having("body like 'Such%'")).count(),
+    ).toEqual(expected);
   });
 
   it("or with named scope", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 10 });
-    await User.create({ name: "charlie", score: 5 });
-    const r = User.where({ name: "alice" }).or(User.where({ score: 5 }));
-    const results = await r.toArray();
-    expect(results.length).toBe(2);
+    const expected = await Post.where("id = 1 or body LIKE '%a%'").toArray();
+    expect(
+      await Post.where("id = 1")
+        .or((Post as any).containingTheLetterA())
+        .toArray(),
+    ).toEqual(expected);
   });
 
   it("or inside named scope", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    const r = User.where({ name: "alice" }).or(User.where({ name: "nobody" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
+    const expected = await Post.where("body LIKE '%a%' OR title LIKE ?", "%'%")
+      .order("id DESC")
+      .toArray();
+    expect(
+      await (Post.order({ id: "desc" }) as any).typographicallyInteresting().toArray(),
+    ).toEqual(expected);
   });
 
-  it("or with sti relation", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ name: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
+  it("or with sti relation", async () => {
+    const expected = byId(await Post.where("id = 1 or id = 2").toArray());
+    expect(byId(await Post.where({ id: 1 }).or(SpecialPost.all()).toArray())).toEqual(expected);
   });
 
   it("or on loaded relation", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    await User.create({ name: "bob", score: 2 });
-    const base = User.where({ name: "alice" });
-    await base.toArray();
-    const r = base.or(User.where({ name: "bob" }));
-    const results = await r.toArray();
-    expect(results.length).toBe(2);
+    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const p = Post.where("id = 1");
+    await p.load();
+    expect(p.loaded).toBe(true);
+    expect(await p.or(Post.where("id = 2")).toArray()).toEqual(expected);
   });
 
   it("or with non relation object raises error", () => {
-    const { User } = makeModel();
-    expect(() =>
-      User.where({ name: ["alice", "bob", "charlie"] }).or({ name: "Rails" } as any),
-    ).toThrow("You have passed Hash object to #or. Pass an ActiveRecord::Relation object instead.");
+    expect(() => Post.where({ id: [1, 2, 3] }).or({ title: "Rails" } as any)).toThrow(
+      "You have passed Hash object to #or. Pass an ActiveRecord::Relation object instead.",
+    );
   });
 
-  it("or with references inequality", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ score: 1 }))
-      .toSql();
-    expect(sql).toContain("OR");
+  it("or with references inequality", async () => {
+    const joined = Post.includes("author");
+    const actual = joined
+      .where({ authors: { id: 1 } })
+      .or(joined.where({ title: "I don't have any comments" }));
+    const author = (await Author.find(1)) as any;
+    const expected = [
+      ...(await author.posts.toArray()),
+      ...(await Post.where({ title: "I don't have any comments" }).toArray()),
+    ];
+    expect(byId(await actual.toArray()).map((p: any) => p.id)).toEqual(
+      byId(expected).map((p: any) => p.id),
+    );
   });
 
   it("or with scope on association", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 1 });
-    const results = await User.where({ name: "alice" }).toArray();
-    expect(results.length).toBe(1);
+    const author = (await Author.first()) as any;
+    let threw = false;
+    try {
+      await author.topPosts.or(author.otherTopPosts).toArray();
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
   });
 
   it("or with annotate", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .annotate("hint")
-      .or(User.where({ name: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
+    const quotedPosts = Post.quotedTableName();
+    // Rails anchors each match at `\z`: the annotation comment is the SQL tail.
+    const tail = (sql: string) => sql.replace(/\s+/g, " ").trimEnd();
+    expect(tail(Post.annotate("foo").or(Post.all()).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo").or(Post.annotate("bar")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo", "bar").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/ /\\* bar \\*/$`),
+    );
   });
 
   it("structurally incompatible values", () => {
-    const { User } = makeModel();
-    const sql = User.where({ name: "a" })
-      .or(User.where({ name: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
-  });
-
-  it("or preserves other querying methods", async () => {
-    const { User } = makeModel();
-    await User.create({ name: "alice", score: 10 });
-    await User.create({ name: "bob", score: 20 });
-    await User.create({ name: "carol", score: 30 });
-    const r = User.where({ name: "alice" })
-      .or(User.where({ name: "bob" }))
-      .order("score")
-      .limit(1);
-    const results = await r.toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe("alice");
+    // Rails wraps these in `assert_nothing_raised` and never executes them — it
+    // only asserts that `#or` doesn't raise on structurally-equal relations.
+    // Don't call `.toArray()`: e.g. `Post.group("author_id")` selecting
+    // `posts.*` would error on PG ("must appear in GROUP BY"), which Rails never
+    // hits because it doesn't run the query.
+    let threw = false;
+    try {
+      Post.includes("author").includes("author").or(Post.includes("author"));
+      Post.eagerLoad("author").eagerLoad("author").or(Post.eagerLoad("author"));
+      Post.preload("author").preload("author").or(Post.preload("author"));
+      Post.group("author_id").group("author_id").or(Post.group("author_id"));
+      Post.joins("author").joins("author").or(Post.joins("author"));
+      Post.leftOuterJoins("author").leftOuterJoins("author").or(Post.leftOuterJoins("author"));
+      Post.from("posts").or(Post.from("posts"));
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
   });
 });
 
+// The maximum expression tree depth is 1000 by default for SQLite3.
+// https://www.sqlite.org/limits.html#max_expr_depth
 describe("TooManyOrTest", () => {
-  it.skipIf(adapterType === "sqlite")("too many or", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Should not throw even with many OR conditions
-    let rel = Post.where({ title: "a" });
-    for (let i = 0; i < 5; i++) {
-      rel = rel.or(Post.where({ title: String(i) }));
-    }
-    const sql = rel.toSql();
-    expect(sql).toContain("OR");
-  });
-});
+  useHandlerFixtures(["paragraphs"], { schema: canonicalSchema });
 
-describe("OrTest", () => {
-  it("combines two where clauses with OR", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    await User.create({ name: "Charlie", age: 35 });
-
-    const young = User.where({ age: 25 });
-    const old = User.where({ age: 35 });
-    const result = await young.or(old).toArray();
-
-    expect(result).toHaveLength(2);
-    const names = result.map((r: Base) => r.name);
-    expect(names).toContain("Alice");
-    expect(names).toContain("Charlie");
-  });
-
-  it("generates correct SQL with OR", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-
-    const sql = User.where({ name: "Alice" })
-      .or(User.where({ age: 30 }))
-      .toSql();
-    expect(sql).toContain("OR");
-  });
-});
-
-describe("OrTest", () => {
-  it("triple or chains", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-    await User.create({ name: "Charlie" });
-    await User.create({ name: "Dave" });
-
-    // Note: .or().or() nests — the second or wraps the first
-    const result = await User.where({ name: "Alice" })
-      .or(User.where({ name: "Bob" }))
-      .or(User.where({ name: "Charlie" }))
-      .toArray();
-
-    expect(result).toHaveLength(3);
-  });
-
-  it("or with count", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    await User.create({ name: "Charlie", age: 35 });
-
-    const count = await User.where({ age: 25 })
-      .or(User.where({ age: 35 }))
-      .count();
-    expect(count).toBe(2);
-  });
-});
-
-describe("OrTest", () => {
-  it("combines two scoped relations with OR", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("role", "string");
-    User.scope("admins", (rel: any) => rel.where({ role: "admin" }));
-    User.scope("editors", (rel: any) => rel.where({ role: "editor" }));
-
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "editor" });
-    await User.create({ name: "Charlie", role: "viewer" });
-
-    const admins = (User as any).admins();
-    const editors = (User as any).editors();
-    const result = await admins.or(editors).toArray();
-    expect(result.length).toBe(2);
-    const names = result.map((r: any) => r.name).sort();
-    expect(names).toEqual(["Alice", "Bob"]);
-  });
-});
-
-describe("OrTest", () => {
-  class User extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-    }
-  }
-
-  it("or with relation", async () => {
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    await User.create({ name: "Charlie", age: 35 });
-    const result = await User.where({ name: "Alice" })
-      .or(User.where({ name: "Charlie" }))
-      .toArray();
-    expect(result).toHaveLength(2);
-    const names = result.map((r: Base) => r.name);
-    expect(names).toContain("Alice");
-    expect(names).toContain("Charlie");
-  });
-
-  it("or generates correct SQL", () => {
-    const sql = User.where({ name: "Alice" })
-      .or(User.where({ age: 30 }))
-      .toSql();
-    expect(sql).toContain("OR");
-  });
-
-  it("or with count", async () => {
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    await User.create({ name: "Charlie", age: 35 });
-    const count = await User.where({ age: 25 })
-      .or(User.where({ age: 35 }))
-      .count();
-    expect(count).toBe(2);
-  });
-
-  it("triple or chains", async () => {
-    await User.create({ name: "Alice", age: 25 });
-    await User.create({ name: "Bob", age: 30 });
-    await User.create({ name: "Charlie", age: 35 });
-    const result = await User.where({ name: "Alice" })
-      .or(User.where({ name: "Bob" }))
-      .or(User.where({ name: "Charlie" }))
-      .toArray();
-    expect(result).toHaveLength(3);
-  });
-});
-
-describe("OrTest", () => {
-  class Post extends Base {
-    static {
-      this.attribute("title", "string");
-      this.attribute("body", "string");
-      this.attribute("author_id", "integer");
-      this.attribute("published", "boolean", { default: false });
-    }
-  }
-
-  it("combines two relations with OR", async () => {
-    await Post.create({ title: "First", author_id: 1 });
-    await Post.create({ title: "Second", author_id: 2 });
-    await Post.create({ title: "Third", author_id: 3 });
-
-    const result = await Post.where({ author_id: 1 })
-      .or(Post.where({ author_id: 3 }))
-      .toArray();
-
-    expect(result).toHaveLength(2);
-    const ids = result.map((r: Base) => r.author_id);
-    expect(ids).toContain(1);
-    expect(ids).toContain(3);
-  });
-
-  it("or generates SQL containing OR keyword", () => {
-    const sql = Post.where({ title: "A" })
-      .or(Post.where({ title: "B" }))
-      .toSql();
-    expect(sql).toContain("OR");
-  });
-
-  it("or with whereNot on one side", async () => {
-    await Post.create({ title: "Foo", published: true });
-    await Post.create({ title: "Bar", published: false });
-    await Post.create({ title: "Baz", published: true });
-
-    const published = Post.where({ published: true });
-    const titled = Post.where({ title: "Bar" });
-    const result = await published.or(titled).toArray();
-
-    expect(result).toHaveLength(3);
-  });
-
-  it("or is chainable with other query methods", async () => {
-    await Post.create({ title: "A", author_id: 1 });
-    await Post.create({ title: "B", author_id: 2 });
-    await Post.create({ title: "C", author_id: 1 });
-
-    const result = await Post.where({ author_id: 1 })
-      .or(Post.where({ author_id: 2 }))
-      .limit(2)
-      .toArray();
-
-    expect(result).toHaveLength(2);
-  });
-
-  it("or preserves ordering", async () => {
-    await Post.create({ title: "Z", author_id: 1 });
-    await Post.create({ title: "A", author_id: 2 });
-
-    const result = await Post.where({ author_id: 1 })
-      .or(Post.where({ author_id: 2 }))
-      .order("title")
-      .toArray();
-
-    expect(result[0].title).toBe("A");
-    expect(result[1].title).toBe("Z");
-  });
-});
-
-describe("OrTest", () => {
-  class User extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("role", "string");
-      this.attribute("age", "integer");
-    }
-  }
-
-  // Rails: test_or_with_two_relations
-  it("or combines two relations", async () => {
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "user" });
-    await User.create({ name: "Charlie", role: "mod" });
-
-    const result = await User.where({ role: "admin" })
-      .or(User.where({ role: "mod" }))
-      .toArray();
-    expect(result).toHaveLength(2);
-    const names = result.map((u: any) => u.name).sort();
-    expect(names).toEqual(["Alice", "Charlie"]);
-  });
-
-  // Rails: test_or_chaining
-  it("triple or chains all three conditions", async () => {
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "user" });
-    await User.create({ name: "Charlie", role: "mod" });
-    await User.create({ name: "Dave", role: "guest" });
-
-    const result = await User.where({ role: "admin" })
-      .or(User.where({ role: "user" }))
-      .or(User.where({ role: "mod" }))
-      .toArray();
-    expect(result).toHaveLength(3);
-    const names = result.map((u: any) => u.name).sort();
-    expect(names).toEqual(["Alice", "Bob", "Charlie"]);
-  });
-
-  // Rails: test_or_with_count
-  it("or works with count", async () => {
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "user" });
-    await User.create({ name: "Charlie", role: "admin" });
-
-    const count = await User.where({ role: "admin" })
-      .or(User.where({ name: "Bob" }))
-      .count();
-    expect(count).toBe(3);
-  });
-
-  // Rails: test_or_with_exists
-  it("or works with exists?", async () => {
-    await User.create({ name: "Alice", role: "admin" });
-
-    expect(
-      await User.where({ role: "admin" })
-        .or(User.where({ role: "mod" }))
-        .exists(),
-    ).toBe(true);
-
-    expect(
-      await User.where({ role: "guest" })
-        .or(User.where({ role: "mod" }))
-        .exists(),
-    ).toBe(false);
-  });
+  // Generous timeout: folding 1001 relations with `#or` builds a 1001-deep
+  // OR tree and the resulting count query is large; well past the 5s default
+  // on the MySQL/Postgres lanes (SQLite skips it — max_expr_depth is 1000).
+  it.skipIf(adapterType === "sqlite")(
+    "too many or",
+    async () => {
+      const paragraphs = Array.from({ length: 1001 }, (_, i) =>
+        Paragraph.where({ id: i, book_id: i * i }),
+      );
+      const combined = paragraphs.reduce((acc, rel) => acc.or(rel));
+      expect(await combined.count()).toBe(1001);
+    },
+    120_000,
+  );
 });

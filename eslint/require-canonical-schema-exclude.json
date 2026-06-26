@@ -38,7 +38,6 @@
   "packages/activerecord/src/relation.test.ts",
   "packages/activerecord/src/relation.trails.test.ts",
   "packages/activerecord/src/relation/delete-all.test.ts",
-  "packages/activerecord/src/relation/or.test.ts",
   "packages/activerecord/src/relation/update-all.test.ts",
   "packages/activerecord/src/relation/where.test.ts",
   "packages/activerecord/src/relations.test.ts",
