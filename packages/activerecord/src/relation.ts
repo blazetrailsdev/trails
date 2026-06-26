@@ -1189,7 +1189,17 @@ export class Relation<T extends Base> {
       );
     }
 
-    const combined = [...recs, ...relations];
+    // Rails `excluding!(records + relations.flat_map(&:ids))`. `Relation#ids`
+    // returns the cached `records.map(&:id)` when the relation is loaded
+    // (calculations.rb:371) and re-queries otherwise. A loaded relation's
+    // records are already in memory, so spread them in to match Rails exactly;
+    // an unloaded relation flows through `excludingBang` as a `NOT IN (subquery)`
+    // since trails' synchronous builder cannot run its id-select here.
+    const combined: unknown[] = [...recs];
+    for (const rel of relations) {
+      if (rel.isLoaded) combined.push(...rel._records);
+      else combined.push(rel);
+    }
     if (combined.length === 0) return this;
     return this._clone().excludingBang(combined);
   }
