@@ -24,11 +24,14 @@ export class Transaction {
    * Mirrors: ActiveRecord::Transaction#after_commit
    */
   afterCommit(fn: () => void | Promise<void>): void | Promise<void> {
-    if (this.isClosed()) {
-      // No open transaction — execute immediately (matches Rails behavior)
+    // Mirrors Rails Transaction#after_commit: only a *null* transaction runs the
+    // block immediately. A non-null but finalized transaction delegates to the
+    // internal transaction, which raises "Cannot register callbacks on a
+    // finalized transaction" — we must not collapse null and finalized together.
+    if (this._internalTransaction == null) {
       return fn();
     }
-    this._internalTransaction!.afterCommit(fn);
+    this._internalTransaction.afterCommit(fn);
   }
 
   /**
@@ -38,8 +41,10 @@ export class Transaction {
    * Mirrors: ActiveRecord::Transaction#after_rollback
    */
   afterRollback(fn: () => void | Promise<void>): void {
-    if (this.isClosed()) return;
-    this._internalTransaction!.afterRollback(fn);
+    // Mirrors Rails Transaction#after_rollback (`@internal_transaction&.after_rollback`):
+    // a null transaction is a no-op; a non-null finalized transaction delegates
+    // and raises via the internal transaction.
+    this._internalTransaction?.afterRollback(fn);
   }
 
   /**
