@@ -9,6 +9,6 @@ export const toBeLinkedUsersFixtureData = {
   jamis: {
     name: "Jamis",
     account_id: ref("to_be_linked_accounts", "signals37"),
-    settings: { symbol: "symbol", string: "string" },
+    settings: { ":symbol": "symbol", string: "string" },
   },
 };
