@@ -6745,15 +6745,50 @@ export class Relation<T extends Base> {
       // projection below replaces the relation's columns instead of being mixed
       // with the eager-load's `comments.*` projection — which Postgres rejects
       // ("column must appear in the GROUP BY clause") and SQLite silently allows.
-      const collection: Relation<T> = this._eagerLoadingForSql()
-        ? this.applyJoinDependencyForArel()
-        : this;
+      // A limit/offset over a collection reflection is materialized to a
+      // `WHERE pk IN (ids)` relation with limit/offset cleared, so the branch
+      // below keys off the RESOLVED relation's limit/offset (Rails'
+      // `collection.has_limit_or_offset?`), not the original's.
+      //
+      // Inlined rather than delegated because `Relation` is thenable: returning
+      // or awaiting a bare relation through an async helper would execute it and
+      // resolve to its records. Here only `_materializeLimitedIds` (an id array)
+      // is awaited; the relation is built with synchronous assignments.
+      let collection: Relation<T> = this;
+      if (this._eagerLoadingForSql()) {
+        const eagerSpecs = [
+          ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+        ];
+        const rel = this._clone();
+        rel._eagerLoadAssociations = [];
+        rel._includesAssociations = [];
+        const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
+        if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+          // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
+          // materialize the limited DISTINCT primary keys, rewrite as
+          // `WHERE pk IN (ids)`, and clear limit/offset.
+          const basePk =
+            (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
+          const jd = new JoinDependency(this._modelClass);
+          this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+          if (jd.nodes.length > 0) {
+            const limitedIds = await this._materializeLimitedIds(jd, basePk as string);
+            collection = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
+            collection._limitValue = null;
+            collection._offsetValue = null;
+          } else {
+            collection = rel.leftOuterJoins(eagerSpecs);
+          }
+        } else {
+          collection = rel.leftOuterJoins(eagerSpecs);
+        }
+      }
       const tsColumn = this.table.get(timestampColumn);
       // Build COUNT(*) and MAX(col) projections via Arel nodes.
       const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const maxNode = tsColumn.maximum();
 
-      if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
+      if (collection._limitValue !== null || (collection._offsetValue ?? 0) > 0) {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
         const inner = collection._clone();
@@ -6766,7 +6801,10 @@ export class Relation<T extends Base> {
           ...(inner._selectColumns ?? []),
           tsColumn.as("collection_cache_key_timestamp"),
         ];
-        if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
+        if (
+          collection._isDistinct &&
+          (!collection._selectColumns || collection._selectColumns.length === 0)
+        ) {
           // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
           // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
           // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
