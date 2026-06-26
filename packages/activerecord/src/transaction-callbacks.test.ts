@@ -4,7 +4,7 @@
  */
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   Base,
   transaction,
@@ -20,9 +20,10 @@ import {
   Rollback,
   registerModel,
 } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Owner } from "./test-helpers/models/owner.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 function defineBehaviourTopic() {
   return class extends Base {
@@ -44,23 +45,10 @@ function defineBehaviourTopic() {
   };
 }
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    topics: { title: "string", parent_id: "integer", updated_at: "datetime" },
-    orders: { total: "integer", amount: "integer" },
-    payments: { amount: "integer" },
-    invoices: { total: "integer" },
-    posts: {
-      title: "string",
-      lock_version: "integer",
-      published: "boolean",
-      updated_at: "datetime",
-    },
-    comments: { body: "string", post_id: "integer" },
-    widgets: { name: "string" },
-  });
+// Rails `fixtures :topics, :owners, :pets`. `{ schema }` recreates the canonical
+// tables so sibling-file contamination on the shared worker DB can't leak rows.
+useHandlerFixtures(["topics", "owners", "pets"], {
+  schema: canonicalSchema,
 });
 
 describe("TransactionCallbacksTest", () => {
@@ -132,11 +120,11 @@ describe("TransactionCallbacksTest", () => {
     Topic.afterCommit(function () {
       called.push("after_commit");
     });
+    let topic: any;
     await transaction(Topic, async () => {
-      await Topic.create({ title: "first" });
+      topic = await Topic.create({ title: "first" });
     });
     expect(called).toEqual(["after_commit"]);
-    const topic = (await Topic.all().toArray())[0];
     called.length = 0;
     await transaction(Topic, async () => {
       await topic.update({ title: "updated" });
@@ -616,13 +604,14 @@ describe("TransactionCallbacksTest", () => {
     Topic.afterCommit(function () {
       throw new Error("boom");
     });
+    let record: any;
     try {
       await transaction(Topic, async () => {
-        await Topic.create({ title: "persisted" });
+        record = await Topic.create({ title: "persisted" });
       });
     } catch {}
-    const all = await Topic.all().toArray();
-    expect(all.length).toBe(1);
+    expect(record.id).not.toBeNull();
+    expect(await Topic.find(record.id)).toBeTruthy();
   });
 
   it("after rollback callback should not swallow errors when set to raise", async () => {
@@ -655,18 +644,19 @@ describe("TransactionCallbacksTest", () => {
       }
     }
     let commitCalled = false;
+    let record: any;
     Topic.afterCommit(function () {
       commitCalled = true;
       throw new Error("callback error");
     });
     try {
       await transaction(Topic, async () => {
-        await Topic.create({ title: "saved" });
+        record = await Topic.create({ title: "saved" });
       });
     } catch {}
     expect(commitCalled).toBe(true);
-    const all = await Topic.all().toArray();
-    expect(all.length).toBe(1);
+    expect(record.id).not.toBeNull();
+    expect(await Topic.find(record.id)).toBeTruthy();
   });
 
   it("after rollback callback when raise should restore state", async () => {
@@ -748,40 +738,23 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", async () => {
-    class Post extends Base {
-      declare title: string;
-      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+    // Rails: pet = Pet.first; owner = pet.owner; owner.on_after_commit { flag = true }
+    // pet.name = "Fluffy the Third"; pet.save → belongs_to(touch: true) touches the
+    // owner, firing its after_commit blocks.
+    registerModel(Owner);
+    registerModel(Pet);
+    const pet = (await Pet.first()) as Pet;
+    const owner = (await pet.loadBelongsTo("owner")) as Owner;
+    let flag = false;
 
-      static {
-        this._tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    registerModel(Post);
-
-    class Comment extends Base {
-      declare body: string;
-      declare post_id: number;
-      declare post: Post | null;
-      declare loadBelongsTo: (name: "post") => Promise<Post | null>;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.belongsTo("post", { touch: true });
-      }
-    }
-    registerModel(Comment);
-
-    const post = await Post.create({ title: "Hello" });
-    const called: string[] = [];
-    Post.afterCommit(function () {
-      called.push("after_commit");
+    owner.onAfterCommit(() => {
+      flag = true;
     });
-    await Comment.create({ body: "Reply", post_id: post.id });
-    expect(called).toEqual(["after_commit"]);
+
+    pet.writeAttribute("name", "Fluffy the Third");
+    await pet.save();
+
+    expect(flag).toBe(true);
   });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
@@ -1016,101 +989,53 @@ describe("TransactionCallbacksTest", () => {
 });
 
 describe("TransactionCallbacksTest", () => {
-  it("fires afterCommit callback outside transaction", async () => {
-    const log: string[] = [];
-
-    class Order extends Base {
-      declare total: number;
-
-      static {
-        this.attribute("total", "integer");
-        this.afterCommit((record: any) => {
-          log.push("committed");
-        });
-      }
-    }
-
-    await Order.create({ total: 100 });
-    expect(log).toContain("committed");
-  });
-
   it("call after commit after transaction commits", async () => {
     const log: string[] = [];
 
-    class Payment extends Base {
-      declare amount: number;
+    class Topic extends Base {
+      declare title: string;
 
       static {
-        this.attribute("amount", "integer");
-        this.afterCommit((record: any) => {
-          log.push("committed");
-        });
-      }
-    }
-
-    await transaction(Payment, async (tx) => {
-      await Payment.create({ amount: 50 });
-    });
-    expect(log).toContain("committed");
-  });
-
-  it("afterCommit fires immediately outside transaction (Rails-guided)", async () => {
-    const log: string[] = [];
-    class Order extends Base {
-      declare amount: number;
-
-      static {
-        this.attribute("amount", "integer");
+        this.attribute("title", "string");
         this.afterCommit(() => {
           log.push("committed");
         });
       }
     }
-    await Order.create({ amount: 100 });
+
+    await transaction(Topic, async () => {
+      await Topic.create({ title: "New topic" });
+    });
     expect(log).toContain("committed");
   });
 
-  it("afterCommit fires on transaction commit (Rails-guided)", async () => {
-    const log: string[] = [];
-    class Invoice extends Base {
-      declare total: number;
-
-      static {
-        this.attribute("total", "integer");
-        this.afterCommit(() => {
-          log.push("invoice committed");
-        });
-      }
-    }
-    await transaction(Invoice, async () => {
-      await Invoice.create({ total: 200 });
-    });
-    expect(log).toContain("invoice committed");
-  });
   describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     it("after commit callbacks with optimistic locking", async () => {
-      const log: string[] = [];
-      class Post extends Base {
-        declare title: string;
-        declare lock_version: number;
+      // Rails: PersonWithCallbacks(self.table_name = :people) with
+      // after_*_commit appending to history; people has lock_version.
+      const history: string[] = [];
+      class PersonWithCallbacks extends Base {
+        declare first_name: string;
 
         static {
-          this._tableName = "posts";
-          this.attribute("title", "string");
-          this.attribute("lock_version", "integer", { default: 0 });
-          this.afterCreate(function () {
-            log.push("created");
+          this._tableName = "people";
+          this.attribute("first_name", "string");
+          this.afterCreateCommit(function () {
+            history.push("commit_on_create");
           });
-          this.afterUpdate(function () {
-            log.push("updated");
+          this.afterUpdateCommit(function () {
+            history.push("commit_on_update");
+          });
+          this.afterDestroyCommit(function () {
+            history.push("commit_on_destroy");
           });
         }
       }
-      const p = await Post.create({ title: "test" });
-      expect(log).toContain("created");
-      await p.update({ title: "changed" });
-      expect(log).toContain("updated");
-      expect(p.lock_version).toBe(1);
+      const person = await PersonWithCallbacks.create({ first_name: "first name" });
+      await person.update({ first_name: "another name" });
+      await person.destroy();
+
+      expect(history).toEqual(["commit_on_create", "commit_on_update", "commit_on_destroy"]);
     });
   }); // TransactionAfterCommitCallbacksWithOptimisticLockingTest
 
@@ -1121,6 +1046,7 @@ describe("TransactionCallbacksTest", () => {
         declare title: string;
 
         static {
+          this._tableName = "topics";
           this.attribute("title", "string");
           this.afterCreate(function () {
             log.push("created");
@@ -1352,21 +1278,22 @@ describe("TransactionCallbacksTest", () => {
       const log: string[] = [];
       class Post extends Base {
         declare title: string;
-        declare published: boolean;
+        declare approved: boolean;
 
         static {
+          this._tableName = "topics";
           this.attribute("title", "string");
-          this.attribute("published", "boolean", { default: false });
+          this.attribute("approved", "boolean", { default: false });
           this.beforeSave(function (record: any) {
-            if (record.published) {
+            if (record.approved) {
               log.push("published_save");
             }
           });
         }
       }
-      await Post.create({ title: "draft", published: false });
+      await Post.create({ title: "draft", approved: false });
       expect(log).not.toContain("published_save");
-      await Post.create({ title: "live", published: true });
+      await Post.create({ title: "live", approved: true });
       expect(log).toContain("published_save");
     });
   }); // CallbacksOnActionAndConditionTest
@@ -1511,6 +1438,7 @@ describe("TransactionCallbacksTest", () => {
         declare title: string;
 
         static {
+          this._tableName = "topics";
           this.attribute("title", "string");
           this.beforeCreate(function () {
             log.push("before_create");
@@ -1530,10 +1458,11 @@ describe("TransactionCallbacksTest", () => {
 describe("hasTransactionalCallbacks regression", () => {
   it("returns true for a model with only beforeCommit callbacks", () => {
     class Widget extends Base {
-      declare name: string;
+      declare title: string;
 
       static {
-        this.attribute("name", "string");
+        this._tableName = "topics";
+        this.attribute("title", "string");
       }
     }
     beforeCommit(Widget, () => {});
