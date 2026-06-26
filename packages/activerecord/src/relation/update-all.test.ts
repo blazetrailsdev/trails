@@ -107,7 +107,7 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all with non standard table name", async () => {
-    expect(await WarehouseThing.where({ id: 1 }).updateAll({ value: 0 })).toBe(1);
+    expect(await WarehouseThing.where({ id: 1 }).updateAll(["value = ?", 0])).toBe(1);
     expect(((await WarehouseThing.find(1)) as any).value).toBe(0);
   });
 
@@ -408,6 +408,8 @@ describe("UpdateAllTest", () => {
     const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
     await pplScope.updateCounters({ touch: { time: now } } as any);
 
+    const updatedAts = await pplScope.pluck("updated_at");
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(now.epochMilliseconds));
     expect(await pplScope.pluck("lock_version")).toEqual(expected);
 
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
