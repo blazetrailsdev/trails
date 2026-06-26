@@ -2,6 +2,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
+import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { registerModel } from "./associations.js";
@@ -183,22 +184,28 @@ describe("CollectionCacheKeyTest", () => {
 
   it("it triggers at most one query", async () => {
     const developers = Developer.where({ name: "David" });
-    const key1 = await developers.cacheKey();
-    const key2 = await developers.cacheKey();
-    expect(key1).toBe(key2);
+
+    await assertQueriesCount(1, false, async () => {
+      await developers.cacheKey();
+    });
+    await assertNoQueries(false, async () => {
+      await developers.cacheKey();
+    });
   });
 
   it("it doesn't trigger any query if the relation is already loaded", async () => {
     const developers = await Developer.where({ name: "David" }).load();
-    const key = await developers.cacheKey();
-    expect(key).toMatch(/^developers\/query-[0-9a-f]+/);
+    await assertNoQueries(false, async () => {
+      await developers.cacheKey();
+    });
   });
 
   it("it doesn't trigger any query if collection_cache_versioning is enabled", async () => {
     await withCollectionCacheVersioning(async () => {
       const developers = Developer.where({ name: "David" });
-      const key = await developers.cacheKey();
-      expect(key).toMatch(/^developers\/query-[0-9a-f]+$/);
+      await assertNoQueries(false, async () => {
+        await developers.cacheKey();
+      });
     });
   });
 
