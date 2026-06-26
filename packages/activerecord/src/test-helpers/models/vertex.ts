@@ -1,7 +1,13 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Edge } from "./edge.js";
 // vendor/rails/activerecord/test/models/vertex.rb
 import { Base } from "../../base.js";
 
 export class Vertex extends Base {
+  declare sinkEdges: AssociationProxy<Edge>;
+  declare sinks: AssociationProxy<Vertex>;
+  declare sources: AssociationProxy<Vertex>;
+
   static {
     // trails' inflector pluralizes "vertex" → "vertexes" (see
     // packages/activesupport/src/inflector.test.ts), but the test schema table is

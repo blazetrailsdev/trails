@@ -48,7 +48,7 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
 
   it("builds the in-memory join row with the base-class owner FK", async () => {
     const post = await SpecialPost.create({ title: "sti", body: "b", type: "SpecialPost" });
-    const people = post.people as {
+    const people = post.people as unknown as {
       build: (a: Record<string, unknown>) => Promise<Person>;
     };
     const person = await people.build({ first_name: "Eve" });
