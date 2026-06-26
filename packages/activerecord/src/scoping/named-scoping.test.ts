@@ -52,7 +52,7 @@ describe("NamedScopingTest", () => {
   it("implements enumerable", async () => {
     expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
     expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
-    expect((await (Topic as any).base().first()).id).toBe(((await Topic.first()) as any).id);
+    expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
   });
 
   it("found items are cached", async () => {
