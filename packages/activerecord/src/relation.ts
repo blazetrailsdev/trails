@@ -4782,7 +4782,7 @@ export class Relation<T extends Base> {
           columns: string[];
         }>;
         const hasUniqueIndex = idxs.some(
-          (idx) => idx.unique && !idx.where && cursorArr.every((c) => idx.columns.includes(c)),
+          (idx) => idx.unique && !idx.where && idx.columns.every((c) => cursorArr.includes(c)),
         );
         if (!hasUniqueIndex) {
           throw new Error(":cursor must include a primary key or other unique column(s)");
