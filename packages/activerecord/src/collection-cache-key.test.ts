@@ -114,7 +114,7 @@ describe("CollectionCacheKeyTest", () => {
   it("cache_key for relation with table alias", async () => {
     const tableAlias = Developer.arelTable.alias("omg_developers");
 
-    let developers = new Relation(Developer, tableAlias as never);
+    let developers = new Relation(Developer, tableAlias);
     developers = developers.where({ salary: 100000 }).order({ updated_at: "desc" });
     const lastDeveloperTimestamp = ((await developers.first()) as Developer)
       .updated_at as Temporal.Instant;
