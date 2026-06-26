@@ -36,7 +36,5 @@
   "packages/activerecord/src/scoping/relation-scoping.test.ts",
   "packages/activerecord/src/serialized-attribute.test.ts",
   "packages/activerecord/src/store.test.ts",
-  "packages/activerecord/src/strict-loading-sync-reader.test.ts",
-  "packages/activerecord/src/strict-loading.test.ts",
   "packages/activerecord/src/timestamp.test.ts"
 ]
