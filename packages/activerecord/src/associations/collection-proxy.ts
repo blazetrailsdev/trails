@@ -2760,8 +2760,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#none?
    */
   // @ts-expect-error Rails Relation#none? fires a query (Enumerable#none?
-  //   via each); our Relation#isNone only checks the NullRelation flag.
-  //   CP must fire a count query to check actual emptiness. Permanent.
+  //   via each); our Relation#isNone only checks the NullRelation flag, so the
+  //   CollectionProxy override widens the param/return to the collection form.
   async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
     if (predicate !== undefined) {
       const records = await this.loadTarget();
@@ -2770,7 +2770,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       return true;
     }
-    return (await this.count()) === 0;
+    // Rails CollectionProxy#none? (no block) is `empty?` — `size.zero?` — so it
+    // honors an active counter cache / loaded target / cached ids exactly like
+    // isEmpty rather than always firing a COUNT.
+    return this.isEmpty();
   }
 
   /**

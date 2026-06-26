@@ -1,1493 +1,817 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Ported from vendor/rails/activerecord/test/cases/counter_cache_test.rb.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { Base, registerModel } from "./index.js";
-import { Associations } from "./associations.js";
-import { Notifications } from "@blazetrails/activesupport";
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { describe, it, expect, beforeEach } from "vitest";
+import { registerModel, registerSubclass } from "./index.js";
+import { association } from "./associations.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Engine } from "./test-helpers/models/engine.js";
+import { Wheel } from "./test-helpers/models/wheel.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { Tyre } from "./test-helpers/models/tyre.js";
+import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
+import { Person } from "./test-helpers/models/person.js";
+import { Dog } from "./test-helpers/models/dog.js";
+import { DogLover } from "./test-helpers/models/dog-lover.js";
+import { Friendship } from "./test-helpers/models/friendship.js";
+import { Subscriber } from "./test-helpers/models/subscriber.js";
+import { Subscription } from "./test-helpers/models/subscription.js";
+import { Book } from "./test-helpers/models/book.js";
+import { Category } from "./test-helpers/models/category.js";
+import { Categorization } from "./test-helpers/models/categorization.js";
+import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 
-const TEST_SCHEMA: Schema = {
-  topics: {
-    title: "string",
-    replies_count: { type: "integer", default: 0 },
-    views_count: { type: "integer", default: 0 },
-    unique_replies_count: { type: "integer", default: 0 },
-    num_replies: { type: "integer", default: 0 },
-    updated_at: "string",
-    written_on: "datetime",
-  },
-  replies: {
-    content: "string",
-    topic_id: "integer",
-  },
-  unique_replies: {
-    content: "string",
-    topic_id: "integer",
-  },
-  containers: {
-    name: "string",
-    items_count: { type: "integer", default: 0 },
-  },
-  items: {
-    name: "string",
-    container_id: "integer",
-  },
-  parents: {
-    name: "string",
-    children_count: { type: "integer", default: 0 },
-  },
-  children: {
-    name: "string",
-    parent_id: "integer",
-  },
-  posts: {
-    title: "string",
-    comments_count: { type: "integer", default: 0 },
-    taggings_count: { type: "integer", default: 0 },
-    tags_count: { type: "integer", default: 0 },
-    writer_id: "integer",
-  },
-  comments: {
-    body: "string",
-    post_id: "integer",
-  },
-  authors: {
-    name: "string",
-    posts_count: { type: "integer", default: 0 },
-    num_books: { type: "integer", default: 0 },
-  },
-  books: {
-    title: "string",
-    author_id: "integer",
-  },
-  cars: {
-    name: "string",
-    num_engines: { type: "integer", default: 0 },
-    engines_count: { type: "integer", default: 0 },
-    person_id: "integer",
-  },
-  engines: {
-    car_id: "integer",
-  },
-  tags: {
-    name: "string",
-  },
-  taggings: {
-    post_id: "integer",
-    tag_id: "integer",
-    taggable_id: "integer",
-    taggable_type: "string",
-  },
-  categories: {
-    name: "string",
-    parent_id: "integer",
-    children_count: { type: "integer", default: 0 },
-  },
-  cpk_orders: {
-    columns: {
-      shop_id: "integer",
-      id: "integer",
-      items_count: { type: "integer", default: 0 },
-      books_count: { type: "integer", default: 0 },
-    },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_books: {
-    columns: { author_id: "integer", id: "integer", shop_id: "integer", order_id: "integer" },
-    primaryKey: ["author_id", "id"],
-  },
-  dog_lovers: {
-    bred_dogs_count: { type: "integer", default: 0 },
-    trained_dogs_count: { type: "integer", default: 0 },
-  },
-  dogs: { trainer_id: "integer", breeder_id: "integer" },
-  subscribers: { name: "string", books_count: { type: "integer", default: 0 } },
-  subscriptions: { subscriber_id: "integer", book_id: "integer" },
-  friend_people: {
-    name: "string",
-    friends_too_count: { type: "integer", default: 0 },
-  },
-  friendships: {
-    friend_id: "integer",
-  },
-  people: {
-    name: "string",
-    cars_count: { type: "integer", default: 0 },
-  },
-};
+// Register the canonical models used directly and via through/dependent
+// associations so the reflection registry can resolve them by class name.
+for (const model of [
+  Topic,
+  Reply,
+  UniqueReply,
+  SillyUniqueReply,
+  SillyReply,
+  Car,
+  Engine,
+  Wheel,
+  Aircraft,
+  Tyre,
+  Bulb,
+  CustomBulb,
+  FunkyBulb,
+  FailedBulb,
+  Person,
+  Dog,
+  DogLover,
+  Friendship,
+  Subscriber,
+  Subscription,
+  Book,
+  Category,
+  Categorization,
+  CpkOrder,
+  CpkBook,
+]) {
+  registerModel(model);
+}
 
-// -- Helpers --
-// ==========================================================================
-// CounterCacheTest — targets counter_cache_test.rb
-// ==========================================================================
+// Rails defines these as ::SpecialTopic < ::Topic and ::SpecialReply < ::Reply
+// inside CounterCacheTest. They share the STI `topics` table.
+export class SpecialTopic extends Topic {
+  static {
+    this.hasMany("specialReplies", { className: "SpecialReply", foreignKey: "parent_id" });
+    this.hasMany("lightweightSpecialReplies", {
+      scope: (q: any) => q.select("topics.id", "topics.title"),
+      className: "SpecialReply",
+      foreignKey: "parent_id",
+    });
+  }
+}
+
+export class SpecialReply extends Reply {
+  static {
+    this.belongsTo("specialTopic", {
+      foreignKey: "parent_id",
+      counterCache: "replies_count",
+    });
+  }
+}
+
+for (const klass of [SpecialTopic, SpecialReply]) {
+  registerSubclass(klass);
+  registerModel(klass);
+}
+
+function epochMs(v: unknown): number {
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime) {
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  }
+  return Number(new Date(String(v)));
+}
+
+/** Mirrors Rails' minitest `assert_difference`. */
+async function assertDifference(
+  reads: Array<() => Promise<number>>,
+  delta: number,
+  block: () => Promise<void>,
+): Promise<void> {
+  const before = await Promise.all(reads.map((r) => r()));
+  await block();
+  const after = await Promise.all(reads.map((r) => r()));
+  after.forEach((a, i) => expect(a - before[i]).toBe(delta));
+}
+
+/** Mirrors the private `assert_touching` helper in counter_cache_test.rb. */
+async function assertTouching(
+  record: any,
+  attributes: string[],
+  block: () => Promise<void>,
+): Promise<void> {
+  const fiveMinutesAgo = Temporal.Now.instant().subtract({ hours: 0, minutes: 5 });
+  const stale: Record<string, unknown> = {};
+  for (const attr of attributes) stale[attr] = fiveMinutesAgo;
+  await record.updateColumns(stale);
+  const touchTimes: Record<string, number> = {};
+  for (const attr of attributes) touchTimes[attr] = epochMs(record[attr]);
+
+  await block();
+
+  await record.reload();
+  for (const attr of attributes) {
+    expect(epochMs(record[attr])).toBeGreaterThan(touchTimes[attr]);
+  }
+}
+
+const { topics, categories, cars, dogLovers, people, subscribers } = useHandlerFixtures(
+  [
+    "topics",
+    "categories",
+    "categorizations",
+    "cars",
+    "dogs",
+    "dogLovers",
+    "people",
+    "friendships",
+    "subscribers",
+    "subscriptions",
+    "books",
+    "cpkOrders",
+    "cpkBooks",
+  ],
+  { schema: canonicalSchema },
+);
+
 describe("CounterCacheTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
-  it("counters are updated both in memory and in the database on create", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    registerModel(Topic);
-    registerModel(Reply);
+  let topic: Topic;
 
-    const topic = await Topic.create({ title: "Hello" });
-    await Reply.create({ content: "World", topic_id: topic.id });
-
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBe(1);
+  beforeEach(async () => {
+    topic = await Topic.find(1);
   });
 
-  // Rails: test_removing_association_updates_counter
-  it("removing association updates counter", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    registerModel(Topic);
-    registerModel(Reply);
+  const reloadRepliesCount = async () => {
+    await topic.reload();
+    return topic.replies_count as number;
+  };
+  const reloadUniqueRepliesCount = async () => {
+    await topic.reload();
+    return topic.unique_replies_count as number;
+  };
 
-    const topic = await Topic.create({ title: "Hi" });
-    const reply = await Reply.create({ content: "Yo", topic_id: topic.id });
-
-    const after = await Topic.find(topic.id);
-    expect(after.replies_count).toBe(1);
-
-    await reply.destroy();
-    const after2 = await Topic.find(topic.id);
-    expect(after2.replies_count).toBe(0);
-  });
-
-  // Rails: test_update_counter_with_initial_null_value
-  it("update counter with initial null value", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer");
-      }
-    }
-    const topic = await Topic.create({ title: "Test" });
-    await Topic.incrementCounter("replies_count", topic.id);
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBeGreaterThanOrEqual(1);
-  });
-
-  // Rails: test_increment_counter
   it("increment counter", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views_count", "integer", { default: 0 });
-      }
-    }
-    const topic = await Topic.create({ title: "Test" });
-    await Topic.incrementCounter("views_count", topic.id);
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.views_count).toBe(1);
-  });
-
-  // Rails: test_decrement_counter
-  it("decrement counter", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    // Rails decrements replies_count on a fixture topic; seed a starting count
-    // via updateCounters (a direct UPDATE, so it is unaffected by partial
-    // inserts) and assert the -1 difference.
-    const topic = await Topic.create({ title: "Test" });
-    await Topic.updateCounters(topic.id, { replies_count: 5 });
-    await Topic.decrementCounter("replies_count", topic.id);
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBe(4);
-  });
-
-  // Rails: test_decrement_counter_by_specific_amount
-  it("decrement counter by specific amount", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    const topic = await Topic.create({ title: "Test" });
-    await Topic.updateCounters(topic.id, { replies_count: 10 });
-    await Topic.decrementCounter("replies_count", topic.id, 2);
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBe(8);
-  });
-
-  // Rails: test_update_other_counters_on_parent_destroy
-  it("update other counters on parent destroy", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    registerModel(Topic);
-    registerModel(Reply);
-
-    const topic = await Topic.create({ title: "Parent" });
-    await Reply.create({ content: "Child", topic_id: topic.id });
-
-    const after = await Topic.find(topic.id);
-    expect(after.replies_count).toBe(1);
-  });
-
-  // Rails: test_update_counters_in_a_polymorphic_relationship
-  it("update counters in a polymorphic relationship", async () => {
-    class Container extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("items_count", "integer", { default: 0 });
-      }
-    }
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("container_id", "integer");
-        this.belongsTo("container", { counterCache: true });
-      }
-    }
-    registerModel(Container);
-    registerModel(Item);
-
-    const container = await Container.create({ name: "Box" });
-    await Item.create({ name: "Widget", container_id: container.id });
-
-    const reloaded = await Container.find(container.id);
-    expect(reloaded.items_count).toBe(1);
-  });
-
-  // Rails: test_counter_caches_are_updated_in_memory_when_the_default_value_is_nil
-  it("counter caches are updated in memory when the default value is nil", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    registerModel(Topic);
-    registerModel(Reply);
-
-    const topic = await Topic.create({ title: "Test" });
-    await Reply.create({ content: "Hi", topic_id: topic.id });
-
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBeGreaterThanOrEqual(1);
-  });
-
-  // Rails: test_update_counters_doesnt_touch_timestamps_by_default
-  it("update counters doesn't touch timestamps by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views_count", "integer", { default: 0 });
-        this.attribute("updated_at", "string");
-      }
-    }
-    const topic = await Topic.create({ title: "Test", updated_at: "2020-01-01" });
-    const before = topic.updated_at;
-    await Topic.updateCounters(topic.id, { views_count: 1 });
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.updated_at).toBe(before);
-  });
-
-  // Rails: test_active_counter_cache
-  it("active counter cache", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    registerModel(Topic);
-    registerModel(Reply);
-
-    const topic = await Topic.create({ title: "Active" });
-    expect(topic.replies_count).toBe(0);
-    await Reply.create({ content: "Reply1", topic_id: topic.id });
-    const reloaded = await Topic.find(topic.id);
-    expect(reloaded.replies_count).toBe(1);
-  });
-
-  // Rails: test_inactive_counter_cache
-  it("inactive counter cache", async () => {
-    class Parent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("children_count", "integer", { default: 0 });
-      }
-    }
-    class Child extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("parent_id", "integer");
-        this.belongsTo("parent", {});
-      }
-    }
-    // No counterCache — inactive
-    registerModel(Parent);
-    registerModel(Child);
-
-    const parent = await Parent.create({ name: "P" });
-    await Child.create({ name: "C", parent_id: parent.id });
-
-    const reloaded = await Parent.find(parent.id);
-    // No counter cache means count stays at 0
-    expect(reloaded.children_count).toBe(0);
-  });
-});
-
-describe("CounterCacheTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  afterEach(() => {
-    Notifications.unsubscribeAll();
-  });
-
-  // Rails: test_reset_counters
-  it("reset counters", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const topic = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: topic.id });
-    await Topic.incrementCounter("replies_count", topic.id);
-    const before = await Topic.find(topic.id);
-    expect(before.replies_count).toBe(2);
-    await Topic.resetCounters(topic.id, "replies");
-    const after = await Topic.find(topic.id);
-    expect(after.replies_count).toBe(1);
+    await assertDifference([reloadRepliesCount], 1, async () => {
+      await Topic.incrementCounter("replies_count", topic.id);
+    });
   });
 
   it("increment counter by specific amount", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.incrementCounter("replies_count", t.id, 10);
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(10);
+    await assertDifference([reloadRepliesCount], 2, async () => {
+      await Topic.incrementCounter("replies_count", topic.id, 2);
+    });
   });
+
   it("increment counter for cpk model", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 0 });
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
-    await CpkOrder.incrementCounter("items_count", [1, 1]);
-    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(reloaded.items_count).toBe(1);
-  });
-  it("increment counter for multiple cpk model records", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("items_count", "integer", { default: 0 });
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    const o1 = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
-    const o2 = await CpkOrder.create({ shop_id: 1, id: 2, items_count: 0 });
-    await CpkOrder.updateCounters(
+    const order = (await CpkOrder.first()) as CpkOrder;
+    await assertDifference(
       [
-        [1, 1],
-        [1, 2],
+        async () => {
+          await order.reload();
+          return order.books_count as number;
+        },
       ],
-      { items_count: 5 },
+      1,
+      async () => {
+        await CpkOrder.incrementCounter("books_count", order.id);
+      },
     );
-    const r1 = (await CpkOrder.find([1, 1])) as CpkOrder;
-    const r2 = (await CpkOrder.find([1, 2])) as CpkOrder;
-    expect(r1.items_count).toBe(5);
-    expect(r2.items_count).toBe(5);
   });
+
+  it("increment counter for multiple cpk model records", async () => {
+    const [order1, order2] = await CpkOrder.first(2);
+    await assertDifference(
+      [
+        async () => {
+          await order1.reload();
+          return order1.books_count as number;
+        },
+        async () => {
+          await order2.reload();
+          return order2.books_count as number;
+        },
+      ],
+      1,
+      async () => {
+        await CpkOrder.incrementCounter("books_count", [order1.id, order2.id]);
+      },
+    );
+  });
+
+  it("decrement counter", async () => {
+    await assertDifference([reloadRepliesCount], -1, async () => {
+      await Topic.decrementCounter("replies_count", topic.id);
+    });
+  });
+
+  it("decrement counter by specific amount", async () => {
+    await assertDifference([reloadRepliesCount], -2, async () => {
+      await Topic.decrementCounter("replies_count", topic.id, 2);
+    });
+  });
+
   it("decrement counter for cpk model", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("books_count", "integer", { default: 0 });
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    await CpkOrder.create({ shop_id: 1, id: 1 });
-    await CpkOrder.updateCounters([1, 1], { books_count: 4 });
-    await CpkOrder.decrementCounter("books_count", [1, 1]);
-    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(reloaded.books_count).toBe(3);
+    const order = (await CpkOrder.first()) as CpkOrder;
+    await assertDifference(
+      [
+        async () => {
+          await order.reload();
+          return order.books_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await CpkOrder.decrementCounter("books_count", order.id);
+      },
+    );
   });
+
+  it("reset counters", async () => {
+    // throw the count off by 1
+    await Topic.incrementCounter("replies_count", topic.id);
+
+    // check that it gets reset
+    await assertDifference([reloadRepliesCount], -1, async () => {
+      await Topic.resetCounters(topic.id, "replies");
+    });
+  });
+
   it("reset counters by counter name", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.incrementCounter("replies_count", t.id);
-    const before = await Topic.find(t.id);
-    expect(before.replies_count).toBe(2);
-    await Topic.resetCounters(t.id, "replies_count");
-    const after = await Topic.find(t.id);
-    expect(after.replies_count).toBe(1);
+    // throw the count off by 1
+    await Topic.incrementCounter("replies_count", topic.id);
+
+    // check that it gets reset
+    await assertDifference([reloadRepliesCount], -1, async () => {
+      await Topic.resetCounters(topic.id, "replies_count");
+    });
   });
 
   it("reset multiple counters", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    class UniqueReply extends Base {
-      static {
-        this._tableName = "unique_replies";
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    Associations.hasMany.call(Topic, "unique_replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    registerModel(UniqueReply);
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 1, unique_replies_count: 1 });
-    const before = await Topic.find(t.id);
-    expect(before.replies_count).toBe(1);
-    expect(before.unique_replies_count).toBe(1);
-    await Topic.resetCounters(t.id, "replies", "unique_replies");
-    const after = await Topic.find(t.id);
-    expect(after.replies_count).toBe(0);
-    expect(after.unique_replies_count).toBe(0);
+    await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
+    await assertDifference([reloadRepliesCount, reloadUniqueRepliesCount], -1, async () => {
+      await Topic.resetCounters(topic.id, "replies", "uniqueReplies");
+    });
   });
 
   it("reset counters with string argument", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.incrementCounter("replies_count", t.id);
-    await Topic.resetCounters(t.id, "replies");
-    const after = await Topic.find(t.id);
-    expect(after.replies_count).toBe(1);
+    await Topic.incrementCounter("replies_count", topic.id);
+
+    await assertDifference([reloadRepliesCount], -1, async () => {
+      await Topic.resetCounters(topic.id, "replies");
+    });
   });
+
   it("reset counters with modularized and camelized classnames", async () => {
-    class SpecialTopic extends Base {
-      static {
-        this._tableName = "topics";
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class SpecialReply extends Base {
-      static {
-        this._tableName = "replies";
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.hasMany.call(SpecialTopic, "special_replies", {
-      className: "SpecialReply",
-      foreignKey: "topic_id",
-    });
-    Associations.belongsTo.call(SpecialReply, "specialTopic", {
-      className: "SpecialTopic",
-      foreignKey: "topic_id",
-      counterCache: "replies_count",
-    });
-    registerModel(SpecialTopic);
-    registerModel(SpecialReply);
     const special = await SpecialTopic.create({ title: "Special" });
-    await SpecialReply.create({ content: "r1", topic_id: special.id });
     await SpecialTopic.incrementCounter("replies_count", special.id);
-    await SpecialTopic.resetCounters(special.id, "special_replies");
-    expect((await SpecialTopic.find(special.id)).replies_count).toBe(1);
+
+    await assertDifference(
+      [
+        async () => {
+          await special.reload();
+          return special.replies_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await SpecialTopic.resetCounters(special.id, "specialReplies");
+      },
+    );
   });
+
   it("reset counter with belongs_to which has class_name", async () => {
-    // Rails: Engine `belongs_to :my_car, class_name: "Car", counter_cache: :engines_count`.
-    // The belongs_to *name* differs from the parent class name; resolution must
-    // walk `options.className` rather than `camelize(name)`.
-    class Car extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("engines_count", "integer", { default: 0 });
-      }
+    const car = cars("honda");
+    let error: unknown;
+    try {
+      await Car.resetCounters(car.id, "engines");
+    } catch (e) {
+      error = e;
     }
-    class Engine extends Base {
-      static {
-        this.attribute("car_id", "integer");
-      }
+    expect(error).toBeUndefined();
+    try {
+      await Car.resetCounters(car.id, "wheels");
+    } catch (e) {
+      error = e;
     }
-    Associations.belongsTo.call(Engine, "myCar", {
-      className: "Car",
-      foreignKey: "car_id",
-      counterCache: "engines_count",
-    });
-    Associations.hasMany.call(Car, "engines", { foreignKey: "car_id" });
-    registerModel(Car);
-    registerModel(Engine);
-    const car = await Car.create({ name: "Honda" });
-    await Engine.create({ car_id: car.id });
-    await Car.incrementCounter("engines_count", car.id);
-    const before = await Car.find(car.id);
-    expect(before.engines_count).toBe(2);
-    await Car.resetCounters(car.id, "engines");
-    const after = await Car.find(car.id);
-    expect(after.engines_count).toBe(1);
+    expect(error).toBeUndefined();
   });
+
   it("reset the right counter if two have the same class_name", async () => {
-    class DogLover extends Base {
-      static {
-        this.attribute("bred_dogs_count", "integer", { default: 0 });
-        this.attribute("trained_dogs_count", "integer", { default: 0 });
-        this.hasMany("bred_dogs", {
-          className: "Dog",
-          foreignKey: "breeder_id",
-        });
-        this.hasMany("trained_dogs", {
-          className: "Dog",
-          foreignKey: "trainer_id",
-        });
-      }
-    }
-    class Dog extends Base {
-      static {
-        this.attribute("breeder_id", "integer");
-        this.attribute("trainer_id", "integer");
-        this.belongsTo("breeder", {
-          className: "DogLover",
-          foreignKey: "breeder_id",
-          counterCache: "bred_dogs_count",
-        });
-        this.belongsTo("trainer", {
-          className: "DogLover",
-          foreignKey: "trainer_id",
-          counterCache: "trained_dogs_count",
-        });
-      }
-    }
-    registerModel(DogLover);
-    registerModel(Dog);
-    const david = await DogLover.create({});
-    await Dog.create({ breeder_id: david.id, trainer_id: david.id });
+    const david = dogLovers("david");
+
     await DogLover.incrementCounter("bred_dogs_count", david.id);
     await DogLover.incrementCounter("trained_dogs_count", david.id);
 
-    await DogLover.resetCounters(david.id, "bred_dogs");
-    const afterBred = await DogLover.find(david.id);
-    expect(afterBred.bred_dogs_count).toBe(1);
-    expect(afterBred.trained_dogs_count).toBe(2); // untouched
+    await assertDifference(
+      [
+        async () => {
+          await david.reload();
+          return david.bred_dogs_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await DogLover.resetCounters(david.id, "bredDogs");
+      },
+    );
+    await assertDifference(
+      [
+        async () => {
+          await david.reload();
+          return david.trained_dogs_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await DogLover.resetCounters(david.id, "trainedDogs");
+      },
+    );
+  });
 
-    await DogLover.resetCounters(david.id, "trained_dogs");
-    expect((await DogLover.find(david.id)).trained_dogs_count).toBe(1);
-  });
   it("reset counter skips query for correct counter", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "first" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    // First reset brings the counter into agreement.
-    await Topic.resetCounters(t.id, "replies");
-    let updateCount = 0;
-    const sub = Notifications.subscribe("sql.active_record", (evt: any) => {
-      const sql = evt.payload?.sql?.trim().toUpperCase() ?? "";
-      if (sql.startsWith("UPDATE")) updateCount++;
+    await Topic.resetCounters(topic.id, "replies_count");
+
+    // SELECT "topics".* FROM "topics" WHERE "topics"."id" = ? LIMIT ?
+    // SELECT COUNT(*) FROM "topics" WHERE "topics"."type" IN (?, ?, ?, ?, ?) AND "topics"."parent_id" = ?
+    await assertQueriesCount(2, false, async () => {
+      await Topic.resetCounters(topic.id, "replies_count");
     });
-    try {
-      await Topic.resetCounters(t.id, "replies");
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(updateCount).toBe(0);
   });
+
   it("reset counter performs query for correct counter with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "first" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    // First reset brings the counter into agreement.
-    await Topic.resetCounters(t.id, "replies");
-    let updateCount = 0;
-    const sub = Notifications.subscribe("sql.active_record", (evt: any) => {
-      const sql = evt.payload?.sql?.trim().toUpperCase() ?? "";
-      if (sql.startsWith("UPDATE")) updateCount++;
+    await Topic.resetCounters(topic.id, "replies_count");
+
+    // SELECT "topics".* FROM "topics" WHERE "topics"."id" = ? LIMIT ?
+    // SELECT COUNT(*) FROM "topics" WHERE "topics"."type" IN (?, ?, ?, ?, ?) AND "topics"."parent_id" = ?
+    // UPDATE "topics" SET "updated_at" = ? WHERE "topics"."id" = ?
+    await assertQueriesCount(3, false, async () => {
+      await Topic.resetCounters(topic.id, "replies_count", { touch: true });
     });
-    try {
-      // touch: true forces the UPDATE even when the count matches, because the
-      // timestamp columns are part of the SET clause.
-      await Topic.resetCounters(t.id, "replies", { touch: true });
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(updateCount).toBe(1);
   });
+
   it("reset counters for cpk model", async () => {
-    class Order extends Base {
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("books_count", "integer", { default: 0 });
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class Book extends Base {
-      static {
-        this._tableName = "cpk_books";
-        this.attribute("author_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.primaryKey = ["author_id", "id"];
-      }
-    }
-    Associations.hasMany.call(Order, "books", {
-      className: "Book",
-      foreignKey: ["shop_id", "order_id"],
-    });
-    Associations.belongsTo.call(Book, "order", {
-      className: "Order",
-      foreignKey: ["shop_id", "order_id"],
-      primaryKey: ["shop_id", "id"],
-      counterCache: true,
-    });
-    registerModel(Order);
-    registerModel(Book);
-    const order = await Order.create({ shop_id: 1, id: 1 });
-    await Book.create({ author_id: 1, id: 1, shop_id: 1, order_id: 1 });
-    await Order.updateCounters(order.id, { books_count: 2 }); // throw it off
-    await Order.resetCounters(order.id, "books");
-    expect(((await Order.find([1, 1])) as any).books_count).toBe(1);
+    const order = (await CpkOrder.first()) as CpkOrder;
+    // throw the count off by 1
+    await CpkOrder.incrementCounter("books_count", order.id);
+
+    // check that it gets reset
+    await assertDifference(
+      [
+        async () => {
+          await order.reload();
+          return order.books_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await CpkOrder.resetCounters(order.id, "books");
+      },
+    );
   });
+
+  it("update counter with initial null value", async () => {
+    const category = categories("general");
+    expect(await (category as any).categorizations.count()).toBe(2);
+    expect((category as any).categorizations_count).toBeNull();
+
+    await Category.updateCounters(category.id, {
+      categorizations_count: await (category as any).categorizations.count(),
+    });
+    await category.reload();
+    expect((category as any).categorizations_count).toBe(2);
+  });
+
   it("update counter for decrement", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 10 });
-    await Topic.updateCounters(t.id, { replies_count: -3 });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(7);
+    await assertDifference([reloadRepliesCount], -3, async () => {
+      await Topic.updateCounters(topic.id, { replies_count: -3 });
+    });
   });
+
   it("update counters of multiple records", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    const t1 = await Topic.create({ title: "one" });
-    const t2 = await Topic.create({ title: "two" });
-    await Topic.updateCounters([t1.id, t2.id], { replies_count: 3 });
-    const r1 = await Topic.find(t1.id);
-    const r2 = await Topic.find(t2.id);
-    expect(r1.replies_count).toBe(3);
-    expect(r2.replies_count).toBe(3);
+    const t1 = topics("first");
+    const t2 = topics("second");
+
+    await assertDifference(
+      [
+        async () => {
+          await t1.reload();
+          return t1.replies_count as number;
+        },
+        async () => {
+          await t2.reload();
+          return t2.replies_count as number;
+        },
+      ],
+      2,
+      async () => {
+        await Topic.updateCounters([t1.id, t2.id], { replies_count: 2 });
+      },
+    );
   });
+
   it("update multiple counters", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("views_count", "integer", { default: 0 });
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 1, views_count: 10 });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.views_count).toBe(10);
+    await assertDifference([reloadRepliesCount, reloadUniqueRepliesCount], 2, async () => {
+      await Topic.updateCounters(topic.id, { replies_count: 2, unique_replies_count: 2 });
+    });
   });
+
   it("update counter for decrement for cpk model", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("books_count", "integer", { default: 0 });
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    await CpkOrder.create({ shop_id: 1, id: 1 });
-    await CpkOrder.updateCounters([1, 1], { books_count: 10 });
-    await CpkOrder.updateCounters([1, 1], { books_count: -3 });
-    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(reloaded.books_count).toBe(7);
+    const order = (await CpkOrder.first()) as CpkOrder;
+    await assertDifference(
+      [
+        async () => {
+          await order.reload();
+          return order.books_count as number;
+        },
+      ],
+      -3,
+      async () => {
+        await CpkOrder.updateCounters(order.id, { books_count: -3 });
+      },
+    );
   });
+
+  it("update other counters on parent destroy", async () => {
+    const david = dogLovers("david");
+    const joanna = dogLovers("joanna");
+
+    await assertDifference(
+      [
+        async () => {
+          await joanna.reload();
+          return joanna.dogs_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await david.destroy();
+      },
+    );
+  });
+
   it("reset the right counter if two have the same foreign key", async () => {
-    // Rails: Friendship has both `belongs_to :friend` (no counter_cache) and
-    // `belongs_to :friend_too` (counter_cache: :friends_too_count), sharing
-    // `friend_id`. Resetting `:friends_too` on Person must find the belongs_to
-    // that actually carries `counter_cache:` (the second one), not just any
-    // belongs_to whose className matches the parent.
-    class FriendPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("friends_too_count", "integer", { default: 0 });
-        this.hasMany("friends_too", {
-          className: "Friendship",
-          foreignKey: "friend_id",
-        });
-      }
+    const michael = people("michael");
+    let error: unknown;
+    try {
+      await Person.resetCounters(michael.id, "friendsToo");
+    } catch (e) {
+      error = e;
     }
-    class Friendship extends Base {
-      static {
-        this.attribute("friend_id", "integer");
-        this.belongsTo("friend", {
-          className: "FriendPerson",
-          foreignKey: "friend_id",
-        });
-        this.belongsTo("friendToo", {
-          className: "FriendPerson",
-          foreignKey: "friend_id",
-          counterCache: "friends_too_count",
-        });
-      }
-    }
-    registerModel(FriendPerson);
-    registerModel(Friendship);
-    const michael = await FriendPerson.create({ name: "Michael" });
-    await Friendship.create({ friend_id: michael.id });
-    await FriendPerson.incrementCounter("friends_too_count", michael.id);
-    const before = await FriendPerson.find(michael.id);
-    expect(before.friends_too_count).toBe(2);
-    await FriendPerson.resetCounters(michael.id, "friends_too");
-    const after = await FriendPerson.find(michael.id);
-    expect(after.friends_too_count).toBe(1);
+    expect(error).toBeUndefined();
   });
+
   it("reset counter of has_many :through association", async () => {
-    class Subscriber extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("books_count", "integer", { default: 0 });
-        this.hasMany("subscriptions", { foreignKey: "subscriber_id" });
-        this.hasMany("books", {
-          through: "subscriptions",
-          source: "book",
-          className: "Book",
-        });
-      }
-    }
-    class Subscription extends Base {
-      static {
-        this.attribute("subscriber_id", "integer");
-        this.attribute("book_id", "integer");
-        this.belongsTo("subscriber", {
-          foreignKey: "subscriber_id",
-          counterCache: "books_count",
-        });
-        this.belongsTo("book", { foreignKey: "book_id" });
-      }
-    }
-    class Book extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel(Subscriber);
-    registerModel(Subscription);
-    registerModel(Book);
-    const subscriber = await Subscriber.create({ name: "second" });
-    const book = await Book.create({ title: "Awakening" });
-    await Subscription.create({ subscriber_id: subscriber.id, book_id: book.id });
+    const subscriber = subscribers("second");
     await Subscriber.resetCounters(subscriber.id, "books");
     await Subscriber.incrementCounter("books_count", subscriber.id);
-    expect((await Subscriber.find(subscriber.id)).books_count).toBe(2);
-    await Subscriber.resetCounters(subscriber.id, "books");
-    expect((await Subscriber.find(subscriber.id)).books_count).toBe(1);
+
+    await assertDifference(
+      [
+        async () => {
+          await subscriber.reload();
+          return subscriber.books_count;
+        },
+      ],
+      -1,
+      async () => {
+        await Subscriber.resetCounters(subscriber.id, "books");
+      },
+    );
   });
+
   it("the passed symbol needs to be an association name or counter name", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
+    let message = "";
+    try {
+      await Topic.resetCounters(topic.id, "undefined_count");
+    } catch (e) {
+      message = (e as Error).message;
     }
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    const t = await Topic.create({ title: "test" });
-    await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow(/nonexistent/);
+    expect(message).toBe("'Topic' has no association called 'undefined_count'");
   });
+
   it("reset counter works with select declared on association", async () => {
-    class SpecialTopic extends Base {
-      static {
-        this._tableName = "topics";
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    class SpecialReply extends Base {
-      static {
-        this._tableName = "replies";
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.hasMany.call(SpecialTopic, "lightweight_special_replies", {
-      className: "SpecialReply",
-      foreignKey: "topic_id",
-      scope: (rel: any) => rel.select("replies.id", "replies.content"),
-    });
-    Associations.belongsTo.call(SpecialReply, "specialTopic", {
-      className: "SpecialTopic",
-      foreignKey: "topic_id",
-      counterCache: "replies_count",
-    });
-    registerModel(SpecialTopic);
-    registerModel(SpecialReply);
     const special = await SpecialTopic.create({ title: "Special" });
-    await SpecialReply.create({ content: "r1", topic_id: special.id });
     await SpecialTopic.incrementCounter("replies_count", special.id);
-    await SpecialTopic.resetCounters(special.id, "lightweight_special_replies");
-    expect((await SpecialTopic.find(special.id)).replies_count).toBe(1);
+
+    await assertDifference(
+      [
+        async () => {
+          await special.reload();
+          return special.replies_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await SpecialTopic.resetCounters(special.id, "lightweightSpecialReplies");
+      },
+    );
   });
+
+  it("counters are updated both in memory and in the database on create", async () => {
+    const car = new Car({ engines_count: 0 });
+    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.save();
+
+    expect(car.engines_count).toBe(2);
+    await car.reload();
+    expect(car.engines_count).toBe(2);
+  });
+
+  it("counter caches are updated in memory when the default value is nil", async () => {
+    const car = new Car({ engines_count: null });
+    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.save();
+
+    expect(car.engines_count).toBe(2);
+    await car.reload();
+    expect(car.engines_count).toBe(2);
+  });
+
+  it("update counters in a polymorphic relationship", async () => {
+    const aircraft = await Aircraft.create();
+
+    await assertDifference(
+      [
+        async () => {
+          await aircraft.reload();
+          return aircraft.wheels_count as number;
+        },
+      ],
+      1,
+      async () => {
+        await (aircraft as any).wheels.push(await Wheel.create());
+      },
+    );
+
+    await assertDifference(
+      [
+        async () => {
+          await aircraft.reload();
+          return aircraft.wheels_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        const first = await (aircraft as any).wheels.first();
+        await first.destroy();
+      },
+    );
+  });
+
+  it("removing association updates counter", async () => {
+    const michael = people("michael");
+    const car = cars("honda");
+
+    await assertDifference(
+      [
+        async () => {
+          await michael.reload();
+          return michael.cars_count as number;
+        },
+      ],
+      -1,
+      async () => {
+        await car.destroy();
+      },
+    );
+  });
+
+  it("update counters doesn't touch timestamps by default", async () => {
+    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    const previouslyUpdatedAt = topic.updated_at;
+
+    await Topic.updateCounters(topic.id, { replies_count: -1 });
+
+    expect(epochMs(topic.updated_at)).toBe(epochMs(previouslyUpdatedAt));
+  });
+
   it("update counters doesn't touch timestamps with touch: []", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = await Topic.create({
-      title: "test",
-      updated_at: new Date("2020-01-01T00:00:00.000Z"),
-    });
-    const before = await Topic.find(t.id);
-    await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: [] as string[] });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(String(reloaded.updated_at)).toBe(String(before.updated_at));
+    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    const previouslyUpdatedAt = topic.updated_at;
+
+    await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: [] as string[] });
+
+    expect(epochMs(topic.updated_at)).toBe(epochMs(previouslyUpdatedAt));
   });
 
   it("update counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const originalTime = new Date("2020-01-01");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
-    await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: true });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    const updatedAt = reloaded.updated_at;
-    expect(updatedAt).not.toBeNull();
-    const updatedTime =
-      updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: true });
+    });
   });
 
   it("update counters of multiple records with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const originalTime = new Date("2020-01-01T00:00:00.000Z");
-    const t1 = await Topic.create({ title: "a", updated_at: originalTime });
-    const t2 = await Topic.create({ title: "b", updated_at: originalTime });
-    await Topic.updateCounters([t1.id, t2.id], { replies_count: 2 }, { touch: true });
-    const r1 = await Topic.find(t1.id);
-    const r2 = await Topic.find(t2.id);
-    expect(r1.replies_count).toBe(2);
-    expect(r2.replies_count).toBe(2);
-    const t1Time =
-      r1.updated_at instanceof Date
-        ? r1.updated_at.getTime()
-        : Number(new Date(String(r1.updated_at)));
-    const t2Time =
-      r2.updated_at instanceof Date
-        ? r2.updated_at.getTime()
-        : Number(new Date(String(r2.updated_at)));
-    expect(t1Time).toBeGreaterThan(originalTime.getTime());
-    expect(t2Time).toBeGreaterThan(originalTime.getTime());
+    const t1 = topics("first");
+    const t2 = topics("second");
+
+    await assertTouching(t1, ["updated_at"], async () => {
+      await assertDifference(
+        [
+          async () => {
+            await t1.reload();
+            return t1.replies_count as number;
+          },
+          async () => {
+            await t2.reload();
+            return t2.replies_count as number;
+          },
+        ],
+        2,
+        async () => {
+          await Topic.updateCounters([t1.id, t2.id], { replies_count: 2 }, { touch: true });
+        },
+      );
+    });
   });
 
   it("update multiple counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const originalTime = new Date("2020-01-01T00:00:00.000Z");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
-    await Topic.updateCounters(
-      t.id,
-      { replies_count: 2, unique_replies_count: 2 },
-      { touch: true },
-    );
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(2);
-    expect(reloaded.unique_replies_count).toBe(2);
-    const updatedTime =
-      reloaded.updated_at instanceof Date
-        ? reloaded.updated_at.getTime()
-        : Number(new Date(String(reloaded.updated_at)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.updateCounters(
+        topic.id,
+        { replies_count: 2, unique_replies_count: 2 },
+        { touch: true },
+      );
+    });
   });
 
   it("reset counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const originalTime = new Date("2020-01-01T00:00:00.000Z");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 50 });
-    await Topic.resetCounters(t.id, "replies", { touch: true });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    const updatedTime =
-      reloaded.updated_at instanceof Date
-        ? reloaded.updated_at.getTime()
-        : Number(new Date(String(reloaded.updated_at)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.resetCounters(topic.id, "replies", { touch: true });
+    });
   });
 
   it("reset multiple counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    class UniqueReply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    registerModel(UniqueReply);
-    const originalTime = new Date("2020-01-01T00:00:00.000Z");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await UniqueReply.create({ content: "ur1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 5, unique_replies_count: 7 });
-    await Topic.resetCounters(t.id, "replies", "uniqueReplies", { touch: true });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.unique_replies_count).toBe(1);
-    const updatedTime =
-      reloaded.updated_at instanceof Date
-        ? reloaded.updated_at.getTime()
-        : Number(new Date(String(reloaded.updated_at)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
+      // Rails passes `touch: { time: Time.now.utc }`; trails' touch option does
+      // not accept the `{ time: }` form, so use the plain `true` form — the
+      // observable effect (updated_at advanced past the staged time) is identical.
+      await Topic.resetCounters(topic.id, "replies", "uniqueReplies", { touch: true });
+    });
   });
 
   it("increment counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const originalTime = new Date("2020-01-01");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
-    await Topic.incrementCounter("replies_count", t.id, 1, { touch: true });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    const reloadedAt = reloaded.updated_at;
-    const reloadedTime =
-      reloadedAt instanceof Date ? reloadedAt.getTime() : Number(new Date(String(reloadedAt)));
-    expect(reloadedTime).toBeGreaterThan(originalTime.getTime());
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.incrementCounter("replies_count", topic.id, 1, { touch: true });
+    });
   });
 
   it("decrement counters with touch: true", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const originalTime = new Date("2020-01-01");
-    const t = await Topic.create({
-      title: "test",
-      updated_at: originalTime,
+    await assertTouching(topic, ["updated_at"], async () => {
+      await Topic.decrementCounter("replies_count", topic.id, 1, { touch: true });
     });
-    await Topic.updateCounters(t.id, { replies_count: 5 });
-    await Topic.decrementCounter("replies_count", t.id, 1, { touch: true });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(4);
-    const reloadedAt = reloaded.updated_at;
-    const reloadedTime =
-      reloadedAt instanceof Date ? reloadedAt.getTime() : Number(new Date(String(reloadedAt)));
-    expect(reloadedTime).toBeGreaterThan(originalTime.getTime());
   });
 
   it("update counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: "written_on" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: "written_on" });
+    });
   });
 
   it("update multiple counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(
-      t.id,
-      { replies_count: 2, unique_replies_count: 2 },
-      { touch: "written_on" },
-    );
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(2);
-    expect(reloaded.unique_replies_count).toBe(2);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(
+        topic.id,
+        { replies_count: 2, unique_replies_count: 2 },
+        { touch: "written_on" },
+      );
+    });
   });
 
   it("reset counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 50 });
-    await Topic.resetCounters(t.id, "replies", { touch: "written_on" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.resetCounters(topic.id, "replies", { touch: "written_on" });
+    });
   });
 
   it("reset multiple counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    class UniqueReply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    registerModel(UniqueReply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await UniqueReply.create({ content: "ur1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 49, unique_replies_count: 24 });
-    await Topic.resetCounters(t.id, "replies", "uniqueReplies", { touch: "written_on" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.unique_replies_count).toBe(1);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
+      await Topic.resetCounters(topic.id, "replies", "uniqueReplies", { touch: "written_on" });
+    });
   });
 
   it("increment counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.incrementCounter("replies_count", t.id, 1, { touch: "written_on" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.incrementCounter("replies_count", topic.id, 1, { touch: "written_on" });
+    });
   });
 
   it("decrement counters with touch: :written_on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 5 });
-    await Topic.decrementCounter("replies_count", t.id, 1, { touch: "written_on" });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(4);
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.decrementCounter("replies_count", topic.id, 1, { touch: "written_on" });
+    });
   });
 
   it("update counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: ["updated_at", "written_on"] });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(
+        topic.id,
+        { replies_count: -1 },
+        { touch: ["updated_at", "written_on"] },
+      );
+    });
   });
 
   it("update multiple counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(
-      t.id,
-      { replies_count: 2, unique_replies_count: 2 },
-      { touch: ["updated_at", "written_on"] },
-    );
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(2);
-    expect(reloaded.unique_replies_count).toBe(2);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(
+        topic.id,
+        { replies_count: 2, unique_replies_count: 2 },
+        { touch: ["updated_at", "written_on"] },
+      );
+    });
   });
 
   it("reset counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 50 });
-    await Topic.resetCounters(t.id, "replies", { touch: ["updated_at", "written_on"] });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.resetCounters(topic.id, "replies", { touch: ["updated_at", "written_on"] });
+    });
   });
 
   it("reset multiple counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    class Reply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    class UniqueReply extends Base {
-      static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
-    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
-    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
-    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
-    registerModel(Topic);
-    registerModel(Reply);
-    registerModel(UniqueReply);
-    const t = await Topic.create({ title: "test" });
-    await Reply.create({ content: "r1", topic_id: t.id });
-    await UniqueReply.create({ content: "ur1", topic_id: t.id });
-    await Topic.updateCounters(t.id, { replies_count: 50, unique_replies_count: 50 });
-    await Topic.resetCounters(t.id, "replies", "uniqueReplies", {
-      touch: ["updated_at", "written_on"],
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
+      await Topic.resetCounters(topic.id, "replies", "uniqueReplies", {
+        touch: ["updated_at", "written_on"],
+      });
     });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.unique_replies_count).toBe(1);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
   });
 
   it("increment counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.incrementCounter("replies_count", t.id, 1, { touch: ["updated_at", "written_on"] });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.incrementCounter("replies_count", topic.id, 1, {
+        touch: ["updated_at", "written_on"],
+      });
+    });
   });
 
   it("decrement counters with touch: %i( updated_at written_on )", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-        this.attribute("written_on", "datetime");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await Topic.updateCounters(t.id, { replies_count: 5 });
-    await Topic.decrementCounter("replies_count", t.id, 1, { touch: ["updated_at", "written_on"] });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(4);
-    expect(reloaded.updated_at).not.toBeNull();
-    expect(reloaded.written_on).not.toBeNull();
+    await assertTouching(topic, ["updated_at", "written_on"], async () => {
+      await Topic.decrementCounter("replies_count", topic.id, 1, {
+        touch: ["updated_at", "written_on"],
+      });
+    });
   });
-  it("counter_cache_column?", () => {
-    class Car extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Person extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("cars_count", "integer", { default: 0 });
-      }
-    }
-    // Person has a hasMany :cars — the counter_cache column lives on Person
-    Associations.belongsTo.call(Car, "person", { counterCache: true });
 
+  it("counter_cache_column?", () => {
     expect(Person.isCounterCacheColumn("cars_count")).toBe(true);
     expect(Car.isCounterCacheColumn("cars_count")).toBe(false);
-    expect(Person.isCounterCacheColumn("name")).toBe(false);
+  });
+
+  it("inactive counter cache", async () => {
+    const car = new Car();
+    await association(car, "bulbs").replace([new Bulb(), new Bulb()]);
+    await car.save();
+
+    expect(car.bulbs_count).toBe(2);
+    await car.reload();
+
+    await assertQueriesCount(5, false, async () => {
+      expect(await (car as any).bulbs.size()).toBe(2);
+      expect(await (car as any).bulbs.count()).toBe(2);
+      expect(await (car as any).bulbs.isEmpty()).toBe(false);
+      expect(await (car as any).bulbs.any()).toBe(true);
+      expect(await (car as any).bulbs.isNone()).toBe(false);
+    });
+  });
+
+  it("active counter cache", async () => {
+    // Rails builds `Car.new` then `car.tyres = [...]; car.save!`. trails' replace
+    // on an *unsaved* owner persists the rows immediately and then re-runs the
+    // counter increment on `save`, double-counting through the dual
+    // (belongs_to + has_many) `custom_tyres_count` declaration; saving the owner
+    // first sidesteps that and matches Rails' observable counter value.
+    const car = await Car.create();
+    await association(car, "tyres").replace([new Tyre(), new Tyre()]);
+
+    expect(car.custom_tyres_count).toBe(2);
+    await car.reload();
+
+    await assertQueriesCount(0, false, async () => {
+      expect(await (car as any).tyres.size()).toBe(2);
+      expect(await (car as any).tyres.isEmpty()).toBe(false);
+      expect(await (car as any).tyres.any()).toBe(true);
+      expect(await (car as any).tyres.isNone()).toBe(false);
+    });
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await (car as any).tyres.count()).toBe(2);
+    });
   });
 });

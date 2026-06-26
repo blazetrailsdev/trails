@@ -598,6 +598,18 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     }
   }
 
+  // A model may declare a *composite* primaryKey over a table whose schema keeps
+  // a single autoincrement `id` (e.g. CpkOrder: model `["shop_id", "id"]`, table
+  // `id`). `pkCol` resolved to the schema's `id` above, so the composite-seeding
+  // branch below won't fire — but Rails seeds the *model's* primary_key columns
+  // via composite_identify, so the extra declared key columns (here `shop_id`)
+  // must still be generated. Otherwise they stay NULL and `record.id` becomes
+  // `[null, id]`, which counter/update_all predicates reject as a non-match.
+  const extraDeclaredPkCols: string[] =
+    Array.isArray(declaredPk) && typeof pkCol === "string"
+      ? declaredPk.filter((c) => c !== pkCol)
+      : [];
+
   // Register this model in the adapter-scoped tableName registry (Phase 1b).
   const registry = getRegistry(adapter);
   registry.set(tableName, ModelClass);
@@ -831,6 +843,15 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     if (Array.isArray(pkCol)) {
       const generated = compositeIdentify(label, pkCol);
       for (const keyCol of pkCol) {
+        if (!(keyCol in row)) row[keyCol] = generated[keyCol]!;
+      }
+    }
+
+    // Seed the model's extra composite-PK columns when the table itself keeps a
+    // single autoincrement id (see `extraDeclaredPkCols` above).
+    if (extraDeclaredPkCols.length > 0) {
+      const generated = compositeIdentify(label, declaredPk as string[]);
+      for (const keyCol of extraDeclaredPkCols) {
         if (!(keyCol in row)) row[keyCol] = generated[keyCol]!;
       }
     }
