@@ -31,6 +31,7 @@ import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers
 import { Movie } from "./test-helpers/models/movie.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
 import { Author } from "./test-helpers/models/author.js";
+import { Book } from "./test-helpers/models/book.js";
 import { Base } from "./base.js";
 import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.js";
 import { captureSql } from "./testing/sql-capture.js";
@@ -154,6 +155,18 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
     expect(called).toBe(0);
+
+    // OMITTED SUBCASE (transactions_test.rb:71): Rails invalidates the internal
+    // transaction (`@internal_transaction.invalidate!`) then registers an
+    // after_all_transactions_commit and asserts it runs *immediately*
+    // (`assert_equal 1, called` inside the block). trails models an invalidated
+    // transaction as finalized (`TransactionState#finalized` is `_state != null`,
+    // and `invalidateBang` sets `_state = "invalidated"`), so the public
+    // `afterCommit` delegates and the internal transaction *raises* "Cannot
+    // register callbacks on a finalized transaction" rather than running the
+    // block. Converging the invalidated→run-immediately path is tracked by
+    // [[transactions-test-rollback-restores-record-state]]'s sibling work; the
+    // five supported subcases above are ported faithfully.
   });
 
   it.skip("after current transaction commit multidb nested transactions", () => {
@@ -162,11 +175,8 @@ describe("TransactionTest", () => {
   });
 
   it("transaction after commit callback", async () => {
-    // Rails' multidb (ARUnit2Model) sub-case and the
-    // "register on a finalized transaction raises" sub-case are omitted: there
-    // is no secondary DB in the single-database test env, and trails' public
-    // Transaction#afterCommit runs the block immediately on a closed
-    // transaction rather than raising (a separate tracked deviation).
+    // Rails' multidb (ARUnit2Model) sub-case is omitted: there is no secondary
+    // DB in the single-database test env.
     let called = 0;
     Topic.currentTransaction().afterCommit(() => {
       called += 1;
@@ -211,6 +221,14 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
     expect(called).toBe(0);
+
+    let committedTransaction: any = null;
+    await Topic.transaction(async () => {
+      committedTransaction = Topic.currentTransaction();
+    });
+    expect(() => committedTransaction.afterCommit(() => {})).toThrow(
+      /Cannot register callbacks on a finalized transaction/,
+    );
   });
 
   it("transaction after rollback callback", async () => {
@@ -252,6 +270,29 @@ describe("TransactionTest", () => {
       );
     });
     expect(called).toBe(0);
+
+    called = 0;
+    await Topic.transaction(async () => {
+      await Topic.transaction(
+        async () => {
+          Topic.currentTransaction().afterRollback(() => {
+            called += 1;
+          });
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+      expect(called).toBe(1);
+    });
+    expect(called).toBe(1);
+
+    let committedTransaction: any = null;
+    await Topic.transaction(async () => {
+      committedTransaction = Topic.currentTransaction();
+    });
+    expect(() => committedTransaction.afterRollback(() => {})).toThrow(
+      /Cannot register callbacks on a finalized transaction/,
+    );
   });
 
   // ---- TransactionTest ----
@@ -280,13 +321,16 @@ describe("TransactionTest", () => {
     expect(topic.changes.title).toEqual(["The Fifth Topic of the day", "Ruby on Rails"]);
   });
 
-  it("transaction does not apply default scope", async () => {
-    // Rails opens the transaction on `Topic.where.not(id:).transaction`; trails
-    // guards against association delegation into Base methods on a Relation, so
-    // open it on the class — the invariant under test (the default/where scope is
-    // not applied to finds inside the transaction) holds either way.
+  // CONVERGENCE-PENDING (relation-level Relation#transaction): Rails opens the
+  // transaction directly on a scoped relation (`Topic.where.not(id:).transaction`)
+  // to prove the scope is NOT applied to finds inside. trails' relation
+  // delegation guard (`guardBaseMethodDelegation`) throws NotImplementedError for
+  // `transaction` on a Relation, so the faithful body can't run yet. Retained
+  // verbatim for the un-skip; tracked alongside [[transactions-test-rollback-restores-record-state]].
+  it.skip("transaction does not apply default scope", async () => {
+    // Regression test for https://github.com/rails/rails/issues/50368
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
-    await Topic.transaction(async () => {
+    await (Topic.whereNot({ id: topic.id }) as any).transaction(async () => {
       expect(await Topic.find(topic.id)).not.toBeNull();
     });
   });
@@ -582,6 +626,58 @@ describe("TransactionTest", () => {
     await first.reload();
     expect(await Topic.find(first.id)).toBeDefined();
   });
+
+  // Rails dynamically defines four cancellation tests for the `validation` and
+  // `save` filters (transactions_test.rb:714). Each installs a singleton
+  // `before_<filter>_for_transaction` that runs `Book.create` then `throw(:abort)`
+  // and asserts BOTH that the dirtied `author_name` reverts AND that the
+  // `Book.count` DB side effect is rolled back.
+  //
+  // CONVERGENCE-PENDING: the DB side effect needs async work (`Book.create`)
+  // inside the cancelling before-filter, but trails' `before_validation` runs on
+  // the strict-sync validation chain (no awaiting) and the canonical Topic's
+  // `before_save_for_transaction` / `before_validation_for_transaction` hook
+  // dispatch is invoked synchronously without `await`, so a `Book.create` there
+  // cannot be awaited or transactionally rolled back. Faithful Rails bodies are
+  // retained for the un-skip; tracked alongside
+  // [[transactions-test-rollback-restores-record-state]].
+  for (const filter of ["validation", "save"] as const) {
+    const hook =
+      filter === "validation" ? "beforeValidationForTransaction" : "beforeSaveForTransaction";
+
+    it.skip(`cancellation from before filters rollbacks in ${filter}`, async () => {
+      first[hook] = async () => {
+        await Book.create({});
+        throwAbort();
+      };
+      const nbooksBeforeSave = await Book.count();
+      const originalAuthorName = first.author_name;
+      first.author_name += "_this_should_not_end_up_in_the_db";
+      const status = await first.save();
+      expect(status).toBeFalsy();
+      expect((await first.reload()).author_name).toBe(originalAuthorName);
+      expect(await Book.count()).toBe(nbooksBeforeSave);
+    });
+
+    it.skip(`cancellation from before filters rollbacks in ${filter}!`, async () => {
+      first[hook] = async () => {
+        await Book.create({});
+        throwAbort();
+      };
+      const nbooksBeforeSave = await Book.count();
+      const originalAuthorName = first.author_name;
+      first.author_name += "_this_should_not_end_up_in_the_db";
+
+      try {
+        await first.saveBang();
+      } catch {
+        // ActiveRecord::RecordInvalid / RecordNotSaved
+      }
+
+      expect((await first.reload()).author_name).toBe(originalAuthorName);
+      expect(await Book.count()).toBe(nbooksBeforeSave);
+    });
+  }
 
   it("callback rollback in create", async () => {
     class CallbackRollbackTopic extends Topic {}
