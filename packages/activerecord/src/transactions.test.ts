@@ -161,6 +161,58 @@ describe("TransactionTest", () => {
     // (multi-database setup) — not available in single-database test env.
   });
 
+  it("transaction after commit callback", async () => {
+    // Rails' multidb (ARUnit2Model) sub-case and the
+    // "register on a finalized transaction raises" sub-case are omitted: there
+    // is no secondary DB in the single-database test env, and trails' public
+    // Transaction#afterCommit runs the block immediately on a closed
+    // transaction rather than raising (a separate tracked deviation).
+    let called = 0;
+    Topic.currentTransaction().afterCommit(() => {
+      called += 1;
+    });
+    expect(called).toBe(1);
+
+    Topic.currentTransaction().afterCommit(() => {
+      called += 1;
+    });
+    expect(called).toBe(2);
+
+    called = 0;
+    await Topic.transaction(async () => {
+      Topic.currentTransaction().afterCommit(() => {
+        called += 1;
+      });
+      expect(called).toBe(0);
+    });
+    expect(called).toBe(1);
+
+    called = 0;
+    await Topic.transaction(async () => {
+      await Topic.transaction(
+        async () => {
+          Topic.currentTransaction().afterCommit(() => {
+            called += 1;
+          });
+          expect(called).toBe(0);
+        },
+        { requiresNew: true },
+      );
+      expect(called).toBe(0);
+    });
+    expect(called).toBe(1);
+
+    called = 0;
+    await Topic.transaction(async () => {
+      Topic.currentTransaction().afterCommit(() => {
+        called += 1;
+      });
+      expect(called).toBe(0);
+      throw new Rollback();
+    });
+    expect(called).toBe(0);
+  });
+
   it("transaction after rollback callback", async () => {
     let called = 0;
     Topic.currentTransaction().afterRollback(() => {
@@ -1647,5 +1699,27 @@ describe("ConcurrentTransactionTest", () => {
   it.skip("transaction isolation  read committed", () => {
     // PERMANENT-SKIP: Ruby Thread semantics — uses Thread.new to assert
     // READ COMMITTED isolation across concurrent threads; JS is single-threaded.
+  });
+});
+
+// ==========================================================================
+// trails-extra: a block-arg `tx.afterCommit(...)` registered inside an explicit
+// transaction fires once the transaction commits (no direct Rails counterpart;
+// guards the standalone `transaction(Model, (tx) => ...)` callback wiring).
+// ==========================================================================
+describe("TransactionTest", () => {
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
+  it("call after commit after transaction commits", async () => {
+    const log: string[] = [];
+
+    await transaction(Topic, async (tx) => {
+      tx.afterCommit(() => {
+        log.push("committed");
+      });
+      await Topic.create({ title: "Alice" });
+    });
+
+    expect(log).toEqual(["committed"]);
   });
 });
