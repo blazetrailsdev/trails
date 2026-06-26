@@ -245,20 +245,6 @@ const TEST_SCHEMA: Schema = {
   jeeo_posts: { title: "string" },
   lna_authors: { name: "string" },
   lna_posts: { title: "string", lna_author_id: "integer" },
-  nest_ho_authors: { name: "string" },
-  nest_ho_c_authors: { name: "string" },
-  nest_ho_c_posts: { title: "string", nest_ho_c_author_id: "integer" },
-  nest_ho_ca_authors: { name: "string" },
-  nest_ho_ca_posts: { title: "string", nest_ho_ca_author_id: "integer" },
-  nest_ho_cn_authors: { name: "string" },
-  nest_ho_cn_posts: { title: "string", nest_ho_cn_author_id: "integer" },
-  nest_ho_oa_authors: { name: "string" },
-  nest_ho_oa_posts: { title: "string", nest_ho_oa_author_id: "integer" },
-  nest_ho_on_authors: { name: "string" },
-  nest_ho_on_posts: { title: "string", nest_ho_on_author_id: "integer" },
-  nest_ho_ord_authors: { name: "string" },
-  nest_ho_ord_posts: { title: "string", nest_ho_ord_author_id: "integer" },
-  nest_ho_posts: { title: "string", nest_ho_author_id: "integer" },
   pcs_contractships: { pcs_project_id: "integer", pcs_developer_id: "integer" },
   pcs_developers: { name: "string" },
   pcs_projects: { name: "string" },
@@ -1020,214 +1006,6 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(posts).toHaveLength(1);
   });
-  it("nested loading through has one association", async () => {
-    class NestHoAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoPost", {
-          className: "NestHoPost",
-          foreignKey: "nest_ho_author_id",
-        });
-      }
-    }
-    class NestHoPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_author_id", "integer");
-      }
-    }
-    registerModel("NestHoAuthor", NestHoAuthor);
-    registerModel("NestHoPost", NestHoPost);
-
-    const author = await NestHoAuthor.create({ name: "Alice" });
-    await NestHoPost.create({ title: "First Post", nest_ho_author_id: author.id });
-
-    const authors = await NestHoAuthor.all().includes("nestHoPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoPost").target;
-    expect(post?.title).toBe("First Post");
-  });
-  it("nested loading through has one association with order", async () => {
-    class NestHoOrdAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoOrdPost", {
-          className: "NestHoOrdPost",
-          foreignKey: "nest_ho_ord_author_id",
-        });
-      }
-    }
-    class NestHoOrdPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_ord_author_id", "integer");
-      }
-    }
-    registerModel("NestHoOrdAuthor", NestHoOrdAuthor);
-    registerModel("NestHoOrdPost", NestHoOrdPost);
-
-    const author = await NestHoOrdAuthor.create({ name: "Bob" });
-    await NestHoOrdPost.create({
-      title: "Only Post",
-      nest_ho_ord_author_id: author.id,
-    });
-
-    const authors = await NestHoOrdAuthor.all().includes("nestHoOrdPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoOrdPost").target;
-    expect(post?.title).toBe("Only Post");
-  });
-  it("nested loading through has one association with order on association", async () => {
-    class NestHoOaAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoOaPost", {
-          className: "NestHoOaPost",
-          foreignKey: "nest_ho_oa_author_id",
-        });
-      }
-    }
-    class NestHoOaPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_oa_author_id", "integer");
-      }
-    }
-    registerModel("NestHoOaAuthor", NestHoOaAuthor);
-    registerModel("NestHoOaPost", NestHoOaPost);
-
-    const author = await NestHoOaAuthor.create({ name: "Carol" });
-    await NestHoOaPost.create({
-      title: "Carol Post",
-      nest_ho_oa_author_id: author.id,
-    });
-
-    const authors = await NestHoOaAuthor.all().includes("nestHoOaPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoOaPost").target;
-    expect(post?.title).toBe("Carol Post");
-  });
-  it("nested loading through has one association with order on nested association", async () => {
-    class NestHoOnAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoOnPost", {
-          className: "NestHoOnPost",
-          foreignKey: "nest_ho_on_author_id",
-        });
-      }
-    }
-    class NestHoOnPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_on_author_id", "integer");
-      }
-    }
-    registerModel("NestHoOnAuthor", NestHoOnAuthor);
-    registerModel("NestHoOnPost", NestHoOnPost);
-
-    const author = await NestHoOnAuthor.create({ name: "Dave" });
-    await NestHoOnPost.create({
-      title: "Dave Post",
-      nest_ho_on_author_id: author.id,
-    });
-
-    const authors = await NestHoOnAuthor.all().includes("nestHoOnPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoOnPost").target;
-    expect(post?.title).toBe("Dave Post");
-  });
-  it("nested loading through has one association with conditions", async () => {
-    class NestHoCAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoCPost", {
-          className: "NestHoCPost",
-          foreignKey: "nest_ho_c_author_id",
-        });
-      }
-    }
-    class NestHoCPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_c_author_id", "integer");
-      }
-    }
-    registerModel("NestHoCAuthor", NestHoCAuthor);
-    registerModel("NestHoCPost", NestHoCPost);
-
-    const author = await NestHoCAuthor.create({ name: "Eve" });
-    await NestHoCPost.create({
-      title: "Eve Post",
-      nest_ho_c_author_id: author.id,
-    });
-
-    const authors = await NestHoCAuthor.all().includes("nestHoCPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoCPost").target;
-    expect(post?.title).toBe("Eve Post");
-  });
-  it("nested loading through has one association with conditions on association", async () => {
-    class NestHoCaAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoCaPost", {
-          className: "NestHoCaPost",
-          foreignKey: "nest_ho_ca_author_id",
-        });
-      }
-    }
-    class NestHoCaPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_ca_author_id", "integer");
-      }
-    }
-    registerModel("NestHoCaAuthor", NestHoCaAuthor);
-    registerModel("NestHoCaPost", NestHoCaPost);
-
-    const author = await NestHoCaAuthor.create({ name: "Frank" });
-    await NestHoCaPost.create({
-      title: "Frank Post",
-      nest_ho_ca_author_id: author.id,
-    });
-
-    const authors = await NestHoCaAuthor.all().includes("nestHoCaPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoCaPost").target;
-    expect(post?.title).toBe("Frank Post");
-  });
-  it("nested loading through has one association with conditions on nested association", async () => {
-    class NestHoCnAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("nestHoCnPost", {
-          className: "NestHoCnPost",
-          foreignKey: "nest_ho_cn_author_id",
-        });
-      }
-    }
-    class NestHoCnPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("nest_ho_cn_author_id", "integer");
-      }
-    }
-    registerModel("NestHoCnAuthor", NestHoCnAuthor);
-    registerModel("NestHoCnPost", NestHoCnPost);
-
-    const author = await NestHoCnAuthor.create({ name: "Grace" });
-    await NestHoCnPost.create({
-      title: "Grace Post",
-      nest_ho_cn_author_id: author.id,
-    });
-
-    const authors = await NestHoCnAuthor.all().includes("nestHoCnPost").toArray();
-    expect(authors).toHaveLength(1);
-    const post = (authors[0] as any).association("nestHoCnPost").target;
-    expect(post?.title).toBe("Grace Post");
-  });
-
   it("eager load has many with string keys", async () => {
     class EagerStrParent extends Base {
       static {
@@ -4034,6 +3812,68 @@ describe("EagerAssociationTest", () => {
       expect((post!.association("comments").target as Base[]).length).not.toBe(0);
       expect(post!.association("author").target as Base).toBeTruthy();
     });
+  });
+
+  it("nested loading through has one association", async () => {
+    const aa = await AuthorAddress.all()
+      .includes({ author: "posts" })
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with order", async () => {
+    const aa = await AuthorAddress.all()
+      .includes({ author: "posts" })
+      .order("author_addresses.id")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with order on association", async () => {
+    const aa = await AuthorAddress.all()
+      .includes({ author: "posts" })
+      .order("authors.id")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with order on nested association", async () => {
+    const aa = await AuthorAddress.all()
+      .includes({ author: "posts" })
+      .order("posts.id")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with conditions", async () => {
+    const aa = await AuthorAddress.references("author_addresses")
+      .includes({ author: "posts" })
+      .where("author_addresses.id > 0")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with conditions on association", async () => {
+    const aa = await AuthorAddress.references("authors")
+      .includes({ author: "posts" })
+      .where("authors.id > 0")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
+  });
+
+  it("nested loading through has one association with conditions on nested association", async () => {
+    const aa = await AuthorAddress.references("posts")
+      .includes({ author: "posts" })
+      .where("posts.id > 0")
+      .find(authorAddresses("david_address").id);
+    const author = aa.association("author").target as Author;
+    expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
   });
 });
 
