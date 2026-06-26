@@ -598,8 +598,11 @@ describe("HasManyAssociationsTest", () => {
       if (!(e instanceof Client.RaisedOnDestroy)) throw e;
     }
 
+    // clientsOfFirm carries an order("id") scope and `good` is saved before
+    // `bad`, so Rails' `assert_equal [good, bad], ...reload` is an ordered
+    // assertion — preserve the order rather than sorting.
     const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
-    expect(reloaded.map((c) => c.id).sort()).toEqual([good.id, bad.id].sort());
+    expect(reloaded.map((c) => c.id)).toEqual([good.id, bad.id]);
   });
 
   it("transaction when deleting new record", async () => {
