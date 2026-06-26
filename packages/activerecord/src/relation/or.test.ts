@@ -274,11 +274,18 @@ describe("OrTest", () => {
 describe("TooManyOrTest", () => {
   useHandlerFixtures(["paragraphs"], { schema: canonicalSchema });
 
-  it.skipIf(adapterType === "sqlite")("too many or", async () => {
-    const paragraphs = Array.from({ length: 1001 }, (_, i) =>
-      Paragraph.where({ id: i, book_id: i * i }),
-    );
-    const combined = paragraphs.reduce((acc, rel) => acc.or(rel));
-    expect(await combined.count()).toBe(1001);
-  });
+  // Generous timeout: folding 1001 relations with `#or` builds a 1001-deep
+  // OR tree and the resulting count query is large; well past the 5s default
+  // on the MySQL/Postgres lanes (SQLite skips it — max_expr_depth is 1000).
+  it.skipIf(adapterType === "sqlite")(
+    "too many or",
+    async () => {
+      const paragraphs = Array.from({ length: 1001 }, (_, i) =>
+        Paragraph.where({ id: i, book_id: i * i }),
+      );
+      const combined = paragraphs.reduce((acc, rel) => acc.or(rel));
+      expect(await combined.count()).toBe(1001);
+    },
+    120_000,
+  );
 });
