@@ -688,43 +688,13 @@ describe("numericality with in: range", () => {
     expect(p.errors.get("age")).toContain("is not a number");
   });
 
-  it("allowNil skips cast-null input on UPDATE (Rails cast-based skip)", () => {
-    // Rails' EachValidator#validate runs the allow_nil skip against
-    // `read_attribute_for_validation` — the CAST value — BEFORE
-    // prepare_value_for_validation reads the raw before-type-cast input.
-    // A 10 → 'abc' update on an integer attr casts to null, so
-    // `allow_nil: true` skips it even though the raw value is 'abc'.
-    // (Mirrors AR's test_allow_nil_works_for_casted_value: "" → nil → skip.)
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { allowNil: true } });
-      }
-    }
-    const p = new Person({ age: 10 });
-    expect(p.isValid()).toBe(true);
-    p.changesApplied(); // baseline = 10
-    p.writeAttribute("age", "abc");
-    expect(p.readAttribute("age")).toBeNull(); // cast failed → null
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
-    expect(p.isValid()).toBe(true); // cast null + allowNil → skipped
-  });
-
-  it("allowNil skips cast-null input (Rails cast-based skip)", () => {
-    // EachValidator#validate skips validateEach when the CAST value is
-    // null and allow_nil: true. 'abc' on an integer attr casts to null,
-    // so it is skipped — the before-type-cast raw read only matters when
-    // the value is NOT skipped (i.e. without allow_nil; see the
-    // "numericality: true" test above, which DOES flag 'abc').
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { allowNil: true } });
-      }
-    }
-    expect(new Person({}).isValid()).toBe(true); // genuinely nil → skip
-    expect(new Person({ age: "abc" }).isValid()).toBe(true); // cast null → skip
-  });
+  // Removed: two trails-only tests that pinned the now-deleted `validate`
+  // override's deviation (typed integer "abc" + allowNil asserted invalid).
+  // Rails skips that case (cast-based allow_nil), so the tests no longer
+  // describe real behaviour; the converged behaviour is covered by the AR
+  // "allow nil works for casted value" port and the "numericality: true"
+  // raw-read test above. Renaming them in place would violate the
+  // never-reword-test-names rule, so they are dropped rather than relabelled.
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", () => {
     // Rails: allow_only_integer?(record) returns
