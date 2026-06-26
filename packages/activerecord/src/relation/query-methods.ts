@@ -2349,7 +2349,7 @@ function selectListColumns(host: QueryMethodsHost): unknown[] | null {
       cols = [pk, ...cols];
     }
     if (cols.length > 0) {
-      const table: any = modelClass?.arelTable;
+      const table: any = (host as any).table ?? modelClass?.arelTable;
       return cols.map((f: string) => table?.get(f) ?? arelSql(f));
     }
   }
@@ -2367,8 +2367,15 @@ function selectListColumns(host: QueryMethodsHost): unknown[] | null {
 export function buildProjections(this: QueryMethodsHost): unknown[] {
   const cols = selectListColumns(this);
   if (cols) return cols;
-  const table: any = (this as any)._modelClass?.arelTable;
-  return [table ? table.star : arelSql("*")];
+  const table: any = (this as any).table ?? (this as any)._modelClass?.arelTable;
+  return [table ? tableStar(table) : arelSql("*")];
+}
+
+// A table's `.*` projection. `Table#star` is a getter; a table ALIAS
+// (Nodes.TableAlias) has no such helper, but `get("*")` yields the equivalent
+// `<alias>.*` Attribute (the "*" sentinel skips column-name quoting either way).
+function tableStar(table: any): unknown {
+  return table.star ?? table.get("*");
 }
 
 /**
@@ -2383,8 +2390,8 @@ export function buildSelect(this: QueryMethodsHost, arel: any): void {
     arel.project(...cols);
     return;
   }
-  const table: any = (this as any)._modelClass?.arelTable;
-  arel.project(table ? table.star : arelSql("*"));
+  const table: any = (this as any).table ?? (this as any)._modelClass?.arelTable;
+  arel.project(table ? tableStar(table) : arelSql("*"));
 }
 
 /** @internal */

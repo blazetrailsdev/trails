@@ -561,10 +561,19 @@ export class Relation<T extends Base> {
 
   private _table: Table | null = null;
 
-  constructor(modelClass: typeof Base, table?: Table, predicateBuilder?: PredicateBuilder) {
+  constructor(
+    modelClass: typeof Base,
+    // Rails `Relation.create(model, table:)` stores any supplied table object as
+    // `@table`, including an aliased table (`arel_table.alias(...)`). Accept the
+    // Arel `TableAlias` node directly so callers don't need to cast; the build
+    // paths (`_buildSelectManager`, Calculations#performCount) seed the manager
+    // from whichever node this is.
+    table?: Table | Nodes.TableAlias,
+    predicateBuilder?: PredicateBuilder,
+  ) {
     this._modelClass = modelClass;
     if (table) {
-      this._table = table;
+      this._table = table as Table;
     }
     if (predicateBuilder) {
       this._predicateBuilder = predicateBuilder;
@@ -5496,9 +5505,23 @@ export class Relation<T extends Base> {
    * composes the two managers).
    */
   private _buildSelectManager(): SelectManager {
-    const table = this._modelClass.arelTable;
+    // `this.table` is the model's arel_table unless the relation was built on a
+    // table alias (Rails `Relation.create(Model, table: arel_table.alias(...))`),
+    // in which case projections, FROM, and ORDER BY must all reference the alias
+    // so they stay consistent with the WHERE clause the predicate builder wrote.
+    const table = this.table;
     const projections = this._buildProjections(table);
-    const manager = table.project(...(projections as any));
+    // `Table#project` seeds a SelectManager whose FROM is the table. A table
+    // ALIAS (Nodes.TableAlias, from `Relation.create(Model, table: alias)`) is a
+    // plain AST node without that factory helper, so seed the manager directly —
+    // `new SelectManager(node)` sets FROM to the alias (`developers omg_developers`).
+    const manager =
+      table instanceof Table
+        ? table.project(...(projections as any))
+        : ((m) => {
+            if (projections.length > 0) m.project(...(projections as any));
+            return m;
+          })(new SelectManager(table as any));
 
     this._applyJoinsToManager(manager);
 
@@ -5845,6 +5868,13 @@ export class Relation<T extends Base> {
             } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
               const lit = this.orderColumn(rawCol) as Nodes.Node;
               manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
+            } else if (!this._isKnownColumn(rawCol)) {
+              // A bare identifier that isn't a real column (e.g. a SELECT alias
+              // like `name AS dev_name` → `ORDER BY dev_name DESC`) must pass
+              // through verbatim — qualifying it to the base table would emit
+              // `developers.dev_name`, which the database can't resolve. Mirrors
+              // Rails treating a string order arg as a raw SQL literal.
+              manager.order(new Nodes.SqlLiteral(trimmed));
             } else {
               const node = table.get(rawCol);
               manager.order(
@@ -6709,19 +6739,91 @@ export class Relation<T extends Base> {
           }, null);
       }
     } else {
-      const collection: Relation<T> = this;
+      // Rails: `collection = eager_loading? ? apply_join_dependency : self`
+      // (relation.rb:481). An eager-loaded relation must have its includes/
+      // eager_load converted to plain JOINs first, so the COUNT(*)/MAX(...)
+      // projection below replaces the relation's columns instead of being mixed
+      // with the eager-load's `comments.*` projection — which Postgres rejects
+      // ("column must appear in the GROUP BY clause") and SQLite silently allows.
+      // A limit/offset over a collection reflection is materialized to a
+      // `WHERE pk IN (ids)` relation with limit/offset cleared, so the branch
+      // below keys off the RESOLVED relation's limit/offset (Rails'
+      // `collection.has_limit_or_offset?`), not the original's.
+      //
+      // Inlined rather than delegated because `Relation` is thenable: returning
+      // or awaiting a bare relation through an async helper would execute it and
+      // resolve to its records. Here only `_materializeLimitedIds` (an id array)
+      // is awaited; the relation is built with synchronous assignments.
+      let collection: Relation<T> = this;
+      if (this._eagerLoadingForSql()) {
+        const eagerSpecs = [
+          ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+        ];
+        const rel = this._clone();
+        rel._eagerLoadAssociations = [];
+        rel._includesAssociations = [];
+        const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
+        const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
+        if (
+          hasLimitOrOffset &&
+          !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
+          !Array.isArray(pk)
+        ) {
+          // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
+          // materialize the limited DISTINCT primary keys, rewrite as
+          // `WHERE pk IN (ids)`, and clear limit/offset. Single-column PK only —
+          // `_materializeLimitedIds` (shared with the pluck eager-limit path) has
+          // no composite-PK support (Rails' zip/transpose over
+          // `Array(primary_key)`), so a composite PK falls through to the
+          // synchronous applyJoinDependencyForArel below, which surfaces the
+          // unsupported combination as an explicit NotImplementedError rather
+          // than emitting a wrong single-column `"col1,col2"` predicate.
+          const jd = new JoinDependency(this._modelClass);
+          this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+          if (jd.nodes.length > 0) {
+            const limitedIds = await this._materializeLimitedIds(jd, pk);
+            collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
+            collection._limitValue = null;
+            collection._offsetValue = null;
+          } else {
+            collection = rel.leftOuterJoins(eagerSpecs);
+          }
+        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+          // Composite-PK, non-limitable eager limit/offset: unsupported here —
+          // surfaces NotImplementedError rather than a wrong predicate. Tracked
+          // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
+          collection = this.applyJoinDependencyForArel();
+        } else {
+          collection = rel.leftOuterJoins(eagerSpecs);
+        }
+      }
       const tsColumn = this.table.get(timestampColumn);
       // Build COUNT(*) and MAX(col) projections via Arel nodes.
       const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const maxNode = tsColumn.maximum();
 
-      if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
+      if (collection._limitValue !== null || (collection._offsetValue ?? 0) > 0) {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
         const inner = collection._clone();
-        inner._selectColumns = [tsColumn.as("collection_cache_key_timestamp")];
-        if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
-          inner._selectColumns = [this.table.star, ...inner._selectColumns];
+        // Rails appends `select("<col> AS collection_cache_key_timestamp")` to
+        // whatever the collection already selects — a custom `select(...)` must
+        // survive so its aliases (e.g. an `ORDER BY` on a `name AS dev_name`
+        // select) still resolve in the subquery. Replacing the select list here
+        // dropped those aliases and broke ordering.
+        inner._selectColumns = [
+          ...(inner._selectColumns ?? []),
+          tsColumn.as("collection_cache_key_timestamp"),
+        ];
+        if (
+          collection._isDistinct &&
+          (!collection._selectColumns || collection._selectColumns.length === 0)
+        ) {
+          // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
+          // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
+          // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
+          const star = (this.table as { star?: Nodes.Node }).star ?? this.table.get("*");
+          inner._selectColumns = [star, ...inner._selectColumns];
         }
         // Build a proper Arel SelectManager for the outer COUNT/MAX query so
         // quoting and adapter differences are handled by the AST visitor.
