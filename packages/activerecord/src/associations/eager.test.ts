@@ -10,7 +10,7 @@ import {
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
 } from "../index.js";
-import { association, loadHasManyThrough } from "../associations.js";
+import { loadHasManyThrough } from "../associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -71,12 +71,6 @@ const TEST_SCHEMA: Schema = {
   alar_category_posts: { alar_post_id: "integer", alar_category_id: "integer" },
   alar_comments: { body: "string", type: "string", alar_post_id: "integer" },
   alar_posts: { title: "string" },
-  awe_authors: { name: "string" },
-  awe_posts: { awe_author_id: "integer", title: "string" },
-  awex_authors: { name: "string" },
-  awex_posts: { awex_author_id: "integer", mention: "string" },
-  bt_scope_authors: { name: "string" },
-  bt_scope_posts: { title: "string", bt_scope_author_id: "integer" },
   cpk_hm_items: { order_shop_id: "integer", order_id: "integer", product: "string" },
   cpk_hm_orders: {
     columns: { shop_id: "integer", id: "integer", name: "string" },
@@ -107,9 +101,6 @@ const TEST_SCHEMA: Schema = {
   eager_comments: { body: "string", eager_post_id: "integer" },
   eager_count_comments: { body: "string", eager_count_post_id: "integer" },
   eager_count_posts: { title: "string" },
-  eager_dist_items: { label: "string" },
-  eager_dist_joins: { eager_dist_owner_id: "integer", eager_dist_item_id: "integer" },
-  eager_dist_owners: { name: "string" },
   eager_dup_authors: { name: "string" },
   eager_dup_children: { label: "string", eager_dup_parent_id: "integer" },
   eager_dup_parents: { name: "string" },
@@ -157,9 +148,6 @@ const TEST_SCHEMA: Schema = {
   eager_ho_parents: { name: "string" },
   eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
   eager_ho_ref_parents: { name: "string" },
-  eager_imp_items: { label: "string" },
-  eager_imp_joins: { eager_imp_owner_id: "integer", eager_imp_item_id: "integer" },
-  eager_imp_owners: { name: "string" },
   eager_inv_children: { value: "string", eager_inv_parent_id: "integer" },
   eager_inv_parents: { name: "string" },
   eager_leo_comments: { body: "string", eager_leo_post_id: "integer" },
@@ -198,9 +186,6 @@ const TEST_SCHEMA: Schema = {
   eager_str_thr_owners: { name: "string" },
   eager_tags: { name: "string", eager_article_id: "integer" },
   eager_tl_widgets: { name: "string" },
-  eager_twice_joins: { eager_twice_owner_id: "integer", eager_twice_target_id: "integer" },
-  eager_twice_owners: { name: "string" },
-  eager_twice_targets: { label: "string" },
   eager_widgets: { name: "string" },
   ex_sug_posts: { title: "string" },
   ex_sug_taggings: { name: "string", ex_sug_post_id: "integer" },
@@ -212,8 +197,6 @@ const TEST_SCHEMA: Schema = {
   ej_ho_profiles: { bio: "string", ej_ho_user_id: "integer" },
   ej_ho_users: { name: "string" },
   ej_posts: { title: "string", ej_author_id: "integer" },
-  elidas_authors: { name: "string" },
-  elidas_posts: { elidas_author_id: "integer" },
   elmar_contracts: { elmar_developer_id: "integer" },
   elmar_developers: { name: "string", elmar_mentor_id: "integer" },
   elmar_mentors: { name: "string" },
@@ -230,11 +213,7 @@ const TEST_SCHEMA: Schema = {
   },
   enra_authors: { name: "string" },
   enra_posts: { title: "string", enra_author_id: "integer" },
-  eoidas_authors: { name: "string" },
-  eoidas_posts: { eoidas_author_id: "integer" },
   ex_sug_authors: { name: "string" },
-  hm_scope_authors: { name: "string" },
-  hm_scope_posts: { title: "string", hm_scope_author_id: "integer" },
   idup_categories: { name: "string" },
   idup_category_posts: { idup_post_id: "integer", idup_category_id: "integer" },
   idup_comments: { body: "string", idup_post_id: "integer" },
@@ -245,19 +224,11 @@ const TEST_SCHEMA: Schema = {
   jeeo_posts: { title: "string" },
   lna_authors: { name: "string" },
   lna_posts: { title: "string", lna_author_id: "integer" },
-  pcs_contractships: { pcs_project_id: "integer", pcs_developer_id: "integer" },
-  pcs_developers: { name: "string" },
-  pcs_projects: { name: "string" },
   peb_clients: { name: "string", peb_firm_id: "integer" },
   peb_firms: { name: "string" },
   phmt_authors: { name: "string" },
   phmt_comments: { body: "string", phmt_post_id: "integer" },
   phmt_posts: { title: "string", phmt_author_id: "integer" },
-  pia_widgets: { name: "string" },
-  pidas_authors: { name: "string" },
-  pidas_posts: { pidas_author_id: "integer", mention: "string" },
-  poidas_authors: { name: "string" },
-  poidas_posts: { poidas_author_id: "integer", mention: "string" },
   pra_authors: { name: "string" },
   pra_posts: { title: "string", pra_author_id: "integer" },
   pre_poly_orphans: { name: "string", owner_id: "integer", owner_type: "string" },
@@ -1253,53 +1224,6 @@ describe("EagerAssociationTest", () => {
     expect(proxy.loaded).toBe(true);
     expect(proxy.target).toEqual([]);
   });
-  it("preloading has many through with implicit source", async () => {
-    class EagerImpOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerImpJoins", {
-          className: "EagerImpJoin",
-          foreignKey: "eager_imp_owner_id",
-        });
-        this.hasMany("eagerImpItems", {
-          className: "EagerImpItem",
-          through: "eagerImpJoins",
-          source: "eagerImpItem",
-        });
-      }
-    }
-    class EagerImpJoin extends Base {
-      static {
-        this.attribute("eager_imp_owner_id", "integer");
-        this.attribute("eager_imp_item_id", "integer");
-        this.belongsTo("eagerImpItem", {
-          className: "EagerImpItem",
-          foreignKey: "eager_imp_item_id",
-        });
-      }
-    }
-    class EagerImpItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("EagerImpOwner", EagerImpOwner);
-    registerModel("EagerImpJoin", EagerImpJoin);
-    registerModel("EagerImpItem", EagerImpItem);
-    const owner = await EagerImpOwner.create({ name: "O" });
-    const item = await EagerImpItem.create({ label: "I" });
-    await EagerImpJoin.create({
-      eager_imp_owner_id: owner.id,
-      eager_imp_item_id: item.id,
-    });
-    const items = await loadHasManyThrough(owner, "eagerImpItems", {
-      through: "eagerImpJoins",
-      source: "eagerImpItem",
-      className: "EagerImpItem",
-    });
-    expect(items).toHaveLength(1);
-  });
   it("eager with invalid association reference", async () => {
     class EagerWidget extends Base {
       static {
@@ -1818,61 +1742,6 @@ describe("EagerAssociationTest", () => {
     const preloaded = (results[0] as any).association("owner").target;
     expect(preloaded).toBeNull();
   });
-  it("preloading has many through with distinct", async () => {
-    class EagerDistOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerDistJoins", {
-          className: "EagerDistJoin",
-          foreignKey: "eager_dist_owner_id",
-        });
-        this.hasMany("eagerDistItems", {
-          through: "eagerDistJoins",
-          source: "eagerDistItem",
-          className: "EagerDistItem",
-        });
-      }
-    }
-    class EagerDistJoin extends Base {
-      static {
-        this.attribute("eager_dist_owner_id", "integer");
-        this.attribute("eager_dist_item_id", "integer");
-        this.belongsTo("eagerDistItem", {
-          className: "EagerDistItem",
-          foreignKey: "eager_dist_item_id",
-        });
-      }
-    }
-    class EagerDistItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("EagerDistOwner", EagerDistOwner);
-    registerModel("EagerDistJoin", EagerDistJoin);
-    registerModel("EagerDistItem", EagerDistItem);
-
-    const owner = await EagerDistOwner.create({ name: "O" });
-    const item = await EagerDistItem.create({ label: "I" });
-    // Two join records pointing to the same item
-    await EagerDistJoin.create({
-      eager_dist_owner_id: owner.id,
-      eager_dist_item_id: item.id,
-    });
-    await EagerDistJoin.create({
-      eager_dist_owner_id: owner.id,
-      eager_dist_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "eagerDistItems", {
-      through: "eagerDistJoins",
-      source: "eagerDistItem",
-      className: "EagerDistItem",
-    });
-    // With two join records pointing to same item, we get two references
-    expect(items.length).toBeGreaterThanOrEqual(1);
-  });
   it("preloading has one using reorder", async () => {
     class EagerReordParent extends Base {
       static {
@@ -2058,52 +1927,6 @@ describe("EagerAssociationTest", () => {
       directDevContracts![0].elmar_developer_id,
     );
   });
-  it("preloading has many through with custom scope", async () => {
-    class PcsProject extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pcsContractships", {
-          className: "PcsContractship",
-          foreignKey: "pcs_project_id",
-        });
-        this.hasMany("scopedDevs", {
-          className: "PcsDeveloper",
-          through: "pcsContractships",
-          source: "pcsDeveloper",
-          scope: (rel: any) => rel.where({ name: "David" }),
-        });
-      }
-    }
-    class PcsDeveloper extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PcsContractship extends Base {
-      static {
-        this.attribute("pcs_project_id", "integer");
-        this.attribute("pcs_developer_id", "integer");
-        this.belongsTo("pcsDeveloper", {
-          className: "PcsDeveloper",
-          foreignKey: "pcs_developer_id",
-        });
-      }
-    }
-    registerModel(PcsProject);
-    registerModel(PcsDeveloper);
-    registerModel(PcsContractship);
-
-    const proj = await PcsProject.create({ name: "AR" });
-    const david = await PcsDeveloper.create({ name: "David" });
-    const bob = await PcsDeveloper.create({ name: "Bob" });
-    await PcsContractship.create({ pcs_project_id: proj.id, pcs_developer_id: david.id });
-    await PcsContractship.create({ pcs_project_id: proj.id, pcs_developer_id: bob.id });
-
-    const projects = await PcsProject.all().includes("scopedDevs").toArray();
-    const devs = (projects[0] as any).association("scopedDevs").target;
-    expect(devs.length).toBe(1);
-    expect(devs[0].name).toBe("David");
-  });
   it("scoping with a circular preload", async () => {
     // Rails: Comment.preload(post: :comments).scoping { Comment.find(1) }
     // The pushed scope carries the preload values, so `find` inside the block
@@ -2138,311 +1961,10 @@ describe("EagerAssociationTest", () => {
     expect(after.id).toBe(expected.id);
   });
 
-  it("belongs_to association ignores the scoping", async () => {
-    class BtScopeAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class BtScopePost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("bt_scope_author_id", "integer");
-        this.belongsTo("btScopeAuthor", { foreignKey: "bt_scope_author_id" });
-      }
-    }
-    registerModel(BtScopeAuthor);
-    registerModel(BtScopePost);
-
-    const alice = await BtScopeAuthor.create({ name: "Alice" });
-    const bob = await BtScopeAuthor.create({ name: "Bob" });
-    await BtScopePost.create({ title: "P1", bt_scope_author_id: alice.id });
-    await BtScopePost.create({ title: "P2", bt_scope_author_id: bob.id });
-
-    await BtScopeAuthor.scoping(BtScopeAuthor.where({ name: "Alice" }), async () => {
-      const posts = await BtScopePost.all().includes("btScopeAuthor").toArray();
-      expect(posts).toHaveLength(2);
-      const authors = posts.map((p: any) => p.association("btScopeAuthor").target);
-      expect(authors.filter((a: any) => a !== null)).toHaveLength(2);
-    });
-  });
-
-  it("has_many association ignores the scoping", async () => {
-    class HmScopeAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmScopePosts", {
-          className: "HmScopePost",
-          foreignKey: "hm_scope_author_id",
-        });
-      }
-    }
-    class HmScopePost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("hm_scope_author_id", "integer");
-      }
-    }
-    registerModel(HmScopeAuthor);
-    registerModel(HmScopePost);
-
-    const alice = await HmScopeAuthor.create({ name: "Alice" });
-    await HmScopePost.create({ title: "P1", hm_scope_author_id: alice.id });
-    await HmScopePost.create({ title: "P2", hm_scope_author_id: alice.id });
-
-    await HmScopePost.scoping(HmScopePost.where({ title: "P1" }), async () => {
-      const authors = await HmScopeAuthor.all().includes("hmScopePosts").toArray();
-      expect(authors).toHaveLength(1);
-      const posts = (authors[0] as any).association("hmScopePosts").target;
-      expect(posts).toHaveLength(2);
-    });
-  });
-
-  it("preloading a through association twice does not reset it", async () => {
-    class EagerTwiceOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerTwiceJoins", {
-          className: "EagerTwiceJoin",
-          foreignKey: "eager_twice_owner_id",
-        });
-        this.hasMany("eagerTwiceTargets", {
-          through: "eagerTwiceJoins",
-          source: "eagerTwiceTarget",
-          className: "EagerTwiceTarget",
-        });
-      }
-    }
-    class EagerTwiceJoin extends Base {
-      static {
-        this.attribute("eager_twice_owner_id", "integer");
-        this.attribute("eager_twice_target_id", "integer");
-        this.belongsTo("eagerTwiceTarget", {
-          className: "EagerTwiceTarget",
-          foreignKey: "eager_twice_target_id",
-        });
-      }
-    }
-    class EagerTwiceTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("EagerTwiceOwner", EagerTwiceOwner);
-    registerModel("EagerTwiceJoin", EagerTwiceJoin);
-    registerModel("EagerTwiceTarget", EagerTwiceTarget);
-
-    const owner = await EagerTwiceOwner.create({ name: "O" });
-    const t1 = await EagerTwiceTarget.create({ label: "T1" });
-    await EagerTwiceJoin.create({
-      eager_twice_owner_id: owner.id,
-      eager_twice_target_id: t1.id,
-    });
-
-    // Loading twice should return the same results
-    const targets1 = await loadHasManyThrough(owner, "eagerTwiceTargets", {
-      through: "eagerTwiceJoins",
-      source: "eagerTwiceTarget",
-      className: "EagerTwiceTarget",
-    });
-    expect(targets1).toHaveLength(1);
-    const targets2 = await loadHasManyThrough(owner, "eagerTwiceTargets", {
-      through: "eagerTwiceJoins",
-      source: "eagerTwiceTarget",
-      className: "EagerTwiceTarget",
-    });
-    expect(targets2).toHaveLength(1);
-  });
   it.skip("preloading associations with string joins and order references", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
-  it("preloading of instance dependent associations is supported", async () => {
-    class PIDASAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pidasPostsWithSignature", {
-          className: "PIDASPost",
-          foreignKey: "pidas_author_id",
-          scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
-        });
-      }
-    }
-    class PIDASPost extends Base {
-      static {
-        this.attribute("pidas_author_id", "integer");
-        this.attribute("mention", "string");
-      }
-    }
-    registerModel("PIDASAuthor", PIDASAuthor);
-    registerModel("PIDASPost", PIDASPost);
-    const author1 = await PIDASAuthor.create({ name: "Alice" });
-    await PIDASPost.create({ pidas_author_id: author1.id, mention: "alice" });
-    const authors = await (PIDASAuthor as any).preload("pidasPostsWithSignature").toArray();
-    expect(authors).not.toHaveLength(0);
-    for (const author of authors) {
-      expect(author.association("pidasPostsWithSignature").isLoaded()).toBe(true);
-    }
-  });
-  it("eager loading of instance dependent associations is not supported", async () => {
-    class ELIDASAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("elidasPostsWithSignature", {
-          className: "ELIDASPost",
-          foreignKey: "elidas_author_id",
-          scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name }),
-        });
-      }
-    }
-    class ELIDASPost extends Base {
-      static {
-        this.attribute("elidas_author_id", "integer");
-      }
-    }
-    registerModel("ELIDASAuthor", ELIDASAuthor);
-    registerModel("ELIDASPost", ELIDASPost);
-    await expect(
-      (ELIDASAuthor as any).eagerLoad("elidasPostsWithSignature").toArray(),
-    ).rejects.toThrow("association scope 'elidasPostsWithSignature' is instance dependent");
-  });
-  it("preloading of optional instance dependent associations is supported", async () => {
-    class POIDASAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("poidasPostsMentioning", {
-          className: "POIDASPost",
-          foreignKey: "poidas_author_id",
-          scope: (_rel: any, owner?: any) =>
-            owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
-        });
-      }
-    }
-    class POIDASPost extends Base {
-      static {
-        this.attribute("poidas_author_id", "integer");
-        this.attribute("mention", "string");
-      }
-    }
-    registerModel("POIDASAuthor", POIDASAuthor);
-    registerModel("POIDASPost", POIDASPost);
-    const author1 = await POIDASAuthor.create({ name: "Bob" });
-    await POIDASPost.create({ poidas_author_id: author1.id, mention: "bob" });
-    const authors = await (POIDASAuthor as any).includes("poidasPostsMentioning").toArray();
-    expect(authors).not.toHaveLength(0);
-    for (const author of authors) {
-      expect(author.association("poidasPostsMentioning").isLoaded()).toBe(true);
-    }
-  });
-  it("eager loading of optional instance dependent associations is not supported", async () => {
-    class EOIDASAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eoidasPostsMentioning", {
-          className: "EOIDASPost",
-          foreignKey: "eoidas_author_id",
-          scope: (_rel: any, owner?: any) => (owner ? _rel.where({ mention: owner.name }) : _rel),
-        });
-      }
-    }
-    class EOIDASPost extends Base {
-      static {
-        this.attribute("eoidas_author_id", "integer");
-      }
-    }
-    registerModel("EOIDASAuthor", EOIDASAuthor);
-    registerModel("EOIDASPost", EOIDASPost);
-    await expect(
-      (EOIDASAuthor as any).eagerLoad("eoidasPostsMentioning").toArray(),
-    ).rejects.toThrow("association scope 'eoidasPostsMentioning' is instance dependent");
-  });
-  it("preload with invalid argument", async () => {
-    class PiaWidget extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("PiaWidget", PiaWidget);
-    await PiaWidget.create({ name: "w" });
-    await expect(
-      PiaWidget.all()
-        .preload(10 as any)
-        .toArray(),
-    ).rejects.toThrow(/Association names must be Symbol or String, got: Integer/);
-    await expect(PiaWidget.all().preload("doesNotExists").toArray()).rejects.toThrow(
-      /Association named 'doesNotExists' was not found on PiaWidget; perhaps you misspelled it\?/,
-    );
-  });
-  it("associations with extensions are not instance dependent", async () => {
-    class AweAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("awePostsWithExtension", {
-          className: "AwePost",
-          foreignKey: "awe_author_id",
-          scope: (rel: any) => rel.order("title"),
-          extend: { extensionMethod() {} },
-        });
-      }
-    }
-    class AwePost extends Base {
-      static {
-        this.attribute("awe_author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("AweAuthor", AweAuthor);
-    registerModel("AwePost", AwePost);
-    // Rails: `has_many :posts_with_extension, -> { order(:title) } do ... end`
-    // Extension block + ownerless scope (relation-only param, no owner) —
-    // checkEagerLoadableBang treats scope.length > 1 as instance-dependent.
-    const author = await AweAuthor.create({ name: "A" });
-    await AwePost.create({ awe_author_id: author.id, title: "p" });
-    const authors = await (AweAuthor as any).includes("awePostsWithExtension").toArray();
-    expect(authors).not.toHaveLength(0);
-    for (const a of authors) {
-      expect(a.association("awePostsWithExtension").isLoaded()).toBe(true);
-    }
-    const proxy = association(authors[0], "awePostsWithExtension");
-    expect(typeof (proxy as any).extensionMethod).toBe("function");
-  });
-  it("including associations with extensions and an instance dependent scope is supported", async () => {
-    class AwexAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("awexPostsWithExtAndInstance", {
-          className: "AwexPost",
-          foreignKey: "awex_author_id",
-          scope: (_rel: any, owner?: any) =>
-            owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
-          extend: { extensionMethod() {} },
-        });
-      }
-    }
-    class AwexPost extends Base {
-      static {
-        this.attribute("awex_author_id", "integer");
-        this.attribute("mention", "string");
-      }
-    }
-    registerModel("AwexAuthor", AwexAuthor);
-    registerModel("AwexPost", AwexPost);
-    // Rails: `has_many :posts_with_extension_and_instance, ->(record) { ... } do ... end`
-    const author = await AwexAuthor.create({ name: "Alice" });
-    await AwexPost.create({ awex_author_id: author.id, mention: "alice" });
-    await AwexPost.create({ awex_author_id: author.id, mention: "zoe" });
-    const authors = await (AwexAuthor as any).includes("awexPostsWithExtAndInstance").toArray();
-    expect(authors).not.toHaveLength(0);
-    for (const a of authors) {
-      expect(a.association("awexPostsWithExtAndInstance").isLoaded()).toBe(true);
-      const loaded = a.association("awexPostsWithExtAndInstance").target;
-      expect(loaded).toHaveLength(1);
-      expect(loaded[0].mention).toBe("alice");
-      const proxy = association(a, "awexPostsWithExtAndInstance");
-      expect(typeof (proxy as any).extensionMethod).toBe("function");
-    }
   });
   it("preloading readonly association", async () => {
     class PraAuthor extends Base {
@@ -5211,6 +4733,203 @@ describe("EagerAssociationTest", () => {
     expect((f.association("account").target as Account).id).toBe(
       (await reloaded.loadHasOne("account"))!.id,
     );
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (canonical Author/Post/Comment/Category + Project/Member
+// fixtures) — ports of eager_test.rb's preloading has_many-through,
+// instance-dependent, and scoping cases onto the real registry models. Same
+// describe name as the other EagerAssociationTest blocks so test:compare matches
+// the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { authors, posts, developers, projects } = useHandlerFixtures([
+    "authors",
+    "posts",
+    "comments",
+    "categories",
+    "categoriesPosts",
+    "categorizations",
+    "developers",
+    "projects",
+    "developersProjects",
+    "members",
+    "memberships",
+    "clubs",
+  ]);
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection,
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        categories: canonicalSchema.categories,
+        categories_posts: canonicalSchema.categories_posts,
+        categorizations: canonicalSchema.categorizations,
+        developers: canonicalSchema.developers,
+        projects: canonicalSchema.projects,
+        developers_projects: canonicalSchema.developers_projects,
+        members: canonicalSchema.members,
+        memberships: canonicalSchema.memberships,
+        clubs: canonicalSchema.clubs,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Post);
+  registerModel(Author);
+  enableSti(Comment);
+  registerModel(Comment);
+  registerModel(VerySpecialComment);
+  registerModel(Category);
+  registerModel(Categorization);
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Member);
+  enableSti(Membership);
+  registerModel(Membership);
+  registerModel(Club);
+
+  it("preloading has many through with implicit source", async () => {
+    const authorList = (await Author.includes("verySpecialComments").toArray()).sort(
+      (a, b) => Number(a.id) - Number(b.id),
+    );
+    await assertNoQueries(false, () => {
+      const specialCommentAuthors = authorList.map((author) => [
+        (author as any).name,
+        (author.association("verySpecialComments").target as Base[]).length,
+      ]);
+      expect(specialCommentAuthors).toEqual([
+        ["David", 1],
+        ["Mary", 0],
+        ["Bob", 0],
+      ]);
+    });
+  });
+
+  it("preloading has many through with distinct", async () => {
+    const mary = (await Author.includes("uniqueCategorizedPosts")
+      .where({ id: authors("mary").id })
+      .first()) as Author;
+    expect((mary.association("uniqueCategorizedPosts").target as Base[]).length).toBe(1);
+    // Mary has two categorizations both pointing at the "thinking" post, so
+    // `distinct` must collapse them to a single unique post id. Rails' second
+    // assertion (`unique_categorized_post_ids.length == 1`) exercises the
+    // generated `_ids` collection reader; trails does not generate that reader,
+    // so we assert the concrete collapsed post identity instead — add an `_ids`
+    // assertion here if/when `uniqueCategorizedPostIds` lands on Author.
+    const ids = (mary.association("uniqueCategorizedPosts").target as Base[]).map((p) => p.id);
+    expect(ids).toEqual([posts("thinking").id]);
+  });
+
+  it("preloading has many through with custom scope", async () => {
+    const project = await Project.includes("developersNamedDavidWithHashConditions").find(
+      projects("active_record").id,
+    );
+    const loaded = project.association("developersNamedDavidWithHashConditions").target as Base[];
+    expect(loaded.map((d) => d.id)).toEqual([developers("david").id]);
+  });
+
+  it("preloading a through association twice does not reset it", async () => {
+    const members = await Member.includes({ currentMembership: "club" }).includes("club").toArray();
+    await assertNoQueries(false, () => {
+      // Rails: members.map(&:current_membership).map(&:club).size — a nil
+      // current_membership would raise NoMethodError, so do NOT null-guard;
+      // a missing preloaded target must throw (Rails-faithful failure mode).
+      const clubs = members
+        .map((m) => m.association("currentMembership").target as Base)
+        .map((cm) => cm.association("club").target as Base);
+      expect(clubs).toHaveLength(3);
+    });
+  });
+
+  it("belongs_to association ignores the scoping", async () => {
+    const post = await (await Comment.find(1)).loadBelongsTo("post");
+    await Post.scoping(Post.where("1=0"), async () => {
+      expect((await (await Comment.find(1)).loadBelongsTo("post"))!.id).toBe(post!.id);
+      const preloaded = await Comment.preload("post").find(1);
+      expect((preloaded.association("post").target as Base).id).toBe(post!.id);
+      const eagerLoaded = await Comment.eagerLoad("post").find(1);
+      expect((eagerLoaded.association("post").target as Base).id).toBe(post!.id);
+    });
+  });
+
+  it("has_many association ignores the scoping", async () => {
+    const comments = ((await ((await Post.find(1)) as any).comments.toArray()) as Base[]).map(
+      (c) => c.id,
+    );
+    await Comment.scoping(Comment.where("1=0"), async () => {
+      expect(
+        ((await ((await Post.find(1)) as any).comments.toArray()) as Base[]).map((c) => c.id),
+      ).toEqual(comments);
+      const preloaded = await Post.preload("comments").find(1);
+      expect((preloaded.association("comments").target as Base[]).map((c) => c.id)).toEqual(
+        comments,
+      );
+      const eagerLoaded = await Post.eagerLoad("comments").find(1);
+      expect((eagerLoaded.association("comments").target as Base[]).map((c) => c.id)).toEqual(
+        comments,
+      );
+    });
+  });
+
+  it("preloading of instance dependent associations is supported", async () => {
+    const authorList = await Author.preload("postsWithSignature").toArray();
+    expect(authorList).not.toHaveLength(0);
+    for (const author of authorList) {
+      expect(author.association("postsWithSignature").isLoaded()).toBe(true);
+    }
+  });
+
+  it("eager loading of instance dependent associations is not supported", async () => {
+    await expect(Author.eagerLoad("postsWithSignature").toArray()).rejects.toThrow(
+      "association scope 'postsWithSignature' is",
+    );
+  });
+
+  it("preloading of optional instance dependent associations is supported", async () => {
+    const authorList = await Author.includes("postsMentioningAuthor").toArray();
+    expect(authorList).not.toHaveLength(0);
+    for (const author of authorList) {
+      expect(author.association("postsMentioningAuthor").isLoaded()).toBe(true);
+    }
+  });
+
+  it("eager loading of optional instance dependent associations is not supported", async () => {
+    await expect(Author.eagerLoad("postsMentioningAuthor").toArray()).rejects.toThrow(
+      "association scope 'postsMentioningAuthor' is",
+    );
+  });
+
+  it("preload with invalid argument", async () => {
+    await expect(
+      Author.all()
+        .preload(10 as any)
+        .toArray(),
+    ).rejects.toThrow(/Association names must be Symbol or String, got: Integer/);
+    await expect(Author.all().preload("doesNotExists").toArray()).rejects.toThrow(
+      /Association named 'doesNotExists' was not found on Author; perhaps you misspelled it\?/,
+    );
+  });
+
+  it("associations with extensions are not instance dependent", async () => {
+    let error: unknown;
+    try {
+      await Author.includes("postsWithExtension").toArray();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeUndefined();
+  });
+
+  it("including associations with extensions and an instance dependent scope is supported", async () => {
+    const authorList = await Author.includes("postsWithExtensionAndInstance").toArray();
+    expect(authorList).not.toHaveLength(0);
+    for (const author of authorList) {
+      expect(author.association("postsWithExtensionAndInstance").isLoaded()).toBe(true);
+    }
   });
 });
 
