@@ -77,8 +77,10 @@ export async function updateCounters(
  * - composite PK, array of tuples → `("a" = 1 AND "b" = 2) OR ("a" = 3 AND "b" = 4)`
  *
  * Returns the always-false `1=0` sentinel (matching
- * `ModelSchema.buildPkWhereNode`) when the id list is empty, when a
- * composite tuple has the wrong arity, or when any value is null/undefined.
+ * `ModelSchema.buildPkWhereNode`) when the id list is empty, when a composite
+ * tuple has the wrong arity, or when a scalar id is null/undefined. A null
+ * *component* of a composite tuple is rendered as `IS NULL` (Rails Arel
+ * behavior), not a no-op.
  */
 function buildPkPredicate(
   modelClass: typeof Base,
@@ -95,8 +97,14 @@ function buildPkPredicate(
     const groupings: InstanceType<typeof Nodes.Node>[] = [];
     for (const tuple of tuples) {
       if (!Array.isArray(tuple) || tuple.length !== pk.length) return arelSql("1=0");
-      if (tuple.some((v) => v === null || v === undefined)) return arelSql("1=0");
-      const conditions = pk.map((col, i) => table.get(col).eq(tuple[i]));
+      // A null component is an IS NULL match (Rails Arel `where(pk => [nil, n])`
+      // → `shop_id IS NULL AND id = n`), not a no-op — composite-PK fixtures on
+      // a single-id table (e.g. CpkOrder) leave the extra key column NULL.
+      const conditions = pk.map((col, i) =>
+        tuple[i] === null || tuple[i] === undefined
+          ? table.get(col).eq(null)
+          : table.get(col).eq(tuple[i]),
+      );
       groupings.push(new Nodes.Grouping(new Nodes.And(conditions)));
     }
     if (groupings.length === 1) return groupings[0];

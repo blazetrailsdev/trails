@@ -282,14 +282,29 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
   }
 }
 
-/** @internal */
+/**
+ * Mirrors ActiveRecord::Associations::CollectionAssociation#update_counter_in_memory:
+ * the has_many bumps the owner's counter in memory only when
+ * `counter_must_be_updated_by_has_many?` — otherwise, with counter_cache on
+ * both sides, this bump leaks into the belongs_to `increment!` delta
+ * (in_memory − in_database) on the next insert and inflates the counter.
+ * @internal
+ */
 function updateCounterInMemory(assoc: HasManyAssociation, difference: number): void {
   const counterCol = assoc.reflection.options.counterCache;
-  if (counterCol) {
-    const owner = assoc.owner as any;
-    const current = Number(owner.readAttribute?.(String(counterCol)) ?? 0);
-    owner.writeAttribute?.(String(counterCol), current + difference);
-  }
+  if (!counterCol) return;
+  // `assoc.reflection` is the raw definition; resolve the rich reflection the
+  // same way `deleteRecords` does above.
+  const ctor = assoc.owner.constructor as typeof Base & {
+    _reflectOnAssociation?: (n: string) => { isCounterMustBeUpdatedByHasMany?: () => boolean };
+  };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  if (refl?.isCounterMustBeUpdatedByHasMany?.() === false) return;
+  const owner = assoc.owner as any;
+  const column = String(counterCol);
+  const current = Number(owner.readAttribute?.(column) ?? 0);
+  owner.writeAttribute?.(column, current + difference);
+  owner.clearAttributeChange?.(column);
 }
 
 /** @internal */
