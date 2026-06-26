@@ -19,7 +19,7 @@ describe("EagerSingularizationTest", () => {
       octopi: { species: "string" },
       passes: { bus_id: "integer", rides: "integer" },
       buses: { name: "string" },
-      crises_messes: {
+      es_crises_messes: {
         columns: { crisis_id: "integer", mess_id: "integer" },
         primaryKey: false,
       },
@@ -102,7 +102,7 @@ describe("EagerSingularizationTest", () => {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("crises", {
           className: "EsCrisis",
-          joinTable: "crises_messes",
+          joinTable: "es_crises_messes",
           foreignKey: "mess_id",
           associationForeignKey: "crisis_id",
         });
@@ -121,7 +121,7 @@ describe("EagerSingularizationTest", () => {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("messes", {
           className: "EsMess",
-          joinTable: "crises_messes",
+          joinTable: "es_crises_messes",
           foreignKey: "crisis_id",
           associationForeignKey: "mess_id",
         });
