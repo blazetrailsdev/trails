@@ -42,6 +42,5 @@
   "packages/activerecord/src/strict-loading.test.ts",
   "packages/activerecord/src/timestamp.test.ts",
   "packages/activerecord/src/transactions.test.ts",
-  "packages/activerecord/src/validations/uniqueness-validation.test.ts",
-  "packages/activerecord/src/validations/validations.test.ts"
+  "packages/activerecord/src/validations/uniqueness-validation.test.ts"
 ]
