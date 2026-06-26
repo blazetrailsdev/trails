@@ -4143,23 +4143,18 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     // Use touchAttributesWithTime so alias-resolved column names are used
-    // (e.g. Developer.updated_at → legacy_updated_at).
+    // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
+    // so optimistic locking (lock_version increment) is applied — mirrors Rails
+    // touch_all which calls update_all internally (relation.rb).
     const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
-    const updates: Record<string, unknown> = { ...touchUpdates };
+    const updates: Record<string, unknown> = {};
+    for (const [col, time] of Object.entries(touchUpdates)) {
+      updates[col] = new Nodes.Quoted(time);
+    }
 
     if (Object.keys(updates).length === 0) return 0;
 
-    const table = this._modelClass.arelTable;
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
-      ([key, val]) => [table.get(key), val],
-    );
-    const um = new UpdateManager().table(table).set(updateValues);
-    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
-      um.where(node);
-    }
-
-    const [touchSql, touchBinds] = this._compileAstWithBinds(um.ast);
-    return this._conn().executeMutation(touchSql, touchBinds);
+    return this.updateAll(updates);
   }
 
   /**

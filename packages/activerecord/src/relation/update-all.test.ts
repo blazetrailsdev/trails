@@ -167,8 +167,8 @@ describe("UpdateAllTest", () => {
 
     await greetingsComment.reload();
     await moreGreetingsComment.reload();
-    expect(greetingsComment.post_id).toBe(thinkingPost.id);
-    expect(moreGreetingsComment.post_id).toBe(welcomePost.id);
+    expect(greetingsComment.post_id).toBe(Number(thinkingPost.id));
+    expect(moreGreetingsComment.post_id).toBe(Number(welcomePost.id));
   });
 
   it("update all with joins and offset and order", async () => {
@@ -186,8 +186,8 @@ describe("UpdateAllTest", () => {
 
     await moreGreetingsComment.reload();
     await greetingsComment.reload();
-    expect(moreGreetingsComment.post_id).toBe(thinkingPost.id);
-    expect(greetingsComment.post_id).toBe(welcomePost.id);
+    expect(moreGreetingsComment.post_id).toBe(Number(thinkingPost.id));
+    expect(greetingsComment.post_id).toBe(Number(welcomePost.id));
   });
 
   it("update counters with joins", async () => {
@@ -413,11 +413,7 @@ describe("UpdateAllTest", () => {
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
   });
 
-  // TRACKED DEVIATION: Relation#touchAll does not increment lock_version.
-  // Rails touch_all calls update_all which goes through _incrementAttribute for lock_version.
-  // Trails touchAll builds a raw UpdateManager and bypasses updateAll, so lock_version
-  // is never incremented.
-  it.skip("touch all cares about optimistic locking", async () => {
+  it("touch all cares about optimistic locking", async () => {
     const david = people("david");
 
     const now = instant("2015-01-01T12:00:00Z");
