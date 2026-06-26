@@ -222,7 +222,7 @@ describe("RelationMergingTest", () => {
     const expected = await (await Post.find(1)).lastComment;
     for (const rel of relations) {
       const posts = await rel.toArray();
-      const post = posts.find((p: any) => p.id === 1);
+      const post = posts.find((p: any) => Number(p.id) === 1);
       expect((await (post as any).lastComment)?.id).toEqual((expected as any)?.id);
     }
   });
@@ -390,7 +390,15 @@ describe("RelationMergingTest", () => {
 describe("MergingDifferentRelationsTest", () => {
   const { posts } = useHandlerFixtures(
     ["posts", "authors", "authorAddresses", "developers", "comments"],
-    { schema: canonicalSchema },
+    {
+      schema: canonicalSchema,
+      // The same-alias CTE case deliberately triggers a StatementInvalid, which
+      // aborts the PG transaction and would poison shared transactional
+      // fixtures; run it outside the shared transaction.
+      usesTransaction: [
+        "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
+      ],
+    },
   );
 
   it("merging where relations", async () => {
@@ -454,7 +462,7 @@ describe("MergingDifferentRelationsTest", () => {
     const postsWithComments = Post.where("legacy_comments_count > 0");
     const relation = postsWithComments.merge(postsWithTags).order("posts.id");
 
-    expect(await relation.pluck("id")).toEqual([1, 2, 7]);
+    expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
   });
 
   it("merging multiple relations with common table expression", async () => {
@@ -469,7 +477,7 @@ describe("MergingDifferentRelationsTest", () => {
       )
       .order("posts.id");
 
-    expect(await relation.pluck("id")).toEqual([1, 2, 7]);
+    expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
   });
 
   it("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", async () => {
