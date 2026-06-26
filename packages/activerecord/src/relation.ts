@@ -2987,17 +2987,17 @@ export class Relation<T extends Base> {
   }
 
   private referencesEagerLoadedTables(): boolean {
-    if (this._referencesValues.length === 0) return false;
     if (this._includesAssociations.length === 0) return false;
+    if (this._referencesValues.length === 0) return false;
 
-    // Rails references_eager_loaded_tables? (relation.rb) calls build_joins([]) and
-    // iterates the returned nodes: StringJoin → tables_in_string(join.left),
-    // other joins → join.left.name. Mirror that: strings become StringJoin and we
-    // extract via tablesInString; Arel nodes expose their table via left.name when
-    // available (InnerJoin/OuterJoin/LeadingJoin all have left: Table).
+    // Mirrors Rails references_eager_loaded_tables? (relation.rb:1474-1488): calls
+    // build_joins([]) and extracts table names from the returned join nodes
+    // (StringJoin → tables_in_string(join.left), other → join.left.name), then checks
+    // whether any references_values are NOT in that joined-tables set. Only
+    // references_values are consulted; Rails does not scan WHERE predicates.
     // _leftOuterJoinsValues holds association names (not table names). Rails
     // build_joins([]) processes left_outer_joins_values and extracts table names
-    // from the resulting join nodes. We resolve via _resolveAssociationJoin to
+    // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
     const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
@@ -3687,6 +3687,15 @@ export class Relation<T extends Base> {
     // before compiling the probe (Rails materializes at `.where()`-build time).
     await rel._materializeDeferredDistinctPkPredicates();
     if (rel._whereClause.isContradiction()) return false;
+    // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
+    // when includes are promoted to a JOIN strategy, re-execute on the join-dependency
+    // relation so the LEFT OUTER JOIN is emitted into the probe query.
+    if (rel._eagerLoadingForSql()) {
+      // Mirrors Rails FinderMethods#exists? (finder_methods.rb:370):
+      // `apply_join_dependency(eager_loading: false)` — hardcoded false skips
+      // the limit/offset+non-limitable-collection guard in apply_join_dependency.
+      return rel.applyJoinDependencyForArel(false).exists();
+    }
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
     // existence probe that never instantiates records (no after_find /
     // association loading) and doesn't go through count()'s limit
@@ -3970,7 +3979,33 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update_all
    */
-  async updateAll(updates: Record<string, unknown>): Promise<number> {
+  async updateAll(
+    updates: Record<string, unknown> | string | [string, ...unknown[]],
+  ): Promise<number> {
+    // Mirrors Rails relation.rb#update_all: accepts a Hash, a SQL string, or an
+    // Array [sql, *binds] (sanitize_sql_for_assignment). The blank/none checks
+    // mirror Rails' order (blank precedes none?).
+    if (Array.isArray(updates)) {
+      const [sql, ...binds] = updates;
+      if (!sql || typeof sql !== "string")
+        throw new ArgumentError("Empty list of attributes to change");
+      if (this._isNone) return 0;
+      await this._materializeDeferredDistinctPkPredicates();
+      const boundSql = new Nodes.BoundSqlLiteral(
+        sql,
+        binds.map((v) => {
+          return _qm.normalizeBoundValue.call(this as any, v);
+        }),
+        {},
+      );
+      return this._execUpdateAll(boundSql);
+    }
+    if (typeof updates === "string") {
+      if (!updates) throw new ArgumentError("Empty list of attributes to change");
+      if (this._isNone) return 0;
+      await this._materializeDeferredDistinctPkPredicates();
+      return this._execUpdateAll(new Nodes.SqlLiteral(updates));
+    }
     // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
     if (Object.keys(updates).length === 0)
       throw new ArgumentError("Empty list of attributes to change");
@@ -4004,16 +4039,16 @@ export class Relation<T extends Base> {
         updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
       }
     }
+    return this._execUpdateAll(updateValues);
+  }
+
+  private async _execUpdateAll(
+    updateValues: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
+  ): Promise<number> {
+    const table = this._modelClass.arelTable;
     const primaryKey = this._modelClass.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      // Mirrors Rails `update_all` (relation.rb:606-617): build the arel from
-      // `apply_join_dependency.arel` when eager-loading, else `build_arel`, then
-      // `compile_update`. The join sources are preserved so the visitor rewrites
-      // a joined UPDATE into `UPDATE ... WHERE pk IN (SELECT pk ... JOIN ...)`,
-      // honoring a default_scope JOIN predicate (`projects.name`) that a bare
-      // UpdateManager would drop. `arel.source.left = table` forces the UPDATE
-      // target back to the model table.
       const arel = this._eagerLoadingForSql()
         ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
         : this._buildArel();
@@ -4025,14 +4060,12 @@ export class Relation<T extends Base> {
         : table.get(primaryKey);
       stmtAst = arel.compileUpdate(updateValues, key, havingAst, groupColumns).ast;
     } else {
-      // No primary key — fall back to a plain UpdateManager.
       const um = new UpdateManager().table(table).set(updateValues);
       for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
         um.where(node);
       }
       stmtAst = um.ast;
     }
-
     const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execUpdate(
       updateSql,
@@ -4142,37 +4175,19 @@ export class Relation<T extends Base> {
   async touchAll(...names: string[]): Promise<number> {
     if (this._isNone) return 0;
 
-    const now = Temporal.Now.instant();
+    // Use touchAttributesWithTime so alias-resolved column names are used
+    // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
+    // so optimistic locking (lock_version increment) is applied — mirrors Rails
+    // touch_all which calls update_all internally (relation.rb).
+    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
     const updates: Record<string, unknown> = {};
-    const aliases = this._modelClass._attributeAliases ?? {};
-
-    // Mirrors Rails timestamp_attributes_for_update: ["updated_at", "updated_on"]
-    // each resolved through attribute_aliases, then intersected with column_names.
-    for (const tsName of ["updated_at", "updated_on"]) {
-      const col = aliases[tsName] ?? tsName;
-      if (this._modelClass._attributeDefinitions.has(col)) {
-        updates[col] = now;
-      }
-    }
-    // Mirrors Rails touch_attributes_with_time: explicit names also resolved through aliases.
-    for (const name of names) {
-      const col = aliases[name] ?? name;
-      updates[col] = now;
+    for (const [col, time] of Object.entries(touchUpdates)) {
+      updates[col] = new Nodes.Quoted(time);
     }
 
     if (Object.keys(updates).length === 0) return 0;
 
-    const table = this._modelClass.arelTable;
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
-      ([key, val]) => [table.get(key), val],
-    );
-    const um = new UpdateManager().table(table).set(updateValues);
-    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
-      um.where(node);
-    }
-
-    const [touchSql, touchBinds] = this._compileAstWithBinds(um.ast);
-    return this._conn().executeMutation(touchSql, touchBinds);
+    return this.updateAll(updates);
   }
 
   /**
@@ -6158,6 +6173,16 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#update
    */
   async update(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
+    if (
+      id !== null &&
+      typeof id === "object" &&
+      attrs !== undefined &&
+      "_isActiveRecordBase" in ((id as any).constructor ?? {})
+    ) {
+      throw new ArgumentError(
+        `You are passing an instance of ActiveRecord::Base to \`update\`. Please pass the id of the object by calling \`.id\`.`,
+      );
+    }
     if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
       // update(attrs) form — update all matching records
       const updates = (id ?? {}) as Record<string, unknown>;
@@ -6257,14 +6282,21 @@ export class Relation<T extends Base> {
    * wrapper keeps NULL counters from propagating through the arithmetic.
    */
   async updateCounters(
-    counters: Record<string, number>,
-    options?: { touch?: boolean | string | string[] },
+    counters: Record<string, number | { time?: Temporal.Instant }>,
+    options?: { touch?: boolean | string | string[] | { time?: Temporal.Instant } },
   ): Promise<number> {
     if (this._isNone) return 0;
 
+    // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
+    const touchFromCounters = (counters as Record<string, unknown>).touch;
+    const normalCounters: Record<string, number> = {};
+    for (const [k, v] of Object.entries(counters)) {
+      if (k !== "touch") normalCounters[k] = v as number;
+    }
+
     const updates: Record<string, unknown> = {};
 
-    for (const [counterName, value] of Object.entries(counters)) {
+    for (const [counterName, value] of Object.entries(normalCounters)) {
       // Mirror Rails Relation#update_counters: `attr = table[counter_name]` →
       // `updates[attr.name] = _increment_attribute(attr, value)` (relation.rb:930).
       // resolveAliasedColumn bridges a counter cache on an aliased column to the
@@ -6275,17 +6307,37 @@ export class Relation<T extends Base> {
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
-    if (options?.touch) {
+    const touchOption = touchFromCounters ?? options?.touch;
+    if (touchOption) {
       // `touch: []` is an explicit "skip timestamp updates" signal. Rails'
       // counter_cache test `update counters doesn't touch timestamps with
       // touch: []` asserts this behavior (its Rails implementation is
       // incidentally a no-op because the test never reloads the record).
-      const isEmptyArray = Array.isArray(options.touch) && options.touch.length === 0;
+      const isEmptyArray = Array.isArray(touchOption) && touchOption.length === 0;
       if (!isEmptyArray) {
-        const names = options.touch === true ? [] : ([] as string[]).concat(options.touch);
-        const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
-        for (const [col, time] of Object.entries(touchUpdates)) {
-          updates[col] = new Nodes.Quoted(time);
+        // touch: { time: now } — Rails: when touch is a Hash, extract :time for explicit timestamp
+        const explicitTime =
+          touchOption !== null &&
+          typeof touchOption === "object" &&
+          !Array.isArray(touchOption) &&
+          "time" in touchOption
+            ? (touchOption as { time: Temporal.Instant }).time
+            : undefined;
+
+        if (explicitTime) {
+          // Explicit time: resolve timestamp columns (same as touchAttributesWithTime) but
+          // use the given time instead of currentTimeFromProperTimezone().
+          const attrs = touchAttributesWithTime.call(this._modelClass);
+          for (const col of Object.keys(attrs)) {
+            updates[col] = new Nodes.Quoted(explicitTime);
+          }
+        } else {
+          const names =
+            touchOption === true ? [] : ([] as string[]).concat(touchOption as string | string[]);
+          const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
+          for (const [col, time] of Object.entries(touchUpdates)) {
+            updates[col] = new Nodes.Quoted(time);
+          }
         }
       }
     }
