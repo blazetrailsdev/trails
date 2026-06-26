@@ -28,8 +28,6 @@
   "packages/activerecord/src/persistence.test.ts",
   "packages/activerecord/src/reflection.test.ts",
   "packages/activerecord/src/relation.trails.test.ts",
-  "packages/activerecord/src/relation/delete-all.test.ts",
-  "packages/activerecord/src/relation/update-all.test.ts",
   "packages/activerecord/src/relation/where.test.ts",
   "packages/activerecord/src/relations.test.ts",
   "packages/activerecord/src/serialized-attribute.test.ts",

@@ -17,6 +17,7 @@ export class Pet extends Base {
   declare persons: AssociationProxy<Person>;
   declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
   declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare integer: number | null;
   declare name: string;
   declare owner_id: number;
   declare pet_id: number;

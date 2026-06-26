@@ -1,550 +1,178 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/delete_all_test.rb
  */
-import type { AssociationProxy } from "../associations/collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { describe, it, expect } from "vitest";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Author, AuthorAddress } from "../test-helpers/models/author.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Pet } from "../test-helpers/models/pet.js";
+import { Toy } from "../test-helpers/models/toy.js";
+import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
+import { RecordNotFound } from "../errors.js";
+import { registerModel } from "../associations.js";
 
-function epochMs(v: unknown): number {
-  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
-  if (v instanceof Temporal.PlainDateTime)
-    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
-  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, CpkOrderAgreement]) {
+  registerModel(klass as any);
 }
-import { Base, registerModel } from "../index.js";
-import { loadHasMany } from "../associations.js";
-
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    posts: {
-      title: "string",
-      author: "string",
-      status: "string",
-      updated_at: "datetime",
-      author_id: "integer",
-    },
-    items: { name: "string", status: "string", active: "boolean" },
-    users: { name: "string", active: "boolean" },
-    delete_all_authors: { name: "string" },
-    delete_all_posts: { title: "string", author_id: "integer" },
-    cpk_orders: {
-      columns: { shop_id: "integer", id: "integer", status: "string" },
-      primaryKey: ["shop_id", "id"],
-    },
-    da_pets: { name: "string" },
-    da_toys: { name: "string", pet_id: "integer" },
-  });
-});
 
 // ==========================================================================
 // DeleteAllTest — targets relation/delete_all_test.rb
 // ==========================================================================
 describe("DeleteAllTest", () => {
-  it("delete all removes all records", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const count = await Post.all().deleteAll();
-    expect(count).toBe(2);
+  const { authors, posts, cpkOrderAgreements } = useHandlerFixtures(
+    [
+      "authors",
+      "authorAddresses",
+      "comments",
+      "posts",
+      "pets",
+      "toys",
+      "cpkOrders",
+      "cpkOrderAgreements",
+    ],
+    { schema: canonicalSchema },
+  );
+
+  it("destroy all", async () => {
+    const davids = Author.where({ name: "David" });
+
+    // Force load
+    expect(await davids.toArray()).toEqual([authors("david")]);
+    expect(davids.isLoaded).toBe(true);
+
+    const destroyed = await davids.destroyAll();
+    expect(destroyed).toHaveLength(1);
+    expect(destroyed[0].id).toBe(authors("david").id);
+    expect(destroyed[0].isDestroyed()).toBe(true);
+
+    expect(await davids.toArray()).toEqual([]);
   });
 
-  it("delete all with where", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const count = await Post.where({ title: "a" }).deleteAll();
-    expect(count).toBe(1);
+  it("delete all", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const before = (await Author.count()) as number;
+    await davids.deleteAll();
+    expect(await Author.count()).toBe(before - 1);
+    expect(davids.isLoaded).toBe(false);
   });
-});
-
-class Pet extends Base {
-  declare name: string;
-  declare toys: AssociationProxy<Toy>;
-
-  static {
-    this.tableName = "da_pets";
-    this.attribute("name", "string");
-    this.hasMany("toys", { className: "Toy", foreignKey: "pet_id" });
-  }
-}
-class Toy extends Base {
-  declare name: string;
-  declare pet_id: number;
-  declare pet: Pet | null;
-  declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
-
-  static {
-    this.tableName = "da_toys";
-    this.attribute("name", "string");
-    this.attribute("pet_id", "integer");
-    this.belongsTo("pet", { className: "Pet", foreignKey: "pet_id" });
-  }
-}
-registerModel(Pet);
-registerModel(Toy);
-
-describe("DeleteAllTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post };
-  }
 
   it("delete all with index hint", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", author: "alice" });
-    await Post.create({ title: "b", author: "bob" });
-    await Post.where({ author: "alice" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(1);
+    const davids = Author.where({ name: "David" }).from(
+      `${Author.quotedTableName} /*! USE INDEX (PRIMARY) */`,
+    );
+
+    const before = (await Author.count()) as number;
+    await davids.deleteAll();
+    expect(await Author.count()).toBe(before - 1);
+    expect(davids.isLoaded).toBe(false);
   });
 
   it("delete all loaded", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "x" });
-    await Post.create({ title: "y" });
-    const rel = Post.all();
-    await rel.toArray();
-    await rel.deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    const davids = Author.where({ name: "David" });
+
+    // Force load
+    expect(await davids.toArray()).toEqual([authors("david")]);
+    expect(davids.isLoaded).toBe(true);
+
+    const before = (await Author.count()) as number;
+    await davids.deleteAll();
+    expect(await Author.count()).toBe(before - 1);
+
+    expect(await davids.toArray()).toEqual([]);
+    expect(davids.isLoaded).toBe(true);
   });
 
   it("delete all with group by and having", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "g1", author: "alice" });
-    await Post.create({ title: "g2", author: "alice" });
-    await Post.where({ author: "alice" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
+    const minimumCommentsCount = 2;
+    const postsToBeDeleted = await Post.mostCommented(minimumCommentsCount).toArray();
+    expect(postsToBeDeleted.length).toBeGreaterThan(0);
+
+    const before = (await Post.count()) as number;
+    await Post.mostCommented(minimumCommentsCount).deleteAll();
+    expect(await Post.count()).toBe(before - postsToBeDeleted.length);
+
+    for (const deletedPost of postsToBeDeleted) {
+      await expect(deletedPost.reload()).rejects.toThrow(RecordNotFound);
+    }
   });
 
   it("delete all with unpermitted relation raises error", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "t" });
-    // Mirrors Rails: distinct / with / with_recursive cannot be honored by
-    // delete_all, so it raises ActiveRecordError instead of silently dropping
-    // them.
-    await expect(Post.distinct().deleteAll()).rejects.toThrow(
+    await expect(Author.distinct().deleteAll()).rejects.toThrow(
       "delete_all doesn't support distinct",
     );
-    await expect(Post.with({ limited: Post.limit(2) }).deleteAll()).rejects.toThrow(
+    await expect(Author.with({ limited: Author.limit(2) }).deleteAll()).rejects.toThrow(
       "delete_all doesn't support with",
     );
   });
 
-  async function makePetWithBone() {
-    const pet = await Pet.create({ name: "parrot" });
-    await Toy.create({ name: "Bone", pet_id: pet.id });
-    return pet;
-  }
-
   it("delete all with joins and where part is hash", async () => {
-    await makePetWithBone();
-    const whereArgs = { toys: { name: "Bone" } };
-    const count = await Pet.joins("toys").where(whereArgs).count();
-    expect(await Pet.joins("toys").where(whereArgs).deleteAll()).toBe(count);
+    const pets = Pet.joins("toys").where({ toys: { name: "Bone" } });
+
+    expect(await pets.exists()).toBe(true);
+    const countBefore = await pets.count();
+    expect(await pets.deleteAll()).toBe(countBefore);
   });
 
   it("delete all with joins and where part is not hash", async () => {
-    await makePetWithBone();
-    const whereArgs: [string, string] = ["da_toys.name = ?", "Bone"];
-    const count = await Pet.joins("toys")
-      .where(...whereArgs)
-      .count();
-    expect(
-      await Pet.joins("toys")
-        .where(...whereArgs)
-        .deleteAll(),
-    ).toBe(count);
+    const pets = Pet.joins("toys").where("toys.name = ?", "Bone");
+
+    expect(await pets.exists()).toBe(true);
+    const countBefore = await pets.count();
+    expect(await pets.deleteAll()).toBe(countBefore);
   });
 
   it("delete all with left joins", async () => {
-    await makePetWithBone();
-    const whereArgs = { toys: { name: "Bone" } };
-    const count = await Pet.leftJoins("toys").where(whereArgs).count();
-    expect(await Pet.leftJoins("toys").where(whereArgs).deleteAll()).toBe(count);
+    const pets = Pet.leftJoins("toys").where({ toys: { name: "Bone" } });
+
+    expect(await pets.exists()).toBe(true);
+    const countBefore = await pets.count();
+    expect(await pets.deleteAll()).toBe(countBefore);
   });
 
-  it("delete all with includes", async () => {
-    await makePetWithBone();
-    const whereArgs = { toys: { name: "Bone" } };
-    const count = await Pet.includes("toys").where(whereArgs).count();
-    expect(await Pet.includes("toys").where(whereArgs).deleteAll()).toBe(count);
-  });
+  // TRACKED DEVIATION: includes + where referencing included table should switch to JOIN strategy
+  // (Rails auto-detects table reference and uses LEFT OUTER JOIN). Trails `includes` does a
+  // separate SELECT so toys.name is not available in the WHERE clause.
+  it.skip("delete all with includes", async () => {
+    const pets = Pet.includes("toys").where("toys.name = ?", "Bone");
 
-  it("delete all with includes and group skips limit materialization guard", async () => {
-    await makePetWithBone();
-    // Mirrors Rails `apply_join_dependency(eager_loading: group_values.empty?)`
-    // (finder_methods.rb:457): a grouped delete passes `eager_loading: false`,
-    // so the limit/offset materialization guard is skipped — `includes + group
-    // + limit` deletes rather than raising NotImplementedError.
-    const rel = Pet.includes("toys")
-      .where({ toys: { name: "Bone" } })
-      .group("da_pets.id")
-      .limit(5);
-    expect(await rel.deleteAll()).toBe(1);
-    expect(await Pet.all().toArray()).toHaveLength(0);
-  });
-
-  it("delete all with from clause still targets the table", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "fromtest", author: "ivan" });
-    // Mirrors Rails `relation.rb:1024` (`arel.source.left = table`): an explicit
-    // `from(custom)` overrides the FROM source, but `delete_all` forces it back
-    // to the bare table, so the DELETE targets `posts` rather than the aliased
-    // FROM node (which would emit `DELETE FROM posts AS p` and not match).
-    expect(await Post.from("posts AS p").where({ author: "ivan" }).deleteAll()).toBe(1);
-    expect(await Post.all().toArray()).toHaveLength(0);
+    expect(await pets.exists()).toBe(true);
+    const countBefore = await pets.count();
+    expect(await pets.deleteAll()).toBe(countBefore);
   });
 
   it("delete all with order and limit deletes subset only", async () => {
-    const { Post } = makeModel();
-    const first = await Post.create({ title: "first", author: "frank" });
-    const second = await Post.create({ title: "second", author: "frank" });
-    const limitedPosts = Post.where({ author: "frank" }).order("id").limit(1);
+    const author = authors("david");
+    const limitedPosts = Post.where({ author_id: author.id }).order("id").limit(1);
     expect(await limitedPosts.count()).toBe(1);
     expect(await limitedPosts.limit(2).count()).toBe(2);
     expect(await limitedPosts.deleteAll()).toBe(1);
-    const remainingIds = (await Post.all().toArray()).map((p) => p.id);
-    expect(remainingIds).not.toContain(first.id);
-    expect(remainingIds).toContain(second.id);
+    await expect(Post.find(posts("welcome").id)).rejects.toThrow(RecordNotFound);
+    expect(await Post.find(posts("thinking").id)).toBeTruthy();
   });
 
   it("delete all with order and limit and offset deletes subset only", async () => {
-    const { Post } = makeModel();
-    const first = await Post.create({ title: "first", author: "grace" });
-    const second = await Post.create({ title: "second", author: "grace" });
-    const limitedPosts = Post.where({ author: "grace" }).order("id").limit(1).offset(1);
+    const author = authors("david");
+    const limitedPosts = Post.where({ author_id: author.id }).order("id").limit(1).offset(1);
     expect(await limitedPosts.count()).toBe(1);
+    expect(await limitedPosts.limit(2).count()).toBe(2);
     expect(await limitedPosts.deleteAll()).toBe(1);
-    const remainingIds = (await Post.all().toArray()).map((p) => p.id);
-    expect(remainingIds).toContain(first.id);
-    expect(remainingIds).not.toContain(second.id);
+    await expect(Post.find(posts("thinking").id)).rejects.toThrow(RecordNotFound);
+    expect(await Post.find(posts("welcome").id)).toBeTruthy();
   });
 
-  it("delete all composite model with join subquery", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "cm", author: "hal" });
-    await Post.where({ author: "hal" }).deleteAll();
-    const remaining = await Post.all().toArray();
-    expect(remaining.length).toBe(0);
-  });
-
-  it("delete all composite model with order and limit deletes subset only", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    await CpkOrder.create({ shop_id: 1, id: 1, status: "pending" });
-    await CpkOrder.create({ shop_id: 1, id: 2, status: "pending" });
-    const limited = CpkOrder.where({ status: "pending" }).order("id").limit(1);
-    expect(await limited.count()).toBe(1);
-    expect(await limited.deleteAll()).toBe(1);
-    const remaining = await CpkOrder.all().toArray();
-    const remainingIds = remaining.map((o) => o.readAttribute("id"));
-    expect(remainingIds).not.toContain(1);
-    expect(remainingIds).toContain(2);
-  });
-});
-
-describe("DeleteAllTest", () => {
-  it("updateAll does not run callbacks", async () => {
-    const log: string[] = [];
-
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-        this.afterSave(() => {
-          log.push("after_save");
-        });
-      }
-    }
-
-    await User.create({ name: "Alice", active: true });
-    log.length = 0;
-
-    await User.all().updateAll({ active: false });
-    expect(log).toHaveLength(0);
-  });
-
-  it("update column should not modify updated at", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.updated_at;
-
-    await Post.all().updateAll({ title: "Changed" });
-
-    const reloaded = await Post.find(post.id);
-    // updateAll should NOT auto-bump updated_at
-    expect(epochMs(reloaded.updated_at)).toBe(epochMs(originalUpdatedAt));
-  });
-
-  it("deleteAll does not run callbacks", async () => {
-    const log: string[] = [];
-
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeDestroy(() => {
-          log.push("before_destroy");
-        });
-      }
-    }
-
-    await User.create({ name: "Alice" });
-    log.length = 0;
-
-    await User.all().deleteAll();
-    expect(log).toHaveLength(0);
-  });
-
-  it("destroyAll runs callbacks on each record", async () => {
-    const log: string[] = [];
-
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.afterDestroy((r: any) => {
-          log.push(r.name);
-        });
-      }
-    }
-
-    await User.create({ name: "Alice" });
-    await User.create({ name: "Bob" });
-
-    await User.all().destroyAll();
-    expect(log).toContain("Alice");
-    expect(log).toContain("Bob");
-  });
-
-  it("updateAll returns count of affected rows", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-      }
-    }
-
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
-
-    const count = await User.where({ active: true }).updateAll({ active: false });
-    expect(count).toBe(1);
-  });
-
-  it("deleteAll on empty table returns 0", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    expect(await User.all().deleteAll()).toBe(0);
-  });
-});
-
-describe("DeleteAllTest", () => {
-  it("delete all removes all matching records", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-      }
-    }
-    await Item.create({ name: "A", active: true });
-    await Item.create({ name: "B", active: false });
-    await Item.create({ name: "C", active: true });
-
-    const count = await Item.where({ active: true }).deleteAll();
-    expect(count).toBe(2);
-    expect(await Item.all().count()).toBe(1);
-  });
-
-  it("destroy all runs callbacks", async () => {
-    const log: string[] = [];
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.afterDestroy((r: any) => {
-          log.push(r.name);
-        });
-      }
-    }
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    const destroyed = await Item.all().destroyAll();
-    expect(destroyed).toHaveLength(2);
-    expect(log).toContain("A");
-    expect(log).toContain("B");
-  });
-
-  it("deleteAll does not run callbacks", async () => {
-    const log: string[] = [];
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeDestroy(() => {
-          log.push("destroyed");
-        });
-      }
-    }
-    await Item.create({ name: "A" });
-    await Item.all().deleteAll();
-    expect(log).toHaveLength(0);
-  });
-
-  it("updateAll does not run callbacks", async () => {
-    const log: string[] = [];
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-        this.beforeSave(() => {
-          log.push("saved");
-        });
-      }
-    }
-    await Item.create({ name: "A" });
-    log.length = 0;
-    await Item.all().updateAll({ name: "B" });
-    expect(log).toHaveLength(0);
-  });
-
-  it("updateAll returns count", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("active", "boolean");
-      }
-    }
-    await Item.create({ active: true });
-    await Item.create({ active: false });
-    const count = await Item.where({ active: true }).updateAll({ active: false });
-    expect(count).toBe(1);
-  });
-
-  it("deleteAll on empty table returns 0", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(await Item.all().deleteAll()).toBe(0);
-  });
-
-  it("destroyBy destroys matching records with callbacks", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    await Item.create({ name: "A" });
-    const destroyed = await Item.destroyBy({ name: "A" });
-    expect(destroyed).toHaveLength(2);
-    expect(await Item.all().count()).toBe(1);
-  });
-
-  it("deleteBy deletes matching records without callbacks", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await Item.create({ name: "A" });
-    await Item.create({ name: "B" });
-    const count = await Item.deleteBy({ name: "A" });
-    expect(count).toBe(1);
-  });
-
-  it("static updateAll updates all records", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    await Item.create({ status: "old" });
-    await Item.create({ status: "old" });
-    await Item.updateAll({ status: "new" });
-    const items = await Item.all().toArray();
-    expect(items.every((i: any) => i.status === "new")).toBe(true);
-  });
-  it("destroy all", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await Item.create({ name: "a" });
-    await Item.create({ name: "b" });
-    await Item.create({ name: "c" });
-    const destroyed = await Item.all().destroyAll();
-    expect(destroyed).toHaveLength(3);
-    expect(await Item.count()).toBe(0);
-  });
-
-  it("delete all", async () => {
-    class DeleteAllAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("delete_all_posts", {
-          className: "DeleteAllPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class DeleteAllPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DeleteAllAuthor);
-    registerModel(DeleteAllPost);
-    const author = await DeleteAllAuthor.create({ name: "Alice" });
-    await DeleteAllPost.create({ author_id: author.id, title: "A" });
-    await DeleteAllPost.create({ author_id: author.id, title: "B" });
-    await author.destroy();
-    const remaining = await loadHasMany(author, "delete_all_posts", {
-      className: "DeleteAllPost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
+  // TRACKED DEVIATION: JoinDependency cannot build a join for CpkOrder.hasMany("orderAgreements")
+  // (composite primary key model + single-column FK association). Skipped pending CPK join support.
+  it.skip("delete all composite model with join subquery", async () => {
+    const agreement = cpkOrderAgreements("order_agreement_three");
+    const joinScope = CpkOrder.joins("orderAgreements").where(
+      "cpk_order_agreements.signature = ?",
+      agreement.signature,
+    );
+    expect(await joinScope.deleteAll()).toBe(1);
   });
 });

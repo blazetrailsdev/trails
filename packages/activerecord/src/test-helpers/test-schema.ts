@@ -1134,6 +1134,9 @@ export const TEST_SCHEMA: Schema = {
       pet_id: "integer",
       name: "string",
       owner_id: "integer",
+      // Rails schema.rb: `t.integer :owner_id, :integer` — creates both owner_id AND a
+      // column literally named "integer" (multi-arg form of t.integer).
+      integer: { type: "integer", null: true },
       created_at: "datetime",
       updated_at: "datetime",
     },
