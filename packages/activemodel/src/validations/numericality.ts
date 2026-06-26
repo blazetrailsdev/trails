@@ -261,13 +261,18 @@ export function optionAsNumber(
   precision: number,
   scale?: number,
 ): number | undefined {
-  let resolved = this.resolveValue(record, optionValue);
+  const resolved = this.resolveValue(record, optionValue);
   if (resolved === undefined || resolved === null) return undefined;
-  // Rails passes BigDecimal compare options straight through parse_as_number
-  // (`raw_value.is_a?(BigDecimal)` → `round(raw_value, scale)`, still a
-  // Numeric). trails normalizes to its fixed-form string so the numeric path
-  // below treats it the same as a number literal.
-  if (resolved instanceof BigDecimal) resolved = resolved.toString("F");
+  // Rails parse_as_number's BigDecimal branch is `round(raw_value, scale)` —
+  // scale rounding ONLY, with no `to_d(precision)` / precision pass (unlike
+  // the Float branch). Mirror that exactly: round to scale and return, rather
+  // than falling through to `parseAsNumber` (which also applies precision and
+  // would clamp a BigDecimal option carrying more significant digits than the
+  // validator's precision to a different target than Rails compares against).
+  if (resolved instanceof BigDecimal) {
+    const n = Number(resolved.toString("F"));
+    return Number.isFinite(n) ? round(n, scale) : undefined;
+  }
   // Rails option_as_number → parse_as_number → Kernel.Float would raise
   // TypeError on non-Numeric/non-String input (Date, boolean, object).
   // Throw the consistent validator error rather than silently accepting
