@@ -4142,23 +4142,10 @@ export class Relation<T extends Base> {
   async touchAll(...names: string[]): Promise<number> {
     if (this._isNone) return 0;
 
-    const now = Temporal.Now.instant();
-    const updates: Record<string, unknown> = {};
-    const aliases = this._modelClass._attributeAliases ?? {};
-
-    // Mirrors Rails timestamp_attributes_for_update: ["updated_at", "updated_on"]
-    // each resolved through attribute_aliases, then intersected with column_names.
-    for (const tsName of ["updated_at", "updated_on"]) {
-      const col = aliases[tsName] ?? tsName;
-      if (this._modelClass._attributeDefinitions.has(col)) {
-        updates[col] = now;
-      }
-    }
-    // Mirrors Rails touch_attributes_with_time: explicit names also resolved through aliases.
-    for (const name of names) {
-      const col = aliases[name] ?? name;
-      updates[col] = now;
-    }
+    // Use touchAttributesWithTime so alias-resolved column names are used
+    // (e.g. Developer.updated_at → legacy_updated_at).
+    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
+    const updates: Record<string, unknown> = { ...touchUpdates };
 
     if (Object.keys(updates).length === 0) return 0;
 

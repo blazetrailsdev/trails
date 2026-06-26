@@ -202,12 +202,7 @@ describe("UpdateAllTest", () => {
     expect(parrot.integer).toBe(1);
   });
 
-  // TRACKED DEVIATION: Relation#touchAll does not resolve attribute aliases (e.g.
-  // Developer updated_at → legacy_updated_at). Rails touch_all calls
-  // touch_attributes_with_time which resolves aliases, but the trails
-  // implementation uses _attributeDefinitions.has("updated_at") directly.
-  // These four tests are skipped until touchAll resolves aliases.
-  it.skip("touch all updates records timestamps", async () => {
+  it("touch all updates records timestamps", async () => {
     const david = developers("david");
     const davidPreviouslyUpdatedAt = david.legacy_updated_at;
     const jamis = developers("jamis");
@@ -222,7 +217,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(jamis.legacy_updated_at)).toBe(epochMs(jamisPreviouslyUpdatedAt));
   });
 
-  it.skip("touch all with custom timestamp", async () => {
+  it("touch all with custom timestamp", async () => {
     const developer = developers("david");
     const previouslyCreatedAt = developer.legacy_created_at;
     const previouslyUpdatedAt = developer.legacy_updated_at;
@@ -235,7 +230,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
   });
 
-  it.skip("touch all with aliased for update timestamp", async () => {
+  it("touch all with aliased for update timestamp", async () => {
     expect(Object.keys((Developer as any)._attributeAliases ?? {})).toContain("updated_at");
 
     const developer = developers("david");
@@ -250,7 +245,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
   });
 
-  it.skip("touch all with given time", async () => {
+  it("touch all with given time", async () => {
     const developer = developers("david");
     const previouslyCreatedAt = developer.legacy_created_at;
     const previouslyUpdatedAt = developer.legacy_updated_at;
