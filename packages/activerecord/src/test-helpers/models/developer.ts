@@ -165,7 +165,10 @@ export class Developer extends Base {
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });
-    this.hasMany("comments");
+    // Rails: `has_many :comments, ->(developer) { where(body: "I'm #{developer.name}") }`
+    this.hasMany("comments", {
+      scope: (q: any, developer: any) => q.where({ body: `I'm ${developer.name}` }),
+    });
     this.hasMany("ratings", { through: "comments" });
 
     this.hasOne("ship", { dependent: "nullify" });

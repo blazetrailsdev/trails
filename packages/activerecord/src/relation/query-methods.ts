@@ -1017,6 +1017,15 @@ export function argumentError(message: string): Error {
  * would incorrectly treat e.g. `new Date(0)` and `new Date(1)` as equal
  * since their internal state is not enumerable.
  */
+/** Order-preserving uniq using {@link deepEqual} (mirrors Ruby `Array#uniq`). */
+function uniqArray(arr: unknown[]): unknown[] {
+  const out: unknown[] = [];
+  for (const el of arr) {
+    if (!out.some((seen) => deepEqual(seen, el))) out.push(el);
+  }
+  return out;
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -1099,6 +1108,24 @@ export function structurallyIncompatibleValuesFor(
   for (const [label, field] of STRUCTURAL_FIELDS) {
     const a = self[field] as unknown;
     const b = other[field] as unknown;
+    // Mirrors Rails' structurally_incompatible_values_for (query_methods.rb):
+    // for Array-valued methods it does `next true unless v2.is_a?(Array)` —
+    // i.e. when the *other* relation never set this value (Ruby `nil`) the
+    // pair is compatible regardless of `self`'s value. trails represents an
+    // unset multi-value as an empty array, so an empty `b` stands in for nil.
+    // The one case trails can't distinguish from a representation alone is
+    // `unscope(<dim>)`, which *explicitly* empties the array (Rails keeps it an
+    // Array, so the comparison proceeds → incompatible). We recover that
+    // distinction from `_unscopeValues` (unscope! records the reset dim there):
+    // an empty `b` is "never set" → compatible only when the other relation did
+    // not unscope this dimension. Matching values are compared after `uniq`.
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b)) continue;
+      const otherUnscoped = ((other._unscopeValues as unknown[]) ?? []).includes(label);
+      if (b.length === 0 && !otherUnscoped) continue;
+      if (!deepEqual(uniqArray(a), uniqArray(b as unknown[]))) incompat.push(label);
+      continue;
+    }
     if (!deepEqual(a, b)) incompat.push(label);
   }
   return incompat;

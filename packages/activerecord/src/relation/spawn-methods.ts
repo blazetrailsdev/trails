@@ -5,6 +5,7 @@
  */
 
 import { Merger, HashMerger } from "./merger.js";
+import { argumentError } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -27,7 +28,27 @@ export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
  * Mirrors: ActiveRecord::SpawnMethods#merge
  */
 export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T {
-  return new Merger(this, other).merge() as T;
+  // Mirrors SpawnMethods#merge!: a Hash routes through HashMerger, a
+  // Relation through Merger, and a proc/lambda is instance-exec'd against
+  // the spawned relation. A bare Relation is detected by its `_whereClause`.
+  if (other == null) {
+    throw argumentError(`invalid argument: ${String(other)}.`);
+  }
+  if (typeof other === "function") {
+    // Mirrors merge!'s `instance_exec(&other)` (spawn_methods.rb:48-49): the
+    // block runs with the spawned relation as receiver (`this`), receives no
+    // positional args (an arity>=1 proc's first param is `undefined`, as Ruby
+    // passes `nil`), and its return value is used verbatim — Rails does NOT
+    // `|| self`.
+    return (other as (this: T) => T).call(this._clone());
+  }
+  if (typeof other === "object" && "_whereClause" in other) {
+    return new Merger(this, other).merge() as T;
+  }
+  if (typeof other === "object") {
+    return new HashMerger(this, other).merge() as T;
+  }
+  throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
 }
 
 /**
@@ -62,6 +83,7 @@ export function mergeBang(this: any, other: any): any {
     if (other._isDistinct) this._isDistinct = true;
     if (other._lockValue) this._lockValue = other._lockValue;
     if (other._isReadonly) this._isReadonly = true;
+    if (other._skipQueryCache) this._skipQueryCache = true;
     if (other._isStrictLoading !== undefined) this._isStrictLoading = other._isStrictLoading;
     // mergeClauses
     if (other._havingClause && !other._havingClause.isEmpty())
@@ -69,7 +91,9 @@ export function mergeBang(this: any, other: any): any {
     if (
       (!this._fromClause || this._fromClause.isEmpty?.()) &&
       other._fromClause &&
-      !other._fromClause.isEmpty?.()
+      !other._fromClause.isEmpty?.() &&
+      // Rails replace_from_clause? also requires same base_class (see Merger).
+      this._modelClass?.baseClass === other._modelClass?.baseClass
     ) {
       this._fromClause = other._fromClause;
     }
@@ -100,6 +124,8 @@ export function mergeBang(this: any, other: any): any {
     }
     this._namedInnerJoinDeps.push(...(other._namedInnerJoinDeps ?? []));
     this._leftOuterJoinDeps.push(...(other._leftOuterJoinDeps ?? []));
+    // mergeCtes — append the other relation's common table expressions
+    if (other._ctes?.length > 0) this._ctes = [...this._ctes, ...other._ctes];
     // sticky none
     if (other._isNone) this._isNone = true;
   } else if (typeof other === "object" && other !== null) {

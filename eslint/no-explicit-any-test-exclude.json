@@ -218,6 +218,7 @@
   "packages/activerecord/src/relation/delete-all.test.ts",
   "packages/activerecord/src/relation/field-ordered-values.test.ts",
   "packages/activerecord/src/relation/finder-methods.test.ts",
+  "packages/activerecord/src/relation/merging.test.ts",
   "packages/activerecord/src/relation/mutation.test.ts",
   "packages/activerecord/src/relation/or.test.ts",
   "packages/activerecord/src/relation/order.test.ts",
