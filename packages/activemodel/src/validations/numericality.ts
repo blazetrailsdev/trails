@@ -195,30 +195,14 @@ export class NumericalityValidator extends EachValidator {
   }
 
   // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
-  /**
-   * Override EachValidator.validate so the allowNil/allowBlank short-circuits
-   * test the CAST value (what `read_attribute_for_validation` returns), while
-   * `validateEach` still receives the prepared raw value.
-   *
-   * This mirrors Rails' EachValidator#validate exactly: the `allow_nil` /
-   * `allow_blank` skip runs against `read_attribute_for_validation(attribute)`
-   * (the cast value) BEFORE `prepare_value_for_validation` swaps in the raw
-   * `*_before_type_cast` input. That's what
-   * `test_allow_nil_works_for_casted_value` asserts — assigning `""` to a
-   * decimal column casts to nil, so `allow_nil: true` skips it even though the
-   * raw value is `""`. An integer column casting `"abc"` to nil WITHOUT
-   * `allow_nil` still falls through to `validateEach`, which sees the raw
-   * `"abc"` and flags `not_a_number`.
-   */
-  override validate(record: ValidatableRecord): void {
-    for (const attribute of this.attributes) {
-      const cast = this.readAttributeForValidation(record, attribute);
-      if (cast == null && this.options.allowNil === true) continue;
-      if (isBlank(cast) && this.options.allowBlank === true) continue;
-      const value = this.prepareValueForValidation(cast, record, attribute);
-      this.validateEach(record, attribute, value);
-    }
-  }
+  // No `validate` override: like Rails' NumericalityValidator, the
+  // allowNil/allowBlank short-circuit lives in EachValidator#validate and runs
+  // against the CAST value (`read_attribute_for_validation`) before
+  // `prepare_value_for_validation` swaps in the raw `*_before_type_cast` input.
+  // That's what `test_allow_nil_works_for_casted_value` relies on — assigning
+  // `""` to a decimal column casts to nil, so `allow_nil: true` skips it; an
+  // integer `"abc"` without `allow_nil` still reaches validateEach and flags
+  // not_a_number via the prepared raw value.
 }
 
 // Rails: /\A[+-]?\d+\z/ — use a true end-of-string check rather than

@@ -688,14 +688,13 @@ describe("numericality with in: range", () => {
     expect(p.errors.get("age")).toContain("is not a number");
   });
 
-  it("validates raw before-type-cast input on UPDATE even when allowNil is true", () => {
-    // Regression: trails' Model.attributeChangedInPlace returns true for
-    // any change-from-snapshot (not just in-place mutation as Rails
-    // means it). So if numericality's prepareValueForValidation
-    // honored the Rails record_attribute_changed_in_place? short-circuit,
-    // a 10 → 'abc' update on an integer attr would skip the raw read
-    // and let allowNil silently pass. Pin the trails behavior: raw
-    // 'abc' is read regardless of dirty state.
+  it("allowNil skips cast-null input on UPDATE (Rails cast-based skip)", () => {
+    // Rails' EachValidator#validate runs the allow_nil skip against
+    // `read_attribute_for_validation` — the CAST value — BEFORE
+    // prepare_value_for_validation reads the raw before-type-cast input.
+    // A 10 → 'abc' update on an integer attr casts to null, so
+    // `allow_nil: true` skips it even though the raw value is 'abc'.
+    // (Mirrors AR's test_allow_nil_works_for_casted_value: "" → nil → skip.)
     class Person extends Model {
       static {
         this.attribute("age", "integer");
@@ -706,17 +705,17 @@ describe("numericality with in: range", () => {
     expect(p.isValid()).toBe(true);
     p.changesApplied(); // baseline = 10
     p.writeAttribute("age", "abc");
-    expect(p.readAttribute("age")).toBeNull(); // cast failed
+    expect(p.readAttribute("age")).toBeNull(); // cast failed → null
     expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
-    expect(p.isValid()).toBe(false); // raw 'abc' wins over null cast + allowNil
-    expect(p.errors.get("age")).toContain("is not a number");
+    expect(p.isValid()).toBe(true); // cast null + allowNil → skipped
   });
 
-  it("validates raw before-type-cast input even when allowNil is true (overridden validate)", () => {
-    // EachValidator.validate skips validateEach when allow_nil: true and
-    // value is null. Numericality overrides validate so the raw input
-    // is read FIRST — 'abc' on an integer column casts to null but
-    // should still be caught as not_a_number even with allowNil: true.
+  it("allowNil skips cast-null input (Rails cast-based skip)", () => {
+    // EachValidator#validate skips validateEach when the CAST value is
+    // null and allow_nil: true. 'abc' on an integer attr casts to null,
+    // so it is skipped — the before-type-cast raw read only matters when
+    // the value is NOT skipped (i.e. without allow_nil; see the
+    // "numericality: true" test above, which DOES flag 'abc').
     class Person extends Model {
       static {
         this.attribute("age", "integer");
@@ -724,9 +723,7 @@ describe("numericality with in: range", () => {
       }
     }
     expect(new Person({}).isValid()).toBe(true); // genuinely nil → skip
-    const bad = new Person({ age: "abc" });
-    expect(bad.isValid()).toBe(false); // raw 'abc' wins over null cast
-    expect(bad.errors.get("age")).toContain("is not a number");
+    expect(new Person({ age: "abc" }).isValid()).toBe(true); // cast null → skip
   });
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", () => {
