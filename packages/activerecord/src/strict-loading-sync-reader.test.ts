@@ -1,11 +1,4 @@
-// Phase R.3: strict loading now catches sync singular-association
-// reader access too. When `record._strictLoading` is enabled (via any
-// of the Rails-style toggles), `record.developer` / `record.ship`
-// throw `StrictLoadingViolationError` on an unloaded association
-// instead of silently returning null.
-//
-// Preserves Rails default (off) — strict loading is opt-in.
-// No Rails counterpart; rides canonical Developer/Ship tables.
+// No Rails counterpart; exercises the sync singular-association strict-loading reader (Phase R.3).
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError } from "./index.js";
@@ -23,16 +16,12 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   });
 
   it("sync belongsTo access throws when strict loading is enabled and not loaded", async () => {
-    // Ship.developer is a belongsTo; with developer_id set and strict loading
-    // enabled, the sync getter must throw before attempting a DB load.
     const ship = await Ship.create({ name: "Strict Ship", developer_id: developers("david").id });
     ship.strictLoadingBang();
     expect(() => (ship as any).developer).toThrow(StrictLoadingViolationError);
   });
 
   it("sync hasOne access throws when strict loading is enabled and not loaded", async () => {
-    // Developer.ship is a hasOne; with strict loading enabled and no ship
-    // preloaded, the sync getter must throw.
     const developer = await Developer.find(developers("jamis").id);
     developer.strictLoadingBang();
     expect(() => (developer as any).ship).toThrow(StrictLoadingViolationError);
@@ -41,9 +30,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   it("sync access returns the record (no throw) once loaded", async () => {
     const ship = await Ship.create({ name: "Loaded Ship", developer_id: developers("david").id });
     ship.strictLoadingBang();
-    // Explicit async load populates the association cache.
     await ship.loadBelongsTo("developer");
-    // Subsequent sync access should succeed.
     expect(() => (ship as any).developer).not.toThrow();
     const dev = (ship as any).developer as Developer;
     expect(dev.id).toBe(developers("david").id);
@@ -90,7 +77,6 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   it("preloaded singular mapped to null does not throw (eagerly-loaded nil)", async () => {
     const ship = await Ship.create({ name: "No-dev Ship" });
     ship.strictLoadingBang();
-    // Simulate an eager load that resolved to null.
     const holder = (ship as any).association("developer");
     holder.setTarget(null);
     holder._loadedFromPreload = true;
@@ -126,11 +112,10 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     const developer = new Developer({ id: developers("david").id });
     const assoc = ship.association("developer") as any;
     assoc.target = developer;
-    // loaded is still false; reader should short-circuit on the non-null target.
+    // loaded is still false; reader short-circuits on the non-null target.
     expect(assoc.loaded).toBe(false);
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
-    // Reader should have marked it loaded as a side effect.
     expect(assoc.loaded).toBe(true);
   });
 

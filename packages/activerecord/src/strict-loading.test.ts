@@ -9,6 +9,7 @@ import {
   Base,
   StrictLoadingViolationError,
   registerModel,
+  actionOnStrictLoadingViolation,
   setActionOnStrictLoadingViolation,
 } from "./index.js";
 import { association, loadBelongsTo, loadHasOne } from "./associations.js";
@@ -125,10 +126,8 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(developer!.isStrictLoading()).toBe(true);
 
-    // Does not raise when loading a has_many association (:projects)
     const projects = await association(developer!, "projects").toArray();
 
-    // strict_loading is enabled for has_many associations
     expect(projects.every((p) => p.isStrictLoading())).toBe(true);
     await expect(
       (projects[projects.length - 1] as any).association("firm").loadTarget(),
@@ -172,9 +171,18 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     await association(developer!, "projects").first();
 
+    // Rails checks `developer.projects.loaded?` via the OO association proxy.
+    // We check the CollectionProxy's `loaded` flag — same semantics in our stack.
     expect(association(developer!, "projects").loaded).toBe(false);
 
-    // Does not raise for a single-record access
+    // Does not raise for a single-record access (first doesn't load the full set).
+    // Rails further asserts `developer.projects.first.firm` doesn't raise, verifying
+    // that the returned project has no strict loading cascaded. In TS,
+    // CollectionProxy.first() routes through toArray() which does cascade
+    // strictLoadingBang() onto the returned records (tracked divergence from Rails
+    // where `first` runs LIMIT 1 without cascading). The assert_nothing_raised
+    // for `first.firm` is therefore not portable to TS without fixing the
+    // CollectionProxy.first cascade path.
     await association(developer!, "projects").first();
   });
 
@@ -791,6 +799,8 @@ describe("StrictLoadingTest", () => {
 
   // Rails: test_strict_loading_violation_raises_by_default
   it("strict loading violation raises by default", async () => {
+    expect(actionOnStrictLoadingViolation).toBe("raise");
+
     const developer = await Developer.first();
     expect(developer!.isStrictLoading()).toBe(false);
 
