@@ -1,155 +1,195 @@
 /**
- * Tests to increase Rails test coverage matching.
+ * Mirrors: activerecord/test/cases/validations/numericality_validation_test.rb
+ *
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { DecimalType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { NumericalityValidator } from "./numericality.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { NumericData } from "../test-helpers/models/numeric-data.js";
 
 setupHandlerSuite();
-useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
-  await defineSchema({
-    widgets: { price: "float", quantity: "integer" },
-    widget2s: { price: "float" },
-    decimals: { amount: "decimal" },
-  });
+  await NumericData.loadSchema();
 });
 
 describe("NumericalityValidationTest", () => {
-  function makeModel() {
-    class Widget extends Base {
-      static {
-        this.attribute("price", "float");
-        this.attribute("quantity", "integer");
-        this.validates("price", { numericality: { greaterThan: 0 } });
-      }
-    }
-    return { Widget };
+  // Rails: `@model_class = NumericData.dup`. A fresh subclass per test so the
+  // `validates_numericality_of` declaration does not leak across tests.
+  function modelClass(): typeof NumericData {
+    return class extends NumericData {
+      static name = "NumericData";
+    };
   }
+
   it("column with precision", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 9.99 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("unscaled_bank_balance", {
+      equalTo: 10_000_000.12,
+    });
+
+    const subject = modelClassVar.new({ unscaled_bank_balance: 10_000_000.121 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("column with precision higher than double fig", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 0.001 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("decimal_number_big_precision", {
+      equalTo: 10_000_000.3,
+    });
+
+    const subject = modelClassVar.new({ decimal_number_big_precision: 10_000_000.3 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("column with scale", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 1.5 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 10 });
+
+    const subject = modelClassVar.new({ bank_balance: 10.001 });
+
+    expect(subject.isValid()).toBe(false);
   });
+
   it("no column precision", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: -1 });
-    expect(w.isValid()).toBe(false);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("decimal_number", {
+      equalTo: 1_000_000_000.123454,
+    });
+
+    const subject = modelClassVar.new({ decimal_number: 1_000_000_000.1234545 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("virtual attribute", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 10 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType());
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
+      equalTo: 1_000_000_000.123454,
+    });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 1_000_000_000.1234545 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("on abstract class", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 0 });
-    expect(w.isValid()).toBe(false);
+    class AbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.validates("bank_balance", { numericality: { equalTo: 10_000_000.12 } });
+      }
+    }
+
+    class MyClass extends AbstractClass {
+      static _tableName = "numeric_data";
+      static name = "MyClass";
+    }
+    const subject = MyClass.new({ bank_balance: 10_000_000.12 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("virtual attribute without precision", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 5 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType());
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
+      equalTo: new BigDecimal("65.6"),
+    });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 65.6 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("virtual attribute with precision round down", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 3.14 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 123.454 });
+
+    expect(subject.isValid()).toBe(true);
   });
+
   it("virtual attribute with precision round half even", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 2.5 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 123.455 });
+
+    // BigDecimal's to_d behavior changed in BigDecimal 3.1.0, see
+    // https://github.com/ruby/bigdecimal/issues/70 — under 3.1.0+ this rounds
+    // away from the equal_to target and is therefore invalid.
+    expect(subject.isValid()).toBe(false);
   });
+
   it("virtual attribute with precision round up", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 1.123456 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 123.456 });
+
+    expect(subject.isValid()).toBe(false);
   });
+
   it("virtual attribute with scale", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 100 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType({ scale: 2 }));
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", { greaterThan: 1 });
+
+    const subject = modelClassVar.new({ virtual_decimal_number: 1.001 });
+
+    expect(subject.isValid()).toBe(false);
   });
+
   it("virtual attribute with precision and scale", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 999.99 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 4, scale: 2 }));
+    modelClassVar.validatesNumericalityOf("virtual_decimal_number", {
+      lessThanOrEqualTo: 99.99,
+    });
+
+    for (const rawValue of ["99.994", 99.994, new BigDecimal("99.994")]) {
+      const subject = modelClassVar.new({ virtual_decimal_number: rawValue });
+      expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
+        new BigDecimal("99.99").toString("F"),
+      );
+      expect(subject.isValid()).toBe(true);
+    }
+
+    for (const rawValue of ["99.999", 99.999, new BigDecimal("99.999")]) {
+      const subject = modelClassVar.new({ virtual_decimal_number: rawValue });
+      expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
+        new BigDecimal("100.00").toString("F"),
+      );
+      expect(subject.isValid()).toBe(false);
+    }
   });
+
   it("aliased attribute", () => {
-    const { Widget } = makeModel();
-    const w = new Widget({ price: 1 });
-    expect(w.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("newBankBalance", { greaterOrEqualThan: 0 });
+
+    const subject = modelClassVar.new({ newBankBalance: "abcd" });
+
+    expect(subject.isValid()).toBe(false);
   });
+
   it("allow nil works for casted value", () => {
-    class Widget2 extends Base {
-      static {
-        this.attribute("price", "float");
-        this.validates("price", { numericality: { allowNil: true } });
-      }
-    }
-    const w = new Widget2({});
-    expect(w.isValid()).toBe(true);
-  });
-  it("column with precision rounds value before comparison", () => {
-    // AR NumericalityValidator extracts precision/scale from typeForAttribute
-    // and passes to AM's validateEach which rounds the value before checks.
-    class Decimal extends Base {
-      static {
-        this.attribute("amount", "decimal");
-        this.validatesWith(NumericalityValidator, {
-          attributes: ["amount"],
-          lessThan: 1000,
-        });
-      }
-      static typeForAttribute(name: string): any {
-        if (name === "amount") return { precision: 5, scale: 2 };
-        return null;
-      }
-    }
-    // 999.99 < 1000 — valid
-    const d = new Decimal({ amount: 999.99 });
-    expect(d.isValid()).toBe(true);
+    const modelClassVar = modelClass();
+    modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 0, allowNil: true });
 
-    // 1000 is not < 1000 — invalid
-    const d2 = new Decimal({ amount: 1000 });
-    expect(d2.isValid()).toBe(false);
-  });
-  it("column with scale rounds fractional digits before comparison", () => {
-    class Decimal extends Base {
-      static {
-        this.attribute("amount", "decimal");
-        // greaterThan: 1.23 — value is rounded to scale=2 before compare
-        this.validatesWith(NumericalityValidator, {
-          attributes: ["amount"],
-          greaterThan: 1.23,
-        });
-      }
-      static typeForAttribute(name: string): any {
-        if (name === "amount") return { precision: 5, scale: 2 };
-        return null;
-      }
-    }
-    // 1.234 rounds to 1.23 at scale=2 → not > 1.23 → invalid
-    const d = new Decimal({ amount: 1.234 });
-    expect(d.isValid()).toBe(false);
+    const subject = modelClassVar.new({ bank_balance: "" });
 
-    // 1.235 rounds to 1.24 at scale=2 → > 1.23 → valid
-    const d2 = new Decimal({ amount: 1.235 });
-    expect(d2.isValid()).toBe(true);
+    expect(subject.isValid()).toBe(true);
   });
 });

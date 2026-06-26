@@ -688,46 +688,13 @@ describe("numericality with in: range", () => {
     expect(p.errors.get("age")).toContain("is not a number");
   });
 
-  it("validates raw before-type-cast input on UPDATE even when allowNil is true", () => {
-    // Regression: trails' Model.attributeChangedInPlace returns true for
-    // any change-from-snapshot (not just in-place mutation as Rails
-    // means it). So if numericality's prepareValueForValidation
-    // honored the Rails record_attribute_changed_in_place? short-circuit,
-    // a 10 → 'abc' update on an integer attr would skip the raw read
-    // and let allowNil silently pass. Pin the trails behavior: raw
-    // 'abc' is read regardless of dirty state.
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { allowNil: true } });
-      }
-    }
-    const p = new Person({ age: 10 });
-    expect(p.isValid()).toBe(true);
-    p.changesApplied(); // baseline = 10
-    p.writeAttribute("age", "abc");
-    expect(p.readAttribute("age")).toBeNull(); // cast failed
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
-    expect(p.isValid()).toBe(false); // raw 'abc' wins over null cast + allowNil
-    expect(p.errors.get("age")).toContain("is not a number");
-  });
-
-  it("validates raw before-type-cast input even when allowNil is true (overridden validate)", () => {
-    // EachValidator.validate skips validateEach when allow_nil: true and
-    // value is null. Numericality overrides validate so the raw input
-    // is read FIRST — 'abc' on an integer column casts to null but
-    // should still be caught as not_a_number even with allowNil: true.
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { allowNil: true } });
-      }
-    }
-    expect(new Person({}).isValid()).toBe(true); // genuinely nil → skip
-    const bad = new Person({ age: "abc" });
-    expect(bad.isValid()).toBe(false); // raw 'abc' wins over null cast
-    expect(bad.errors.get("age")).toContain("is not a number");
-  });
+  // Removed: two trails-only tests that pinned the now-deleted `validate`
+  // override's deviation (typed integer "abc" + allowNil asserted invalid).
+  // Rails skips that case (cast-based allow_nil), so the tests no longer
+  // describe real behaviour; the converged behaviour is covered by the AR
+  // "allow nil works for casted value" port and the "numericality: true"
+  // raw-read test above. Renaming them in place would violate the
+  // never-reword-test-names rule, so they are dropped rather than relabelled.
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", () => {
     // Rails: allow_only_integer?(record) returns
