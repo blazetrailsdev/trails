@@ -47,14 +47,26 @@ describe("WhereChainTest", () => {
     expect(includesRecord(relation, posts("authorless"))).toBe(false);
   });
 
-  // The four self-join `children` cases below exercise a standalone
-  // self-association (`Comment.children`, target table == owner table) in
-  // where.associated / where.missing. trails' flat string ON-rebind path can't
-  // alias a self-join it adds with no prior inner join — the predicate collapses
-  // to the unaliased owner table (`ambiguous column name: comments.id`). This is
-  // the documented `_rebindOperand` deviation; converging it requires routing
-  // whereAssociated/whereMissing through JoinDependency/AliasTracker. Tracked by
-  // RFC 0027 story `converge-where-associated-missing-onto-join-dependency`.
+  // Skip boundary: only the standalone self-join cases where
+  // where.associated / where.missing must ADD the `Comment.children` self-join
+  // itself (no prior join). trails' flat string ON-rebind path can't alias a
+  // self-join it adds with no sibling join to disambiguate — the predicate
+  // collapses to the unaliased owner table (`ambiguous column name: comments.id`).
+  // This is the documented `_rebindOperand` deviation; converging it requires
+  // routing whereAssociated/whereMissing through JoinDependency/AliasTracker.
+  // Tracked by RFC 0027 `converge-where-associated-missing-onto-join-dependency`.
+  //
+  // The `add joins before` case (further down) is NOT skipped: a prior inner
+  // `joins("children")` is built by JoinDependency, which aliases the child side
+  // (`children_comments`) correctly. whereAssociated dedups onto that join, so the
+  // emitted SQL is `FROM comments INNER JOIN comments children_comments ON
+  // children_comments.parent_id = comments.id WHERE comments.id IS NOT NULL`. The
+  // base-table `IS NOT NULL` is degenerate but harmless — the INNER JOIN already
+  // restricts to comments that have a child, a Rails-equivalent result set that
+  // is deterministic across adapters. The `add left joins before` /
+  // `add left outer joins before` cases ARE skipped: a LEFT join keeps childless
+  // rows, so the predicate must land on the aliased child column to filter them,
+  // which the flat path can't do.
   it.skip("associated with child association", async () => {
     const relation = await Comment.all().where().associated("children").toArray();
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
@@ -193,6 +205,9 @@ describe("WhereChainTest", () => {
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
+  // NOT skipped: the prior inner `joins("children")` provides a JoinDependency
+  // self-join (aliased `children_comments`) that does the filtering. See the
+  // skip-boundary note above.
   it("associated with add joins before", async () => {
     const relation = await Comment.joins("children").where().associated("children").toArray();
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
