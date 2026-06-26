@@ -35,7 +35,6 @@
   "packages/activerecord/src/querying-methods-delegation.test.ts",
   "packages/activerecord/src/querying.test.ts",
   "packages/activerecord/src/reflection.test.ts",
-  "packages/activerecord/src/relation.test.ts",
   "packages/activerecord/src/relation.trails.test.ts",
   "packages/activerecord/src/relation/delete-all.test.ts",
   "packages/activerecord/src/relation/update-all.test.ts",
