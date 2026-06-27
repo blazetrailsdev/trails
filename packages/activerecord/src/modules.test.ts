@@ -16,8 +16,7 @@ import {
   MyAppBusinessSuffixedFirm,
   MyAppBillingAccount,
 } from "./test-helpers/models/company-in-module.js";
-import { ShopCollection } from "./test-helpers/models/shop.js";
-import { ShopProduct } from "./test-helpers/models/shop.js";
+import { ShopCollection, ShopProduct } from "./test-helpers/models/shop.js";
 
 describe("ModulesTest", () => {
   useHandlerFixtures([
@@ -30,7 +29,6 @@ describe("ModulesTest", () => {
     "variants",
   ]);
 
-  // Rails setup: store_full_sti_class = false; teardown: restore to true.
   // Module-namespaced models (MyAppBusiness*) store demodulized type names in
   // the DB — the fixture data uses "Firm" / "Client", not the full module path.
   let _prevStoreFullStiClass: boolean;
@@ -43,16 +41,20 @@ describe("ModulesTest", () => {
   });
 
   it.skip("module spanning associations", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // PERMANENT-SKIP: Ruby Module#ancestors / constant-path lookup for cross-module association
+    // resolution has no JS equivalent (scripts/api-compare/unported-files.ts).
   });
   it.skip("module spanning has and belongs to many associations", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // PERMANENT-SKIP: Ruby Module#ancestors / constant-path lookup for cross-module association
+    // resolution has no JS equivalent (scripts/api-compare/unported-files.ts).
   });
   it.skip("associations spanning cross modules", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // PERMANENT-SKIP: Ruby Module#ancestors / constant-path lookup for cross-module association
+    // resolution has no JS equivalent (scripts/api-compare/unported-files.ts).
   });
   it.skip("find account and include company", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // PERMANENT-SKIP: Ruby Module#ancestors / constant-path lookup for cross-module association
+    // resolution has no JS equivalent (scripts/api-compare/unported-files.ts).
   });
 
   it("table name", () => {
@@ -75,7 +77,8 @@ describe("ModulesTest", () => {
   });
 
   it.skip("eager loading in modules", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // PERMANENT-SKIP: Ruby Module#ancestors / constant-path lookup for cross-module association
+    // resolution has no JS equivalent (scripts/api-compare/unported-files.ts).
   });
 
   it("module table name prefix", () => {
@@ -85,10 +88,6 @@ describe("ModulesTest", () => {
   });
 
   it("module table name prefix with global prefix", () => {
-    // Mirrors Rails set/reset/assert/ensure. The mutation of the global
-    // Base.tableNamePrefix and the recompute via resetTableName run fully
-    // synchronously (no awaits), so no sibling test can observe the mutated
-    // global before the finally restores it.
     const classes = [
       MyAppBusinessCompany,
       MyAppBusinessFirm,
@@ -120,8 +119,6 @@ describe("ModulesTest", () => {
   });
 
   it("module table name suffix with global suffix", () => {
-    // Mirrors Rails set/reset/assert/ensure; see the prefix test above for why
-    // the synchronous mutate-and-restore is safe under shared-worker fixtures.
     const classes = [
       MyAppBusinessCompany,
       MyAppBusinessFirm,
@@ -147,33 +144,46 @@ describe("ModulesTest", () => {
   });
 
   it.skip("compute type can infer class name of sibling inside module", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint
-    // that Rails does not — sibling lookup (Firm from Client.computeType("Firm"))
-    // throws SubclassNotFound in trails. Convergence needed in inheritance.ts.
+    // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint that
+    // Rails does not — sibling lookup (Firm from Client.computeType("Firm")) throws
+    // SubclassNotFound in trails. Story: compute-type-sibling-lookup (RFC 0019).
+    // Listed in scripts/api-compare/unported-files.ts until convergence lands.
     expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
   });
 
   it("nested models should not raise exception when using delete all dependency on association", async () => {
-    const collection = await ShopCollection.first();
-    expect(await collection!.products.toArray()).not.toEqual([]);
-    let error: unknown;
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
     try {
-      await collection!.destroy();
-    } catch (e) {
-      error = e;
+      const collection = await ShopCollection.first();
+      expect(await collection!.products.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await collection!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
     }
-    expect(error).toBeUndefined();
   });
 
   it("nested models should not raise exception when using nullify dependency on association", async () => {
-    const product = await ShopProduct.first();
-    expect(await product!.variants.toArray()).not.toEqual([]);
-    let error: unknown;
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
     try {
-      await product!.destroy();
-    } catch (e) {
-      error = e;
+      const product = await ShopProduct.first();
+      expect(await product!.variants.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await product!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
     }
-    expect(error).toBeUndefined();
   });
 });
