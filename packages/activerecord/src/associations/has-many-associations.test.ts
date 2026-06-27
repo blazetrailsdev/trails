@@ -7210,9 +7210,6 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(HmSubStiPost);
   });
 
-  // Rails has_many_associations_test.rb:312 test_do_not_call_callbacks_for_delete_all:
-  //   car.funky_bulbs.delete_all — FunkyBulb has before_destroy that throws;
-  //   delete_all must bypass it (uses SQL DELETE, not destroy).
   it("do not call callbacks for delete all", async () => {
     const car = (await HmCar.create({ name: "honda" })) as any;
     await car.funkyBulbs.create({});
@@ -7222,7 +7219,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await car.funkyBulbs.count()).toBe(0);
   });
 
-  // Rails has_many_associations_test.rb:903 test_find_first_after_reset.
   // BLOCKED: CollectionProxy#first does not cache _target on load (toArray is
   // deliberately cache-bypassing per collection-proxy.ts:686-692). Each call to
   // first() fetches a new object; the toBe identity check fails. Story:
@@ -7236,8 +7232,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await collection.first()).not.toBe(original);
   });
 
-  // Rails has_many_associations_test.rb — test_deleting_updates_counter_cache:
-  //   topic.replies.delete(first_reply); topic.reload; replies_count matches actual.
   it("deleting updates counter cache", async () => {
     const topic = (await HmTopic.order("id ASC").first()) as any;
     const actual = (await topic.replies.toArray()).length;
@@ -7248,8 +7242,6 @@ describe("HasManyAssociationsTest", () => {
     expect((await topic.replies.toArray()).length).toBe(topic.replies_count);
   });
 
-  // Rails has_many_associations_test.rb — test_destroy_dependent_when_deleted_from_association:
-  //   firm.clients.delete(client) → RecordNotFound on Client.find(client.id).
   it("destroy dependent when deleted from association", async () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clients.size()).toBe(3);
@@ -7260,8 +7252,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.clients.size()).toBe(2);
   });
 
-  // Rails has_many_associations_test.rb:2056 test_replace_with_less_and_dependent_nullify:
-  //   companies(:rails_core).companies = [] — nullify, not delete.
   it("replace with less and dependent nullify", async () => {
     const numCompanies = await Company.count();
     const railsCore = companies("rails_core") as any;
@@ -7269,15 +7259,12 @@ describe("HasManyAssociationsTest", () => {
     expect(await Company.count()).toBe(numCompanies);
   });
 
-  // Rails has_many_associations_test.rb:2477 test_calling_one_should_return_true_if_one.
   it("calling one should return true if one", async () => {
     const firm = companies("first_firm") as any;
     expect(await firm.limitedClients.one()).toBe(true);
     expect(await firm.limitedClients.size()).toBe(1);
   });
 
-  // Rails has_many_associations_test.rb:2607 test_abstract_class_with_polymorphic_has_many:
-  //   SubStiPost.create!, Tagging.create!(taggable: post), post.taggings == [tagging].
   it("abstract class with polymorphic has many", async () => {
     const post = (await HmSubStiPost.create({ title: "fooo", body: "baa" })) as any;
     const tagging = (await HmTagging.create({
@@ -7288,8 +7275,6 @@ describe("HasManyAssociationsTest", () => {
     expect(taggings.some((t: any) => Number(t.id) === Number(tagging.id))).toBe(true);
   });
 
-  // Rails has_many_associations_test.rb:2613 test_with_polymorphic_has_many_with_custom_columns_name:
-  //   Post.create!, Image.create!, post.images << image; assert image in post.images.
   // BLOCKED: has_many `as:` with custom `foreignType` not implemented on write path —
   // collection-association.ts:649 always writes `${as}_type` (imageable_type) but the
   // images table uses imageable_class. Story: assoc-has-many-custom-foreign-type (RFC 0019).
@@ -7304,14 +7289,11 @@ describe("HasManyAssociationsTest", () => {
     expect(Number(imageable.id)).toBe(Number(post.id));
   });
 
-  // Rails has_many_associations_test.rb:3114 test_destroy_does_not_raise_when_association_errors_on_destroy.
   // BLOCKED: AuthorWithErrorDestroyingAssociation not in canonical models.
   // Needs canonical model mirroring vendor/rails/activerecord/test/models/author.rb.
   // Story: assoc-has-many-author-error-destroying (RFC 0019).
   it.skip("destroy does not raise when association errors on destroy", () => {});
 
-  // Rails has_many_associations_test.rb:3170 test_has_many_preloading_with_duplicate_records:
-  //   Post.joins(:comments).preload(:comments).order(:id).to_a → posts.first.comments ids [1,2].
   it("has many preloading with duplicate records", async () => {
     const allPosts = await HmPost.joins("comments").preload("comments").order("id").toArray();
     const first = allPosts[0] as any;
@@ -7383,8 +7365,6 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(HmReply);
   });
 
-  // Rails has_many_associations_test.rb:2886 test_custom_named_counter_cache:
-  //   topics(:first).approved_replies.clear decrements replies_count by 1.
   // BLOCKED: clear() with no dependent nullifies FKs via SQL UPDATE but does not
   // call _decrementCounterCache. Story: assoc-has-many-counter-cache-clear (RFC 0019).
   it.skip("custom named counter cache", async () => {
@@ -7394,65 +7374,55 @@ describe("HasManyAssociationsTest", () => {
     expect((await HmTopic.find(topic.id)).replies_count).toBe(before - 1);
   });
 
-  // Rails has_many_associations_test.rb:2057 test_restrict_with_exception:
-  //   RestrictedWithExceptionFirm.destroy → raises DeleteRestrictionError when child present.
   it("restrict with exception", async () => {
-    const firm = (await RestrictedWithExceptionFirm.create({ name: "TestFirm" })) as any;
-    await Company.create({ name: "ChildCo", client_of: firm.id });
+    const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
+    await firm.companies.create({ name: "child" });
+    expect(await firm.companies.isEmpty()).toBe(false);
     await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
-    expect(await RestrictedWithExceptionFirm.count()).toBeGreaterThan(0);
+    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
+    expect(await firm.companies.exists({ name: "child" })).toBe(true);
   });
 });
 
-// -- Counter cache (head describe migration — B1966c) --
-//
-// Counter-cache cluster: kept in its own `HasManyAssociationsTest` describe so
-// it can run under shared adapter + `defineSchema` upfront +
-// `withTransactionalFixtures` (mirrors #1938 / #1966 pilot pattern). Tests
-// re-declare local classes per `it()` (counter-cache options vary by test);
-// transactional fixtures roll rows back between tests while the schema
-// declared once in `beforeAll` survives.
-
 describe("HasManyAssociationsTest", () => {
-  const { cars } = useHandlerFixtures(["cars"], { schema: TEST_SCHEMA });
+  const { cars } = useHandlerFixtures(["cars", "topics"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
     // engines table not in fixture registry; create it separately.
     await defineSchema({ engines: TEST_SCHEMA.engines });
     registerModel(HmCar);
     registerModel(HmEngine);
+    registerModel(HmTopic);
+    registerModel(HmReply);
+    enableSti(HmTopic);
+    registerSubclass(HmReply);
   });
 
-  // Rails has_many_associations_test.rb:1365 test_has_many_without_counter_cache_option:
-  //   Ship.has_many :treasures (no counter_cache) — reflection.options[:counter_cache] is nil.
   it("has many without counter cache option", () => {
     const assoc = (HmShip as any)._associations.find((a: any) => a.name === "treasures");
     expect(assoc).toBeDefined();
     expect(assoc.options.counterCache).toBeUndefined();
   });
 
-  // Rails has_many_associations_test.rb:1368 test_counter_cache_updates_in_memory_after_create:
-  //   car.engines.create!; car.read_attribute(:engines_count) == 1.
   it("counter cache updates in memory after create", async () => {
-    const car = (await HmCar.create({ name: "MyRide" })) as any;
-    await car.engines.create({});
-    expect(car.readAttribute("engines_count")).toBe(1);
-    expect(await car.engines.size()).toBe(1);
-    expect(((await HmCar.find(car.id)) as any).readAttribute("engines_count")).toBe(1);
+    const topic = (await HmTopic.create({ title: "Zoom-zoom-zoom" })) as any;
+    await topic.replies.create({ title: "re: zoom", content: "speedy quick!" });
+    expect(topic.readAttribute("replies_count")).toBe(1);
+    expect(await topic.replies.size()).toBe(1);
+    expect(((await HmTopic.find(topic.id)) as any).readAttribute("replies_count")).toBe(1);
   });
 
-  // Rails has_many_associations_test.rb:1375 test_pushing_association_updates_counter_cache:
-  //   car.engines << Engine.new; car.reload.engines_count == 1.
   it("pushing association updates counter cache", async () => {
-    const car = (await HmCar.create({ name: "MyRide" })) as any;
-    const engine = new HmEngine({}) as any;
-    await car.engines.push(engine);
-    const reloaded = (await HmCar.find(car.id)) as any;
-    expect(reloaded.engines_count).toBe(1);
+    const topic = (await HmTopic.create({ title: "PushTest" })) as any;
+    const reply = new HmReply({ title: "r" }) as any;
+    await topic.replies.push(reply);
+    const reloaded = (await HmTopic.find(topic.id)) as any;
+    expect(reloaded.replies_count).toBe(1);
   });
 
-  // Rails has_many_associations_test.rb:1473 test_calling_empty_with_counter_cache:
-  //   car.engines.create!; fresh = Car.find(car.id); assert_no_queries { car.engines.empty? }
+  // Rails uses posts(:welcome).comments; trails' posts table has `legacy_comments_count`
+  // (not `comments_count`), so hasCachedCounter? is false for post.comments and
+  // assertNoQueries would fail. Car/Engine (engines_count) tests the same path faithfully.
   it("calling empty with counter cache", async () => {
     const car = cars("honda") as any;
     await car.engines.create({});
