@@ -3359,9 +3359,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // `has_many :orderAgreements, primaryKey: "id"` on a CPK through model),
       // that named column is the one the FK references — use it instead of the
       // through model's own (possibly composite) primary key.
-      const sourcePk = sourceRefl?.isPolymorphic?.()
-        ? undefined
-        : (sourceRefl?.associationPrimaryKey ?? sourceRefl?.options?.primaryKey);
+      let sourcePk: string | string[] | undefined;
+      try {
+        sourcePk = sourceRefl?.associationPrimaryKey ?? sourceRefl?.options?.primaryKey;
+      } catch {
+        sourcePk = undefined;
+      }
       const throughPkCol = typeof sourcePk === "string" ? sourcePk : throughModel.primaryKey;
       if (Array.isArray(throughPkCol)) {
         throw new ConfigurationError(
