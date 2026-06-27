@@ -269,17 +269,15 @@ const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
 /** @internal */
 const PG_ONLY_TYPES = new Set<string>(["citext", "hstore", "uuid", "interval", "oid"]);
 
-// MySQL/MariaDB accepts native DATETIME columns with "YYYY-MM-DD HH:MM:SS" format
-// (no T/Z suffix). AR DateTime.serialize now emits this format, so datetime can
-// use the native column type. `date` likewise uses the native DATE column — the
-// MySQL adapter quotes Temporal.PlainDate and casts DATE fields back via
-// temporal-type-cast, so date attributes round-trip with the correct type.
-// Without this, an introspected DATE-as-VARCHAR resolves to StringType and
-// multiparameter date assignment yields a raw string. time/json still use
-// "string" (VARCHAR); `binary` routes through the native BLOB mapping so
-// encrypted binary attributes round-trip (BinaryData-wrapped ciphertext needs a
-// binary column). PG-only types are deliberately absent: defineSchema throws
-// when one is used against MySQL or SQLite.
+// MySQL/MariaDB accepts native DATETIME/DATE/TIME columns. AR serializes
+// Temporal.PlainTime values for TIME columns, so time attributes round-trip
+// with the correct type. Without native TIME, an introspected TIME-as-VARCHAR
+// resolves to StringType and multiparameter time assignment yields a raw string
+// (same problem that "date: string" caused before PR #4141 fixed it for DATE).
+// json still uses "string" (VARCHAR); `binary` routes through the native BLOB
+// mapping so encrypted binary attributes round-trip (BinaryData-wrapped
+// ciphertext needs a binary column). PG-only types are deliberately absent:
+// defineSchema throws when one is used against MySQL or SQLite.
 /** @internal */
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   string: "string",
@@ -291,7 +289,7 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   boolean: "boolean",
   datetime: "datetime",
   date: "date",
-  time: "string",
+  time: "time",
   binary: "binary",
   json: "string",
 };
