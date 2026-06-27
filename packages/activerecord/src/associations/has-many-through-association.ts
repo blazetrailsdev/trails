@@ -11,7 +11,7 @@ import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass } from "../associations.js";
 import {
   sourceReflection,
-  staleState as throughStaleState,
+  staleStateImpl as throughStaleState,
   throughTargetScope,
 } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";

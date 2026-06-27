@@ -124,7 +124,7 @@ function ensureNotNested(assoc: { owner: Base; reflection: any }): void {
 }
 
 /** @internal */
-export function staleState(assoc: { owner: Base; reflection: any }): unknown[] | null {
+export function staleStateImpl(assoc: { owner: Base; reflection: any }): unknown[] | null {
   const tr = throughReflection(assoc) as any;
   if (!tr?.isBelongsTo?.()) return null;
   const fks: string[] = Array.isArray(tr.foreignKey) ? tr.foreignKey : [tr.foreignKey];
