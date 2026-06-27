@@ -4,11 +4,11 @@ import { Base } from "../../base.js";
 
 export class Cat extends Base {
   declare isFemale: () => boolean;
-  declare femaleBang: () => Promise<true>;
+  declare femaleBang: () => Promise<true | undefined>;
   declare static female: () => Relation<Cat>;
   declare static notFemale: () => Relation<Cat>;
   declare isMale: () => boolean;
-  declare maleBang: () => Promise<true>;
+  declare maleBang: () => Promise<true | undefined>;
   declare static male: () => Relation<Cat>;
   declare static notMale: () => Relation<Cat>;
 
