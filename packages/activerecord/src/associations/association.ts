@@ -45,6 +45,9 @@ export class Association {
    * target (including a preloaded-nil) from a lazy load that must re-query.
    */
   _loadedFromPreload = false;
+  /** True after asyncLoadTarget() completes a full DB load — signals the dotted
+   *  collection proxy that it can hydrate from this instance's target. */
+  _loadedViaAsync = false;
 
   private _staleState: unknown = undefined;
   /**
@@ -126,6 +129,7 @@ export class Association {
     this._staleState = undefined;
     this._explicitTarget = false;
     this._loadedFromPreload = false;
+    this._loadedViaAsync = false;
   }
 
   resetNegativeCache(): void {
@@ -390,7 +394,19 @@ export class Association {
    * In our async-native implementation, this is identical to loadTarget.
    */
   async asyncLoadTarget(): Promise<Base | Base[] | null> {
-    return this.loadTarget();
+    const result = await this.loadTarget();
+    this._loadedViaAsync = true;
+    // Share the loaded target with the dotted collection proxy if it already
+    // exists (e.g. firm.clients was accessed before the async load completed).
+    const name = this.reflection.name;
+    const proxy = this.owner._collectionProxies.get(name) as
+      | { loaded?: boolean; _hydrateFromPreload?(r: Base[]): void }
+      | undefined;
+    if (proxy && !proxy.loaded && typeof proxy._hydrateFromPreload === "function") {
+      const records = Array.isArray(result) ? result : result != null ? [result] : [];
+      proxy._hydrateFromPreload(records);
+    }
+    return result;
   }
 
   marshalDump(): [string, Record<string, unknown>] {

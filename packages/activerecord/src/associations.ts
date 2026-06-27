@@ -3019,6 +3019,14 @@ export function association<T extends Base = Base>(
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
         existing._hydrateFromPreload(records as T[]);
+      } else {
+        // Hydrate from an AssociationInstance loaded via asyncLoadTarget()
+        const instance = record._associationInstances.get(assocName);
+        if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
+          const target = instance.target;
+          const records = Array.isArray(target) ? target : target != null ? [target] : [];
+          existing._hydrateFromPreload(records as T[]);
+        }
       }
     }
     return existing;
@@ -3061,11 +3069,18 @@ export function association<T extends Base = Base>(
     _hydrateFromPreload: (records: T[]) => void;
   };
 
-  // Hydrate from preloaded data if available
+  // Hydrate from preloaded data or from an asyncLoadTarget()-loaded AssociationInstance
   const preloaded = _preloadedHolderTarget(record, assocName)?.value;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
     proxy._hydrateFromPreload(records as T[]);
+  } else {
+    const instance = record._associationInstances.get(assocName);
+    if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
+      const target = instance.target;
+      const records = Array.isArray(target) ? target : target != null ? [target] : [];
+      proxy._hydrateFromPreload(records as T[]);
+    }
   }
 
   const wrapped = wrapCollectionProxy<T>(proxy);
