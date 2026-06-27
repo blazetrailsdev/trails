@@ -67,7 +67,7 @@ export class Post extends Base {
   declare authorWithAddress: Author | null;
   declare authorWithSelect: Author | null;
   declare authorWithTheLetterA: Author | null;
-  declare firstComment: Comment | null;
+  declare firstComment: Promise<string | null>;
   declare lastComment: Comment | null;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
@@ -264,6 +264,15 @@ export class Post extends Base {
       foreignKey: "author_id",
     });
 
+    // Rails post.rb:56-58 — `def first_comment; super.body; end`.
+    // configurable:false before hasOne prevents defineReaders from overwriting it.
+    Object.defineProperty(this.prototype, "firstComment", {
+      get(this: any): Promise<string | null> {
+        return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
+      },
+      configurable: false,
+      enumerable: false,
+    });
     this.hasOne("firstComment", {
       scope: (q: any) => q.order("id ASC"),
       className: "Comment",
