@@ -6,7 +6,6 @@
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
   "packages/activerecord/src/calculations.test.ts",
-  "packages/activerecord/src/counter-cache.trails.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
   "packages/activerecord/src/modules.test.ts",

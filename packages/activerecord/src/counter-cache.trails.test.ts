@@ -9,37 +9,12 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
-
-const TEST_SCHEMA: Schema = {
-  topics: {
-    title: "string",
-    replies_count: { type: "integer", default: 0 },
-  },
-  replies: {
-    content: "string",
-    topic_id: "integer",
-  },
-  cpk_orders: {
-    columns: {
-      shop_id: "integer",
-      id: "integer",
-      items_count: { type: "integer", default: 0 },
-      books_count: { type: "integer", default: 0 },
-    },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_books: {
-    columns: { author_id: "integer", id: "integer", shop_id: "integer", order_id: "integer" },
-    primaryKey: ["author_id", "id"],
-  },
-};
 
 describe("CounterCacheTest (trails)", () => {
   setupHandlerSuite();
@@ -65,9 +40,6 @@ describe("CounterCacheTest (trails)", () => {
 describe("CounterCacheTest deferred resolution (trails)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
   afterAll(async () => {
     const { modelRegistry } = await import("./associations.js");
     modelRegistry.delete("Reply");
@@ -78,11 +50,14 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
   it("counter cache on unloaded association class works", async () => {
     // Declare Reply (with belongs_to + counterCache) BEFORE Topic exists in the
     // registry — exercises pendingCounterCacheColumns deferred-resolution.
+    // Reply rides the canonical `topics` table (STI-style, FK = parent_id),
+    // mirroring how Rails' Reply < Topic works.
     class Reply extends Base {
+      static _tableName = "topics";
       static {
-        this.attribute("content", "string");
-        this.attribute("topic_id", "integer");
-        this.belongsTo("topic", { counterCache: true });
+        this.attribute("content", "text");
+        this.attribute("parent_id", "integer");
+        this.belongsTo("topic", { counterCache: true, foreignKey: "parent_id" });
       }
     }
     // Clear any leftover Topic from prior tests so the unloaded path is
@@ -101,7 +76,7 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
 
     expect(Topic.isCounterCacheColumn("replies_count")).toBe(true);
     const t = await Topic.create({ title: "x" });
-    await Reply.create({ content: "r", topic_id: t.id });
+    await Reply.create({ content: "r", parent_id: t.id });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(1);
   });
