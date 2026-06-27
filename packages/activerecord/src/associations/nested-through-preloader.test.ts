@@ -60,8 +60,8 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const r2 = ratings("special_comment_rating");
     const r3 = ratings("sub_special_comment_rating");
     const result = await david.ratings.toArray();
-    expect(result.map((r) => r.id).sort((a: any, b: any) => a - b)).toEqual(
-      [r1.id, r2.id, r3.id].sort((a: any, b: any) => a - b),
+    expect(result.map((r) => r.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [r1.id, r2.id, r3.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -72,8 +72,8 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const r3 = ratings("sub_special_comment_rating");
     const [author] = await Author.where({ id: david.id }).includes("ratings").toArray();
     const preloaded = (author.association("ratings").target ?? []) as any[];
-    expect(preloaded.map((r: any) => r.id).sort((a: any, b: any) => a - b)).toEqual(
-      [r1.id, r2.id, r3.id].sort((a: any, b: any) => a - b),
+    expect(preloaded.map((r: any) => r.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [r1.id, r2.id, r3.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -97,8 +97,8 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const preloaded = (author.association("ratings").target ?? []) as any[];
     // Filtering the outer relation must not silently drop preloaded
     // targets, introduce duplicates, or leak stray rows.
-    expect(preloaded.map((r: any) => r.id).sort((a: any, b: any) => a - b)).toEqual(
-      [r1.id, r2.id, r3.id].sort((a: any, b: any) => a - b),
+    expect(preloaded.map((r: any) => r.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [r1.id, r2.id, r3.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 

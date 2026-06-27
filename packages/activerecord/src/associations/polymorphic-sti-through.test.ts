@@ -73,8 +73,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
   it("polymorphic-through filters by source_type: only cakeDesigners, not drinkDesigners", async () => {
     const { hotel, cake1, cake2, drink } = await seed();
     const cakes = await (hotel as any).cakeDesigners.toArray();
-    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => a - b)).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
     // source_type filter must exclude DrinkDesigner rows even when their id
     // collides with a CakeDesigner id (different tables share auto-increment sequences).
@@ -88,8 +88,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .includes("cakeDesigners")
       .toArray();
     const preloaded = (h.association("cakeDesigners").target ?? []) as any[];
-    expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => a - b)).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+    expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
     expect(preloaded.every((d: any) => d instanceof CakeDesigner)).toBe(true);
   });
@@ -98,8 +98,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const { hotel, cake1, cake2, drink } = await seed();
     const cakes = await (hotel as any).cakeDesigners.toArray();
     const drinks = await (hotel as any).drinkDesigners.toArray();
-    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => a - b)).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
     expect(drinks.map((d: any) => d.id)).toEqual([(drink as any).id]);
     expect(cakes.every((d: any) => d instanceof CakeDesigner)).toBe(true);
@@ -114,8 +114,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .toArray();
     const cakes = (h.association("cakeDesigners").target ?? []) as any[];
     const drinks = (h.association("drinkDesigners").target ?? []) as any[];
-    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => a - b)).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+    expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
     expect(drinks.map((d: any) => d.id)).toEqual([(drink as any).id]);
     expect(cakes.every((d: any) => d instanceof CakeDesigner)).toBe(true);
@@ -136,8 +136,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .toArray();
     const preloaded = (h.association("cakeDesigners").target ?? []) as any[];
     // Filtering the outer relation must not silently drop preloaded targets.
-    expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => a - b)).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+    expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -150,9 +150,9 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .toArray();
     const firstIds = ((first.association("cakeDesigners").target ?? []) as any[])
       .map((d) => d.id)
-      .sort((a: any, b: any) => a - b);
+      .sort((a: any, b: any) => Number(a) - Number(b));
     expect(firstIds).toEqual(
-      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => a - b),
+      [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
 
     const [second] = await Hotel.where({ id: (h2 as any).id })
@@ -160,9 +160,9 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       .toArray();
     const secondIds = ((second.association("cakeDesigners").target ?? []) as any[])
       .map((d) => d.id)
-      .sort((a: any, b: any) => a - b);
+      .sort((a: any, b: any) => Number(a) - Number(b));
     expect(secondIds).toEqual(
-      [(h2cake1 as any).id, (h2cake2 as any).id].sort((a: any, b: any) => a - b),
+      [(h2cake1 as any).id, (h2cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
     // No leakage between preloads.
     expect(secondIds.every((id) => !firstIds.includes(id))).toBe(true);

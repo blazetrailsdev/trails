@@ -237,8 +237,10 @@ describe("NestedThroughAssociationsTest", () => {
     const otherDetails = memberDetails("some_other_guy");
     const groucho = members("groucho");
     const result = await groucho.organizationMemberDetails.toArray();
-    const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => a - b);
-    expect(sortedIds).toEqual([grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => a - b));
+    const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(sortedIds).toEqual(
+      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
   });
 
   it("has many through has one with has many through source reflection preload", async () => {
@@ -250,9 +252,9 @@ describe("NestedThroughAssociationsTest", () => {
       .toArray();
     const preloaded = ((member.association("organizationMemberDetails").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((d) => d.id)).toEqual(
-      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => a - b),
+      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -281,8 +283,10 @@ describe("NestedThroughAssociationsTest", () => {
     const otherDetails = memberDetails("some_other_guy");
     const groucho = members("groucho");
     const result = await groucho.organizationMemberDetails_2.toArray();
-    const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => a - b);
-    expect(sortedIds).toEqual([grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => a - b));
+    const sortedIds = result.map((d) => d.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(sortedIds).toEqual(
+      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
   });
 
   it("has many through has one through with has many source reflection preload", async () => {
@@ -294,9 +298,9 @@ describe("NestedThroughAssociationsTest", () => {
       .toArray();
     const preloaded = ((member.association("organizationMemberDetails_2").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((d) => d.id)).toEqual(
-      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => a - b),
+      [grouchoDetails.id, otherDetails.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -325,8 +329,10 @@ describe("NestedThroughAssociationsTest", () => {
     const cooking = categories("cooking");
     const bob = authors("bob");
     const result = await bob.postCategories.toArray();
-    const sortedIds = result.map((c) => c.id).sort((a: any, b: any) => a - b);
-    expect(sortedIds).toEqual([general.id, cooking.id].sort((a: any, b: any) => a - b));
+    const sortedIds = result.map((c) => c.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(sortedIds).toEqual(
+      [general.id, cooking.id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
   });
 
   it("has many through has many with has and belongs to many source reflection preload", async () => {
@@ -335,9 +341,9 @@ describe("NestedThroughAssociationsTest", () => {
     const [, , author] = await Author.includes("postCategories").order("authors.id").toArray();
     const preloaded = ((author.association("postCategories").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((c) => c.id)).toEqual(
-      [general.id, cooking.id].sort((a: any, b: any) => a - b),
+      [general.id, cooking.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -362,9 +368,9 @@ describe("NestedThroughAssociationsTest", () => {
     const [, category] = await Category.includes("postComments").order("categories.id").toArray();
     const preloaded = ((category.association("postComments").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((c) => c.id)).toEqual(
-      [greetings.id, moreGreetings.id].sort((a: any, b: any) => a - b),
+      [greetings.id, moreGreetings.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -396,9 +402,9 @@ describe("NestedThroughAssociationsTest", () => {
       .toArray();
     const preloaded = ((author.association("categoryPostComments").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((c) => c.id)).toEqual(
-      [greetings.id, moreGreetings.id].sort((a: any, b: any) => a - b),
+      [greetings.id, moreGreetings.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -442,9 +448,9 @@ describe("NestedThroughAssociationsTest", () => {
     const thinkingGeneral = taggings("thinking_general");
     const davidWelcomeGeneral = categorizations("david_welcome_general");
     const result = await davidWelcomeGeneral.postTaggings.toArray();
-    const sortedIds = result.map((t) => t.id).sort((a: any, b: any) => a - b);
+    const sortedIds = result.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
-      [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => a - b),
+      [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -457,9 +463,9 @@ describe("NestedThroughAssociationsTest", () => {
       .toArray();
     const preloaded = ((categorization.association("postTaggings").target ?? []) as any[])
       .slice()
-      .sort((a: any, b: any) => a.id - b.id);
+      .sort((a: any, b: any) => Number(a.id) - Number(b.id));
     expect(preloaded.map((t) => t.id)).toEqual(
-      [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => a - b),
+      [welcomeGeneral.id, thinkingGeneral.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
   });
 
@@ -568,9 +574,11 @@ describe("NestedThroughAssociationsTest", () => {
     const otherByMary = posts("other_by_mary");
 
     const similarPosts = await bob.similarPosts.toArray();
-    const sortedIds = similarPosts.map((p) => p.id).sort((a: any, b: any) => a - b);
+    const sortedIds = similarPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
-      [miscByBob.id, miscByMary.id, otherByBob.id, otherByMary.id].sort((a: any, b: any) => a - b),
+      [miscByBob.id, miscByMary.id, otherByBob.id, otherByMary.id].sort(
+        (a: any, b: any) => Number(a) - Number(b),
+      ),
     );
 
     const mary = authors("mary");
@@ -578,8 +586,10 @@ describe("NestedThroughAssociationsTest", () => {
       .where({ "posts.id": miscByBob.id })
       .distinct()
       .toArray();
-    const authorIds = authorsResult.map((a) => a.id).sort((a: any, b: any) => a - b);
-    expect(authorIds).toEqual([mary.id, bob.id].sort((a: any, b: any) => a - b));
+    const authorIds = authorsResult
+      .map((a) => a.id)
+      .sort((a: any, b: any) => Number(a) - Number(b));
+    expect(authorIds).toEqual([mary.id, bob.id].sort((a: any, b: any) => Number(a) - Number(b)));
 
     const empty1 = await Author.joins("similarPosts")
       .where({ "taggings.taggable_type": "FakeModel" })
@@ -599,8 +609,8 @@ describe("NestedThroughAssociationsTest", () => {
       .where({ "posts.id": miscByBob.id })
       .distinct()
       .toArray();
-    const ids = result.map((a) => a.id).sort((a: any, b: any) => a - b);
-    expect(ids).toEqual([mary.id, bob.id].sort((a: any, b: any) => a - b));
+    const ids = result.map((a) => a.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(ids).toEqual([mary.id, bob.id].sort((a: any, b: any) => Number(a) - Number(b)));
   });
 
   it("has many through with foreign key option on through reflection", async () => {
@@ -611,8 +621,10 @@ describe("NestedThroughAssociationsTest", () => {
     const davidAuthor = authors("david");
 
     const agentsPosts = await david.agentsPosts.toArray();
-    const sortedIds = agentsPosts.map((p) => p.id).sort((a: any, b: any) => a - b);
-    expect(sortedIds).toEqual([welcome.id, authorless.id].sort((a: any, b: any) => a - b));
+    const sortedIds = agentsPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(sortedIds).toEqual(
+      [welcome.id, authorless.id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
 
     const agentsPostsAuthors = await davidUnicyclist.agentsPostsAuthors.toArray();
     expect(agentsPostsAuthors.map((a) => a.id)).toEqual([davidAuthor.id]);
@@ -629,8 +641,10 @@ describe("NestedThroughAssociationsTest", () => {
     const susan = people("susan");
 
     const agents = await unicyclist.agents.toArray();
-    const sortedIds = agents.map((p) => p.id).sort((a: any, b: any) => a - b);
-    expect(sortedIds).toEqual([michael.id, susan.id].sort((a: any, b: any) => a - b));
+    const sortedIds = agents.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b));
+    expect(sortedIds).toEqual(
+      [michael.id, susan.id].sort((a: any, b: any) => Number(a) - Number(b)),
+    );
 
     const jobsResult = await Job.joins("agents").toArray();
     expect(jobsResult.filter((j) => j.id === unicyclist.id)).toHaveLength(2);
@@ -642,9 +656,11 @@ describe("NestedThroughAssociationsTest", () => {
     const subSpecialRating = ratings("sub_special_comment_rating");
 
     const ratingsResult = await stiComments.specialCommentsRatings.toArray();
-    const sortedIds = ratingsResult.map((r) => r.id).sort((a: any, b: any) => a - b);
+    const sortedIds = ratingsResult
+      .map((r) => r.id)
+      .sort((a: any, b: any) => Number(a) - Number(b));
     expect(sortedIds).toEqual(
-      [specialRating.id, subSpecialRating.id].sort((a: any, b: any) => a - b),
+      [specialRating.id, subSpecialRating.id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
 
     const scope = Post.joins("specialCommentsRatings").where({ id: stiComments.id });
