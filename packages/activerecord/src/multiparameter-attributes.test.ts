@@ -250,130 +250,145 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with time zone aware attributes", async () => {
     // zone: -28800 → Pacific Time; June is PDT (UTC-7) so local 16:24 → UTC 23:24.
-    await withTimezoneConfig(
-      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      async () => {
-        // Mirrors Rails: Topic.reset_column_information so the schema reloads with
-        // awareAttributes: true active, wrapping written_on in TimeZoneConverter.
-        Topic.resetColumnInformation();
-        await Topic.loadSchema();
-        const topic = new Topic();
-        topic.assignAttributes({
-          "written_on(1i)": "2004",
-          "written_on(2i)": "6",
-          "written_on(3i)": "24",
-          "written_on(4i)": "16",
-          "written_on(5i)": "24",
-          "written_on(6i)": "00",
-        });
-        // awareAttributes wraps as TimeWithZone at runtime; declared type is Instant|PlainDateTime
-        const twz = (topic as any).written_on as TimeWithZone;
-        expect(twz).toBeInstanceOf(TimeWithZone);
-        expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(23); // PDT: local 16:24 → UTC 23:24
-        expect(twz.hour).toBe(16); // wall-clock in zone
-      },
-    );
-    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    try {
+      await withTimezoneConfig(
+        { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          // Mirrors Rails: Topic.reset_column_information so the schema reloads with
+          // awareAttributes: true active, wrapping written_on in TimeZoneConverter.
+          Topic.resetColumnInformation();
+          await Topic.loadSchema();
+          const topic = new Topic();
+          topic.assignAttributes({
+            "written_on(1i)": "2004",
+            "written_on(2i)": "6",
+            "written_on(3i)": "24",
+            "written_on(4i)": "16",
+            "written_on(5i)": "24",
+            "written_on(6i)": "00",
+          });
+          // awareAttributes wraps as TimeWithZone at runtime; declared type is Instant|PlainDateTime
+          const twz = (topic as any).written_on as TimeWithZone;
+          expect(twz).toBeInstanceOf(TimeWithZone);
+          expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(23); // PDT: local 16:24 → UTC 23:24
+          expect(twz.hour).toBe(16); // wall-clock in zone
+        },
+      );
+    } finally {
+      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    }
   });
 
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
-    await withTimezoneConfig({ awareAttributes: true }, async () => {
-      Topic.resetColumnInformation();
-      await Topic.loadSchema();
-      const topic = new Topic();
-      topic.assignAttributes({
-        "written_on(1i)": "2004",
-        "written_on(2i)": "",
-        "written_on(3i)": "",
+    try {
+      await withTimezoneConfig({ awareAttributes: true }, async () => {
+        Topic.resetColumnInformation();
+        await Topic.loadSchema();
+        const topic = new Topic();
+        topic.assignAttributes({
+          "written_on(1i)": "2004",
+          "written_on(2i)": "",
+          "written_on(3i)": "",
+        });
+        expect(topic.written_on).toBeNull();
       });
-      expect(topic.written_on).toBeNull();
-    });
-    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    } finally {
+      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    }
   });
 
   it("multiparameter attributes on time with time zone aware attributes false", async () => {
-    await withTimezoneConfig(
-      { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
-      async () => {
-        Topic.resetColumnInformation();
-        await Topic.loadSchema();
-        const topic = new Topic();
-        topic.assignAttributes({
-          "written_on(1i)": "2004",
-          "written_on(2i)": "6",
-          "written_on(3i)": "24",
-          "written_on(4i)": "16",
-          "written_on(5i)": "24",
-          "written_on(6i)": "00",
-        });
-        const val = topic.written_on;
-        expect(val).not.toBeInstanceOf(TimeWithZone); // assert_not_respond_to :time_zone
-        expect(val).toBeInstanceOf(Temporal.Instant);
-      },
-    );
-    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    try {
+      await withTimezoneConfig(
+        { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          Topic.resetColumnInformation();
+          await Topic.loadSchema();
+          const topic = new Topic();
+          topic.assignAttributes({
+            "written_on(1i)": "2004",
+            "written_on(2i)": "6",
+            "written_on(3i)": "24",
+            "written_on(4i)": "16",
+            "written_on(5i)": "24",
+            "written_on(6i)": "00",
+          });
+          const val = topic.written_on;
+          expect(val).not.toBeInstanceOf(TimeWithZone); // assert_not_respond_to :time_zone
+          expect(val).toBeInstanceOf(Temporal.Instant);
+        },
+      );
+    } finally {
+      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    }
   });
 
   it("multiparameter attributes on time with skip time zone conversion for attributes", async () => {
-    await withTimezoneConfig(
-      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      async () => {
-        // Mirrors Rails: Topic.skip_time_zone_conversion_for_attributes = [:written_on]
-        Topic.skipTimeZoneConversionForAttributes = ["written_on"];
-        Topic.resetColumnInformation();
-        await Topic.loadSchema();
-        const topic = new Topic();
-        topic.assignAttributes({
-          "written_on(1i)": "2004",
-          "written_on(2i)": "6",
-          "written_on(3i)": "24",
-          "written_on(4i)": "16",
-          "written_on(5i)": "24",
-          "written_on(6i)": "00",
-        });
-        const val = topic.written_on;
-        expect(val).not.toBeInstanceOf(TimeWithZone);
-        expect(val).toBeInstanceOf(Temporal.Instant);
-        expect((val as Temporal.Instant).toZonedDateTimeISO("UTC").hour).toBe(16);
-      },
-    );
-    // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
-    Topic.skipTimeZoneConversionForAttributes = [];
-    Topic.resetColumnInformation();
+    try {
+      await withTimezoneConfig(
+        { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          // Mirrors Rails: Topic.skip_time_zone_conversion_for_attributes = [:written_on]
+          Topic.skipTimeZoneConversionForAttributes = ["written_on"];
+          Topic.resetColumnInformation();
+          await Topic.loadSchema();
+          const topic = new Topic();
+          topic.assignAttributes({
+            "written_on(1i)": "2004",
+            "written_on(2i)": "6",
+            "written_on(3i)": "24",
+            "written_on(4i)": "16",
+            "written_on(5i)": "24",
+            "written_on(6i)": "00",
+          });
+          const val = topic.written_on;
+          expect(val).not.toBeInstanceOf(TimeWithZone);
+          expect(val).toBeInstanceOf(Temporal.Instant);
+          expect((val as Temporal.Instant).toZonedDateTimeISO("UTC").hour).toBe(16);
+        },
+      );
+    } finally {
+      // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
+      Topic.skipTimeZoneConversionForAttributes = [];
+      Topic.resetColumnInformation();
+    }
   });
 
   it("multiparameter attributes on time only column with time zone aware attributes does not do time zone conversion", async () => {
-    await withTimezoneConfig(
-      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      async () => {
-        // Mirrors Rails: Topic.reset_column_information so schema reloads with
-        // awareAttributes: true, wrapping bonus_time and written_on in TimeZoneConverter.
-        Topic.resetColumnInformation();
-        await Topic.loadSchema();
-        const topic = new Topic();
-        topic.assignAttributes({
-          "bonus_time(1i)": "2000",
-          "bonus_time(2i)": "1",
-          "bonus_time(3i)": "1",
-          "bonus_time(4i)": "16",
-          "bonus_time(5i)": "24",
-        });
-        // awareAttributes wraps time columns as TimeWithZone at runtime; declared type is PlainTime
-        const bt = (topic as any).bonus_time as TimeWithZone;
-        expect(bt).toBeInstanceOf(TimeWithZone);
-        expect(bt.hour).toBe(16);
-        // written_on with empty month/day → null
-        topic.assignAttributes({
-          "written_on(1i)": "2000",
-          "written_on(2i)": "",
-          "written_on(3i)": "",
-          "written_on(4i)": "",
-          "written_on(5i)": "",
-        });
-        expect(topic.written_on).toBeNull();
-      },
-    );
-    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    try {
+      await withTimezoneConfig(
+        { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          // Mirrors Rails: Topic.reset_column_information so schema reloads with
+          // awareAttributes: true, wrapping bonus_time and written_on in TimeZoneConverter.
+          Topic.resetColumnInformation();
+          await Topic.loadSchema();
+          const topic = new Topic();
+          topic.assignAttributes({
+            "bonus_time(1i)": "2000",
+            "bonus_time(2i)": "1",
+            "bonus_time(3i)": "1",
+            "bonus_time(4i)": "16",
+            "bonus_time(5i)": "24",
+          });
+          // awareAttributes wraps time columns as TimeWithZone at runtime; declared type is PlainTime
+          const bt = (topic as any).bonus_time as TimeWithZone;
+          expect(bt).toBeInstanceOf(TimeWithZone);
+          expect(bt.hour).toBe(16);
+          // written_on with empty month/day → null
+          topic.assignAttributes({
+            "written_on(1i)": "2000",
+            "written_on(2i)": "",
+            "written_on(3i)": "",
+            "written_on(4i)": "",
+            "written_on(5i)": "",
+          });
+          expect(topic.written_on).toBeNull();
+        },
+      );
+    } finally {
+      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+    }
   });
 
   it("multiparameter attributes setting time attribute", () => {
