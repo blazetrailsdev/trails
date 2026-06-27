@@ -28,7 +28,7 @@ import { Tagging } from "./test-helpers/models/tagging.js";
 import { Account, SubAccount } from "./test-helpers/models/account.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { Edge } from "./test-helpers/models/edge.js";
-import { CpkOrder } from "./test-helpers/models/cpk.js";
+import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { Reader } from "./test-helpers/models/reader.js";
 import { Company, DependentFirm } from "./test-helpers/models/company.js";
@@ -102,6 +102,7 @@ describe("RelationTest", () => {
     registerModel(Entrant);
     registerModel(Edge);
     registerModel(CpkOrder);
+    registerModel(CpkBook);
     registerModel(Subscriber);
     registerModel(Reader);
     registerModel(Company);
@@ -124,6 +125,7 @@ describe("RelationTest", () => {
     expect(van).toBeTruthy();
     const result = await Minivan.where({ minivan_id: [van] }).toArray();
     expect(result[0].minivan_id).toBe(van!.minivan_id);
+    expect(result[0].id).toBe(van!.id);
   });
 
   it("two scopes with includes should not drop any include", () => {
@@ -244,6 +246,8 @@ describe("RelationTest", () => {
     expect(fromSubquery.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
     const fromSubqueryNamed = await Topic.select("subquery.*").from(relation).toArray();
     expect(fromSubqueryNamed.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
+    const fromSubqueryAliased = await Topic.select("a.*").from(relation, "a").toArray();
+    expect(fromSubqueryAliased.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
   });
 
   it("finding with subquery with binds", async () => {
@@ -252,6 +256,10 @@ describe("RelationTest", () => {
     const direct = await commentRel.toArray();
     const fromSubquery = await Comment.select("*").from(commentRel).toArray();
     expect(fromSubquery.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
+    const fromSubqueryNamed = await Comment.select("subquery.*").from(commentRel).toArray();
+    expect(fromSubqueryNamed.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
+    const fromSubqueryAliased = await Comment.select("a.*").from(commentRel, "a").toArray();
+    expect(fromSubqueryAliased.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
   });
 
   it("finding with subquery without select does not change the select", async () => {
@@ -351,12 +359,15 @@ describe("RelationTest", () => {
     // BLOCKED: relations — canonical comments table lacks STI `type` column
   });
 
-  it("finding with subquery with eager loading in from", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it.skip("finding with subquery with eager loading in from", () => {
+    // BLOCKED: relations — Comment.includes("post").where({ "posts.type": "Post" }) subquery
+    // needs eager_load JOIN folded into FROM subquery; eagerLoad is implemented but
+    // composing it with from() as a subquery source is not yet supported
   });
 
-  it("finding with subquery with eager loading in where", () => {
-    expect(Post.where({ title: "x" })).toBeInstanceOf(Relation);
+  it.skip("finding with subquery with eager loading in where", () => {
+    // BLOCKED: relations — same as above; Comment.includes("post").where({ "posts.type": "Post" })
+    // used as an id-in subquery requires eager_load→JOIN in the subquery context
   });
 
   it("finding with conditions", async () => {
@@ -448,9 +459,11 @@ describe("RelationTest", () => {
     ).rejects.toThrow(IrreversibleOrderError);
   });
 
-  it("reverse arel assoc order with multiargument function", () => {
-    const sql = Post.order("title ASC").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+  it.skip("reverse arel assoc order with multiargument function", () => {
+    // BLOCKED: relations — Rails uses Arel.sql("REPLACE(title,'','')") => :asc (hash key is a
+    // SqlLiteral, a String subclass). Trails' SqlLiteral is not a String, so
+    // { [arelSql("...")]: "asc" } produces a wrong key. Without a SqlLiteral-keyed order
+    // API, this test cannot assert no-throw on reverse of a multi-arg function hash order.
   });
 
   it.skipIf(adapterType !== "postgres")("reverse order with nulls first or last", () => {
@@ -471,9 +484,9 @@ describe("RelationTest", () => {
     );
   });
 
-  it("default reverse order on table without primary key", () => {
-    const sql = Post.all().toSql();
-    expect(sql).toContain("SELECT");
+  it.skip("default reverse order on table without primary key", () => {
+    // BLOCKED: relations — reverseOrder() on a no-PK table should raise IrreversibleOrderError;
+    // Trails' reverseOrder() doesn't check for a missing primary key yet
   });
 
   it("order with hash and symbol generates the same sql", () => {
@@ -781,8 +794,26 @@ describe("RelationTest", () => {
     expect(await query.size()).toBe(1);
   });
 
-  it("preloading with associations and merges", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it("preloading with associations and merges", async () => {
+    const post = await Post.createBang({ title: "Uhuu", body: "body" });
+    await Reader.createBang({ post_id: post.id, person_id: 1 });
+    const comment = await Comment.createBang({ post_id: post.id, body: "body" });
+
+    // Rails also asserts no-queries for preloaded post.readers after the merge; that
+    // assertion requires cross-model preload propagation through merge, not yet ported.
+    const postRel = Post.joins("INNER JOIN readers ON readers.post_id = posts.id").where({
+      title: "Uhuu",
+    });
+    const resultComment = await Comment.joins("INNER JOIN posts ON posts.id = comments.post_id")
+      .merge(postRel)
+      .first();
+    expect(resultComment!.id).toBe(comment.id);
+
+    const postRel2 = Post.where({ title: "Uhuu" });
+    const resultComment2 = await Comment.joins("INNER JOIN posts ON posts.id = comments.post_id")
+      .merge(postRel2)
+      .first();
+    expect(resultComment2!.id).toBe(comment.id);
   });
 
   it("preloading with associations default scopes and merges", async () => {
@@ -807,22 +838,36 @@ describe("RelationTest", () => {
     const post2Comments = await post2!.comments.toArray();
     expect(post2Comments).toHaveLength(2);
     expect(post2Comments.map((c: any) => c.id)).toContain(comments("greetings").id);
+
+    const postsWithLastComment = await Post.preload("lastComment").toArray();
+    const postWithLastComment = postsWithLastComment.find((p) => Number(p.id) === 1)!;
+    const freshPost = await Post.find(1);
+    const directLastComment = await freshPost.loadHasOne("lastComment");
+    expect(postWithLastComment.lastComment).toEqual(directLastComment);
   });
 
-  it("to sql on eager join", () => {
-    expect(typeof Post.all().toSql()).toBe("string");
+  it("to sql on eager join", async () => {
+    void posts("welcome");
+    const sql = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
+    const rows = await Post.eagerLoad("lastComment").order("comments.id DESC").toArray();
+    expect(rows.length).toBeGreaterThan(0);
+    // toSql reflects the same query used for loading
+    expect(sql).toContain("comments");
   });
 
-  it("to sql on scoped proxy", () => {
-    const sql = Post.all().toSql();
-    expect(typeof sql).toBe("string");
-    expect(sql).toContain("SELECT");
+  it("to sql on scoped proxy", async () => {
+    const auth = await Author.first();
+    Post.writtenBy(auth!).where("1=1");
+    expect(auth!.posts.toSql()).not.toContain("1=1");
   });
 
-  it("loading with one association with non preload", () => {
-    const sql = Post.all().toSql();
-    expect(typeof sql).toBe("string");
-    expect(sql).toContain("SELECT");
+  it("loading with one association with non preload", async () => {
+    void posts("welcome");
+    const postsEager = await Post.eagerLoad("lastComment").order("comments.id DESC").toArray();
+    const post = postsEager.find((p) => Number(p.id) === 1)!;
+    const freshPost = await Post.find(1);
+    const directLastComment = await freshPost.loadHasOne("lastComment");
+    expect(post.lastComment).toEqual(directLastComment);
   });
 
   it("dynamic find by attributes", async () => {
