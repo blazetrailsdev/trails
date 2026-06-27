@@ -148,7 +148,14 @@ describe("ModulesTest", () => {
     // Rails does not — sibling lookup (Firm from Client.computeType("Firm")) throws
     // SubclassNotFound in trails. Story: compute-type-sibling-lookup (RFC 0019).
     // Listed in scripts/api-compare/unported-files.ts until convergence lands.
-    expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
+    // Rails sets store_full_sti_class = true for this test (modules_test.rb:146-147).
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
+    } finally {
+      Base.storeFullStiClass = prev;
+    }
   });
 
   it("nested models should not raise exception when using delete all dependency on association", async () => {
