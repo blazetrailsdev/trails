@@ -17511,7 +17511,7 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "_create_record",
     "call": "new",
-    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` — the `new` operator, not a recognized method call."
+    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` \u2014 the `new` operator, not a recognized method call."
   },
   {
     "package": "activerecord",
@@ -44307,13 +44307,6 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "select_for_count",
     "call": "arel_columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "compile",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
