@@ -3910,10 +3910,38 @@ describe("EagerAssociationTest", () => {
     }
   });
 
-  it.skip("eager with multiple associations with same table has many and habtm", () => {
-    // BLOCKED: associations — HABTM class_name-aliased shared-join-table gap
-    // ROOT-CAUSE: associations/builder/has-and-belongs-to-many.ts + associations.ts createHabtmJoinModel derive the target FK / source name from the association name (other_post_id / otherPost) not the resolved class name (post_id / post)
-    // SCOPE: ~30–80 LOC fix; RFC 0019 story habtm-classname-aliased-shared-jointable-source; Category.other_posts/special_posts (HABTM aliases over categories_posts) fail to preload
+  it("eager with multiple associations with same table has many and habtm", async () => {
+    function sortById(records: Base[]) {
+      return [...records].sort((a, b) => Number(a.id) - Number(b.id));
+    }
+    const postTypes = ["posts", "otherPosts", "specialPosts"] as const;
+    for (const ModelClass of [Author, Category] as (typeof Author | typeof Category)[]) {
+      const tableName = ModelClass.tableName;
+      const pk = ModelClass.primaryKey as string;
+      const d1 = (await (ModelClass as any).order(`${tableName}.${pk}`).toArray()) as Base[];
+      const d2 = (await (ModelClass as any)
+        .order(`${tableName}.${pk}`)
+        .includes(...postTypes)
+        .toArray()) as Base[];
+      for (let i = 0; i < d1.length; i++) {
+        expect(d1[i].id).toEqual(d2[i].id);
+        const d1Posts = sortById((await (d1[i] as any).posts.toArray()) as Base[]);
+        const d2Posts = sortById(d2[i].association("posts").target as Base[]);
+        expect(d2Posts.map((p) => p.id)).toEqual(d1Posts.map((p) => p.id));
+        for (const postType of postTypes.slice(1)) {
+          const d3 = (await (ModelClass as any)
+            .order(`${tableName}.${pk}`)
+            .includes("posts", postType)
+            .toArray()) as Base[];
+          expect(d3[i].id).toEqual(d1[i].id);
+          const d1Type = sortById((await (d1[i] as any)[postType].toArray()) as Base[]);
+          const d2Type = sortById(d2[i].association(postType).target as Base[]);
+          const d3Type = sortById(d3[i].association(postType).target as Base[]);
+          expect(d2Type.map((p) => p.id)).toEqual(d1Type.map((p) => p.id));
+          expect(d3Type.map((p) => p.id)).toEqual(d1Type.map((p) => p.id));
+        }
+      }
+    }
   });
 
   it("preconfigured includes with habtm", async () => {
