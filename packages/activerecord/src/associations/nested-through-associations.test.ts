@@ -153,7 +153,6 @@ describe("NestedThroughAssociationsTest", () => {
   // Source: has_many
   // Through: has_many through
   // trails deduplicates nested-through results by PK; Rails returns all rows including duplicates.
-  // The direct-load path returns [alterself, webster132] (2 unique) instead of [alterself, webster132, webster132].
   it.todo("has many through has many through with has many source reflection");
 
   it("has many through has many through with has many source reflection preload", async () => {
