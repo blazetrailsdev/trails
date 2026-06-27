@@ -537,8 +537,8 @@ interface UpdateRecord extends AttributeIO {
     lockingColumn: string;
     lockingEnabled: boolean;
   };
-  save(options?: { validate?: boolean }): Promise<boolean>;
-  saveBang(options?: { validate?: boolean }): Promise<true>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
+  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
 function assertLockingColumnNotExplicitly(
