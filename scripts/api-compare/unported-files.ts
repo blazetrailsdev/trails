@@ -293,8 +293,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "find account and include company",
       "eager loading in modules",
       "compute type can infer class name of sibling inside module",
-      "nested models should not raise exception when using delete all dependency on association",
-      "nested models should not raise exception when using nullify dependency on association",
     ],
     reason:
       "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +

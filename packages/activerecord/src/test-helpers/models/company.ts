@@ -432,6 +432,25 @@ export class NewlyContractedCompany extends Company {
   }
 }
 
+for (const klass of [
+  Company,
+  AbstractCompany,
+  SpecialCo,
+  Firm,
+  DependentFirm,
+  RestrictedWithExceptionFirm,
+  RestrictedWithErrorFirm,
+  Agency,
+  Client,
+  ExclusivelyDependentFirm,
+  LargeClient,
+  SpecialClient,
+  VerySpecialClient,
+  NewlyContractedCompany,
+]) {
+  registerModel(klass);
+}
+
 // `registerModel` derives the qualified "Namespaced::*" registry key from each
 // class's own `moduleName`, so cross-namespace className resolution works
 // without hand-written `registerModel("Ruby::Name", …)` strings.

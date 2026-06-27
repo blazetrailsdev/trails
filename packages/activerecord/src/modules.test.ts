@@ -1,12 +1,6 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import {
   MyAppBusinessCompany,
   MyAppBusinessFirm,
@@ -22,21 +16,32 @@ import {
   MyAppBusinessSuffixedFirm,
   MyAppBillingAccount,
 } from "./test-helpers/models/company-in-module.js";
+import { ShopCollection } from "./test-helpers/models/shop.js";
+import { ShopProduct } from "./test-helpers/models/shop.js";
 
 describe("ModulesTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      accounts: { name: "string" },
-      billing_accounts: { name: "string" },
-      app_billing_accounts: { name: "string" },
-      accounts_archive: { name: "string" },
-      accounts_archive_v2: { name: "string" },
-      vehicles: { type: "string" },
-      posts: { title: "string", author_id: "integer" },
-    });
+  useHandlerFixtures([
+    "accounts",
+    "companies",
+    "projects",
+    "developers",
+    "collections",
+    "products",
+    "variants",
+  ]);
+
+  // Rails setup: store_full_sti_class = false; teardown: restore to true.
+  // Module-namespaced models (MyAppBusiness*) store demodulized type names in
+  // the DB — the fixture data uses "Firm" / "Client", not the full module path.
+  let _prevStoreFullStiClass: boolean;
+  beforeEach(() => {
+    _prevStoreFullStiClass = Base.storeFullStiClass;
+    Base.storeFullStiClass = false;
   });
+  afterEach(() => {
+    Base.storeFullStiClass = _prevStoreFullStiClass;
+  });
+
   it.skip("module spanning associations", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
@@ -57,13 +62,16 @@ describe("ModulesTest", () => {
   });
 
   it("assign ids", async () => {
-    class Account extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    const firm = await MyAppBusinessFirm.first();
+    const client = await MyAppBusinessClient.first();
+    let error: unknown;
+    try {
+      type WithClients = { clients: { setIds(ids: number[]): Promise<void> } };
+      await (firm as unknown as WithClients).clients.setIds([client!.id as number]);
+    } catch (e) {
+      error = e;
     }
-    const a = await Account.create({ name: "test" });
-    expect(a.id).toBeDefined();
+    expect(error).toBeUndefined();
   });
 
   it.skip("eager loading in modules", () => {
@@ -135,6 +143,57 @@ describe("ModulesTest", () => {
     } finally {
       Base.tableNameSuffix = "";
       classes.forEach((klass) => klass.resetTableName());
+    }
+  });
+
+  it.skip("compute type can infer class name of sibling inside module", () => {
+    // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint
+    // that Rails does not — sibling lookup (Firm from Client.computeType("Firm"))
+    // throws SubclassNotFound in trails. Convergence needed in inheritance.ts.
+    // Rails modules_test.rb:146-147 sets store_full_sti_class = true for this test;
+    // the outer beforeEach leaves it false, so restore it here for future un-skippers.
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
+    } finally {
+      Base.storeFullStiClass = prev;
+    }
+  });
+
+  it("nested models should not raise exception when using delete all dependency on association", async () => {
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      const collection = await ShopCollection.first();
+      expect(await collection!.products.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await collection!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
+    }
+  });
+
+  it("nested models should not raise exception when using nullify dependency on association", async () => {
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      const product = await ShopProduct.first();
+      expect(await product!.variants.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await product!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
     }
   });
 });

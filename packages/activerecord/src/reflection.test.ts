@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   Base,
   columns,
@@ -29,189 +29,11 @@ import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-// All tables referenced by tests in this file. Tests declare ad-hoc model
-// classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must be
-// materialized up front rather than auto-derived by the test adapter.
-const TEST_SCHEMA: Schema = {
-  addresses: { street: "string" },
-  admin_users: { name: "string" },
-  appointments: { doctor_id: "integer", patient_id: "integer" },
-  articles: { title: "string", body_text: "string", views: "integer" },
-  authors: { name: "string" },
-  blog_posts: { title: "string", blog_id: "integer" },
-  bookmarks: { author_name: "string" },
-  books: { title: "string", author_id: "integer" },
-  bulbs: { car_id: "integer" },
-  cars: {},
-  cat_categories: { name: "string" },
-  catalog_categories: { name: "string" },
-  catalog_products: { name: "string" },
-  categories: { name: "string" },
-  chapters: { title: "string", book_id: "integer" },
-  chefs: { department_id: "integer", name: "string" },
-  children: { parent_id: "integer" },
-  clients: { name: "string" },
-  comments: { post_id: "integer", blog_post_id: "integer" },
-  companies: {},
-  company2s: {},
-  content_pages: { name: "string" },
-  contract2s: { company2_id: "integer" },
-  contracts: { company_id: "integer" },
-  crews: { ship_id: "integer" },
-  customers: {
-    balance_amount: "integer",
-    balance_currency: "string",
-    address_street: "string",
-    address_city: "string",
-  },
-  departments: { hotel_id: "integer", name: "string" },
-  developers: { name: "string" },
-  doctors: {},
-  essay_authors: { name: "string" },
-  essay_cats: { name: "string" },
-  essay_models: {
-    name: "string",
-    writer_id: "integer",
-    writer_type: "string",
-    category_id: "integer",
-  },
-  firms: { name: "string" },
-  habtm_posts: { title: "string" },
-  host_as: { name: "string" },
-  hot_accounts: { hot_owner_id: "integer" },
-  hot_owners: { name: "string" },
-  hot_profiles: { hot_account_id: "integer" },
-  hotels: { name: "string" },
-  items: { tenant_id: "integer" },
-  jt_categories: { name: "string" },
-  jt_products: { name: "string" },
-  libraries: { name: "string" },
-  line_items: { order_id: "integer", shop_id: "integer" },
-  magazines: { publisher_id: "integer" },
-  ms_departments: { hotel_id: "integer" },
-  ms_hotels: { name: "string" },
-  n_authors: { name: "string" },
-  n_categories: { name: "string" },
-  n_comments: { post_id: "integer" },
-  n_posts: { author_id: "integer" },
-  n_taggings: { post_id: "integer", tag_id: "integer" },
-  n_tags: { name: "string" },
-  nested_nested_users: { name: "string" },
-  nested_users: { name: "string" },
-  no_pk_models: {},
-  no_pk_owners: {},
-  ns_admin_users: { name: "string" },
-  ns_billing_accounts: { firm_id: "integer" },
-  ns_billing_firms: { name: "string" },
-  ns_billing_nested_firms: { name: "string" },
-  ns_biz_clients: { name: "string", firm_id: "integer" },
-  ns_biz_firms: { name: "string" },
-  ns_post_bs: { name: "string" },
-  ns_posts: { name: "string" },
-  ns_tag_bs: { name: "string" },
-  ns_tags: { name: "string" },
-  orders: {},
-  orgs: {},
-  orphan2s: { name: "string" },
-  orphans: { name: "string" },
-  owners: { no_pk_model_id: "integer", name: "string" },
-  parents: { name: "string" },
-  parts: { ship_id: "integer" },
-  patients: {},
-  people: { name: "string", age: "integer", active: "boolean" },
-  pets: { owner_id: "integer" },
-  post_tags: { post_id: "integer", tag_id: "integer" },
-  posts: {
-    writer_id: "integer",
-    author_id: "integer",
-    title: "string",
-    user_id: "integer",
-  },
-  profiles: { user_id: "integer" },
-  projects: { name: "string" },
-  publishers: {},
-  ratings: { comment_id: "integer" },
-  refl_authors: { name: "string" },
-  refl_categories: { name: "string" },
-  refl_essays: {
-    name: "string",
-    writer_id: "integer",
-    writer_type: "string",
-    category_id: "integer",
-  },
-  refl_organizations: { name: "string" },
-  rooms: { owner_id: "integer" },
-  sc2_chef_lists: {
-    employable_list_id: "integer",
-    employable_list_type: "string",
-    employable_id: "integer",
-    employable_type: "string",
-  },
-  sc2_hotels: { name: "string" },
-  sc2_mocktails: {},
-  sc3_authors: { name: "string" },
-  sc3_books: {
-    author_id: "integer",
-    format_record_id: "integer",
-    format_record_type: "string",
-  },
-  sc3_hardbacks: {},
-  sc4_chefs: {
-    department_id: "integer",
-    employable_id: "integer",
-    employable_type: "string",
-  },
-  sc4_depts: { hotel_id: "integer" },
-  sc4_drinks: {},
-  sc4_hotels: { name: "string" },
-  sc4_recipes: { chef_id: "integer", hotel_id: "integer" },
-  sc_cakes: {},
-  sc_chefs: {
-    department_id: "integer",
-    employable_id: "integer",
-    employable_type: "string",
-  },
-  sc_depts: { hotel_id: "integer" },
-  sc_drinks: {},
-  sc_hotels: { name: "string" },
-  ships: { name: "string" },
-  special_books: { isbn: "string", author_id: "integer" },
-  sponsors: {
-    sponsorable_id: "integer",
-    sponsorable_type: "string",
-    sponsor_club_id: "integer",
-  },
-  standalones: { name: "string" },
-  sub_books: { title: "string" },
-  subscribers: { name: "string" },
-  subscriptions: { subscriber_id: "integer", book_id: "integer" },
-  taggings: { taggable_id: "integer", taggable_type: "string" },
-  tags: { taggable_id: "integer", taggable_type: "string", name: "string" },
-  target_as: { name: "string" },
-  targets: {},
-  tasks: { title: "string" },
-  teams: {},
-  tenants: { tenant_id: "integer" },
-  top_users: { name: "string" },
-  topic2s: { title: "string" },
-  topics: {
-    title: "string",
-    author_name: "string",
-    body: "string",
-    category_id: "integer",
-  },
-  users: { name: "string", email: "string" },
-};
-
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema(TEST_SCHEMA);
-});
 
 describe("ReflectionTest", () => {
   function makeModels() {
@@ -575,26 +397,16 @@ describe("ReflectionTest", () => {
     expect(names.indexOf("author_name")).toBeLessThan(names.indexOf("body"));
   });
   it("content columns", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("body", "string");
-        this.attribute("category_id", "integer");
-      }
-    }
-    registerModel("Topic", Topic);
-    Associations.belongsTo.call(Topic, "category", {});
+    class Topic extends Base {}
     const cols = contentColumns(Topic);
     const colNames = cols.map((c) => c.name);
-    // Should exclude id (PK) and category_id (FK)
+    // Should exclude id (PK) and parent_id (FK ending in _id)
     expect(colNames).not.toContain("id");
-    expect(colNames).not.toContain("category_id");
-    // Should include content columns
+    expect(colNames).not.toContain("parent_id");
+    // Should include content columns (canonical topics schema)
     expect(colNames).toContain("title");
     expect(colNames).toContain("author_name");
-    expect(colNames).toContain("body");
+    expect(colNames).toContain("content");
   });
   it("non existent types are identity types", () => {
     class Topic2 extends Base {
@@ -1257,6 +1069,9 @@ describe("ReflectionTest", () => {
   it("column string type and limit", () => {
     class Article extends Base {
       static {
+        // Use a table absent from the canonical schema so columnsHash() falls
+        // back to _attributeDefinitions instead of the DB schema cache.
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }
@@ -1268,6 +1083,7 @@ describe("ReflectionTest", () => {
   it("column null not null", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }
@@ -1278,6 +1094,7 @@ describe("ReflectionTest", () => {
   it("human name for column", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("body_text", "string");
       }
     }
@@ -1289,6 +1106,7 @@ describe("ReflectionTest", () => {
   it("integer columns", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("views", "integer");
       }
     }
@@ -1300,6 +1118,7 @@ describe("ReflectionTest", () => {
   it("non existent columns return null object", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }
