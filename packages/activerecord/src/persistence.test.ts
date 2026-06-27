@@ -24,7 +24,6 @@ import {
   ActiveRecordError,
   registerModel,
 } from "./index.js";
-import { adapterSupports } from "./test-helpers/supports.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -53,14 +52,16 @@ import { Account } from "./test-helpers/models/account.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
-import { Parrot } from "./test-helpers/models/parrot.js";
+import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 // `Post` is imported under an alias for the same esbuild-rename reason as
-// `Topic`/`Item`: bespoke in-function `class Post` declarations still exist in
-// the not-yet-converted blocks.
-import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+// `Topic`/`Item`: a bespoke in-function `class Post` declaration still exists in
+// the not-yet-converted update-all block.
+import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
-import { Company, LargeClient, Client } from "./test-helpers/models/company.js";
+import { Company, LargeClient, Client, Firm } from "./test-helpers/models/company.js";
+import { AdminUser } from "./test-helpers/models/admin/user.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Car } from "./test-helpers/models/car.js";
@@ -82,8 +83,10 @@ for (const klass of [
   CpkBook,
   Minivan,
   Company,
+  Firm,
   LargeClient,
   Client,
+  AdminUser,
   AutoId,
   Person,
   Car,
@@ -746,130 +749,120 @@ describe("PersistenceTest", () => {
 });
 
 // ==========================================================================
-// PersistenceTest2 — additional coverage for persistence_test.rb
+// PersistenceTest — delete/destroy new and with-associations, converted from
+// bespoke Post to canonical Client + companies fixtures.
 // ==========================================================================
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  let Post: typeof Base;
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string" },
-      cb_posts: { title: "string" },
-      special_posts: { title: "string", body: "string" },
-      ts_posts: { title: "string", created_at: "datetime" },
-    });
-    class PostClass extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    Post = PostClass;
-  });
+  useHandlerFixtures(["companies"], { schema: canonicalSchema });
 
+  // Rails: test_delete_new_record
   it("delete new record", async () => {
-    const p = new Post({ title: "new" });
-    await p.destroy();
+    const client = new Client({ name: "37signals" });
+    await client.delete();
+    expect(client.isFrozen()).toBe(true);
+    expect(await client.save()).toBe(false);
+    await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
+    expect(client.isFrozen()).toBe(true);
+    expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
+  // Rails: test_destroy_new_record
   it("destroy new record", async () => {
-    const p = new Post({ title: "new" });
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
+    const client = new Client({ name: "37signals" });
+    await client.destroy();
+    expect(client.isFrozen()).toBe(true);
+    expect(await client.save()).toBe(false);
+    await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
+    expect(client.isFrozen()).toBe(true);
+    expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
-  it("update all with hash", async () => {
-    await Post.create({ title: "update-all" });
-    await Post.where({ title: "update-all" }).updateAll({ title: "updated" });
-    const found = await Post.where({ title: "updated" }).toArray();
-    expect(found.length).toBe(1);
-  });
-
+  // Rails: test_destroy_record_with_associations
   it("destroy record with associations", async () => {
-    const p = await Post.create({ title: "with-assoc" });
-    await p.destroy();
-    expect(p.isDestroyed()).toBe(true);
+    const client = await Client.find(3);
+    await client.destroy();
+    expect(client.isFrozen()).toBe(true);
+    expect(await client.firm).toBeInstanceOf(Firm);
+    expect(await client.save()).toBe(false);
+    await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
+    expect(client.isFrozen()).toBe(true);
+    expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
 
+  // Rails: test_delete_record_with_associations
   it("delete record with associations", async () => {
-    const p = await Post.create({ title: "del-assoc" });
-    await Post.delete(p.id);
-    const results = await Post.where({ id: p.id } as any).toArray();
-    expect(results.length).toBe(0);
+    const client = await Client.find(3);
+    await client.delete();
+    expect(client.isFrozen()).toBe(true);
+    expect(await client.firm).toBeInstanceOf(Firm);
+    expect(await client.save()).toBe(false);
+    await expect(client.saveBang()).rejects.toThrow(RecordNotSaved);
+    expect(client.isFrozen()).toBe(true);
+    expect(() => client.writeAttribute("name", "something else")).toThrow();
   });
+});
 
+// ==========================================================================
+// PersistenceTest — instantiate creates a new instance, canonical Post +
+// SpecialPost STI (persistence_test.rb#test_instantiate_creates_a_new_instance)
+// ==========================================================================
+describe("PersistenceTest", () => {
+  useHandlerFixtures(["posts", "authors"], { schema: canonicalSchema });
+
+  // Rails: test_instantiate_creates_a_new_instance
   it("instantiate creates a new instance", () => {
-    const p = new Post({ title: "inst" });
-    expect(p).toBeInstanceOf(Base);
-    expect(p.isNewRecord()).toBe(true);
+    const post = CanonicalPost.instantiate({
+      title: "appropriate documentation",
+      type: "SpecialPost",
+    });
+    expect(post.title).toBe("appropriate documentation");
+    expect(post).toBeInstanceOf(SpecialPost);
+    expect(() => (post as any).body).toThrow(MissingAttributeError);
   });
+});
 
-  it("update attribute in before validation respects callback chain", async () => {
-    class CBPost extends Base {
-      static {
-        this.tableName = "cb_posts";
-        this.attribute("title", "string");
-        this.beforeValidation((record: any) => {
-          const val = record.title;
-          if (!val) record.title = "default";
-        });
-      }
-    }
-    const p = await CBPost.create({});
-    expect(p.title).toBe("default");
-  });
+// ==========================================================================
+// PersistenceTest — create with custom timestamps (canonical LiveParrot).
+// ==========================================================================
+describe("PersistenceTest", () => {
+  useHandlerFixtures(["parrots"], { schema: canonicalSchema });
 
-  it("update columns with default scope", async () => {
-    const p = await Post.create({ title: "scope-cols" });
-    await p.updateColumns({ title: "updated-scope-cols" });
-    expect(p.title).toBe("updated-scope-cols");
-  });
-
-  it("persist inherited class with different table name", async () => {
-    class SpecialPost extends Post {
-      static {
-        this.tableName = "special_posts";
-      }
-    }
-    const sp = await SpecialPost.create({ title: "special" });
-    expect(sp.isPersisted()).toBe(true);
-  });
-
-  it("reload via querycache", async () => {
-    const p = await Post.create({ title: "cached" });
-    await p.reload();
-    expect(p.title).toBe("cached");
-  });
-
-  // Rails gates this `supports_insert_returning? && !current_adapter?(:SQLite3Adapter)`
-  // (persistence_test.rb:1612) → adapters=[mysql,postgresql] features=[insert_returning].
-  // The compound guard mirrors both dimensions; at runtime mysql:8 lacks
-  // insert_returning so it runs on Postgres only.
-  it.skipIf(adapterType === "sqlite" || !adapterSupports("insert_returning"))(
-    "model with no auto populated fields still returns primary key after insert",
-    async () => {
-      const p = await Post.create({ title: "pk-test" });
-      expect(p.id).toBeTruthy();
-    },
-  );
-
+  // Rails: test_create_with_custom_timestamps
   it("create with custom timestamps", async () => {
-    class TSPost extends Base {
+    const customDatetime = instant("2026-01-01T00:00:00Z");
+    for (const attr of ["created_at", "created_on", "updated_at", "updated_on"]) {
+      const parrot = await LiveParrot.create({ name: "colombian", [attr]: customDatetime });
+      expect(Math.floor(epochMs(parrot.readAttribute(attr) as Temporal.Instant) / 1000)).toBe(
+        Math.floor(customDatetime.epochMilliseconds / 1000),
+      );
+    }
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — becomes errors base (canonical AdminUser subclass).
+// ==========================================================================
+describe("PersistenceTest", () => {
+  useHandlerFixtures(["admin/users"], { schema: canonicalSchema });
+
+  // Rails: test_becomes_errors_base
+  it("becomes errors base", () => {
+    class ChildUser extends AdminUser {
       static {
-        this.tableName = "ts_posts";
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
+        this.storeAccessor("settings", { accessors: ["foo"] });
       }
     }
-    const p = await TSPost.create({ title: "ts" });
-    expect(p.isPersisted()).toBe(true);
-  });
-
-  it("becomes errors base", () => {
-    const p = new Post({ title: "base" });
-    expect(p).toBeInstanceOf(Base);
+    const admin = new AdminUser();
+    admin.errors.add("token", "invalid");
+    const child = admin.becomes(ChildUser);
+    expect(child.errors.attributeNames).toEqual(["token"]);
+    let raised = false;
+    try {
+      child.errors.add("foo", "invalid");
+    } catch {
+      raised = true;
+    }
+    expect(raised).toBe(false);
   });
 });
 
