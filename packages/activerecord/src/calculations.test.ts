@@ -474,7 +474,7 @@ describe("CalculationsTest", () => {
 
   it("group by count for a composite primary key model", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
-    const authorId = book.author_id as number;
+    const authorId = book.author_id;
     const expected: Record<number, number> = {
       [authorId]: (await CpkBook.where({ author_id: authorId }).count()) as number,
     };
