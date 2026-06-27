@@ -5,9 +5,7 @@
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
-  "packages/activerecord/src/calculations.test.ts",
   "packages/activerecord/src/persistence.test.ts",
-  "packages/activerecord/src/reflection.test.ts",
   "packages/activerecord/src/relation.trails.test.ts",
   "packages/activerecord/src/relation/where.test.ts",
   "packages/activerecord/src/relations.test.ts"
