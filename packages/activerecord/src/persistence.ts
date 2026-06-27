@@ -793,7 +793,7 @@ export async function save<T extends SaveRecord>(
 /** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
   T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
->(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
+>(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined> {
   const result = await this.save(options);
   if (result === false) {
     // Mirrors Rails' two save! layers: ActiveRecord::Validations#save! raises
@@ -801,14 +801,15 @@ export async function saveBang<
     // Persistence#save! raises RecordNotSaved("Failed to save the record")
     // for a create_or_update that returned false (destroyed record, halted
     // callback) without populating validation errors.
-    // `undefined` (before_save throws Rollback, caught by outer transaction)
-    // is treated as a silent no-op, matching Rails save! returning nil there.
     if ((this as unknown as { errors: { any: boolean } }).errors.any) {
       raiseValidationError(this);
     }
     throw new RecordNotSaved("Failed to save the record", this as unknown as object);
   }
-  return true;
+  // Mirrors Rails' with_transaction_returning_status returning `status` directly:
+  // `undefined` when before_save raises Rollback (caught by the joined transaction,
+  // status never assigned) — matching Rails save! returning nil in that path.
+  return result as true | undefined;
 }
 
 interface DestroyRecord {
