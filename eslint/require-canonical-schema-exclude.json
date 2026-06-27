@@ -1,7 +1,6 @@
 [
   "packages/activerecord/src/associations.test.ts",
   "packages/activerecord/src/associations/association-scope.test.ts",
-  "packages/activerecord/src/associations/belongs-to-associations.test.ts",
   "packages/activerecord/src/associations/eager.test.ts",
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",

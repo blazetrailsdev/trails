@@ -42,6 +42,10 @@ export class Company extends AbstractCompany {
   arbitraryMethod(): string {
     return "I am Jack's profound disappointment";
   }
+
+  private privateMethod(): string {
+    return "I am Jack's innermost fears and aspirations";
+  }
 }
 
 export class SpecialCo extends Company {}
