@@ -29,76 +29,62 @@
  * resolves to null, the chain walker has no type filter, ids mix
  * across polymorphic targets).
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+
+// Local model classes for testing invalid through-association configurations.
+// These classes are used ONLY for reflection validation (no DB queries happen
+// in the error path), so they need no real table backing — the validation
+// fires synchronously before any SQL is emitted.
+
+class StvAuthor extends Base {
+  static {
+    this._tableName = "stv_authors";
+  }
+}
+class StvComment extends Base {
+  static {
+    this._tableName = "stv_comments";
+  }
+}
+class StvPost extends Base {
+  static {
+    this._tableName = "stv_posts";
+  }
+}
+class StvMember extends Base {
+  static {
+    this._tableName = "stv_members";
+  }
+}
+
+registerModel("StvAuthor", StvAuthor);
+registerModel("StvComment", StvComment);
+registerModel("StvPost", StvPost);
+registerModel("StvMember", StvMember);
+
+function freshAssociations() {
+  (StvAuthor as any)._associations = [];
+  (StvAuthor as any)._reflections = {};
+  (StvComment as any)._associations = [];
+  (StvComment as any)._reflections = {};
+  (StvPost as any)._associations = [];
+  (StvPost as any)._reflections = {};
+}
+
+// Dummy record — validation errors throw synchronously before any DB query.
+function author() {
+  return Object.assign(new StvAuthor(), { id: 1 });
+}
 
 describe("ThroughReflection — checkValidityBang at first use", () => {
-  let adapter: TestDatabaseAdapter;
+  useHandlerFixtures([], { schema: canonicalSchema });
 
-  class StvAuthor extends Base {
-    static {
-      this._tableName = "stv_authors";
-      this.attribute("name", "string");
-    }
-  }
-  class StvComment extends Base {
-    static {
-      this._tableName = "stv_comments";
-      this.attribute("stv_author_id", "integer");
-      this.attribute("origin_id", "integer");
-      this.attribute("origin_type", "string");
-    }
-  }
-  class StvPost extends Base {
-    static {
-      this._tableName = "stv_posts";
-      this.attribute("stv_author_id", "integer");
-    }
-  }
-  class StvMember extends Base {
-    static {
-      this._tableName = "stv_members";
-      this.attribute("name", "string");
-    }
-  }
-
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      stv_authors: { name: "string" },
-      stv_comments: {
-        stv_author_id: "integer",
-        origin_id: "integer",
-        origin_type: "string",
-      },
-      stv_posts: { stv_author_id: "integer" },
-      stv_members: { name: "string" },
-    });
-    StvAuthor.adapter = adapter;
-    StvComment.adapter = adapter;
-    StvPost.adapter = adapter;
-    StvMember.adapter = adapter;
-    registerModel("StvAuthor", StvAuthor);
-    registerModel("StvComment", StvComment);
-    registerModel("StvPost", StvPost);
-    registerModel("StvMember", StvMember);
-  });
-  withTransactionalFixtures(() => adapter);
-
-  beforeEach(() => {
-    (StvAuthor as any)._associations = [];
-    (StvAuthor as any)._reflections = {};
-    (StvComment as any)._associations = [];
-    (StvComment as any)._reflections = {};
-    (StvPost as any)._associations = [];
-    (StvPost as any)._reflections = {};
-  });
-
-  it("raises PolymorphicSourceError when source is polymorphic but sourceType is missing", async () => {
+  it("raises PolymorphicSourceError when source is polymorphic but sourceType is missing", () => {
+    freshAssociations();
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -115,13 +101,13 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    const author = await StvAuthor.create({ name: "a" });
-    expect(() => association(author, "originFromComments")).toThrow(
+    expect(() => association(author(), "originFromComments")).toThrow(
       /polymorphic association 'origin'/,
     );
   });
 
-  it("raises PointlessSourceTypeError when sourceType is set but source is not polymorphic", async () => {
+  it("raises PointlessSourceTypeError when sourceType is set but source is not polymorphic", () => {
+    freshAssociations();
     // Non-polymorphic belongsTo source + sourceType is meaningless
     // (and would inject a PolymorphicReflection whose foreignType
     // resolves to null downstream).
@@ -139,11 +125,11 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "author",
       sourceType: "StvAuthor",
     });
-    const author = await StvAuthor.create({ name: "a" });
-    expect(() => association(author, "authorsByPost")).toThrow(/:source_type/);
+    expect(() => association(author(), "authorsByPost")).toThrow(/:source_type/);
   });
 
   it("fires at the loadHasMany entry point too (not just association() / Association#ctor)", async () => {
+    freshAssociations();
     // loadHasMany is the loader path direct callers (preloader,
     // tests) hit without going through `association()`. The
     // validation has to surface there too — matching Rails'
@@ -163,9 +149,8 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    const author = await StvAuthor.create({ name: "a" });
     await expect(
-      loadHasMany(author, "originFromComments", {
+      loadHasMany(author(), "originFromComments", {
         className: "StvMember",
         through: "stvComments",
         source: "origin",
@@ -173,7 +158,8 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
     ).rejects.toThrow(/polymorphic association 'origin'/);
   });
 
-  it("raises HasManyThroughSourceAssociationNotFoundError for an unresolvable source", async () => {
+  it("raises HasManyThroughSourceAssociationNotFoundError for an unresolvable source", () => {
+    freshAssociations();
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -186,13 +172,13 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    const author = await StvAuthor.create({ name: "a" });
-    expect(() => association(author, "missingSource")).toThrow(
+    expect(() => association(author(), "missingSource")).toThrow(
       /Could not find the source association/,
     );
   });
 
-  it("re-throws a cached validation error on subsequent calls (caught-then-retried can't sneak past)", async () => {
+  it("re-throws a cached validation error on subsequent calls (caught-then-retried can't sneak past)", () => {
+    freshAssociations();
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -207,19 +193,16 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    const author = await StvAuthor.create({ name: "a" });
+    const a = author();
     // First call: error surfaces.
-    expect(() => association(author, "originFromComments")).toThrow(
-      /polymorphic association 'origin'/,
-    );
+    expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
     // Second call (caller may swallow the first): same error must
     // re-throw. Cached on the reflection, never silently passed.
-    expect(() => association(author, "originFromComments")).toThrow(
-      /polymorphic association 'origin'/,
-    );
+    expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
   });
 
-  it("raises HasOneThroughCantAssociateThroughCollection for has_one :through collection", async () => {
+  it("raises HasOneThroughCantAssociateThroughCollection for has_one :through collection", () => {
+    freshAssociations();
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -235,13 +218,13 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    const author = await StvAuthor.create({ name: "a" });
-    expect(() => association(author, "singularThroughCollection")).toThrow(
+    expect(() => association(author(), "singularThroughCollection")).toThrow(
       /has_one :through association.*going through.*which is a collection/,
     );
   });
 
-  it("accepts the valid shape: polymorphic source with sourceType", async () => {
+  it("accepts the valid shape: polymorphic source with sourceType", () => {
+    freshAssociations();
     Associations.hasMany.call(StvAuthor, "stvComments", {
       className: "StvComment",
       foreignKey: "stv_author_id",
@@ -257,7 +240,6 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "origin",
       sourceType: "StvMember",
     });
-    const author = await StvAuthor.create({ name: "a" });
-    expect(() => association(author, "stvMembersViaComments")).not.toThrow();
+    expect(() => association(author(), "stvMembersViaComments")).not.toThrow();
   });
 });

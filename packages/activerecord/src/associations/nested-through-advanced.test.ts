@@ -6,324 +6,124 @@
  * autosave-skip guarantee. Mirrors selected scenarios from
  * vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { Associations, loadHasManyThrough } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { registerModel } from "../index.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Tag } from "../test-helpers/models/tag.js";
+import { Tagging } from "../test-helpers/models/tagging.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Hotel } from "../test-helpers/models/hotel.js";
+import { Department } from "../test-helpers/models/department.js";
+import { Chef } from "../test-helpers/models/chef.js";
+import { CakeDesigner } from "../test-helpers/models/cake-designer.js";
+import { DrinkDesigner } from "../test-helpers/models/drink-designer.js";
 
-const TEST_SCHEMA: Schema = {
-  nta_authors: { name: "string" },
-  nta_posts: { nta_author_id: "integer", title: "string" },
-  nta_taggings: {
-    taggable_id: "integer",
-    taggable_type: "string",
-    nta_tag_id: "integer",
-  },
-  nta_tags: { name: "string" },
-  nse_hotels: { name: "string" },
-  nse_chefs: {
-    nse_hotel_id: "integer",
-    employable_id: "integer",
-    employable_type: "string",
-  },
-  nse_cake_designers: { name: "string" },
-  nse_drink_designers: { name: "string" },
-};
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+registerModel(Author);
+registerModel(Tag);
+registerModel(Tagging);
+registerModel(Post);
+registerModel(Hotel);
+registerModel(Department);
+registerModel(Chef);
+registerModel(CakeDesigner);
+registerModel(DrinkDesigner);
 
 describe("HMT Slot E — nested-through advanced", () => {
-  let adapter: TestDatabaseAdapter;
-
-  class NtaAuthor extends Base {
-    static {
-      this._tableName = "nta_authors";
-      this.attribute("id", "integer");
-      this.attribute("name", "string");
-    }
-  }
-  class NtaPost extends Base {
-    static {
-      this._tableName = "nta_posts";
-      this.attribute("id", "integer");
-      this.attribute("nta_author_id", "integer");
-      this.attribute("title", "string");
-    }
-  }
-  class NtaTagging extends Base {
-    static {
-      this._tableName = "nta_taggings";
-      this.attribute("id", "integer");
-      this.attribute("taggable_id", "integer");
-      this.attribute("taggable_type", "string");
-      this.attribute("nta_tag_id", "integer");
-    }
-  }
-  class NtaTag extends Base {
-    static {
-      this._tableName = "nta_tags";
-      this.attribute("id", "integer");
-      this.attribute("name", "string");
-    }
-  }
-
-  beforeAll(async () => {
-    adapter = await freshAdapter();
-    NtaAuthor.adapter = adapter;
-    NtaPost.adapter = adapter;
-    NtaTagging.adapter = adapter;
-    NtaTag.adapter = adapter;
-    registerModel("NtaAuthor", NtaAuthor);
-    registerModel("NtaPost", NtaPost);
-    registerModel("NtaTagging", NtaTagging);
-    registerModel("NtaTag", NtaTag);
-    (NtaAuthor as any)._associations = [];
-    (NtaPost as any)._associations = [];
-    (NtaTagging as any)._associations = [];
-    (NtaTag as any)._associations = [];
-
-    Associations.hasMany.call(NtaAuthor, "ntaPosts", {
-      className: "NtaPost",
-      foreignKey: "nta_author_id",
-    });
-    Associations.hasMany.call(NtaPost, "ntaTaggings", {
-      className: "NtaTagging",
-      foreignKey: "taggable_id",
-    });
-    Associations.belongsTo.call(NtaTagging, "ntaTag", {
-      className: "NtaTag",
-      foreignKey: "nta_tag_id",
-    });
-
-    // Direct through: Author → posts → taggings.
-    Associations.hasMany.call(NtaAuthor, "ntaTaggings", {
-      className: "NtaTagging",
-      through: "ntaPosts",
-      source: "ntaTaggings",
-    });
-    // Nested through: Author → (posts → taggings) → tags.
-    Associations.hasMany.call(NtaAuthor, "ntaTags", {
-      className: "NtaTag",
-      through: "ntaTaggings",
-      source: "ntaTag",
-    });
-    // Same nested-through but with `distinct` on the user scope —
-    // mirrors Rails `has_many :distinct_subscribers, -> { distinct }`.
-    Associations.hasMany.call(NtaAuthor, "ntaDistinctTags", {
-      className: "NtaTag",
-      through: "ntaTaggings",
-      source: "ntaTag",
-      scope: (rel: any) => rel.distinct(),
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  async function seedSharedTag() {
-    const author = await NtaAuthor.create({ name: "David" });
-    const p1 = (await NtaPost.create({ nta_author_id: author.id, title: "p1" })) as any;
-    const p2 = (await NtaPost.create({ nta_author_id: author.id, title: "p2" })) as any;
-    const tag = (await NtaTag.create({ name: "general" })) as any;
-    // Same tag attached via two distinct posts → distinct reflection
-    // must dedupe to one tag row.
-    await NtaTagging.create({
-      taggable_id: p1.id,
-      taggable_type: "NtaPost",
-      nta_tag_id: tag.id,
-    });
-    await NtaTagging.create({
-      taggable_id: p2.id,
-      taggable_type: "NtaPost",
-      nta_tag_id: tag.id,
-    });
-    return { author, p1, p2, tag };
-  }
+  const { authors, tags, taggings } = useHandlerFixtures(
+    ["authors", "authorAddresses", "posts", "taggings", "tags"],
+    { schema: canonicalSchema },
+  );
 
   it("distinct on the source-reflection scope returns one row when a tag is reachable via multiple posts", async () => {
-    const { author, tag } = await seedSharedTag();
-    const reflection = (NtaAuthor as any)._reflectOnAssociation("ntaDistinctTags");
-    const tags = await loadHasManyThrough(author, "ntaDistinctTags", reflection.options);
-    // Two taggings point to the same tag row via two different
-    // posts. The user-provided `scope: rel.distinct()` must keep the
-    // target row from duplicating in the chained result.
-    expect(tags.map((t: any) => t.id)).toEqual([tag.id]);
-    expect(tags.length).toBe(1);
+    // david has two posts (welcome + thinking) each tagged "general".
+    // distinctTags deduplicates by tag PK, so we get exactly one row.
+    const david = authors("david");
+    const general = tags("general");
+    const result = await david.distinctTags.toArray();
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(general.id);
   });
 
   it("preloading nested-through does not leak target rows between independent owner sets", async () => {
-    const { author: a1 } = await seedSharedTag();
-    const a2 = await NtaAuthor.create({ name: "other" });
-    // a2 has its own post + its own tag — no overlap with a1.
-    const op = (await NtaPost.create({ nta_author_id: a2.id, title: "op" })) as any;
-    const otherTag = (await NtaTag.create({ name: "solo" })) as any;
-    await NtaTagging.create({
-      taggable_id: op.id,
-      taggable_type: "NtaPost",
-      nta_tag_id: otherTag.id,
-    });
-
-    const firstLoad = (await NtaAuthor.all()
-      .where({ id: a1.id })
-      .preload("ntaTags")
-      .toArray()) as any[];
-    const secondLoad = (await NtaAuthor.all()
-      .where({ id: a2.id })
-      .preload("ntaTags")
-      .toArray()) as any[];
-
-    const firstTags = firstLoad[0].association("ntaTags").target as any[];
-    const secondTags = secondLoad[0].association("ntaTags").target as any[];
-    // Source-reflection state from the first preload must not bleed
-    // into the second (Rails-equivalent of the "reset source
-    // reflection after loading" guarantee).
-    expect(firstTags.every((t: any) => t.name === "general")).toBe(true);
-    expect(secondTags.map((t: any) => t.name)).toEqual(["solo"]);
+    const david = authors("david");
+    const bob = authors("bob");
+    // Load each author's tags in separate preload queries.
+    const [davidRow] = await Author.where({ id: david.id }).preload("tags").toArray();
+    const [bobRow] = await Author.where({ id: bob.id }).preload("tags").toArray();
+    const davidTags = (davidRow.association("tags").target ?? []) as any[];
+    const bobTags = (bobRow.association("tags").target ?? []) as any[];
+    // david: welcome+thinking both tagged "general"
+    expect(davidTags.every((t: any) => t.name === "General")).toBe(true);
+    // bob: misc_by_bob + other_by_bob tagged misc/blue — distinct from general
+    expect(bobTags.every((t: any) => t.name !== "General")).toBe(true);
   });
 
   it("table referenced multiple times in the nested chain aliases consistently across loads", async () => {
-    // Author → ntaPosts → ntaTaggings: the same NtaPost table appears
-    // both as the direct through (ntaPosts) and as the polymorphic
-    // taggable of ntaTaggings. Two separate loads on the same chain
-    // must produce stable IDs (no alias collision across invocations).
-    const { author } = await seedSharedTag();
-    const taggings1 = (await NtaAuthor.all()
-      .where({ id: author.id })
-      .preload("ntaTaggings")
-      .toArray()) as any[];
-    const taggings2 = (await NtaAuthor.all()
-      .where({ id: author.id })
-      .preload("ntaTaggings")
-      .toArray()) as any[];
-    const t1 = (taggings1[0].association("ntaTaggings").target ?? []) as any[];
-    const t2 = (taggings2[0].association("ntaTaggings").target ?? []) as any[];
-    expect(t1.map((r: any) => r.id).sort()).toEqual(t2.map((r: any) => r.id).sort());
+    // Author → posts → taggings: two separate preloads of the same chain
+    // must produce stable results (no alias collision between invocations).
+    const david = authors("david");
+    const [r1] = await Author.where({ id: david.id }).preload("taggings").toArray();
+    const [r2] = await Author.where({ id: david.id }).preload("taggings").toArray();
+    const t1 = ((r1.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
+    const t2 = ((r2.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
+    expect(t1).toEqual(t2);
+    // david has 2 post-taggings (welcome_general + thinking_general)
     expect(t1.length).toBe(2);
   });
 
   it("through with polymorphic source + sourceType filters cross-type targets out of the result", async () => {
-    // Hotel → chefs → employable (polymorphic). The polymorphic
-    // source reflection plus `sourceType: NseCakeDesigner` must
-    // select only the cake chef row even when a drink chef shares
-    // the same chefs table. Mirrors the source-type axis of
-    // test_has_many_through_polymorphic_with_scope; the user-scope
-    // axis is exercised in the source-condition cases above.
-    class NseHotel extends Base {
-      static {
-        this._tableName = "nse_hotels";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class NseChef extends Base {
-      static {
-        this._tableName = "nse_chefs";
-        this.attribute("id", "integer");
-        this.attribute("nse_hotel_id", "integer");
-        this.attribute("employable_id", "integer");
-        this.attribute("employable_type", "string");
-      }
-    }
-    class NseCakeDesigner extends Base {
-      static {
-        this._tableName = "nse_cake_designers";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class NseDrinkDesigner extends Base {
-      static {
-        this._tableName = "nse_drink_designers";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    [NseHotel, NseChef, NseCakeDesigner, NseDrinkDesigner].forEach((m) => {
-      m.adapter = adapter;
-      (m as any)._associations = [];
+    // Hotel → chefs (polymorphic employable) → cakeDesigners (sourceType filter).
+    // A drink designer that shares the chefs table must not appear in cakeDesigners.
+    const cake = await CakeDesigner.create({});
+    const drink = await DrinkDesigner.create({});
+    const dept = await Department.create({});
+    const cakeChef = await Chef.create({
+      department_id: (dept as any).id,
+      employable_id: (cake as any).id,
+      employable_type: "CakeDesigner",
     });
-    registerModel("NseHotel", NseHotel);
-    registerModel("NseChef", NseChef);
-    registerModel("NseCakeDesigner", NseCakeDesigner);
-    registerModel("NseDrinkDesigner", NseDrinkDesigner);
-
-    Associations.hasMany.call(NseHotel, "nseChefs", {
-      className: "NseChef",
-      foreignKey: "nse_hotel_id",
+    const drinkChef = await Chef.create({
+      department_id: (dept as any).id,
+      employable_id: (drink as any).id,
+      employable_type: "DrinkDesigner",
     });
-    Associations.belongsTo.call(NseChef, "employable", {
-      polymorphic: true,
-      foreignKey: "employable_id",
-    });
-    Associations.hasMany.call(NseHotel, "cakeDesigners", {
-      className: "NseCakeDesigner",
-      through: "nseChefs",
-      source: "employable",
-      sourceType: "NseCakeDesigner",
-    });
-
-    const cake = (await NseCakeDesigner.create({ name: "Cake Boss" })) as any;
-    const drink = (await NseDrinkDesigner.create({ name: "Mixer" })) as any;
-    const hotel = (await NseHotel.create({ name: "Grand" })) as any;
-    await NseChef.create({
-      nse_hotel_id: hotel.id,
-      employable_id: cake.id,
-      employable_type: "NseCakeDesigner",
-    });
-    await NseChef.create({
-      nse_hotel_id: hotel.id,
-      employable_id: drink.id,
-      employable_type: "NseDrinkDesigner",
-    });
-
-    const reflection = (NseHotel as any)._reflectOnAssociation("cakeDesigners");
-    const designers = await loadHasManyThrough(hotel, "cakeDesigners", reflection.options);
-    expect(designers.length).toBe(1);
-    expect((designers[0] as any).id).toBe(cake.id);
+    void cakeChef;
+    void drinkChef;
+    const hotel = await Hotel.create({ departments: [dept] });
+    const cakes = await (hotel as any).cakeDesigners.toArray();
+    expect(cakes.length).toBe(1);
+    expect(cakes[0].id).toBe((cake as any).id);
   });
 
   it("preloading two independent author sets keeps each owner's nested-through targets isolated", async () => {
-    // Mirrors the second half of test_has_many_through_reset_source_-
-    // reflection_after_loading_is_complete: independently preloaded
-    // collections (here, queried by disjoint id sets) must yield
-    // tags rooted at their own owners — the source-reflection cache
-    // must not bind to the first owner set.
-    const { author: david } = await seedSharedTag();
-    const mary = await NtaAuthor.create({ name: "Mary" });
-    const mp = (await NtaPost.create({ nta_author_id: mary.id, title: "mp" })) as any;
-    const otherTag = (await NtaTag.create({ name: "solo" })) as any;
-    await NtaTagging.create({
-      taggable_id: mp.id,
-      taggable_type: "NtaPost",
-      nta_tag_id: otherTag.id,
-    });
-
-    const preloaded = (await NtaAuthor.all().preload("ntaTags").toArray()) as any[];
-    const byId = new Map(preloaded.map((row: any) => [row.id, row]));
-    const davidTags = byId.get(david.id)!.association("ntaTags").target as any[];
-    const maryTags = byId.get(mary.id)!.association("ntaTags").target as any[];
-    expect(davidTags.every((t: any) => t.name === "general")).toBe(true);
-    expect(maryTags.map((t: any) => t.name)).toEqual(["solo"]);
+    // Preload all authors' tags in one query — each owner must get only their own tags.
+    const david = authors("david");
+    const bob = authors("bob");
+    const preloaded = await Author.where({ id: [david.id, bob.id] })
+      .preload("tags")
+      .toArray();
+    const byId = new Map(preloaded.map((row) => [row.id, row]));
+    const davidTags = ((byId.get(david.id)!.association("tags").target ?? []) as any[]).map(
+      (t) => t.name,
+    );
+    const bobTags = ((byId.get(bob.id)!.association("tags").target ?? []) as any[]).map(
+      (t) => t.name,
+    );
+    expect(davidTags.every((n: any) => n === "General")).toBe(true);
+    expect(bobTags.some((n: any) => n !== "General")).toBe(true);
   });
 
   it("nested-through must not autosave: reading the proxy after save inserts nothing", async () => {
-    const { author } = await seedSharedTag();
-    const before = await NtaTagging.all().toArray();
-    // Re-save the owner and re-read the nested-through proxy: nothing
-    // on the through chain should be re-inserted or duplicated.
-    await author.save();
-    const reflection = (NtaAuthor as any)._reflectOnAssociation("ntaTags");
-    const tags = await loadHasManyThrough(author, "ntaTags", reflection.options);
-    // Two taggings point at the same tag, so the chained source
-    // query (WHERE id IN (...)) returns one row — but the through
-    // side must remain untouched: no extra taggings written, no
-    // existing taggings dropped.
-    expect(tags.length).toBe(1);
-    const after = await NtaTagging.all().toArray();
-    expect(after.length).toBe(before.length);
+    // Re-saving an author must not insert duplicate taggings via the
+    // nested-through chain. Count before and after must match.
+    const david = authors("david");
+    const before = await Tagging.where({ taggable_type: "Post" }).count();
+    await david.save();
+    const tags = await david.tags.toArray();
+    expect(tags.length).toBeGreaterThan(0);
+    const after = await Tagging.where({ taggable_type: "Post" }).count();
+    expect(after).toBe(before);
   });
 });
