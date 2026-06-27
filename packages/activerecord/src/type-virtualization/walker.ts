@@ -270,7 +270,7 @@ function hasSkipMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile): boolean {
   const ranges = ts.getLeadingCommentRanges(sf.text, cls.pos) ?? [];
   for (const r of ranges) {
     const text = sf.text.slice(r.pos, r.end);
-    if (/@trails-typegen\s+skip\b/.test(text)) return true;
+    if (/@trails-typegen\s+skip(?!-)/.test(text)) return true;
   }
   return false;
 }

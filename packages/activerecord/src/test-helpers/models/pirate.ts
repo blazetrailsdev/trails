@@ -1,6 +1,9 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Bird } from "./bird.js";
+import type { Bulb } from "./bulb.js";
 import type { FamousShip } from "./ship.js";
+import type { Matey } from "./matey.js";
 import type { Parrot } from "./parrot.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
@@ -17,6 +20,37 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
  * column's schema declare; all association declares still materialize.
  */
 export class Pirate extends Base {
+  declare parrot: Parrot | null;
+  declare nonValidatedParrot: Parrot | null;
+  declare parrots: AssociationProxy<Parrot>;
+  declare nonValidatedParrots: AssociationProxy<Parrot>;
+  declare parrotsWithMethodCallbacks: AssociationProxy<Parrot>;
+  declare parrotsWithProcCallbacks: AssociationProxy<Parrot>;
+  declare autosavedParrots: AssociationProxy<Parrot>;
+  declare treasures: AssociationProxy<Treasure>;
+  declare treasureEstimates: AssociationProxy<PriceEstimate>;
+  declare ship: Ship | null;
+  declare updateOnlyShip: Ship | null;
+  declare nonValidatedShip: Ship | null;
+  declare birds: AssociationProxy<Bird>;
+  declare birdsWithMethodCallbacks: AssociationProxy<Bird>;
+  declare birdsWithProcCallbacks: AssociationProxy<Bird>;
+  declare birdsWithRejectAllBlank: AssociationProxy<Bird>;
+  declare fooBulb: Bulb | null;
+  declare mateys: AssociationProxy<Matey>;
+  declare attackerMatey: Matey | null;
+  declare loadBelongsTo: ((name: "parrot") => Promise<Parrot | null>) &
+    ((name: "nonValidatedParrot") => Promise<Parrot | null>);
+  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
+    ((name: "updateOnlyShip") => Promise<Ship | null>) &
+    ((name: "nonValidatedShip") => Promise<Ship | null>) &
+    ((name: "fooBulb") => Promise<Bulb | null>) &
+    ((name: "attackerMatey") => Promise<Matey | null>);
+  declare created_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare non_validated_parrot_id: number;
+  declare parrot_id: number;
+  declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
+
   static {
     this.belongsTo("parrot", { validate: true });
     this.belongsTo("nonValidatedParrot", { className: "Parrot" });
@@ -138,7 +172,14 @@ acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: reject
 
 export class DestructivePirate extends Pirate {
   declare dependentShip: Ship | null;
-  declare loadHasOne: (name: "dependentShip") => Promise<Ship | null>;
+  declare loadBelongsTo: ((name: "parrot") => Promise<Parrot | null>) &
+    ((name: "nonValidatedParrot") => Promise<Parrot | null>);
+  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
+    ((name: "updateOnlyShip") => Promise<Ship | null>) &
+    ((name: "nonValidatedShip") => Promise<Ship | null>) &
+    ((name: "fooBulb") => Promise<Bulb | null>) &
+    ((name: "attackerMatey") => Promise<Matey | null>) &
+    ((name: "dependentShip") => Promise<Ship | null>);
 
   static {
     this.hasOne("dependentShip", {
