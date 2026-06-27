@@ -795,12 +795,14 @@ export async function saveBang<
   T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
 >(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
   const result = await this.save(options);
-  if (!result) {
+  if (result === false) {
     // Mirrors Rails' two save! layers: ActiveRecord::Validations#save! raises
     // RecordInvalid when validations failed (errors present); otherwise
     // Persistence#save! raises RecordNotSaved("Failed to save the record")
     // for a create_or_update that returned false (destroyed record, halted
     // callback) without populating validation errors.
+    // `undefined` (before_save throws Rollback, caught by outer transaction)
+    // is treated as a silent no-op, matching Rails save! returning nil there.
     if ((this as unknown as { errors: { any: boolean } }).errors.any) {
       raiseValidationError(this);
     }

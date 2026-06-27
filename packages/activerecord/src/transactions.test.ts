@@ -305,13 +305,7 @@ describe("TransactionTest", () => {
     });
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("rollback dirty changes", async () => {
+  it("rollback dirty changes", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
     await transaction(Base, async () => {
@@ -336,13 +330,7 @@ describe("TransactionTest", () => {
     });
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("rollback dirty changes multiple saves", async () => {
+  it("rollback dirty changes multiple saves", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
     await transaction(Base, async () => {
@@ -354,13 +342,7 @@ describe("TransactionTest", () => {
     expect(topic.changes.title).toEqual(["The Fifth Topic of the day", "Another Title"]);
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("rollback dirty changes then retry save", async () => {
+  it("rollback dirty changes then retry save", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
     await transaction(Base, async () => {
@@ -565,13 +547,7 @@ describe("TransactionTest", () => {
     expect(((await Topic.find(1)) as any).approved).toBe(false);
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("rolling back in a callback rollbacks before save", async () => {
+  it("rolling back in a callback rollbacks before save", async () => {
     first.beforeSaveForTransaction = () => {
       throw new Rollback();
     };
@@ -1038,13 +1014,7 @@ describe("TransactionTest", () => {
     expect(second.isDestroyed()).toBe(false);
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("restore frozen state after double destroy", async () => {
+  it("restore frozen state after double destroy", async () => {
     const topic = (await Topic.create({})) as any;
     const reply = await topic.replies.create({});
 
@@ -1058,13 +1028,7 @@ describe("TransactionTest", () => {
     expect(topic.isFrozen()).toBe(false);
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("restore new record after double save", async () => {
+  it("restore new record after double save", async () => {
     const topic = Topic.new() as any;
 
     await Topic.transaction(async () => {
@@ -1094,13 +1058,7 @@ describe("TransactionTest", () => {
     expect(topic.isNewRecord()).toBe(false);
   });
 
-  // CONVERGENCE-PENDING (transactions-test-rollback-restores-record-state): saving a
-  // record inside an already-open transaction prematurely finalizes its
-  // per-record transaction state, so an outer rollback no longer restores the
-  // pre-save dirty changes / new-record / frozen / id snapshot (and a Rollback
-  // raised in before_save is swallowed by the save's own transaction). Faithful
-  // Rails body retained for the un-skip once the gap is converged.
-  it.skip("restore previously new record after double save", async () => {
+  it("restore previously new record after double save", async () => {
     const topic = (await Topic.createBang({})) as any;
 
     await Topic.transaction(async () => {
