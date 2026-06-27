@@ -3022,7 +3022,7 @@ export function association<T extends Base = Base>(
       } else {
         // Hydrate from an AssociationInstance loaded via asyncLoadTarget()
         const instance = record._associationInstances.get(assocName);
-        if (instance?.loaded && (instance as any)._loadedViaAsync && instance.isCollection?.()) {
+        if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
           const target = instance.target;
           const records = Array.isArray(target) ? target : target != null ? [target] : [];
           existing._hydrateFromPreload(records as T[]);
@@ -3076,7 +3076,7 @@ export function association<T extends Base = Base>(
     proxy._hydrateFromPreload(records as T[]);
   } else {
     const instance = record._associationInstances.get(assocName);
-    if (instance?.loaded && (instance as any)._loadedViaAsync && instance.isCollection?.()) {
+    if (instance?.loaded && instance._loadedViaAsync && instance.isCollection?.()) {
       const target = instance.target;
       const records = Array.isArray(target) ? target : target != null ? [target] : [];
       proxy._hydrateFromPreload(records as T[]);
