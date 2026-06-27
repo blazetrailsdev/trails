@@ -94,6 +94,15 @@ export interface VirtualizeOptions extends WalkOptions {
    * {@link import("./synthesize.js").SynthesizeOptions.associationTargets}.
    */
   associationTargets?: ReadonlyMap<string, string>;
+  /**
+   * Cross-file class-name → direct-superclass-name map built by the generator
+   * from the model registry (all model files). Merged with the in-file
+   * `superNameOf` produced by `buildInheritance` so that a subclass narrowing
+   * an association to a target whose `extends` chain lives in another model
+   * file is recognized as a valid subtype and the precise declare is kept
+   * rather than conservatively suppressed. In-file entries take precedence.
+   */
+  globalSuperNameOf?: ReadonlyMap<string, string>;
 }
 
 export function virtualize(
@@ -105,7 +114,15 @@ export function virtualize(
   const classes = walk(sf, options);
   // In-file superclass graph + per-class ancestor chains (for inherited
   // loader overloads and incompatible-override detection — see synthesize).
-  const { superNameOf, ancestorsOf } = buildInheritance(classes);
+  const { superNameOf: inFileSuperNameOf, ancestorsOf } = buildInheritance(classes);
+  // Merge cross-file map first (lower precedence) then overwrite with in-file
+  // entries so local `extends` always wins over the registry-derived chain.
+  const superNameOf: ReadonlyMap<string, string> = (() => {
+    if (!options.globalSuperNameOf) return inFileSuperNameOf;
+    const merged = new Map<string, string>(options.globalSuperNameOf);
+    for (const [k, v] of inFileSuperNameOf) merged.set(k, v);
+    return merged;
+  })();
 
   interface Edit {
     pos: number;
