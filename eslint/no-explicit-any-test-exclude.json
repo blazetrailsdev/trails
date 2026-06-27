@@ -251,6 +251,7 @@
   "packages/activerecord/src/test-helpers/fixtures/fixtures.test.ts",
   "packages/activerecord/src/test-helpers/use-fixtures.test.ts",
   "packages/activerecord/src/time-precision.test.ts",
+  "packages/activerecord/src/timestamp.test.ts",
   "packages/activerecord/src/token-for.test.ts",
   "packages/activerecord/src/touch-later.test.ts",
   "packages/activerecord/src/transaction-callbacks.test.ts",

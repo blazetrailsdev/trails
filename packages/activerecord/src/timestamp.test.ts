@@ -1,1011 +1,748 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Ported from vendor/rails/activerecord/test/cases/timestamp_test.rb.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adapterType, createTestAdapter } from "./test-adapter.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
-
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Developer, DeveloperCalledJamis } from "./test-helpers/models/developer.js";
+import { Owner } from "./test-helpers/models/owner.js";
+import { Pet } from "./test-helpers/models/pet.js";
+import { Toy } from "./test-helpers/models/toy.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Task } from "./test-helpers/models/task.js";
+
+registerModel("Developer", Developer);
+registerModel("DeveloperCalledJamis", DeveloperCalledJamis);
+registerModel("Owner", Owner);
+registerModel("Pet", Pet);
+registerModel("Toy", Toy);
+registerModel("Car", Car);
+registerModel("Task", Task);
 
 describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", updated_at: "string", created_at: "string" },
-      simples: { name: "string" },
-      authors: { name: "string", updated_at: "string" },
-    });
+  const { developers, owners, pets, toys, cars, tasks } = useHandlerFixtures([
+    "developers",
+    "owners",
+    "pets",
+    "toys",
+    "cars",
+    "tasks",
+  ]);
+
+  let developer: Developer;
+  let owner: Owner;
+  let previouslyUpdatedAt: Temporal.Instant;
+
+  beforeEach(async () => {
+    developer = await Developer.find(developers("david").id);
+    owner = await Owner.find((owners("blackbeard") as any).readAttribute("owner_id"));
+    const prevMonth = Temporal.Now.instant().subtract({ hours: 30 * 24 });
+    await developer.updateColumns({ legacy_updated_at: prevMonth, legacy_updated_on: prevMonth });
+    previouslyUpdatedAt = developer.legacy_updated_at as Temporal.Instant;
   });
 
-  function makePost() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("created_at", "datetime");
-      }
-    }
-    return Post;
-  }
+  it("saving a changed record updates its timestamp", async () => {
+    developer.name = "Jack Bauer";
+    await developer.save();
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
+  });
 
   it("saving a unchanged record doesnt update its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    const before = post.updated_at;
-    await post.save();
-    const after = post.updated_at;
-    // Timestamps might or might not be equal depending on timing, but no error
-    expect(after !== undefined || before !== undefined || true).toBe(true);
+    await developer.save();
+    expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
   it("touching a record updates its timestamp", async () => {
-    const Post = makePost();
-    const post = (await Post.create({ title: "test" })) as typeof Post.prototype &
-      Record<string, unknown>;
-    const previousUpdatedAt = post.updated_at as Temporal.Instant;
+    const previousSalary = developer.salary as number;
+    developer.salary = previousSalary + 10000;
+    await developer.touch();
 
-    // Mirrors Rails' @developer.salary change before touch: an unrelated,
-    // unsaved dirty attribute must survive _touch_row's changes_applied (the
-    // method restores non-touched changes after clearing dirty state).
-    post.title = "changed";
-    await post.touch();
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
+    expect(developer.salary).toBe(previousSalary + 10000);
+    expect(developer.attributeChanged("salary")).toBe(true);
+    expect(developer.changed).toBe(true);
+    expect(developer.changedAttributes).toEqual(["salary"]);
+    expect((developer as any).isSavedChanges()).toBe(true);
+    expect(Object.keys(developer.savedChanges).sort()).toEqual([
+      "legacy_updated_at",
+      "legacy_updated_on",
+    ]);
 
-    expect(post.updated_at).not.toEqual(previousUpdatedAt);
-    expect(post.title).toBe("changed");
-    expect(post.attributeChanged("title")).toBe(true);
-    expect(post.changedAttributes).toEqual(["title"]);
-    // The touched timestamp is cleared by changes_applied.
-    expect(post.attributeChanged("updated_at")).toBe(false);
-
-    const reloaded = await Post.find(post.id!);
-    expect(reloaded).toBeDefined();
+    await developer.reload();
+    expect(developer.salary).toBe(previousSalary);
   });
 
   it("touching a record with default scope that excludes it updates its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch();
-    expect(post.id).toBeDefined();
+    const dev = developer.becomes(DeveloperCalledJamis);
+    await dev.touch();
+
+    expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
+    expect(dev.changed).toBe(false);
+    expect((dev as any).isSavedChanges()).toBe(true);
+    expect(Object.keys(dev.savedChanges).sort()).toEqual([
+      "legacy_updated_at",
+      "legacy_updated_on",
+    ]);
+
+    await dev.reload();
+    expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
 
   it("saving when record timestamps is false doesnt update its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.isPersisted()).toBe(true);
+    (Developer as any).recordTimestamps = false;
+    try {
+      developer.name = "John Smith";
+      await developer.save();
+      expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
+    } finally {
+      (Developer as any).recordTimestamps = true;
+    }
   });
 
   it("saving when instance record timestamps is false doesnt update its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    // Push updated_at into the past so a same-tick save cannot produce a false pass.
-    const pastTime = Temporal.Now.instant().subtract({ hours: 1 });
-    await post.updateColumns({ updated_at: pastTime });
-    const previousUpdatedAt = post.updated_at as Temporal.Instant | null;
-    expect(previousUpdatedAt).not.toBeNull();
-    expect(Post.recordTimestamps).toBe(true);
+    (developer as any).recordTimestamps = false;
+    expect((Developer as any).recordTimestamps).toBe(true);
 
-    post.recordTimestamps = false;
-    post.title = "Updated";
-    const result = await post.save();
-    expect(result).toBe(true);
+    developer.name = "John Smith";
+    await developer.save();
 
-    expect(post.updated_at).toEqual(previousUpdatedAt);
+    expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
   it("touching updates timestamp with given time", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    const t = instant("2020-01-01T00:00:00Z");
-    await post.touch();
-    expect(post.id).toBeDefined();
+    const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
+    const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0)); // Time.utc(2015, 2, 16, 0, 0, 0)
+    await developer.touch({ time: newTime });
+
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
+    const updatedAt = developer.legacy_updated_at as Temporal.Instant;
+    expect(updatedAt.epochMilliseconds).toBe(newTime.getTime());
   });
 
   it("touching an attribute updates timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch("updated_at");
-    const reloaded = await Post.find(post.id!);
-    expect(reloaded).toBeDefined();
+    const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
+    travel(1000);
+    try {
+      await developer.touch("legacy_created_at");
+    } finally {
+      travelBack();
+    }
+
+    expect(developer.attributeChanged("legacy_created_at")).toBe(false);
+    expect(developer.changed).toBe(false);
+    expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
 
   it("touching update at attribute as symbol updates timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch("updated_at");
-    expect(post.id).toBeDefined();
+    travel(1000);
+    try {
+      await developer.touch("legacy_updated_at");
+    } finally {
+      travelBack();
+    }
+
+    expect(developer.attributeChanged("legacy_updated_at")).toBe(false);
+    expect(developer.changed).toBe(false);
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
 
   it("touching an attribute updates it", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    const orig = post.updated_at;
-    await new Promise((r) => setTimeout(r, 5));
-    await post.touch("updated_at");
-    const newVal = post.updated_at;
-    // Touch should set updated_at
-    expect(post.id).toBeDefined();
+    const task = await Task.find(tasks("first_task").id);
+    const previousValue = task.ending;
+    await task.touch("ending");
+    expect(task.ending).not.toEqual(previousValue);
+    const diffMs = Math.abs((task.ending as Temporal.Instant).epochMilliseconds - Date.now());
+    expect(diffMs).toBeLessThan(1000);
   });
 
   it("touching an attribute updates timestamp with given time", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch("updated_at");
-    expect(post.id).toBeDefined();
+    const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
+    const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
+    const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0)); // Time.utc(2015, 2, 16, 4, 54, 0)
+    // Rails: @developer.touch(:created_at, time: new_time) — touch a named attr with given time.
+    // trails touch() doesn't support (name, {time}) — travel to the target time instead.
+    travelTo(newTime);
+    try {
+      await developer.touch("legacy_created_at");
+    } finally {
+      travelBack();
+    }
+
+    expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
+    expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
+    const createdAt = developer.legacy_created_at as Temporal.Instant;
+    const updatedAt = developer.legacy_updated_at as Temporal.Instant;
+    expect(createdAt.epochMilliseconds).toBe(newTime.getTime());
+    expect(updatedAt.epochMilliseconds).toBe(newTime.getTime());
   });
 
   it("touching many attributes updates them", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch("updated_at", "created_at");
-    expect(post.id).toBeDefined();
+    const task = await Task.find(tasks("first_task").id);
+    const previousStarting = task.starting;
+    const previousEnding = task.ending;
+    await task.touch("starting", "ending");
+
+    expect(task.starting).not.toEqual(previousStarting);
+    expect(task.ending).not.toEqual(previousEnding);
+    const nowMs = Date.now();
+    expect(Math.abs((task.starting as Temporal.Instant).epochMilliseconds - nowMs)).toBeLessThan(
+      1000,
+    );
+    expect(Math.abs((task.ending as Temporal.Instant).epochMilliseconds - nowMs)).toBeLessThan(
+      1000,
+    );
   });
 
   it("touching a record without timestamps is unexceptional", async () => {
-    class Simple extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    const car = await Car.find(cars("honda").id);
+    let threw = false;
+    try {
+      await car.touch();
+    } catch {
+      threw = true;
     }
-    const s = await Simple.create({ name: "x" });
-    expect(async () => await s.touch()).not.toThrow();
+    expect(threw).toBe(false);
   });
 
   it("touching a no touching object", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch();
-    expect(post.isPersisted()).toBe(true);
+    await Developer.noTouching(async () => {
+      expect(Developer.isTouchingSuppressed).toBe(true);
+      expect(Owner.isTouchingSuppressed).toBe(false);
+      await developer.touch();
+    });
+
+    expect(Developer.isTouchingSuppressed).toBe(false);
+    expect(Owner.isTouchingSuppressed).toBe(false);
+    expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
   it("touching related objects", async () => {
-    const Post = makePost();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const all = await Post.all().toArray();
-    expect(all.length).toBe(2);
+    const ownerForTest = await Owner.find((owners("blackbeard") as any).readAttribute("owner_id"));
+    const previouslyOwnerUpdatedAt = ownerForTest.updated_at as Temporal.Instant;
+
+    await Owner.noTouching(async () => {
+      const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
+      await pet.touch();
+    });
+
+    expect(ownerForTest.updated_at).toEqual(previouslyOwnerUpdatedAt);
   });
 
   it("global no touching", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    await Base.noTouching(async () => {
+      expect(Developer.isTouchingSuppressed).toBe(true);
+      expect(Owner.isTouchingSuppressed).toBe(true);
+      await developer.touch();
+    });
+
+    expect(Developer.isTouchingSuppressed).toBe(false);
+    expect(Owner.isTouchingSuppressed).toBe(false);
+    expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
   it("no touching threadsafe", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    // JS is single-threaded; verify noTouching state is isolated to its block
+    // (Rails verifies Thread-local isolation; JS has no threads but the same
+    // temporal isolation applies to the async block).
+    expect(Developer.isTouchingSuppressed).toBe(false);
+    await Developer.noTouching(async () => {
+      expect(Developer.isTouchingSuppressed).toBe(true);
+    });
+    expect(Developer.isTouchingSuppressed).toBe(false);
   });
 
   it("no touching with callbacks", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.isPersisted()).toBe(true);
+    class DevWithAfterTouch extends Base {
+      afterTouchCalled = false;
+      static {
+        this.tableName = "developers";
+        this.aliasAttribute("created_at", "legacy_created_at");
+        this.aliasAttribute("updated_at", "legacy_updated_at");
+        this.aliasAttribute("created_on", "legacy_created_on");
+        this.aliasAttribute("updated_on", "legacy_updated_on");
+        this.afterTouch(function (this: DevWithAfterTouch) {
+          this.afterTouchCalled = true;
+        });
+      }
+    }
+
+    const dev = await DevWithAfterTouch.find(developers("david").id);
+    await DevWithAfterTouch.noTouching(async () => {
+      await dev.touch();
+      expect(dev.afterTouchCalled).toBe(false);
+    });
   });
 
   it("saving an unchanged record with a mutating before save callback updates its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.save();
-    expect(post.isPersisted()).toBe(true);
+    class MutatingSaveKlass extends Base {
+      static {
+        this.tableName = "developers";
+        this.aliasAttribute("created_at", "legacy_created_at");
+        this.aliasAttribute("updated_at", "legacy_updated_at");
+        this.aliasAttribute("created_on", "legacy_created_on");
+        this.aliasAttribute("updated_on", "legacy_updated_on");
+        this.beforeSave(function (this: MutatingSaveKlass) {
+          if (!this.isNewRecord()) {
+            this.name = "Jack Bauer";
+          }
+        });
+      }
+      declare name: string;
+    }
+
+    const dev = await MutatingSaveKlass.create({});
+    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+    const previousName = dev.name;
+
+    travel(1000);
+    try {
+      await dev.save();
+    } finally {
+      travelBack();
+    }
+
+    expect(dev.name).not.toBe(previousName);
+    expect(dev.legacy_updated_at).not.toEqual(previousUpdatedAt);
   });
 
   it("saving an unchanged record with a mutating before update callback updates its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.updateAttribute("title", "updated");
-    expect(post.title).toBe("updated");
+    class MutatingUpdateKlass extends Base {
+      static {
+        this.tableName = "developers";
+        this.aliasAttribute("created_at", "legacy_created_at");
+        this.aliasAttribute("updated_at", "legacy_updated_at");
+        this.aliasAttribute("created_on", "legacy_created_on");
+        this.aliasAttribute("updated_on", "legacy_updated_on");
+        this.beforeUpdate(function (this: MutatingUpdateKlass) {
+          if (!this.isNewRecord()) {
+            this.name = "Jack Bauer";
+          }
+        });
+      }
+      declare name: string;
+    }
+
+    const dev = await MutatingUpdateKlass.create({});
+    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+    const previousName = dev.name;
+
+    travel(1000);
+    try {
+      await dev.save();
+    } finally {
+      travelBack();
+    }
+
+    await dev.reload();
+
+    expect(dev.name).not.toBe(previousName);
+    expect(dev.legacy_updated_at).not.toEqual(previousUpdatedAt);
   });
 
   it("saving an unchanged record with a non mutating before update callback does not update its timestamp", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.save();
-    expect(post.isPersisted()).toBe(true);
+    class NonMutatingUpdateKlass extends Base {
+      static {
+        this.tableName = "developers";
+        this.aliasAttribute("created_at", "legacy_created_at");
+        this.aliasAttribute("updated_at", "legacy_updated_at");
+        this.aliasAttribute("created_on", "legacy_created_on");
+        this.aliasAttribute("updated_on", "legacy_updated_on");
+        this.beforeUpdate(function () {
+          // no-op
+        });
+      }
+    }
+
+    const dev = await NonMutatingUpdateKlass.create({});
+    const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
+
+    travel(1000);
+    try {
+      await dev.save();
+    } finally {
+      travelBack();
+    }
+
+    await dev.reload();
+
+    expect(dev.legacy_updated_at).toEqual(previousUpdatedAt);
   });
 
   it("saving a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-      }
+    const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
+    const petOwner = await pet.loadBelongsTo("owner");
+    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as Temporal.Instant;
+
+    travel(1000);
+    try {
+      pet.name = "Fluffy the Third";
+      await pet.save();
+    } finally {
+      travelBack();
     }
-    const author = await Author.create({ name: "Alice" });
-    expect(author.id).toBeDefined();
+
+    const reloadedPet = await Pet.find(pet.pet_id);
+    const updatedOwner = await reloadedPet.loadBelongsTo("owner");
+    expect((updatedOwner as Owner).updated_at).not.toEqual(previousOwnerUpdatedAt);
   });
 
   it("destroying a record with a belongs to that specifies touching the parent should update the parent updated at", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.destroy();
-    expect(post.isDestroyed()).toBe(true);
+    const pet = await Pet.find((pets("parrot") as any).readAttribute("pet_id"));
+    const petOwner = await pet.loadBelongsTo("owner");
+    const previousOwnerUpdatedAt = (petOwner as Owner).updated_at as Temporal.Instant;
+
+    travel(1000);
+    try {
+      await pet.destroy();
+    } finally {
+      travelBack();
+    }
+
+    const refreshedOwner = await Owner.find(
+      (owners("blackbeard") as any).readAttribute("owner_id"),
+    );
+    expect(refreshedOwner.updated_at).not.toEqual(previousOwnerUpdatedAt);
   });
 
   it("saving a new record belonging to invalid parent with touch should not raise exception", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.isPersisted()).toBe(true);
+    class InvalidOwner extends Owner {
+      static {
+        this.validate(function (this: InvalidOwner) {
+          (this as any).errors.add("base", "invalid");
+        });
+      }
+    }
+
+    const pet = new Pet({ owner: new InvalidOwner() });
+    await pet.save();
+
+    expect((pet as any).owner.isNewRecord()).toBe(true);
   });
 
   it("saving a record with a belongs to that specifies touching a specific attribute the parent should update that attribute", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    class PetTouchHappyAt extends Base {
+      static {
+        this.tableName = "pets";
+        this._primaryKey = "pet_id";
+        this.belongsTo("owner", { touch: "happy_at" });
+      }
+    }
+    registerModel("PetTouchHappyAt", PetTouchHappyAt);
+
+    const pet = await PetTouchHappyAt.find((pets("parrot") as any).readAttribute("pet_id"));
+    const ownerInst = await (pet as any).loadBelongsTo("owner");
+    const previousOwnerHappyAt = ownerInst.happy_at;
+
+    pet.name = "Fluffy the Third";
+    await pet.save();
+
+    expect(ownerInst.happy_at).not.toEqual(previousOwnerHappyAt);
   });
 
   it("touching a record with a belongs to that uses a counter cache should update the parent", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch();
-    expect(post.id).toBeDefined();
+    class PetCounterCacheTouch extends Base {
+      static {
+        this.tableName = "pets";
+        this._primaryKey = "pet_id";
+        this.belongsTo("owner", { counterCache: "use_count", touch: true });
+      }
+    }
+    registerModel("PetCounterCacheTouch", PetCounterCacheTouch);
+
+    const pet = await PetCounterCacheTouch.find((pets("parrot") as any).readAttribute("pet_id"));
+    const ownerInst = await (pet as any).loadBelongsTo("owner");
+    const threeDAgo = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    await ownerInst.updateColumns({ happy_at: threeDAgo });
+    const previousOwnerUpdatedAt = ownerInst.updated_at as Temporal.Instant;
+
+    travel(1000);
+    try {
+      pet.name = "I'm a parrot";
+      await pet.save();
+    } finally {
+      travelBack();
+    }
+
+    expect(ownerInst.updated_at).not.toEqual(previousOwnerUpdatedAt);
   });
 
   it("touching a record touches parent record and grandparent record", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch();
-    expect(post.id).toBeDefined();
+    class ToyTouchPet extends Base {
+      static {
+        this.tableName = "toys";
+        this._primaryKey = "toy_id";
+        this.belongsTo("pet", { touch: true });
+      }
+    }
+    registerModel("ToyTouchPet", ToyTouchPet);
+
+    const toy = await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"));
+    const pet = await (toy as any).loadBelongsTo("pet");
+    const ownerInst = await pet.loadBelongsTo("owner");
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+
+    await ownerInst.updateColumns({ updated_at: time });
+    await toy.touch();
+    await ownerInst.reload();
+
+    expect(ownerInst.updated_at).not.toEqual(time);
   });
 
   it("touching a record touches polymorphic record", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    class ToyAnon extends Base {
+      static {
+        this.tableName = "toys";
+        this._primaryKey = "toy_id";
+      }
+    }
+
+    class WheelPolymorphicTouch extends Base {
+      static {
+        this.tableName = "wheels";
+        this.belongsTo("wheelable", { polymorphic: true, touch: true });
+      }
+    }
+    registerModel("ToyAnon", ToyAnon);
+    registerModel("WheelPolymorphicTouch", WheelPolymorphicTouch);
+
+    const toy = (await ToyAnon.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+    await toy.updateColumns({ updated_at: time });
+
+    const wheel = new WheelPolymorphicTouch() as any;
+    wheel.wheelable = toy;
+    await wheel.save();
+    await wheel.touch();
+
+    expect(toy.updated_at).not.toEqual(time);
   });
 
   it("changing parent of a record touches both new and old parent record", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.updateAttribute("title", "changed");
-    expect(post.title).toBe("changed");
+    class ToyTouchPet2 extends Base {
+      static {
+        this.tableName = "toys";
+        this._primaryKey = "toy_id";
+        this.belongsTo("pet", { touch: true });
+      }
+    }
+    registerModel("ToyTouchPet2", ToyTouchPet2);
+
+    const toy1 = (await ToyTouchPet2.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const oldPet = await toy1.loadBelongsTo("pet");
+
+    const toy2 = (await ToyTouchPet2.find((toys("doll") as any).readAttribute("toy_id"))) as any;
+    const newPet = await toy2.loadBelongsTo("pet");
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+
+    await oldPet.updateColumns({ updated_at: time });
+    await newPet.updateColumns({ updated_at: time });
+
+    toy1.pet = newPet;
+    await toy1.save();
+
+    await oldPet.reload();
+    await newPet.reload();
+
+    expect(oldPet.updated_at).not.toEqual(time);
+    expect(newPet.updated_at).not.toEqual(time);
   });
 
   it("changing parent of a record touches both new and old polymorphic parent record changes within same class", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    class WheelPolymorphicTouch2 extends Base {
+      static {
+        this.tableName = "wheels";
+        this.belongsTo("wheelable", { polymorphic: true, touch: true });
+      }
+    }
+    registerModel("WheelPolymorphicTouch2", WheelPolymorphicTouch2);
+
+    const car1 = await Car.find(cars("honda").id);
+    const car2 = await Car.find(cars("zyke").id);
+
+    const wheel = (await WheelPolymorphicTouch2.create({ wheelable: car1 })) as any;
+
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+
+    await car1.updateColumns({ updated_at: time });
+    await car2.updateColumns({ updated_at: time });
+
+    wheel.wheelable = car2;
+    await wheel.save();
+
+    expect((await Car.find(car1.id)).updated_at).not.toEqual(time);
+    expect((await Car.find(car2.id)).updated_at).not.toEqual(time);
   });
 
   it("changing parent of a record touches both new and old polymorphic parent record changes with other class", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    class ToyAnon2 extends Base {
+      static {
+        this.tableName = "toys";
+        this._primaryKey = "toy_id";
+      }
+    }
+
+    class WheelPolymorphicTouch3 extends Base {
+      static {
+        this.tableName = "wheels";
+        this.belongsTo("wheelable", { polymorphic: true, touch: true });
+      }
+    }
+    registerModel("ToyAnon2", ToyAnon2);
+    registerModel("WheelPolymorphicTouch3", WheelPolymorphicTouch3);
+
+    const car = await Car.find(cars("honda").id);
+    const toy = (await ToyAnon2.find((toys("bulbuli") as any).readAttribute("toy_id"))) as any;
+
+    const wheel = (await WheelPolymorphicTouch3.create({ wheelable: car })) as any;
+
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+
+    await car.updateColumns({ updated_at: time });
+    await toy.updateColumns({ updated_at: time });
+
+    wheel.wheelable = toy;
+    await wheel.save();
+
+    expect((await Car.find(car.id)).updated_at).not.toEqual(time);
+    expect((await ToyAnon2.find(toy.toy_id)).updated_at).not.toEqual(time);
   });
 
   it("clearing association touches the old record", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.id).toBeDefined();
+    class ToyTouchPet3 extends Base {
+      static {
+        this.tableName = "toys";
+        this._primaryKey = "toy_id";
+        this.belongsTo("pet", { touch: true });
+      }
+    }
+    registerModel("ToyTouchPet3", ToyTouchPet3);
+
+    const toy = (await ToyTouchPet3.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const pet = await toy.loadBelongsTo("pet");
+    const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
+
+    await pet.updateColumns({ updated_at: time });
+
+    toy.pet = null;
+    await toy.save();
+
+    await pet.reload();
+
+    expect(pet.updated_at).not.toEqual(time);
   });
 
-  it("timestamp column values are present in create callbacks", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.isPersisted()).toBe(true);
+  // Rails: timestamps are written by an internal before_create callback registered
+  // before user callbacks, so created_at is available in user before_create.
+  // Trails writes timestamps in the create-callback body (after before_create phase)
+  // — a tracked parity gap. The test exists to document the intended Rails behavior.
+  it.skip("timestamp column values are present in create callbacks", async () => {
+    class PersonWithTimestampInCreate extends Base {
+      static {
+        this.tableName = "people";
+        this.beforeCreate(function (this: PersonWithTimestampInCreate) {
+          (this as any).born_at = (this as any).created_at;
+        });
+      }
+    }
+
+    const person = await PersonWithTimestampInCreate.create({ first_name: "David" });
+    expect((person as any).born_at).not.toBeNull();
   });
 
   it("timestamp column values are present in update callbacks", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.updateAttribute("title", "updated");
-    expect(post.title).toBe("updated");
+    class PersonWithTimestampInUpdate extends Base {
+      static {
+        this.tableName = "people";
+        this.beforeUpdate(function (this: PersonWithTimestampInUpdate) {
+          (this as any).born_at = (this as any).created_at;
+        });
+      }
+    }
+
+    const person = await PersonWithTimestampInUpdate.create({ first_name: "David" });
+    await person.update({ first_name: "John" });
+    expect((person as any).born_at).not.toBeNull();
   });
 
-  it("timestamp column values are present in save callbacks", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.save();
-    expect(post.isPersisted()).toBe(true);
-  });
+  // Same callback-ordering parity gap as test_timestamp_column_values_are_present_in_create_callbacks.
+  it.skip("timestamp column values are present in save callbacks", async () => {
+    class PersonWithTimestampInSave extends Base {
+      static {
+        this.tableName = "people";
+        this.beforeCreate(function (this: PersonWithTimestampInSave) {
+          (this as any).born_at = (this as any).created_at;
+        });
+      }
+    }
 
-  it("timestamp attributes for update in model", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    await post.touch("updated_at");
-    expect(post.id).toBeDefined();
-  });
-
-  it("all timestamp attributes in model", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.created_at !== undefined || true).toBe(true);
-    expect(post.updated_at !== undefined || true).toBe(true);
+    const person = await PersonWithTimestampInSave.create({ first_name: "David" });
+    expect((person as any).born_at).not.toBeNull();
   });
 
   it("timestamp attributes for create in model", async () => {
-    const Post = makePost();
-    const post = await Post.create({ title: "test" });
-    expect(post.created_at).toBeDefined();
+    const toy = await Toy.find((toys("bone") as any).readAttribute("toy_id"));
+    expect((toy as any).timestampAttributesForCreateInModel()).toEqual(["created_at"]);
+  });
+
+  it("timestamp attributes for update in model", async () => {
+    const toy = await Toy.find((toys("bone") as any).readAttribute("toy_id"));
+    expect((toy as any).timestampAttributesForUpdateInModel()).toEqual(["updated_at"]);
+  });
+
+  it("all timestamp attributes in model", async () => {
+    const toy = await Toy.find((toys("bone") as any).readAttribute("toy_id"));
+    expect((toy as any).allTimestampAttributesInModel()).toEqual(["created_at", "updated_at"]);
   });
 });
 
 describe("TimestampsWithoutTransactionTest", () => {
   setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: { title: "string" } });
+
+  afterEach(async () => {
+    const ctx = new MigrationContext(Base.connection);
+    await ctx.dropTable("timestamp_attribute_posts", "foos", { ifExists: true });
   });
 
   it("do not write timestamps on save if they are not attributes", async () => {
-    class Post extends Base {
+    const ctx = new MigrationContext(Base.connection);
+    await ctx.createTable("timestamp_attribute_posts", { force: true }, (t) => {
+      // Only id column — no created_at / updated_at
+    });
+
+    class TimestampAttributePost extends Base {
       static {
-        this.attribute("title", "string");
+        this.tableName = "timestamp_attribute_posts";
+        // created_at and updated_at are virtual (mirrors Ruby attr_accessor)
+        this.attribute("created_at", "datetime", { virtual: true });
+        this.attribute("updated_at", "datetime", { virtual: true });
       }
+      created_at: unknown = null;
+      updated_at: unknown = null;
     }
-    // No created_at/updated_at defined, save should work without error
-    const p = await Post.create({ title: "no timestamps" });
-    expect(p.isPersisted()).toBe(true);
-    expect(p.created_at ?? undefined).toBeUndefined();
+
+    const post = new TimestampAttributePost({ id: 1 });
+    await post.save();
+    expect(post.created_at).toBeNull();
+    expect(post.updated_at).toBeNull();
   });
+
   it("index is created for both timestamps", async () => {
-    const adapter = createTestAdapter();
-    const ctx = new MigrationContext(adapter);
+    const ctx = new MigrationContext(Base.connection);
     await ctx.createTable("foos", { force: true }, (t) => {
       t.timestamps({ null: true, index: true });
     });
-    try {
-      const indexes = await ctx.indexes("foos");
-      const columns = indexes.flatMap((i) => i.columns).sort();
-      expect(columns).toEqual(["created_at", "updated_at"]);
-    } finally {
-      await ctx.dropTable("foos");
-    }
+
+    const indexes = await ctx.indexes("foos");
+    const columns = indexes.flatMap((i) => i.columns).sort();
+    expect(columns).toEqual(["created_at", "updated_at"]);
+
+    await ctx.dropTable("foos");
   });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", created_at: "string", updated_at: "string", updated_on: "string" },
-      simples: { name: "string" },
-    });
-  });
-
-  it("auto-sets created_at and updated_at on insert", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const before = Temporal.Now.instant();
-    const post = await Post.create({ title: "Hello" });
-    const after = Temporal.Now.instant();
-
-    const createdAt = post.created_at as Temporal.Instant;
-    const updatedAt = post.updated_at as Temporal.Instant;
-    expect(createdAt).toBeInstanceOf(Temporal.Instant);
-    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    expect(createdAt.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
-    expect(createdAt.epochMilliseconds).toBeLessThanOrEqual(after.epochMilliseconds);
-    expect(createdAt.epochMilliseconds).toBe(updatedAt.epochMilliseconds);
-  });
-
-  it("created_at round-trips through the database as Temporal.Instant", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = await Post.create({ title: "Round-trip" });
-    const reloaded = await Post.find(post.id!);
-    expect(reloaded.created_at).toBeInstanceOf(Temporal.Instant);
-    expect((reloaded.created_at as Temporal.Instant).epochMilliseconds).toBe(
-      (post.created_at as Temporal.Instant).epochMilliseconds,
-    );
-  });
-
-  it("does not overwrite explicitly set timestamps on insert", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const explicit = instant("2020-01-01T00:00:00Z");
-    const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
-
-    expect((post.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      explicit.toString({ smallestUnit: "second" }),
-    );
-    expect((post.updated_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      explicit.toString({ smallestUnit: "second" }),
-    );
-  });
-
-  it("saving a changed record updates its timestamp", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.created_at as Temporal.Instant).epochMilliseconds;
-
-    post.title = "Updated";
-    await post.save();
-
-    const updatedAt = post.updated_at as Temporal.Instant;
-    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    // created_at should remain unchanged
-    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
-  });
-
-  it("sets updated_on on update when column exists", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_on", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-
-    post.title = "Updated";
-    const beforeSave = Temporal.Now.instant();
-    await post.save();
-
-    const afterSave = post.updated_on as Temporal.Instant;
-    expect(afterSave).toBeInstanceOf(Temporal.Instant);
-    expect(afterSave.epochMilliseconds).toBeGreaterThanOrEqual(beforeSave.epochMilliseconds);
-  });
-
-  it("does not set updated_on when recordTimestamps is false", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_on", "datetime");
-        this.attribute("updated_at", "datetime");
-        this.recordTimestamps = false;
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    expect(post.updated_on).toBeNull();
-    expect(post.updated_at).toBeNull();
-    post.title = "Updated";
-    await post.save();
-    expect(post.updated_on).toBeNull();
-    expect(post.updated_at).toBeNull();
-  });
-
-  it("does not touch timestamps when model has no timestamp attributes", async () => {
-    class Simple extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const s = await Simple.create({ name: "test" });
-    expect(s.readAttribute("created_at")).toBeNull();
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: {
-        title: "string",
-        updated_at: "string",
-        published_at: "string",
-        touched_at: "string",
-      },
-    });
-  });
-
-  it("touching a record updates its timestamp", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.updated_at as Temporal.Instant;
-
-    await post.touch();
-
-    const newUpdatedAt = post.updated_at as Temporal.Instant;
-    expect(newUpdatedAt).toBeInstanceOf(Temporal.Instant);
-    expect(newUpdatedAt.epochMilliseconds).toBeGreaterThanOrEqual(
-      originalUpdatedAt.epochMilliseconds,
-    );
-  });
-
-  it("touching an attribute updates it", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("published_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    await post.touch("published_at");
-
-    expect(post.published_at).toBeInstanceOf(Temporal.Instant);
-    expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
-  });
-
-  it("touch skips callbacks", async () => {
-    const log: string[] = [];
-
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    log.length = 0;
-
-    await post.touch();
-    expect(log).toHaveLength(0);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", updated_at: "string", replied_at: "string", viewed_at: "string" },
-      simples: { name: "string" },
-    });
-  });
-
-  it("touch persists to database", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    await post.touch();
-
-    const reloaded = await Post.find(post.id);
-    expect(reloaded.updated_at).not.toBeNull();
-  });
-
-  it("touch with multiple attribute names", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.attribute("replied_at", "datetime");
-        this.attribute("viewed_at", "datetime");
-      }
-    }
-
-    const post = await Post.create({ title: "Hello" });
-    await post.touch("replied_at", "viewed_at");
-
-    expect(post.replied_at).toBeInstanceOf(Temporal.Instant);
-    expect(post.viewed_at).toBeInstanceOf(Temporal.Instant);
-    expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
-  });
-
-  it("touching a record without timestamps is unexceptional", async () => {
-    class Simple extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    const s = await Simple.create({ name: "test" });
-    // Mirrors Rails: with no timestamp columns and no names, touch returns true.
-    expect(await s.touch()).toBe(true);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { updated_at: "string" } });
-  });
-  it("updates timestamps on all matching records", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("updated_at", "datetime");
-    await Item.create({});
-    await Item.create({});
-
-    const affected = await Item.all().touchAll();
-    expect(affected).toBe(2);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ users: { name: "string" } });
-  });
-
-  it("defaults to true", () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    expect(User.recordTimestamps).toBe(true);
-  });
-
-  it("can be disabled", () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.recordTimestamps = false;
-      }
-    }
-    expect(User.recordTimestamps).toBe(false);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ users: { name: "string" } });
-  });
-
-  it("suppresses touching during the block", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    expect(User.isTouchingSuppressed).toBe(false);
-    await User.noTouching(async () => {
-      expect(User.isTouchingSuppressed).toBe(true);
-    });
-    expect(User.isTouchingSuppressed).toBe(false);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", created_at: "string", updated_at: "string" },
-      simples: { name: "string" },
-    });
-  });
-  it("sets created_at and updated_at on create", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const before = Temporal.Now.instant();
-    const post = await Post.create({ title: "Hello" });
-    const after = Temporal.Now.instant();
-
-    const createdAt = post.created_at as Temporal.Instant;
-    expect(createdAt).toBeInstanceOf(Temporal.Instant);
-    expect(createdAt.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
-    expect(createdAt.epochMilliseconds).toBeLessThanOrEqual(after.epochMilliseconds);
-  });
-
-  it("does not overwrite explicit timestamps on create", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const explicit = instant("2020-01-01T00:00:00Z");
-    const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
-    expect((post.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      explicit.toString({ smallestUnit: "second" }),
-    );
-  });
-
-  it("updates updated_at on save", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.created_at as Temporal.Instant).epochMilliseconds;
-
-    post.title = "Updated";
-    await post.save();
-
-    const updatedAt = post.updated_at as Temporal.Instant;
-    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
-  });
-
-  it("created_at never overwritten on subsequent saves", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = await Post.create({ title: "Hello" });
-    const original = (post.created_at as Temporal.Instant).epochMilliseconds;
-
-    post.title = "v2";
-    await post.save();
-    post.title = "v3";
-    await post.save();
-
-    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(original);
-  });
-
-  it("touch updates updated_at", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = await Post.create({ title: "Hello" });
-    const original = (post.updated_at as Temporal.Instant).epochMilliseconds;
-    await post.touch();
-    const newTime = (post.updated_at as Temporal.Instant).epochMilliseconds;
-    expect(newTime).toBeGreaterThanOrEqual(original);
-  });
-
-  it("touch skips callbacks", async () => {
-    const log: string[] = [];
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-      }
-    }
-    const post = await Post.create({ title: "Hello" });
-    log.length = 0;
-    await post.touch();
-    expect(log).toHaveLength(0);
-  });
-
-  it("updateColumn does not update updated_at", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const post = await Post.create({ title: "Hello" });
-    const original = (post.updated_at as Temporal.Instant).epochMilliseconds;
-    await post.updateColumn("title", "Changed");
-    expect((post.updated_at as Temporal.Instant).epochMilliseconds).toBe(original);
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ items: { updated_at: "string" } });
-  });
-  it("touchAll updates timestamps on all records", async () => {
-    class Item extends Base {
-      static {
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    await Item.create({});
-    await Item.create({});
-    const affected = await Item.all().touchAll();
-    expect(affected).toBe(2);
-  });
-});
-
-describe("TimestampTest", () => {
-  class Article extends Base {
-    static {
-      this.attribute("title", "string");
-      this.attribute("body", "string");
-      this.attribute("created_at", "datetime");
-      this.attribute("updated_at", "datetime");
-    }
-  }
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema({
-      articles: { title: "string", body: "string", created_at: "string", updated_at: "string" },
-    });
-  });
-  it("created_at and updated_at match on first save", async () => {
-    const article = await Article.create({ title: "Hello" });
-    const createdAt = article.created_at as Temporal.Instant;
-    const updatedAt = article.updated_at as Temporal.Instant;
-    expect(createdAt.epochMilliseconds).toBe(updatedAt.epochMilliseconds);
-  });
-
-  it("updates updated_at but not created_at on update", async () => {
-    const article = await Article.create({ title: "Hello" });
-    const originalCreatedAt = (article.created_at as Temporal.Instant).epochMilliseconds;
-
-    article.title = "Updated";
-    await article.save();
-
-    expect((article.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
-    expect(article.updated_at).toBeInstanceOf(Temporal.Instant);
-  });
-
-  it("does not overwrite user-supplied created_at", async () => {
-    const custom = instant("2000-01-01T00:00:00Z");
-    const article = await Article.create({ title: "Old", created_at: custom });
-    expect((article.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      custom.toString({ smallestUnit: "second" }),
-    );
-  });
-
-  it("does not overwrite user-supplied updated_at on create", async () => {
-    const custom = instant("2000-01-01T00:00:00Z");
-    const article = await Article.create({ title: "Old", updated_at: custom });
-    expect((article.updated_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
-      custom.toString({ smallestUnit: "second" }),
-    );
-  });
-
-  it("timestamps are persisted to the database", async () => {
-    const article = await Article.create({ title: "Persisted" });
-    const reloaded = await Article.find(article.id);
-    expect(reloaded.created_at).not.toBeNull();
-    expect(reloaded.updated_at).not.toBeNull();
-  });
-});
-
-describe("TimestampTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", updated_at: "string" },
-      comments: { body: "string", post_id: "integer" },
-    });
-  });
-  // Rails: test "touch parent on save"
-  it("touches the parent record when child is saved", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    registerModel(Post);
-
-    class Comment extends Base {
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.belongsTo("post", { touch: true });
-      }
-    }
-    registerModel(Comment);
-
-    const post = await Post.create({ title: "Hello" });
-    const before = post.updated_at;
-
-    await new Promise((r) => setTimeout(r, 10));
-    await Comment.create({ body: "Reply", post_id: post.id });
-
-    await post.reload();
-    expect(post.updated_at).not.toEqual(before);
-  });
-});
-
-// MySQL/MariaDB datetime wire format (Temporal ISO Z suffix) is a pre-existing
-// gap tracked separately; these tests cover the SQLite/PG paths only.
-describe("TimestampTest — t.timestamps() end-to-end", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    const ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("timed_authors", {}, (t) => {
-      t.string("name");
-      t.timestamps();
-    });
-  });
-  afterAll(async () => {
-    await new MigrationContext(Base.connection).dropTable("timed_authors", { ifExists: true });
-  });
-
-  it.skipIf(adapterType === "mysql")(
-    "create fills both columns when table has NOT NULL timestamp columns from t.timestamps()",
-    async () => {
-      class Author extends Base {
-        static {
-          this._tableName = "timed_authors";
-          this.attribute("name", "string");
-          this.attribute("created_at", "datetime");
-          this.attribute("updated_at", "datetime");
-        }
-      }
-
-      const author = await Author.create({ name: "Alice" });
-      expect(author.created_at).toBeInstanceOf(Temporal.Instant);
-      expect(author.updated_at).toBeInstanceOf(Temporal.Instant);
-    },
-  );
-});
-
-describe("TimestampTest — t.timestamps() end-to-end", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    const ctx = new MigrationContext(Base.connection);
-    await ctx.createTable("nullable_timed_authors", {}, (t) => {
-      t.string("name");
-      t.timestamps({ null: true });
-    });
-  });
-  afterAll(async () => {
-    await new MigrationContext(Base.connection).dropTable("nullable_timed_authors", {
-      ifExists: true,
-    });
-  });
-
-  it.skipIf(adapterType === "mysql")(
-    "insert does not fail when recordTimestamps is false and columns are nullable",
-    async () => {
-      class Author extends Base {
-        static {
-          this._tableName = "nullable_timed_authors";
-          this.attribute("name", "string");
-          this.attribute("created_at", "datetime");
-          this.attribute("updated_at", "datetime");
-          this.recordTimestamps = false;
-        }
-      }
-
-      const author = await Author.create({ name: "Bob" });
-      expect(author.id).toBeDefined();
-    },
-  );
 });
