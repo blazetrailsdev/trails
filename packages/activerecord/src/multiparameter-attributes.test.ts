@@ -1,7 +1,7 @@
 /**
  * Mirrors: activerecord/test/cases/multiparameter_attributes_test.rb
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
@@ -15,6 +15,16 @@ const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 describe("MultiParameterAttributeTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+
+  // Eagerly resolve date/time column types before any test runs. On MariaDB the
+  // adapter schema cache is cold at startup (pool=null makes eagerWarmSchemaCache
+  // a no-op), so without this the sync loadSchema path hits an empty cache and
+  // marks _schemaLoaded=true with no type info — causing last_read and bonus_time
+  // to resolve as the fallback Value type instead of Date/Time. Mirrors the same
+  // pattern in date.test.ts.
+  beforeAll(async () => {
+    await Topic.loadSchema();
+  });
 
   it("multiparameter attributes on date", () => {
     const topic = new Topic();
