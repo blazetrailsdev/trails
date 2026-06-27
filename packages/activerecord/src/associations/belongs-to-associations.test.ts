@@ -644,12 +644,12 @@ describe("BelongsToAssociationsTest", () => {
     const reply = await Reply.create({ title: "blah!", content: "world around!", topic });
 
     expect((reply as any).parent_id).toBe(Number(topic.id));
-    expect(await (await topic.reload()).replies.size()).toBeGreaterThanOrEqual(1);
+    expect(await (await topic.reload()).replies.size()).toBe(1);
 
     (reply as any).topic = null;
     await reply.reload();
     expect((reply as any).parent_id).toBe(Number(topic.id));
-    expect(await (await topic.reload()).replies.size()).toBeGreaterThanOrEqual(1);
+    expect(await (await topic.reload()).replies.size()).toBe(1);
 
     (reply as any).topic = null;
     await reply.save();
