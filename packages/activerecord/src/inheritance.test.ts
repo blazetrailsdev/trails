@@ -7,59 +7,30 @@ import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } fr
 import { isStiSubclass } from "./inheritance.js";
 
 import { quoteTableName } from "./test-helpers/quote-regex.js";
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { SelectedMembership } from "./test-helpers/models/membership.js";
 
-const TEST_SCHEMA: Schema = {
-  vehicles: {
-    name: "string",
-    type: "string",
-    kind: "string",
-  },
-  companies: {
-    name: "string",
-    type: "string",
-  },
-  accounts: {
-    firm_id: "integer",
-    credit_limit: "integer",
-  },
-  vegetables: {
-    name: "string",
-    type: "string",
-    custom_type: "string",
-  },
-  subscribers: {
-    columns: {
-      nick: "string",
-      name: "string",
-      type: "string",
-    },
-    primaryKey: ["nick"],
-  },
-  entries: {
-    entryable_type: "string",
-    entryable_id: "integer",
-  },
-  user2s: {
-    name: "string",
-    type: "string",
-  },
-  user3s: {
-    name: "string",
-    type: "string",
-  },
-};
-
 describe("InheritanceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema({
+      companies: canonicalSchema.companies,
+      accounts: canonicalSchema.accounts,
+      /* eslint-disable blazetrails/require-canonical-schema */
+      vehicles: { name: "string", type: "string", kind: "string" },
+      vegetables: { name: "string", type: "string", custom_type: "string" },
+      subscribers: {
+        columns: { nick: "string", name: "string", type: "string" },
+        primaryKey: ["nick"],
+      },
+      entries: { entryable_type: "string", entryable_id: "integer" },
+      /* eslint-enable blazetrails/require-canonical-schema */
+    });
   });
 
   function makeHierarchy() {
@@ -1256,7 +1227,19 @@ describe("InheritanceComputeTypeTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema({
+      companies: canonicalSchema.companies,
+      accounts: canonicalSchema.accounts,
+      /* eslint-disable blazetrails/require-canonical-schema */
+      vehicles: { name: "string", type: "string", kind: "string" },
+      vegetables: { name: "string", type: "string", custom_type: "string" },
+      subscribers: {
+        columns: { nick: "string", name: "string", type: "string" },
+        primaryKey: ["nick"],
+      },
+      entries: { entryable_type: "string", entryable_id: "integer" },
+      /* eslint-enable blazetrails/require-canonical-schema */
+    });
   });
 
   function makeHierarchy() {
@@ -1292,7 +1275,19 @@ describe("InheritanceAttributeMappingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema({
+      companies: canonicalSchema.companies,
+      accounts: canonicalSchema.accounts,
+      /* eslint-disable blazetrails/require-canonical-schema */
+      vehicles: { name: "string", type: "string", kind: "string" },
+      vegetables: { name: "string", type: "string", custom_type: "string" },
+      subscribers: {
+        columns: { nick: "string", name: "string", type: "string" },
+        primaryKey: ["nick"],
+      },
+      entries: { entryable_type: "string", entryable_id: "integer" },
+      /* eslint-enable blazetrails/require-canonical-schema */
+    });
   });
 
   it("sti with custom type", async () => {
@@ -1324,7 +1319,19 @@ describe("InheritanceAttributeTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema({
+      companies: canonicalSchema.companies,
+      accounts: canonicalSchema.accounts,
+      /* eslint-disable blazetrails/require-canonical-schema */
+      vehicles: { name: "string", type: "string", kind: "string" },
+      vegetables: { name: "string", type: "string", custom_type: "string" },
+      subscribers: {
+        columns: { nick: "string", name: "string", type: "string" },
+        primaryKey: ["nick"],
+      },
+      entries: { entryable_type: "string", entryable_id: "integer" },
+      /* eslint-enable blazetrails/require-canonical-schema */
+    });
   });
 
   it("inheritance new with subclass as default", async () => {

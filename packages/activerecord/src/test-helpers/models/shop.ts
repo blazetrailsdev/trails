@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 // vendor/rails/activerecord/test/models/shop.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class ShopCollection extends Base {
   declare products: AssociationProxy<ShopProduct>;
@@ -48,3 +49,5 @@ export class ShopVariant extends Base {
     this.tableName = "variants";
   }
 }
+
+registerModel([ShopCollection, ShopProductType, ShopProduct, ShopVariant]);

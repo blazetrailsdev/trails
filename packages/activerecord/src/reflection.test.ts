@@ -36,6 +36,10 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // All tables referenced by tests in this file. Tests declare ad-hoc model
 // classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must be
 // materialized up front rather than auto-derived by the test adapter.
+// The 100+ tables here are all file-unique bespoke schemas; they differ
+// structurally from the canonical test-schema.ts entries (different column
+// sets, no STI type columns, or incompatible NOT NULL constraints).
+/* eslint-disable blazetrails/require-canonical-schema */
 const TEST_SCHEMA: Schema = {
   addresses: { street: "string" },
   admin_users: { name: "string" },
@@ -206,6 +210,7 @@ const TEST_SCHEMA: Schema = {
   },
   users: { name: "string", email: "string" },
 };
+/* eslint-enable blazetrails/require-canonical-schema */
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
