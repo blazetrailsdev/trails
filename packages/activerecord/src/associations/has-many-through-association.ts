@@ -9,7 +9,11 @@ import { compositeQueryConstraintsList } from "../persistence.js";
 import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass } from "../associations.js";
-import { sourceReflection, throughTargetScope } from "./through-association.js";
+import {
+  sourceReflection,
+  staleState as throughStaleState,
+  throughTargetScope,
+} from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
@@ -86,17 +90,44 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return throughTargetScope(this, super["targetScope"]());
   }
 
-  // Rails uses scope.pluck(*reflection.association_primary_key). We load via
-  // doAsyncFindTarget (the join-table path) and cache the PKs so that
-  // repeated calls don't re-issue the join query.
+  // Rails' ids_reader: scope.pluck(*reflection.association_primary_key).
+  // Using scope().pluck() (matching the base idsReader path) avoids calling
+  // doAsyncFindTarget() → loadHasMany() → syncToAssociationInstance() which
+  // would mark the association as loaded — violating the Rails contract that
+  // `record.misc_tag_ids` does not preload `miscTags`.
+  protected override staleState(): unknown {
+    const vals = throughStaleState(this);
+    if (!vals) return null;
+    return vals.length === 1 ? vals[0] : JSON.stringify(vals);
+  }
+
+  protected override primaryKeyValue(record: Base): unknown {
+    const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+    const refl = ctor._reflectOnAssociation?.(this.reflection.name);
+    const srcPk = refl?.sourceReflection?.associationPrimaryKey;
+    if (typeof srcPk === "string") {
+      return typeof (record as any)._readAttribute === "function"
+        ? (record as any)._readAttribute(srcPk)
+        : (record as any)[srcPk];
+    }
+    return super.primaryKeyValue(record);
+  }
+
   override async idsReader(): Promise<unknown[]> {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
     }
     if (this._associationIds) return this._associationIds;
-    const records = await this.doAsyncFindTarget();
-    this._associationIds = records.map((r) => this.primaryKeyValue(r));
-    return this._associationIds;
+    const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+    const refl = ctor._reflectOnAssociation?.(this.reflection.name);
+    const srcPk = refl?.sourceReflection?.associationPrimaryKey;
+    const pk = (typeof srcPk === "string" ? srcPk : null) ?? (this.klass as any).primaryKey ?? "id";
+    const rel = this.scope();
+    if (rel && typeof rel.pluck === "function") {
+      this._associationIds = await rel.pluck(...(Array.isArray(pk) ? pk : [pk]));
+      return this._associationIds!;
+    }
+    return [];
   }
 
   /**
@@ -171,7 +202,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
           if (built.isCollection) {
             inverseAssoc.addToTarget?.(built.throughRecord);
           } else if (built.isHasOne) {
-            inverseAssoc.target = built.throughRecord;
+            if (typeof inverseAssoc.queueWrite === "function") {
+              inverseAssoc.queueWrite(built.throughRecord);
+            } else {
+              inverseAssoc.target = built.throughRecord;
+              inverseAssoc.loadedBang?.();
+            }
             inverseAssoc.setInverseInstance?.(built.throughRecord);
           }
         }
@@ -298,8 +334,13 @@ export function buildThroughInverseFor(
   owner: Base,
   reflection: AssociationDefinition,
   record: Base,
+  throughScope?: unknown,
 ): BuiltThroughInverse | null {
-  const assoc = { owner, reflection } as unknown as HasManyThroughAssociation;
+  const assoc = {
+    owner,
+    reflection,
+    _throughScope: throughScope,
+  } as unknown as HasManyThroughAssociation;
   const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(reflection.name);
   const sourceRefl = refl?.sourceReflection;
@@ -351,17 +392,35 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   const cached = cache.get(record);
   if (cached) return cached;
 
-  ensureMutable(assoc);
   const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   const proxy = throughAssociation(assoc) as {
     build?: (attrs: Record<string, unknown>) => Base;
+    isLoaded?: () => boolean;
+    target?: Base | null;
   } | null;
   if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
 
+  // When the through is a singular (has_one/belongs_to) association that's already
+  // loaded, reuse the existing through record rather than building a new one.
+  // Mirrors Rails' build_through_record which, for singular throughs with a live
+  // target, returns the target directly so autosave uses the persisted join record.
+  const existingTarget = proxy.isLoaded?.() ? proxy.target : undefined;
+  if (existingTarget && !Array.isArray(existingTarget)) {
+    cache.set(record, existingTarget);
+    return existingTarget;
+  }
+
   const attributes = throughScopeAttributes(assoc);
-  attributes[sourceRefl.name] = record;
+  // Only set the source association on the through record when the source is
+  // belongs_to — has_many/has_one sources cannot be assigned as a scalar.
+  // Rails' build_through_record wires the inverse separately via
+  // inverse_reflection_for; we rely on `buildThroughInverseFor`'s caller to do that.
+  const sourceIsBelongsTo = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
+  if (sourceIsBelongsTo) {
+    attributes[sourceRefl.name] = record;
+  }
   const newRecord = proxy.build(attributes);
   if (assoc.reflection.options.sourceType && sourceRefl.foreignType) {
     (newRecord as any).writeAttribute?.(

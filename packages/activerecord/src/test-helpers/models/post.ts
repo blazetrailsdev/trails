@@ -518,16 +518,16 @@ export class Post extends Base {
       source: "person",
       through: "readers",
       beforeAdd: (_owner: any, reader: any) => {
-        Post.log("added", "before", reader.firstName);
+        Post.log("added", "before", reader.first_name);
       },
       afterAdd: (_owner: any, reader: any) => {
-        Post.log("added", "after", reader.firstName);
+        Post.log("added", "after", reader.first_name);
       },
       beforeRemove: (_owner: any, reader: any) => {
-        Post.log("removed", "before", reader.firstName);
+        Post.log("removed", "before", reader.first_name);
       },
       afterRemove: (_owner: any, reader: any) => {
-        Post.log("removed", "after", reader.firstName);
+        Post.log("removed", "after", reader.first_name);
       },
     });
     this.hasMany("skimmers", {

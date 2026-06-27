@@ -214,6 +214,7 @@ export class Association {
   associationScope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
+    if (this._staleState != null && this.isStaleTarget()) this.resetScope();
     if (this._cachedScope === undefined) {
       const ctor = this.owner.constructor as typeof Base & {
         _reflectOnAssociation?: (n: string) => unknown;

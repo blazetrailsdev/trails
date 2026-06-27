@@ -705,6 +705,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const results = await this._execLoad();
     this._target = this._mergeTargetLists(results);
     this._targetLoaded = true;
+    // Eagerly sync the Association instance NOW (while owner FKs still reflect
+    // the load time). Without this, syncAssociationInstance fires later — after
+    // a FK change — snapshotting the wrong stale state into loadedBang.
+    if (typeof (this._record as any).association === "function") {
+      (this._record as any).association(this._assocName);
+    }
     return this._target;
   }
 
@@ -1021,7 +1027,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Mirrors the inverse half of Rails' HasManyThroughAssociation#build_record:
     // pre-build the join row and wire it onto the target's inverse so the join
     // is created alongside the target on save.
-    const built = buildThroughInverseFor(this._record, this._assocDef, record);
+    const built = buildThroughInverseFor(
+      this._record,
+      this._assocDef,
+      record,
+      (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope ??
+        (this._isThrough ? this.scope() : this),
+    );
     if (built?.isCollection) {
       const invProxy = association(record, built.inverseName) as unknown as CollectionProxy;
       invProxy._target.push(built.throughRecord);
@@ -1030,8 +1042,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         built.inverseName,
       );
       if (inv) {
-        inv.target = built.throughRecord;
+        if (typeof inv.queueWrite === "function") {
+          inv.queueWrite(built.throughRecord);
+        } else {
+          inv.target = built.throughRecord;
+          inv.loadedBang?.();
+        }
         inv.setInverseInstance?.(built.throughRecord);
+      }
+    } else if (built) {
+      // belongs_to inverse: call the writer to set FK on the new target record from the through record.
+      const inv = (record as unknown as { association?: (n: string) => any }).association?.(
+        built.inverseName,
+      );
+      if (inv && typeof inv.writer === "function") {
+        inv.writer(built.throughRecord);
       }
     }
     return record;
@@ -1352,7 +1377,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<Base> {
     const ctor = this._record.constructor as typeof Base;
     if (this._record.isNewRecord()) {
-      throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
+      throw new Error(`You cannot call create unless the parent is saved`);
     }
     const record = this._buildThrough(attrs) as T;
     if (block) block(record);
@@ -1989,100 +2014,139 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
     const sourceFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
 
-    for (const record of records) {
-      // Route the in-memory mutation through `_addToTarget` (Rails'
-      // `replace_on_target`) so the through/HABTM branch shares the same
-      // set_inverse_instance + `@replaced_or_added_targets` dedup tracking +
-      // before/after_add callback handling as the non-through `push`/`<<`
-      // path. The `save` callback carries the through-specific join-row work
-      // (Rails' `HasManyThroughAssociation#insert_record`); when it resolves
-      // false (`record.save` failed, or the join row didn't persist) the
-      // record is left out of the target, matching the prior gating.
-      const insertJoinRecord = async (): Promise<boolean> => {
-        // Owner not yet persisted: defer the join insert. Mirrors Rails'
-        // CollectionAssociation#concat_records, which only calls insert_record
-        // when `!owner.new_record?` — otherwise it just adds the target to the
-        // in-memory collection and lets the owner's after_create autosave
-        // create the join row with the resolved owner FK. Inserting now would
-        // write a null owner FK (the owner has no id yet) and double-insert
-        // once the autosave runs.
-        if (this._record.isNewRecord()) return true;
-        // Save the target record if it's new
-        if (record.isNewRecord()) {
-          if (bang) {
-            await record.saveBang(); // raises RecordInvalid if invalid
-          } else if (!(await record.save())) {
-            return false;
-          }
-        }
-        // Create the join record. A composite source FK arises when the join's
-        // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
-        // where Sharded::Tag declares `query_constraints [blog_id, id]`, so the
-        // source FK is `[blog_id, tag_id]`. Pair each source-FK column with the
-        // source reflection's association_primary_key column read off the target
-        // (mirroring the composite-owner branch); the single-column write would
-        // otherwise stringify the array into one bogus key and leave tag_id null.
-        let sourceJoinAttrs: Record<string, unknown>;
-        if (Array.isArray(sourceFk)) {
-          const sourcePk = sourceRefl?.associationPrimaryKey;
-          const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
-          if (sourcePkCols.length !== sourceFk.length) {
-            throw new ConfigurationError(
-              `Through association "${this._assocName}" has a composite source foreign key ` +
-                `(${sourceFk.join(", ")}) whose length does not match the target primary key ` +
-                `(${sourcePkCols.join(", ")}).`,
-            );
-          }
-          sourceJoinAttrs = {};
-          for (let i = 0; i < sourceFk.length; i++) {
-            sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i]);
-          }
-        } else {
-          const targetPk = (record.constructor as typeof Base).primaryKey;
-          let targetPkCol: string;
-          if (Array.isArray(targetPk)) {
-            // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
-            // when set, or fall back to "id" when it is part of the composite PK.
-            const srcPk = sourceRefl?.associationPrimaryKey;
-            if (typeof srcPk === "string") {
-              targetPkCol = srcPk;
-            } else if (targetPk.includes("id")) {
-              targetPkCol = "id";
+    // Mirrors Rails' `CollectionProxy#transaction` delegating to the through
+    // model's transaction — concat_records wraps inserts in the join model's
+    // transaction so join-row writes and any associated saves are atomic.
+    await throughModel.transaction(async () => {
+      for (const record of records) {
+        // Route the in-memory mutation through `_addToTarget` (Rails'
+        // `replace_on_target`) so the through/HABTM branch shares the same
+        // set_inverse_instance + `@replaced_or_added_targets` dedup tracking +
+        // before/after_add callback handling as the non-through `push`/`<<`
+        // path. The `save` callback carries the through-specific join-row work
+        // (Rails' `HasManyThroughAssociation#insert_record`); when it resolves
+        // false (`record.save` failed, or the join row didn't persist) the
+        // record is left out of the target, matching the prior gating.
+        const insertJoinRecord = async (): Promise<boolean> => {
+          // Owner not yet persisted: defer the join insert. Mirrors Rails'
+          // CollectionAssociation#concat_records, which only calls insert_record
+          // when `!owner.new_record?` — otherwise it just adds the target to the
+          // in-memory collection and lets the owner's after_create autosave
+          // create the join row with the resolved owner FK. Inserting now would
+          // write a null owner FK (the owner has no id yet) and double-insert
+          // once the autosave runs.
+          if (this._record.isNewRecord()) return true;
+          // Save the target record if it's new. Mirrors Rails' concat (<<) which
+          // always raises on validation failure (raise_on_validation_error? == true).
+          if (record.isNewRecord()) {
+            if (bang) {
+              await record.saveBang(); // raises RecordInvalid if invalid
             } else {
+              await record.saveBang(); // << always raises on new-record failure
+            }
+          }
+          // Create the join record. A composite source FK arises when the join's
+          // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
+          // where Sharded::Tag declares `query_constraints [blog_id, id]`, so the
+          // source FK is `[blog_id, tag_id]`. Pair each source-FK column with the
+          // source reflection's association_primary_key column read off the target
+          // (mirroring the composite-owner branch); the single-column write would
+          // otherwise stringify the array into one bogus key and leave tag_id null.
+          let sourceJoinAttrs: Record<string, unknown>;
+          if (Array.isArray(sourceFk)) {
+            const sourcePk = sourceRefl?.associationPrimaryKey;
+            const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
+            if (sourcePkCols.length !== sourceFk.length) {
               throw new ConfigurationError(
-                `Through association "${this._assocName}" has a composite-PK target "${(record.constructor as typeof Base).name}" but no scalar primaryKey on the source reflection. Specify primaryKey: "<col>" on the source belongs_to.`,
+                `Through association "${this._assocName}" has a composite source foreign key ` +
+                  `(${sourceFk.join(", ")}) whose length does not match the target primary key ` +
+                  `(${sourcePkCols.join(", ")}).`,
               );
             }
+            sourceJoinAttrs = {};
+            for (let i = 0; i < sourceFk.length; i++) {
+              sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i]);
+            }
           } else {
-            targetPkCol = targetPk;
+            const targetPk = (record.constructor as typeof Base).primaryKey;
+            let targetPkCol: string;
+            if (Array.isArray(targetPk)) {
+              // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
+              // when set, or fall back to "id" when it is part of the composite PK.
+              const srcPk = sourceRefl?.associationPrimaryKey;
+              if (typeof srcPk === "string") {
+                targetPkCol = srcPk;
+              } else if (targetPk.includes("id")) {
+                targetPkCol = "id";
+              } else {
+                throw new ConfigurationError(
+                  `Through association "${this._assocName}" has a composite-PK target "${(record.constructor as typeof Base).name}" but no scalar primaryKey on the source reflection. Specify primaryKey: "<col>" on the source belongs_to.`,
+                );
+              }
+            } else {
+              // Use sourceRefl.associationPrimaryKey when set — e.g. a
+              // belongs_to with primaryKey: "name" means the join FK references
+              // category.name, not category.id.
+              const srcPk = sourceRefl?.associationPrimaryKey;
+              targetPkCol = (typeof srcPk === "string" ? srcPk : null) ?? targetPk;
+            }
+            sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
           }
-          sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
-        }
-        const joinAttrs: Record<string, unknown> = {
-          ...ownerJoinAttrs,
-          ...sourceJoinAttrs,
+          const pendingScope = (this as unknown as { _pendingThroughScope?: unknown })
+            ._pendingThroughScope;
+          const hmtScope = (pendingScope ?? this) as unknown as {
+            whereValuesHash?: (t: string) => Record<string, unknown>;
+          };
+          const throughScopeAttrs: Record<string, unknown> = {};
+          if (typeof hmtScope.whereValuesHash === "function") {
+            const raw = hmtScope.whereValuesHash(throughModel.tableName);
+            const ownerFk = String(throughAssoc.options.foreignKey ?? "");
+            const srcFkStr = Array.isArray(sourceFk) ? sourceFk.join("\0") : String(sourceFk);
+            const inheritanceCol = String((throughModel as any).inheritanceColumn ?? "type");
+            for (const [k, v] of Object.entries(raw)) {
+              if (k !== ownerFk && k !== srcFkStr && k !== inheritanceCol) {
+                throughScopeAttrs[k] = v;
+              }
+            }
+          }
+          const joinAttrs: Record<string, unknown> = {
+            ...throughScopeAttrs,
+            ...ownerJoinAttrs,
+            ...sourceJoinAttrs,
+          };
+          // Polymorphic through: ownerJoinAttrs already has the polymorphic
+          // _id column from _throughOwnerPolymorphic; just add the _type.
+          if (throughAssoc.options.as) {
+            joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
+          }
+          // Mirrors Rails' save_through_record: skip insert if the through record
+          // was already persisted (e.g. via autosave triggered by record.save in
+          // _createThrough). Without this guard, _createThrough's record.save
+          // (which fires autosave on the inverse has_many :readers) + the
+          // throughModel.create below would both create a join row.
+          const throughCache = (this._record as any)._throughRecordsCaches?.get(this._assocName);
+          const prebuiltThrough = throughCache?.get(record);
+          if (prebuiltThrough?.isPersisted?.()) return true;
+          let joinRecord: Base;
+          if (bang) {
+            // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
+            joinRecord = new throughModel(joinAttrs);
+            await joinRecord.saveBang();
+          } else {
+            joinRecord = new throughModel(joinAttrs);
+            // Mirrors Rails' insert_record: always raises on join-record failure
+            // (HasManyThroughAssociation#insert_record uses save! for the join row).
+            await joinRecord.saveBang();
+          }
+          return joinRecord.isPersisted();
         };
-        // Polymorphic through: ownerJoinAttrs already has the polymorphic
-        // _id column from _throughOwnerPolymorphic; just add the _type.
-        if (throughAssoc.options.as) {
-          joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
-        }
-        let joinRecord: Base;
-        if (bang) {
-          // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
-          joinRecord = new throughModel(joinAttrs);
-          await joinRecord.saveBang();
-        } else {
-          joinRecord = await throughModel.create(joinAttrs);
-        }
-        return joinRecord.isPersisted();
-      };
-      await this._addToTarget(
-        record,
-        { skipCallbacks, replace: this.distinctValue },
-        insertJoinRecord,
-      );
-    }
+        await this._addToTarget(
+          record,
+          { skipCallbacks, replace: this.distinctValue },
+          insertJoinRecord,
+        );
+      }
+    }); // end throughModel.transaction
   }
 
   private _invalidateAssociationIds(): void {
@@ -3291,13 +3355,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           `Through association "${this._assocName}" does not support a composite foreign key on the hasMany source — the target-side IN-subquery needs a single column.`,
         );
       }
-      if (Array.isArray(throughModel.primaryKey)) {
+      // When the source reflection specifies a primaryKey option (e.g.
+      // `has_many :orderAgreements, primaryKey: "id"` on a CPK through model),
+      // that named column is the one the FK references — use it instead of the
+      // through model's own (possibly composite) primary key.
+      const sourcePk = sourceRefl?.associationPrimaryKey ?? sourceRefl?.options?.primaryKey;
+      const throughPkCol = typeof sourcePk === "string" ? sourcePk : throughModel.primaryKey;
+      if (Array.isArray(throughPkCol)) {
         throw new ConfigurationError(
           `Through association "${this._assocName}" does not support a composite primary key on the through model "${throughModel.name}" — the target-side IN-subquery needs a single column.`,
         );
       }
       const sourceFkStr = sourceFk;
-      const throughPkCol = throughModel.primaryKey;
 
       throughSubquery.project(throughTable.get(throughPkCol));
       const inNode = targetArelTable.get(sourceFkStr).in(throughSubquery);
@@ -3413,9 +3482,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isThrough) {
       const ctor = this._record.constructor as typeof Base;
       if (this._record.isNewRecord()) {
-        throw new RecordNotSaved(
-          `Cannot create through association on an unpersisted ${ctor.name}`,
-        );
+        throw new RecordNotSaved(`You cannot call create unless the parent is saved`);
       }
       const record = this._buildThrough(attrs) as T;
       if (block) block(record);

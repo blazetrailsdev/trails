@@ -1741,7 +1741,8 @@ export async function loadHasMany(
     if (
       cache &&
       cache !== record._collectionProxies.get(assocName) &&
-      Array.isArray(cache.target)
+      Array.isArray(cache.target) &&
+      !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
     ) {
       return cache.target;
     }
