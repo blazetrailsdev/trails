@@ -75,6 +75,7 @@ import {
   SillyUniqueReply as HmSillyUniqueReply,
 } from "../test-helpers/models/reply.js";
 import { Ship as HmShip } from "../test-helpers/models/ship.js";
+import { Treasure as HmTreasure } from "../test-helpers/models/treasure.js";
 import { SubStiPost as HmSubStiPost } from "../test-helpers/models/post.js";
 import { Image as HmImage } from "../test-helpers/models/image.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -7267,12 +7268,10 @@ describe("HasManyAssociationsTest", () => {
 
   it("abstract class with polymorphic has many", async () => {
     const post = (await HmSubStiPost.create({ title: "fooo", body: "baa" })) as any;
-    const tagging = (await HmTagging.create({
-      taggable_id: post.id,
-      taggable_type: "Post",
-    })) as any;
+    const tagging = (await HmTagging.create({ taggable: post })) as any;
     const taggings = await post.taggings.toArray();
-    expect(taggings.some((t: any) => Number(t.id) === Number(tagging.id))).toBe(true);
+    expect(taggings).toHaveLength(1);
+    expect(Number(taggings[0].id)).toBe(Number(tagging.id));
   });
 
   // BLOCKED: has_many `as:` with custom `foreignType` not implemented on write path —
@@ -7385,23 +7384,35 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cars } = useHandlerFixtures(["cars", "topics"], { schema: TEST_SCHEMA });
+  const { cars } = useHandlerFixtures(["cars", "topics", "ships", "treasures"], {
+    schema: TEST_SCHEMA,
+  });
 
   beforeAll(async () => {
     // engines table not in fixture registry; create it separately.
     await defineSchema({ engines: TEST_SCHEMA.engines });
     registerModel(HmCar);
     registerModel(HmEngine);
+    registerModel(HmShip);
+    registerModel(HmTreasure);
     registerModel(HmTopic);
     registerModel(HmReply);
     enableSti(HmTopic);
     registerSubclass(HmReply);
   });
 
-  it("has many without counter cache option", () => {
+  it("has many without counter cache option", async () => {
+    const ship = (await HmShip.create({ name: "Countless", treasures_count: 10 })) as any;
     const assoc = (HmShip as any)._associations.find((a: any) => a.name === "treasures");
     expect(assoc).toBeDefined();
     expect(assoc.options.counterCache).toBeUndefined();
+    // Count comes from SQL, not the cached attribute
+    expect(await ship.treasures.size()).toBe(0);
+    const countBefore = (await HmShip.find(ship.id)).treasures_count;
+    await ship.treasures.create({ name: "Gold" });
+    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
+    await ship.treasures.destroyAll();
+    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
   });
 
   it("counter cache updates in memory after create", async () => {
