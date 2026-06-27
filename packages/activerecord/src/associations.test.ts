@@ -1818,7 +1818,7 @@ describe("GeneratedMethodsTest", () => {
     const developer = await Developer.find(developers("david").id);
     expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
     expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
-    expect(computer.readAttribute("developer")).toBe(developer.id);
+    expect(computer.readAttribute("developer")).toBe(Number(developer.id));
   });
 
   it("model method overrides association method", async () => {
