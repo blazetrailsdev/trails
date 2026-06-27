@@ -7463,14 +7463,7 @@ describe("AsyncHasManyAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  it.skip("async load has many", async () => {
-    // BLOCKED: association(...).asyncLoadTarget() does not leave the dotted
-    // `firm.clients` proxy loaded, so the post-load size()/toArray() re-query
-    // instead of reading the prefetched target.
-    // ROOT-CAUSE: associations/association.ts#asyncLoadTarget not sharing the
-    // loaded target with the dotted collection proxy.
-    // SCOPE: tracked by assoc-async-load-target-shares-proxy-state +
-    // unskip-async-load-has-many (RFC 0019).
+  it("async load has many", async () => {
     // Rails has_many_associations_test.rb:3261 test_async_load_has_many:
     //   firm.association(:clients).async_load_target; then clients.size == 3
     //   and clients[2] is reachable with no further queries.
@@ -7478,11 +7471,9 @@ describe("AsyncHasManyAssociationsTest", () => {
 
     await firm.association("clients").asyncLoadTarget();
 
-    expect(await firm.clients.size()).toBe(3);
-
     await assertNoQueries(false, async () => {
-      const all = await firm.clients.toArray();
-      expect(all[2]).not.toBeNull();
+      expect(await firm.clients.size()).toBe(3);
+      expect(firm.clients[2]).not.toBeUndefined();
     });
   });
 });
