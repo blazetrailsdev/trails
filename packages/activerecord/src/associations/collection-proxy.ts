@@ -2467,9 +2467,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: T[]): Promise<void> {
     const destroyed: Base[] = [];
-    for (const record of records) {
-      await record.destroy();
-      if (record.isDestroyed()) destroyed.push(record);
+    const run = async () => {
+      for (const record of records) {
+        await record.destroy();
+        if (record.isDestroyed()) destroyed.push(record);
+      }
+    };
+    // Rails delete_or_destroy wraps remove_records in a transaction only when
+    // there are persisted records, so a mid-batch raise rolls back the batch.
+    if (records.some((r) => !r.isNewRecord())) {
+      await this.transaction(run);
+    } else {
+      await run();
     }
     // Remove join/through rows only for successfully destroyed records
     if (destroyed.length > 0) {
