@@ -261,7 +261,7 @@ function _assignTimestampsOnCreate(this: any): void {
   if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
     const time = currentTimeFromProperTimezone();
     for (const col of allTimestampAttributesInModel.call(ctor)) {
-      if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
+      if (ctor._attributeDefinitions?.has(col) && !this._readAttribute?.(col)) {
         this._writeAttribute?.(col, time);
       }
     }
