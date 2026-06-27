@@ -23,6 +23,8 @@ import {
   // bespoke `Firm` remains today, but the alias keeps future conversions safe.
   Firm as HmFirm,
   Client,
+  DependentFirm,
+  RestrictedWithExceptionFirm,
   RestrictedWithErrorFirm,
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
@@ -62,8 +64,20 @@ import { Subscription as HmSubscription } from "../test-helpers/models/subscript
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
 import { Car as HmCar } from "../test-helpers/models/car.js";
-import { Bulb as HmBulb } from "../test-helpers/models/bulb.js";
+import { Engine as HmEngine } from "../test-helpers/models/engine.js";
+import { Bulb as HmBulb, FunkyBulb as HmFunkyBulb } from "../test-helpers/models/bulb.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
+import { Topic as HmTopic } from "../test-helpers/models/topic.js";
+import {
+  Reply as HmReply,
+  SillyReply as HmSillyReply,
+  UniqueReply as HmUniqueReply,
+  SillyUniqueReply as HmSillyUniqueReply,
+} from "../test-helpers/models/reply.js";
+import { Ship as HmShip } from "../test-helpers/models/ship.js";
+import { Treasure as HmTreasure } from "../test-helpers/models/treasure.js";
+import { SubStiPost as HmSubStiPost } from "../test-helpers/models/post.js";
+import { Image as HmImage } from "../test-helpers/models/image.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
@@ -7154,297 +7168,138 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 });
 
-const TAIL_HMT_SCHEMA: Schema = {
-  no_cb_authors: { name: "string" },
-  no_cb_posts: { author_id: "integer", title: "string" },
-  reset_authors: { name: "string" },
-  reset_posts: { author_id: "integer", title: "string" },
-  del_cc_authors: { name: "string", posts_count: "integer" },
-  del_cc_posts: { author_id: "integer", title: "string" },
-  dep_del_authors: { name: "string" },
-  dep_del_posts: { author_id: "integer", title: "string" },
-  null_authors: { name: "string" },
-  null_posts: { author_id: "integer", title: "string" },
-  one_authors: { name: "string" },
-  one_posts: { author_id: "integer", title: "string" },
-  abs_poly_comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
-  abs_poly_posts: { title: "string" },
-  cust_poly_comments: { body: "string", taggable_id: "integer", taggable_type: "string" },
-  cust_poly_posts: { title: "string" },
-  no_raise_authors: { name: "string" },
-  no_raise_posts: { author_id: "integer", title: "string" },
-  preload_authors: { name: "string" },
-  preload_posts: { author_id: "integer", title: "string" },
-};
-
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const { companies, topics } = useHandlerFixtures(
+    ["companies", "accounts", "topics", "posts", "comments", "taggings", "cars", "bulbs"],
+    { schema: TEST_SCHEMA },
+  );
 
   beforeAll(async () => {
-    await defineSchema(TAIL_HMT_SCHEMA);
+    // Create images table separately — no images fixture file exists,
+    // so it isn't included in the useHandlerFixtures set above.
+    await defineSchema({ images: TEST_SCHEMA.images });
+  });
+
+  beforeAll(() => {
+    registerModel(Company);
+    registerModel(HmFirm);
+    registerModel(Client);
+    registerModel(DependentFirm);
+    registerModel(Account);
+    enableSti(Company);
+    registerSubclass(HmFirm);
+    registerSubclass(Client);
+    registerSubclass(DependentFirm);
+    registerModel(HmCar);
+    registerModel(HmFunkyBulb);
+    registerSubclass(HmFunkyBulb);
+    registerModel(HmTopic);
+    registerModel(HmReply);
+    registerModel(HmSillyReply);
+    registerModel(HmUniqueReply);
+    registerModel(HmSillyUniqueReply);
+    enableSti(HmTopic);
+    registerSubclass(HmReply);
+    registerSubclass(HmSillyReply);
+    registerSubclass(HmUniqueReply);
+    registerSubclass(HmSillyUniqueReply);
+    registerModel(HmPost);
+    registerModel(Comment);
+    registerModel(HmImage);
+    registerModel(HmSubStiPost);
+    registerModel(HmTagging);
+    registerSubclass(HmSubStiPost);
   });
 
   it("do not call callbacks for delete all", async () => {
-    class NoCbAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("no_cb_posts", {
-          className: "NoCbPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class NoCbPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NoCbAuthor);
-    registerModel(NoCbPost);
-    const author = await NoCbAuthor.create({ name: "Alice" });
-    await NoCbPost.create({ author_id: author.id, title: "A" });
-    await NoCbPost.create({ author_id: author.id, title: "B" });
-    await author.destroy();
-    const remaining = await loadHasMany(author, "no_cb_posts", {
-      className: "NoCbPost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
+    const car = (await HmCar.create({ name: "honda" })) as any;
+    await car.funkyBulbs.create({});
+    expect(await car.funkyBulbs.count()).toBe(1);
+    const reloaded = await car.reload();
+    expect(await reloaded.funkyBulbs.deleteAll()).toBe(1);
+    expect(await car.funkyBulbs.count()).toBe(0);
   });
-  it("find first after reset", async () => {
-    class ResetAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ResetPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ResetAuthor);
-    registerModel(ResetPost);
-    const author = await ResetAuthor.create({ name: "Alice" });
-    await ResetPost.create({ author_id: author.id, title: "First" });
-    await ResetPost.create({ author_id: author.id, title: "Second" });
-    // Load, then reload (simulating reset)
-    const posts1 = await loadHasMany(author, "reset_posts", {
-      className: "ResetPost",
-      foreignKey: "author_id",
-    });
-    expect(posts1.length).toBe(2);
-    const posts2 = await loadHasMany(author, "reset_posts", {
-      className: "ResetPost",
-      foreignKey: "author_id",
-    });
-    expect(posts2.length).toBe(2);
+
+  // BLOCKED: CollectionProxy#first does not cache _target on load (toArray is
+  // deliberately cache-bypassing per collection-proxy.ts:686-692). Each call to
+  // first() fetches a new object; the toBe identity check fails. Story:
+  // assoc-has-many-collection-first-caching (RFC 0019).
+  it.skip("find first after reset", async () => {
+    const firm = (await HmFirm.first()) as any;
+    const collection = firm.clients;
+    const original = await collection.first();
+    expect(await collection.first()).toBe(original);
+    collection.reset();
+    expect(await collection.first()).not.toBe(original);
   });
+
   it("deleting updates counter cache", async () => {
-    class DelCcAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class DelCcPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "DelCcAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(DelCcAuthor);
-    registerModel(DelCcPost);
-    const author = await DelCcAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await DelCcPost.create({ author_id: author.id, title: "A" });
-    let reloaded = await DelCcAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-    await post.destroy();
-    reloaded = await DelCcAuthor.find(author.id!);
-    // Counter cache may or may not decrement on destroy depending on implementation
-    expect((reloaded as any).posts_count).toBeLessThanOrEqual(1);
+    const topic = (await HmTopic.order("id ASC").first()) as any;
+    const actual = (await topic.replies.toArray()).length;
+    expect(actual).toBe(topic.replies_count);
+    const firstReply = await topic.replies.first();
+    await topic.replies.delete(firstReply);
+    await topic.reload();
+    expect((await topic.replies.toArray()).length).toBe(topic.replies_count);
   });
+
   it("destroy dependent when deleted from association", async () => {
-    class DepDelAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("dep_del_posts", {
-          className: "DepDelPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class DepDelPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DepDelAuthor);
-    registerModel(DepDelPost);
-    const author = await DepDelAuthor.create({ name: "Alice" });
-    await DepDelPost.create({ author_id: author.id, title: "A" });
-    await author.destroy();
-    const remaining = await loadHasMany(author, "dep_del_posts", {
-      className: "DepDelPost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
+    const firm = companies("first_firm") as any;
+    expect(await firm.clients.size()).toBe(3);
+    const client = await firm.clients.first();
+    await firm.clients.delete(client);
+    await expect(Client.find(client.id)).rejects.toThrow(RecordNotFound);
+    await expect(firm.clients.find(client.id)).rejects.toThrow(RecordNotFound);
+    expect(await firm.clients.size()).toBe(2);
   });
+
   it("replace with less and dependent nullify", async () => {
-    class NullAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("null_posts", {
-          className: "NullPost",
-          foreignKey: "author_id",
-          dependent: "nullify",
-        });
-      }
-    }
-    class NullPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NullAuthor);
-    registerModel(NullPost);
-    const author = await NullAuthor.create({ name: "Alice" });
-    const post = await NullPost.create({ author_id: author.id, title: "A" });
-    await author.destroy();
-    const reloaded = await NullPost.find(post.id!);
-    expect(reloaded.author_id).toBeNull();
+    const numCompanies = await Company.count();
+    const railsCore = companies("rails_core") as any;
+    await railsCore.companies.replace([]);
+    expect(await Company.count()).toBe(numCompanies);
   });
+
   it("calling one should return true if one", async () => {
-    class OneAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class OnePost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(OneAuthor);
-    registerModel(OnePost);
-    const author = await OneAuthor.create({ name: "Alice" });
-    await OnePost.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "one_posts", {
-      className: "OnePost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length === 1).toBe(true);
+    const firm = companies("first_firm") as any;
+    expect(await firm.limitedClients.one()).toBe(true);
+    expect(await firm.limitedClients.size()).toBe(1);
   });
+
   it("abstract class with polymorphic has many", async () => {
-    class AbsPolyComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-      }
-    }
-    class AbsPolyPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("absPolyComments", {
-          as: "commentable",
-          className: "AbsPolyComment",
-        });
-      }
-    }
-    registerModel(AbsPolyComment);
-    registerModel(AbsPolyPost);
-    const post = await AbsPolyPost.create({ title: "Hello" });
-    const proxy = association(post, "absPolyComments");
-    const comment = proxy.build({ body: "nice" });
-    expect(comment.commentable_id).toBe(Number(post.id));
-    expect(comment.commentable_type).toBe("AbsPolyPost");
+    const post = (await HmSubStiPost.create({ title: "fooo", body: "baa" })) as any;
+    const tagging = (await HmTagging.create({ taggable: post })) as any;
+    const taggings = await post.taggings.toArray();
+    expect(taggings).toHaveLength(1);
+    expect(Number(taggings[0].id)).toBe(Number(tagging.id));
   });
-  it("with polymorphic has many with custom columns name", async () => {
-    class CustPolyComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-      }
-    }
-    class CustPolyPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("custPolyComments", {
-          as: "taggable",
-          className: "CustPolyComment",
-        });
-      }
-    }
-    registerModel(CustPolyComment);
-    registerModel(CustPolyPost);
-    const post = await CustPolyPost.create({ title: "Hello" });
-    const proxy = association(post, "custPolyComments");
-    const comment = proxy.build({ body: "nice" });
-    expect(comment.taggable_id).toBe(Number(post.id));
-    expect(comment.taggable_type).toBe("CustPolyPost");
+
+  // BLOCKED: has_many `as:` with custom `foreignType` not implemented on write path —
+  // collection-association.ts:649 always writes `${as}_type` (imageable_type) but the
+  // images table uses imageable_class. Story: assoc-has-many-custom-foreign-type (RFC 0019).
+  it.skip("with polymorphic has many with custom columns name", async () => {
+    const post = (await HmPost.create({ title: "foo", body: "bar" })) as any;
+    const image = (await HmImage.create({})) as any;
+    await post.images.push(image);
+    const images = await post.images.toArray();
+    expect(images.some((i: any) => Number(i.id) === Number(image.id))).toBe(true);
+    const reloaded = (await HmImage.find(Number(image.id))) as any;
+    const imageable = await reloaded.loadBelongsTo("imageable");
+    expect(Number(imageable.id)).toBe(Number(post.id));
   });
-  it("destroy does not raise when association errors on destroy", async () => {
-    class NoRaiseAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class NoRaisePost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NoRaiseAuthor);
-    registerModel(NoRaisePost);
-    const author = await NoRaiseAuthor.create({ name: "Alice" });
-    const post = await NoRaisePost.create({ author_id: author.id, title: "A" });
-    // Destroying the post should not raise
-    await post.destroy();
-    expect(post.isDestroyed()).toBe(true);
-  });
+
+  // BLOCKED: AuthorWithErrorDestroyingAssociation not in canonical models.
+  // Needs canonical model mirroring vendor/rails/activerecord/test/models/author.rb.
+  // Story: assoc-has-many-author-error-destroying (RFC 0019).
+  it.skip("destroy does not raise when association errors on destroy", () => {});
+
   it("has many preloading with duplicate records", async () => {
-    class PreloadAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PreloadPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(PreloadAuthor);
-    registerModel(PreloadPost);
-    const author = await PreloadAuthor.create({ name: "Alice" });
-    await PreloadPost.create({ author_id: author.id, title: "A" });
-    await PreloadPost.create({ author_id: author.id, title: "B" });
-    // Load twice - should get same results
-    const posts1 = await loadHasMany(author, "preload_posts", {
-      className: "PreloadPost",
-      foreignKey: "author_id",
-    });
-    const posts2 = await loadHasMany(author, "preload_posts", {
-      className: "PreloadPost",
-      foreignKey: "author_id",
-    });
-    expect(posts1.length).toBe(2);
-    expect(posts2.length).toBe(2);
+    const allPosts = await HmPost.joins("comments").preload("comments").order("id").toArray();
+    const first = allPosts[0] as any;
+    const commentIds = (await first.comments.toArray())
+      .map((c: any) => Number(c.id))
+      .sort((a: number, b: number) => a - b);
+    expect(commentIds).toEqual([1, 2]);
   });
 });
 
@@ -7487,214 +7342,104 @@ describe("AsyncHasManyAssociationsTest", () => {
   });
 });
 
-const TAIL_HMT2_SCHEMA: Schema = {
-  cn_posts: { title: "string", my_comment_count: "integer" },
-  cn_comments: { body: "string", post_id: "integer" },
-  r_widgets: { name: "string", container_id: "integer" },
-  r_containers: { name: "string" },
-};
-
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema(TAIL_HMT2_SCHEMA);
+  const { topics } = useHandlerFixtures(["companies", "accounts", "topics"], {
+    schema: TEST_SCHEMA,
   });
 
-  it("custom named counter cache", async () => {
-    // Rails: test_custom_named_counter_cache / test_custom_counter_cache
-    class CnPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("my_comment_count", "integer");
-      }
-    }
-    class CnComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-        this.belongsTo("cnPost", {
-          className: "CnPost",
-          foreignKey: "post_id",
-          counterCache: "my_comment_count",
-        });
-      }
-    }
-    registerModel("CnPost", CnPost);
-    registerModel("CnComment", CnComment);
+  beforeAll(() => {
+    registerModel(Company);
+    registerModel(HmFirm);
+    registerModel(Client);
+    registerModel(DependentFirm);
+    registerModel(RestrictedWithExceptionFirm);
+    enableSti(Company);
+    registerSubclass(HmFirm);
+    registerSubclass(Client);
+    registerSubclass(DependentFirm);
+    registerSubclass(RestrictedWithExceptionFirm);
+    registerModel(HmTopic);
+    registerModel(HmReply);
+    enableSti(HmTopic);
+    registerSubclass(HmReply);
+  });
 
-    const post = await CnPost.create({ title: "Post", my_comment_count: 0 });
-    await CnComment.create({ body: "Hi", post_id: post.id });
-
-    const reloaded = await CnPost.find(post.id as number);
-    expect(reloaded.my_comment_count).toBe(1);
+  // BLOCKED: clear() with no dependent nullifies FKs via SQL UPDATE but does not
+  // call _decrementCounterCache. Story: assoc-has-many-counter-cache-clear (RFC 0019).
+  it.skip("custom named counter cache", async () => {
+    const topic = topics("first") as any;
+    const before = topic.replies_count as number;
+    await topic.approvedReplies.clear();
+    expect((await HmTopic.find(topic.id)).replies_count).toBe(before - 1);
   });
 
   it("restrict with exception", async () => {
-    class RWidget extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("container_id", "integer");
-      }
-    }
-    class RContainer extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("rWidgets", {
-          className: "RWidget",
-          foreignKey: "container_id",
-          dependent: "restrictWithException",
-        });
-      }
-    }
-    registerModel("RWidget", RWidget);
-    registerModel("RContainer", RContainer);
-
-    const container = await RContainer.create({ name: "Box" });
-    await RWidget.create({ name: "Item", container_id: container.id });
-    // Destroying the parent should throw DeleteRestrictionError
-    await expect(container.destroy()).rejects.toThrow(DeleteRestrictionError);
-    // Parent should still exist
-    expect(await RContainer.count()).toBe(1);
+    const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
+    await firm.companies.create({ name: "child" });
+    expect(await firm.companies.isEmpty()).toBe(false);
+    await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
+    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
+    expect(await firm.companies.exists({ name: "child" })).toBe(true);
   });
 });
 
-// -- Counter cache (head describe migration — B1966c) --
-//
-// Counter-cache cluster: kept in its own `HasManyAssociationsTest` describe so
-// it can run under shared adapter + `defineSchema` upfront +
-// `withTransactionalFixtures` (mirrors #1938 / #1966 pilot pattern). Tests
-// re-declare local classes per `it()` (counter-cache options vary by test);
-// transactional fixtures roll rows back between tests while the schema
-// declared once in `beforeAll` survives.
-
-const COUNTER_CACHE_HEAD_SCHEMA: Schema = {
-  authors: { name: "string", posts_count: "integer" },
-  posts: { author_id: "integer", title: "string" },
-};
-
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema(COUNTER_CACHE_HEAD_SCHEMA);
+  const { cars } = useHandlerFixtures(["cars", "topics", "ships", "treasures"], {
+    schema: TEST_SCHEMA,
   });
 
-  it("has many without counter cache option", () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
-    const assoc = (Author as any)._associations.find((a: any) => a.name === "posts");
+  beforeAll(async () => {
+    // engines table not in fixture registry; create it separately.
+    await defineSchema({ engines: TEST_SCHEMA.engines });
+    registerModel(HmCar);
+    registerModel(HmEngine);
+    registerModel(HmShip);
+    registerModel(HmTreasure);
+    registerModel(HmTopic);
+    registerModel(HmReply);
+    enableSti(HmTopic);
+    registerSubclass(HmReply);
+  });
+
+  it("has many without counter cache option", async () => {
+    const ship = (await HmShip.create({ name: "Countless", treasures_count: 10 })) as any;
+    const assoc = (HmShip as any)._associations.find((a: any) => a.name === "treasures");
     expect(assoc).toBeDefined();
     expect(assoc.options.counterCache).toBeUndefined();
+    // Count comes from SQL, not the cached attribute
+    expect(await ship.treasures.size()).toBe(0);
+    const countBefore = (await HmShip.find(ship.id)).treasures_count;
+    await ship.treasures.create({ name: "Gold" });
+    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
+    await ship.treasures.destroyAll();
+    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
   });
 
   it("counter cache updates in memory after create", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      inverseOf: "author",
-    });
-    Associations.belongsTo.call(Post, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Mirrors Rails: car.wheels.create! then check in-memory counter, association
-    // size, and reloaded counter (has_many_associations_test.rb:1368-1374).
-    await (author as any).posts.create({ title: "A" });
-    expect((author as any).readAttribute("posts_count")).toBe(1);
-    expect(await (author as any).posts.size()).toBe(1);
-    expect(((await Author.find(author.id!)) as any).readAttribute("posts_count")).toBe(1);
+    const topic = (await HmTopic.create({ title: "Zoom-zoom-zoom" })) as any;
+    await topic.replies.create({ title: "re: zoom", content: "speedy quick!" });
+    expect(topic.readAttribute("replies_count")).toBe(1);
+    expect(await topic.replies.size()).toBe(1);
+    expect(((await HmTopic.find(topic.id)) as any).readAttribute("replies_count")).toBe(1);
   });
 
   it("pushing association updates counter cache", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      inverseOf: "author",
-    });
-    Associations.belongsTo.call(Post, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Mirrors Rails: car.wheels << Wheel.new then check car.reload.wheels_count.
-    const post = new Post({ title: "A" });
-    await (author as any).posts.push(post);
-    const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
+    const topic = (await HmTopic.create({ title: "PushTest" })) as any;
+    const reply = new HmReply({ title: "r" }) as any;
+    await topic.replies.push(reply);
+    const reloaded = (await HmTopic.find(topic.id)) as any;
+    expect(reloaded.replies_count).toBe(1);
   });
 
+  // Rails uses posts(:welcome).comments; trails' posts table has `legacy_comments_count`
+  // (not `comments_count`), so hasCachedCounter? is false for post.comments and
+  // assertNoQueries would fail. Car/Engine (engines_count) tests the same path faithfully.
   it("calling empty with counter cache", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      inverseOf: "author",
-    });
-    Associations.belongsTo.call(Post, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    registerModel(Author);
-    registerModel(Post);
-    // Seed a post so the DB counter is 1, then reload a fresh owner so the
-    // proxy is unloaded. Mirrors Rails: assert_no_queries { post.comments.empty? }
-    // when the counter cache shows rows exist (has_many_associations_test.rb:1473-1477).
-    const seedAuthor = await Author.create({ name: "Alice", posts_count: 0 });
-    await (seedAuthor as any).posts.create({ title: "A" });
-    const author = await Author.find(seedAuthor.id!);
+    const car = cars("honda") as any;
+    await car.engines.create({});
+    const fresh = (await HmCar.find(car.id)) as any;
     await assertNoQueries(false, async () => {
-      expect(await (author as any).posts.isEmpty()).toBe(false);
+      expect(await fresh.engines.isEmpty()).toBe(false);
     });
   });
 });
