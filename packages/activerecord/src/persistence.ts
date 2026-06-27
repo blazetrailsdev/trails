@@ -594,7 +594,7 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): void {
 export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -611,8 +611,8 @@ export async function update<T extends UpdateRecord>(
     for (const [key, value] of Object.entries(attrs)) {
       assignUpdateAttribute(self, key, value);
     }
-    return self.save() as Promise<boolean>;
-  }) as Promise<boolean>;
+    return self.save() as Promise<boolean | undefined>;
+  }) as Promise<boolean | undefined>;
 }
 
 /**
@@ -720,7 +720,7 @@ interface SaveRecord {
 export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   // Mirrors ActiveRecord::Suppressor#save: a suppressed record returns `true`
   // immediately, before validations or the INSERT/UPDATE. This is why
   // `create!`/`save!` inside `suppress` never raise even on invalid records —
@@ -776,9 +776,9 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return (await withTransactionReturningStatus.call(self, () =>
-      self.createOrUpdate(),
-    )) as boolean;
+    return (await withTransactionReturningStatus.call(self, () => self.createOrUpdate())) as
+      | boolean
+      | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
     // callbacks raise RecordInvalid when a child fails to save. The transaction
@@ -792,7 +792,9 @@ export async function save<T extends SaveRecord>(
 
 /** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
-  T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
+  T extends SaveRecord & {
+    save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean | undefined>;
+  },
 >(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined> {
   const result = await this.save(options);
   if (result === false) {
@@ -809,7 +811,7 @@ export async function saveBang<
   // Mirrors Rails' with_transaction_returning_status returning `status` directly:
   // `undefined` when before_save raises Rollback (caught by the joined transaction,
   // status never assigned) — matching Rails save! returning nil in that path.
-  return result as true | undefined;
+  return result;
 }
 
 interface DestroyRecord {

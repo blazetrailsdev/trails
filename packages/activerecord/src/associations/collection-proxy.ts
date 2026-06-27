@@ -1203,7 +1203,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _addToTarget(
     record: T,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
-    save?: () => Promise<boolean>,
+    save?: () => Promise<boolean | undefined>,
   ): Promise<T | null> {
     const { skipCallbacks = false, replace = false } = options;
     const index = this._targetReplaceIndex(record, replace);
@@ -1761,7 +1761,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // insert_record: assign the owner's FK/type onto the record, then save.
     // Mirrors Rails' `CollectionAssociation#insert_record` →
     // `set_owner_attributes` + `record.save`.
-    const insertRecord = (record: T): Promise<boolean> => {
+    const insertRecord = (record: T): Promise<boolean | undefined> => {
       if (Array.isArray(foreignKey)) {
         if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
           throw new Error(
