@@ -252,15 +252,12 @@ describe("MultiParameterAttributeTest", () => {
     // zone: -28800 → Pacific Time; June is PDT (UTC-7) so local 16:24 → UTC 23:24.
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      () => {
-        // Re-declare written_on as a fresh "datetime" attribute; schema-reflected columns
-        // resolve the attribute type differently and don't trigger TimeWithZone wrapping.
-        class AwareTopic extends Topic {
-          static {
-            this.attribute("written_on", "datetime");
-          }
-        }
-        const topic = new AwareTopic();
+      async () => {
+        // Mirrors Rails: Topic.reset_column_information so the schema reloads with
+        // awareAttributes: true active, wrapping written_on in TimeZoneConverter.
+        Topic.resetColumnInformation();
+        await Topic.loadSchema();
+        const topic = new Topic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
           "written_on(2i)": "6",
@@ -276,10 +273,13 @@ describe("MultiParameterAttributeTest", () => {
         expect(twz.hour).toBe(16); // wall-clock in zone
       },
     );
+    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
   });
 
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
-    await withTimezoneConfig({ awareAttributes: true }, () => {
+    await withTimezoneConfig({ awareAttributes: true }, async () => {
+      Topic.resetColumnInformation();
+      await Topic.loadSchema();
       const topic = new Topic();
       topic.assignAttributes({
         "written_on(1i)": "2004",
@@ -288,12 +288,15 @@ describe("MultiParameterAttributeTest", () => {
       });
       expect(topic.written_on).toBeNull();
     });
+    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
   });
 
   it("multiparameter attributes on time with time zone aware attributes false", async () => {
     await withTimezoneConfig(
       { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
-      () => {
+      async () => {
+        Topic.resetColumnInformation();
+        await Topic.loadSchema();
         const topic = new Topic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
@@ -308,19 +311,18 @@ describe("MultiParameterAttributeTest", () => {
         expect(val).toBeInstanceOf(Temporal.Instant);
       },
     );
+    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
   });
 
   it("multiparameter attributes on time with skip time zone conversion for attributes", async () => {
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      () => {
-        // Subclass to isolate skipTimeZoneConversionForAttributes mutation from the shared Topic.
-        class SkipZoneTopic extends Topic {
-          static {
-            this.skipTimeZoneConversionForAttributes = ["written_on"];
-          }
-        }
-        const topic = new SkipZoneTopic();
+      async () => {
+        // Mirrors Rails: Topic.skip_time_zone_conversion_for_attributes = [:written_on]
+        Topic.skipTimeZoneConversionForAttributes = ["written_on"];
+        Topic.resetColumnInformation();
+        await Topic.loadSchema();
+        const topic = new Topic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
           "written_on(2i)": "6",
@@ -335,21 +337,20 @@ describe("MultiParameterAttributeTest", () => {
         expect((val as Temporal.Instant).toZonedDateTimeISO("UTC").hour).toBe(16);
       },
     );
+    // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
+    Topic.skipTimeZoneConversionForAttributes = [];
+    Topic.resetColumnInformation();
   });
 
   it("multiparameter attributes on time only column with time zone aware attributes does not do time zone conversion", async () => {
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
-      () => {
-        // Re-declare bonus_time and written_on as fresh attribute types; schema-reflected
-        // columns don't trigger TimeWithZone wrapping via awareAttributes.
-        class AwareTopic extends Topic {
-          static {
-            this.attribute("bonus_time", "time");
-            this.attribute("written_on", "datetime");
-          }
-        }
-        const topic = new AwareTopic();
+      async () => {
+        // Mirrors Rails: Topic.reset_column_information so schema reloads with
+        // awareAttributes: true, wrapping bonus_time and written_on in TimeZoneConverter.
+        Topic.resetColumnInformation();
+        await Topic.loadSchema();
+        const topic = new Topic();
         topic.assignAttributes({
           "bonus_time(1i)": "2000",
           "bonus_time(2i)": "1",
@@ -372,6 +373,7 @@ describe("MultiParameterAttributeTest", () => {
         expect(topic.written_on).toBeNull();
       },
     );
+    Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
   });
 
   it("multiparameter attributes setting time attribute", () => {
