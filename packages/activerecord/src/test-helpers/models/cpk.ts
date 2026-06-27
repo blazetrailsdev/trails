@@ -1,3 +1,4 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/cpk/
 import { Base } from "../../base.js";
@@ -6,6 +7,9 @@ import { generatesTokenFor } from "../../token-for.js";
 
 // cpk/author.rb
 export class CpkAuthor extends Base {
+  declare books: AssociationProxy<CpkBook>;
+  declare name: string;
+
   static _tableName = "cpk_authors";
   static _demodulizedName = "Author";
 
@@ -17,6 +21,19 @@ export class CpkAuthor extends Base {
 
 // cpk/book.rb
 export class CpkBook extends Base {
+  declare order: CpkOrder | null;
+  declare orderExplicitFkPk: CpkOrder | null;
+  declare author: CpkAuthor | null;
+  declare chapters: AssociationProxy<CpkChapter>;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>);
+  declare author_id: number;
+  declare order_id: number;
+  declare revision: number;
+  declare shop_id: number;
+  declare title: string;
+
   static _tableName = "cpk_books";
   static _demodulizedName = "Book";
 
@@ -47,10 +64,20 @@ acceptsNestedAttributesFor(CpkBook, "chapters");
 generatesTokenFor(CpkBook, "test");
 
 export class CpkBestSeller extends CpkBook {
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>);
+
   static _demodulizedName = "BestSeller";
 }
 
 export class CpkBrokenBook extends CpkBook {
+  declare order: CpkOrderWithSpecialPrimaryKey | null;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>) &
+    ((name: "order") => Promise<CpkOrderWithSpecialPrimaryKey | null>);
+
   static _demodulizedName = "BrokenBook";
   static {
     this.belongsTo("order", { className: "CpkOrderWithSpecialPrimaryKey" });
@@ -58,6 +85,12 @@ export class CpkBrokenBook extends CpkBook {
 }
 
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
+  declare order: CpkNonCpkOrder | null;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>) &
+    ((name: "order") => Promise<CpkNonCpkOrder | null>);
+
   static _demodulizedName = "BrokenBookWithNonCpkOrder";
   static {
     this.belongsTo("order", {
@@ -68,6 +101,12 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
 }
 
 export class CpkNonCpkBook extends CpkBook {
+  declare nonCpkOrder: CpkNonCpkOrder | null;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>) &
+    ((name: "nonCpkOrder") => Promise<CpkNonCpkOrder | null>);
+
   static _demodulizedName = "NonCpkBook";
   static {
     this._primaryKey = "id";
@@ -76,6 +115,12 @@ export class CpkNonCpkBook extends CpkBook {
 }
 
 export class CpkNullifiedBook extends CpkBook {
+  declare chapter: CpkChapter | null;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>);
+  declare loadHasOne: (name: "chapter") => Promise<CpkChapter | null>;
+
   static _demodulizedName = "NullifiedBook";
   static {
     this.hasOne("chapter", {
@@ -87,6 +132,13 @@ export class CpkNullifiedBook extends CpkBook {
 }
 
 export class CpkBookWithOrderAgreements extends CpkBook {
+  declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
+  declare orderAgreement: CpkOrderAgreement | null;
+  declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &
+    ((name: "orderExplicitFkPk") => Promise<CpkOrder | null>) &
+    ((name: "author") => Promise<CpkAuthor | null>);
+  declare loadHasOne: (name: "orderAgreement") => Promise<CpkOrderAgreement | null>;
+
   static _demodulizedName = "BookWithOrderAgreements";
   static {
     this.hasMany("orderAgreements", { through: "order" });
@@ -96,6 +148,8 @@ export class CpkBookWithOrderAgreements extends CpkBook {
 
 // cpk/book_destroy_async.rb
 export class CpkBookDestroyAsync extends Base {
+  declare chapters: AssociationProxy<CpkChapterDestroyAsync>;
+
   static _demodulizedName = "BookDestroyAsync";
   static _tableName = "cpk_books";
 
@@ -111,6 +165,12 @@ export class CpkBookDestroyAsync extends Base {
 
 // cpk/chapter.rb
 export class CpkChapter extends Base {
+  declare book: CpkBook | null;
+  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
+  declare author_id: number;
+  declare book_id: number;
+  declare title: string;
+
   static _demodulizedName = "Chapter";
   static _tableName = "cpk_chapters";
 
@@ -122,6 +182,9 @@ export class CpkChapter extends Base {
 
 // cpk/chapter_destroy_async.rb
 export class CpkChapterDestroyAsync extends Base {
+  declare book: CpkBookDestroyAsync | null;
+  declare loadBelongsTo: (name: "book") => Promise<CpkBookDestroyAsync | null>;
+
   static _demodulizedName = "ChapterDestroyAsync";
   static _tableName = "cpk_chapters";
 
@@ -136,6 +199,16 @@ export class CpkChapterDestroyAsync extends Base {
 
 // cpk/order.rb
 export class CpkOrder extends Base {
+  declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
+  declare books: AssociationProxy<CpkBook>;
+  declare book: CpkBook | null;
+  declare orderTags: AssociationProxy<CpkOrderTag>;
+  declare tags: AssociationProxy<CpkTag>;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+  declare books_count: number | null;
+  declare shop_id: number;
+  declare status: string;
+
   static _tableName = "cpk_orders";
   static _demodulizedName = "Order";
 
@@ -159,6 +232,9 @@ export class CpkOrder extends Base {
 }
 
 export class CpkBrokenOrder extends CpkOrder {
+  declare book: CpkBook | null;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "BrokenOrder";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -168,6 +244,9 @@ export class CpkBrokenOrder extends CpkOrder {
 }
 
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
+  declare book: CpkBook | null;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "OrderWithSpecialPrimaryKey";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -177,6 +256,10 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
 }
 
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
+  declare book: CpkNonCpkBook | null;
+  declare loadHasOne: ((name: "book") => Promise<CpkBook | null>) &
+    ((name: "book") => Promise<CpkNonCpkBook | null>);
+
   static _demodulizedName = "BrokenOrderWithNonCpkBooks";
   static {
     this._primaryKey = ["shop_id", "status"];
@@ -186,6 +269,8 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
 }
 
 export class CpkNonCpkOrder extends CpkOrder {
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "NonCpkOrder";
   static {
     this._primaryKey = "id";
@@ -193,6 +278,9 @@ export class CpkNonCpkOrder extends CpkOrder {
 }
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
+  declare book: CpkBook | null;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
     this.hasOne("book", { className: "CpkBook", foreignKey: "order_id", primaryKey: "id" });
@@ -200,6 +288,9 @@ export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
 }
 
 export class CpkOrderWithNullifiedBook extends CpkOrder {
+  declare book: CpkBook | null;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "OrderWithNullifiedBook";
   static {
     this.hasOne("book", {
@@ -211,6 +302,9 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
 }
 
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
+  declare chapters: AssociationProxy<CpkChapter>;
+  declare loadHasOne: (name: "book") => Promise<CpkBook | null>;
+
   static _demodulizedName = "OrderWithSingularBookChapters";
   static {
     this.hasMany("chapters", { className: "CpkChapter", through: "book" });
@@ -219,6 +313,11 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
 
 // cpk/order_agreement.rb
 export class CpkOrderAgreement extends Base {
+  declare order: CpkOrder | null;
+  declare loadBelongsTo: (name: "order") => Promise<CpkOrder | null>;
+  declare order_id: number;
+  declare signature: string;
+
   static _demodulizedName = "OrderAgreement";
   static _tableName = "cpk_order_agreements";
 
@@ -229,6 +328,15 @@ export class CpkOrderAgreement extends Base {
 
 // cpk/order_tag.rb
 export class CpkOrderTag extends Base {
+  declare tag: CpkTag | null;
+  declare order: CpkOrder | null;
+  declare loadBelongsTo: ((name: "tag") => Promise<CpkTag | null>) &
+    ((name: "order") => Promise<CpkOrder | null>);
+  declare attached_by: string;
+  declare attached_reason: string;
+  declare order_id: number;
+  declare tag_id: number;
+
   static _demodulizedName = "OrderTag";
   static _tableName = "cpk_order_tags";
   static _primaryKey = ["order_id", "tag_id"];
@@ -241,6 +349,10 @@ export class CpkOrderTag extends Base {
 
 // cpk/tag.rb
 export class CpkTag extends Base {
+  declare orderTags: AssociationProxy<CpkOrderTag>;
+  declare orders: AssociationProxy<CpkOrder>;
+  declare name: string;
+
   static _demodulizedName = "Tag";
   static _tableName = "cpk_tags";
 
@@ -252,6 +364,10 @@ export class CpkTag extends Base {
 
 // cpk/post.rb
 export class CpkPost extends Base {
+  declare comments: AssociationProxy<CpkComment>;
+  declare author: string;
+  declare title: string;
+
   static _demodulizedName = "Post";
   static _tableName = "cpk_posts";
 
@@ -266,6 +382,15 @@ export class CpkPost extends Base {
 
 // cpk/comment.rb
 export class CpkComment extends Base {
+  declare commentable: Base | null;
+  declare post: CpkPost | null;
+  declare loadBelongsTo: ((name: "commentable") => Promise<Base | null>) &
+    ((name: "post") => Promise<CpkPost | null>);
+  declare commentable_author: string;
+  declare commentable_title: string;
+  declare commentable_type: string;
+  declare text: string;
+
   static _demodulizedName = "Comment";
   static _tableName = "cpk_comments";
 
@@ -284,6 +409,13 @@ export class CpkComment extends Base {
 
 // cpk/review.rb
 export class CpkReview extends Base {
+  declare book: CpkBook | null;
+  declare loadBelongsTo: (name: "book") => Promise<CpkBook | null>;
+  declare author_id: number;
+  declare comment: string;
+  declare "number": number;
+  declare rating: number;
+
   static _demodulizedName = "Review";
   static _tableName = "cpk_reviews";
 
@@ -297,6 +429,10 @@ export class CpkReview extends Base {
 
 // cpk/car.rb
 export class CpkCar extends Base {
+  declare carReviews: AssociationProxy<CpkCarReview>;
+  declare make: string;
+  declare model: string;
+
   static _tableName = "cpk_cars";
   static _demodulizedName = "Car";
 
@@ -310,6 +446,13 @@ export class CpkCar extends Base {
 
 // cpk/car_review.rb
 export class CpkCarReview extends Base {
+  declare car: CpkCar | null;
+  declare loadBelongsTo: (name: "car") => Promise<CpkCar | null>;
+  declare car_make: string;
+  declare car_model: string;
+  declare comment: string;
+  declare rating: number;
+
   static _tableName = "cpk_car_reviews";
   static _demodulizedName = "CarReview";
 

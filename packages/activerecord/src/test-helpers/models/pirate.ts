@@ -1,8 +1,21 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Bird } from "./bird.js";
+import type { FamousShip } from "./ship.js";
+import type { Parrot } from "./parrot.js";
+import type { PriceEstimate } from "./price-estimate.js";
+import type { Ship } from "./ship.js";
+import type { Treasure } from "./treasure.js";
 import { isBlank, throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+/**
+ * @trails-typegen skip-columns: catchphrase
+ * dirty.test.ts overrides `catchphrase` as a get/set accessor pair (TS2611 —
+ * a declared property cannot be overridden as an accessor). Suppress this
+ * column's schema declare; all association declares still materialize.
+ */
 export class Pirate extends Base {
   static {
     this.belongsTo("parrot", { validate: true });
@@ -124,6 +137,9 @@ acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: tru
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: rejectAllBlank });
 
 export class DestructivePirate extends Pirate {
+  declare dependentShip: Ship | null;
+  declare loadHasOne: (name: "dependentShip") => Promise<Ship | null>;
+
   static {
     this.hasOne("dependentShip", {
       className: "Ship",
@@ -134,6 +150,8 @@ export class DestructivePirate extends Pirate {
 }
 
 export class FamousPirate extends Base {
+  declare famousShips: AssociationProxy<FamousShip>;
+
   static {
     this.tableName = "pirates";
     this.hasMany("famousShips", { inverseOf: "famousPirate" });
@@ -142,6 +160,15 @@ export class FamousPirate extends Base {
 }
 
 export class SpacePirate extends Base {
+  declare parrot: Parrot | null;
+  declare parrots: AssociationProxy<Parrot>;
+  declare ship: Ship | null;
+  declare birds: AssociationProxy<Bird>;
+  declare treasures: AssociationProxy<Treasure>;
+  declare treasureEstimates: AssociationProxy<PriceEstimate>;
+  declare loadBelongsTo: (name: "parrot") => Promise<Parrot | null>;
+  declare loadHasOne: (name: "ship") => Promise<Ship | null>;
+
   static {
     this.tableName = "pirates";
     this.belongsTo("parrot");
