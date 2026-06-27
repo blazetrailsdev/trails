@@ -265,9 +265,9 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(t.isLow()).toBeBoolean();
   });
 
-  it("Base.enum bang setter: `declare lowBang: () => this` (in-memory, returns self)", () => {
+  it("Base.enum bang: `declare lowBang: () => Promise<true | undefined>` (persisting, via update!)", () => {
     const t = new Task({ status: 0 });
-    expectTypeOf(t.lowBang()).toMatchTypeOf<Task>();
+    expectTypeOf(t.lowBang()).toEqualTypeOf<Promise<true | undefined>>();
   });
 
   it("Base.enum class scopes: `declare static low: () => Relation<Task>`", () => {

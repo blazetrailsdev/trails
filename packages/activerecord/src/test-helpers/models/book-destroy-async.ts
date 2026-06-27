@@ -15,15 +15,15 @@ export class BookDestroyAsync extends Base {
   declare essays: AssociationProxy<EssayDestroyAsync>;
   declare content: Content | null;
   declare isProposed: () => boolean;
-  declare proposedBang: () => Promise<true>;
+  declare proposedBang: () => Promise<true | undefined>;
   declare static proposed: () => Relation<BookDestroyAsync>;
   declare static notProposed: () => Relation<BookDestroyAsync>;
   declare isWritten: () => boolean;
-  declare writtenBang: () => Promise<true>;
+  declare writtenBang: () => Promise<true | undefined>;
   declare static written: () => Relation<BookDestroyAsync>;
   declare static notWritten: () => Relation<BookDestroyAsync>;
   declare isPublished: () => boolean;
-  declare publishedBang: () => Promise<true>;
+  declare publishedBang: () => Promise<true | undefined>;
   declare static published: () => Relation<BookDestroyAsync>;
   declare static notPublished: () => Relation<BookDestroyAsync>;
   declare loadHasOne: (name: "content") => Promise<Content | null>;
