@@ -3923,17 +3923,19 @@ describe("EagerAssociationTest", () => {
         .order(`${tableName}.${pk}`)
         .includes(...postTypes)
         .toArray()) as Base[];
-      for (let i = 0; i < d1.length; i++) {
-        expect(d1[i].id).toEqual(d2[i].id);
-        const d1Posts = sortById((await (d1[i] as any).posts.toArray()) as Base[]);
-        const d2Posts = sortById(d2[i].association("posts").target as Base[]);
-        expect(d2Posts.map((p) => p.id)).toEqual(d1Posts.map((p) => p.id));
-        for (const postType of postTypes.slice(1)) {
-          const d3 = (await (ModelClass as any)
-            .order(`${tableName}.${pk}`)
-            .includes("posts", postType)
-            .toArray()) as Base[];
+      for (const postType of postTypes.slice(1)) {
+        const d3 = (await (ModelClass as any)
+          .order(`${tableName}.${pk}`)
+          .includes("posts", postType)
+          .toArray()) as Base[];
+        for (let i = 0; i < d1.length; i++) {
+          expect(d1[i].id).toEqual(d2[i].id);
           expect(d3[i].id).toEqual(d1[i].id);
+          const d1Posts = sortById((await (d1[i] as any).posts.toArray()) as Base[]);
+          const d2Posts = sortById(d2[i].association("posts").target as Base[]);
+          const d3Posts = sortById(d3[i].association("posts").target as Base[]);
+          expect(d2Posts.map((p) => p.id)).toEqual(d1Posts.map((p) => p.id));
+          expect(d3Posts.map((p) => p.id)).toEqual(d1Posts.map((p) => p.id));
           const d1Type = sortById((await (d1[i] as any)[postType].toArray()) as Base[]);
           const d2Type = sortById(d2[i].association(postType).target as Base[]);
           const d3Type = sortById(d3[i].association(postType).target as Base[]);
