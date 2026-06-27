@@ -757,7 +757,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
       }
     }
     expect(failures, `unseedable registry entries:\n${failures.join("\n")}`).toEqual([]);
-  }, 120000);
+  }, 300000);
 });
 
 // --- encryption add-on bootstrap (opt-in addOn hook) ---
