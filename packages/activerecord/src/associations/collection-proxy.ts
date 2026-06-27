@@ -1196,7 +1196,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     this._ensureThroughWritable();
     if (this._isThrough) {
-      return (await this._createThrough(attrs, block)) as T;
+      return (await this._createThrough(
+        attrs,
+        block,
+        (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
+      )) as T;
     }
     const record = this._buildRaw(attrs) as T;
     if (block) block(record);
@@ -1374,6 +1378,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _createThrough(
     attrs: Record<string, unknown> = {},
     block?: (r: T) => void,
+    throughScope?: unknown,
   ): Promise<Base> {
     const ctor = this._record.constructor as typeof Base;
     if (this._record.isNewRecord()) {
@@ -1383,7 +1388,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (block) block(record);
     const saved = await record.save();
     if (!saved) return record;
-    await this._pushThrough([record]);
+    await this._pushThrough([record], false, false, throughScope);
     return record;
   }
 
@@ -1972,7 +1977,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return attrs;
   }
 
-  private async _pushThrough(records: T[], skipCallbacks = false, bang = false): Promise<void> {
+  private async _pushThrough(
+    records: T[],
+    skipCallbacks = false,
+    bang = false,
+    throughScope?: unknown,
+  ): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
@@ -2092,14 +2102,34 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             }
             sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
           }
-          const pendingScope = (this as unknown as { _pendingThroughScope?: unknown })
-            ._pendingThroughScope;
-          const hmtScope = (pendingScope ?? this) as unknown as {
-            whereValuesHash?: (t: string) => Record<string, unknown>;
-          };
+          // Extract WHERE conditions that belong to the through model's table.
+          // Use the explicit `throughScope` (passed from AssociationRelation#create
+          // for scoped creates like `.where(favorite: true).create(...)`) when
+          // available.  Fall back to the CollectionProxy's own _whereClause for
+          // the non-scoped push path (e.g. `favorites.push(member)` where the
+          // default scope bakes in `favorite: true`).  Accessing `_whereClause`
+          // directly avoids going through the JS Proxy wrapper, which would
+          // trigger a strict-loading violation for unset/unknown properties.
+          const scopeSource: { whereValuesHash?: (t: string) => Record<string, unknown> } =
+            throughScope != null
+              ? (throughScope as { whereValuesHash?: (t: string) => Record<string, unknown> })
+              : (
+                    this as unknown as {
+                      _whereClause?: { toH: (t: string) => Record<string, unknown> };
+                    }
+                  )._whereClause != null
+                ? {
+                    whereValuesHash: (t: string) =>
+                      (
+                        this as unknown as {
+                          _whereClause: { toH: (t: string) => Record<string, unknown> };
+                        }
+                      )._whereClause.toH(t),
+                  }
+                : {};
           const throughScopeAttrs: Record<string, unknown> = {};
-          if (typeof hmtScope.whereValuesHash === "function") {
-            const raw = hmtScope.whereValuesHash(throughModel.tableName);
+          if (typeof scopeSource.whereValuesHash === "function") {
+            const raw = scopeSource.whereValuesHash(throughModel.tableName);
             const ownerFk = String(throughAssoc.options.foreignKey ?? "");
             const inheritanceCol = String((throughModel as any).inheritanceColumn ?? "type");
             for (const [k, v] of Object.entries(raw)) {
@@ -2126,17 +2156,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           const throughCache = (this._record as any)._throughRecordsCaches?.get(this._assocName);
           const prebuiltThrough = throughCache?.get(record);
           if (prebuiltThrough?.isPersisted?.()) return true;
-          let joinRecord: Base;
-          if (bang) {
-            // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
-            joinRecord = new throughModel(joinAttrs);
-            await joinRecord.saveBang();
-          } else {
-            joinRecord = new throughModel(joinAttrs);
-            // Mirrors Rails' insert_record: always raises on join-record failure
-            // (HasManyThroughAssociation#insert_record uses save! for the join row).
-            await joinRecord.saveBang();
-          }
+          // Always use createBang: Rails' save_through_record calls save! on
+          // the join row, so validation failures raise in both bang and non-bang
+          // push paths. Using createBang (class method) avoids enrolling an
+          // unsaved `new` instance for owner autosave, which produced a spurious
+          // empty DEFAULT-VALUES INSERT alongside the correct keyed INSERT.
+          const joinRecord: Base = await (throughModel as any).createBang(joinAttrs);
           return joinRecord.isPersisted();
         };
         await this._addToTarget(
