@@ -1308,8 +1308,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#group
    */
-  group(...columns: string[]): Relation<T> {
-    return this._clone().groupBang(...columns);
+  group(...columns: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
+    return this._clone().groupBang(...(columns as string[]));
   }
 
   /**

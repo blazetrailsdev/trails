@@ -495,13 +495,19 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   return this;
 }
 
-function groupBang(this: QueryMethodsHost, ...columns: string[]): any {
-  this._groupColumns.push(...columns);
+function groupBang(
+  this: QueryMethodsHost,
+  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
+): any {
+  this._groupColumns.push(...(columns as string[]));
   return this;
 }
 
-function regroupBang(this: QueryMethodsHost, ...columns: string[]): any {
-  this._groupColumns = [...columns];
+function regroupBang(
+  this: QueryMethodsHost,
+  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
+): any {
+  this._groupColumns = [...(columns as string[])];
   return this;
 }
 

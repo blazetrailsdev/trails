@@ -189,7 +189,7 @@ export function order<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#group */
 export function group<T extends typeof Base>(
   this: T,
-  ...columns: string[]
+  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): Relation<InstanceType<T>> {
   return this.all().group(...columns);
 }
