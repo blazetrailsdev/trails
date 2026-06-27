@@ -176,28 +176,28 @@ describe("BelongsToAssociationsTest", () => {
     { schema: canonicalSchema },
   );
 
-  it("test_belongs_to", async () => {
+  it("belongs to", async () => {
     const client = await Client.find(3);
     const firstFirm = companies("first_firm");
     expect((await client.loadBelongsTo("firm"))!.id).toBe(firstFirm.id);
     expect((await client.loadBelongsTo("firm"))!.name).toBe(firstFirm.name);
   });
 
-  it("test_where_with_custom_primary_key", async () => {
+  it("where with custom primary key", async () => {
     const david = authors("david");
     const essay = essays("david_modest_proposal");
     const result = await Author.where({ ownedEssay: essay }).toArray();
     expect(result.map((a) => a.id)).toContain(david.id);
   });
 
-  it("test_find_by_with_custom_primary_key", async () => {
+  it("find by with custom primary key", async () => {
     const david = authors("david");
     const essay = essays("david_modest_proposal");
     const result = await Author.findBy({ ownedEssay: essay });
     expect(result!.id).toBe(david.id);
   });
 
-  it("test_where_on_polymorphic_association_with_nil", async () => {
+  it("where on polymorphic association with nil", async () => {
     const greetings = comments("greetings");
     const result = await Comment.where({ author: null }).first();
     expect(result!.id).toBe(greetings.id);
@@ -205,19 +205,19 @@ describe("BelongsToAssociationsTest", () => {
     expect(result2!.id).toBe(greetings.id);
   });
 
-  it("test_where_on_polymorphic_association_with_empty_array", async () => {
+  it("where on polymorphic association with empty array", async () => {
     const result = await Comment.where({ author: [] }).toArray();
     expect(result).toHaveLength(0);
   });
 
-  it("test_where_on_polymorphic_association_with_cpk", async () => {
+  it("where on polymorphic association with cpk", async () => {
     const post = await CpkBook.create({ title: "Welcome", author_id: 1, id: 100 });
     await CpkBook.create({ title: "A comment", author_id: (post.id as number[])[1], id: 101 });
     const count = await CpkBook.where({ author_id: (post.id as number[])[1] }).count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  it("test_assigning_belongs_to_on_destroyed_object", async () => {
+  it("assigning belongs to on destroyed object", async () => {
     const client = await Client.create({ name: "Client" });
     await client.destroy();
     expect(client.isDestroyed()).toBe(true);
@@ -229,7 +229,7 @@ describe("BelongsToAssociationsTest", () => {
     }).toThrow(/frozen/i);
   });
 
-  it("test_eager_loading_wont_mutate_owner_record", async () => {
+  it("eager loading wont mutate owner record", async () => {
     const client = await Client.eagerLoad("firmWithBasicId").first();
     expect((client as any).firmIdCameFromUser?.()).toBeFalsy();
 
@@ -237,29 +237,29 @@ describe("BelongsToAssociationsTest", () => {
     expect((client2 as any).firmIdCameFromUser?.()).toBeFalsy();
   });
 
-  it.todo("test_missing_attribute_error_is_raised_when_no_foreign_key_attribute");
+  it.todo("missing attribute error is raised when no foreign key attribute");
 
-  it("test_belongs_to_does_not_use_order_by", async () => {
+  it("belongs to does not use order by", async () => {
     const client = await Client.find(3);
     await client.loadBelongsTo("firm");
     // Just verify it loads without error; Rails checks SQL doesn't have ORDER BY
     expect(client).toBeDefined();
   });
 
-  it("test_belongs_to_with_primary_key", async () => {
+  it("belongs to with primary key", async () => {
     const firstFirmName = companies("first_firm").name;
     const client = await Client.create({ name: "Primary key client", firm_name: firstFirmName });
     const firm = await client.loadBelongsTo("firmWithPrimaryKey");
     expect(firm!.name).toBe(firstFirmName);
   });
 
-  it("test_belongs_to_with_primary_key_joins_on_correct_column", async () => {
+  it("belongs to with primary key joins on correct column", async () => {
     const sql = Client.joins("firmWithPrimaryKey").toSql();
     expect(sql).toMatch(/firm_with_primary_keys_companies|firm_with_primary_key/i);
     expect(sql).not.toMatch(/"firm_with_primary_keys_companies"\."id"/);
   });
 
-  it("test_optional_relation_can_be_set_per_model", async () => {
+  it("optional relation can be set per model", async () => {
     class FirstModel extends Base {
       static _tableName = "accounts";
       static {
@@ -281,7 +281,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await m2.isValid()).toBe(false);
   });
 
-  it("test_optional_relation", async () => {
+  it("optional relation", async () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
@@ -298,7 +298,7 @@ describe("BelongsToAssociationsTest", () => {
     }
   });
 
-  it("test_not_optional_relation", async () => {
+  it("not optional relation", async () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
@@ -316,7 +316,7 @@ describe("BelongsToAssociationsTest", () => {
     }
   });
 
-  it("test_required_belongs_to_config", async () => {
+  it("required belongs to config", async () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     (Base as any).belongsToRequiredByDefault = true;
     try {
@@ -334,10 +334,10 @@ describe("BelongsToAssociationsTest", () => {
     }
   });
 
-  it.todo("test_default");
-  it.todo("test_default_with_lambda");
+  it.todo("default");
+  it.todo("default with lambda");
 
-  it("test_default_scope_on_relations_is_not_cached", async () => {
+  it("default scope on relations is not cached", async () => {
     const counter = 0;
     const comment = await Comment.first();
     const firstPost = await (comment as any).loadBelongsTo("post");
@@ -348,7 +348,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(secondPost).not.toBeNull();
   });
 
-  it("test_proxy_assignment", async () => {
+  it("proxy assignment", async () => {
     const account = await Account.find(1);
     const firm = await account.loadBelongsTo("firm");
     expect(() => {
@@ -356,37 +356,38 @@ describe("BelongsToAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  it.todo("test_type_mismatch");
+  it.todo("type mismatch");
+  it.todo("raises type mismatch with namespaced class");
 
-  it("test_natural_assignment", async () => {
+  it("natural assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Account.create({ credit_limit: 10 });
     (citibank as any).firm = apple;
-    expect((citibank as any).firm_id).toBe(apple.id);
+    expect((citibank as any).firm_id).toBe(Number(apple.id));
   });
 
-  it("test_id_assignment", async () => {
+  it("id assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Account.create({ credit_limit: 10 });
     (citibank as any).firm_id = apple;
     expect((citibank as any).firm_id).toBeNull();
   });
 
-  it("test_natural_assignment_with_primary_key", async () => {
+  it("natural assignment with primary key", async () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Client.create({ name: "Primary key client" });
     (citibank as any).firmWithPrimaryKey = apple;
     expect((citibank as any).firm_name).toBe(apple.name);
   });
 
-  it("test_eager_loading_with_primary_key", async () => {
+  it("eager loading with primary key", async () => {
     await Firm.create({ name: "Apple" });
     await Client.create({ name: "Citibank", firm_name: "Apple" });
     const result = await Client.where({ name: "Citibank" }).includes("firmWithPrimaryKey").first();
     expect(result!.association("firmWithPrimaryKey").loaded).toBe(true);
   });
 
-  it("test_eager_loading_with_primary_key_as_symbol", async () => {
+  it("eager loading with primary key as symbol", async () => {
     await Firm.create({ name: "Apple" });
     await Client.create({ name: "Citibank", firm_name: "Apple" });
     const result = await Client.where({ name: "Citibank" })
@@ -395,25 +396,25 @@ describe("BelongsToAssociationsTest", () => {
     expect(result!.association("firmWithPrimaryKeySymbols").loaded).toBe(true);
   });
 
-  it("test_creating_the_belonging_object", async () => {
+  it("creating the belonging object", async () => {
     const citibank = await Account.create({ credit_limit: 10 });
     const apple = await (citibank as any).createFirm({ name: "Apple" });
-    expect((citibank as any).firm_id).toBe(apple.id);
+    expect((citibank as any).firm_id).toBe(Number(apple.id));
     await citibank.save();
     await citibank.reload();
     expect((await citibank.loadBelongsTo("firm"))!.id).toBe(apple.id);
   });
 
-  it("test_creating_the_belonging_object_from_new_record", async () => {
+  it("creating the belonging object from new record", async () => {
     const citibank = Account.new({ credit_limit: 10 });
     const apple = await (citibank as any).createFirm({ name: "Apple" });
-    expect((citibank as any).firm_id).toBe(apple.id);
+    expect((citibank as any).firm_id).toBe(Number(apple.id));
     await citibank.save();
     await citibank.reload();
     expect((await citibank.loadBelongsTo("firm"))!.id).toBe(apple.id);
   });
 
-  it("test_creating_the_belonging_object_with_primary_key", async () => {
+  it("creating the belonging object with primary key", async () => {
     const client = await Client.create({ name: "Primary key client" });
     const apple = await (client as any).createFirmWithPrimaryKey({ name: "Apple" });
     expect((client as any).firm_name).toBe(apple.name);
@@ -422,34 +423,34 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (client as any).loadBelongsTo("firmWithPrimaryKey"))!.name).toBe(apple.name);
   });
 
-  it("test_building_the_belonging_object", async () => {
+  it("building the belonging object", async () => {
     const citibank = await Account.create({ credit_limit: 10 });
     const apple = (citibank as any).buildFirm({ name: "Apple" });
     await citibank.save();
-    expect((citibank as any).firm_id).toBe(apple.id);
+    expect((citibank as any).firm_id).toBe(Number(apple.id));
   });
 
-  it("test_building_the_belonging_object_for_composite_primary_key", async () => {
+  it("building the belonging object for composite primary key", async () => {
     const cpkBook = cpkBooks("cpk_great_author_first_book");
     const order = (cpkBook as any).buildOrder();
     await cpkBook.save();
     const [, id] = order.id;
-    expect((cpkBook as any).order_id).toBe(id);
+    expect((cpkBook as any).order_id).toBe(Number(id));
   });
 
-  it("test_belongs_to_with_explicit_composite_primary_key", async () => {
+  it("belongs to with explicit composite primary key", async () => {
     const cpkBook = cpkBooks("cpk_great_author_first_book");
     const order = (cpkBook as any).buildOrderExplicitFkPk();
     order.shop_id = 123;
     await cpkBook.save();
     const [shopId, id] = order.id;
-    expect((cpkBook as any).order_id).toBe(id);
-    expect((cpkBook as any).shop_id).toBe(shopId);
+    expect((cpkBook as any).order_id).toBe(Number(id));
+    expect((cpkBook as any).shop_id).toBe(Number(shopId));
     await cpkBook.reload();
     expect((await (cpkBook as any).loadBelongsTo("orderExplicitFkPk"))!.id).toEqual(order.id);
   });
 
-  it("test_belongs_to_with_inverse_association_for_composite_primary_key", async () => {
+  it("belongs to with inverse association for composite primary key", async () => {
     const author = CpkBook.new({ title: "The Rails Way", author_id: 10, id: 200 });
     const order = CpkOrder.new({ shop_id: 10, id: 200, status: "paid" });
     (order as any).book = author;
@@ -457,49 +458,47 @@ describe("BelongsToAssociationsTest", () => {
     await order.save();
     const [, orderId] = order.id as [number, number];
     expect(orderId).toBeTruthy();
-    expect((author as any).order_id).toBe(orderId);
+    expect((author as any).order_id).toBe(Number(orderId));
   });
 
-  it.todo(
-    "test_should_set_composite_foreign_key_on_association_when_key_changes_on_associated_record",
-  );
+  it.todo("should set composite foreign key on association when key changes on associated record");
 
-  it("test_building_the_belonging_object_with_implicit_sti_base_class", async () => {
+  it("building the belonging object with implicit sti base class", async () => {
     const account = Account.new({});
     const company = (account as any).buildFirm();
     expect(company).toBeInstanceOf(Company);
   });
 
-  it("test_building_the_belonging_object_with_explicit_sti_base_class", async () => {
+  it("building the belonging object with explicit sti base class", async () => {
     const account = Account.new({});
     const company = (account as any).buildFirm({ type: "Company" });
     expect(company).toBeInstanceOf(Company);
   });
 
-  it("test_building_the_belonging_object_with_sti_subclass", async () => {
+  it("building the belonging object with sti subclass", async () => {
     const account = Account.new({});
     const company = (account as any).buildFirm({ type: "Firm" });
     expect(company).toBeInstanceOf(Firm);
   });
 
-  it("test_building_the_belonging_object_with_an_invalid_type", async () => {
+  it("building the belonging object with an invalid type", async () => {
     const account = Account.new({});
     expect(() => (account as any).buildFirm({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 
-  it("test_building_the_belonging_object_with_an_unrelated_type", async () => {
+  it("building the belonging object with an unrelated type", async () => {
     const account = Account.new({});
     expect(() => (account as any).buildFirm({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
-  it("test_building_the_belonging_object_with_primary_key", async () => {
+  it("building the belonging object with primary key", async () => {
     const client = await Client.create({ name: "Primary key client" });
     const apple = (client as any).buildFirmWithPrimaryKey({ name: "Apple" });
     await client.save();
     expect((client as any).firm_name).toBe(apple.name);
   });
 
-  it("test_create!", async () => {
+  it("create!", async () => {
     const client = await Client.create({ name: "Jimmy" });
     const account = await (client as any).createAccount({ credit_limit: 10 });
     expect((client as any).firm_id ?? account.id).toBeTruthy();
@@ -509,7 +508,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Client.find(client.id!)).account).toBeDefined();
   });
 
-  it("test_failing_create!", async () => {
+  it("failing create!", async () => {
     const client = await Client.create({ name: "Jimmy" });
     let threw = false;
     try {
@@ -522,7 +521,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((client as any).account).toBeDefined();
   });
 
-  it("test_reloading_the_belonging_object", async () => {
+  it("reloading the belonging object", async () => {
     const odegyAccount = accounts("odegy_account");
     expect((await odegyAccount.loadBelongsTo("firm"))!.name).toBe("Odegy");
 
@@ -534,7 +533,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(odegyAccount.firm!.name).toBe("ODEGY");
   });
 
-  it("test_reload_the_belonging_object_with_query_cache", async () => {
+  it("reload the belonging object with query cache", async () => {
     const odegyAccountId = accounts("odegy_account").id;
     const account = await Account.find(odegyAccountId);
     await account.loadBelongsTo("firm");
@@ -543,7 +542,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(account.firm).not.toBeNull();
   });
 
-  it("test_resetting_the_association", async () => {
+  it("resetting the association", async () => {
     const odegyAccount = accounts("odegy_account");
     expect((await odegyAccount.loadBelongsTo("firm"))!.name).toBe("Odegy");
 
@@ -554,7 +553,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await odegyAccount.loadBelongsTo("firm"))!.name).toBe("ODEGY");
   });
 
-  it("test_natural_assignment_to_nil", async () => {
+  it("natural assignment to nil", async () => {
     const client = await Client.find(3);
     (client as any).firm = null;
     await client.save();
@@ -563,7 +562,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((client as any).client_of).toBeNull();
   });
 
-  it("test_natural_assignment_to_nil_with_primary_key", async () => {
+  it("natural assignment to nil with primary key", async () => {
     const firstFirmName = companies("first_firm").name;
     const client = await Client.create({ name: "Primary key client", firm_name: firstFirmName });
     (client as any).firmWithPrimaryKey = null;
@@ -573,21 +572,21 @@ describe("BelongsToAssociationsTest", () => {
     expect((client as any).client_of).toBeNull();
   });
 
-  it("test_with_different_class_name", async () => {
+  it("with different class name", async () => {
     const c1 = await Company.find(1);
     const c3 = (await Company.find(3)) as Client;
     expect((await c3.loadBelongsTo("firmWithOtherName"))!.name).toBe(c1.name);
     expect(c3.firmWithOtherName).not.toBeNull();
   });
 
-  it("test_with_condition", async () => {
+  it("with condition", async () => {
     const c1 = await Company.find(1);
     const c3 = (await Company.find(3)) as Client;
     expect((await c3.loadBelongsTo("firmWithCondition"))!.name).toBe(c1.name);
     expect(c3.firmWithCondition).not.toBeNull();
   });
 
-  it("test_polymorphic_association_class", async () => {
+  it("polymorphic association class", async () => {
     const sponsor = Sponsor.new({});
     expect(sponsor.association("sponsorable").klass).toBeUndefined();
     await sponsor.association("sponsorable").reload();
@@ -602,7 +601,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(sponsor.association("sponsorable").klass).toBe(Member);
   });
 
-  it("test_with_polymorphic_and_condition", async () => {
+  it("with polymorphic and condition", async () => {
     const sponsor = await Sponsor.create({});
     const member = await Member.create({ name: "Bert" });
 
@@ -619,19 +618,19 @@ describe("BelongsToAssociationsTest", () => {
     expect((sponsorPreloaded as any).sponsorableWithConditions).toBeNull();
   });
 
-  it("test_with_select", async () => {
+  it("with select", async () => {
     const post = await Post.find(2);
     const author = await (post as any).loadBelongsTo("authorWithSelect");
     expect(Object.keys(author!.attributes).length).toBe(1);
   });
 
-  it("test_custom_attribute_with_select", async () => {
+  it("custom attribute with select", async () => {
     const company = await Company.find(2);
     const firm = await (company as any).loadBelongsTo("firmWithSelect");
     expect(Object.keys(firm!.attributes).length).toBe(2);
   });
 
-  it("test_belongs_to_without_counter_cache_option", async () => {
+  it("belongs to without counter cache option", async () => {
     const ship = await Ship.create({ name: "Countless" });
     const initialCount = (ship as any).treasures_count ?? 0;
 
@@ -644,7 +643,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Ship.find(ship.id!)).treasures_count).toBe(initialCount);
   });
 
-  it("test_belongs_to_counter", async () => {
+  it("belongs to counter", async () => {
     const debate = await Topic.create({ title: "debate" });
     expect(debate.readAttribute("replies_count")).toBe(0);
 
@@ -655,16 +654,16 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(debate.id!)).readAttribute("replies_count")).toBe(0);
   });
 
-  it("test_belongs_to_counter_with_assigning_nil", async () => {
+  it("belongs to counter with assigning nil", async () => {
     const topic = await Topic.create({ title: "debate" });
     const reply = await Reply.create({ title: "blah!", content: "world around!", topic });
 
-    expect((reply as any).parent_id).toBe(topic.id);
+    expect((reply as any).parent_id).toBe(Number(topic.id));
     expect(await (await topic.reload()).replies.size()).toBeGreaterThanOrEqual(1);
 
     (reply as any).topic = null;
     await reply.reload();
-    expect((reply as any).parent_id).toBe(topic.id);
+    expect((reply as any).parent_id).toBe(Number(topic.id));
     expect(await (await topic.reload()).replies.size()).toBeGreaterThanOrEqual(1);
 
     (reply as any).topic = null;
@@ -672,24 +671,24 @@ describe("BelongsToAssociationsTest", () => {
     expect((await topic.reload()).readAttribute("replies_count")).toBe(0);
   });
 
-  it("test_belongs_to_counter_with_assigning_new_object", async () => {
+  it("belongs to counter with assigning new object", async () => {
     const topic = await Topic.create({ title: "debate" });
     const reply = await Reply.create({ title: "blah!", content: "world around!", topic });
 
-    expect((reply as any).parent_id).toBe(topic.id);
+    expect((reply as any).parent_id).toBe(Number(topic.id));
     expect((await topic.reload()).replies_count).toBe(1);
 
     const topic2 = (reply as any).buildTopic({ title: "debate2" });
     await reply.save();
 
-    expect((reply as any).parent_id).not.toBe(topic.id);
-    expect((reply as any).parent_id).toBe(topic2.id);
+    expect((reply as any).parent_id).not.toBe(Number(topic.id));
+    expect((reply as any).parent_id).toBe(Number(topic2.id));
 
     expect((await topic.reload()).replies_count).toBe(0);
     expect((await topic2.reload()).replies_count).toBe(1);
   });
 
-  it("test_belongs_to_with_primary_key_counter", async () => {
+  it("belongs to with primary key counter", async () => {
     const debate = await Topic.create({ title: "debate" });
     const debate2 = await Topic.create({ title: "debate2" });
     const reply = await Reply.create({
@@ -727,7 +726,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await debate2.reload()).replies_count).toBe(0);
   });
 
-  it("test_belongs_to_counter_with_reassigning", async () => {
+  it("belongs to counter with reassigning", async () => {
     const topic1 = await Topic.create({ title: "t1" });
     const topic2 = await Topic.create({ title: "t2" });
     const reply1 = Reply.new({ title: "r1", content: "r1" });
@@ -765,7 +764,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await (await Topic.find(topic2.id!)).replies.size()).toBe(0);
   });
 
-  it("test_belongs_to_reassign_with_namespaced_models_and_counters", async () => {
+  it("belongs to reassign with namespaced models and counters", async () => {
     const topic1 = await WebTopic.create({ title: "t1" });
     const topic2 = await WebTopic.create({ title: "t2" });
     const reply1 = WebReply.new({ title: "r1", content: "r1" });
@@ -782,7 +781,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await (await WebTopic.find(topic2.id!)).replies.size()).toBe(1);
   });
 
-  it("test_belongs_to_counter_after_save", async () => {
+  it("belongs to counter after save", async () => {
     const topic = await Topic.create({ title: "monday night" });
 
     await topic.replies.create({ title: "re: monday night", content: "football" });
@@ -793,7 +792,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it("test_belongs_to_counter_after_touch", async () => {
+  it("belongs to counter after touch", async () => {
     const topic = await Topic.create({ title: "topic" });
 
     expect(topic.replies_count).toBe(0);
@@ -813,7 +812,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(topic.replies_count).toBe(0);
   });
 
-  it("test_belongs_to_touch_with_reassigning", async () => {
+  it("belongs to touch with reassigning", async () => {
     const debate = await Topic.create({ title: "debate" });
     const debate2 = await Topic.create({ title: "debate2" });
     const reply = await Reply.create({
@@ -846,7 +845,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(Temporal.Instant.compare(debate2At2, time)).toBeGreaterThan(0);
   });
 
-  it("test_belongs_to_with_touch_option_on_touch", async () => {
+  it("belongs to with touch option on touch", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     await lineItem.touch();
@@ -854,7 +853,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem).toBeDefined();
   });
 
-  it("test_belongs_to_with_touch_on_multiple_records", async () => {
+  it("belongs to with touch on multiple records", async () => {
     const lineItem = await LineItem.create({ amount: 1 });
     const lineItem2 = await LineItem.create({ amount: 2 });
     await Invoice.create({ lineItems: [lineItem, lineItem2] });
@@ -870,9 +869,9 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem).toBeDefined();
   });
 
-  it.todo("test_belongs_to_with_touch_option_on_touch_without_updated_at_attributes");
+  it.todo("belongs to with touch option on touch without updated at attributes");
 
-  it("test_belongs_to_with_touch_option_on_touch_and_removed_parent", async () => {
+  it("belongs to with touch option on touch and removed parent", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
@@ -882,28 +881,28 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem).toBeDefined();
   });
 
-  it("test_belongs_to_with_touch_option_on_update", async () => {
+  it("belongs to with touch option on update", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     await lineItem.update({ amount: 10 });
     expect(lineItem).toBeDefined();
   });
 
-  it("test_belongs_to_with_touch_option_on_empty_update", async () => {
+  it("belongs to with touch option on empty update", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     await lineItem.save();
     expect(lineItem).toBeDefined();
   });
 
-  it("test_belongs_to_with_touch_option_on_destroy", async () => {
+  it("belongs to with touch option on destroy", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     await lineItem.destroy();
     expect(lineItem.isDestroyed()).toBe(true);
   });
 
-  it("test_belongs_to_with_touch_option_on_destroy_with_destroyed_parent", async () => {
+  it("belongs to with touch option on destroy with destroyed parent", async () => {
     const lineItem = await LineItem.create({});
     const invoice = await Invoice.create({ lineItems: [lineItem] });
     await invoice.destroy();
@@ -911,7 +910,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem.isDestroyed()).toBe(true);
   });
 
-  it("test_belongs_to_with_touch_option_on_touch_and_reassigned_parent", async () => {
+  it("belongs to with touch option on touch and reassigned parent", async () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
     (lineItem as any).invoice = await Invoice.create({});
@@ -919,7 +918,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem).toBeDefined();
   });
 
-  it("test_belongs_to_counter_after_update", async () => {
+  it("belongs to counter after update", async () => {
     const topic = await Topic.create({ title: "37s" });
     await (topic as any).replies.create({ title: "re: 37s", content: "rails" });
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
@@ -928,7 +927,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it("test_belongs_to_counter_when_update_columns", async () => {
+  it("belongs to counter when update columns", async () => {
     const topic = await Topic.create({ title: "37s" });
     await (topic as any).replies.create({ title: "re: 37s", content: "rails" });
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
@@ -937,7 +936,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it("test_assignment_before_child_saved", async () => {
+  it("assignment before child saved", async () => {
     const finalCut = Client.new({ name: "Final Cut" });
     const firm = await Firm.find(1);
     (finalCut as any).firm = firm;
@@ -950,7 +949,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((finalCut as any).firm.id).toBe(firm.id);
   });
 
-  it("test_assignment_before_child_saved_with_primary_key", async () => {
+  it("assignment before child saved with primary key", async () => {
     const finalCut = Client.new({ name: "Final Cut" });
     const firm = await Firm.find(1);
     (finalCut as any).firmWithPrimaryKey = firm;
@@ -962,20 +961,20 @@ describe("BelongsToAssociationsTest", () => {
     expect((finalCut as any).firmWithPrimaryKey.id).toBe(firm.id);
   });
 
-  it("test_new_record_with_foreign_key_but_no_object", async () => {
+  it("new record with foreign key but no object", async () => {
     const client = Client.new({ firm_id: 1 });
     const firmBasicId = await client.loadBelongsTo("firmWithBasicId");
     expect(firmBasicId!.id).toBe((await Firm.first())!.id);
   });
 
-  it("test_setting_foreign_key_after_nil_target_loaded", async () => {
+  it("setting foreign key after nil target loaded", async () => {
     const client = Client.new({});
     await client.loadBelongsTo("firmWithBasicId");
     (client as any).firm_id = 1;
     expect((await client.loadBelongsTo("firmWithBasicId"))!.id).toBe(companies("first_firm").id);
   });
 
-  it("test_polymorphic_setting_foreign_key_after_nil_target_loaded", async () => {
+  it("polymorphic setting foreign key after nil target loaded", async () => {
     const sponsor = Sponsor.new({});
     await (sponsor as any).loadBelongsTo("sponsorable");
     (sponsor as any).sponsorable_id = 1;
@@ -983,14 +982,14 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (sponsor as any).loadBelongsTo("sponsorable"))!.id).toBe(members("groucho").id);
   });
 
-  it("test_dont_find_target_when_foreign_key_is_null", async () => {
+  it("dont find target when foreign key is null", async () => {
     const tagging = taggings("thinking_general");
     await assertNoQueries(false, async () => {
       await (tagging as any).loadBelongsTo("superTag");
     });
   });
 
-  it("test_dont_find_target_when_saving_foreign_key_after_stale_association_loaded", async () => {
+  it("dont find target when saving foreign key after stale association loaded", async () => {
     const client = await Client.create({
       name: "Test client",
       firmWithBasicId: await Firm.find(1),
@@ -1000,12 +999,12 @@ describe("BelongsToAssociationsTest", () => {
     expect(client).toBeDefined();
   });
 
-  it("test_field_name_same_as_foreign_key", async () => {
+  it("field name same as foreign key", async () => {
     const computer = await Computer.find(1);
     expect(await computer.loadBelongsTo("developer")).not.toBeNull();
   });
 
-  it("test_counter_cache", async () => {
+  it("counter cache", async () => {
     const topic = await Topic.create({ title: "Zoom-zoom-zoom" });
     expect(topic.readAttribute("replies_count")).toBe(0);
 
@@ -1020,7 +1019,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await topic.replies.size()).toBe(15);
   });
 
-  it("test_counter_cache_double_destroy", async () => {
+  it("counter cache double destroy", async () => {
     const topic = await Topic.create({ title: "Zoom-zoom-zoom" });
 
     for (let i = 0; i < 5; i++) {
@@ -1038,7 +1037,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await (await topic.reload()).replies.size()).toBe(4);
   });
 
-  it("test_concurrent_counter_cache_double_destroy", async () => {
+  it("concurrent counter cache double destroy", async () => {
     const topic = await Topic.create({ title: "Zoom-zoom-zoom" });
 
     for (let i = 0; i < 5; i++) {
@@ -1058,7 +1057,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await (await topic.reload()).replies.size()).toBe(4);
   });
 
-  it("test_custom_counter_cache", async () => {
+  it("custom counter cache", async () => {
     const reply = await Reply.create({ title: "re: zoom", content: "speedy quick!" });
     expect(reply.readAttribute("replies_count")).toBe(0);
 
@@ -1072,7 +1071,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await reply.replies.size()).toBe(17);
   });
 
-  it("test_replace_counter_cache", async () => {
+  it("replace counter cache", async () => {
     const topic = await Topic.create({ title: "Zoom-zoom-zoom" });
     const reply = await Reply.create({ title: "re: zoom", content: "speedy quick!" });
 
@@ -1083,7 +1082,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(topic.replies_count).toBe(1);
   });
 
-  it("test_association_assignment_sticks", async () => {
+  it("association assignment sticks", async () => {
     const post = await Post.first();
     const [author1, author2] = await Author.limit(2).toArray();
     expect(author1).not.toBeNull();
@@ -1095,17 +1094,17 @@ describe("BelongsToAssociationsTest", () => {
     await post!.save();
     await post!.reload();
 
-    expect((post as any).author_id).toBe(author2.id);
+    expect((post as any).author_id).toBe(Number(author2.id));
   });
 
-  it("test_cant_save_readonly_association", async () => {
+  it("cant save readonly association", async () => {
     const firstClient = companies("first_client");
     const firm = await (firstClient as any).loadBelongsTo("readonlyFirm");
     expect(firm!.isReadonly()).toBe(true);
     await expect(firm.save()).rejects.toThrow(ReadOnlyRecord);
   });
 
-  it("test_polymorphic_assignment_foreign_key_type_string", async () => {
+  it("polymorphic assignment foreign key type string", async () => {
     const comment = await Comment.first();
     const david = authors("david");
     const groucho = members("groucho");
@@ -1123,7 +1122,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Comment.includes("resource").first())!.resource!.id).toBe(groucho.id);
   });
 
-  it("test_polymorphic_assignment_foreign_type_field_updating", async () => {
+  it("polymorphic assignment foreign type field updating", async () => {
     const sponsor = Sponsor.new({});
     const member = await Member.create({});
     (sponsor as any).sponsorable = member;
@@ -1135,7 +1134,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((sponsor2 as any).sponsorable_type).toBe("Member");
   });
 
-  it("test_polymorphic_assignment_with_primary_key_foreign_type_field_updating", async () => {
+  it("polymorphic assignment with primary key foreign type field updating", async () => {
     const essay = Essay.new({});
     const writer = await Author.create({ name: "David" });
     (essay as any).writer = writer;
@@ -1147,31 +1146,31 @@ describe("BelongsToAssociationsTest", () => {
     expect((essay2 as any).writer_type).toBe("Author");
   });
 
-  it("test_polymorphic_assignment_updates_foreign_id_field_for_new_and_saved_records", async () => {
+  it("polymorphic assignment updates foreign id field for new and saved records", async () => {
     const sponsor = Sponsor.new({});
     const savedMember = await Member.create({});
     const newMember = Member.new({});
 
     (sponsor as any).sponsorable = savedMember;
-    expect((sponsor as any).sponsorable_id).toBe(savedMember.id);
+    expect((sponsor as any).sponsorable_id).toBe(Number(savedMember.id));
 
     (sponsor as any).sponsorable = newMember;
     expect((sponsor as any).sponsorable_id).toBeNull();
   });
 
-  it("test_assignment_updates_foreign_id_field_for_new_and_saved_records", async () => {
+  it("assignment updates foreign id field for new and saved records", async () => {
     const client = Client.new({});
     const savedFirm = await Firm.create({ name: "Saved" });
     const newFirm = Firm.new({});
 
     (client as any).firm = savedFirm;
-    expect((client as any).client_of).toBe(savedFirm.id);
+    expect((client as any).client_of).toBe(Number(savedFirm.id));
 
     (client as any).firm = newFirm;
     expect((client as any).client_of).toBeNull();
   });
 
-  it("test_polymorphic_assignment_with_primary_key_updates_foreign_id_field_for_new_and_saved_records", async () => {
+  it("polymorphic assignment with primary key updates foreign id field for new and saved records", async () => {
     const essay = Essay.new({});
     const savedWriter = await Author.create({ name: "David" });
     const newWriter = Author.new({});
@@ -1183,7 +1182,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((essay as any).writer_id).toBeNull();
   });
 
-  it("test_polymorphic_assignment_with_nil", async () => {
+  it("polymorphic assignment with nil", async () => {
     const essay = Essay.new({});
     expect((essay as any).writer_id).toBeNull();
     expect((essay as any).writer_type).toBeNull();
@@ -1196,9 +1195,9 @@ describe("BelongsToAssociationsTest", () => {
     expect((essay as any).writer_type).toBeNull();
   });
 
-  it.todo("test_belongs_to_proxy_should_not_respond_to_private_methods");
+  it.todo("belongs to proxy should not respond to private methods");
 
-  it("test_belongs_to_proxy_should_respond_to_private_methods_via_send", async () => {
+  it("belongs to proxy should respond to private methods via send", async () => {
     // Ruby `send` bypasses visibility; TS has no equivalent. Verify private
     // methods exist on the instance via bracket access (best-effort port).
     const firm = companies("first_firm");
@@ -1208,7 +1207,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(typeof (loadedFirm as any)["privateMethod"]).toBe("function");
   });
 
-  it("test_save_of_record_with_loaded_belongs_to", async () => {
+  it("save of record with loaded belongs to", async () => {
     const acct = accounts("signals37");
     const foundAccount = await Account.find(acct.id!);
 
@@ -1226,7 +1225,7 @@ describe("BelongsToAssociationsTest", () => {
     await expect(foundAccount2.save()).resolves.toBeDefined();
   });
 
-  it("test_dependent_delete_and_destroy_with_belongs_to", async () => {
+  it("dependent delete and destroy with belongs to", async () => {
     AuthorAddress.destroyedAuthorAddressIds.length = 0;
 
     const authorAddress = authorAddresses("david_address");
@@ -1243,26 +1242,26 @@ describe("BelongsToAssociationsTest", () => {
     expect(AuthorAddress.destroyedAuthorAddressIds).toContain(authorAddress.id);
   });
 
-  it.todo("test_belongs_to_invalid_dependent_option_raises_exception");
+  it.todo("belongs to invalid dependent option raises exception");
 
-  it.todo("test_dependency_should_halt_parent_destruction");
+  it.todo("dependency should halt parent destruction");
 
-  it.todo("test_dependency_should_halt_parent_destruction_with_cascaded_three_levels");
+  it.todo("dependency should halt parent destruction with cascaded three levels");
 
-  it("test_attributes_are_being_set_when_initialized_from_belongs_to_association_with_where_clause", async () => {
+  it("attributes are being set when initialized from belongs to association with where clause", async () => {
     const acc = accounts("signals37");
     const newFirm = (acc as any).buildFirm({ name: "Apple" });
     expect(newFirm.name).toBe("Apple");
   });
 
-  it("test_attributes_are_set_without_error_when_initialized_from_belongs_to_association_with_array_in_where_clause", async () => {
+  it("attributes are set without error when initialized from belongs to association with array in where clause", async () => {
     const newAccount = Account.where({ credit_limit: [50, 60] }).new({});
     expect((newAccount as any).credit_limit).toBeNull();
   });
 
-  it.todo("test_reassigning_the_parent_id_updates_the_object");
+  it.todo("reassigning the parent id updates the object");
 
-  it("test_assigning_nil_on_an_association_clears_the_associations_inverse", async () => {
+  it("assigning nil on an association clears the associations inverse", async () => {
     await withHasManyInversing(async () => {
       const book = await Book.create({});
       const citation = await (book as any).citations.create({});
@@ -1274,7 +1273,7 @@ describe("BelongsToAssociationsTest", () => {
     });
   });
 
-  it("test_clearing_an_association_clears_the_associations_inverse", async () => {
+  it("clearing an association clears the associations inverse", async () => {
     const author = await Author.create({ name: "Jimmy Tolkien" });
     const post = await (author as any).createPost({ title: "The silly medallion", body: "" });
     expect((author as any).post!.id).toBe(post.id);
@@ -1288,7 +1287,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((author as any).post).toBeNull();
   });
 
-  it("test_destroying_child_with_unloaded_parent_and_foreign_key_and_touch_is_possible_with_has_many_inversing", async () => {
+  it("destroying child with unloaded parent and foreign key and touch is possible with has many inversing", async () => {
     await withHasManyInversing(async () => {
       const book = await Book.create({});
       const citation = await (book as any).citations.create({});
@@ -1299,7 +1298,7 @@ describe("BelongsToAssociationsTest", () => {
     });
   });
 
-  it("test_polymorphic_reassignment_of_associated_id_updates_the_object", async () => {
+  it("polymorphic reassignment of associated id updates the object", async () => {
     const sponsor = sponsors("moustache_club_sponsor_for_groucho");
 
     await (sponsor as any).loadBelongsTo("sponsorable");
@@ -1316,7 +1315,7 @@ describe("BelongsToAssociationsTest", () => {
     );
   });
 
-  it("test_polymorphic_reassignment_of_associated_type_updates_the_object", async () => {
+  it("polymorphic reassignment of associated type updates the object", async () => {
     const sponsor = sponsors("moustache_club_sponsor_for_groucho");
 
     await (sponsor as any).loadBelongsTo("sponsorable");
@@ -1333,7 +1332,7 @@ describe("BelongsToAssociationsTest", () => {
     );
   });
 
-  it("test_reloading_association_with_key_change", async () => {
+  it("reloading association with key change", async () => {
     const client = companies("second_client");
     const firm = (client as any).association("firm");
 
@@ -1346,7 +1345,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(firm.target!.id).toBe(companies("first_firm").id);
   });
 
-  it("test_polymorphic_counter_cache", async () => {
+  it("polymorphic counter cache", async () => {
     const tagging = taggings("welcome_general");
     const post = posts("welcome");
     const comment = comments("greetings");
@@ -1370,7 +1369,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await post.reload()).tags_count).toBe(postTagsBefore);
   });
 
-  it("test_polymorphic_with_custom_foreign_type", async () => {
+  it("polymorphic with custom foreign type", async () => {
     const sponsor = sponsors("moustache_club_sponsor_for_groucho");
     const groucho = members("groucho");
     const other = members("some_other_guy");
@@ -1389,7 +1388,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (sponsor as any).loadBelongsTo("thing"))!.id).toBe(groucho.id);
   });
 
-  it("test_polymorphic_with_custom_name_counter_cache", async () => {
+  it("polymorphic with custom name counter cache", async () => {
     const car = await Car.create({ name: "X" });
     const wheel = await Wheel.create({ wheelable_type: "Car", wheelable_id: car.id });
     expect((await car.reload()).wheels_count).toBe(1);
@@ -1399,7 +1398,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await car.reload()).wheels_count).toBe(0);
   });
 
-  it("test_polymorphic_with_custom_name_touch_old_belongs_to_model", async () => {
+  it("polymorphic with custom name touch old belongs to model", async () => {
     const car = await Car.create({ name: "X" });
     const wheel = await Wheel.create({ wheelable_type: "Car", wheelable_id: car.id });
 
@@ -1410,55 +1409,55 @@ describe("BelongsToAssociationsTest", () => {
     expect((reloadedCar as any).wheels_owned_at).not.toBeNull();
   });
 
-  it("test_build_with_conditions", async () => {
+  it("build with conditions", async () => {
     const client = companies("second_client");
     const firm = (client as any).buildBobFirm();
     expect(firm.name).toBe("Bob");
   });
 
-  it("test_create_with_conditions", async () => {
+  it("create with conditions", async () => {
     const client = companies("second_client");
     const firm = await (client as any).createBobFirm();
     expect(firm.name).toBe("Bob");
   });
 
-  it("test_create_bang_with_conditions", async () => {
+  it("create bang with conditions", async () => {
     const client = companies("second_client");
     const firm = await (client as any).createBobFirm();
     expect(firm.name).toBe("Bob");
   });
 
-  it("test_build_with_block", async () => {
+  it("build with block", async () => {
     const client = await Client.create({ name: "Client Company" });
     const firm = (client as any).buildFirm({ name: "Agency Company" });
     expect(firm.name).toBe("Agency Company");
   });
 
-  it("test_create_with_block", async () => {
+  it("create with block", async () => {
     const client = await Client.create({ name: "Client Company" });
     const firm = await (client as any).createFirm({ name: "Agency Company" });
     expect(firm.name).toBe("Agency Company");
   });
 
-  it("test_create_bang_with_block", async () => {
+  it("create bang with block", async () => {
     const client = await Client.create({ name: "Client Company" });
     const firm = await (client as any).createFirm({ name: "Agency Company" });
     expect(firm.name).toBe("Agency Company");
   });
 
-  it("test_should_set_foreign_key_on_create_association", async () => {
+  it("should set foreign key on create association", async () => {
     const client = await Client.create({ name: "fuu" });
     const firm = await (client as any).createFirm({ name: "baa" });
     expect((client as any).client_of).toBe(firm.id);
   });
 
-  it("test_should_set_foreign_key_on_create_association!", async () => {
+  it("should set foreign key on create association!", async () => {
     const client = await Client.create({ name: "fuu" });
     const firm = await (client as any).createFirm({ name: "baa" });
     expect((client as any).client_of).toBe(firm.id);
   });
 
-  it("test_should_set_foreign_key_on_create_association_with_unpersisted_owner", async () => {
+  it("should set foreign key on create association with unpersisted owner", async () => {
     const tagging = Tagging.new({});
     const tag = await (tagging as any).createTag();
 
@@ -1467,11 +1466,11 @@ describe("BelongsToAssociationsTest", () => {
     expect((tagging as any).tag_id).toBe(tag.id);
   });
 
-  it.todo("test_should_set_foreign_key_on_save");
+  it.todo("should set foreign key on save");
 
-  it.todo("test_should_set_foreign_key_on_save!");
+  it.todo("should set foreign key on save!");
 
-  it("test_self_referential_belongs_to_with_counter_cache_assigning_nil", async () => {
+  it("self referential belongs to with counter cache assigning nil", async () => {
     const comment = await Comment.create({ post: posts("thinking"), body: "fuu" });
     (comment as any).parent = null;
     await comment.save();
@@ -1480,7 +1479,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await comments("greetings").reload()).children_count).toBe(0);
   });
 
-  it("test_belongs_to_with_id_assigning", async () => {
+  it("belongs to with id assigning", async () => {
     const post = posts("welcome");
     const comment = await Comment.create({ body: "foo", post });
     const parent = comments("greetings");
@@ -1491,7 +1490,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await parent.reload()).children_count).toBe(1);
   });
 
-  it("test_belongs_to_with_out_of_range_value_assigning", async () => {
+  it("belongs to with out of range value assigning", async () => {
     class TempModel extends Author {
       static {
         this.validatesPresenceOf("authorAddress");
@@ -1506,7 +1505,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((author as any).errors.details.get("authorAddress")).toEqual([{ error: "blank" }]);
   });
 
-  it("test_polymorphic_with_custom_primary_key", async () => {
+  it("polymorphic with custom primary key", async () => {
     const toy = await Toy.create({});
     const sponsor = await Sponsor.create({ sponsorable: toy });
 
@@ -1514,7 +1513,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (sponsor as any).loadBelongsTo("sponsorable"))!.id).toEqual(toy.toy_id);
   });
 
-  it("test_destroying_polymorphic_child_with_unloaded_parent_and_touch_is_possible_with_has_many_inversing", async () => {
+  it("destroying polymorphic child with unloaded parent and touch is possible with has many inversing", async () => {
     await withHasManyInversing(async () => {
       const toy = await Toy.create({});
       const sponsor = await (toy as any).sponsors.create({});
@@ -1525,7 +1524,7 @@ describe("BelongsToAssociationsTest", () => {
     });
   });
 
-  it("test_polymorphic_with_false", async () => {
+  it("polymorphic with false", async () => {
     expect(() => {
       class TempPost extends Base {
         static _tableName = "posts";
@@ -1548,7 +1547,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((citibank as any).association("firm").isStaleTarget()).toBe(false);
   });
 
-  it("test_reflect_the_most_recent_change", async () => {
+  it("reflect the most recent change", async () => {
     const [author1, author2] = await Author.limit(2).toArray();
     const post = Post.new({ title: "foo", body: "bar" });
 
@@ -1556,7 +1555,7 @@ describe("BelongsToAssociationsTest", () => {
     (post as any).author_id = author2.id;
 
     expect(await post.save()).toBe(true);
-    expect((post as any).author_id).toBe(author2.id);
+    expect((post as any).author_id).toBe(Number(author2.id));
   });
 
   it("dangerous association name raises ArgumentError", async () => {
@@ -1582,7 +1581,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await Column.count()).toBeGreaterThanOrEqual(1);
   });
 
-  it("test_multiple_counter_cache_with_after_create_update", async () => {
+  it("multiple counter cache with after create update", async () => {
     const post = posts("welcome");
     const parent = comments("greetings");
 
