@@ -275,7 +275,10 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+      // mirrors Rails ensure: Topic.reset_column_information
+      // reload re-warms the adapter schema cache so later tests can load the schema sync.
+      Topic.resetColumnInformation();
+      await Topic.loadSchema();
     }
   });
 
@@ -293,7 +296,8 @@ describe("MultiParameterAttributeTest", () => {
         expect(topic.written_on).toBeNull();
       });
     } finally {
-      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+      Topic.resetColumnInformation();
+      await Topic.loadSchema();
     }
   });
 
@@ -319,7 +323,8 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+      Topic.resetColumnInformation();
+      await Topic.loadSchema();
     }
   });
 
@@ -351,6 +356,7 @@ describe("MultiParameterAttributeTest", () => {
       // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
       Topic.skipTimeZoneConversionForAttributes = [];
       Topic.resetColumnInformation();
+      await Topic.loadSchema();
     }
   });
 
@@ -387,7 +393,8 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation(); // mirrors Rails ensure: Topic.reset_column_information
+      Topic.resetColumnInformation();
+      await Topic.loadSchema();
     }
   });
 
