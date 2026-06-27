@@ -162,26 +162,38 @@ describe("ModulesTest", () => {
   });
 
   it("nested models should not raise exception when using delete all dependency on association", async () => {
-    const collection = await ShopCollection.first();
-    expect(await collection!.products.toArray()).not.toEqual([]);
-    let error: unknown;
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
     try {
-      await collection!.destroy();
-    } catch (e) {
-      error = e;
+      const collection = await ShopCollection.first();
+      expect(await collection!.products.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await collection!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
     }
-    expect(error).toBeUndefined();
   });
 
   it("nested models should not raise exception when using nullify dependency on association", async () => {
-    const product = await ShopProduct.first();
-    expect(await product!.variants.toArray()).not.toEqual([]);
-    let error: unknown;
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
     try {
-      await product!.destroy();
-    } catch (e) {
-      error = e;
+      const product = await ShopProduct.first();
+      expect(await product!.variants.toArray()).not.toEqual([]);
+      let error: unknown;
+      try {
+        await product!.destroy();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeUndefined();
+    } finally {
+      Base.storeFullStiClass = prev;
     }
-    expect(error).toBeUndefined();
   });
 });
