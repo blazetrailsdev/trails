@@ -4386,11 +4386,11 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   ): Promise<this>;
   toggleBang(attribute: string): Promise<boolean>;
   save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean>;
-  saveBang(options?: { validate?: boolean; touch?: boolean }): Promise<true>;
+  saveBang(options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined>;
   destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown>): Promise<boolean>;
-  updateBang(attrs: Record<string, unknown>): Promise<true>;
+  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
   delete(): Promise<this>;
   reload(options?: { lock?: boolean | string; unscoped?: boolean }): Promise<this>;
   initializeDup(other: unknown): void;

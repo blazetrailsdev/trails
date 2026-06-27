@@ -622,7 +622,7 @@ export async function update<T extends UpdateRecord>(
 export async function updateBang<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
-): Promise<true> {
+): Promise<true | undefined> {
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -632,8 +632,8 @@ export async function updateBang<T extends UpdateRecord>(
     for (const [key, value] of Object.entries(attrs)) {
       assignUpdateAttribute(self, key, value);
     }
-    return self.saveBang() as Promise<true>;
-  }) as Promise<true>;
+    return self.saveBang() as Promise<true | undefined>;
+  }) as Promise<true | undefined>;
 }
 
 interface DeleteRecord {
