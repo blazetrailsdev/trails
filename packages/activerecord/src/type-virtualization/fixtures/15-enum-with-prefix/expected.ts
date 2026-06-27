@@ -1,11 +1,11 @@
 export class Task extends Base {
   declare status: number;
   declare isStatusLow: () => boolean;
-  declare statusLowBang: () => Promise<true>;
+  declare statusLowBang: () => Promise<true | undefined>;
   declare static statusLow: () => import("@blazetrails/activerecord").Relation<Task>;
   declare static notStatusLow: () => import("@blazetrails/activerecord").Relation<Task>;
   declare isStatusHigh: () => boolean;
-  declare statusHighBang: () => Promise<true>;
+  declare statusHighBang: () => Promise<true | undefined>;
   declare static statusHigh: () => import("@blazetrails/activerecord").Relation<Task>;
   declare static notStatusHigh: () => import("@blazetrails/activerecord").Relation<Task>;
 
