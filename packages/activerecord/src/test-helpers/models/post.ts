@@ -264,9 +264,8 @@ export class Post extends Base {
       foreignKey: "author_id",
     });
 
-    // Rails post.rb:56-58 — `def first_comment; super.body; end`. Defined
-    // non-configurable before hasOne so the framework accessor does not
-    // overwrite it; `await post.firstComment` returns the body string.
+    // Rails post.rb:56-58 — `def first_comment; super.body; end`.
+    // configurable:false before hasOne prevents defineReaders from overwriting it.
     Object.defineProperty(this.prototype, "firstComment", {
       get(this: any): Promise<string | null> {
         return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
