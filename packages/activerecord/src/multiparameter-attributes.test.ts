@@ -6,22 +6,22 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
 describe("MultiParameterAttributeTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // useHandlerFixtures wires setupHandlerSuite + withTransactionalFixtures + defineSchema.
+  // The defineSchema call warms the pool's schema cache for topics so the synchronous
+  // loadSchema path (triggered by new Topic() inside tests) finds the date/time column
+  // types correctly on all adapters including MariaDB. Mirrors date.test.ts.
+  useHandlerFixtures(["topics"], { schema: TEST_SCHEMA });
 
-  // Eagerly resolve date/time column types before any test runs. On MariaDB the
-  // adapter schema cache is cold at startup (pool=null makes eagerWarmSchemaCache
-  // a no-op), so without this the sync loadSchema path hits an empty cache and
-  // marks _schemaLoaded=true with no type info — causing last_read and bonus_time
-  // to resolve as the fallback Value type instead of Date/Time. Mirrors the same
-  // pattern in date.test.ts.
+  // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.
+  // Without this, the sync loadSchema path runs before the cache is applied to the
+  // model class and marks _schemaLoaded=true with empty _attributeDefinitions.
   beforeAll(async () => {
     await Topic.loadSchema();
   });
