@@ -1069,6 +1069,9 @@ describe("ReflectionTest", () => {
   it("column string type and limit", () => {
     class Article extends Base {
       static {
+        // Use a table absent from the canonical schema so columnsHash() falls
+        // back to _attributeDefinitions instead of the DB schema cache.
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }
@@ -1080,6 +1083,7 @@ describe("ReflectionTest", () => {
   it("column null not null", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }
@@ -1090,6 +1094,7 @@ describe("ReflectionTest", () => {
   it("human name for column", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("body_text", "string");
       }
     }
@@ -1101,6 +1106,7 @@ describe("ReflectionTest", () => {
   it("integer columns", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("views", "integer");
       }
     }
@@ -1112,6 +1118,7 @@ describe("ReflectionTest", () => {
   it("non existent columns return null object", () => {
     class Article extends Base {
       static {
+        this._tableName = "refl_articles";
         this.attribute("title", "string");
       }
     }

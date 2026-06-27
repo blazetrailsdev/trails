@@ -83,11 +83,7 @@ export const TEST_SCHEMA: Schema = {
     manufactured_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
   },
 
-  articles: {
-    title: "string",
-    body_text: "text",
-    views: "integer",
-  },
+  articles: {},
 
   articles_magazines: {
     article_id: "integer",
