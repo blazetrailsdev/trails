@@ -176,7 +176,13 @@ export class HasAndBelongsToMany {
 
     const joinModelName = `HABTM_${camelize(name)}`;
     const registryKey = `${model.name}::${joinModelName}`;
-    const sourceName = singularize(name);
+    // Derive the source belongsTo name from the resolved class name so that
+    // class_name:-aliased associations (e.g. other_posts with class_name: "Post")
+    // share the same join-model source name as the canonical association ("post"),
+    // matching Rails' association_foreign_key derivation from klass.name.
+    const sourceName = options.className
+      ? underscore(demodulize(singularize(String(options.className))))
+      : singularize(name);
     const JoinModel = deps.createHabtmJoinModel(
       model,
       joinModelName,
@@ -296,7 +302,7 @@ export class HasAndBelongsToMany {
     const habtmOptions: Record<string, unknown> = {
       joinTable: joinTableName,
       through: middleName,
-      source: (options.source as string) ?? singularize(name),
+      source: (options.source as string) ?? sourceName,
     };
     for (const k of HABTM_FORWARDED_KEYS) {
       if (Object.prototype.hasOwnProperty.call(options, k)) {
