@@ -111,6 +111,34 @@ function superClassNameOf(cls: ts.ClassDeclaration): string | undefined {
 }
 
 /**
+ * Build a global class-name → direct-superclass-name map from all registered
+ * model files, mirroring `buildInheritance` but across file boundaries. Used
+ * to thread into the virtualizer so cross-file subtype relationships are
+ * recognized during conflict suppression (prevents conservatively dropping a
+ * correct narrowed declare when the target's superclass lives in another file).
+ */
+function buildGlobalSuperNameOf(registry: ReadonlyMap<string, string>): Map<string, string> {
+  const result = new Map<string, string>();
+  const walkedFiles = new Set<string>();
+  for (const [, file] of registry) {
+    if (walkedFiles.has(file)) continue;
+    walkedFiles.add(file);
+    const sf = ts.createSourceFile(
+      file,
+      fs.readFileSync(file, "utf8"),
+      ts.ScriptTarget.ES2022,
+      true,
+    );
+    for (const stmt of sf.statements) {
+      if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+      const superName = superClassNameOf(stmt);
+      if (superName && !result.has(stmt.name.text)) result.set(stmt.name.text, superName);
+    }
+  }
+  return result;
+}
+
+/**
  * Cross-file lookup of a model's association calls by class name (parse each
  * registered file on demand, cached) for `resolveThroughTarget`. Walks ALL
  * classes since a through target may be an STI subclass.
@@ -521,6 +549,7 @@ async function main(): Promise<void> {
     schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
   }
   const associationLookup = buildModelAssociationLookup(registry);
+  const globalSuperNameOf = buildGlobalSuperNameOf(registry);
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
@@ -568,6 +597,7 @@ async function main(): Promise<void> {
       // Baked attribute declares allow null assignment (Rails attributes
       // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
       attributesNullable: true,
+      globalSuperNameOf,
     });
     if (virtualized === source) {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);

@@ -592,6 +592,28 @@ describe("virtualize — materializing-generator gaps", () => {
     );
   });
 
+  test("cross-file subtype: narrowed declare is kept when superclass chain lives in another file", () => {
+    // SpecialPost extends Post lives in a DIFFERENT file (not in src below).
+    // Without globalSuperNameOf the declare would be conservatively suppressed;
+    // with it, classExtends("SpecialPost","Post") returns true → kept.
+    const src =
+      "class Comment extends Base {\n" +
+      '  static { this.belongsTo("post"); }\n' +
+      "}\n" +
+      "class SpecialComment extends Comment {\n" +
+      '  static { this.belongsTo("post", { className: "SpecialPost" }); }\n' +
+      "}\n";
+    // Simulate a cross-file registry entry: SpecialPost extends Post.
+    const globalSuperNameOf = new Map([["SpecialPost", "Post"]]);
+    const { text } = virtualize(src, "comment.ts", {
+      isModelClass: () => true,
+      globalSuperNameOf,
+    });
+    expect(text.slice(text.indexOf("class SpecialComment"))).toContain(
+      "declare post: SpecialPost | null;",
+    );
+  });
+
   test("subclass association overrides across a 3-level chain (suppress, keep subtype, effective target)", () => {
     // Mid.post → Sibling isn't assignable to Root's `post: Post` → suppressed
     // (loader overload kept). Leaf.post → SpecialPost (extends Post): Mid was

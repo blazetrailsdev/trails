@@ -271,8 +271,8 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
     // inherited target is `Base` itself (e.g. an inherited polymorphic
     // `belongsTo` like `Comment.author`) a concrete override (`SpecialComment`'s
     // `hasOne :author, through: :post` → `Author`) is always assignable and
-    // never a TS2416 conflict — even though `classExtends` is in-file-only and
-    // can't follow the cross-file `Author → Base` chain.
+    // never a TS2416 conflict — the `base === "Base"` guard handles this
+    // without needing to follow the `Author → Base` chain.
     if (ownTarget === base || base === "Base" || classExtends(ownTarget, base, superNameOf))
       continue;
     out.add(call.name);
@@ -281,8 +281,9 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
 }
 
 /**
- * Whether `sub` transitively extends `sup` per `superNameOf`. IN-FILE ONLY: a
- * cross-file subtype returns false → its narrowing override is suppressed.
+ * Whether `sub` transitively extends `sup` per `superNameOf`. When the caller
+ * supplies a merged cross-file map (global registry + in-file), cross-file
+ * subtypes resolve correctly and their narrowing overrides are kept.
  */
 function classExtends(
   sub: string,
