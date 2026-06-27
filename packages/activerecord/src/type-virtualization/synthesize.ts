@@ -403,7 +403,7 @@ function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
 
 // `enum` / `Base.enum` and the `defineEnum(...)` alias share one runtime path
 // (`_enum`), so both emit the same surface: predicate, persisting bang
-// (`updateBang` → `Promise<true>`), positive scope, and auto `not*` scope.
+// (`updateBang` → `Promise<true | undefined>`), positive scope, and auto `not*` scope.
 // Rails generates no plain in-memory setter, so none is declared.
 function renderEnum(info: ClassInfo, call: EnumCall | DefineEnumCall): RenderedLine[] {
   const out: RenderedLine[] = [];
@@ -415,7 +415,7 @@ function renderEnum(info: ClassInfo, call: EnumCall | DefineEnumCall): RenderedL
     const bang = `${scopeName}Bang`;
     const notScope = `not${pascal(methodBase)}`;
     out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
-    out.push(line(`declare ${bang}: () => Promise<true>;`, bang, false));
+    out.push(line(`declare ${bang}: () => Promise<true | undefined>;`, bang, false));
     out.push(
       line(
         `declare static ${scopeName}: () => ${AR_IMPORT}.Relation<${info.name}>;`,

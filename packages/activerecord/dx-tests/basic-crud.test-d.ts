@@ -136,7 +136,7 @@ describe("basic CRUD DX — defining and using a model", () => {
 
   it("persistence methods on an instance return Promises and sensible scalars", () => {
     const u = new User({ name: "dean" });
-    expectTypeOf(u.save).returns.resolves.toBeBoolean();
+    expectTypeOf(u.save).returns.resolves.toEqualTypeOf<boolean | undefined>();
     expectTypeOf(u.destroy).returns.toBeObject();
     expectTypeOf(u.isNewRecord()).toBeBoolean();
     expectTypeOf(u.isPersisted()).toBeBoolean();
@@ -212,8 +212,8 @@ describe("basic CRUD DX — defining and using a model", () => {
 
   it("update / updateBang exist on the instance with attrs bag", () => {
     const u = new User();
-    assertType<Promise<boolean>>(u.update({ name: "dean2" }));
-    assertType<Promise<true>>(u.updateBang({ name: "dean2" }));
+    assertType<Promise<boolean | undefined>>(u.update({ name: "dean2" }));
+    assertType<Promise<true | undefined>>(u.updateBang({ name: "dean2" }));
   });
 
   it("tableName configured in `static {}` is a string accessor", () => {

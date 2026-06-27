@@ -9,23 +9,23 @@ import { registerSubclass } from "../../inheritance.js";
 
 export class Membership extends Base {
   declare isMembership: () => boolean;
-  declare membershipBang: () => Promise<true>;
+  declare membershipBang: () => Promise<true | undefined>;
   declare static membership: () => Relation<Membership>;
   declare static notMembership: () => Relation<Membership>;
   declare isCurrentMembership: () => boolean;
-  declare currentMembershipBang: () => Promise<true>;
+  declare currentMembershipBang: () => Promise<true | undefined>;
   declare static currentMembership: () => Relation<Membership>;
   declare static notCurrentMembership: () => Relation<Membership>;
   declare isSuperMembership: () => boolean;
-  declare superMembershipBang: () => Promise<true>;
+  declare superMembershipBang: () => Promise<true | undefined>;
   declare static superMembership: () => Relation<Membership>;
   declare static notSuperMembership: () => Relation<Membership>;
   declare isSelectedMembership: () => boolean;
-  declare selectedMembershipBang: () => Promise<true>;
+  declare selectedMembershipBang: () => Promise<true | undefined>;
   declare static selectedMembership: () => Relation<Membership>;
   declare static notSelectedMembership: () => Relation<Membership>;
   declare isTenantMembership: () => boolean;
-  declare tenantMembershipBang: () => Promise<true>;
+  declare tenantMembershipBang: () => Promise<true | undefined>;
   declare static tenantMembership: () => Relation<Membership>;
   declare static notTenantMembership: () => Relation<Membership>;
   declare member: Member | null;

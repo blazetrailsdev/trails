@@ -425,7 +425,7 @@ interface CounterBangRecord extends AttributeIO {
 
 /** Save path used by toggleBang. */
 interface ToggleBangRecord extends AttributeIO {
-  save(options?: { validate?: boolean }): Promise<boolean>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
 }
 
 /** Mirrors: ActiveRecord::Persistence#increment */
@@ -513,7 +513,7 @@ export async function decrementBang<
 export async function toggleBang<T extends ToggleBangRecord>(
   this: T & { toggle(attribute: string): T },
   attribute: string,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   this.toggle(attribute);
   // Rails' `update_attribute(name, value)` is effectively `self[name] = value;
   // save(validate: false)`. Our toggle() already wrote the toggled value;
@@ -537,8 +537,8 @@ interface UpdateRecord extends AttributeIO {
     lockingColumn: string;
     lockingEnabled: boolean;
   };
-  save(options?: { validate?: boolean }): Promise<boolean>;
-  saveBang(options?: { validate?: boolean }): Promise<true>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
+  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
 function assertLockingColumnNotExplicitly(
@@ -594,7 +594,7 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): void {
 export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -611,8 +611,8 @@ export async function update<T extends UpdateRecord>(
     for (const [key, value] of Object.entries(attrs)) {
       assignUpdateAttribute(self, key, value);
     }
-    return self.save() as Promise<boolean>;
-  }) as Promise<boolean>;
+    return self.save() as Promise<boolean | undefined>;
+  }) as Promise<boolean | undefined>;
 }
 
 /**
@@ -622,7 +622,7 @@ export async function update<T extends UpdateRecord>(
 export async function updateBang<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
-): Promise<true> {
+): Promise<true | undefined> {
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -632,8 +632,8 @@ export async function updateBang<T extends UpdateRecord>(
     for (const [key, value] of Object.entries(attrs)) {
       assignUpdateAttribute(self, key, value);
     }
-    return self.saveBang() as Promise<true>;
-  }) as Promise<true>;
+    return self.saveBang() as Promise<true | undefined>;
+  }) as Promise<true | undefined>;
 }
 
 interface DeleteRecord {
@@ -720,7 +720,7 @@ interface SaveRecord {
 export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   // Mirrors ActiveRecord::Suppressor#save: a suppressed record returns `true`
   // immediately, before validations or the INSERT/UPDATE. This is why
   // `create!`/`save!` inside `suppress` never raise even on invalid records —
@@ -776,9 +776,9 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return (await withTransactionReturningStatus.call(self, () =>
-      self.createOrUpdate(),
-    )) as boolean;
+    return (await withTransactionReturningStatus.call(self, () => self.createOrUpdate())) as
+      | boolean
+      | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
     // callbacks raise RecordInvalid when a child fails to save. The transaction
@@ -792,10 +792,12 @@ export async function save<T extends SaveRecord>(
 
 /** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
-  T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
->(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true> {
+  T extends SaveRecord & {
+    save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean | undefined>;
+  },
+>(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined> {
   const result = await this.save(options);
-  if (!result) {
+  if (result === false) {
     // Mirrors Rails' two save! layers: ActiveRecord::Validations#save! raises
     // RecordInvalid when validations failed (errors present); otherwise
     // Persistence#save! raises RecordNotSaved("Failed to save the record")
@@ -806,7 +808,10 @@ export async function saveBang<
     }
     throw new RecordNotSaved("Failed to save the record", this as unknown as object);
   }
-  return true;
+  // Mirrors Rails' with_transaction_returning_status returning `status` directly:
+  // `undefined` when before_save raises Rollback (caught by the joined transaction,
+  // status never assigned) — matching Rails save! returning nil in that path.
+  return result;
 }
 
 interface DestroyRecord {
@@ -1009,7 +1014,8 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
 
 interface AttributeSingleSave {
   writeAttribute(name: string, value: unknown): void;
-  save(options?: { validate?: boolean }): Promise<boolean>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
+  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
 /** Mirrors: ActiveRecord::Persistence#update_attribute */
@@ -1017,7 +1023,7 @@ export async function updateAttribute<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   this.writeAttribute(name, value);
   return this.save({ validate: false });
 }
@@ -1026,19 +1032,16 @@ export async function updateAttribute<T extends AttributeSingleSave>(
  * Mirrors: ActiveRecord::Persistence#update_attribute! —
  * `public_send("#{name}=", value); save!(validate: false)`.
  * Skips validations, raises RecordNotSaved when a callback aborts.
+ * Returns undefined (Rails nil) when before_save raises Rollback and it is
+ * swallowed by a joined outer transaction.
  */
 export async function updateAttributeBang<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<true> {
+): Promise<true | undefined> {
   this.writeAttribute(name, value);
-  const saved = await this.save({ validate: false });
-  if (!saved) {
-    const ctorName = (this.constructor as { name?: string }).name || "record";
-    throw new RecordNotSaved(`Failed to save the ${ctorName} while updating \`${name}\``, this);
-  }
-  return true;
+  return this.saveBang({ validate: false });
 }
 
 interface UpdateColumnsRecord {

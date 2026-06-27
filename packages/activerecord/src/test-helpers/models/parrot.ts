@@ -64,11 +64,11 @@ export class Parrot extends Base {
 
 export class LiveParrot extends Parrot {
   declare isAfrican: () => boolean;
-  declare africanBang: () => Promise<true>;
+  declare africanBang: () => Promise<true | undefined>;
   declare static african: () => Relation<LiveParrot>;
   declare static notAfrican: () => Relation<LiveParrot>;
   declare isAustralian: () => boolean;
-  declare australianBang: () => Promise<true>;
+  declare australianBang: () => Promise<true | undefined>;
   declare static australian: () => Relation<LiveParrot>;
   declare static notAustralian: () => Relation<LiveParrot>;
 

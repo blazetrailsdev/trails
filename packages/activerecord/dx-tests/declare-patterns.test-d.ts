@@ -131,11 +131,10 @@ class Task extends Base {
   // record.isLow() / record.isHigh() — boolean predicates
   declare isLow: () => boolean;
   declare isHigh: () => boolean;
-  // record.lowBang() / record.highBang() — in-memory setters, return this.
-  // Not async, does not persist. Use `record.updateColumn("status", "low")`
-  // if you want a persisting one-liner.
-  declare lowBang: () => this;
-  declare highBang: () => this;
+  // record.lowBang() / record.highBang() — persisting bang methods (update!).
+  // Return undefined when a before_save callback raises Rollback.
+  declare lowBang: () => Promise<true | undefined>;
+  declare highBang: () => Promise<true | undefined>;
   // Class-level enum scopes: Task.low() / Task.high()
   declare static low: () => Relation<Task>;
   declare static high: () => Relation<Task>;
@@ -266,9 +265,9 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(t.isLow()).toBeBoolean();
   });
 
-  it("Base.enum bang setter: `declare lowBang: () => this` (in-memory, returns self)", () => {
+  it("Base.enum bang: `declare lowBang: () => Promise<true | undefined>` (persisting, via update!)", () => {
     const t = new Task({ status: 0 });
-    expectTypeOf(t.lowBang()).toMatchTypeOf<Task>();
+    expectTypeOf(t.lowBang()).toEqualTypeOf<Promise<true | undefined>>();
   });
 
   it("Base.enum class scopes: `declare static low: () => Relation<Task>`", () => {

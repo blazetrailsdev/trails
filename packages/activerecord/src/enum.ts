@@ -72,7 +72,7 @@ export function installEnumAttribute(
 
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
-  updateBang(attrs: Record<string, unknown>): Promise<true>;
+  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
   readAttributeForDatabase(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
 }

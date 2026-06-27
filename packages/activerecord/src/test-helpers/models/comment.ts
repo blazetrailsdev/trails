@@ -45,11 +45,11 @@ export class Comment extends Base {
   declare children: AssociationProxy<Comment>;
   declare parent: Comment | null;
   declare isDefault: () => boolean;
-  declare defaultBang: () => Promise<true>;
+  declare defaultBang: () => Promise<true | undefined>;
   declare static default: () => Relation<Comment>;
   declare static notDefault: () => Relation<Comment>;
   declare isChild: () => boolean;
-  declare childBang: () => Promise<true>;
+  declare childBang: () => Promise<true | undefined>;
   declare static child: () => Relation<Comment>;
   declare static notChild: () => Relation<Comment>;
   declare loadBelongsTo: ((name: "post") => Promise<Post | null>) &

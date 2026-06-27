@@ -1,19 +1,5 @@
 [
   {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "_create_record",
-    "call": "new",
-    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` \u2014 the `new` operator, not a recognized method call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "_create_record",
-    "call": "owner",
-    "reason": "Rails `owner.persisted?` reads `owner` as a method; trails accesses it as the `this.owner` property (getter), so no `owner()` call appears."
-  },
-  {
     "package": "abstractcontroller",
     "tsFile": "base.ts",
     "rubyName": "_valid_action_name?",
@@ -17523,6 +17509,20 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
+    "rubyName": "_create_record",
+    "call": "new",
+    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` \u2014 the `new` operator, not a recognized method call."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "_create_record",
+    "call": "owner",
+    "reason": "Rails `owner.persisted?` reads `owner` as a method; trails accesses it as the `this.owner` property (getter), so no `owner()` call appears."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
     "rubyName": "delete",
     "call": "enqueue_destroy_association",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -22781,8 +22781,22 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
+    "call": "clear",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
     "call": "delete_if",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "disconnect!",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
   },
   {
     "package": "activerecord",
@@ -22802,36 +22816,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
-    "call": "clear",
-    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "clear_reloadable_connections",
-    "call": "disconnect!",
-    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "clear_reloadable_connections",
     "call": "with_exclusively_acquired_all_connections",
     "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_clearReloadableConnections` helper (so the sync API and `clearReloadableConnectionsAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "flush",
-    "call": "delete",
-    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "flush",
-    "call": "disconnect!",
-    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
   },
   {
     "package": "activerecord",
@@ -22895,6 +22881,20 @@
     "rubyName": "disconnect",
     "call": "with_exclusively_acquired_all_connections",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "delete",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "disconnect!",
+    "reason": "Bucket (b) equivalent: the synchronous body moved into the shared private `_flush` helper (so the sync API and `flushAsync` both delegate, mirroring the `_disconnect` split); the call lives there, not in the public method the shallow analyzer scans."
   },
   {
     "package": "activerecord",
@@ -36942,13 +36942,6 @@
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "update_attribute!",
-    "call": "save!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "update_attribute!",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -43298,8 +43291,22 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "update_all",
+    "call": "compile_update",
+    "reason": "Delegated to private _execUpdateAll helper which calls arel.compileUpdate(); split avoids repeating the arel-build block across hash/string/array overload forms."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
     "call": "composite_primary_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "empty?",
+    "reason": "Delegated to private _execUpdateAll helper which checks having_clause emptiness; split avoids repeating the arel-build block across hash/string/array overload forms."
   },
   {
     "package": "activerecord",
@@ -43347,6 +43354,13 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "update_all",
+    "call": "reset",
+    "reason": "Delegated to private _execUpdateAll helper which calls this.reset() after execution; split avoids repeating the arel-build block across hash/string/array overload forms."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
     "call": "sanitize_sql_for_assignment",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -43356,6 +43370,13 @@
     "rubyName": "update_all",
     "call": "sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "table",
+    "reason": "Delegated to private _execUpdateAll helper which sets arel.source.left = table; split avoids repeating the arel-build block across hash/string/array overload forms."
   },
   {
     "package": "activerecord",
@@ -60240,33 +60261,5 @@
     "rubyName": "before_initialize",
     "call": "on_load",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "compile_update",
-    "reason": "Delegated to private _execUpdateAll helper which calls arel.compileUpdate(); split avoids repeating the arel-build block across hash/string/array overload forms."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "empty?",
-    "reason": "Delegated to private _execUpdateAll helper which checks having_clause emptiness; split avoids repeating the arel-build block across hash/string/array overload forms."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "reset",
-    "reason": "Delegated to private _execUpdateAll helper which calls this.reset() after execution; split avoids repeating the arel-build block across hash/string/array overload forms."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "table",
-    "reason": "Delegated to private _execUpdateAll helper which sets arel.source.left = table; split avoids repeating the arel-build block across hash/string/array overload forms."
   }
 ]
