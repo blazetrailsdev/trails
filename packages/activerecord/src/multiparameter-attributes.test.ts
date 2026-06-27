@@ -385,15 +385,24 @@ describe("MultiParameterAttributeTest", () => {
           // fails silently, leaving bonus_time with no type and falling back to "value".
           const _diagSc = (Topic as any).connection?.schemaCache;
           const _diagCacheWarm = _diagSc?._columnsHash?.has?.("topics") ?? "no-sc";
+          const _diagColSqlType =
+            (_diagSc?._columnsHash?.get?.("topics") as Record<string, any> | undefined)?.[
+              "bonus_time"
+            ]?.sqlType ?? "no-col";
           const _diagDefBefore = (Topic as any)._attributeDefinitions?.get?.("bonus_time");
+          const _diagUserProvided = _diagDefBefore?.userProvided;
+          const _diagOwnDefs = Object.prototype.hasOwnProperty.call(Topic, "_attributeDefinitions");
           (Topic as any)._schemaLoaded = false;
           (Topic as any)._schemaLoadPromise = undefined;
           await Topic.loadSchema();
           const _diagDefAfter = (Topic as any)._attributeDefinitions?.get?.("bonus_time");
           console.warn(
-            "[tz-diag] poolCacheWarm=%s defBefore=%s defAfter=%s schemaLoaded=%s",
+            "[tz-diag] poolCacheWarm=%s colSqlType=%s defBefore=%s userProvided=%s ownDefs=%s defAfter=%s schemaLoaded=%s",
             _diagCacheWarm,
+            _diagColSqlType,
             _diagDefBefore?.type?.constructor?.name ?? "undefined",
+            _diagUserProvided,
+            _diagOwnDefs,
             _diagDefAfter?.type?.constructor?.name ?? "undefined",
             (Topic as any)._schemaLoaded,
           );
