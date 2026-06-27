@@ -21,19 +21,19 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("DJAS routing widening — nested-through", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
-  // Author → Post → Comment → Rating (4-level chain).
-  // `noJoinsNtRatings` on the author is nested: it goes through
-  // `ntComments`, which is itself a through on `ntPosts`.
   class NtAuthor extends Base {
     static {
       this._tableName = "nt_authors";
@@ -63,14 +63,21 @@ describe("DJAS routing widening — nested-through", () => {
   }
 
   beforeAll(async () => {
-    /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS nested-through harness; nt_* tables have no schema.rb analog */
-    await defineSchema({
-      nt_authors: { name: "string" },
-      nt_posts: { nt_author_id: "integer", title: "string" },
-      nt_comments: { nt_post_id: "integer", body: "string" },
-      nt_ratings: { nt_comment_id: "integer", value: "integer" },
+    await migrationCtx().createTable("nt_authors", { force: true }, (t: any) => {
+      t.string("name");
     });
-    /* eslint-enable blazetrails/require-canonical-schema */
+    await migrationCtx().createTable("nt_posts", { force: true }, (t: any) => {
+      t.integer("nt_author_id");
+      t.string("title");
+    });
+    await migrationCtx().createTable("nt_comments", { force: true }, (t: any) => {
+      t.integer("nt_post_id");
+      t.string("body");
+    });
+    await migrationCtx().createTable("nt_ratings", { force: true }, (t: any) => {
+      t.integer("nt_comment_id");
+      t.integer("value");
+    });
     registerModel("NtAuthor", NtAuthor);
     registerModel("NtPost", NtPost);
     registerModel("NtComment", NtComment);
@@ -79,7 +86,6 @@ describe("DJAS routing widening — nested-through", () => {
     (NtPost as any)._associations = [];
     (NtComment as any)._associations = [];
 
-    // Level 1: posts.
     Associations.hasMany.call(NtAuthor, "ntPosts", {
       className: "NtPost",
       foreignKey: "nt_author_id",
@@ -92,17 +98,11 @@ describe("DJAS routing widening — nested-through", () => {
       className: "NtRating",
       foreignKey: "nt_comment_id",
     });
-
-    // Level 2 (direct through): author → posts → comments.
     Associations.hasMany.call(NtAuthor, "ntComments", {
       className: "NtComment",
       through: "ntPosts",
       source: "ntComments",
     });
-
-    // Level 3 (nested through): author → (posts → comments) →
-    // ratings. `through: ntComments` where `ntComments` is itself a
-    // through — that's what makes this reflection `isNested()`.
     Associations.hasMany.call(NtAuthor, "noJoinsNtRatings", {
       className: "NtRating",
       through: "ntComments",
@@ -112,9 +112,9 @@ describe("DJAS routing widening — nested-through", () => {
   });
 
   afterAll(async () => {
-    for (const t of ["nt_ratings", "nt_comments", "nt_posts", "nt_authors"]) {
-      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
-    }
+    await migrationCtx().dropTable("nt_ratings", "nt_comments", "nt_posts", "nt_authors", {
+      ifExists: true,
+    });
   });
 
   afterEach(() => {
@@ -131,9 +131,6 @@ describe("DJAS routing widening — nested-through", () => {
     const r2 = (await NtRating.create({ nt_comment_id: c2.id, value: 8 })) as any;
     const r3 = (await NtRating.create({ nt_comment_id: c2.id, value: 9 })) as any;
 
-    // A stray rating on a different author's chain — must not leak
-    // into the result (proves the chain walk filters by owner at the
-    // first step, not just on the source table).
     const otherAuthor = await NtAuthor.create({ name: "b" });
     const otherPost = (await NtPost.create({
       nt_author_id: otherAuthor.id,
@@ -148,9 +145,6 @@ describe("DJAS routing widening — nested-through", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -162,18 +156,10 @@ describe("DJAS routing widening — nested-through", () => {
       Notifications.unsubscribe(sub);
     }
     expect(observed.length).toBeGreaterThan(0);
-    // No JOIN anywhere — the 3-step walk (posts → comments → ratings)
-    // must emit three separate SELECTs rather than a multi-table
-    // join that would collapse under `disable_joins: true`.
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
   });
 
   it("nested-through + ordered intermediate: DJAR wrap reorders final records by chain-intermediate sequence", async () => {
-    // When any step in the (flattened) chain is ordered, DJAS wraps
-    // the final step in a DisableJoinsAssociationRelation whose
-    // loaded-chain reorder re-emits records in the intermediate's
-    // pluck order. This test proves the wrap fires on a nested
-    // shape, not just a direct through.
     Associations.hasMany.call(NtPost, "ntCommentsOrdered", {
       className: "NtComment",
       foreignKey: "nt_post_id",
@@ -193,10 +179,6 @@ describe("DJAS routing widening — nested-through", () => {
 
     const author = await NtAuthor.create({ name: "ord" });
     const post = (await NtPost.create({ nt_author_id: author.id, title: "p" })) as any;
-    // Insert comment "b" first (smaller id), "a" second (larger id).
-    // The upstream .order("body") flips their pluck order to a, b,
-    // so the final rating reorder should emit a-ratings before
-    // b-ratings even though r_from_a has the larger comment id.
     const cb = (await NtComment.create({ nt_post_id: post.id, body: "b" })) as any;
     const ca = (await NtComment.create({ nt_post_id: post.id, body: "a" })) as any;
     await NtRating.create({ nt_comment_id: cb.id, value: 1 });
@@ -204,8 +186,6 @@ describe("DJAS routing widening — nested-through", () => {
 
     const reflection = (NtAuthor as any)._reflectOnAssociation("noJoinsNtRatingsOrdered");
     const ratings = await loadHasMany(author, "noJoinsNtRatingsOrdered", reflection.options);
-    // Ordered by the intermediate (comment body a-then-b): value 2
-    // (from comment a) before value 1 (from comment b).
     expect(ratings.map((r: any) => r.value)).toEqual([2, 1]);
   });
 });

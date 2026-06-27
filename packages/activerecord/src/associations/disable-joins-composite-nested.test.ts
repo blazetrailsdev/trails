@@ -9,49 +9,35 @@
  * wasn't exercised directly.
  *
  * Chain here:
- *   CkShop
- *     has_many :ckOrders (shop_id → shop.id)
- *     has_many :ckLineItemsThroughOrders, through: :ckOrders,
- *                                         source: :ckLineItems
+ *   CknShop
+ *     has_many :cknOrders (shop_id → shop.id)
+ *     has_many :cknLineItemsThroughOrders, through: :cknOrders,
+ *                                          source: :cknLineItems
  *       # source edge uses composite FK
- *       # (ck_order_shop_id, ck_order_number) →
- *       # CkOrder's composite PK (shop_id, order_number)
- *     has_many :ckLineItemTags, through: :ckLineItemsThroughOrders,
- *                               source: :ckTags,
- *                               disable_joins: true
+ *       # (ckn_order_shop_id, ckn_order_number) →
+ *       # CknOrder's composite PK (shop_id, order_number)
+ *     has_many :cknLineItemTags, through: :cknLineItemsThroughOrders,
+ *                                source: :cknTags,
+ *                                disable_joins: true
  *       # Nested-through — `through:` is itself a through
  *
  * The walk runs three step queries (orders → line_items →
  * line_item_tags) — the middle step emits an Arel OR-of-AND
  * composite predicate from PredicateBuilder.buildComposite.
+ *
+ * Tables use the `ckn_*` prefix (not `ck_*`) to avoid colliding
+ * with disable-joins-composite-key.test.ts on the same worker.
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const CKN_SCHEMA: Schema = {
-  /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS composite-key nested-through harness; ckn_* tables have no schema.rb analog (composite PK shape) */
-  ckn_shops: { name: "string" },
-  ckn_orders: {
-    columns: {
-      shop_id: "integer",
-      order_number: "integer",
-      label: "string",
-    },
-    primaryKey: ["shop_id", "order_number"],
-  },
-  ckn_line_items: {
-    ckn_order_shop_id: "integer",
-    ckn_order_number: "integer",
-    sku: "string",
-  },
-  ckn_tags: { ckn_line_item_id: "integer", value: "string" },
-  /* eslint-enable blazetrails/require-canonical-schema */
-};
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("DJAS composite-key + nested-through", () => {
   setupHandlerSuite();
@@ -89,7 +75,27 @@ describe("DJAS composite-key + nested-through", () => {
   }
 
   beforeAll(async () => {
-    await defineSchema(CKN_SCHEMA);
+    await migrationCtx().createTable("ckn_shops", { force: true }, (t: any) => {
+      t.string("name");
+    });
+    await migrationCtx().createTable(
+      "ckn_orders",
+      { primaryKey: ["shop_id", "order_number"], force: true },
+      (t: any) => {
+        t.integer("shop_id");
+        t.integer("order_number");
+        t.string("label");
+      },
+    );
+    await migrationCtx().createTable("ckn_line_items", { force: true }, (t: any) => {
+      t.integer("ckn_order_shop_id");
+      t.integer("ckn_order_number");
+      t.string("sku");
+    });
+    await migrationCtx().createTable("ckn_tags", { force: true }, (t: any) => {
+      t.integer("ckn_line_item_id");
+      t.string("value");
+    });
     registerModel("CknShop", CknShop);
     registerModel("CknOrder", CknOrder);
     registerModel("CknLineItem", CknLineItem);
@@ -119,7 +125,6 @@ describe("DJAS composite-key + nested-through", () => {
       through: "cknOrders",
       source: "cknLineItems",
     });
-    // Nested through + composite FK on the middle edge + disable_joins.
     Associations.hasMany.call(CknShop, "cknLineItemTags", {
       className: "CknTag",
       through: "cknLineItemsThroughOrders",
@@ -129,9 +134,9 @@ describe("DJAS composite-key + nested-through", () => {
   });
 
   afterAll(async () => {
-    for (const t of ["ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops"]) {
-      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
-    }
+    await migrationCtx().dropTable("ckn_tags", "ckn_line_items", "ckn_orders", "ckn_shops", {
+      ifExists: true,
+    });
   });
 
   afterEach(() => Notifications.unsubscribeAll());
@@ -151,8 +156,6 @@ describe("DJAS composite-key + nested-through", () => {
     await CknTag.create({ ckn_line_item_id: li.id, value: "red" });
     await CknTag.create({ ckn_line_item_id: li.id, value: "sale" });
 
-    // Another shop's chain — must not leak. Proves the walk's
-    // first-step filter by shop.id is holding.
     const other = await CknShop.create({ name: "Other" });
     const otherOrder = (await CknOrder.create({
       shop_id: other.id,
@@ -169,9 +172,6 @@ describe("DJAS composite-key + nested-through", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -183,14 +183,7 @@ describe("DJAS composite-key + nested-through", () => {
       Notifications.unsubscribe(sub);
     }
     expect(observed.length).toBeGreaterThan(0);
-    // DJAS walks step-by-step — three SELECTs, no JOIN across the
-    // chain. A regression that fell back to AssociationScope (or
-    // regressed buildComposite into an IN-subquery in the nested
-    // case) would show a JOIN.
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
-    // The composite edge must fire the OR-of-AND predicate shape
-    // PredicateBuilder.buildComposite emits — referring to both
-    // composite columns alongside each other in the WHERE.
     expect(
       observed.some(
         (s) => /ckn_order_shop_id/i.test(s) && /ckn_order_number/i.test(s) && /\bAND\b/i.test(s),
@@ -199,15 +192,6 @@ describe("DJAS composite-key + nested-through", () => {
   });
 
   it("unsaved owner returns [] even when orphan through rows have NULL FKs", async () => {
-    // PredicateBuilder's ArrayHandler folds `[null]` into
-    // `key IS NULL`. Without the `isNewRecord()` short-circuit,
-    // an unsaved owner whose PK is null would seed DJAS with
-    // `[null]`, and the first-step WHERE would match orphan through
-    // rows whose FK is null — leaking into the chain as a phantom
-    // association. Create the orphan on CknLineItem (its composite
-    // FK columns are nullable) rather than CknOrder (whose shop_id
-    // is part of its composite PK and implicitly NOT NULL on
-    // PG/MySQL).
     const orphanLi = (await CknLineItem.create({
       ckn_order_shop_id: null as any,
       ckn_order_number: null as any,

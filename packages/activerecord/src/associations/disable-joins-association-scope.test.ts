@@ -1,20 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const DJS_SCHEMA: Schema = {
-  /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS harness; djs_* tables have no schema.rb analog */
-  djs_authors: { name: "string" },
-  djs_posts: { djs_author_id: "integer", title: "string" },
-  djs_comments: { djs_post_id: "integer", body: "string" },
-  /* eslint-enable blazetrails/require-canonical-schema */
-};
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("DisableJoinsAssociationScope", () => {
   setupHandlerSuite();
@@ -42,7 +37,17 @@ describe("DisableJoinsAssociationScope", () => {
   }
 
   beforeAll(async () => {
-    await defineSchema(DJS_SCHEMA);
+    await migrationCtx().createTable("djs_authors", { force: true }, (t: any) => {
+      t.string("name");
+    });
+    await migrationCtx().createTable("djs_posts", { force: true }, (t: any) => {
+      t.integer("djs_author_id");
+      t.string("title");
+    });
+    await migrationCtx().createTable("djs_comments", { force: true }, (t: any) => {
+      t.integer("djs_post_id");
+      t.string("body");
+    });
     registerModel("DjsAuthor", DjsAuthor);
     registerModel("DjsPost", DjsPost);
     registerModel("DjsComment", DjsComment);
@@ -77,14 +82,11 @@ describe("DisableJoinsAssociationScope", () => {
   });
 
   afterAll(async () => {
-    for (const t of ["djs_comments", "djs_posts", "djs_authors"]) {
-      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
-    }
+    await migrationCtx().dropTable("djs_comments", "djs_posts", "djs_authors", {
+      ifExists: true,
+    });
   });
 
-  // Backstop in case a test throws before reaching its in-test
-  // unsubscribe — leaked sql.active_record subscribers can corrupt
-  // sibling tests (and bloat process memory across the suite).
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -100,8 +102,6 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "c2" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    // No `await` — DJAS.scope() is sync now (matches Rails). The
-    // returned DJAR is in deferred-chain mode; toArray runs the walk.
     const built = DisableJoinsAssociationScope.INSTANCE.scope({
       owner: author,
       reflection,
@@ -114,10 +114,6 @@ describe("DisableJoinsAssociationScope", () => {
   });
 
   it("issues per-step queries (no multi-table JOIN actually emitted to the DB)", async () => {
-    // Capture executed SQL via Notifications so we can assert the
-    // WHOLE point of DJAS — no JOIN ever hits the wire — instead of
-    // just verifying the records came back. (Uses the top-level
-    // `Notifications` import; no need for a dynamic re-import.)
     const author = await DjsAuthor.create({ name: "A" });
     const post = await DjsPost.create({ djs_author_id: author.id, title: "p" });
     await DjsComment.create({ djs_post_id: post.id, body: "c1" });
@@ -132,9 +128,6 @@ describe("DisableJoinsAssociationScope", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -145,19 +138,11 @@ describe("DisableJoinsAssociationScope", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
-    // Per-step queries hit djs_posts and djs_comments individually;
-    // a JOIN-based load would have a single query mentioning both
-    // table names with a JOIN keyword. Assert no captured SQL has JOIN.
     expect(observed.length).toBeGreaterThan(0);
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
   });
 
   it("chained .where() on the deferred DJAR composes into the walker result", async () => {
-    // Regression: a deferred DJAR's chained query state (wheres,
-    // orders, etc.) was silently dropped because the walker built a
-    // fresh relation that didn't see anything on the chained DJAR.
-    // _loadThroughViaDisableJoinsScope hits this when `options.scope`
-    // adds .where on top of the DJAS-returned relation.
     const author = await DjsAuthor.create({ name: "A" });
     const post = await DjsPost.create({ djs_author_id: author.id, title: "p" });
     await DjsComment.create({ djs_post_id: post.id, body: "include-me" });
@@ -169,8 +154,6 @@ describe("DisableJoinsAssociationScope", () => {
       reflection,
       klass: reflection.klass,
     }) as any;
-    // Chain a where() onto the deferred DJAR — this is what
-    // options.scope(rel) does in production.
     const filtered = built.where({ body: "include-me" });
     const records = await filtered.toArray();
     expect(records.map((r: any) => r.body)).toEqual(["include-me"]);
@@ -200,22 +183,11 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
 
-    // The deferred outer DJAR wraps a chain walk that internally
-    // produces a *loaded-chain* DJAR (the source step has no order
-    // but the through step does → wrap in DJAR for IN-list reorder).
-    // We verify the externally observable contract: records come back
-    // in upstream-ordered sequence (postA.title="a" before postB.title="b").
     const records = await built.toArray();
     expect(records.map((r: any) => r.body)).toEqual(["from-a", "from-b"]);
   });
 
   it("limit on the ordered-upstream wrap case slices AFTER reorder (no SQL LIMIT before IN-list ordering)", async () => {
-    // Regression: the ordered-upstream wrap returns a loaded-chain
-    // DJAR that, before this fix, applied SQL LIMIT during super.toArray()
-    // when a chained .limit(n) was merged in via composition. That
-    // sliced rows in IN-clause order (DB-arbitrary), not through-table
-    // order — so .limit(1) might return the LAST through record's
-    // first comment instead of the FIRST.
     const author = await DjsAuthor.create({ name: "A" });
     const postB = await DjsPost.create({ djs_author_id: author.id, title: "b" });
     const postA = await DjsPost.create({ djs_author_id: author.id, title: "a" });
@@ -229,8 +201,6 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
 
-    // Chain .limit(1) on the deferred outer DJAR. The first record by
-    // through-table ordering (ordered by post.title) is from postA.
     const limited = built.limit(1) as Promise<Base[]> | DisableJoinsAssociationRelation<Base>;
     const records = await limited;
     expect(records.length).toBe(1);

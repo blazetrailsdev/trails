@@ -20,11 +20,14 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
   setupHandlerSuite();
@@ -58,14 +61,20 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   }
 
   beforeAll(async () => {
-    /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS routing-widening harness; rw_* tables have no schema.rb analog */
-    await defineSchema({
-      rw_authors: { name: "string" },
-      rw_comments: { rw_author_id: "integer", origin_id: "integer", origin_type: "string" },
-      rw_members: { name: "string" },
-      rw_other_origins: { label: "string" },
+    await migrationCtx().createTable("rw_authors", { force: true }, (t: any) => {
+      t.string("name");
     });
-    /* eslint-enable blazetrails/require-canonical-schema */
+    await migrationCtx().createTable("rw_comments", { force: true }, (t: any) => {
+      t.integer("rw_author_id");
+      t.integer("origin_id");
+      t.string("origin_type");
+    });
+    await migrationCtx().createTable("rw_members", { force: true }, (t: any) => {
+      t.string("name");
+    });
+    await migrationCtx().createTable("rw_other_origins", { force: true }, (t: any) => {
+      t.string("label");
+    });
     registerModel("RwAuthor", RwAuthor);
     registerModel("RwComment", RwComment);
     registerModel("RwMember", RwMember);
@@ -82,10 +91,6 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       foreignKey: "origin_id",
       polymorphic: true,
     });
-    // has_many :no_joins_rw_members, through: :rw_comments,
-    //   source: :origin, source_type: "RwMember", disable_joins: true
-    // Direct (non-nested) through: RwAuthor → rwComments (through) →
-    // origin (polymorphic belongsTo, sourceType disambiguates).
     Associations.hasMany.call(RwAuthor, "noJoinsRwMembers", {
       className: "RwMember",
       through: "rwComments",
@@ -93,9 +98,6 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       sourceType: "RwMember",
       disableJoins: true,
     });
-    // `has_one :through` must go through a singular step — Rails
-    // rejects has_one-through-collection. Use a dedicated has_one
-    // comment so the chain is singular all the way to the source.
     Associations.hasOne.call(RwAuthor, "rwComment", {
       className: "RwComment",
       foreignKey: "rw_author_id",
@@ -110,9 +112,9 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   });
 
   afterAll(async () => {
-    for (const t of ["rw_other_origins", "rw_members", "rw_comments", "rw_authors"]) {
-      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
-    }
+    await migrationCtx().dropTable("rw_other_origins", "rw_members", "rw_comments", "rw_authors", {
+      ifExists: true,
+    });
   });
 
   afterEach(() => {
@@ -123,13 +125,8 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     const author = await RwAuthor.create({ name: "a" });
     const m1 = (await RwMember.create({ name: "m1" })) as any;
     const m2 = (await RwMember.create({ name: "m2" })) as any;
-    // ids overlap across polymorphic target tables (separate
-    // per-table sequences), so the source_type filter is the only
-    // thing that could discriminate — not a lucky id mismatch.
     const other = (await RwOtherOrigin.create({ label: "o" })) as any;
-    expect(other.id).toBe(m1.id); // id collision across polymorphic targets
-    // Comments pointing at both RwMembers (match sourceType) and the
-    // RwOtherOrigin (must be filtered out by source_type, not by id).
+    expect(other.id).toBe(m1.id);
     await RwComment.create({
       rw_author_id: author.id,
       origin_id: m1.id,
@@ -149,11 +146,6 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal schema/type-map introspection (name "SCHEMA"),
-      // matching Rails' SQLCounter which never counts SCHEMA queries. PG's
-      // type-map loader issues a `pg_type LEFT JOIN pg_range` query lazily on a
-      // cold connection; it is not an association query and must not trip the
-      // no-JOIN assertion below.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -161,32 +153,17 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       const reflection = (RwAuthor as any)._reflectOnAssociation("noJoinsRwMembers");
       const members = await loadHasMany(author, "noJoinsRwMembers", reflection.options);
       expect(members.map((m: any) => m.id).sort()).toEqual([m1.id, m2.id].sort());
-      // `count()` should hit the same routing gate and also avoid
-      // the JOIN path. CollectionProxy#count currently loads
-      // records and returns `.length` rather than issuing a
-      // distinct COUNT — we only assert the cardinality and the
-      // no-JOIN shape, not the query form.
       const count = await association(author, "noJoinsRwMembers").count();
       expect(count).toBe(2);
     } finally {
       Notifications.unsubscribe(sub);
     }
     expect(observed.length).toBeGreaterThan(0);
-    // Hard assert: no JOIN in any query — would be present if the
-    // loader regressed back to AssociationScope's join-based path.
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
-    // And the source_type filter actually lands somewhere —
-    // contributed by PolymorphicReflection#_sourceTypeScope via
-    // constraints() during the DJAS chain walk.
     expect(observed.some((s) => /origin_type/i.test(s))).toBe(true);
   });
 
   it("has_one :through polymorphic+sourceType routes through DJAS (no JOIN)", async () => {
-    // The routing gate is shared by loadHasMany and loadHasOne
-    // (associations.ts), so the same widening needs to hold for
-    // has_one :through. `noJoinsOneRwMember` is defined in
-    // beforeEach above so we don't mutate RwAuthor's association list
-    // across tests.
     const author = await RwAuthor.create({ name: "a" });
     const member = (await RwMember.create({ name: "m" })) as any;
     const other = (await RwOtherOrigin.create({ label: "o" })) as any;
@@ -204,11 +181,6 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal schema/type-map introspection (name "SCHEMA"),
-      // matching Rails' SQLCounter which never counts SCHEMA queries. PG's
-      // type-map loader issues a `pg_type LEFT JOIN pg_range` query lazily on a
-      // cold connection; it is not an association query and must not trip the
-      // no-JOIN assertion below.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
