@@ -180,12 +180,14 @@ function buildExtendedAliases(
         continue;
       const rawClassName = call.options["className"];
       if (rawClassName) {
-        // Gap A: resolve "Namespace::Class" to TS class name; fall back to
-        // Base when unresolvable so the declare stays typecheck-green.
+        // Gap A: resolve "Namespace::Class" to TS class name.
+        // If unresolvable, omit the alias so the synthesizer skips the declare
+        // (no entry → resolveAssociationTarget returns undefined → no emit).
+        // Rails raises on a bad class name; we should not bake Base as a fallback.
         const stripped = stripQuotes(rawClassName);
         if (stripped.includes("::") && !out.has(stripped)) {
           const tsName = resolveNamespacedClassName(stripped, namespacedRegistry);
-          out.set(stripped, tsName ?? "Base");
+          if (tsName) out.set(stripped, tsName);
         }
       } else {
         // Gap B: fix mis-singularized classify results
