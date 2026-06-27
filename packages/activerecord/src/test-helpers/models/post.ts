@@ -67,7 +67,7 @@ export class Post extends Base {
   declare authorWithAddress: Author | null;
   declare authorWithSelect: Author | null;
   declare authorWithTheLetterA: Author | null;
-  declare firstComment: string | null;
+  declare firstComment: Promise<string | null>;
   declare lastComment: Comment | null;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
