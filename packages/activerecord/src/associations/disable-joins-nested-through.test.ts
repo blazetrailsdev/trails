@@ -19,16 +19,17 @@
  * the gate, or a change to `getChain` that silently falls back,
  * gets caught.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("DJAS routing widening — nested-through", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   // Author → Post → Comment → Rating (4-level chain).
   // `noJoinsNtRatings` on the author is nested: it goes through
@@ -62,17 +63,14 @@ describe("DJAS routing widening — nested-through", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS nested-through harness; nt_* tables have no schema.rb analog */
+    await defineSchema({
       nt_authors: { name: "string" },
       nt_posts: { nt_author_id: "integer", title: "string" },
       nt_comments: { nt_post_id: "integer", body: "string" },
       nt_ratings: { nt_comment_id: "integer", value: "integer" },
     });
-    NtAuthor.adapter = adapter;
-    NtPost.adapter = adapter;
-    NtComment.adapter = adapter;
-    NtRating.adapter = adapter;
+    /* eslint-enable blazetrails/require-canonical-schema */
     registerModel("NtAuthor", NtAuthor);
     registerModel("NtPost", NtPost);
     registerModel("NtComment", NtComment);
@@ -112,7 +110,12 @@ describe("DJAS routing widening — nested-through", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["nt_ratings", "nt_comments", "nt_posts", "nt_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   afterEach(() => {
     Notifications.unsubscribeAll();

@@ -1,21 +1,24 @@
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA: Schema = {
+const DJS_SCHEMA: Schema = {
+  /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS harness; djs_* tables have no schema.rb analog */
   djs_authors: { name: "string" },
   djs_posts: { djs_author_id: "integer", title: "string" },
   djs_comments: { djs_post_id: "integer", body: "string" },
+  /* eslint-enable blazetrails/require-canonical-schema */
 };
 
 describe("DisableJoinsAssociationScope", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class DjsAuthor extends Base {
     static {
@@ -39,11 +42,7 @@ describe("DisableJoinsAssociationScope", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    DjsAuthor.adapter = adapter;
-    DjsPost.adapter = adapter;
-    DjsComment.adapter = adapter;
+    await defineSchema(DJS_SCHEMA);
     registerModel("DjsAuthor", DjsAuthor);
     registerModel("DjsPost", DjsPost);
     registerModel("DjsComment", DjsComment);
@@ -76,7 +75,12 @@ describe("DisableJoinsAssociationScope", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["djs_comments", "djs_posts", "djs_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   // Backstop in case a test throws before reaching its in-test
   // unsubscribe — leaked sql.active_record subscribers can corrupt

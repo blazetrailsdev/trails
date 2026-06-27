@@ -14,16 +14,17 @@
  * joins through associations: tuple-style matching across the
  * intermediate records, no JOIN in the generated query shape.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA: Schema = {
+const CK_SCHEMA: Schema = {
+  /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS composite-key harness; ck_* tables have no schema.rb analog (composite PK shape) */
   ck_shops: { name: "string" },
   ck_orders: {
     columns: {
@@ -38,10 +39,12 @@ const TEST_SCHEMA: Schema = {
     ck_order_number: "integer",
     sku: "string",
   },
+  /* eslint-enable blazetrails/require-canonical-schema */
 };
 
 describe("DJAS — composite key support", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   // Shopify-style composite-PK shape: (shop_id, order_number). We
   // avoid `id` as the second PK column because Base.id is an accessor
@@ -71,11 +74,7 @@ describe("DJAS — composite key support", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    CkShop.adapter = adapter;
-    CkOrder.adapter = adapter;
-    CkLineItem.adapter = adapter;
+    await defineSchema(CK_SCHEMA);
     registerModel("CkShop", CkShop);
     registerModel("CkOrder", CkOrder);
     registerModel("CkLineItem", CkLineItem);
@@ -99,7 +98,12 @@ describe("DJAS — composite key support", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["ck_line_items", "ck_orders", "ck_shops"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   // Backstop in case a test throws before reaching its in-test
   // unsubscribe. Same pattern as instrumentation.test.ts.

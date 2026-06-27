@@ -25,15 +25,16 @@
  * (reflection.rb:968); our ReflectionProxy forwards it, and DJAS'
  * `_addConstraintsDj` threads it through the chain walk.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA: Schema = {
+const DP_SCHEMA: Schema = {
+  /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS polymorphic non-id PK harness; dp_* tables have no schema.rb analog (non-id primary keys) */
   dp_authors: { name: "string" },
   dp_galleries: {
     dp_author_id: "integer",
@@ -48,10 +49,12 @@ const TEST_SCHEMA: Schema = {
     columns: { slug: "string", headline: "string" },
     primaryKey: ["slug"],
   },
+  /* eslint-enable blazetrails/require-canonical-schema */
 };
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class DpAuthor extends Base {
     static {
@@ -85,12 +88,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    DpAuthor.adapter = adapter;
-    DpGallery.adapter = adapter;
-    DpNonIdPhoto.adapter = adapter;
-    DpNonIdArticle.adapter = adapter;
+    await defineSchema(DP_SCHEMA);
     registerModel("DpAuthor", DpAuthor);
     registerModel("DpGallery", DpGallery);
     registerModel("DpNonIdPhoto", DpNonIdPhoto);
@@ -131,7 +129,12 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["dp_non_id_articles", "dp_non_id_photos", "dp_galleries", "dp_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   afterEach(() => Notifications.unsubscribeAll());
 

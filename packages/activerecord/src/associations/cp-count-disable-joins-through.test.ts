@@ -18,16 +18,17 @@
  * DJAR materializes records to enforce the in-memory reorder.
  * We don't need to materialize for the count, so we emit COUNT.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("CollectionProxy#count — disable_joins through", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class CdAuthor extends Base {
     static {
@@ -54,16 +55,14 @@ describe("CollectionProxy#count — disable_joins through", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS count harness; cd_* tables have no schema.rb analog */
+    await defineSchema({
       cd_authors: { name: "string" },
       cd_posts: { cd_author_id: "integer", title: "string" },
       cd_comments: { cd_post_id: "integer", body: "string" },
       cd_ratings: { cd_comment_id: "integer", value: "integer" },
     });
-    CdAuthor.adapter = adapter;
-    CdPost.adapter = adapter;
-    CdComment.adapter = adapter;
+    /* eslint-enable blazetrails/require-canonical-schema */
     registerModel("CdAuthor", CdAuthor);
     registerModel("CdPost", CdPost);
     registerModel("CdComment", CdComment);
@@ -89,7 +88,12 @@ describe("CollectionProxy#count — disable_joins through", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["cd_ratings", "cd_comments", "cd_posts", "cd_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   afterEach(() => Notifications.unsubscribeAll());
 
@@ -138,7 +142,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
         this.attribute("value", "integer");
       }
     }
-    CdRating.adapter = adapter;
     registerModel("CdRating", CdRating);
     (CdRating as any)._associations = [];
     (CdRating as any)._reflections = {};

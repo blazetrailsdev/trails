@@ -18,16 +18,17 @@
  * that re-introduces the gate — or any future change that silently
  * falls back to AssociationScope — is caught.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class RwAuthor extends Base {
     static {
@@ -57,17 +58,14 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    /* eslint-disable blazetrails/require-canonical-schema -- trails-internal DJAS routing-widening harness; rw_* tables have no schema.rb analog */
+    await defineSchema({
       rw_authors: { name: "string" },
       rw_comments: { rw_author_id: "integer", origin_id: "integer", origin_type: "string" },
       rw_members: { name: "string" },
       rw_other_origins: { label: "string" },
     });
-    RwAuthor.adapter = adapter;
-    RwComment.adapter = adapter;
-    RwMember.adapter = adapter;
-    RwOtherOrigin.adapter = adapter;
+    /* eslint-enable blazetrails/require-canonical-schema */
     registerModel("RwAuthor", RwAuthor);
     registerModel("RwComment", RwComment);
     registerModel("RwMember", RwMember);
@@ -110,7 +108,12 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    for (const t of ["rw_other_origins", "rw_members", "rw_comments", "rw_authors"]) {
+      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
+    }
+  });
 
   afterEach(() => {
     Notifications.unsubscribeAll();
