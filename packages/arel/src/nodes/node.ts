@@ -49,6 +49,7 @@ export abstract class Node {
    * Mirrors: `eql?` / `==` semantics used throughout the Arel test suite.
    */
   eql(other: unknown): boolean {
+    if (other === this) return true;
     if (!other || typeof other !== "object") return false;
     if (
       (other as { constructor: unknown }).constructor !==
