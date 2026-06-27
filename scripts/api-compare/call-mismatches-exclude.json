@@ -155,13 +155,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "update_attribute!",
-    "call": "save!",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "update",
