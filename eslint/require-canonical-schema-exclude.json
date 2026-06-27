@@ -1,13 +1,6 @@
 [
   "packages/activerecord/src/associations.test.ts",
   "packages/activerecord/src/associations/association-scope.test.ts",
-  "packages/activerecord/src/associations/cp-count-disable-joins-through.test.ts",
-  "packages/activerecord/src/associations/disable-joins-association-scope.test.ts",
-  "packages/activerecord/src/associations/disable-joins-composite-key.test.ts",
-  "packages/activerecord/src/associations/disable-joins-composite-nested.test.ts",
-  "packages/activerecord/src/associations/disable-joins-nested-through.test.ts",
-  "packages/activerecord/src/associations/disable-joins-polymorphic-nonid-pk.test.ts",
-  "packages/activerecord/src/associations/disable-joins-routing-widening.test.ts",
   "packages/activerecord/src/associations/eager.test.ts",
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-associations.test.ts",
