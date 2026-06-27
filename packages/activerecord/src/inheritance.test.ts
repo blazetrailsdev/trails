@@ -634,7 +634,7 @@ describe("InheritanceAttributeMappingTest", () => {
     await IamtEmpire.create({ name: "an Empire" });
 
     const rawRows = (
-      await Base.connection.selectAll("SELECT name, type FROM companies ORDER BY name")
+      await Base.connection.selectAll("SELECT name, type FROM companies ORDER BY id")
     ).toArray() as Array<{ name: string; type: string }>;
     expect(rawRows[0]).toMatchObject({
       name: "a Startup",
