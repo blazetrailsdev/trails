@@ -15,8 +15,6 @@ import {
 } from "./index.js";
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Agency, Company, Firm } from "./test-helpers/models/company.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
@@ -35,179 +33,11 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
-const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
-  pirates: { catchphrase: "string" },
-  ships: { name: "string", pirate_id: "integer" },
-  birds: { name: "string", pirate_id: "integer" },
-  parts: { name: "string", ship_id: "integer" },
-  parrots: { name: "string" },
-  companies: { name: "string" },
-  clients: { name: "string", company_id: "integer" },
-  unvalidated_clients: { name: "string", company_id: "integer" },
-  cpk_order_pks: {
-    columns: { shop_id: "integer", id: "integer", status: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_book_fks: { order_id: "integer", title: "string" },
-  ai_cpk_orders: {
-    columns: { shop_id: "integer", id: "integer", status: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  ai_cpk_order_agreements: { order_id: "integer", signature: "string" },
-  ai_cpk_two_orders: {
-    columns: { shop_id: "integer", id: "integer", status: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  ai_cpk_two_books: {
-    columns: {
-      author_id: "integer",
-      id: "integer",
-      title: "string",
-      order_id: "integer",
-      shop_id: "integer",
-    },
-    primaryKey: ["author_id", "id"],
-  },
-  aid_firms: { name: "string" },
-  aid_contracts: { aid_firm_id: "integer", aid_developer_id: "integer" },
-  aid_developers: { name: "string" },
-  firms: { name: "string" },
-  accounts: { credit_limit: "integer", firm_id: "integer" },
-  p_firms: { name: "string" },
-  p_accounts: { credit_limit: "integer", p_firm_id: "integer" },
-  loose_accounts: { credit_limit: "integer", firm_id: "integer" },
-  cb_firms: { name: "string" },
-  cb_accounts: { credit_limit: "integer", cb_firm_id: "integer" },
-  cu_firms: { name: "string" },
-  cu_accounts: { credit_limit: "integer", cu_firm_id: "integer" },
-  cs_firms: { name: "string" },
-  cs_accounts: { credit_limit: "integer", cs_firm_id: "integer" },
-  cb_parents: { name: "string" },
-  cb_children: { value: "string", cb_parent_id: "integer" },
-  poly_parents: { name: "string" },
-  poly_children: { name: "string", employable_id: "integer", employable_type: "string" },
-  cb_owners: { name: "string" },
-  cb_pets: { species: "string", cb_owner_id: "integer" },
-  eyes: {},
-  iris: { eye_id: "integer", color: "string" },
-  poly_as_parents: { name: "string" },
-  poly_as_children: { name: "string", employable_id: "integer", employable_type: "string" },
-  dual_valid_ships: { name: "string", pirate_id: "integer" },
-  dual_pirates: { catchphrase: "string" },
-  flex_ships: { name: "string", pirate_id: "integer", flex_pirate_id: "integer" },
-  deep_parts: { name: "string", ship_id: "integer" },
-  deep_ships: { name: "string", pirate_id: "integer" },
-  deep_pirates: { catchphrase: "string" },
-  cc_pirates: { catchphrase: "string" },
-  swap_chefs: { name: "string", employable_id: "integer", employable_type: "string" },
-  swap_cake_designers: { name: "string" },
-  swap_drink_designers: { name: "string" },
-  authors: { name: "string" },
-  posts: { title: "string", author_id: "integer" },
-  flex_authors: { name: "string" },
-  flex_posts: { title: "string", flex_author_id: "integer" },
-  poly_members: { name: "string" },
-  poly_sponsors: { sponsorable_id: "integer", sponsorable_type: "string" },
-  cpk_order2s: { shop_id: "integer", status: "string" },
-  cpk_book2s: { shop_id: "integer", order_id: "integer", title: "string" },
-  flex_pirates: { catchphrase: "string" },
-  cc_ships: { name: "string", pirate_id: "integer" },
-  parents: { name: "string" },
-  children: { name: "string", parent_id: "integer", region: "string", label: "string" },
-  ps: { name: "string" },
-  cs: { favorite: "boolean", p_id: "integer" },
-  references: { favorite: "boolean", job_id: "integer", person_id: "integer" },
-  people: { name: "string", first_name: "string" },
-  widgets: { status: "string", owner_id: "integer" },
-  owners: { name: "string" },
-  books: { title: "string", author_id: "integer" },
-  profiles: { bio: "string", user_id: "integer" },
-  users: { name: "string" },
-  comp_parents: { region_id: "integer", name: "string" },
-  comp_children: { comp_parent_region_id: "integer", comp_parent_id: "integer", label: "string" },
-  ship_cyclics: { name: "string" },
-  prisoner_cyclics: { ship_id: "integer" },
-  vm_parents: { name: "string" },
-  vm_children: { val: "string", vm_parent_id: "integer" },
-  vo_parents: { name: "string" },
-  vo_children: { val: "string", vo_parent_id: "integer" },
-  nv_parents: { name: "string" },
-  nv_children: { val: "string", nv_parent_id: "integer" },
-  bv_owners: { name: "string" },
-  bv_children: { val: "string", bv_owner_id: "integer" },
-  nb_owners: { name: "string" },
-  nb_children: { val: "string", nb_owner_id: "integer" },
-  hv_parents: { name: "string" },
-  hv_tags: { label: "string" },
-  items: { name: "string", label: "string" },
-  addresses: { street: "string" },
-  hot_orgs: { name: "string" },
-  hot_members: { name: "string" },
-  hot_details: { hot_org_id: "integer", hot_member_id: "integer" },
-  rev_orgs: { name: "string" },
-  rev_members: { name: "string" },
-  rev_details: { rev_org_id: "integer", rev_member_id: "integer" },
-  tags: { name: "string" },
-  labels: { text: "string" },
-  bt_owners: { name: "string" },
-  bt_records: { value: "string", bt_owner_id: "integer" },
-  tch_parents: { name: "string", updated_at: "string" },
-  tch_children: { value: "string", tch_parent_id: "integer" },
-  uc_parents: { name: "string" },
-  uc_children: { val: "string", uc_parent_id: "integer" },
-  asb1_tags: { name: "string", asb1_article_id: "integer" },
-  asb1_articles: { title: "string" },
-  nuc_tags: { name: "string", nuc_article_id: "integer" },
-  nuc_articles: { title: "string" },
-  av_tags: { name: "string", av_article_id: "integer" },
-  av_articles: { title: "string" },
-  ndi_tags: { name: "string", ndi_article_id: "integer" },
-  ndi_articles: { title: "string" },
-  di_tags: { name: "string", di_article_id: "integer" },
-  di_articles: { title: "string" },
-  bvu_tags: { name: "string", bvu_article_id: "integer" },
-  bvu_articles: { title: "string" },
-  vc_tags: { name: "string", vc_article_id: "integer" },
-  vc_articles: { title: "string" },
-  bv_tags: { name: "string", bv_article_id: "integer" },
-  bv_articles: { title: "string" },
-  cb_tags: { name: "string", cb_article_id: "integer" },
-  cb_articles: { title: "string" },
-  nl_tags: { name: "string", nl_article_id: "integer" },
-  nl_articles: { title: "string" },
-  me_tags: { name: "string", me_article_id: "integer" },
-  me_articles: { title: "string" },
-  rb_tags: { name: "string", rb_article_id: "integer" },
-  rb_articles: { title: "string" },
-  ri_tags: { name: "string", ri_article_id: "integer" },
-  ri_articles: { title: "string" },
-  child2s: {},
-  parent2s: {},
-  as: {},
-  bs: { name: "string" },
-  qc_owners: { tenant_id: "integer", name: "string" },
-  qc_children: { tenant_id: "integer", qc_owner_id: "integer", title: "string" },
-  qc_no_collapses: { tenant_id: "integer", value: "string" },
-  qc_no_collapse_children: { tenant_id: "integer", qc_no_collapse_id: "integer", label: "string" },
-  qc_tenants: { tenant_id: "integer", name: "string" },
-  qc_tenant_records: { tenant_id: "integer", qc_tenant_id: "integer", note: "string" },
-  parrots_pirates: { pirate_id: "integer", parrot_id: "integer" },
-  nauto_articles: { title: "string" },
-  nauto_tags: { name: "string", nauto_article_id: "integer" },
-  pwacc_posts: { title: "string", body: "string", author_id: "integer" },
-  pwacc_comments: { post_id: "integer", body: "string" },
-  pwacc_categories: { name: "string" },
-  pwacc_categories_posts: { category_id: "integer", post_id: "integer" },
-};
-
 function cacheAssoc(record: Base, name: string, value: unknown) {
   record.association(name).setTarget(value as any);
 }
 
 setupHandlerSuite();
-beforeAll(async () => {
-  await defineSchema(UNIVERSAL_AUTOSAVE_SCHEMA);
-});
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   // Transactional fixtures roll back every persisted pirate/ship/parrot per test
@@ -215,8 +45,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   // (e.g. TestAutosaveAssociationOnACollectionRemoveCallbacks) — Rails'
   // `use_transactional_tests`.
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+  beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(Ship);
     registerModel(Developer);
@@ -3731,14 +3560,6 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   let PublishedBookM: typeof Base;
 
   beforeAll(async () => {
-    // The file-level beforeAll rebuilds `books` from the bespoke
-    // UNIVERSAL_AUTOSAVE_SCHEMA (title-only, no isbn). Restore the canonical
-    // `books`/`authors` shape so PublishedBook's isbn uniqueness validator can
-    // query against a real column.
-    await defineSchema(
-      { authors: TEST_SCHEMA.authors, books: TEST_SCHEMA.books },
-      { dropExisting: true },
-    );
     AuthorM = (await import("./test-helpers/models/author.js")).Author as never;
     const bookMod = await import("./test-helpers/models/book.js");
     BookM = bookMod.Book as never;
@@ -3981,13 +3802,6 @@ describe.skip("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   useHandlerTransactionalFixtures();
 
-  beforeAll(async () => {
-    await defineSchema(
-      { posts: TEST_SCHEMA.posts, comments: TEST_SCHEMA.comments },
-      { dropExisting: true },
-    );
-  });
-
   // Mirrors Rails' nested Post/Comment classes (posts/comments tables) with a
   // Comment after_save callback that reads back the inverse `post.comments`.
   function makeModels() {
@@ -4099,11 +3913,7 @@ describe.skip("TestAutosaveAssociationWithTouch", () => {
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
   useHandlerTransactionalFixtures();
 
-  beforeAll(async () => {
-    await defineSchema(
-      { companies: TEST_SCHEMA.companies, projects: TEST_SCHEMA.projects },
-      { dropExisting: true },
-    );
+  beforeAll(() => {
     registerModel("Company", Company);
     registerModel("Firm", Firm);
     registerModel("Agency", Agency);
@@ -4930,8 +4740,7 @@ describe.skip("computePrimaryKey", () => {
 // before_remove/after_remove callbacks, not record-level child.destroy().
 describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
   setupHandlerSuite();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+  beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(Bird);
   });
