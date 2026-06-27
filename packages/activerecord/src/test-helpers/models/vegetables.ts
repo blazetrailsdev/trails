@@ -1,6 +1,8 @@
 import type { Company } from "./company.js";
 // vendor/rails/activerecord/test/models/vegetables.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
+import { registerSubclass } from "../../inheritance.js";
 
 export class Vegetable extends Base {
   declare custom_type: string;
@@ -28,6 +30,11 @@ export class RedCabbage extends Cabbage {
   static {
     this.belongsTo("seller", { className: "Company" });
   }
+}
+
+registerModel([Vegetable, Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]);
+for (const klass of [Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]) {
+  registerSubclass(klass);
 }
 
 export class YellingVegetable extends Vegetable {
