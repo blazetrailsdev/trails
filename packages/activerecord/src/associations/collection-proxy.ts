@@ -2101,10 +2101,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           if (typeof hmtScope.whereValuesHash === "function") {
             const raw = hmtScope.whereValuesHash(throughModel.tableName);
             const ownerFk = String(throughAssoc.options.foreignKey ?? "");
-            const srcFkStr = Array.isArray(sourceFk) ? sourceFk.join("\0") : String(sourceFk);
             const inheritanceCol = String((throughModel as any).inheritanceColumn ?? "type");
             for (const [k, v] of Object.entries(raw)) {
-              if (k !== ownerFk && k !== srcFkStr && k !== inheritanceCol) {
+              if (k !== ownerFk && k !== inheritanceCol) {
                 throughScopeAttrs[k] = v;
               }
             }

@@ -117,11 +117,14 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
     }
+    if (this.target.length > 0) {
+      return (await this.loadTarget()).map((r) => this.primaryKeyValue(r));
+    }
     if (this._associationIds) return this._associationIds;
     const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
     const refl = ctor._reflectOnAssociation?.(this.reflection.name);
     const srcPk = refl?.sourceReflection?.associationPrimaryKey;
-    const pk = (typeof srcPk === "string" ? srcPk : null) ?? (this.klass as any).primaryKey ?? "id";
+    const pk = (typeof srcPk === "string" ? srcPk : null) ?? (this.klass as any).primaryKey;
     const rel = this.scope();
     if (rel && typeof rel.pluck === "function") {
       this._associationIds = await rel.pluck(...(Array.isArray(pk) ? pk : [pk]));
@@ -403,9 +406,9 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
 
   // When the through is a singular (has_one/belongs_to) association that's already
-  // loaded, reuse the existing through record rather than building a new one.
-  // Mirrors Rails' build_through_record which, for singular throughs with a live
-  // target, returns the target directly so autosave uses the persisted join record.
+  // loaded, reuse the existing through record. For singular throughs there is only
+  // one possible join row, so the loaded target is always the right one — building
+  // a fresh record would wire FK on the new target to null instead of the real PK.
   const existingTarget = proxy.isLoaded?.() ? proxy.target : undefined;
   if (existingTarget && !Array.isArray(existingTarget)) {
     cache.set(record, existingTarget);
@@ -413,12 +416,7 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   }
 
   const attributes = throughScopeAttributes(assoc);
-  // Only set the source association on the through record when the source is
-  // belongs_to — has_many/has_one sources cannot be assigned as a scalar.
-  // Rails' build_through_record wires the inverse separately via
-  // inverse_reflection_for; we rely on `buildThroughInverseFor`'s caller to do that.
-  const sourceIsBelongsTo = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
-  if (sourceIsBelongsTo) {
+  if (sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo") {
     attributes[sourceRefl.name] = record;
   }
   const newRecord = proxy.build(attributes);
