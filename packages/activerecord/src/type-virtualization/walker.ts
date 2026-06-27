@@ -96,6 +96,8 @@ export interface ClassInfo {
   existingMembers: Set<string>;
   existingStaticMembers: Set<string>;
   skip: boolean; // `/** @trails-typegen skip */` JSDoc above the class
+  /** Column names listed in `@trails-typegen skip-columns: col1, col2` JSDoc — excluded from schema-reflected declares. */
+  skipSchemaColumns: Set<string>;
   /**
    * The `static tableName = "..."` value when the user declared it
    * explicitly. Used to look up schema columns in
@@ -219,6 +221,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     existingMembers: new Set(),
     existingStaticMembers: new Set(),
     skip: hasSkipMarker(cls, sourceFile),
+    skipSchemaColumns: parseSkipColumns(cls, sourceFile),
   };
 
   if (info.skip) return info;
@@ -267,9 +270,30 @@ function hasSkipMarker(cls: ts.ClassDeclaration, sf: ts.SourceFile): boolean {
   const ranges = ts.getLeadingCommentRanges(sf.text, cls.pos) ?? [];
   for (const r of ranges) {
     const text = sf.text.slice(r.pos, r.end);
-    if (/@trails-typegen\s+skip\b/.test(text)) return true;
+    if (/@trails-typegen\s+skip(?!-)/.test(text)) return true;
   }
   return false;
+}
+
+/**
+ * Parse `@trails-typegen skip-columns: col1, col2` from leading JSDoc of a
+ * class declaration. Returns the set of column names to exclude from
+ * schema-reflected `declare` generation.
+ */
+function parseSkipColumns(cls: ts.ClassDeclaration, sf: ts.SourceFile): Set<string> {
+  const out = new Set<string>();
+  const ranges = ts.getLeadingCommentRanges(sf.text, cls.pos) ?? [];
+  for (const r of ranges) {
+    const text = sf.text.slice(r.pos, r.end);
+    const m = /@trails-typegen\s+skip-columns:\s*([^\n*]+)/.exec(text);
+    if (m && m[1]) {
+      for (const col of m[1].split(",")) {
+        const trimmed = col.trim();
+        if (trimmed) out.add(trimmed);
+      }
+    }
+  }
+  return out;
 }
 
 function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {

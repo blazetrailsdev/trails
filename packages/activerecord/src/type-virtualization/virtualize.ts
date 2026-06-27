@@ -103,6 +103,12 @@ export interface VirtualizeOptions extends WalkOptions {
    * rather than conservatively suppressed. In-file entries take precedence.
    */
   globalSuperNameOf?: ReadonlyMap<string, string>;
+  /**
+   * DB column names consumed by `composedOf` aggregations, keyed by class name.
+   * Forwarded to `synthesizeDeclares` to prevent emitting a bare scalar declare
+   * for a column whose value is exposed as an aggregate object.
+   */
+  composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 export function virtualize(
@@ -140,6 +146,7 @@ export function virtualize(
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
       associationTargets: options.associationTargets,
+      composedOfColumns: options.composedOfColumns,
       ancestors: ancestorsOf.get(info),
       superNameOf,
     });

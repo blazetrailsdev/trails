@@ -3,6 +3,11 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Eye extends Base {
+  declare iris: Iris | null;
+  declare irisWithReadOnlyForeignKey: IrisWithReadOnlyForeignKey | null;
+  declare loadHasOne: ((name: "iris") => Promise<Iris | null>) &
+    ((name: "irisWithReadOnlyForeignKey") => Promise<IrisWithReadOnlyForeignKey | null>);
+
   afterCreateCallbacksStack: boolean[] = [];
   afterUpdateCallbacksStack: boolean[] = [];
   afterSaveCallbacksStack: boolean[] = [];
@@ -57,6 +62,11 @@ acceptsNestedAttributesFor(Eye, "iris");
 acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
 export class Iris extends Base {
+  declare eye: Eye | null;
+  declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
+  declare color: string;
+  declare eye_id: number;
+
   beforeValidationCallbacksCounter: number = 0;
   beforeCreateCallbacksCounter: number = 0;
   beforeSaveCallbacksCounter: number = 0;
@@ -89,6 +99,8 @@ export class Iris extends Base {
 }
 
 export class IrisWithReadOnlyForeignKey extends Iris {
+  declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
+
   static {
     this.attrReadonly("eye_id");
   }

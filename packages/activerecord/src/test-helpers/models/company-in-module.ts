@@ -1,3 +1,7 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Developer } from "./developer.js";
+import type { Firm } from "./company.js";
+import type { Project } from "./project.js";
 // vendor/rails/activerecord/test/models/company_in_module.rb
 // Ruby modules flattened to prefixed exports (TypeScript namespaces banned by lint rule).
 // Each class carries its Ruby module path via `static moduleName` (+ the bare
@@ -77,6 +81,8 @@ export class MyAppBusinessClientContact extends Base {
 
 // MyApplication::Business::Developer
 export class MyAppBusinessDeveloper extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Developer";
 
@@ -88,6 +94,8 @@ export class MyAppBusinessDeveloper extends Base {
 
 // MyApplication::Business::Project
 export class MyAppBusinessProject extends Base {
+  declare developers: AssociationProxy<Developer>;
+
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Project";
 
@@ -164,6 +172,17 @@ export class MyAppBillingNestedFirm extends Base {
 // Billing is a plain module (not an AR model), so the table is the inferred
 // "accounts" with no contained prefix.
 export class MyAppBillingAccount extends Base {
+  declare firm: MyAppBusinessFirm | null;
+  declare qualifiedBillingFirm: MyAppBillingFirm | null;
+  declare unqualifiedBillingFirm: Firm | null;
+  declare nestedQualifiedBillingFirm: MyAppBillingNestedFirm | null;
+  declare nestedUnqualifiedBillingFirm: MyAppBillingNestedFirm | null;
+  declare loadBelongsTo: ((name: "firm") => Promise<MyAppBusinessFirm | null>) &
+    ((name: "qualifiedBillingFirm") => Promise<MyAppBillingFirm | null>) &
+    ((name: "unqualifiedBillingFirm") => Promise<Firm | null>) &
+    ((name: "nestedQualifiedBillingFirm") => Promise<MyAppBillingNestedFirm | null>) &
+    ((name: "nestedUnqualifiedBillingFirm") => Promise<MyAppBillingNestedFirm | null>);
+
   static moduleName = "MyApplication::Billing";
   static _demodulizedName = "Account";
 

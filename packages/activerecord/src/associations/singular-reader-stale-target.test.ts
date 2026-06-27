@@ -47,7 +47,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await targetId(client.firm)).toBe(firstFirmId);
     expect(await targetId(client.firmWithCondition)).toBe(firstFirmId);
 
-    client.client_of = anotherFirmId;
+    client.client_of = anotherFirmId as bigint;
 
     expect(firmProxy.isStaleTarget()).toBe(true);
     expect(firmWithConditionProxy.isStaleTarget()).toBe(true);
@@ -66,7 +66,7 @@ describe("BelongsToAssociationsTest", () => {
     // Changing the owner FK makes the loaded target stale. Rails' guard
     // `(@stale_state && stale_target?) || find_target?` issues a fresh query
     // on the stale branch rather than returning the in-memory cache.
-    client.client_of = anotherFirmId;
+    client.client_of = anotherFirmId as bigint;
 
     expect(firmProxy.isStaleTarget()).toBe(true);
     expect(await targetId(firmProxy.loadTarget())).toBe(anotherFirmId);

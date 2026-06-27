@@ -18,11 +18,13 @@ import ts from "typescript";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classify, camelize } from "@blazetrails/activesupport";
 import { virtualize } from "../src/type-virtualization/virtualize.js";
 import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
 import {
   resolveAssociationTarget,
   resolveThroughTarget,
+  stripQuotes,
   type ModelAssociationLookup,
 } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
@@ -92,6 +94,157 @@ function buildModelRegistry(): Map<string, string> {
     }
   }
   return registry;
+}
+
+/**
+ * Build a map from Ruby-qualified class names ("Module::Class") to the TS
+ * class identifier, by scanning model files for `static moduleName` and
+ * `static _demodulizedName` on each class. Used to resolve namespaced
+ * `className:` values like `"Namespaced::Client"` → `NamespacedClient`.
+ */
+function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  const seen = new Set<string>();
+  for (const [, file] of registry) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const sf = ts.createSourceFile(
+      file,
+      fs.readFileSync(file, "utf8"),
+      ts.ScriptTarget.ES2022,
+      true,
+    );
+    for (const stmt of sf.statements) {
+      if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+      const tsName = stmt.name.text;
+      let moduleName: string | undefined;
+      let demodulizedName: string | undefined;
+      for (const m of stmt.members) {
+        if (!ts.isPropertyDeclaration(m) || !m.initializer) continue;
+        if (!ts.isIdentifier(m.name) && !ts.isStringLiteralLike(m.name)) continue;
+        const prop = ts.isIdentifier(m.name) ? m.name.text : m.name.text;
+        if (!ts.isStringLiteralLike(m.initializer)) continue;
+        if (prop === "moduleName") moduleName = m.initializer.text;
+        else if (prop === "_demodulizedName") demodulizedName = m.initializer.text;
+      }
+      if (moduleName) {
+        const baseName = demodulizedName ?? tsName;
+        const qualified = `${moduleName}::${baseName}`;
+        if (!out.has(qualified)) out.set(qualified, tsName);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve a Ruby-style "Module::Class" className to the TS class identifier.
+ * Tries exact match first, then a suffix match for relative namespaces
+ * (e.g. "Nested::Firm" matches any qualified name ending "::Nested::Firm").
+ */
+function resolveNamespacedClassName(
+  name: string,
+  namespacedRegistry: ReadonlyMap<string, string>,
+): string | undefined {
+  const exact = namespacedRegistry.get(name);
+  if (exact) return exact;
+  const suffix = `::${name}`;
+  for (const [qualified, tsName] of namespacedRegistry) {
+    if (qualified.endsWith(suffix)) return tsName;
+  }
+  return undefined;
+}
+
+/**
+ * Extend the per-file alias map with:
+ *  - Gap A: resolutions for Ruby-namespaced `className:` values ("A::B" → TsName)
+ *  - Gap B: classify-correction aliases when classify(assocName) isn't in the
+ *    TS class registry (e.g. "iris" → classify → "Iri", camelize → "Iris")
+ */
+function buildExtendedAliases(
+  sf: ts.SourceFile,
+  baseAliases: ReadonlyMap<string, string>,
+  isModelClass: (cls: ts.ClassDeclaration) => boolean,
+  registry: ReadonlyMap<string, string>,
+  namespacedRegistry: ReadonlyMap<string, string>,
+): Map<string, string> {
+  const out = new Map(baseAliases);
+  for (const info of walk(sf, { isModelClass })) {
+    for (const call of info.calls) {
+      if (
+        call.kind !== "hasMany" &&
+        call.kind !== "hasAndBelongsToMany" &&
+        call.kind !== "belongsTo" &&
+        call.kind !== "hasOne"
+      )
+        continue;
+      const rawClassName = call.options["className"];
+      if (rawClassName) {
+        // Gap A: resolve "Namespace::Class" to TS class name.
+        // If unresolvable, omit the alias so the synthesizer skips the declare
+        // (no entry → resolveAssociationTarget returns undefined → no emit).
+        // Rails raises on a bad class name; we should not bake Base as a fallback.
+        const stripped = stripQuotes(rawClassName);
+        if (stripped.includes("::") && !out.has(stripped)) {
+          const tsName = resolveNamespacedClassName(stripped, namespacedRegistry);
+          if (tsName) out.set(stripped, tsName);
+        }
+      } else {
+        // Gap B: fix mis-singularized classify results
+        const classified = classify(call.name);
+        if (!registry.has(classified) && !out.has(classified)) {
+          const cam = camelize(call.name);
+          if (registry.has(cam) && cam !== classified) out.set(classified, cam);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Extract the DB column names consumed by `composedOf(this, name, { mapping })` calls
+ * in static blocks, keyed by class name. These columns should be excluded from
+ * schema-reflected `declare` lines to avoid conflicting with the aggregation type.
+ */
+function extractComposedOfColumns(sf: ts.SourceFile): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const visitClass = (cls: ts.ClassDeclaration): void => {
+    if (!cls.name) return;
+    const className = cls.name.text;
+    for (const member of cls.members) {
+      if (!ts.isClassStaticBlockDeclaration(member)) continue;
+      for (const stmt of member.body.statements) {
+        if (!ts.isExpressionStatement(stmt)) continue;
+        const call = stmt.expression;
+        if (!ts.isCallExpression(call)) continue;
+        if (!ts.isIdentifier(call.expression) || call.expression.text !== "composedOf") continue;
+        // composedOf(this, name, { ..., mapping: [[col, method], ...] })
+        const [, , optsArg] = call.arguments;
+        if (!optsArg || !ts.isObjectLiteralExpression(optsArg)) continue;
+        for (const prop of optsArg.properties) {
+          if (!ts.isPropertyAssignment(prop)) continue;
+          if (!ts.isIdentifier(prop.name) || prop.name.text !== "mapping") continue;
+          const mapping = prop.initializer;
+          if (!ts.isArrayLiteralExpression(mapping)) continue;
+          for (const pair of mapping.elements) {
+            if (!ts.isArrayLiteralExpression(pair) || pair.elements.length < 1) continue;
+            const colArg = pair.elements[0];
+            if (!colArg || !ts.isStringLiteralLike(colArg)) continue;
+            const cols = out.get(className) ?? new Set<string>();
+            cols.add(colArg.text);
+            out.set(className, cols);
+          }
+        }
+      }
+    }
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) visitClass(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
 }
 
 const ASSOC_KINDS = new Set<string>(["hasMany", "hasAndBelongsToMany", "belongsTo", "hasOne"]);
@@ -550,6 +703,7 @@ async function main(): Promise<void> {
   }
   const associationLookup = buildModelAssociationLookup(registry);
   const globalSuperNameOf = buildGlobalSuperNameOf(registry);
+  const namespacedClassRegistry = buildNamespacedClassRegistry(registry);
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
@@ -561,7 +715,18 @@ async function main(): Promise<void> {
     for (const cls of collectModelClassNodes(sf)) modelSpans.add(`${cls.pos}:${cls.end}`);
     const isModelClass = (cls: ts.ClassDeclaration): boolean =>
       modelSpans.has(`${cls.pos}:${cls.end}`);
-    const classNameAliases = buildClassNameAliases(sf);
+    const baseAliases = buildClassNameAliases(sf);
+    // Gap A + Gap B: extend aliases with namespaced class resolutions and
+    // registry-corrected classify results.
+    const classNameAliases = buildExtendedAliases(
+      sf,
+      baseAliases,
+      isModelClass,
+      registry,
+      namespacedClassRegistry,
+    );
+    // Gap D: collect composedOf mapping columns to exclude from schema declares.
+    const composedOfColumns = extractComposedOfColumns(sf);
     // Pre-resolve `through:` targets so declares + auto-imports name the real
     // source class, not `classify`-of-the-association-name.
     const associationTargets = buildAssociationTargets(
@@ -594,6 +759,7 @@ async function main(): Promise<void> {
       schemaColumnsByTable: underModelsDir ? schemaColumnsByTable : undefined,
       classNameAliases,
       associationTargets,
+      composedOfColumns: composedOfColumns.size > 0 ? composedOfColumns : undefined,
       // Baked attribute declares allow null assignment (Rails attributes
       // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
       attributesNullable: true,

@@ -74,6 +74,12 @@ export interface SynthesizeOptions {
   ancestors?: readonly ClassInfo[];
   /** In-file class name → direct superclass name (subtype-vs-conflict check). */
   superNameOf?: ReadonlyMap<string, string>;
+  /**
+   * DB column names consumed by `composedOf` aggregations, keyed by class name.
+   * These columns are excluded from schema-reflected declares to avoid a bare
+   * scalar type shadowing the aggregation object type.
+   */
+  composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
@@ -83,6 +89,10 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
   // Subclass singular associations whose target isn't assignable to the
   // ancestor's (TS2416): suppress the property declare (loader overload kept).
   const conflictingSingulars = collectConflictingSingulars(info, opts);
+  // Subclass collection associations that override an ancestor's same-named
+  // collection: AssociationProxy<T> is invariant, so ANY target change is a
+  // TS2416 conflict. Suppress the property declare.
+  const conflictingCollections = collectConflictingCollections(info, opts);
   // Track ALL synthesized instance member names so schema-reflected
   // declares don't collide with attribute() / hasMany() / belongsTo() /
   // hasOne() / scope() etc. Rails allows an association named "comments"
@@ -93,6 +103,12 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     if (
       (call.kind === "belongsTo" || call.kind === "hasOne") &&
       conflictingSingulars.has(call.name)
+    ) {
+      continue;
+    }
+    if (
+      (call.kind === "hasMany" || call.kind === "hasAndBelongsToMany") &&
+      conflictingCollections.has(call.name)
     ) {
       continue;
     }
@@ -131,12 +147,18 @@ function renderSchemaColumnDeclares(
   // Sort by column name so emitted declares are stable regardless of
   // JSON key insertion order.
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
+  const composedCols = opts.composedOfColumns?.get(info.name);
   for (const [col, value] of entries) {
     if (synthesizedInstanceNames.has(col)) continue;
     if (info.existingMembers.has(col)) continue;
     // Skip "id" — Base already defines a PrimaryKeyValue accessor that
     // handles composite keys; re-declaring here would shadow it.
     if (col === "id") continue;
+    // Skip columns consumed by composedOf aggregations — their type is the
+    // aggregate class, not the bare scalar the schema would suggest.
+    if (composedCols?.has(col)) continue;
+    // Skip columns listed in `@trails-typegen skip-columns:` JSDoc.
+    if (info.skipSchemaColumns.has(col)) continue;
     const tsType = renderSchemaValueType(value);
     // Emit a bracket-quoted declare for non-identifier / reserved-word
     // names (e.g. `declare "strange-col": string;`). TypeScript allows
@@ -228,6 +250,31 @@ function renderLoaderOverloads(
   }
   if (hasOneOverloads.length > 0) {
     out.push(line(`declare loadHasOne: ${joinOverloads(hasOneOverloads)};`, "loadHasOne", false));
+  }
+  return out;
+}
+
+/**
+ * `hasMany`/`hasAndBelongsToMany` names on `info` that override an in-file
+ * ancestor's same-named collection. `AssociationProxy<T>` is invariant — even
+ * a target that extends the ancestor's target is not assignable (TS2416) —
+ * so every collection override is a conflict and the redeclare is suppressed.
+ */
+function collectConflictingCollections(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
+  const out = new Set<string>();
+  const ancestors = opts.ancestors;
+  if (!ancestors || ancestors.length === 0) return out;
+  const inheritedCollections = new Set<string>();
+  for (const anc of ancestors) {
+    for (const call of anc.calls) {
+      if (call.kind === "hasMany" || call.kind === "hasAndBelongsToMany") {
+        inheritedCollections.add(call.name);
+      }
+    }
+  }
+  for (const call of info.calls) {
+    if (call.kind !== "hasMany" && call.kind !== "hasAndBelongsToMany") continue;
+    if (inheritedCollections.has(call.name)) out.add(call.name);
   }
   return out;
 }
