@@ -112,6 +112,7 @@ import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
+  registerBaseTimestampCallbacks,
 } from "./callbacks.js";
 import {
   runAllCallbacks as cbRunAll,
@@ -4794,6 +4795,12 @@ for (const [name, fn] of [
     enumerable: false,
   });
 }
+
+// Register Timestamp's internal before_create callback on Base.prototype so
+// timestamps are available to user-defined before_create callbacks (Rails parity:
+// ActiveRecord::Timestamp registers before_create :_assign_timestamps_on_create
+// at include-time, before any subclass callbacks).
+registerBaseTimestampCallbacks(Base.prototype);
 
 // Register Model's super methods for the Validations module.
 // Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid)

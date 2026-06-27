@@ -638,11 +638,7 @@ describe("TimestampTest", () => {
     expect(pet.updated_at).not.toEqual(time);
   });
 
-  // Rails: timestamps are written by an internal before_create callback registered
-  // before user callbacks, so created_at is available in user before_create.
-  // Trails writes timestamps in the create-callback body (after before_create phase)
-  // — a tracked parity gap. The test exists to document the intended Rails behavior.
-  it.skip("timestamp column values are present in create callbacks", async () => {
+  it("timestamp column values are present in create callbacks", async () => {
     class PersonWithTimestampInCreate extends Base {
       static {
         this.tableName = "people";
@@ -671,8 +667,7 @@ describe("TimestampTest", () => {
     expect((person as any).born_at).not.toBeNull();
   });
 
-  // Same callback-ordering parity gap as test_timestamp_column_values_are_present_in_create_callbacks.
-  it.skip("timestamp column values are present in save callbacks", async () => {
+  it("timestamp column values are present in save callbacks", async () => {
     class PersonWithTimestampInSave extends Base {
       static {
         this.tableName = "people";

@@ -249,6 +249,35 @@ function registerCallback(
   );
 }
 
+/**
+ * Mirrors Rails' ActiveRecord::Timestamp#_assign_timestamps_on_create, registered
+ * as an early before_create callback on Base so timestamps are available to user-defined
+ * before_create callbacks (which run after this one in the inherited chain).
+ *
+ * @internal
+ */
+function _assignTimestampsOnCreate(this: any): void {
+  const ctor = this.constructor;
+  if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
+    const time = currentTimeFromProperTimezone();
+    for (const col of allTimestampAttributesInModel.call(ctor)) {
+      if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
+        this._writeAttribute?.(col, time);
+      }
+    }
+  }
+}
+
+/**
+ * Register the internal timestamp before_create callback on Base.prototype.
+ * Must be called once after Base is defined, before any subclass registers callbacks.
+ *
+ * @internal
+ */
+export function registerBaseTimestampCallbacks(baseProto: object): void {
+  _registerCallbackOnProto(baseProto, "before", "create", _assignTimestampsOnCreate, {});
+}
+
 // ---------------------------------------------------------------------------
 // Private instance helpers — mirrors ActiveRecord::Callbacks private block.
 // Rails overrides persistence methods to wrap each in _run_*_callbacks { super }.
@@ -271,20 +300,6 @@ export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor;
   return runAllCallbacks(ctor.prototype, "create", this, async () => {
-    // Rails' _create_record writes the create-time timestamp columns via
-    // _write_attribute; after the insert, changes_applied → forget_attribute_assignments
-    // rebinds each to value_for_database, which for the DateTime type is the cast Time
-    // itself (not a SQL string). value_for_database now returns the cast Temporal, so
-    // forgettingAssignment yields a FromDatabase whose before-type-cast is that Time on
-    // every path — no post-hoc rebind needed.
-    if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
-      const time = currentTimeFromProperTimezone();
-      for (const col of allTimestampAttributesInModel.call(ctor)) {
-        if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
-          this._writeAttribute?.(col, time);
-        }
-      }
-    }
     if (!this._performInsert) throw new Error("_performInsert not implemented");
     // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
     // insert. Rails new records are dirty from construction, so partial_inserts'
