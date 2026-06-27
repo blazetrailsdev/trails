@@ -43,20 +43,20 @@ afterAll(() => {
 describe("isBlank / isPresent", () => {
   it("isBlank returns true when no records exist", async () => {
     const adapter = freshAdapter();
-    class User extends Base {
-      static _tableName = "users";
+    class SampleRecord extends Base {
+      static _tableName = "developers";
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
-    await defineSchema(adapter, { users: { name: "string" } });
+    SampleRecord.attribute("id", "integer");
+    SampleRecord.attribute("name", "string");
+    SampleRecord.adapter = adapter;
+    await defineSchema(adapter, { developers: canonicalSchema.developers });
 
-    expect(await User.all().isBlank()).toBe(true);
-    expect(await User.all().isPresent()).toBe(false);
+    expect(await SampleRecord.all().isBlank()).toBe(true);
+    expect(await SampleRecord.all().isPresent()).toBe(false);
 
-    await User.create({ name: "Alice" });
-    expect(await User.all().isBlank()).toBe(false);
-    expect(await User.all().isPresent()).toBe(true);
+    await SampleRecord.create({ name: "Alice" });
+    expect(await SampleRecord.all().isBlank()).toBe(false);
+    expect(await SampleRecord.all().isPresent()).toBe(true);
   });
 
   // Drop tables/rows this describe wrote on the shared adapter so the
@@ -71,24 +71,6 @@ describe("isBlank / isPresent", () => {
 describe("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", body: "string", status: "string", author_id: "integer" },
-      developers: { commits: "integer" },
-      orders: { created_at: "string", total: "integer" },
-      books: {
-        author_id: "integer",
-        published_year: "integer",
-        title: "string",
-        active: "boolean",
-      },
-      authors: { name: "string" },
-      comments: { post_id: "integer", author_id: "integer" },
-      users: { name: "string" },
-      eager_comments: { body: "string", eager_article_id: "integer" },
-      eager_articles: { title: "string" },
-    });
-  });
 
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
     class Post extends Base {
@@ -485,11 +467,7 @@ describe("RelationTest", () => {
 describe("Relation#arel build_arel convergence", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      widgets: { name: "string", category: "string", price: "integer" },
-      gadgets: { widget_id: "integer", label: "string" },
-    });
+  beforeAll(() => {
     registerModel("Widget", Widget);
     registerModel("Gadget", Gadget);
   });
