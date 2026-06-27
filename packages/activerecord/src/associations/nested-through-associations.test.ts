@@ -802,6 +802,7 @@ describe("NestedThroughAssociationsTest", () => {
 
     const post = await Post.create({ title: "Catchy Title", body: "Interesting body." });
     const category = await Category.create({ name: "Anything" });
+    // Rails: Post::CategoryPost.create!(post:, category:). No canonical join model in trails.
     await (Post as any)
       .leaseConnection()
       .executeMutation(
