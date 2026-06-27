@@ -67,7 +67,7 @@ export class Post extends Base {
   declare authorWithAddress: Author | null;
   declare authorWithSelect: Author | null;
   declare authorWithTheLetterA: Author | null;
-  declare firstComment: Comment | null;
+  declare firstComment: string | null;
   declare lastComment: Comment | null;
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
@@ -264,6 +264,16 @@ export class Post extends Base {
       foreignKey: "author_id",
     });
 
+    // Rails post.rb:56-58 — `def first_comment; super.body; end`. Defined
+    // non-configurable before hasOne so the framework accessor does not
+    // overwrite it; `await post.firstComment` returns the body string.
+    Object.defineProperty(this.prototype, "firstComment", {
+      get(this: any): Promise<string | null> {
+        return this.loadHasOne("firstComment").then((c: any) => c?.body ?? null);
+      },
+      configurable: false,
+      enumerable: false,
+    });
     this.hasOne("firstComment", {
       scope: (q: any) => q.order("id ASC"),
       className: "Comment",

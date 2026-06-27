@@ -24,6 +24,10 @@ import {
   type Developer as DeveloperT,
 } from "./test-helpers/models/developer.js";
 import { Post, FirstPost, Postesque } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { Computer } from "./test-helpers/models/computer.js";
+registerModel(Comment);
+registerModel(Computer);
 import { Project } from "./test-helpers/models/project.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
@@ -1805,30 +1809,21 @@ describe("OverridingAssociationsTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  it("association methods override attribute methods of same name", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", {});
-      }
-    }
-    const ref = reflectOnAssociation(Post, "author");
-    expect(ref).not.toBeNull();
-    expect(ref!.macro).toBe("belongsTo");
+  const { computers, developers, posts, comments } = useHandlerFixtures(
+    ["computers", "developers", "posts", "comments"],
+    { schema: canonicalSchema },
+  );
+  it("association methods override attribute methods of same name", async () => {
+    const computer = await Computer.find(computers("workstation").id);
+    const developer = await Developer.find(developers("david").id);
+    expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
+    expect((await computer.loadBelongsTo("developer"))?.id).toBe(developer.id);
+    expect(computer.readAttribute("developer")).toBe(developer.id);
   });
 
-  it("model method overrides association method", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Model has attribute "title", no association named "title" should conflict
-    const p = new Post({ title: "hello" });
-    expect(p.title).toBe("hello");
+  it("model method overrides association method", async () => {
+    const post = await Post.find(posts("welcome").id);
+    expect(await post.firstComment).toBe(comments("greetings").body);
   });
 
   it("included module overwrites association methods", () => {
