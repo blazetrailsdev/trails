@@ -375,9 +375,16 @@ describe("MultiParameterAttributeTest", () => {
       await withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          // Mirrors Rails: Topic.reset_column_information so schema reloads with
-          // awareAttributes: true, wrapping bonus_time and written_on in TimeZoneConverter.
-          Topic.resetColumnInformation();
+          // Mirrors Rails: Topic.reset_column_information so the schema reloads with
+          // awareAttributes: true active, wrapping bonus_time in TimeZoneConverter.
+          // Reset only model-level state (not the pool cache) so loadSchemaFromAdapter
+          // re-applies hookAttributeType from the warm cache without a DB round-trip.
+          // clearAdapterDataSourceCache (called by resetColumnInformation) forces a DB
+          // re-fetch for dataSourceExists + columns + primaryKeys on each call; after
+          // four prior timezone tests the fifth DB fetch on the pinned MariaDB connection
+          // fails silently, leaving bonus_time with no type and falling back to "value".
+          (Topic as any)._schemaLoaded = false;
+          (Topic as any)._schemaLoadPromise = undefined;
           await Topic.loadSchema();
           const topic = new Topic();
           topic.assignAttributes({
