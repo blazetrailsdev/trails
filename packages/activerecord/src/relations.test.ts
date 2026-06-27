@@ -814,13 +814,17 @@ describe("RelationTest", () => {
       .where({ title: "Uhuu" });
     const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel).toArray();
     expect(resultPosts).toHaveLength(1);
-    // Rails also asserts no-queries (readers already preloaded); Trails does not
-    // have a no-queries assertion helper, so we verify count only.
+    const preloadedReaders = await resultPosts[0].readers.toArray();
+    expect(preloadedReaders).toHaveLength(1);
+    expect(preloadedReaders[0].post_id).toBe(post.id);
 
     // includes branch: PostWithIncludesDefaultScope
     const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
     const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2).toArray();
     expect(resultPosts2).toHaveLength(1);
+    const includedReaders = await resultPosts2[0].readers.toArray();
+    expect(includedReaders).toHaveLength(1);
+    expect(includedReaders[0].post_id).toBe(post.id);
   });
 
   it("loading with one association", async () => {
@@ -1645,7 +1649,10 @@ describe("RelationTest", () => {
     const order2 = await CpkOrder.createBang({ id: [1, 2] });
     await CpkBook.createBang({ id: [2, 1], order: order1 });
     const book = await CpkBook.findOrInitializeBy({ order: order2 });
-    expect(book.order).toEqual(order2);
+    const loadedOrder = await (book as any).loadBelongsTo("order");
+    // Rails: assert_equal order2, book.order (AR == compares by class + PK)
+    expect(loadedOrder.shop_id).toBe((order2 as any).shop_id);
+    expect(loadedOrder.idValue).toBe((order2 as any).idValue);
   });
 
   it("explicit create with", () => {
