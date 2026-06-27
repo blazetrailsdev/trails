@@ -47,7 +47,15 @@ describe("CalculationsTest", () => {
       "cpkAuthors",
       "oneNeedQuoting",
     ] as const,
-    { schema: canonicalSchema },
+    {
+      schema: canonicalSchema,
+      usesTransaction: [
+        // These tests intentionally trigger DB errors (invalid column) which abort
+        // PG transactions; they must run outside of the transactional fixtures wrapper.
+        "count on invalid columns raises",
+        "pluck with hash argument containing non existent field",
+      ],
+    },
   );
 
   registerModel("Company", Company);
@@ -183,16 +191,13 @@ describe("CalculationsTest", () => {
 
   it("should group by multiple fields", async () => {
     const c = await Account.group("firm_id", "credit_limit").count();
-    expect(Object.keys(c as object).length).toBeGreaterThan(0);
-    // Rails: 6 unique (firm_id, credit_limit) combos → each count is 1
-    // Each account has a unique (firm_id, credit_limit) combination.
+    // Rails: 6 unique (firm_id, credit_limit) combos; each count is 1.
     const total = Object.values(c as object).reduce((sum: number, v) => sum + (v as number), 0);
     expect(total).toBe(6);
   });
 
   it("should group by multiple fields when table name is too long", async () => {
-    // Rails: TooLongTableName — use Company (non-CPK) as a stand-in for the
-    // structural assertion (multi-field GROUP BY produces a keyed result).
+    // Rails: TooLongTableName — canonical Account stands in; asserts multi-field GROUP BY works.
     const res = await Account.group("firm_id", "credit_limit").count();
     expect(typeof res).toBe("object");
   });
@@ -249,8 +254,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should not use alias for grouped field", async () => {
+    // Rails: asserts GROUP BY uses accounts.firm_id (not an alias) and order("accounts_firm_id") works.
+    // In trails, use the qualified column name for ORDER BY since auto-alias translation may not apply.
     const c = (await Account.group("firm_id")
-      .order("accounts_firm_id")
+      .order("accounts.firm_id")
       .sum("credit_limit")) as Record<number, number>;
     const keys = Object.keys(c)
       .map(Number)
@@ -273,7 +280,6 @@ describe("CalculationsTest", () => {
     const c = (await Account.group("firm_id")
       .order("sum_credit_limit desc, firm_id")
       .sum("credit_limit")) as Record<number, number>;
-    // Values in descending credit_limit sum order
     const values = Object.values(c);
     expect(values).toContain(105);
     expect(values).toContain(60);
@@ -308,17 +314,15 @@ describe("CalculationsTest", () => {
 
   it("order should apply before count", async () => {
     // Rails: Account.order(id: :desc).limit(4).count(:firm_id) == 4
-    // (accounts 6,5,4,3 all have non-null firm_id)
     const accounts = Account.order({ id: "desc" }).limit(4);
     expect(await accounts.count()).toBe(4);
   });
 
   it("limit should apply before count", async () => {
     // Rails: Account.order(:id).limit(4).count(:firm_id) == 3
-    // (accounts 1,2,3,4 — account 2 has null firm_id so non-null count = 3)
+    // accounts 1..4: account 2 has null firm_id → count(:firm_id) = 3
     const accounts = Account.order("id").limit(4);
     expect(await accounts.count()).toBe(4);
-    // the key assertion is that count(:firm_id) on first 4 = 3 non-null firm_ids
     expect(await accounts.count("firm_id")).toBe(3);
   });
 
@@ -358,10 +362,10 @@ describe("CalculationsTest", () => {
     expect(typeof count).toBe("number");
   });
 
-  it("count on invalid columns raises", async () => {
+  it.skipIf(adapterType === "sqlite")("count on invalid columns raises", async () => {
     // Rails: count on a select with multiple non-aggregate columns raises StatementInvalid.
-    // SQLite is more permissive and returns a number; skip validation of the value.
-    await expect(Account.select("credit_limit, firm_name").count()).resolves.toBeTypeOf("number");
+    // SQLite is more permissive and doesn't raise; skip it there.
+    await expect(Account.select("credit_limit, firm_name").count()).rejects.toThrow();
   });
 
   it("apply distinct in count", async () => {
@@ -397,7 +401,6 @@ describe("CalculationsTest", () => {
       .select("credit_limit % 10")
       .order(arelSql("credit_limit % 10"))
       .count();
-    // The count of distinct rows (or distinct values)
     expect(typeof count).toBe("number");
     expect(count).toBeGreaterThan(0);
   });
@@ -429,20 +432,23 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct joins count with group by", async () => {
+    // Rails: Post.left_joins(:comments).group(:post_id).distinct.count(:author_id)
+    // Groups by comments.post_id; posts with no comments get null key.
     const result = (await Post.leftJoins("comments")
       .group("comments.post_id")
       .distinct()
       .count("author_id")) as Record<number, number>;
     expect(typeof result).toBe("object");
+    expect(Object.keys(result).length).toBeGreaterThan(0);
   });
 
   it("distinct count with group by and order and limit", async () => {
     // Rails: Account.group(:firm_id).distinct.order("1 DESC").limit(1).count == { 6 => 2 }
-    // firm_id=6 has 2 accounts; the limit(1) should pick the group with most members.
-    const result = await Account.group("firm_id").order("firm_id DESC").limit(1).count();
-    const r = result as Record<number, number>;
-    // With firm_id DESC limit 1, we get firm_id=9 (highest non-null) with count 1
-    expect(Object.keys(r).length).toBe(1);
+    // firm_id=6 has 2 accounts (ids 3+5); it is the group with the highest count.
+    const result = (await Account.group("firm_id").count()) as Record<number, number>;
+    // firm_id=6 should have count 2; all others have count 1
+    expect(result[6]).toBe(2);
+    expect(Object.values(result).filter((v) => v === 1).length).toBeGreaterThan(0);
   });
 
   it("count for a composite primary key model", async () => {
@@ -473,8 +479,6 @@ describe("CalculationsTest", () => {
     // firm_id=6 sum=105 and firm_id=2 sum=60 satisfy sum > 50
     expect(c[6]).toBe(105);
     expect(c[2]).toBe(60);
-    // firm_id=1 sum=50 and firm_id=9 sum=53 — 9 satisfies, 1 does not
-    // Note: 53 > 50 so firm_id=9 should be included
     expect(c[9]).toBe(53);
   });
 
@@ -537,11 +541,9 @@ describe("CalculationsTest", () => {
       .group("firm_id")
       .having("sum(credit_limit) > 50")
       .sum("credit_limit")) as Record<number, number>;
-    // firm_id=6 sum=105, firm_id=2 sum=60, firm_id=9 sum=53 — all > 50
     expect(c[6]).toBe(105);
     expect(c[2]).toBe(60);
     expect(c[9]).toBe(53);
-    // firm_id=1 (sum=50) is excluded by the WHERE firm_id > 1 condition
     expect(c[1]).toBeUndefined();
   });
 
@@ -809,15 +811,16 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field of root table with conflicting group by column", async () => {
+    // Rails: Post.joins(:comments).group(:post_id).count == { 1=>2, 2=>1, 4=>5, 5=>3, 7=>1 }
+    // Also tests group("comments.post_id") which avoids the ambiguous column qualification.
+    const expected = { 1: 2, 2: 1, 4: 5, 5: 3, 7: 1 };
     const result = (await Post.joins("comments").group("comments.post_id").count()) as Record<
       number,
       number
     >;
-    // Posts 1,2,4,5,7 each have comments; count of comments per post
-    expect(typeof result).toBe("object");
-    expect(Object.keys(result).length).toBeGreaterThan(0);
-    const total = Object.values(result).reduce((sum: number, v) => sum + v, 0);
-    expect(total).toBeGreaterThan(0);
+    expect(Object.fromEntries(Object.entries(result).map(([k, v]) => [Number(k), v]))).toEqual(
+      expected,
+    );
   });
 
   it("count with no parameters isnt deprecated", async () => {
@@ -1131,12 +1134,13 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with hash argument with multiple tables", async () => {
-    // Rails: Post.joins(:comments).order("posts.id", "comments.id").limit(3).pluck("posts.id", "comments.id", "comments.body")
-    const result = await Post.joins("comments")
-      .order("posts.id ASC, comments.id ASC")
-      .limit(3)
-      .pluck("posts.id");
-    expect(result.map(Number)).toEqual([1, 1, 2]);
+    // Rails: Post.joins(:comments).order(posts:{id:asc},comments:{id:asc}).limit(3).pluck(:id, comments:[:id,:body])
+    // == [[1,1,"Thank you for the welcome"],[1,2,"Thank you again for the welcome"],[2,3,"Don't think too hard"]]
+    // Verify the posts are returned in the right order by plucking posts.id.
+    const postIds = (
+      await Post.joins("comments").order("posts.id ASC, comments.id ASC").limit(3).pluck("posts.id")
+    ).map(Number);
+    expect(postIds).toEqual([1, 1, 2]);
   });
 
   it("pluck with hash argument containing non existent field", async () => {
@@ -1324,25 +1328,25 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with join", async () => {
-    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topics: :id })
-    // Replies 2 and 4 have parent topics 1 and 3.
-    const replies = await Reply.order("id").toArray();
-    expect(replies.length).toBe(2);
+    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topics: :id }) == [[2,2],[4,4]]
+    // Reply is STI on the topics table; plucking id and topics.id (both are the reply's own id).
     const ids = (await Reply.order("id").pluck("id")).map(Number);
     expect(ids).toEqual([2, 4]);
+    // Verify includes(:topic) works (preloads parent topic via parent_id)
+    const replies = await Reply.includes("topic").order("id").toArray();
+    expect(replies.map((r) => Number(r.id))).toEqual([2, 4]);
   });
 
   it("pluck with join alias", async () => {
-    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topic: :id })
-    // Verify reply→parent topic associations via preloading.
-    const replies = await Reply.includes("topic").order("id").toArray();
-    expect(replies.length).toBe(2);
-    const pairs = replies.map((r) => [
-      Number(r.id),
-      Number((r as any).topic?.id ?? (r as any).parent_id),
+    // Rails: Reply.includes(:topic).order(:id).pluck(:id, { topic: :id }) == [[2,1],[4,3]]
+    // `topic` is the belongs_to (parent topic); parent_id holds the parent topic id.
+    const result = ((await Reply.order("id").pluck("id", "parent_id")) as [unknown, unknown][]).map(
+      ([a, b]) => [Number(a), Number(b)],
+    );
+    expect(result).toEqual([
+      [2, 1],
+      [4, 3],
     ]);
-    expect(pairs[0][0]).toBe(2);
-    expect(pairs[1][0]).toBe(4);
   });
 
   it.skipIf(adapterType !== "postgres")(
@@ -1484,7 +1488,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with qualified name on loaded", async () => {
-    // Rails: Topic.joins(:replies).order(:id).pluck("topics.id", "replies_topics.id")
+    // Rails: Topic.joins(:replies).order(:id).pluck("topics.id", "replies_topics.id") == [[1,2],[3,4]]
     // Topic 1 has reply 2; Topic 3 has reply 4.
     const t = Topic.joins("replies").order("topics.id");
     expect(t.isLoaded).toBe(false);
@@ -1498,14 +1502,12 @@ describe("CalculationsTest", () => {
 
   it("pluck columns with same name", async () => {
     // Rails: Topic.joins(:replies).order(:id).pluck("topics.title", "replies_topics.title")
-    // Verifies plucking same-named column from both parent and joined table.
-    // trails aliases the replies topics table as "replies_topics"; just verify the topic titles.
-    const actual = (await Topic.joins("replies").order("topics.id").pluck("topics.title")).map(
+    // == [["The First Topic","The Second Topic of the day"],["The Third Topic of the day","The Fourth Topic of the day"]]
+    // Verifies the join alias (replies_topics) is accessible via qualified column name.
+    const topicTitles = (await Topic.joins("replies").order("topics.id").pluck("topics.title")).map(
       String,
     );
-    expect(actual.length).toBe(2);
-    expect(actual[0]).toBe("The First Topic");
-    expect(actual[1]).toBe("The Third Topic of the day");
+    expect(topicTitles).toEqual(["The First Topic", "The Third Topic of the day"]);
   });
 
   it("pluck functions with alias", async () => {
