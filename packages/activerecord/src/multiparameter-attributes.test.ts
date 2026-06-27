@@ -8,6 +8,7 @@ import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
@@ -16,18 +17,13 @@ describe("MultiParameterAttributeTest", () => {
   useHandlerTransactionalFixtures();
 
   it("multiparameter attributes on date", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     });
-    const d = (topic as any).last_read as Temporal.PlainDate;
+    const d = topic.last_read;
     expect(d).toBeInstanceOf(Temporal.PlainDate);
     expect(d.year).toBe(2004);
     expect(d.month).toBe(6);
@@ -35,116 +31,76 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on date with empty year", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with empty month", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "",
       "last_read(3i)": "24",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with empty day", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with empty day and year", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "6",
       "last_read(3i)": "",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with empty day and month", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "",
       "last_read(3i)": "",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with empty year and month", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "24",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on date with all empty", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   it("multiparameter attributes on time", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "2004",
@@ -154,7 +110,7 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(dt).toBeInstanceOf(Temporal.Instant);
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).month).toBe(6);
@@ -165,11 +121,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with no date", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "1",
@@ -178,18 +129,13 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "16",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(dt).toBeInstanceOf(Temporal.Instant);
     expect(utc(dt).hour).toBe(16);
     expect(utc(dt).minute).toBe(24);
   });
 
   it("multiparameter attributes on time with invalid time params", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "",
@@ -198,15 +144,10 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "",
       "written_on(5i)": "",
     });
-    expect((topic as any).written_on).toBeNull();
+    expect(topic.written_on).toBeNull();
   });
 
   it("multiparameter attributes on time with old date", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "1850",
@@ -216,17 +157,12 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(dt).toBeInstanceOf(Temporal.Instant);
     expect(utc(dt).year).toBe(1850);
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     // Rails: time parts without date context → Time.new(nil,nil,nil,16,24) raises ArgumentError,
     // collected into MultiparameterAssignmentErrors.
@@ -236,11 +172,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with raise on small time if missing date parts", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     expect(() => topic.assignAttributes({ "written_on(4i)": "1", "written_on(5i)": "2" })).toThrow(
       MultiparameterAssignmentErrors,
@@ -248,11 +179,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will ignore hour if missing", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "2004",
@@ -260,17 +186,12 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(3i)": "24",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(0);
   });
 
   it("multiparameter attributes on time will ignore hour if blank", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "2004",
@@ -279,17 +200,12 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(0);
   });
 
   it("multiparameter attributes on time will ignore date if empty", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "",
@@ -298,15 +214,10 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "16",
       "written_on(5i)": "24",
     });
-    expect((topic as any).written_on).toBeNull();
+    expect(topic.written_on).toBeNull();
   });
 
   it("multiparameter attributes on time with seconds will ignore date if empty", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "",
@@ -316,16 +227,11 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "30",
     });
-    expect((topic as any).written_on).toBeNull();
+    expect(topic.written_on).toBeNull();
   });
 
   it("multiparameter attributes on time with utc", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
-      class Topic extends Base {
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
       const topic = new Topic();
       topic.assignAttributes({
         "written_on(1i)": "2004",
@@ -335,7 +241,7 @@ describe("MultiParameterAttributeTest", () => {
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       });
-      const instant = (topic as any).written_on as Temporal.Instant;
+      const instant = topic.written_on as Temporal.Instant;
       expect(instant).toBeInstanceOf(Temporal.Instant);
       expect(instant.toZonedDateTimeISO("UTC").hour).toBe(16);
       expect(instant.toZonedDateTimeISO("UTC").minute).toBe(24);
@@ -347,12 +253,14 @@ describe("MultiParameterAttributeTest", () => {
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
       () => {
-        class Topic extends Base {
+        // Re-declare written_on as a fresh "datetime" attribute; schema-reflected columns
+        // resolve the attribute type differently and don't trigger TimeWithZone wrapping.
+        class AwareTopic extends Topic {
           static {
             this.attribute("written_on", "datetime");
           }
         }
-        const topic = new Topic();
+        const topic = new AwareTopic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
           "written_on(2i)": "6",
@@ -361,6 +269,7 @@ describe("MultiParameterAttributeTest", () => {
           "written_on(5i)": "24",
           "written_on(6i)": "00",
         });
+        // awareAttributes wraps as TimeWithZone at runtime; declared type is Instant|PlainDateTime
         const twz = (topic as any).written_on as TimeWithZone;
         expect(twz).toBeInstanceOf(TimeWithZone);
         expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(23); // PDT: local 16:24 → UTC 23:24
@@ -371,18 +280,13 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
     await withTimezoneConfig({ awareAttributes: true }, () => {
-      class Topic extends Base {
-        static {
-          this.attribute("written_on", "datetime");
-        }
-      }
       const topic = new Topic();
       topic.assignAttributes({
         "written_on(1i)": "2004",
         "written_on(2i)": "",
         "written_on(3i)": "",
       });
-      expect((topic as any).written_on).toBeNull();
+      expect(topic.written_on).toBeNull();
     });
   });
 
@@ -390,11 +294,6 @@ describe("MultiParameterAttributeTest", () => {
     await withTimezoneConfig(
       { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
       () => {
-        class Topic extends Base {
-          static {
-            this.attribute("written_on", "datetime");
-          }
-        }
         const topic = new Topic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
@@ -404,7 +303,7 @@ describe("MultiParameterAttributeTest", () => {
           "written_on(5i)": "24",
           "written_on(6i)": "00",
         });
-        const val = (topic as any).written_on;
+        const val = topic.written_on;
         expect(val).not.toBeInstanceOf(TimeWithZone); // assert_not_respond_to :time_zone
         expect(val).toBeInstanceOf(Temporal.Instant);
       },
@@ -415,13 +314,13 @@ describe("MultiParameterAttributeTest", () => {
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
       () => {
-        class Topic extends Base {
+        // Subclass to isolate skipTimeZoneConversionForAttributes mutation from the shared Topic.
+        class SkipZoneTopic extends Topic {
           static {
             this.skipTimeZoneConversionForAttributes = ["written_on"];
-            this.attribute("written_on", "datetime");
           }
         }
-        const topic = new Topic();
+        const topic = new SkipZoneTopic();
         topic.assignAttributes({
           "written_on(1i)": "2004",
           "written_on(2i)": "6",
@@ -430,10 +329,10 @@ describe("MultiParameterAttributeTest", () => {
           "written_on(5i)": "24",
           "written_on(6i)": "00",
         });
-        const val = (topic as any).written_on;
+        const val = topic.written_on;
         expect(val).not.toBeInstanceOf(TimeWithZone);
         expect(val).toBeInstanceOf(Temporal.Instant);
-        expect(val.toZonedDateTimeISO("UTC").hour).toBe(16);
+        expect((val as Temporal.Instant).toZonedDateTimeISO("UTC").hour).toBe(16);
       },
     );
   });
@@ -442,13 +341,15 @@ describe("MultiParameterAttributeTest", () => {
     await withTimezoneConfig(
       { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
       () => {
-        class Topic extends Base {
+        // Re-declare bonus_time and written_on as fresh attribute types; schema-reflected
+        // columns don't trigger TimeWithZone wrapping via awareAttributes.
+        class AwareTopic extends Topic {
           static {
             this.attribute("bonus_time", "time");
             this.attribute("written_on", "datetime");
           }
         }
-        const topic = new Topic();
+        const topic = new AwareTopic();
         topic.assignAttributes({
           "bonus_time(1i)": "2000",
           "bonus_time(2i)": "1",
@@ -456,6 +357,7 @@ describe("MultiParameterAttributeTest", () => {
           "bonus_time(4i)": "16",
           "bonus_time(5i)": "24",
         });
+        // awareAttributes wraps time columns as TimeWithZone at runtime; declared type is PlainTime
         const bt = (topic as any).bonus_time as TimeWithZone;
         expect(bt).toBeInstanceOf(TimeWithZone);
         expect(bt.hour).toBe(16);
@@ -467,17 +369,12 @@ describe("MultiParameterAttributeTest", () => {
           "written_on(4i)": "",
           "written_on(5i)": "",
         });
-        expect((topic as any).written_on).toBeNull();
+        expect(topic.written_on).toBeNull();
       },
     );
   });
 
   it("multiparameter attributes setting time attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     // Rails: topic.attributes = {...} calls assign_attributes
     (topic as any).attributes = {
@@ -487,18 +384,13 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(2i)": "1",
       "written_on(3i)": "1",
     };
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(13);
     expect(utc(dt).minute).toBe(30);
   });
 
   it("multiparameter attributes on time with empty seconds", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "written_on(1i)": "2004",
@@ -508,37 +400,26 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(16);
     expect(utc(dt).second).toBe(0);
   });
 
   it("multiparameter attributes setting date attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     (topic as any).attributes = {
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     };
-    const d = (topic as any).last_read as Temporal.PlainDate;
+    const d = topic.last_read;
     expect(d.year).toBe(2004);
     expect(d.month).toBe(6);
     expect(d.day).toBe(24);
   });
 
   it("create with multiparameter attributes setting date attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("last_read", "date");
-      }
-    }
     // Rails: Topic.new(attrs) calls assign_attributes internally
     const topic = new Topic({
       title: "test",
@@ -546,19 +427,13 @@ describe("MultiParameterAttributeTest", () => {
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     });
-    const d = (topic as any).last_read as Temporal.PlainDate;
+    const d = topic.last_read;
     expect(d.year).toBe(2004);
     expect(d.month).toBe(6);
     expect(d.day).toBe(24);
   });
 
   it("multiparameter attributes setting date and time attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
@@ -571,19 +446,13 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const d = (topic as any).last_read as Temporal.PlainDate;
+    const d = topic.last_read;
     expect(d.year).toBe(2004);
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).hour).toBe(16);
   });
 
   it("create with multiparameter attributes setting date and time attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("written_on", "datetime");
-      }
-    }
     const topic = new Topic({
       title: "test",
       "written_on(1i)": "2004",
@@ -593,24 +462,19 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.Instant;
+    const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(2004);
     expect(utc(dt).hour).toBe(16);
   });
 
   it("multiparameter attributes setting time but not date on date field", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "",
     });
-    expect((topic as any).last_read).toBeNull();
+    expect(topic.last_read).toBeNull();
   });
 
   // -------------------------------------------------------------------------
@@ -782,18 +646,13 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter assigned attributes did not come from user", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("last_read", "date");
-      }
-    }
     const topic = new Topic();
     topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     });
-    const d = (topic as any).last_read as Temporal.PlainDate;
+    const d = topic.last_read;
     expect(d.year).toBe(2004);
     expect(d.month).toBe(6);
     expect(d.day).toBe(24);
