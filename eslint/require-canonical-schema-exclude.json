@@ -13,7 +13,6 @@
   "packages/activerecord/src/associations/source-type-validation.test.ts",
   "packages/activerecord/src/associations/through-association-scope.test.ts",
   "packages/activerecord/src/calculations.test.ts",
-  "packages/activerecord/src/counter-cache.trails.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
   "packages/activerecord/src/modules.test.ts",
