@@ -301,7 +301,9 @@ describe("HasManyThroughAssociationsTest", () => {
     await CurrentMembership.create({ club_id: club.id, member_id: member2.id });
 
     const club1 = await Club.includes("members").findBy({ id: club.id });
-    const clubMembers = ((club1 as any).members as any[]).sort((a: any, b: any) => a.id - b.id);
+    const clubMembers = ((club1 as any).members as any[]).sort(
+      (a: any, b: any) => Number(a.id) - Number(b.id),
+    );
     const expected = [member1, member2].sort((a, b) => Number(a.id) - Number(b.id));
     expect(clubMembers.map((m: any) => m.id)).toEqual(expected.map((m) => m.id));
   });
