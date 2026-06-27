@@ -150,7 +150,15 @@ describe("ModulesTest", () => {
     // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint
     // that Rails does not — sibling lookup (Firm from Client.computeType("Firm"))
     // throws SubclassNotFound in trails. Convergence needed in inheritance.ts.
-    expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
+    // Rails modules_test.rb:146-147 sets store_full_sti_class = true for this test;
+    // the outer beforeEach leaves it false, so restore it here for future un-skippers.
+    const prev = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      expect(MyAppBusinessClient.computeType("Firm")).toBe(MyAppBusinessFirm);
+    } finally {
+      Base.storeFullStiClass = prev;
+    }
   });
 
   it("nested models should not raise exception when using delete all dependency on association", async () => {

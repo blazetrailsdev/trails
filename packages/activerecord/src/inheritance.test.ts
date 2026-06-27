@@ -147,11 +147,16 @@ describe("InheritanceTest", () => {
     expect(isDescendsFromActiveRecord(SubAbstractStiPost)).toBe(false);
   });
 
-  it("company descends from active record", () => {
+  it("company descends from active record", async () => {
     // TRACKED-PENDING-CONVERGENCE: isDescendsFromActiveRecord(Base) returns true in trails
-    // (same as above); LocalCompanySubclass needs schema loaded to have the type attr.
+    // (no type attr → !classHasAttribute); Story: descends-from-active-record-base (RFC 0019).
     expect(isDescendsFromActiveRecord(AbstractCompany)).toBe(true);
     expect(isDescendsFromActiveRecord(Company)).toBe(true);
+    // Rails: assert_not Class.new(Company).descends_from_active_record? — an anonymous
+    // subclass of Company is NOT a direct AR descendant once Company has the type col.
+    await Company.loadSchema();
+    class LocalCompanySubclass extends Company {}
+    expect(isDescendsFromActiveRecord(LocalCompanySubclass)).toBe(false);
   });
 
   it("abstract class", () => {
@@ -291,7 +296,7 @@ describe("InheritanceTest", () => {
   });
 
   it("where create bang with subclass", async () => {
-    const firm = await Company.where({ type: "Firm" }).create({ name: "Basecamp" });
+    const firm = await Company.where({ type: "Firm" }).createBang({ name: "Basecamp" });
     expect(firm.constructor).toBe(Firm);
   });
 
@@ -333,11 +338,13 @@ describe("InheritanceTest", () => {
   });
 
   it("where create bang with invalid type", async () => {
-    await expect(Company.where({ type: "InvalidType" }).create()).rejects.toThrow(SubclassNotFound);
+    await expect(Company.where({ type: "InvalidType" }).createBang()).rejects.toThrow(
+      SubclassNotFound,
+    );
   });
 
   it("where create bang with unrelated type", async () => {
-    await expect(Company.where({ type: "Account" }).create()).rejects.toThrow(SubclassNotFound);
+    await expect(Company.where({ type: "Account" }).createBang()).rejects.toThrow(SubclassNotFound);
   });
 
   it("new with unrelated namespaced type", () => {
