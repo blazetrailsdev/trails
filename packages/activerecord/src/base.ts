@@ -4384,7 +4384,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
     by?: number,
     options?: { touch?: boolean | string | string[] },
   ): Promise<this>;
-  toggleBang(attribute: string): Promise<boolean>;
+  toggleBang(attribute: string): Promise<boolean | undefined>;
   save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean | undefined>;
   saveBang(options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined>;
   destroy(): Promise<this | false>;
@@ -4416,8 +4416,8 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): void;
-  updateAttribute(name: string, value: unknown): Promise<boolean>;
-  updateAttributeBang(name: string, value: unknown): Promise<true>;
+  updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
+  updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<void>;
   updateColumns(attrs: Record<string, unknown>): Promise<void>;
   dup(): this;

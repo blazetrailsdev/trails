@@ -425,7 +425,7 @@ interface CounterBangRecord extends AttributeIO {
 
 /** Save path used by toggleBang. */
 interface ToggleBangRecord extends AttributeIO {
-  save(options?: { validate?: boolean }): Promise<boolean>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
 }
 
 /** Mirrors: ActiveRecord::Persistence#increment */
@@ -513,7 +513,7 @@ export async function decrementBang<
 export async function toggleBang<T extends ToggleBangRecord>(
   this: T & { toggle(attribute: string): T },
   attribute: string,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   this.toggle(attribute);
   // Rails' `update_attribute(name, value)` is effectively `self[name] = value;
   // save(validate: false)`. Our toggle() already wrote the toggled value;
@@ -1014,7 +1014,8 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
 
 interface AttributeSingleSave {
   writeAttribute(name: string, value: unknown): void;
-  save(options?: { validate?: boolean }): Promise<boolean>;
+  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
+  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
 /** Mirrors: ActiveRecord::Persistence#update_attribute */
@@ -1022,7 +1023,7 @@ export async function updateAttribute<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<boolean> {
+): Promise<boolean | undefined> {
   this.writeAttribute(name, value);
   return this.save({ validate: false });
 }
@@ -1031,19 +1032,16 @@ export async function updateAttribute<T extends AttributeSingleSave>(
  * Mirrors: ActiveRecord::Persistence#update_attribute! —
  * `public_send("#{name}=", value); save!(validate: false)`.
  * Skips validations, raises RecordNotSaved when a callback aborts.
+ * Returns undefined (Rails nil) when before_save raises Rollback and it is
+ * swallowed by a joined outer transaction.
  */
 export async function updateAttributeBang<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<true> {
+): Promise<true | undefined> {
   this.writeAttribute(name, value);
-  const saved = await this.save({ validate: false });
-  if (!saved) {
-    const ctorName = (this.constructor as { name?: string }).name || "record";
-    throw new RecordNotSaved(`Failed to save the ${ctorName} while updating \`${name}\``, this);
-  }
-  return true;
+  return this.saveBang({ validate: false });
 }
 
 interface UpdateColumnsRecord {
