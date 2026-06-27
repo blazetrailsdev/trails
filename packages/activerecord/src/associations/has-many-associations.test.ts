@@ -591,14 +591,7 @@ describe("HasManyAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  it.skip("transaction when deleting persisted", async () => {
-    // BLOCKED: CollectionProxy#destroy does not wrap the batch in a transaction
-    // (Rails delete_or_destroy → transaction { remove_records }), so a mid-batch
-    // raise leaves a partial delete instead of rolling back.
-    // ROOT-CAUSE: associations/collection-proxy.ts#destroy not wrapping the loop
-    // in this.transaction when any record is persisted (cf. #delete which does).
-    // SCOPE: ~15 LOC fix; tracked by collection-proxy-destroy-transaction +
-    // unskip-has-many-collection-destroy-transaction (RFC 0019).
+  it("transaction when deleting persisted", async () => {
     const good = Client.new({ name: "Good" }) as any;
     const bad = Client.new({ name: "Bad" }) as any;
     bad.raiseOnDestroy = true;
