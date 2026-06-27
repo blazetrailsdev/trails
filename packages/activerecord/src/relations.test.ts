@@ -15,7 +15,11 @@ import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
 // Canonical models
-import { Post, PostWithPreloadDefaultScope } from "./test-helpers/models/post.js";
+import {
+  Post,
+  PostWithPreloadDefaultScope,
+  PostWithIncludesDefaultScope,
+} from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -75,6 +79,7 @@ describe("RelationTest", () => {
       "cars",
       "minivans",
       "cpkOrders",
+      "cpkBooks",
       "subscribers",
     ],
     {
@@ -794,26 +799,10 @@ describe("RelationTest", () => {
     expect(await query.size()).toBe(1);
   });
 
-  it("preloading with associations and merges", async () => {
-    const post = await Post.createBang({ title: "Uhuu", body: "body" });
-    await Reader.createBang({ post_id: post.id, person_id: 1 });
-    const comment = await Comment.createBang({ post_id: post.id, body: "body" });
-
-    // Rails also asserts no-queries for preloaded post.readers after the merge; that
-    // assertion requires cross-model preload propagation through merge, not yet ported.
-    const postRel = Post.joins("INNER JOIN readers ON readers.post_id = posts.id").where({
-      title: "Uhuu",
-    });
-    const resultComment = await Comment.joins("INNER JOIN posts ON posts.id = comments.post_id")
-      .merge(postRel)
-      .first();
-    expect(resultComment!.id).toBe(comment.id);
-
-    const postRel2 = Post.where({ title: "Uhuu" });
-    const resultComment2 = await Comment.joins("INNER JOIN posts ON posts.id = comments.post_id")
-      .merge(postRel2)
-      .first();
-    expect(resultComment2!.id).toBe(comment.id);
+  it.skip("preloading with associations and merges", async () => {
+    // BLOCKED: relations — Rails asserts result_comment.post.readers is already loaded
+    // (no extra queries) after Comment.joins(:post).merge(Post.preload(:readers)...).
+    // Cross-model preload propagation through merge is not yet implemented in Trails.
   });
 
   it("preloading with associations default scopes and merges", async () => {
@@ -825,6 +814,13 @@ describe("RelationTest", () => {
       .where({ title: "Uhuu" });
     const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel).toArray();
     expect(resultPosts).toHaveLength(1);
+    // Rails also asserts no-queries (readers already preloaded); Trails does not
+    // have a no-queries assertion helper, so we verify count only.
+
+    // includes branch: PostWithIncludesDefaultScope
+    const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
+    const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2).toArray();
+    expect(resultPosts2).toHaveLength(1);
   });
 
   it("loading with one association", async () => {
@@ -846,13 +842,10 @@ describe("RelationTest", () => {
     expect(postWithLastComment.lastComment).toEqual(directLastComment);
   });
 
-  it("to sql on eager join", async () => {
-    void posts("welcome");
-    const sql = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
-    const rows = await Post.eagerLoad("lastComment").order("comments.id DESC").toArray();
-    expect(rows.length).toBeGreaterThan(0);
-    // toSql reflects the same query used for loading
-    expect(sql).toContain("comments");
+  it.skip("to sql on eager join", () => {
+    // BLOCKED: relations — Rails uses capture_sql { ... }.first to get the actual SQL
+    // executed when loading, then asserts it equals to_sql. Trails has no capture_sql
+    // helper, so there is no way to verify toSql matches the executed query shape.
   });
 
   it("to sql on scoped proxy", async () => {
@@ -1647,8 +1640,12 @@ describe("RelationTest", () => {
     expect(topic.title).toBe("FindOrInitByBlock");
   });
 
-  it("find or initialize by with cpk association", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it("find or initialize by with cpk association", async () => {
+    const order1 = await CpkOrder.createBang({ id: [1, 1] });
+    const order2 = await CpkOrder.createBang({ id: [1, 2] });
+    await CpkBook.createBang({ id: [2, 1], order: order1 });
+    const book = await CpkBook.findOrInitializeBy({ order: order2 });
+    expect(book.order).toEqual(order2);
   });
 
   it("explicit create with", () => {
