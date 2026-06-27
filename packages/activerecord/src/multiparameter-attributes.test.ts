@@ -383,9 +383,20 @@ describe("MultiParameterAttributeTest", () => {
           // re-fetch for dataSourceExists + columns + primaryKeys on each call; after
           // four prior timezone tests the fifth DB fetch on the pinned MariaDB connection
           // fails silently, leaving bonus_time with no type and falling back to "value".
+          const _diagSc = (Topic as any).connection?.schemaCache;
+          const _diagCacheWarm = _diagSc?._columnsHash?.has?.("topics") ?? "no-sc";
+          const _diagDefBefore = (Topic as any)._attributeDefinitions?.get?.("bonus_time");
           (Topic as any)._schemaLoaded = false;
           (Topic as any)._schemaLoadPromise = undefined;
           await Topic.loadSchema();
+          const _diagDefAfter = (Topic as any)._attributeDefinitions?.get?.("bonus_time");
+          console.warn(
+            "[tz-diag] poolCacheWarm=%s defBefore=%s defAfter=%s schemaLoaded=%s",
+            _diagCacheWarm,
+            _diagDefBefore?.type?.constructor?.name ?? "undefined",
+            _diagDefAfter?.type?.constructor?.name ?? "undefined",
+            (Topic as any)._schemaLoaded,
+          );
           const topic = new Topic();
           topic.assignAttributes({
             "bonus_time(1i)": "2000",
