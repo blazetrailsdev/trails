@@ -816,7 +816,7 @@ describe("RelationTest", () => {
     expect(resultPosts).toHaveLength(1);
     const preloadedReaders = await resultPosts[0].readers.toArray();
     expect(preloadedReaders).toHaveLength(1);
-    expect(preloadedReaders[0].post_id).toBe(post.id);
+    expect(Number(preloadedReaders[0].post_id)).toBe(Number(post.id));
 
     // includes branch: PostWithIncludesDefaultScope
     const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
@@ -824,7 +824,7 @@ describe("RelationTest", () => {
     expect(resultPosts2).toHaveLength(1);
     const includedReaders = await resultPosts2[0].readers.toArray();
     expect(includedReaders).toHaveLength(1);
-    expect(includedReaders[0].post_id).toBe(post.id);
+    expect(Number(includedReaders[0].post_id)).toBe(Number(post.id));
   });
 
   it("loading with one association", async () => {
@@ -1329,8 +1329,8 @@ describe("RelationTest", () => {
     const comment = await Comment.where({ post_id: welcome.id, author_id: david.id }).createBang({
       body: "hello",
     });
-    expect((comment as any).author_id).toBe(david.id);
-    expect(comment.post_id).toBe(welcome.id);
+    expect(Number((comment as any).author_id)).toBe(Number(david.id));
+    expect(Number(comment.post_id)).toBe(Number(welcome.id));
   });
 
   it("new with array", () => {
