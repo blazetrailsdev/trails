@@ -3,7 +3,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
-import { sql as arelSql } from "@blazetrails/arel";
+import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -86,7 +86,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should sum arel attribute", async () => {
-    expect(await Account.sum("credit_limit")).toBe(318);
+    expect(await Account.sum(Account.arelTable.get("credit_limit"))).toBe(318);
   });
 
   it("should sum with qualified name on loaded", async () => {
@@ -113,7 +113,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should average arel attribute", async () => {
-    expect(await Account.average("credit_limit")).toBe(53.0);
+    expect(await Account.average(Account.arelTable.get("credit_limit"))).toBe(53.0);
   });
 
   it("should resolve aliased attributes", async () => {
@@ -154,18 +154,24 @@ describe("CalculationsTest", () => {
   });
 
   it("should get maximum of arel attribute", async () => {
-    expect(await Account.maximum("credit_limit")).toBe(60);
+    expect(await Account.maximum(Account.arelTable.get("credit_limit"))).toBe(60);
   });
 
   it("should get maximum of field with include", async () => {
     expect(
-      await Account.joins("firm").where("companies.name != 'Summit'").maximum("credit_limit"),
+      await Account.where("companies.name != 'Summit'")
+        .references("companies")
+        .includes("firm")
+        .maximum("credit_limit"),
     ).toBe(55);
   });
 
   it("should get maximum of arel attribute with include", async () => {
     expect(
-      await Account.joins("firm").where("companies.name != 'Summit'").maximum("credit_limit"),
+      await Account.where("companies.name != 'Summit'")
+        .references("companies")
+        .includes("firm")
+        .maximum(Account.arelTable.get("credit_limit")),
     ).toBe(55);
   });
 
@@ -174,7 +180,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should get minimum of arel attribute", async () => {
-    expect(await Account.minimum("credit_limit")).toBe(50);
+    expect(await Account.minimum(Account.arelTable.get("credit_limit"))).toBe(50);
   });
 
   it("should group by field", async () => {
@@ -185,7 +191,9 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by arel attribute", async () => {
-    const c = await Account.group("firm_id").sum("credit_limit");
+    const c = await Account.group(Account.arelTable.get("firm_id")).sum(
+      Account.arelTable.get("credit_limit"),
+    );
     expect((c as Record<number, number>)[1]).toBeDefined();
     expect((c as Record<number, number>)[6]).toBeDefined();
     expect((c as Record<number, number>)[2]).toBeDefined();
@@ -332,7 +340,9 @@ describe("CalculationsTest", () => {
 
   it("limit should apply before count arel attribute", async () => {
     const accounts = Account.order("id").limit(4);
-    expect(await accounts.count("firm_id")).toBe(3);
+    const firmIdAttr = Account.arelTable.get("firm_id");
+    expect(await accounts.count(firmIdAttr)).toBe(3);
+    expect(await accounts.select(firmIdAttr).count()).toBe(3);
   });
 
   it("count should shortcut with limit zero", async () => {
@@ -753,16 +763,18 @@ describe("CalculationsTest", () => {
   });
 
   it("count selected arel attribute", async () => {
-    // Rails: Account.select(:firm_id).count == 5 (count non-null firm_id)
-    // Rails: Account.distinct.select(:firm_id).count == 4 (4 distinct non-null firm_ids)
-    expect(await Account.count("firm_id")).toBe(5);
-    expect(await Account.distinct().count("firm_id")).toBe(4);
+    expect(await Account.select(Account.arelTable.get("firm_id")).count()).toBe(5);
+    expect(await Account.distinct().select(Account.arelTable.get("firm_id")).count()).toBe(4);
   });
 
   it.skipIf(adapterType !== "mysql")("count selected arel attributes", async () => {
     // MySQL: COUNT(DISTINCT id, firm_id) excludes rows where firm_id IS NULL → 5.
     // MariaDB handles NULLs differently in COUNT(DISTINCT ...) and returns 6.
-    expect(await Account.distinct().select("id, firm_id").count()).toBeGreaterThanOrEqual(5);
+    expect(
+      await Account.distinct()
+        .select(Account.arelTable.get("id"), Account.arelTable.get("firm_id"))
+        .count(),
+    ).toBeGreaterThanOrEqual(5);
   });
 
   it("count with column parameter", async () => {
@@ -770,11 +782,11 @@ describe("CalculationsTest", () => {
   });
 
   it("count with arel attribute", async () => {
-    expect(await Account.count("firm_id")).toBe(5);
+    expect(await Account.count(Account.arelTable.get("firm_id"))).toBe(5);
   });
 
   it("count with arel star", async () => {
-    expect(await Account.count("*")).toBe(6);
+    expect(await Account.count(arelStar)).toBe(6);
   });
 
   it("count with aliased attribute", async () => {
@@ -793,13 +805,15 @@ describe("CalculationsTest", () => {
   });
 
   it("count arel attribute in joined table with", async () => {
-    expect(await Account.joins("firm").count("companies.id")).toBe(5);
-    expect(await Account.joins("firm").distinct().count("companies.id")).toBe(4);
+    expect(await Account.joins("firm").count(Company.arelTable.get("id"))).toBe(5);
+    expect(await Account.joins("firm").distinct().count(Company.arelTable.get("id"))).toBe(4);
   });
 
   it("count selected arel attribute in joined table", async () => {
-    expect(await Account.joins("firm").count("companies.id")).toBe(5);
-    expect(await Account.joins("firm").distinct().count("companies.id")).toBe(4);
+    expect(await Account.joins("firm").select(Company.arelTable.get("id")).count()).toBe(5);
+    expect(await Account.joins("firm").distinct().select(Company.arelTable.get("id")).count()).toBe(
+      4,
+    );
   });
 
   it("should count field in joined table with group by", async () => {

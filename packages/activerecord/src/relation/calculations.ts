@@ -31,7 +31,8 @@ import {
  *
  * @internal exported so Relation can share the implementation.
  */
-export function groupColumnToArel(col: string, table: Table): Nodes.Node {
+export function groupColumnToArel(col: string | Nodes.Node, table: Table): Nodes.Node {
+  if (col instanceof Nodes.Node) return col;
   const trimmed = col.trim();
   // Plain identifier → qualify via model table (e.g. "created_at" → "orders"."created_at").
   if (/^[A-Za-z_]\w*$/.test(trimmed)) return table.get(trimmed);
@@ -106,12 +107,16 @@ const SQL_FN_NAMES: Record<AggFn, string> = {
  * discovered through the join dependencies (which, for a `.joins(:assoc)`,
  * include the target klass retained on the pre-resolved SQL join clause).
  */
-function resolveColType(rel: CalculationRelation, column: string): unknown {
+function resolveColType(rel: CalculationRelation, column: string | Nodes.Node): unknown {
   if (column === "*") return null;
+  // Arel attribute node: extract column name from the node.
+  const colStr =
+    column instanceof Nodes.Node ? ((column as unknown as { name?: string }).name ?? "") : column;
+  if (!colStr) return null;
   // A "table.column" aggregate target resolves through joins; the cast type
   // lives on the joined model, keyed by the bare column name.
-  const dot = column.lastIndexOf(".");
-  const bare = dot >= 0 ? column.slice(dot + 1) : column;
+  const dot = colStr.lastIndexOf(".");
+  const bare = dot >= 0 ? colStr.slice(dot + 1) : colStr;
   return (
     pluckCastTypeForKnownColumn(rel, bare) ??
     (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null)
@@ -189,10 +194,40 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
   );
 }
 
-function buildAggNode(rel: CalculationRelation, fn: AggFn, column: string, distinct: boolean): any {
+function buildAggNode(
+  rel: CalculationRelation,
+  fn: AggFn,
+  column: string | Nodes.Node,
+  distinct: boolean,
+): any {
   const sqlName = SQL_FN_NAMES[fn];
-  if (column === "*") {
-    return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral("*")], undefined, distinct);
+  if (column === "*" || column instanceof Nodes.SqlLiteral) {
+    const lit = column === "*" ? new Nodes.SqlLiteral("*") : column;
+    return new Nodes.NamedFunction(sqlName, [lit], undefined, distinct);
+  }
+  // Arel node (e.g. arelTable.get("col")) — use it directly without string resolution.
+  // Mirrors Rails: calculate() passes Arel::Attribute through aggregate_column unchanged.
+  if (column instanceof Nodes.Node) {
+    const node = column as Nodes.Node & {
+      count(distinct: boolean): Nodes.Node;
+      sum(): Nodes.Node;
+      average(): Nodes.Node;
+      minimum(): Nodes.Node;
+      maximum(): Nodes.Node;
+    };
+    if (distinct) return new Nodes.NamedFunction(sqlName, [node], undefined, true);
+    switch (fn) {
+      case "count":
+        return node.count(false);
+      case "sum":
+        return node.sum();
+      case "average":
+        return node.average();
+      case "minimum":
+        return node.minimum();
+      case "maximum":
+        return node.maximum();
+    }
   }
   // Mirrors Rails' aggregate_column → arel_column (query_methods.rb): a known
   // column (after attribute-alias resolution) becomes a qualified column
@@ -324,8 +359,9 @@ function applyFromToManager(rel: CalculationRelation, manager: any): void {
   if (fromNode !== undefined && fromNode !== null) manager.from(fromNode);
 }
 
-function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string): boolean {
+function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | Nodes.Node): boolean {
   if (fn === "count" || fn === "average" || column === "*") return false;
+  if (column instanceof Nodes.Node) return false;
   const table = rel._modelClass.arelTable as {
     typeForAttribute?(col: string): unknown;
   };
@@ -335,7 +371,7 @@ function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string): bo
 async function singleAggregate(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string,
+  column: string | Nodes.Node,
   coerceNumeric: boolean = true,
 ): Promise<unknown | null> {
   // Rails routes aggregates through apply_join_dependency when eager loading,
@@ -345,6 +381,18 @@ async function singleAggregate(
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const projection = aggNode.as("val");
   const manager = table.project(projection);
+  // Rails routes sum/average/maximum/minimum through apply_join_dependency when
+  // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
+  const anyRelSa = rel as any;
+  const promotedSa: string[] =
+    (anyRelSa._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
+  const eagerSa: string[] = (anyRelSa._eagerLoadAssociations as string[] | undefined) ?? [];
+  const allEagerSa = [...new Set([...eagerSa, ...promotedSa])];
+  if (allEagerSa.length > 0) {
+    const jd = QueryMethodBangs.constructJoinDependency.call(anyRelSa, allEagerSa, Nodes.OuterJoin);
+    for (const node of jd.joinConstraints([], undefined, anyRelSa._aliasableReferences()))
+      manager.appendJoinNode(node);
+  }
   rel._applyJoinsToManager(manager);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
@@ -367,7 +415,7 @@ async function singleAggregate(
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string,
+  column: string | Nodes.Node,
   coerceNumeric: boolean = true,
 ): Promise<Record<string, unknown> | Map<unknown, unknown>> {
   rel._checkEagerLoadable();
@@ -475,7 +523,7 @@ async function groupedCompositeAssoc(
   rel: CalculationRelation,
   association: any,
   fn: AggFn,
-  column: string,
+  column: string | Nodes.Node,
   coerceNumeric: boolean,
 ): Promise<Map<unknown, unknown>> {
   const table = rel._modelClass.arelTable;
@@ -554,7 +602,7 @@ function isEmptyCalculationScope(rel: CalculationRelation): boolean {
 
 export async function performCount(
   this: CalculationRelation,
-  column?: string,
+  column?: string | Nodes.Node,
 ): Promise<number | Record<string, number> | Map<unknown, number>> {
   if (this._limitValue === 0) return 0;
   // Safe to test contradiction here: every calc method is wrapped by
@@ -776,13 +824,30 @@ export async function performCount(
     // columnAlias: what the outer COUNT targets. Mirrors Rails:
     //   column_name == :all → Arel.star   (outer: COUNT(*))
     //   else                → "count_column" (outer: COUNT(count_column))
-    const effectiveCol = column === "*" ? undefined : column;
+    const rawEffectiveCol = column === "*" ? undefined : column;
+    // Inherit select-value column when no explicit column is provided (same logic
+    // as the non-limit path below — mirrors Rails execute_simple_calculation).
+    const selectColsLimited = (this as any)._selectColumns as unknown[] | null | undefined;
+    const singleSelectColLimited =
+      !rawEffectiveCol &&
+      selectColsLimited?.length === 1 &&
+      selectColsLimited[0] instanceof Nodes.Node
+        ? selectColsLimited[0]
+        : null;
+    const effectiveCol = rawEffectiveCol ?? singleSelectColLimited ?? undefined;
     let columnAlias: Nodes.Node;
+    // Resolve effectiveCol: an Arel node is used as-is; a string goes through table.get.
+    const resolveColNode = (
+      col: string | Nodes.Node,
+    ): Nodes.Node & { as(alias: string): unknown } =>
+      (col instanceof Nodes.Node ? col : innerTable.get(col)) as Nodes.Node & {
+        as(alias: string): unknown;
+      };
     if (this._isDistinct && effectiveCol) {
       // DISTINCT + specific column: project that column aliased as count_column
       // with DISTINCT applied so the inner query counts distinct non-NULL values
       // of the requested column (matches COUNT(DISTINCT col) semantics).
-      innerManager = project(innerTable.get(effectiveCol).as("count_column"));
+      innerManager = project(resolveColNode(effectiveCol).as("count_column"));
       innerManager.distinct();
       columnAlias = new Nodes.SqlLiteral("count_column");
     } else if (this._isDistinct) {
@@ -799,7 +864,7 @@ export async function performCount(
     } else if (effectiveCol) {
       // Specific column requested: project it aliased as count_column so the
       // outer COUNT(count_column) excludes NULLs, matching non-limited semantics.
-      const colNode = innerTable.get(effectiveCol);
+      const colNode = resolveColNode(effectiveCol);
       innerManager = project(colNode.as("count_column"));
       columnAlias = new Nodes.SqlLiteral("count_column");
     } else {
@@ -840,8 +905,19 @@ export async function performCount(
   // branch so every count path shares them.
   const effectiveColumn = column === "*" ? undefined : column;
 
-  if (effectiveColumn) {
-    const countNode = (aggregateColumn(this, effectiveColumn) as any).count(this._isDistinct);
+  // Rails: when no explicit column, check if select_values has a single Arel attribute
+  // and use it as the count column (mirrors calculations.rb#execute_simple_calculation).
+  const selectColsNonLimited = (this as any)._selectColumns as unknown[] | null | undefined;
+  const singleSelectColForCount =
+    !effectiveColumn &&
+    selectColsNonLimited?.length === 1 &&
+    selectColsNonLimited[0] instanceof Nodes.Node
+      ? selectColsNonLimited[0]
+      : null;
+  const resolvedColumn = effectiveColumn ?? singleSelectColForCount ?? undefined;
+
+  if (resolvedColumn) {
+    const countNode = (aggregateColumn(this, resolvedColumn) as any).count(this._isDistinct);
     const manager = project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
@@ -915,7 +991,7 @@ export async function performCount(
 
 export async function performSum(
   this: CalculationRelation,
-  column?: string,
+  column?: string | Nodes.Node,
 ): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>> {
   if (isEmptyCalculationScope(this)) {
     if (this._groupColumns.length > 0) return {};
@@ -932,7 +1008,7 @@ export async function performSum(
 
 export async function performAverage(
   this: CalculationRelation,
-  column: string,
+  column: string | Nodes.Node,
 ): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   // Returns `unknown` (not just number) because non-numeric column types
   // — interval (Duration), money, time — route through the column type's
@@ -949,7 +1025,7 @@ export async function performAverage(
 
 export async function performMinimum(
   this: CalculationRelation,
-  column: string,
+  column: string | Nodes.Node,
 ): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
@@ -960,7 +1036,7 @@ export async function performMinimum(
 
 export async function performMaximum(
   this: CalculationRelation,
-  column: string,
+  column: string | Nodes.Node,
 ): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
@@ -981,13 +1057,15 @@ export async function performMaximum(
  * rules then reject every subclass override.
  */
 export interface CalculationMethods {
-  count(column?: string): Promise<number | Record<string, number> | Map<unknown, number>>;
+  count(
+    column?: string | Nodes.Node,
+  ): Promise<number | Record<string, number> | Map<unknown, number>>;
   sum(
-    column?: string,
+    column?: string | Nodes.Node,
   ): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>>;
-  average(column: string): Promise<unknown | null | Record<string, unknown>>;
-  minimum(column: string): Promise<unknown | null | Record<string, unknown>>;
-  maximum(column: string): Promise<unknown | null | Record<string, unknown>>;
+  average(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
+  minimum(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
+  maximum(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
 }
 
 /**
@@ -1057,7 +1135,11 @@ function truncate(name: string): string {
 }
 
 /** @internal */
-export function aggregateColumn(rel: CalculationRelation, columnName: string): unknown {
+export function aggregateColumn(
+  rel: CalculationRelation,
+  columnName: string | Nodes.Node,
+): unknown {
+  if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._modelClass.arelTable;
   if (columnName === "*" || columnName === "1") {
     return table.sql ? table.sql(columnName) : columnName;
@@ -1085,7 +1167,10 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 }
 
 /** @internal */
-export function hasInclude(rel: CalculationRelation, columnName: string | null): boolean {
+export function hasInclude(
+  rel: CalculationRelation,
+  columnName: string | Nodes.Node | null,
+): boolean {
   const anyRel = rel as any;
   // eager_load_values.any? → always triggers (part of eager_loading?)
   if (anyRel._eagerLoadAssociations?.length > 0) return true;
@@ -1254,7 +1339,15 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 export function selectForCount(rel: CalculationRelation): string {
   const sel = (rel as any)._selectColumns;
   if (!sel || sel.length === 0) return "*";
-  return sel.map((s: unknown) => String(s)).join(", ");
+  return sel
+    .map((s: unknown) => {
+      if (s instanceof Nodes.Node) {
+        const visitor = rel._conn?.()?.visitor;
+        return visitor ? visitor.compile(s) : String(s);
+      }
+      return String(s);
+    })
+    .join(", ");
 }
 
 /** @internal */
