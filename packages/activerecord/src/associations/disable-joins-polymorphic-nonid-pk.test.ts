@@ -25,33 +25,16 @@
  * (reflection.rb:968); our ReflectionProxy forwards it, and DJAS'
  * `_addConstraintsDj` threads it through the chain walk.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-
-const TEST_SCHEMA: Schema = {
-  dp_authors: { name: "string" },
-  dp_galleries: {
-    dp_author_id: "integer",
-    imageable_uuid: "string",
-    imageable_type: "string",
-  },
-  dp_non_id_photos: {
-    columns: { uuid: "string", title: "string" },
-    primaryKey: ["uuid"],
-  },
-  dp_non_id_articles: {
-    columns: { slug: "string", headline: "string" },
-    primaryKey: ["slug"],
-  },
-};
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class DpAuthor extends Base {
     static {
@@ -85,12 +68,29 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    DpAuthor.adapter = adapter;
-    DpGallery.adapter = adapter;
-    DpNonIdPhoto.adapter = adapter;
-    DpNonIdArticle.adapter = adapter;
+    const conn = Base.connection as any;
+    await conn.createTable("dp_authors", { force: true }, (t: any) => {
+      t.string("name");
+    });
+    await conn.createTable("dp_galleries", { force: true }, (t: any) => {
+      t.integer("dp_author_id");
+      t.string("imageable_uuid");
+      t.string("imageable_type");
+    });
+    await conn.createTable(
+      "dp_non_id_photos",
+      { primaryKey: "uuid", id: { type: "string" }, force: true },
+      (t: any) => {
+        t.string("title");
+      },
+    );
+    await conn.createTable(
+      "dp_non_id_articles",
+      { primaryKey: "slug", id: { type: "string" }, force: true },
+      (t: any) => {
+        t.string("headline");
+      },
+    );
     registerModel("DpAuthor", DpAuthor);
     registerModel("DpGallery", DpGallery);
     registerModel("DpNonIdPhoto", DpNonIdPhoto);
@@ -115,10 +115,6 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       sourceType: "DpNonIdPhoto",
       disableJoins: true,
     });
-    // `has_one :through` must go through a singular association
-    // (has_one / belongs_to) — Rails rejects has_one-through-
-    // collection at reflection time. Use a dedicated has_one
-    // gallery so the chain is singular end-to-end.
     Associations.hasOne.call(DpAuthor, "dpGallery", {
       className: "DpGallery",
       foreignKey: "dp_author_id",
@@ -131,14 +127,22 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    await (Base.connection as any).dropTable(
+      "dp_non_id_articles",
+      "dp_non_id_photos",
+      "dp_galleries",
+      "dp_authors",
+      { ifExists: true },
+    );
+  });
 
   afterEach(() => Notifications.unsubscribeAll());
 
   it("loads via DJAS using the sourceType target's non-id PK (no JOIN, origin_type filter applied)", async () => {
     const author = await DpAuthor.create({ name: "a" });
 
-    // One matching photo (sourceType target uses `uuid` as PK).
     const photo = (await DpNonIdPhoto.create({ uuid: "u-photo", title: "p1" })) as any;
     await DpGallery.create({
       dp_author_id: author.id,
@@ -146,12 +150,6 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       imageable_type: "DpNonIdPhoto",
     });
 
-    // A second real photo whose uuid matches a distraction gallery's
-    // imageable_uuid. Without the sourceType filter
-    // (imageable_type = 'DpNonIdPhoto'), the walk would collect
-    // BOTH uuids from the gallery step and incorrectly load
-    // `otherPhoto` alongside the real one — proving the filter is
-    // doing observable work, not just shaping SQL.
     const otherPhoto = (await DpNonIdPhoto.create({
       uuid: "u-other-photo",
       title: "leak-check",
@@ -166,9 +164,6 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -181,25 +176,14 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       Notifications.unsubscribe(sub);
     }
     expect(observed.length).toBeGreaterThan(0);
-    // DJAS walks step-by-step — no JOIN across the chain.
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
-    // The source-type filter fired at the gallery step.
     expect(observed.some((s) => /imageable_type/i.test(s))).toBe(true);
-    // The final step reads `uuid` (the sourceType target's PK), not
-    // the hard-coded `id` that `BelongsToReflection#joinPrimaryKey`
-    // returns for polymorphic sources. Regression guard: if
-    // `joinPrimaryKeyFor(klass)` stops being routed correctly, the
-    // WHERE would reference `id` and return no rows.
     expect(observed.some((s) => /\bFROM\b\s+["`]?dp_non_id_photos\b.+\buuid\b/i.test(s))).toBe(
       true,
     );
   });
 
   it("has_one :through polymorphic-source + non-id target PK via DJAS", async () => {
-    // Same routing gate + chain walker as has_many — pinning the
-    // has_one variant since the fix touches both paths and
-    // CollectionAssociation / SingularAssociation share the DJAS
-    // scope infrastructure.
     const author = await DpAuthor.create({ name: "a" });
     const photo = (await DpNonIdPhoto.create({ uuid: "u-one", title: "only" })) as any;
     await DpGallery.create({
@@ -211,9 +195,6 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });

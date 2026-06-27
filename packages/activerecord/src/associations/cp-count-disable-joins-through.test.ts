@@ -18,28 +18,30 @@
  * DJAR materializes records to enforce the in-memory reorder.
  * We don't need to materialize for the count, so we emit COUNT.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, association, registerModel } from "../index.js";
+import { Base, MigrationContext, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("CollectionProxy#count — disable_joins through", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class CdAuthor extends Base {
     static {
       this._tableName = "cd_authors";
-      this.attribute("id", "integer");
       this.attribute("name", "string");
     }
   }
   class CdPost extends Base {
     static {
       this._tableName = "cd_posts";
-      this.attribute("id", "integer");
       this.attribute("cd_author_id", "integer");
       this.attribute("title", "string");
     }
@@ -47,23 +49,27 @@ describe("CollectionProxy#count — disable_joins through", () => {
   class CdComment extends Base {
     static {
       this._tableName = "cd_comments";
-      this.attribute("id", "integer");
       this.attribute("cd_post_id", "integer");
       this.attribute("body", "string");
     }
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      cd_authors: { name: "string" },
-      cd_posts: { cd_author_id: "integer", title: "string" },
-      cd_comments: { cd_post_id: "integer", body: "string" },
-      cd_ratings: { cd_comment_id: "integer", value: "integer" },
+    await migrationCtx().createTable("cd_authors", { force: true }, (t: any) => {
+      t.string("name");
     });
-    CdAuthor.adapter = adapter;
-    CdPost.adapter = adapter;
-    CdComment.adapter = adapter;
+    await migrationCtx().createTable("cd_posts", { force: true }, (t: any) => {
+      t.integer("cd_author_id");
+      t.string("title");
+    });
+    await migrationCtx().createTable("cd_comments", { force: true }, (t: any) => {
+      t.integer("cd_post_id");
+      t.string("body");
+    });
+    await migrationCtx().createTable("cd_ratings", { force: true }, (t: any) => {
+      t.integer("cd_comment_id");
+      t.integer("value");
+    });
     registerModel("CdAuthor", CdAuthor);
     registerModel("CdPost", CdPost);
     registerModel("CdComment", CdComment);
@@ -89,7 +95,12 @@ describe("CollectionProxy#count — disable_joins through", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
+
+  afterAll(async () => {
+    await migrationCtx().dropTable("cd_ratings", "cd_comments", "cd_posts", "cd_authors", {
+      ifExists: true,
+    });
+  });
 
   afterEach(() => Notifications.unsubscribeAll());
 
@@ -103,9 +114,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -116,8 +124,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
       Notifications.unsubscribe(sub);
     }
     expect(n).toBe(3);
-    // Intermediate pluck step + final COUNT — exactly two SQLs.
-    // No row-wise SELECT against cd_comments.
     const commentsSelects = observed.filter((s) => /\bFROM\b\s+["`]?cd_comments\b/i.test(s));
     expect(commentsSelects.length).toBe(1);
     expect(commentsSelects[0]).toMatch(/SELECT\s+COUNT\b/i);
@@ -125,20 +131,13 @@ describe("CollectionProxy#count — disable_joins through", () => {
   });
 
   it("nested-through + disable_joins: walker chains through the nested level and still COUNTs the final step", async () => {
-    // Add a Rating model and nest the chain:
-    //   Author → (Posts → Comments) → Ratings
-    // `noJoinsCdRatings` is nested-through with disable_joins. DJAS'
-    // chain walker handles the flattened chain (PR #668), and our
-    // COUNT fast path rides on top.
     class CdRating extends Base {
       static {
         this._tableName = "cd_ratings";
-        this.attribute("id", "integer");
         this.attribute("cd_comment_id", "integer");
         this.attribute("value", "integer");
       }
     }
-    CdRating.adapter = adapter;
     registerModel("CdRating", CdRating);
     (CdRating as any)._associations = [];
     (CdRating as any)._reflections = {};
@@ -165,9 +164,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -176,11 +172,9 @@ describe("CollectionProxy#count — disable_joins through", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
-    // Final step is a single COUNT — not a row-wise SELECT.
     const ratingsSelects = observed.filter((s) => /\bFROM\b\s+["`]?cd_ratings\b/i.test(s));
     expect(ratingsSelects.length).toBe(1);
     expect(ratingsSelects[0]).toMatch(/SELECT\s+COUNT\b/i);
-    // No JOIN across the chain.
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
   });
 
@@ -189,9 +183,6 @@ describe("CollectionProxy#count — disable_joins through", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });

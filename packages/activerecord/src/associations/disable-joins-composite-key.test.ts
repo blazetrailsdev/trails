@@ -14,38 +14,22 @@
  * joins through associations: tuple-style matching across the
  * intermediate records, no JOIN in the generated query shape.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA: Schema = {
-  ck_shops: { name: "string" },
-  ck_orders: {
-    columns: {
-      shop_id: "integer",
-      order_number: "integer",
-      name: "string",
-    },
-    primaryKey: ["shop_id", "order_number"],
-  },
-  ck_line_items: {
-    ck_order_shop_id: "integer",
-    ck_order_number: "integer",
-    sku: "string",
-  },
-};
+function migrationCtx() {
+  return new MigrationContext(Base.connection);
+}
 
 describe("DJAS — composite key support", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  // Shopify-style composite-PK shape: (shop_id, order_number). We
-  // avoid `id` as the second PK column because Base.id is an accessor
-  // that collides with raw column reads on test-adapter.
   class CkShop extends Base {
     static {
       this._tableName = "ck_shops";
@@ -71,11 +55,23 @@ describe("DJAS — composite key support", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    CkShop.adapter = adapter;
-    CkOrder.adapter = adapter;
-    CkLineItem.adapter = adapter;
+    await migrationCtx().createTable("ck_shops", { force: true }, (t: any) => {
+      t.string("name");
+    });
+    await migrationCtx().createTable(
+      "ck_orders",
+      { primaryKey: ["shop_id", "order_number"], force: true },
+      (t: any) => {
+        t.integer("shop_id");
+        t.integer("order_number");
+        t.string("name");
+      },
+    );
+    await migrationCtx().createTable("ck_line_items", { force: true }, (t: any) => {
+      t.integer("ck_order_shop_id");
+      t.integer("ck_order_number");
+      t.string("sku");
+    });
     registerModel("CkShop", CkShop);
     registerModel("CkOrder", CkOrder);
     registerModel("CkLineItem", CkLineItem);
@@ -86,7 +82,6 @@ describe("DJAS — composite key support", () => {
       className: "CkOrder",
       foreignKey: "shop_id",
     });
-    // Composite FK on line_items references CkOrder's composite PK.
     Associations.hasMany.call(CkOrder, "ckLineItems", {
       className: "CkLineItem",
       foreignKey: ["ck_order_shop_id", "ck_order_number"],
@@ -99,10 +94,11 @@ describe("DJAS — composite key support", () => {
       disableJoins: true,
     });
   });
-  withTransactionalFixtures(() => adapter);
 
-  // Backstop in case a test throws before reaching its in-test
-  // unsubscribe. Same pattern as instrumentation.test.ts.
+  afterAll(async () => {
+    await migrationCtx().dropTable("ck_line_items", "ck_orders", "ck_shops", { ifExists: true });
+  });
+
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -125,15 +121,9 @@ describe("DJAS — composite key support", () => {
       sku: "sku-2",
     });
 
-    // Capture SQL to actually prove the "no JOIN" claim — without
-    // this, the test would still pass if the loader regressed to a
-    // JOIN-based path.
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
-      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
-      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
-      // counts SCHEMA queries; not an association JOIN.
       if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
@@ -149,14 +139,6 @@ describe("DJAS — composite key support", () => {
   });
 
   it("composite-key + ordered upstream: skips DJAR wrap (records load via composite-key WHERE, no in-list reorder)", async () => {
-    // NOTE: the test name is preserved from PR #645 (test names are
-    // an identifier in this repo — `test:compare` uses them to match
-    // against Rails). The body now asserts the *new* behavior: the
-    // loaded-chain DJAR wrap supports composite keys via serialized
-    // tuple grouping, so when the through-step is ordered (upstream
-    // `.order("name")` yields orderA before orderB) the source
-    // step's records re-emit in that tuple order regardless of the
-    // DB's own insertion / default order.
     Associations.hasMany.call(CkShop, "ckOrdersOrdered", {
       className: "CkOrder",
       foreignKey: "shop_id",
@@ -192,26 +174,16 @@ describe("DJAS — composite key support", () => {
 
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsOrdered");
     const items = await loadHasMany(shop, "ckLineItemsOrdered", reflection.options);
-    // orderA sorts before orderB by `name`, so the wrap yields
-    // `from-a` before `from-b` even though `from-b` was inserted first.
     expect(items.map((i: any) => i.sku)).toEqual(["from-a", "from-b"]);
   });
 
   it("skips tuples containing null/undefined (matches SQL tuple-equality semantics, not Arel IS NULL)", async () => {
-    // Regression: Arel's Attribute#eq(null) emits IS NULL, but SQL
-    // tuple-equality treats any null component as a non-match.
-    // The composite path now goes DJAS → Relation#where(cols, tuples)
-    // → PredicateBuilder.buildComposite, which handles the null /
-    // undefined filter and the empty-list short-circuit (→ none()).
-    // Mirrors counter-cache.ts#buildPkPredicate's null handling.
     const shop = await CkShop.create({ name: "S" });
     const order = (await CkOrder.create({
       shop_id: shop.id,
       order_number: 100,
       name: "O",
     })) as any;
-    // line item with a NULL composite component — not a match for
-    // any (shop_id, order_number) tuple.
     await CkLineItem.create({
       ck_order_shop_id: order.shop_id,
       ck_order_number: null as any,
@@ -225,9 +197,6 @@ describe("DJAS — composite key support", () => {
 
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
     const items = await loadHasMany(shop, "ckLineItemsThroughOrders", reflection.options);
-    // Only the "valid" record is returned — the orphan with
-    // ck_order_number=NULL doesn't match the (shop_id=1, order_number=100)
-    // tuple even though shop_id matches.
     expect(items.map((i: any) => i.sku)).toEqual(["valid"]);
   });
 
@@ -254,10 +223,6 @@ describe("DJAS — composite key support", () => {
       sku: "lb",
     });
 
-    // Two independently-read `[shop.id, 200]` tuples + B-before-A
-    // ordering. Without tuple dedupe + grouping, the duplicate would
-    // double-count or the Map would bucket by reference and miss
-    // both records.
     const djar = (
       new DisableJoinsAssociationRelation(
         CkLineItem,
@@ -284,10 +249,6 @@ describe("DJAS — composite key support", () => {
   });
 
   it("DisableJoinsAssociationRelation composite-key load: bigint tuple components don't crash serialization", async () => {
-    // Regression: `big_integer`-cast PKs produce bigints, and
-    // JSON.stringify throws on bigint. The serializer must normalize
-    // them before hashing so composite-key dedupe/group-by can't
-    // crash when a tuple component is a bigint.
     const djar = new DisableJoinsAssociationRelation(
       CkLineItem,
       ["ck_order_shop_id", "ck_order_number"],
@@ -297,38 +258,20 @@ describe("DJAS — composite key support", () => {
       ],
     );
     expect(await djar.ids()).toEqual([[1n, 100n]]);
-    // The empty result matters less than the fact that bigint tuple
-    // components don't make construction, ids(), or toArray() throw.
     await expect(djar.toArray()).resolves.toEqual([]);
   });
 
   it("DisableJoinsAssociationRelation key normalization: empty array throws, single-element array collapses to string", async () => {
-    // length 0 is always a bug — the load/reorder path would call
-    // readAttribute(undefined) and misbehave.
     expect(() => new DisableJoinsAssociationRelation(CkLineItem, [] as any, [])).toThrow(
       /at least one column/,
     );
-    // Empty-string key in loaded-chain mode would make
-    // readAttribute("") return null and silently empty the reorder.
-    // `deferred()` uses "" as a placeholder so the guard only fires
-    // when no chainWalker is present.
     expect(() => new DisableJoinsAssociationRelation(CkLineItem, "", [1])).toThrow(
       /key must not be empty/,
     );
-    // length 1 is equivalent to the string form; normalize so
-    // `this.key` / `_composite` stay consistent with the scalar path.
-    // The correlated overloads pair `string[]` with `unknown[][]`, so
-    // the length-1 case is exercised through the tuple-ids route and
-    // the constructor's singleton-tuple flattening (`[[1], [2]]` →
-    // `[1, 2]`).
     const djarTuples = new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [["a"], ["b"]]);
     expect(djarTuples.key).toBe("sku");
     expect(await djarTuples.ids()).toEqual(["a", "b"]);
 
-    // A non-singleton tuple under a length-1 key is a caller bug —
-    // without the guard it would silently route through the scalar
-    // path with an array id that can never match scalar record
-    // attributes, dropping all loaded records. Fail fast.
     expect(
       () =>
         new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [
@@ -336,17 +279,10 @@ describe("DJAS — composite key support", () => {
         ] as unknown as unknown[][]),
     ).toThrow(/single-element array/);
 
-    // Scalar-key + tuple-ids via dynamic `any` erasure: Set dedup
-    // would keep arrays by reference and the Map lookup on load
-    // would never match a scalar record attribute, silently
-    // yielding an empty ordering. Guard fails fast instead.
     expect(() => new DisableJoinsAssociationRelation(CkLineItem, "sku", [[1], [2]] as any)).toThrow(
       /must not be an array/,
     );
 
-    // Non-array `ids` via dynamic erasure — without the early guard
-    // `.map` / `.length` below would throw a generic TypeError or
-    // silently store zero ids.
     expect(
       () => new DisableJoinsAssociationRelation(CkLineItem, "sku", new Set(["a"]) as any),
     ).toThrow(/ids must be an array/);
@@ -354,9 +290,6 @@ describe("DJAS — composite key support", () => {
       /ids must be an array/,
     );
 
-    // ids() returns a defensive copy — caller mutation of the
-    // returned list or its tuples must not desync the internal
-    // `_storedKeyStrings` cache (which the load-time reorder uses).
     const djar = new DisableJoinsAssociationRelation(
       CkLineItem,
       ["ck_order_shop_id", "ck_order_number"],
@@ -365,15 +298,10 @@ describe("DJAS — composite key support", () => {
     const returned = (await djar.ids()) as unknown[][];
     returned.push([999, 999]);
     returned[0][1] = 42;
-    // Second call sees the original — mutation didn't leak into
-    // the DJAR's internal state.
     expect(await djar.ids()).toEqual([[1, 100]]);
   });
 
   it("DisableJoinsAssociationRelation composite-key load: throws ArgumentError on shape/arity mismatch", async () => {
-    // Fail-fast on caller bugs. Without the guard, a flat scalar list
-    // would silently dedupe to "one bucket per scalar" and reorder to
-    // nothing.
     expect(
       () =>
         new DisableJoinsAssociationRelation(CkLineItem, ["ck_order_shop_id", "ck_order_number"], [
@@ -389,11 +317,6 @@ describe("DJAS — composite key support", () => {
   });
 
   it("composite-key + ordered upstream + empty through: preserves none() instead of full table scan", async () => {
-    // Regression: when PredicateBuilder.buildComposite short-circuits
-    // to `Relation#none()` (empty tuples / all-null), the DJAR wrap
-    // would previously copy `_whereClause.predicates` but drop
-    // `_isNone`, producing a full-table SELECT. The scope itself is
-    // already a never-match, so DJAS now returns it directly.
     Associations.hasMany.call(CkShop, "ckOrdersOrdered2", {
       className: "CkOrder",
       foreignKey: "shop_id",
@@ -406,9 +329,6 @@ describe("DJAS — composite key support", () => {
       disableJoins: true,
     });
     const shop = await CkShop.create({ name: "S" });
-    // No orders — through step plucks nothing, final step gets
-    // composite `where([...], [])` which PredicateBuilder resolves to
-    // none().
     const allSql: unknown[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       allSql.push(event?.payload?.sql);
@@ -420,8 +340,6 @@ describe("DJAS — composite key support", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
-    // The none() short-circuit means no SELECT against ck_line_items
-    // at all. A full-table scan (regression) would show at least one.
     const observed = allSql.filter(
       (sql): sql is string =>
         typeof sql === "string" && /\bFROM\b\s+["`]?ck_line_items\b/i.test(sql),
@@ -431,8 +349,6 @@ describe("DJAS — composite key support", () => {
 
   it("returns no rows when the composite-key tuple list is empty (owner has no through records)", async () => {
     const shop = await CkShop.create({ name: "Lonely" });
-    // No orders for this shop → through-records pluck yields [] →
-    // composite-key WHERE short-circuits to a never-true predicate.
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
     const items = await loadHasMany(shop, "ckLineItemsThroughOrders", reflection.options);
     expect(items).toEqual([]);
