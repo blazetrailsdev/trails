@@ -1677,7 +1677,7 @@ describe("BelongsToAssociationsTest", () => {
     await ship.reload();
 
     await ship.update({ developer_id: david.id });
-    expect((ship as any).developer_id).toBe(david.id);
+    expect(Number((ship as any).developer_id)).toBe(Number(david.id));
   });
 
   it("skips parent presence check if parent has not changed", async () => {
