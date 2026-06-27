@@ -1331,7 +1331,9 @@ describe("RelationTest", () => {
     });
     const loadedAuthor = await (comment as any).loadBelongsTo("author");
     const loadedPost = await (comment as any).loadBelongsTo("post");
+    expect(loadedAuthor).toBeInstanceOf(Author);
     expect(Number(loadedAuthor.id)).toBe(Number(david.id));
+    expect(loadedPost).toBeInstanceOf(Post);
     expect(Number(loadedPost.id)).toBe(Number(welcome.id));
   });
 
