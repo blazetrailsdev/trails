@@ -384,10 +384,11 @@ async function singleAggregate(
   // Rails routes sum/average/maximum/minimum through apply_join_dependency when
   // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
   const anyRelSa = rel as any;
+  const eagerSa: string[] = (anyRelSa._eagerLoadAssociations as string[] | undefined) ?? [];
+  const includesSa: string[] = (anyRelSa._includesAssociations as string[] | undefined) ?? [];
   const promotedSa: string[] =
     (anyRelSa._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
-  const eagerSa: string[] = (anyRelSa._eagerLoadAssociations as string[] | undefined) ?? [];
-  const allEagerSa = [...new Set([...eagerSa, ...promotedSa])];
+  const allEagerSa = [...new Set([...eagerSa, ...includesSa, ...promotedSa])];
   if (allEagerSa.length > 0) {
     const jd = QueryMethodBangs.constructJoinDependency.call(anyRelSa, allEagerSa, Nodes.OuterJoin);
     for (const node of jd.joinConstraints([], undefined, anyRelSa._aliasableReferences()))
