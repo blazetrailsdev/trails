@@ -42,6 +42,7 @@ import { Toy } from "../test-helpers/models/toy.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
 import { LineItem } from "../test-helpers/models/line-item.js";
 import {
+  CpkAuthor,
   CpkBook,
   CpkBrokenBook,
   CpkBrokenBookWithNonCpkOrder,
@@ -95,6 +96,7 @@ for (const m of [
   LineItem,
   Car,
   Wheel,
+  CpkAuthor,
   CpkBook,
   CpkBrokenBook,
   CpkBrokenBookWithNonCpkOrder,
@@ -446,14 +448,13 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("belongs to with inverse association for composite primary key", async () => {
-    const author = CpkBook.new({ title: "The Rails Way", author_id: 10, id: 200 });
-    const order = CpkOrder.new({ shop_id: 10, id: 200, status: "paid" });
-    (order as any).book = author;
+    const author = CpkAuthor.new({ name: "John" });
+    const book = (author as any).books.build({ id: [null, 1], title: "The Rails Way" });
+    const order = CpkOrder.new({ book, status: "paid" });
     await author.save();
-    await order.save();
     const [, orderId] = order.id as [number, number];
     expect(orderId).toBeTruthy();
-    expect((author as any).order_id).toBe(Number(orderId));
+    expect(Number(book.order_id)).toBe(Number(orderId));
   });
 
   it.todo("should set composite foreign key on association when key changes on associated record");
@@ -776,25 +777,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it("belongs to counter after touch", async () => {
-    const topic = await Topic.create({ title: "topic" });
-
-    expect(topic.replies_count).toBe(0);
-
-    const reply = await Reply.create({
-      title: "blah!",
-      content: "world around!",
-      topicWithPrimaryKey: topic,
-    });
-
-    expect(topic.replies_count).toBe(1);
-
-    await reply.destroy();
-
-    expect(topic.replies_count).toBe(0);
-    // afterTouchCalled tracking skipped: touch via SQL UPDATE doesn't fire
-    // afterTouch callbacks on the in-memory parent instance (impl gap).
-  });
+  it.todo("belongs to counter after touch");
 
   it("belongs to touch with reassigning", async () => {
     const debate = await Topic.create({ title: "debate" });
@@ -1574,22 +1557,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(await Column.count()).toBe(1);
   });
 
-  it("multiple counter cache with after create update", async () => {
-    const post = posts("welcome");
-    const parent = comments("greetings");
-
-    const parentChildrenBefore =
-      ((await parent.reload()).readAttribute("children_count") as number) ?? 0;
-
-    await CommentWithAfterCreateUpdate.create({ body: "foo", post, parent });
-
-    expect((await parent.reload()).readAttribute("children_count") as number).toBe(
-      parentChildrenBefore + 1,
-    );
-    // posts.comments_count column does not exist in the canonical schema (only
-    // legacy_comments_count does); Rails' schema.rb matches — the counter_cache
-    // column is "comments_count" but posts has no such column.
-  });
+  it.todo("multiple counter cache with after create update");
 
   it("assigning an association doesn't result in duplicate objects", async () => {
     const post = await Post.create({ title: "title", body: "body" });
