@@ -1326,11 +1326,13 @@ describe("RelationTest", () => {
   it("create with polymorphic association", async () => {
     const david = authors("david");
     const welcome = posts("welcome");
-    const comment = await Comment.where({ post_id: welcome.id, author_id: david.id }).createBang({
+    const comment = await Comment.where({ post: welcome, author: david }).createBang({
       body: "hello",
     });
-    expect(Number((comment as any).author_id)).toBe(Number(david.id));
-    expect(Number(comment.post_id)).toBe(Number(welcome.id));
+    const loadedAuthor = await (comment as any).loadBelongsTo("author");
+    const loadedPost = await (comment as any).loadBelongsTo("post");
+    expect(Number(loadedAuthor.id)).toBe(Number(david.id));
+    expect(Number(loadedPost.id)).toBe(Number(welcome.id));
   });
 
   it("new with array", () => {
