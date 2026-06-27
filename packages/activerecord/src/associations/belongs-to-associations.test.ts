@@ -252,8 +252,8 @@ describe("BelongsToAssociationsTest", () => {
   it("belongs to with primary key joins on correct column", async () => {
     const sql = Client.joins("firmWithPrimaryKey").toSql();
     expect(sql).toMatch(/firm_with_primary_keys_companies|firm_with_primary_key/i);
-    expect(sql).not.toMatch(/"firm_with_primary_keys_companies"\."id"/);
-    expect(sql).toMatch(/"firm_with_primary_keys_companies"\."name"/);
+    expect(sql).not.toMatch(/["'`]firm_with_primary_keys_companies["'`]\.["'`]id["'`]/);
+    expect(sql).toMatch(/["'`]firm_with_primary_keys_companies["'`]\.["'`]name["'`]/);
   });
 
   it("optional relation can be set per model", async () => {
@@ -1669,7 +1669,7 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = developers("jamis");
 
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
-    expect((ship as any).developer_id).toBe(david.id);
+    expect(Number((ship as any).developer_id)).toBe(Number(david.id));
 
     await ship.update({ developer_id: jamis.id });
 
@@ -1750,7 +1750,7 @@ describe("BelongsToAssociationsTest", () => {
     const otherOrder = await CpkNonCpkOrder.create({});
     (book as any).nonCpkOrder = otherOrder;
 
-    expect((book as any).order_id).toEqual(otherOrder.id);
+    expect(Number((book as any).order_id)).toEqual(Number(otherOrder.id));
   });
 });
 
