@@ -15,7 +15,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Book } from "./test-helpers/models/book.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
-import { CpkBook } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkChapter } from "./test-helpers/models/cpk.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Contract } from "./test-helpers/models/contract.js";
@@ -79,6 +79,7 @@ describe("CalculationsTest", () => {
   registerModel("NeedQuoting", NeedQuoting);
   registerModel("Edge", Edge);
   registerModel("CpkBook", CpkBook);
+  registerModel("CpkChapter", CpkChapter);
   registerModel("NumericData", NumericData);
 
   it("should sum field", async () => {
