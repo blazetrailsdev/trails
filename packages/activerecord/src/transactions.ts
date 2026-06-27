@@ -402,16 +402,13 @@ interface TransactionRecordSnapshot {
   previouslyNewRecord: boolean;
 
   attributes: any;
-  level: number;
-  _enrolledTxs: Set<unknown>;
 }
 
 /** @internal */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
   // Initialize state once per outermost transaction, then increment level for
-  // each genuinely new TM transaction boundary. Mirrors Rails'
-  // @_start_transaction_state ||= {...}; level += 1.
+  // each savepoint. Mirrors Rails' @_start_transaction_state ||= {...}; level += 1.
   if (!r._startTransactionState) {
     const snapshotAttrs = r._attributes.deepDup();
     // Revert any pre-TX dirty changes so the snapshot holds DB baseline values.
@@ -429,24 +426,9 @@ export function rememberTransactionRecordState(this: Base): void {
       previouslyNewRecord: r._previouslyNewRecord,
       attributes: snapshotAttrs,
       level: 0,
-      // Track which TM transactions have enrolled this record so that
-      // save-within-update (both joining the same outer transaction) does not
-      // double-count the level. Rails avoids this by using
-      // use_transactional_tests=false for TransactionTest; trails runs under
-      // transactional fixtures, so the outer user transaction is a
-      // SavepointTransaction (full_rollback?=false). Without dedup, level=2
-      // and forceRestoreState=false → restore skipped. With dedup, level=1.
-      _enrolledTxs: new Set<unknown>(),
     };
   }
-  // Only increment level for a TM transaction boundary not yet seen. JOIN-path
-  // calls (same TM transaction) don't create an independent rollback boundary
-  // and must not inflate level.
-  const tmTx = currentTransaction();
-  if (!r._startTransactionState._enrolledTxs.has(tmTx)) {
-    r._startTransactionState._enrolledTxs.add(tmTx);
-    r._startTransactionState.level += 1;
-  }
+  r._startTransactionState.level += 1;
 
   // Mirrors Rails' _committed_already_called guard inside remember_transaction_record_state.
   if (r._committedAlreadyCalled) {

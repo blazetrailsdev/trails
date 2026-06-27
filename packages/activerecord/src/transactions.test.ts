@@ -76,6 +76,18 @@ describe("TransactionTest", () => {
         "mark transaction state as nil",
         "rollback on composite key model",
         "restore composite id after rollback",
+        // TransactionTest uses use_transactional_tests=false (transactions_test.rb:196),
+        // so the user's transaction() is a RealTransaction (full_rollback?=true).
+        // These tests nest saves inside an outer transaction; without a RealTransaction,
+        // the outer fixture SavepointTransaction (full_rollback?=false) combined with
+        // level>1 causes _restoreTransactionRecordState to skip restore.
+        "rollback dirty changes",
+        "rollback dirty changes multiple saves",
+        "rollback dirty changes then retry save",
+        "rolling back in a callback rollbacks before save",
+        "restore frozen state after double destroy",
+        "restore new record after double save",
+        "restore previously new record after double save",
       ],
     },
   );
