@@ -43,10 +43,13 @@ registerModel(Rating);
 registerModel(Post);
 
 describe("HMT Slot D — nested-through preloader / STI / joins+includes", () => {
-  const { authors, ratings } = useHandlerFixtures(
-    ["authors", "authorAddresses", "posts", "comments", "ratings"],
-    { schema: canonicalSchema },
-  );
+  const {
+    authors,
+    ratings,
+    comments: fixtureComments,
+  } = useHandlerFixtures(["authors", "authorAddresses", "posts", "comments", "ratings"], {
+    schema: canonicalSchema,
+  });
 
   it("proxy.toArray() walks a 3-level nested-through chain and filters by owner", async () => {
     // Author → comments (through posts) → ratings (3-level chain).
@@ -125,19 +128,19 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     const comments = (preloaded[0].association("comments").target ?? []) as any[];
     const byId = new Map(comments.map((c: any) => [c.id, c]));
 
-    // eager_sti_on_associations_s_comment1 (id=6) is type=SpecialComment
-    const specialRow = byId.get(6);
+    const specialRow = byId.get(fixtureComments("eager_sti_on_associations_s_comment1").id);
     expect(specialRow).toBeDefined();
     expect(specialRow!.constructor).toBe(SpecialComment);
-    // sub_special_comment (id=12) is type=SubSpecialComment
-    const subSpecialRow = byId.get(12);
+    const subSpecialRow = byId.get(fixtureComments("sub_special_comment").id);
     expect(subSpecialRow).toBeDefined();
     expect(subSpecialRow!.constructor).toBe(SubSpecialComment);
 
     // Same check via proxy (direct load)
     const directComments = await david.comments.toArray();
     const directById = new Map(directComments.map((c) => [c.id, c]));
-    const directSpecial = directById.get(6);
+    const directSpecial = directById.get(
+      fixtureComments("eager_sti_on_associations_s_comment1").id,
+    );
     expect(directSpecial).toBeDefined();
     expect(directSpecial!.constructor).toBe(SpecialComment);
   });

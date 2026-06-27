@@ -57,9 +57,6 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
 
   it("carries annotate from the through reflection scope onto the through query", async () => {
     const david = authors("david");
-    const welcome = posts("welcome");
-    void welcome;
-
     const loader = throughLoader([david], "annotatedComments");
     const scope = (loader as any)._buildThroughScope();
     expect(scope.toSql()).toContain("preload-through");
