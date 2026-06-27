@@ -7471,8 +7471,9 @@ describe("AsyncHasManyAssociationsTest", () => {
 
     await firm.association("clients").asyncLoadTarget();
 
+    expect(await firm.clients.size()).toBe(3);
+
     await assertNoQueries(false, async () => {
-      expect(await firm.clients.size()).toBe(3);
       expect(firm.clients[2]).not.toBeUndefined();
     });
   });
