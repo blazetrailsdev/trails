@@ -3,6 +3,7 @@ import type { Pirate } from "./pirate.js";
 // vendor/rails/activerecord/test/models/bird.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
+import { registerModel } from "../../associations.js";
 
 export class Bird extends Base {
   declare pirate: Pirate | null;
@@ -46,3 +47,4 @@ export class Bird extends Base {
 }
 
 acceptsNestedAttributesFor(Bird, "pirate");
+registerModel(Bird);

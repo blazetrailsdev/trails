@@ -5,6 +5,7 @@ import type { RichPerson } from "./person.js";
 import type { Ship } from "./ship.js";
 // vendor/rails/activerecord/test/models/treasure.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Treasure extends Base {
   declare parrots: AssociationProxy<Parrot>;
@@ -30,3 +31,6 @@ export class Treasure extends Base {
 }
 
 export class HiddenTreasure extends Treasure {}
+
+registerModel(Treasure);
+registerModel(HiddenTreasure);

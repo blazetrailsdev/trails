@@ -36,10 +36,10 @@ import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { buildHasManyRelation, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
-import { Ship } from "./test-helpers/models/ship.js";
-import { Bird } from "./test-helpers/models/bird.js";
-import { Treasure } from "./test-helpers/models/treasure.js";
-import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
+import "./test-helpers/models/ship.js";
+import "./test-helpers/models/bird.js";
+import "./test-helpers/models/treasure.js";
+import "./test-helpers/models/price-estimate.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -1761,13 +1761,6 @@ describe("WithAnnotationsTest", () => {
     ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
     { schema: canonicalSchema },
   );
-
-  beforeAll(() => {
-    registerModel("Ship", Ship);
-    registerModel("Bird", Bird);
-    registerModel("Treasure", Treasure);
-    registerModel("PriceEstimate", PriceEstimate);
-  });
 
   it("belongs to with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
