@@ -1721,27 +1721,32 @@ describe("WithAnnotationsTest", () => {
   class SpacePirateAnnotated extends Base {
     static {
       this.tableName = "pirates";
+      this.belongsTo("parrot", { className: "Parrot", foreignKey: "parrot_id" });
       this.belongsTo("parrotWithAnnotation", {
         scope: (q: any) => q.annotate("that tells jokes"),
         className: "Parrot",
         foreignKey: "parrot_id",
       });
+      this.hasAndBelongsToMany("parrots", { className: "Parrot", foreignKey: "pirate_id" });
       this.hasAndBelongsToMany("parrotsWithAnnotation", {
         scope: (q: any) => q.annotate("that are very colorful"),
         className: "Parrot",
         foreignKey: "pirate_id",
       });
+      this.hasOne("ship", { className: "Ship", foreignKey: "pirate_id" });
       this.hasOne("shipWithAnnotation", {
         scope: (q: any) => q.annotate("that is a rocket"),
         className: "Ship",
         foreignKey: "pirate_id",
       });
+      this.hasMany("birds", { className: "Bird", foreignKey: "pirate_id" });
       this.hasMany("birdsWithAnnotation", {
         scope: (q: any) => q.annotate("that are also parrots"),
         className: "Bird",
         foreignKey: "pirate_id",
       });
       this.hasMany("treasures", { as: "looter" });
+      this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
       this.hasMany("treasureEstimatesWithAnnotation", {
         scope: (q: any) => q.annotate("yarrr"),
         through: "treasures",
@@ -1765,12 +1770,20 @@ describe("WithAnnotationsTest", () => {
 
   it("belongs to with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(() => (pirate as any).loadBelongsTo("parrot"));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(() => (pirate as any).loadBelongsTo("parrotWithAnnotation"));
     expect(sqls.some((s) => s.includes("that tells jokes"))).toBe(true);
   });
 
   it("has and belongs to many with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).parrots.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(async () => {
       await (pirate as any).parrotsWithAnnotation.first();
     });
@@ -1779,12 +1792,20 @@ describe("WithAnnotationsTest", () => {
 
   it("has one with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(() => (pirate as any).loadHasOne("ship"));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(() => (pirate as any).loadHasOne("shipWithAnnotation"));
     expect(sqls.some((s) => s.includes("that is a rocket"))).toBe(true);
   });
 
   it("has many with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).birds.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(async () => {
       await (pirate as any).birdsWithAnnotation.first();
     });
@@ -1793,6 +1814,11 @@ describe("WithAnnotationsTest", () => {
 
   it("has many through with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("redbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).treasureEstimates.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(async () => {
       await (pirate as any).treasureEstimatesWithAnnotation.first();
     });
@@ -1800,6 +1826,11 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has many through with annotation includes a query comment when eager loading", async () => {
+    const plain = await captureSql(async () => {
+      await SpacePirateAnnotated.includes("treasureEstimates").first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
     const sqls = await captureSql(async () => {
       await SpacePirateAnnotated.includes("treasureEstimatesWithAnnotation").first();
     });
