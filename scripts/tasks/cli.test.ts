@@ -210,6 +210,17 @@ describe("ready", () => {
     ]);
     expect(ready(idx, { rfc: "0001-r" }).map((s) => s.id)).toEqual(["a"]);
   });
+
+  it("orders by priority (lower N first), unprioritized last, ties stable", () => {
+    const idx = index([
+      story({ id: "none1" }),
+      story({ id: "p5", priority: 5 }),
+      story({ id: "none2" }),
+      story({ id: "p1", priority: 1 }),
+    ]);
+    // p1 < p5 < the two unprioritized, which keep their index order.
+    expect(ready(idx).map((s) => s.id)).toEqual(["p1", "p5", "none1", "none2"]);
+  });
 });
 
 describe("resolveEditTarget", () => {
@@ -276,6 +287,41 @@ describe("nextBundle", () => {
   it("excludes stories with null est_loc", () => {
     const idx = index([story({ id: "a", est_loc: null }), story({ id: "b", est_loc: 50 })]);
     expect(nextBundle(idx, { maxLoc: 250 }).map((s) => s.id)).toEqual(["b"]);
+  });
+
+  it("leads with the highest-priority story, overriding cluster-LOC packing", () => {
+    // c2 packs more LOC (240 > 200), but a1 carries a priority while the c2
+    // stories don't — the prioritized story must be the head (the loop's pick).
+    const idx = index([
+      story({ id: "a1", cluster: "c1", est_loc: 100, priority: 3 }),
+      story({ id: "a2", cluster: "c1", est_loc: 100 }),
+      story({ id: "b1", cluster: "c2", est_loc: 240 }),
+    ]);
+    const bundle = nextBundle(idx, { maxLoc: 250 });
+    expect(bundle[0].id).toBe("a1");
+    // Fill comes from a1's own cluster within the remaining budget.
+    expect(bundle.map((s) => s.id).sort()).toEqual(["a1", "a2"]);
+  });
+
+  it("leads with a prioritized story even when it has no est_loc", () => {
+    // A prioritized story is an explicit "do this" — a missing estimate must
+    // not exclude it the way it does for the unprioritized knapsack path.
+    const idx = index([
+      story({ id: "p", cluster: "c1", est_loc: null, priority: 1 }),
+      story({ id: "f", cluster: "c1", est_loc: 80 }),
+    ]);
+    const bundle = nextBundle(idx, { maxLoc: 250 });
+    expect(bundle[0].id).toBe("p");
+    expect(bundle.map((s) => s.id)).toEqual(["p", "f"]);
+  });
+
+  it("orders multiple prioritized stories by ascending priority (lower N first)", () => {
+    const idx = index([
+      story({ id: "lo", cluster: "c1", est_loc: 50, priority: 9 }),
+      story({ id: "hi", cluster: "c1", est_loc: 50, priority: 1 }),
+    ]);
+    const bundle = nextBundle(idx, { maxLoc: 250 });
+    expect(bundle.map((s) => s.id)).toEqual(["hi", "lo"]);
   });
 
   it("never mixes a real cluster named '_none' with unclustered stories", () => {

@@ -165,22 +165,33 @@ function isIndexStale(indexPath: string): boolean {
 export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
   const rfcStatus = new Map(index.rfcs.map((r) => [r.id, r.status]));
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
-  return index.stories.filter((s) => {
-    if (s.status !== "ready") return false;
-    // A story is only claimable if its OWN RFC is active. A `ready` story
-    // under a draft/postponed/superseded RFC violates the lifecycle invariant
-    // (README: draft-RFC stories "should not be claimed"); a `ready` story
-    // under a closed RFC is almost certainly stale. Only active RFCs feed
-    // pickup. Uses index.rfcs status already in scope — no extra fs reads.
-    // A null status or an rfc absent from the index also fails this check and
-    // is excluded — the conservative default: don't surface a story whose RFC
-    // can't be confirmed active.
-    if (rfcStatus.get(s.rfc) !== "active") return false;
-    if (opts.rfc && s.rfc !== opts.rfc) return false;
-    if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
-    if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
-    return true;
-  });
+  return (
+    index.stories
+      .filter((s) => {
+        if (s.status !== "ready") return false;
+        // A story is only claimable if its OWN RFC is active. A `ready` story
+        // under a draft/postponed/superseded RFC violates the lifecycle invariant
+        // (README: draft-RFC stories "should not be claimed"); a `ready` story
+        // under a closed RFC is almost certainly stale. Only active RFCs feed
+        // pickup. Uses index.rfcs status already in scope — no extra fs reads.
+        // A null status or an rfc absent from the index also fails this check and
+        // is excluded — the conservative default: don't surface a story whose RFC
+        // can't be confirmed active.
+        if (rfcStatus.get(s.rfc) !== "active") return false;
+        if (opts.rfc && s.rfc !== opts.rfc) return false;
+        if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
+        if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
+        return true;
+      })
+      // Order the ready queue by priority (lower N first), honoring the
+      // `priority` frontmatter's documented contract ("ready-queue priority").
+      // Unprioritized stories (null) sort last. Array.sort is stable, so ties —
+      // including the all-null common case — keep index order, leaving callers
+      // that don't set priority (and their tests) unaffected. `next-bundle`
+      // re-derives its own ordering on top of this; the gain here is that the
+      // `ready` command's output reflects priority too.
+      .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+  );
 }
 
 // 0/1 knapsack: max total est_loc within budget. N ≤ a few dozen in
@@ -213,9 +224,39 @@ export function nextBundle(
   index: Index,
   opts: { maxLoc: number; cluster?: string; rfc?: string },
 ): StoryEntry[] {
-  const candidates = ready(index, { rfc: opts.rfc })
-    .filter((s) => s.est_loc !== null)
-    .filter((s) => (opts.cluster ? s.cluster === opts.cluster : true));
+  const inScope = ready(index, { rfc: opts.rfc }).filter((s) =>
+    opts.cluster ? s.cluster === opts.cluster : true,
+  );
+  // Priority overrides cluster-LOC packing. The legend says "lower N = higher
+  // priority"; honor it literally — any prioritized story outranks every
+  // unprioritized one, regardless of cluster or how well it fills the budget.
+  // The loop takes stories[0], so the head must be the globally-highest
+  // priority candidate; we then fill the rest of the budget from that story's
+  // cluster (so a prioritized cluster still bundles together). A prioritized
+  // story is an explicit "do this" signal, so it leads even when it has no
+  // est_loc (treated as 0 for the budget) — the missing-estimate exclusion
+  // below is only for the unprioritized knapsack path. Absent any priorities
+  // this branch is skipped and the original packing runs unchanged.
+  //
+  // `ready()` already returns stories sorted by priority (lower N first), and
+  // `.filter()` preserves order, so `prioritized[0]` is the highest-priority
+  // candidate without re-sorting here — the ordering source of truth stays in
+  // `ready()`.
+  const prioritized = inScope.filter((s) => s.priority !== null);
+  if (prioritized.length > 0) {
+    const lead = prioritized[0];
+    const leadLoc = lead.est_loc ?? 0;
+    const rest = inScope.filter(
+      (s) => s.id !== lead.id && s.cluster === lead.cluster && s.est_loc !== null,
+    );
+    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort(
+      (a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity),
+    );
+    return [lead, ...fill];
+  }
+  // Unprioritized path: knapsack same-cluster stories by est_loc, so stories
+  // without an estimate can't be packed and are excluded here.
+  const candidates = inScope.filter((s) => s.est_loc !== null);
   // Use Map<string | null, ...> so `null` (unclustered) stays distinct
   // from any real cluster name, even one literally called "_none".
   const byCluster = new Map<string | null, StoryEntry[]>();
