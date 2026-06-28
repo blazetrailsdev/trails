@@ -22,6 +22,7 @@ import {
   type ColumnSpec,
   type IndexSpec,
   type Schema,
+  type TableSchema,
 } from "./define-schema.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 
@@ -73,10 +74,38 @@ function columnCompatible(canon: NormColumn, req: NormColumn): boolean {
   return true;
 }
 
-/** @internal */
+/**
+ * Index key includes `name`: Rails passes `options[:name]` straight through to
+ * `add_index` (schema_statements.rb:915, :1000), so an index declared with a
+ * custom name is a genuinely different index from the canonical auto-named one
+ * — leaving the test running against an index it didn't declare. A request that
+ * omits `name` (the common, auto-named case) only matches a canonical index
+ * that is itself auto-named.
+ * @internal
+ */
 function normalizeIndex(ix: IndexSpec): string {
   const cols = Array.isArray(ix.columns) ? ix.columns : [ix.columns];
-  return JSON.stringify({ columns: cols, unique: !!ix.unique, where: ix.where ?? null });
+  return JSON.stringify({
+    columns: cols,
+    unique: !!ix.unique,
+    where: ix.where ?? null,
+    name: ix.name ?? null,
+  });
+}
+
+/**
+ * The effective primary-key shape of a table request, independent of wrapper
+ * form. An unwrapped request — or a wrapper that omits `primaryKey` — means
+ * Rails' `create_table` default of `id: :primary_key` (schema_statements.rb:293,
+ * mirrored by define-schema.ts), so it must compare equal to a canonical table
+ * that also defaults its id, and UNEQUAL to a canonical id-less (`false`) or
+ * composite-key (`string[]`) table. Encoded the same way as the canonical side
+ * (`pk ?? null`) so the default-id case is the shared `null` sentinel.
+ * @internal
+ */
+function effectivePrimaryKey(table: TableSchema): string {
+  const pk = isWrappedSchema(table) ? table.primaryKey : undefined;
+  return JSON.stringify(pk ?? null);
 }
 
 interface CanonicalTable {
@@ -96,9 +125,8 @@ function canonical(): Map<string, CanonicalTable> {
     for (const [name, spec] of Object.entries(columnsOf(raw))) {
       cols.set(name, normalizeColumn(spec));
     }
-    const pk = isWrappedSchema(raw) ? raw.primaryKey : undefined;
     const indexes = new Set((isWrappedSchema(raw) ? (raw.indexes ?? []) : []).map(normalizeIndex));
-    m.set(table, { columns: cols, primaryKey: JSON.stringify(pk ?? null), indexes });
+    m.set(table, { columns: cols, primaryKey: effectivePrimaryKey(raw), indexes });
   }
   _canonical = m;
   return m;
@@ -141,13 +169,17 @@ export function assertCanonicalSchema(schema: Schema): void {
         );
       }
     }
+    // Compare the EFFECTIVE primary key regardless of wrapper form: an
+    // unwrapped (or primaryKey-less) request implies Rails' default `id`, which
+    // must not be silently accepted against an id-less/composite canonical table.
+    if (effectivePrimaryKey(raw) !== ct.primaryKey) {
+      throw new OneSchemaViolation(
+        `AR_ONE_SCHEMA: defineSchema table "${table}" implies a primary key that differs from ` +
+          `canonical (an unwrapped request defaults to an \`id\` column; canonical "${table}" ` +
+          `does not). Declare the canonical primary key or exclude this file.`,
+      );
+    }
     if (isWrappedSchema(raw)) {
-      if (raw.primaryKey !== undefined && JSON.stringify(raw.primaryKey) !== ct.primaryKey) {
-        throw new OneSchemaViolation(
-          `AR_ONE_SCHEMA: defineSchema table "${table}" declares a primary key that differs ` +
-            `from canonical. Converge to canonical or exclude this file.`,
-        );
-      }
       for (const ix of raw.indexes ?? []) {
         if (!ct.indexes.has(normalizeIndex(ix))) {
           throw new OneSchemaViolation(

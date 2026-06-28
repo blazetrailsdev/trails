@@ -45,4 +45,37 @@ describe("assertCanonicalSchema", () => {
       assertCanonicalSchema({ topics: { title: { type: "string", limit: 99 } } }),
     ).toThrow(OneSchemaViolation);
   });
+
+  it("rejects an unwrapped request against a composite-PK canonical table", () => {
+    // toys is `primaryKey: ["toy_id"]`; an unwrapped request implies a default
+    // `id` column, a different PK shape than canonical.
+    expect(() => assertCanonicalSchema({ toys: { name: "string" } })).toThrow(OneSchemaViolation);
+  });
+
+  it("accepts a wrapped request that declares the canonical composite PK", () => {
+    expect(() =>
+      assertCanonicalSchema({ toys: { columns: { name: "string" }, primaryKey: ["toy_id"] } }),
+    ).not.toThrow();
+  });
+
+  it("accepts a matching auto-named index", () => {
+    expect(() =>
+      assertCanonicalSchema({
+        citations: { columns: { book1_id: "big_integer" }, indexes: [{ columns: "book1_id" }] },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects an index declared with a name the canonical index lacks", () => {
+    // citations' canonical index on book1_id is auto-named; a custom name is a
+    // genuinely different index (Rails passes options[:name] through add_index).
+    expect(() =>
+      assertCanonicalSchema({
+        citations: {
+          columns: { book1_id: "big_integer" },
+          indexes: [{ columns: "book1_id", name: "custom_name" }],
+        },
+      }),
+    ).toThrow(OneSchemaViolation);
+  });
 });
