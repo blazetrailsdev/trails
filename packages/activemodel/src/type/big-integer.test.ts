@@ -87,28 +87,18 @@ describe("BigIntegerTest", () => {
     expect((type as unknown as { maxValue(): number }).maxValue()).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("no range error for absurdly large values on standalone type", () => {
+  it("no range error for absurdly large values", () => {
     const type = new BigIntegerType();
     const huge = BigInt("9".repeat(100));
     expect(() => type.serialize(huge)).not.toThrow();
   });
 
-  it("raises RangeError for values outside [-2^63, 2^63-1] when limit is set", () => {
+  it("no range error for values outside int8 range even when limit is set", () => {
+    // BigIntegerType is unconditionally unlimited (big_integer.rb:33 — max_value = Infinity).
+    // The 8-byte guard belongs on the adapter column type, not on BigIntegerType itself.
     const type = new BigIntegerType({ limit: 8 });
-    expect(() => type.serialize(9223372036854775808n)).toThrowError(/out of range/);
-    expect(() => type.serialize(-(1n << 63n) - 1n)).toThrowError(/out of range/);
-    expect(type.serialize((1n << 63n) - 1n)).toBe((1n << 63n) - 1n);
-    expect(type.serialize(-(1n << 63n))).toBe(-(1n << 63n));
-  });
-
-  it("isSerializable uses BigInt-precision for BigInt values when limit is set", () => {
-    const limited = new BigIntegerType({ limit: 8 });
-    expect(limited.isSerializable(9223372036854775808n)).toBe(false);
-    expect(limited.isSerializable(9223372036854775807n)).toBe(true);
-    expect(limited.isSerializable(-(1n << 63n))).toBe(true);
-    expect(limited.isSerializable(-(1n << 63n) - 1n)).toBe(false);
-    const standalone = new BigIntegerType();
-    expect(standalone.isSerializable(BigInt("9".repeat(100)))).toBe(true);
+    expect(() => type.serialize(9223372036854775808n)).not.toThrow();
+    expect(type.isSerializable(BigInt("9".repeat(100)))).toBe(true);
   });
 
   it("blank string casts to null", () => {

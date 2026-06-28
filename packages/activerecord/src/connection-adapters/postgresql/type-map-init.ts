@@ -123,6 +123,55 @@ export function registerClassWithPrecision(
 }
 
 /**
+ * Adapter-specific column type for PG int8 (OID 20 / typname "int8").
+ *
+ * Rails registers int8 as `Type::Integer.new(limit: 8)` (postgresql_adapter.rb:676-680).
+ * In Ruby, Integer arithmetic is arbitrary-precision so the limit-8 range check is exact.
+ * In JS, float64 loses precision at 2^63: Number(2^63n) === Number((2^63-1)n), so the
+ * inherited number-path isInRange gives the wrong answer for BigInt application values.
+ *
+ * We extend BigIntegerType (not IntegerType) because:
+ * - PG driver returns int8 values as strings; BigIntegerType.castValue parses them to BigInt,
+ *   preserving precision for IDs > Number.MAX_SAFE_INTEGER.
+ * - BigIntegerType is unconditionally unlimited (maxValue = Infinity, Rails-faithful).
+ *   This subclass re-establishes the 8-byte bound that belongs on the column type,
+ *   mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic.
+ */
+class PgInteger8 extends BigIntegerType {
+  protected override maxValue(): number {
+    return 2 ** (this._limit() * 8 - 1);
+  }
+
+  // BigInt-precision range check: float64 cannot distinguish 2^63 from 2^63-1.
+  protected override isInRange(value: number | null): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") {
+      const bytes = this._limit();
+      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
+      const min = -(1n << BigInt(bytes * 8 - 1));
+      return value >= min && value <= max;
+    }
+    return super.isInRange(value);
+  }
+
+  // BigInt-aware serializable check (inherited isSerializable converts BigInt via
+  // Number() before calling isInRange, losing precision at the 2^63 boundary).
+  override isSerializable(value: unknown): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
+    return super.isSerializable(value);
+  }
+
+  override serializeCastValue(value: number | null): number | null {
+    return this.ensureInRange(value);
+  }
+
+  override serialize(value: unknown): unknown {
+    return this.ensureInRange(this.cast(value));
+  }
+}
+
+/**
  * Mirrors: PostgreSQLAdapter.initialize_type_map(m) — the class method that
  * seeds the type_map with ~30 known PG types by typname. User-defined types
  * (arrays, ranges, enums, domains, composites) are layered on top at runtime
@@ -133,7 +182,7 @@ export function registerClassWithPrecision(
 export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.registerType("int2", new IntegerType({ limit: 2 }));
   m.registerType("int4", new IntegerType({ limit: 4 }));
-  m.registerType("int8", new BigIntegerType({ limit: 8 }));
+  m.registerType("int8", new PgInteger8({ limit: 8 }));
   m.registerType("oid", new Oid());
   m.registerType("float4", new FloatType({ limit: 24 }));
   m.registerType("float8", new FloatType());
