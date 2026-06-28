@@ -7,7 +7,7 @@
  * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
  */
 
-import { Attribute, Type } from "@blazetrails/activemodel";
+import { Attribute, Type, ActiveModelRangeError } from "@blazetrails/activemodel";
 
 type CastType = Pick<Type, "cast" | "serialize">;
 
@@ -73,6 +73,11 @@ export class QueryAttribute extends Attribute {
   }
 
   isUnboundable(): boolean {
+    try {
+      void this.valueForDatabase;
+    } catch (e) {
+      if (e instanceof ActiveModelRangeError) return true;
+    }
     return false;
   }
 }

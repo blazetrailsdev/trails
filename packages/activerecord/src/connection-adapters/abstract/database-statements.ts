@@ -16,7 +16,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TransactionIsolationError, NotImplementedError } from "../../errors.js";
@@ -1536,10 +1536,16 @@ export const DatabaseStatements = {
     // is correct for every shape that carries binds.
     const preparable = opts?.preparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
-    return this.execQuery(sql, name, binds, {
-      allowRetry: opts?.allowRetry ?? false,
-      prepare,
-    });
+    try {
+      return await this.execQuery(sql, name, binds, {
+        allowRetry: opts?.allowRetry ?? false,
+        prepare,
+      });
+    } catch (e) {
+      // Mirrors: database_statements.rb:78 — rescue ::RangeError → Result.empty
+      if (e instanceof ActiveModelRangeError) return Result.empty();
+      throw e;
+    }
   },
 
   // select_one/value/values/rows delegate to select_all so the QueryCache

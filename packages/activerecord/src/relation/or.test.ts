@@ -54,7 +54,7 @@ describe("OrTest", () => {
   // (poisoning the transaction). SQLite is untyped and stores the value, so the
   // query runs and the result matches. Skipped on the strict-typed lanes pending
   // the `relation-or-large-number-rangeerror-empty` convergence (RFC 0019).
-  it.skipIf(adapterType !== "sqlite")("or with large number", async () => {
+  it("or with large number", async () => {
     const expected = await Post.where("id = 1 or id = 9223372036854775808").toArray();
     expect(
       await Post.where({ id: 1 })

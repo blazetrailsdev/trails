@@ -10,19 +10,41 @@ export class BigIntegerType extends IntegerType {
     return "integer";
   }
 
-  serializeCastValue(value: number | null): number | null {
-    return value;
+  override serializeCastValue(value: number | null): number | null {
+    return this.ensureInRange(value);
   }
 
   /**
-   * @internal Rails-private helper. Returns Infinity to bypass Integer's range check.
+   * @internal Rails-private helper. Bigint columns are always 8 bytes; default
+   * to 8 so the range check covers `[-2^63, 2^63-1]` when no explicit limit is set.
    */
-  protected maxValue(): number {
-    return Number.POSITIVE_INFINITY;
+  protected override _limit(): number {
+    return this.limit ?? 8;
+  }
+
+  /**
+   * @internal Rails-private helper. Uses BigInt arithmetic for BigInt cast values
+   * so the check is exact (float comparison loses precision near 2^63).
+   */
+  protected override isInRange(value: number | null): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") {
+      const bytes = this._limit();
+      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
+      const min = -(1n << BigInt(bytes * 8 - 1));
+      return value >= min && value <= max;
+    }
+    return super.isInRange(value);
+  }
+
+  override isSerializable(value: unknown): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
+    return super.isSerializable(value);
   }
 
   /** @internal Rails-private helper. */
-  protected castValue(value: unknown): number | null {
+  protected override castValue(value: unknown): number | null {
     if (typeof value === "bigint") return value as unknown as number;
     if (typeof value === "number") {
       if (isNaN(value) || !isFinite(value)) return null;
@@ -42,8 +64,7 @@ export class BigIntegerType extends IntegerType {
     return super.castValue(value);
   }
 
-  serialize(value: unknown): unknown {
-    // No range check — maxValue is Infinity. Return cast value as-is (matches Rails).
-    return this.cast(value);
+  override serialize(value: unknown): unknown {
+    return this.ensureInRange(this.cast(value));
   }
 }
