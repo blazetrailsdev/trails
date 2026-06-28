@@ -985,7 +985,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
     if (asName) {
-      buildAttrs[`${underscore(asName)}_type`] = polymorphicName(ctor);
+      const typeCol = this._assocDef.options.foreignType ?? `${underscore(asName)}_type`;
+      buildAttrs[typeCol] = polymorphicName(ctor);
     }
 
     let targetModel = this.model;
@@ -1096,7 +1097,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       skipAssign.add(foreignKey);
     }
     const asName = this._assocDef.options.as;
-    if (asName) skipAssign.add(`${underscore(asName)}_type`);
+    if (asName) skipAssign.add(this._assocDef.options.foreignType ?? `${underscore(asName)}_type`);
 
     const assigned = new Set<string>(
       ((record as any).changedAttributeNamesToSave ?? []) as string[],
