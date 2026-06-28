@@ -4554,13 +4554,16 @@ describe("ChangedForAutosaveTest", () => {
       static {
         this.attribute("id", "integer");
         (this as any)._associations = [
-          { name: "children", type: "hasMany", options: { autosave: true } },
+          {
+            name: "children",
+            type: "hasMany",
+            options: { autosave: true, className: "ChangedChild" },
+          },
         ];
       }
     }
     registerModel("ChangedParent", Parent);
     registerModel("ChangedChild", Child);
-    registerModel("Child", Child);
 
     const parent = new Parent({ id: 1 });
     (parent as any)._newRecord = false;
@@ -4584,13 +4587,16 @@ describe("ChangedForAutosaveTest", () => {
       static {
         this.attribute("id", "integer");
         (this as any)._associations = [
-          { name: "child", type: "hasOne", options: { autosave: true } },
+          {
+            name: "child",
+            type: "hasOne",
+            options: { autosave: true, className: "ChangedChild2" },
+          },
         ];
       }
     }
     registerModel("ChangedParent2", Parent2);
     registerModel("ChangedChild2", Child2);
-    registerModel("Child", Child2);
 
     const parent = new Parent2({ id: 1 });
     (parent as any)._newRecord = false;
