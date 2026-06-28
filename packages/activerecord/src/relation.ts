@@ -4439,8 +4439,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#distinct_value
    */
-  get distinctValue(): boolean {
-    return this._isDistinct;
+  get distinctValue(): true | undefined {
+    return this._isDistinct || undefined;
   }
 
   /**

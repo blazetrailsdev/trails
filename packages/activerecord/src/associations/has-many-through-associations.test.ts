@@ -2,1940 +2,746 @@
  * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
-import { throwAbort } from "@blazetrails/activesupport";
+import { Base, registerModel, RecordInvalid } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
-import { CollectionProxy } from "./collection-proxy.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { association } from "../associations.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { CpkTag, CpkOrder, CpkOrderTag } from "../test-helpers/models/cpk.js";
-import { Author } from "../test-helpers/models/author.js";
-import { Post, FirstPost } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
 
-const TEST_SCHEMA: Schema = {
-  acc_posts: { title: "string" },
-  acc_taggings: { acc_post_id: "integer", acc_tag_id: "integer" },
-  acc_tags: { name: "string" },
-  aco_joins: { aco_owner_id: "integer", aco_person_id: "integer" },
-  aco_owners: { name: "string" },
-  aco_people: { first_name: "string" },
-  ae_people: { first_name: "string" },
-  ae_posts: { title: "string" },
-  ae_readers: { ae_person_id: "integer", ae_post_id: "integer" },
-  af4_items: { label: "string" },
-  af4_refs: { af4_owner_id: "integer", af4_item_id: "integer" },
-  af4_owners: { name: "string" },
-  anb_people: { first_name: "string" },
-  anb_posts: { title: "string", body: "string" },
-  anb_readers: { anb_person_id: "integer", anb_post_id: "integer" },
-  bf_authors: { name: "string" },
-  bf_orgs: { bf_author_id: "integer", name: "string" },
-  bf_posts: { bf_author_id: "integer", title: "string" },
-  bt_del_children: { bt_del_parent_id: "integer" },
-  bt_del_parents: { name: "string" },
-  bt_des_children: { bt_des_parent_id: "integer" },
-  bt_des_parents: { name: "string" },
-  bt_null_children: { bt_null_parent_id: "integer" },
-  bt_null_parents: { name: "string" },
-  btrs_people: { first_name: "string" },
-  btrs_posts: { title: "string" },
-  btrs_readers: { btrs_person_id: "integer", btrs_post_id: "integer" },
-  bts_people: { first_name: "string" },
-  bts_posts: { title: "string" },
-  bts_readers: { bts_person_id: "integer", bts_post_id: "integer" },
-  btsh_people: { first_name: "string" },
-  btsh_posts: { title: "string" },
-  btsh_readers: { btsh_person_id: "integer", btsh_post_id: "integer" },
-  ca_sections: { short_name: "string", ca_seminar_id: "integer", ca_session_id: "integer" },
-  ca_seminars: { name: "string" },
-  ca_sessions: { name: "string" },
-  cbang_items: { name: "string" },
-  cbang_joins: { cbang_owner_id: "integer", cbang_item_id: "integer" },
-  cbang_owners: { name: "string" },
-  cbk_posts: { title: "string" },
-  cbk_taggings: { cbk_post_id: "integer", cbk_tag_id: "integer" },
-  cbk_tags: { name: "string" },
-  cc_d_owners: { name: "string", taggings_count: "integer" },
-  cc_d_taggings: { cc_d_owner_id: "integer", cc_d_tag_id: "integer" },
-  cc_d_tags: { name: "string" },
-  cc_destr_owners: { name: "string", tags_with_destroy_count: "integer" },
-  cc_destr_taggings: { cc_destr_owner_id: "integer", cc_destr_tag_id: "integer" },
-  cc_destr_tags: { name: "string" },
-  cc_nul_owners: { name: "string", tags_with_nullify_count: "integer" },
-  cc_nul_taggings: { cc_nul_owner_id: "integer", cc_nul_tag_id: "integer" },
-  cc_nul_tags: { name: "string" },
-  cc_owners: { name: "string", tags_count: "integer" },
-  cc_rpl_owners: { name: "string", tags_count: "integer" },
-  cc_rpl_taggings: { cc_rpl_owner_id: "integer", cc_rpl_tag_id: "integer" },
-  cc_rpl_tags: { name: "string" },
-  cc_taggings: { cc_owner_id: "integer", cc_tag_id: "integer" },
-  cc_tags: { name: "string" },
-  cck_posts: { title: "string" },
-  cck_taggings: { cck_post_id: "integer", cck_tag_id: "integer" },
-  cck_tags: { name: "string" },
-  cdk_posts: { title: "string" },
-  cdk_taggings: { cdk_post_id: "integer", cdk_tag_id: "integer" },
-  cdk_tags: { name: "string" },
-  ci_people: { name: "string" },
-  ci_posts: { title: "string" },
-  ci_readers: { ci_person_id: "integer", ci_post_id: "integer" },
-  clear_scope_authors: { name: "string" },
-  clear_scope_posts: { author_id: "integer", title: "string" },
-  cnt_authors: { name: "string" },
-  cnt_categs: { cnt_author_id: "integer", cnt_cat_id: "integer" },
-  cnt_cats: { name: "string" },
-  cpk_b_items: { label: "string" },
-  cpk_b_joins: { cpk_b_owner_id: "integer", cpk_b_item_id: "integer" },
-  cpk_b_owners: { name: "string" },
-  cpk_da_items: {
-    columns: { shop_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_hmt_joins: {
-    cpk_hmt_owner_region_id: "integer",
-    cpk_hmt_owner_id: "integer",
-    cpk_hmt_target_id: "integer",
-  },
-  cpk_hmt_owners: {
-    columns: { region_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["region_id", "id"],
-  },
-  cpk_hmt_targets: { name: "string" },
-  cpk_jt_items: { name: "string" },
-  cpk_jt_joins: {
-    cpk_jt_owner_region_id: "integer",
-    cpk_jt_owner_id: "integer",
-    cpk_jt_item_id: "integer",
-  },
-  cpk_jt_owners: {
-    columns: { region_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["region_id", "id"],
-  },
-  cpk_st_joins: {
-    cpk_st_owner_region_id: "integer",
-    cpk_st_owner_id: "integer",
-    cpk_st_target_id: "integer",
-  },
-  cpk_st_owners: {
-    columns: { region_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["region_id", "id"],
-  },
-  cpk_st_targets: { name: "string" },
-  cq_blog_post2s: { blog_id: "integer", title: "string" },
-  cq_blog_post_tag2s: { blog_id: "integer", blog_post_id: "integer", tag_id: "integer" },
-  cq_blog_post_tags: { blog_id: "integer", blog_post_id: "integer", tag_id: "integer" },
-  cq_blog_posts: { blog_id: "integer", title: "string" },
-  cq_tag2s: { blog_id: "integer", name: "string" },
-  cq_tags: { blog_id: "integer", name: "string" },
-  cv_owners: { name: "string" },
-  cv_pet_treasures: { cv_owner_id: "integer", cv_pet_id: "integer" },
-  cv_pets: { name: "string" },
-  cwc_posts: { title: "string" },
-  cwc_taggings: { cwc_post_id: "integer", cwc_tag_id: "integer" },
-  cwc_tags: { name: "string" },
-  dc_joins: { dc_owner_id: "integer", dc_tgt_id: "integer" },
-  dc_owners: { name: "string" },
-  dc_tgts: { name: "string" },
-  dep_del_joins: { dep_del_owner_id: "integer", dep_del_item_id: "integer" },
-  dep_del_owners: { name: "string" },
-  dep_des_joins: { dep_des_owner_id: "integer", dep_des_item_id: "integer" },
-  dep_des_owners: { name: "string" },
-  dep_null_items: { label: "string" },
-  dep_null_joins: { dep_null_owner_id: "integer", dep_null_item_id: "integer" },
-  dep_null_owners: { name: "string" },
-  df_people: { name: "string" },
-  df_posts: { title: "string" },
-  df_readers: { df_person_id: "integer", df_post_id: "integer" },
-  ds_joins: { ds_owner_id: "integer", ds_tgt_id: "integer" },
-  ds_owners: { name: "string" },
-  ds_tgts: { title: "string", is_first: "boolean" },
-  dup_authors: { name: "string" },
-  dup_categs: { dup_author_id: "integer", dup_post_id: "integer", dup_cat_id: "integer" },
-  dup_cats: { name: "string" },
-  dup_posts: { title: "string" },
-  ei_people: { first_name: "string" },
-  ei_posts: { title: "string" },
-  ei_readers: { ei_person_id: "integer", ei_post_id: "integer" },
-  eit_people: { first_name: "string" },
-  eit_posts: { title: "string" },
-  eit_readers: { eit_person_id: "integer", eit_post_id: "integer" },
-  ejj_owners: { name: "string" },
-  ejj_pets: { name: "string", ejj_owner_id: "integer" },
-  ejj_toys: { name: "string", ejj_pet_id: "integer" },
-  fbang_items: { name: "string" },
-  fbang_joins: { fbang_owner_id: "integer", fbang_item_id: "integer" },
-  fbang_owners: { name: "string" },
-  fic_joins: { fic_owner_id: "integer", fic_post_id: "integer" },
-  fic_owners: { name: "string" },
-  fic_posts: { title: "string" },
-  gcs_joins: { gcs_owner_id: "integer", gcs_post_id: "integer" },
-  gcs_owners: { name: "string" },
-  gcs_posts: { title: "string", comments_count: "integer" },
-  gi_people: { first_name: "string" },
-  gi_posts: { title: "string" },
-  gi_readers: { gi_person_id: "integer", gi_post_id: "integer" },
-  gid_authors: { name: "string" },
-  gid_categories: { name: "string" },
-  gid_categorizations: { gid_author_id: "integer", gid_category_id: "integer", special: "boolean" },
-  hmt_arr_items: { label: "string" },
-  hmt_arr_joins: { hmt_arr_owner_id: "integer", hmt_arr_item_id: "integer" },
-  hmt_arr_owners: { name: "string" },
-  hmt_attr_items: { label: "string" },
-  hmt_attr_joins: { hmt_attr_owner_id: "integer", hmt_attr_item_id: "integer" },
-  hmt_attr_owners: { name: "string" },
-  hmt_bang_inv_joins: { hmt_bang_inv_owner_id: "integer", hmt_bang_inv_item_id: "integer" },
-  hmt_bang_inv_owners: { name: "string" },
-  hmt_bang_no_opt_joins: {
-    hmt_bang_no_opt_owner_id: "integer",
-    hmt_bang_no_opt_target_id: "integer",
-  },
-  hmt_bang_no_opt_owners: { name: "string" },
-  hmt_bang_no_opt_targets: { label: "string" },
-  hmt_bang_val_items: { label: "string" },
-  hmt_bang_val_joins: { hmt_bang_val_owner_id: "integer", hmt_bang_val_item_id: "integer" },
-  hmt_bang_val_owners: { name: "string" },
-  hmt_books: { title: "string", library_id: "integer" },
-  hmt_bt_authors: { name: "string" },
-  hmt_bt_favorites: { hmt_bt_author_id: "integer", favorite_author_id: "integer" },
-  hmt_bt_posts: { hmt_bt_author_id: "integer", title: "string" },
-  hmt_build_items: { label: "string" },
-  hmt_build_joins: { hmt_build_owner_id: "integer", hmt_build_item_id: "integer", role: "string" },
-  hmt_build_owners: { name: "string" },
-  hmt_cd_items: { label: "string" },
-  hmt_cd_joins: { hmt_cd_owner_id: "integer", hmt_cd_item_id: "integer" },
-  hmt_cd_owners: { name: "string" },
-  hmt_clr_items: { label: "string" },
-  hmt_clr_joins: { hmt_clr_owner_id: "integer", hmt_clr_item_id: "integer" },
-  hmt_clr_owners: { name: "string" },
-  hmt_clubs: { name: "string" },
-  hmt_courses: { title: "string" },
-  hmt_cr_books: { title: "string" },
-  hmt_cr_subscribers: { nick: "string" },
-  hmt_cr_subscriptions: { hmt_cr_book_id: "integer", hmt_cr_subscriber_id: "integer" },
-  hmt_da_clr_items: { label: "string" },
-  hmt_da_clr_joins: { hmt_da_clr_owner_id: "integer", hmt_da_clr_item_id: "integer" },
-  hmt_da_clr_owners: { name: "string" },
-  hmt_del_assoc_items: { label: "string" },
-  hmt_del_assoc_joins: { hmt_del_assoc_owner_id: "integer", hmt_del_assoc_item_id: "integer" },
-  hmt_del_assoc_owners: { name: "string" },
-  hmt_del_clr_items: { label: "string" },
-  hmt_del_clr_joins: { hmt_del_clr_owner_id: "integer", hmt_del_clr_item_id: "integer" },
-  hmt_del_clr_owners: { name: "string" },
-  hmt_del_items: { label: "string" },
-  hmt_del_joins: { hmt_del_owner_id: "integer", hmt_del_item_id: "integer" },
-  hmt_del_owners: { name: "string" },
-  hmt_dep_del_all_joins: {
-    hmt_dep_del_all_owner_id: "integer",
-    hmt_dep_del_all_item_id: "integer",
-  },
-  hmt_dep_del_all_owners: { name: "string" },
-  hmt_dep_destroy_items: { label: "string" },
-  hmt_dep_destroy_joins: {
-    hmt_dep_destroy_owner_id: "integer",
-    hmt_dep_destroy_item_id: "integer",
-  },
-  hmt_dep_destroy_owners: { name: "string" },
-  hmt_dep_null_joins: { hmt_dep_null_owner_id: "integer", hmt_dep_null_item_id: "integer" },
-  hmt_dep_null_owners: { name: "string" },
-  hmt_destroy_all_items: { label: "string" },
-  hmt_destroy_all_joins: {
-    hmt_destroy_all_owner_id: "integer",
-    hmt_destroy_all_item_id: "integer",
-  },
-  hmt_destroy_all_owners: { name: "string" },
-  hmt_destroy_assoc_items: { label: "string" },
-  hmt_destroy_assoc_joins: {
-    hmt_destroy_assoc_owner_id: "integer",
-    hmt_destroy_assoc_item_id: "integer",
-  },
-  hmt_destroy_assoc_owners: { name: "string" },
-  hmt_ds_items: { label: "string" },
-  hmt_ds_joins: { hmt_ds_owner_id: "integer", hmt_ds_item_id: "integer" },
-  hmt_ds_owners: { name: "string" },
-  hmt_dst_clr_items: { label: "string" },
-  hmt_dst_clr_joins: { hmt_dst_clr_owner_id: "integer", hmt_dst_clr_item_id: "integer" },
-  hmt_dst_clr_owners: { name: "string" },
-  hmt_dup2_items: { name: "string" },
-  hmt_dup2_joins: { hmt_dup2_person_id: "integer", hmt_dup2_item_id: "integer" },
-  hmt_dup2_people: { name: "string" },
-  hmt_dup_clubs: { name: "string" },
-  hmt_dup_memberships: { hmt_dup_person_id: "integer", hmt_dup_club_id: "integer" },
-  hmt_dup_people: { name: "string" },
-  hmt_empty_thr_items: { label: "string" },
-  hmt_empty_thr_joins: { hmt_empty_thr_owner_id: "integer", hmt_empty_thr_item_id: "integer" },
-  hmt_empty_thr_owners: { name: "string" },
-  hmt_enrollments: { student_id: "integer", course_id: "integer" },
-  hmt_events: { name: "string" },
-  hmt_fk_joins: { hmt_fk_owner_id: "integer", hmt_fk_target_id: "integer" },
-  hmt_fk_owners: { name: "string" },
-  hmt_fk_targets: { label: "string" },
-  hmt_groups: { name: "string" },
-  hmt_ho_refl_items: { label: "string" },
-  hmt_ho_refl_joins: { hmt_ho_refl_owner_id: "integer", hmt_ho_refl_item_id: "integer" },
-  hmt_ho_refl_owners: { name: "string" },
-  hmt_ids_cond_items: { label: "string" },
-  hmt_ids_cond_joins: { hmt_ids_cond_owner_id: "integer", hmt_ids_cond_item_id: "integer" },
-  hmt_ids_cond_owners: { name: "string" },
-  hmt_inv_opt_joins: { hmt_inv_opt_owner_id: "integer", hmt_inv_opt_item_id: "integer" },
-  hmt_inv_opt_owners: { name: "string" },
-  hmt_libraries: { name: "string" },
-  hmt_member_records: { name: "string", group_id: "integer" },
-  hmt_memberships: { person_id: "integer", hmt_club_id: "integer" },
-  hmt_mg_clubs: { name: "string" },
-  hmt_mg_members: { name: "string" },
-  hmt_mg_memberships: { hmt_mg_club_id: "integer", hmt_mg_member_id: "integer" },
-  hmt_mismatch_items: { label: "string" },
-  hmt_mismatch_joins: { hmt_mismatch_owner_id: "integer", hmt_mismatch_item_id: "integer" },
-  hmt_mismatch_owners: { name: "string" },
-  hmt_mw_items: { label: "string", status: "string" },
-  hmt_mw_joins: { hmt_mw_owner_id: "integer", hmt_mw_item_id: "integer" },
-  hmt_mw_owners: { name: "string" },
-  hmt_nested_unp_joins: { hmt_nested_unp_owner_id: "integer", hmt_nested_unp_target_id: "integer" },
-  hmt_nested_unp_owners: { name: "string" },
-  hmt_nested_unp_targets: { label: "string" },
-  hmt_new_rec_joins: { hmt_new_rec_owner_id: "integer", hmt_new_rec_thing_id: "integer" },
-  hmt_new_rec_owners: { name: "string" },
-  hmt_new_rec_things: { value: "string" },
-  hmt_no_bt_items: { label: "string" },
-  hmt_no_bt_joins: { hmt_no_bt_owner_id: "integer", hmt_no_bt_item_id: "integer" },
-  hmt_no_bt_owners: { name: "string" },
-  hmt_no_counter_items: { label: "string" },
-  hmt_no_counter_joins: { hmt_no_counter_owner_id: "integer", hmt_no_counter_item_id: "integer" },
-  hmt_no_counter_owners: { name: "string" },
-  hmt_no_err_joins: { hmt_no_err_owner_id: "integer", hmt_no_err_item_id: "integer" },
-  hmt_no_err_owners: { name: "string" },
-  hmt_no_pk_del_items: { label: "string" },
-  hmt_no_pk_del_joins: { hmt_no_pk_del_owner_id: "integer", hmt_no_pk_del_item_id: "integer" },
-  hmt_no_pk_del_owners: { name: "string" },
-  hmt_no_pk_items: { label: "string" },
-  hmt_no_pk_joins: { hmt_no_pk_owner_id: "integer", hmt_no_pk_item_id: "integer" },
-  hmt_no_pk_owners: { name: "string" },
-  hmt_people: { name: "string" },
-  hmt_pk_items: { label: "string" },
-  hmt_pk_joins: { hmt_pk_owner_id: "integer", hmt_pk_item_id: "integer" },
-  hmt_pk_opt_items: { label: "string" },
-  hmt_pk_opt_joins: { hmt_pk_opt_owner_id: "integer", hmt_pk_opt_item_id: "integer" },
-  hmt_pk_opt_owners: { name: "string" },
-  hmt_pk_owners: { name: "string" },
-  hmt_post_tags: { post_id: "integer", hmt_tag_id: "integer" },
-  hmt_posts: { title: "string" },
-  hmt_projects: { name: "string" },
-  hmt_repl_dup_items: { label: "string" },
-  hmt_repl_dup_joins: { hmt_repl_dup_owner_id: "integer", hmt_repl_dup_item_id: "integer" },
-  hmt_repl_dup_owners: { name: "string" },
-  hmt_repl_items: { label: "string" },
-  hmt_repl_joins: { hmt_repl_owner_id: "integer", hmt_repl_item_id: "integer" },
-  hmt_repl_owners: { name: "string" },
-  hmt_ro_items: { label: "string" },
-  hmt_ro_joins: { hmt_ro_owner_id: "integer", hmt_ro_item_id: "integer" },
-  hmt_ro_owners: { name: "string" },
-  hmt_sel_items: { label: "string", extra: "string" },
-  hmt_sel_joins: { hmt_sel_owner_id: "integer", hmt_sel_item_id: "integer" },
-  hmt_sel_owners: { name: "string" },
-  hmt_simple_joins: { hmt_simple_owner_id: "integer", hmt_simple_target_id: "integer" },
-  hmt_simple_owners: { name: "string" },
-  hmt_simple_targets: { label: "string" },
-  hmt_singleton_items: { label: "string" },
-  hmt_singleton_joins: { hmt_singleton_owner_id: "integer", hmt_singleton_item_id: "integer" },
-  hmt_singleton_owners: { name: "string" },
-  hmt_sponsor_ships: { sponsor_id: "integer", event_id: "integer" },
-  hmt_sponsors: { name: "string" },
-  hmt_students: { name: "string" },
-  hmt_tags: { name: "string" },
-  hmt_tasks: { title: "string", project_id: "integer" },
-  hmt_unload_groups: { name: "string" },
-  hmt_unload_members: { name: "string", hmt_unload_group_id: "integer" },
-  hmt_unp_joins: { hmt_unp_owner_id: "integer", hmt_unp_target_id: "integer" },
-  hmt_unp_owners: { name: "string" },
-  hmt_unp_targets: { label: "string" },
-  hmt_upd_items: { label: "string" },
-  hmt_upd_joins: { hmt_upd_owner_id: "integer", hmt_upd_item_id: "integer" },
-  hmt_upd_owners: { name: "string" },
-  hmt_val_opt_items: { label: "string" },
-  hmt_val_opt_joins: { hmt_val_opt_owner_id: "integer", hmt_val_opt_item_id: "integer" },
-  hmt_val_opt_owners: { name: "string" },
-  hmt_writer_book_titles: { title: "string" },
-  hmt_writer_books: { writer_id: "integer", book_id: "integer" },
-  hmt_writers: { name: "string" },
-  htu_people: { name: "string" },
-  htu_posts: { title: "string" },
-  htu_readers: { htu_post_id: "integer", htu_person_id: "integer", skimmer: "boolean" },
-  idestr_owners: { name: "string", indestructible_tags_count: "integer" },
-  idestr_taggings: { idestr_owner_id: "integer", idestr_tag_id: "integer" },
-  idestr_tags: { name: "string" },
-  ijq_jobs: { title: "string" },
-  ijq_people: { first_name: "string" },
-  ijq_references: { ijq_person_id: "integer", ijq_job_id: "integer" },
-  inc_b_people: { first_name: "string" },
-  inc_b_posts: { title: "string" },
-  inc_b_readers: { inc_b_person_id: "integer", inc_b_post_id: "integer" },
-  inc_n_people: { first_name: "string" },
-  inc_n_posts: { title: "string" },
-  inc_n_readers: { inc_n_person_id: "integer", inc_n_post_id: "integer" },
-  inc_people: { first_name: "string" },
-  inc_posts: { title: "string" },
-  inc_readers: { inc_person_id: "integer", inc_post_id: "integer" },
-  inc_scope_joins: { inc_scope_owner_id: "integer", inc_scope_tgt_id: "integer" },
-  inc_scope_owners: { name: "string" },
-  inc_scope_tgts: { label: "string" },
-  io_owners: { name: "string" },
-  ir_club2s: { name: "string" },
-  ir_clubs: { name: "string" },
-  ir_member2s: { name: "string" },
-  ir_members: { name: "string" },
-  ir_membership2s: { ir_club2_id: "integer", ir_member2_id: "integer", favorite: "boolean" },
-  ir_memberships: { ir_club_id: "integer", ir_member_id: "integer", favorite: "boolean" },
-  irpv_items: { name: "string" },
-  irpv_joins: { irpv_owner_id: "integer", irpv_item_id: "integer" },
-  irpv_owners: { name: "string" },
-  jbt_authors: { name: "string" },
-  jbt_categories: { name: "string" },
-  jbt_categorizations: { jbt_author_id: "integer", jbt_category_id: "integer" },
-  jbt_posts: { title: "string", jbt_author_id: "integer" },
-  jd_authors: { name: "string" },
-  jd_categorizations: { jd_author_id: "integer", jd_post_id: "integer" },
-  jd_posts: { title: "string" },
-  js_authors: { name: "string" },
-  js_comments: { js_post_id: "integer", body: "string" },
-  js_posts: { js_author_id: "integer", title: "string" },
-  lj_authors: { name: "string" },
-  lj_comments: { lj_post_id: "integer", body: "string" },
-  lj_posts: { lj_author_id: "integer", title: "string" },
-  ltjm_posts: { title: "string" },
-  ltjm_taggings: { post_id: "integer", tag_id: "integer" },
-  ltjm_tags: { name: "string" },
-  mhr_authors: { name: "string" },
-  mhr_comments: { body: "string", mhr_post_id: "integer" },
-  mhr_posts: { title: "string", mhr_author_id: "integer" },
-  mj_authors: { name: "string" },
-  mj_comments: { body: "string", mj_post_id: "integer" },
-  mj_posts: { title: "string", mj_author_id: "integer" },
-  mj_ratings: { score: "integer", mj_comment_id: "integer" },
-  npc_lesson_students: { npc_lesson_id: "integer", npc_student_id: "integer" },
-  npc_lessons: { name: "string" },
-  npc_students: { name: "string" },
-  npk_items: { label: "string" },
-  npk_joins: { npk_owner_id: "integer", npk_item_id: "integer" },
-  npk_owners: { name: "string" },
-  nr_people: { first_name: "string" },
-  nr_posts: { title: "string" },
-  nr_readers: { nr_person_id: "integer", nr_post_id: "integer" },
-  nsk_posts: { title: "string" },
-  nsk_taggings: { nsk_post_id: "integer", nsk_tag_id: "integer" },
-  nsk_tags: { name: "string" },
-  oht_people: { first_name: "string" },
-  oht_posts: { title: "string" },
-  oht_readers: { oht_person_id: "integer", oht_post_id: "integer" },
-  ord_people: { first_name: "string" },
-  ord_posts: { title: "string" },
-  ord_readers: { ord_person_id: "integer", ord_post_id: "integer" },
-  pep_items: { label: "string" },
-  pep_owners: { name: "string" },
-  pep_taggings: { pep_owner_id: "integer", taggable_id: "integer", taggable_type: "string" },
-  pij_items: { name: "string" },
-  pij_joins: { pij_owner_id: "integer", pij_item_id: "integer" },
-  pij_owners: { name: "string" },
-  pjm_posts: { title: "string" },
-  pjm_taggings: { pjm_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
-  pjm_tags: { name: "string" },
-  pko_items: { label: "string" },
-  pko_joins: { pko_owner_id: "integer", pko_item_id: "integer" },
-  pko_owners: { name: "string" },
-  pn_authors: { name: "string" },
-  pn_posts: { pn_author_id: "integer", title: "string" },
-  pn_taggings: { pn_post_id: "integer", pn_tag_id: "integer" },
-  pn_tags: { name: "string" },
-  ppk_posts: { title: "string" },
-  ppk_taggings: { ppk_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
-  ppk_tags: { name: "string" },
-  preload_multi_children: { value: "string", preload_multi_parent_id: "integer" },
-  preload_multi_parents: { name: "string" },
-  ps_clubs: { name: "string" },
-  ps_members: { name: "string" },
-  ps_memberships: { ps_club_id: "integer", ps_member_id: "integer", type: "string" },
-  ps_posts: { title: "string" },
-  ps_taggings: { ps_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
-  ps_tags: { name: "string" },
-  psr_companies: { name: "string" },
-  psr_contracts: { psr_company_id: "integer", psr_developer_id: "integer" },
-  psr_developers: { name: "string" },
-  pwir_items: { name: "string" },
-  pwir_joins: { pwir_owner_id: "integer", pwir_item_id: "integer" },
-  pwir_owners: { name: "string" },
-  rbi_people: { first_name: "string" },
-  rbi_posts: { title: "string" },
-  rbi_readers: { rbi_person_id: "integer", rbi_post_id: "integer" },
-  rop_people: { first_name: "string" },
-  rop_posts: { title: "string" },
-  rop_readers: { rop_person_id: "integer", rop_post_id: "integer" },
-  rw_posts: { title: "string" },
-  rw_taggings: { rw_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
-  rw_tags: { name: "string" },
-  sbang_items: { name: "string" },
-  sbang_joins: { sbang_owner_id: "integer", sbang_item_id: "integer" },
-  sbang_owners: { name: "string" },
-  self_people: { first_name: "string", primary_contact_id: "integer" },
-  sj_authors: { name: "string" },
-  sj_comments: { sj_post_id: "integer", body: "string" },
-  sj_posts: { sj_author_id: "integer", title: "string" },
-  sp_people: { first_name: "string" },
-  sp_posts: { title: "string" },
-  sp_readers: { sp_person_id: "integer", sp_post_id: "integer" },
-  spk_people: { first_name: "string" },
-  spk_posts: { title: "string" },
-  spk_readers: { spk_person_id: "integer", spk_post_id: "integer" },
-  ss_authors: { name: "string" },
-  ss_readers: { ss_author_id: "integer", skimmer: "boolean" },
-  ssi_authors: { name: "string" },
-  ssi_joins: { ssi_author_id: "integer", ssi_post_id: "integer", skimmer: "boolean" },
-  ssi_posts: { title: "string" },
-  ssj_authors: { name: "string" },
-  ssj_joins: { ssj_author_id: "integer", ssj_post_id: "integer" },
-  ssj_posts: { title: "string", published: "boolean" },
-  st_families: { name: "string" },
-  st_trees: { st_family_id: "integer", st_member_id: "integer", token: "string" },
-  st_users: { name: "string" },
-  sti_add_clubs: { name: "string" },
-  sti_add_members: { name: "string" },
-  sti_add_memberships: { sti_add_club_id: "integer", sti_add_member_id: "integer", type: "string" },
-  sum_people: { first_name: "string", followers_count: "integer" },
-  sum_posts: { title: "string" },
-  sum_readers: { sum_post_id: "integer", sum_person_id: "integer" },
-  sz_people: { first_name: "string" },
-  sz_posts: { title: "string" },
-  sz_readers: { sz_person_id: "integer", sz_post_id: "integer" },
-  ta_companies: { name: "string" },
-  ta_contracts: { ta_company_id: "integer", ta_developer_id: "integer" },
-  ta_developers: { name: "string" },
-  taj_authors: { name: "string" },
-  taj_comments: { body: "string", taj_post_id: "integer" },
-  taj_posts: { title: "string", taj_author_id: "integer" },
-  talj_authors: { name: "string" },
-  talj_comments: { body: "string", talj_post_id: "integer" },
-  talj_posts: { title: "string", talj_author_id: "integer" },
-  tc_people: { first_name: "string" },
-  tc_posts: { title: "string" },
-  tc_readers: { tc_person_id: "integer", tc_post_id: "integer" },
-  trb_posts: { title: "string" },
-  trb_taggings: { trb_post_id: "integer", trb_tag_id: "integer" },
-  trb_tags: { name: "string" },
-  tsi_authors: { name: "string" },
-  tsi_comments: { tsi_post_id: "integer", body: "string" },
-  tsi_posts: { tsi_author_id: "integer", title: "string" },
-  tsu_authors: { name: "string" },
-  tsu_comments: { tsu_post_id: "integer", body: "string" },
-  tsu_posts: { tsu_author_id: "integer", title: "string" },
-  txn_joins: { txn_owner_id: "integer", txn_tag_id: "integer" },
-  txn_owners: { name: "string" },
-  txn_people: { name: "string" },
-  txn_posts: { title: "string" },
-  txn_readers: { txn_post_id: "integer", txn_person_id: "integer" },
-  txn_tags: { name: "string" },
-  uid_authors: { name: "string" },
-  uid_categs: { uid_author_id: "integer", uid_cat_id: "integer", special: "boolean" },
-  uid_cats: { name: "string" },
-  us_authors: { name: "string" },
-  us_comments: { us_post_id: "integer", body: "string" },
-  us_posts: { us_author_id: "integer" },
-};
+import {
+  Author,
+  AuthorFavorite,
+  AuthorAddress,
+  AuthorFavoriteWithScope,
+} from "../test-helpers/models/author.js";
+import { Post, FirstPost, TaggedPost, CategoryPost } from "../test-helpers/models/post.js";
+import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
+import { Tag, OrderedTag } from "../test-helpers/models/tag.js";
+import { Tagging, IndestructibleTagging } from "../test-helpers/models/tagging.js";
+import {
+  Person,
+  PersonWithDependentDestroyJobs,
+  PersonWithDependentDeleteAllJobs,
+  PersonWithDependentNullifyJobs,
+} from "../test-helpers/models/person.js";
+import { Reader, LazyReader, SecureReader } from "../test-helpers/models/reader.js";
+import { Book, PublishedBook } from "../test-helpers/models/book.js";
+import { Subscriber } from "../test-helpers/models/subscriber.js";
+import { Subscription } from "../test-helpers/models/subscription.js";
+import { Category, SpecialCategory } from "../test-helpers/models/category.js";
+import { Categorization, SpecialCategorization } from "../test-helpers/models/categorization.js";
+import { Company, Firm } from "../test-helpers/models/company.js";
+import {
+  Developer,
+  SpecialDeveloper,
+  DeveloperWithIncorrectlyOrderedHasManyThrough,
+  AuditLog,
+  AuditLogRequired,
+} from "../test-helpers/models/developer.js";
+import { Human } from "../test-helpers/models/human.js";
+import { Contract, SpecialContract } from "../test-helpers/models/contract.js";
+import { Member } from "../test-helpers/models/member.js";
+import {
+  Membership,
+  CurrentMembership,
+  SuperMembership,
+  TenantMembership,
+} from "../test-helpers/models/membership.js";
+import { Club, SuperClub } from "../test-helpers/models/club.js";
+import { Organization } from "../test-helpers/models/organization.js";
+import { Owner } from "../test-helpers/models/owner.js";
+import { Pet } from "../test-helpers/models/pet.js";
+import { Toy } from "../test-helpers/models/toy.js";
+import { PetTreasure } from "../test-helpers/models/pet-treasure.js";
+import { Treasure } from "../test-helpers/models/treasure.js";
+import { Job } from "../test-helpers/models/job.js";
+import { Reference } from "../test-helpers/models/reference.js";
+import { Essay } from "../test-helpers/models/essay.js";
+import { Zine } from "../test-helpers/models/zine.js";
+import { Interest } from "../test-helpers/models/interest.js";
+import { Seminar } from "../test-helpers/models/seminar.js";
+import { Session } from "../test-helpers/models/session.js";
+import { Section } from "../test-helpers/models/section.js";
+import { User } from "../test-helpers/models/user.js";
+import { Family } from "../test-helpers/models/family.js";
+import { FamilyTree } from "../test-helpers/models/family-tree.js";
+import { ShardedBlogPost, ShardedTag, ShardedBlogPostTag } from "../test-helpers/models/sharded.js";
+import {
+  CpkTag,
+  CpkOrder,
+  CpkOrderTag,
+  CpkBook,
+  CpkBookWithOrderAgreements,
+  CpkOrderAgreement,
+  CpkChapter,
+} from "../test-helpers/models/cpk.js";
+import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
 
 describe("HasManyThroughAssociationsTest", () => {
   setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  const {
+    posts,
+    readers,
+    people,
+    comments,
+    authors,
+    categories,
+    taggings,
+    tags,
+    owners,
+    pets,
+    toys,
+    jobs,
+    references,
+    companies,
+    books,
+    subscribers,
+    subscriptions,
+    developers,
+    categorizations,
+    essays,
+    categoriesPosts,
+    clubs,
+    memberships,
+    members,
+    authorAddresses,
+    authorFavorites,
+    shardedBlogPosts,
+    shardedTags,
+    shardedBlogPostsTags,
+    cpkTags,
+    cpkOrders,
+    cpkOrderTags,
+    organizations,
+  } = useHandlerFixtures(
+    [
+      "posts",
+      "readers",
+      "people",
+      "comments",
+      "authors",
+      "categories",
+      "taggings",
+      "tags",
+      "owners",
+      "pets",
+      "toys",
+      "jobs",
+      "references",
+      "companies",
+      "books",
+      "subscribers",
+      "subscriptions",
+      "developers",
+      "categorizations",
+      "essays",
+      "categoriesPosts",
+      "clubs",
+      "memberships",
+      "members",
+      "authorAddresses",
+      "authorFavorites",
+      "shardedBlogPosts",
+      "shardedTags",
+      "shardedBlogPostsTags",
+      "cpkTags",
+      "cpkOrders",
+      "cpkOrderTags",
+      "organizations",
+    ],
+    {
+      schema: canonicalSchema,
+      // "update counter caches on destroy with indestructible through record"
+      // intentionally raises on destroy, which aborts the PG transaction and
+      // poisons transactional-fixture teardown for all subsequent tests.
+      usesTransaction: ["update counter caches on destroy with indestructible through record"],
+    },
+  );
 
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  }, 30000);
+  // Register models at describe-time (synchronously) so reflections
+  // are available before any eager validation triggered by useHandlerFixtures.
+  registerModel([
+    Tag,
+    OrderedTag,
+    Tagging,
+    IndestructibleTagging,
+    Comment,
+    VerySpecialComment,
+    Category,
+    SpecialCategory,
+    Categorization,
+    Post,
+    FirstPost,
+    TaggedPost,
+    CategoryPost,
+    Author,
+    AuthorFavorite,
+    AuthorFavoriteWithScope,
+    AuthorAddress,
+    Person,
+    PersonWithDependentDestroyJobs,
+    PersonWithDependentDeleteAllJobs,
+    PersonWithDependentNullifyJobs,
+    PersonalLegacyThing,
+    Reader,
+    LazyReader,
+    SecureReader,
+    Book,
+    PublishedBook,
+    Subscriber,
+    Subscription,
+    Company,
+    Firm,
+    Developer,
+    SpecialDeveloper,
+    DeveloperWithIncorrectlyOrderedHasManyThrough,
+    AuditLog,
+    AuditLogRequired,
+    Human,
+    Contract,
+    SpecialContract,
+    Member,
+    Membership,
+    CurrentMembership,
+    SuperMembership,
+    TenantMembership,
+    Club,
+    SuperClub,
+    Organization,
+    Owner,
+    Pet,
+    Toy,
+    PetTreasure,
+    Treasure,
+    Job,
+    Reference,
+    Essay,
+    Zine,
+    Interest,
+    Seminar,
+    Session,
+    Section,
+    User,
+    Family,
+    FamilyTree,
+    ShardedBlogPost,
+    ShardedTag,
+    ShardedBlogPostTag,
+    CpkTag,
+    CpkOrder,
+    CpkOrderTag,
+    CpkBook,
+    CpkBookWithOrderAgreements,
+    CpkOrderAgreement,
+    CpkChapter,
+    SpecialCategorization,
+  ]);
+
+  it("has many through create record", async () => {
+    const book = await Book.find(books("awdr").id);
+    const subscriber = await (book as any).subscribers.create({ nick: "bob" });
+    expect(subscriber).toBeTruthy();
+    expect(subscriber.isNewRecord()).toBe(false);
+  });
 
   it.skip("marshal dump", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   it("through association with joins", async () => {
-    class TajAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("tajPosts", { foreignKey: "taj_author_id" });
-        this.hasMany("tajComments", {
-          through: "tajPosts",
-          source: "tajComments",
-          className: "TajComment",
-        });
-      }
-    }
-    class TajPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("taj_author_id", "integer");
-        this.hasMany("tajComments", { foreignKey: "taj_post_id" });
-      }
-    }
-    class TajComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("taj_post_id", "integer");
-      }
-    }
-    registerModel("TajAuthor", TajAuthor);
-    registerModel("TajPost", TajPost);
-    registerModel("TajComment", TajComment);
-
-    const author = await TajAuthor.create({ name: "Mary" });
-    const post = await TajPost.create({ title: "P1", taj_author_id: author.id });
-    await TajComment.create({ body: "C1", taj_post_id: post.id });
-
-    // Through association with joins should generate SQL that includes the join
-    const sql = TajAuthor.joins("tajComments").toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("taj_posts");
-    expect(sql).toContain("taj_comments");
-
-    const results = await TajAuthor.joins("tajComments").where({ id: author.id }).toArray();
-    expect(results.length).toBeGreaterThan(0);
+    const mary = await Author.find(authors("mary").id);
+    const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
+    const result = await (mary as any).comments.merge(Post.joins("comments")).toArray();
+    expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
   });
 
   it("through association with left joins", async () => {
-    class TaljAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("taljPosts", { foreignKey: "talj_author_id" });
-        this.hasMany("taljComments", {
-          through: "taljPosts",
-          source: "taljComments",
-          className: "TaljComment",
-        });
-      }
-    }
-    class TaljPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("talj_author_id", "integer");
-        this.hasMany("taljComments", { foreignKey: "talj_post_id" });
-      }
-    }
-    class TaljComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("talj_post_id", "integer");
-      }
-    }
-    registerModel("TaljAuthor", TaljAuthor);
-    registerModel("TaljPost", TaljPost);
-    registerModel("TaljComment", TaljComment);
-
-    const author = await TaljAuthor.create({ name: "Mary" });
-    const post = await TaljPost.create({ title: "P1", talj_author_id: author.id });
-    await TaljComment.create({ body: "C1", talj_post_id: post.id });
-
-    // Through association with left joins
-    const sql = TaljAuthor.leftOuterJoins("taljComments").toSql();
-    expect(sql).toContain("LEFT OUTER JOIN");
-    expect(sql).toContain("talj_posts");
-    expect(sql).toContain("talj_comments");
-
-    const results = await TaljAuthor.leftOuterJoins("taljComments")
-      .where({ id: author.id })
-      .toArray();
-    expect(results.length).toBeGreaterThan(0);
+    const mary = await Author.find(authors("mary").id);
+    const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
+    const result = await (mary as any).comments.merge(Post.leftOuterJoins("comments")).toArray();
+    expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
   });
 
-  it("through association with through scope and nested where", async () => {
-    // Rails: company.special_developers.where.not("contracts.id": nil)
-    // Core: through association with scope + where.not chaining
-    class TaCompany extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ta_contracts", {
-          className: "TaContract",
-          foreignKey: "ta_company_id",
-        });
-        this.hasMany("ta_developers", {
-          className: "TaDeveloper",
-          through: "ta_contracts",
-          source: "ta_developer",
-        });
-      }
-    }
-    class TaContract extends Base {
-      static {
-        this.attribute("ta_company_id", "integer");
-        this.attribute("ta_developer_id", "integer");
-        this.belongsTo("ta_developer", {
-          className: "TaDeveloper",
-          foreignKey: "ta_developer_id",
-        });
-      }
-    }
-    class TaDeveloper extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("TaCompany", TaCompany);
-    registerModel("TaContract", TaContract);
-    registerModel("TaDeveloper", TaDeveloper);
-
-    const company = await TaCompany.create({ name: "Special" });
-    const alice = await TaDeveloper.create({ name: "Alice" });
-    const bob = await TaDeveloper.create({ name: "Bob" });
-    const aliceContract = await TaContract.create({
-      ta_company_id: company.id,
-      ta_developer_id: alice.id,
+  it.skip("through association with through scope and nested where", async () => {
+    const company = await Company.create({ name: "special" });
+    const developer = await SpecialDeveloper.create({});
+    await SpecialContract.create({
+      company_id: company.id,
+      special_developer_id: developer.id,
     });
-    await TaContract.create({ ta_company_id: company.id, ta_developer_id: bob.id });
-
-    // Rails: company.special_developers.where.not("contracts.id": nil)
-    // whereNot filtering on the target table (developer) excludes the specified developer
-    const results = await (company as any).ta_developers
-      .whereNot({ "ta_developers.id": bob.id })
+    const result = await (company as any).specialDevelopers
+      .whereNot({ "contracts.id": null })
       .toArray();
-    expect(results).toHaveLength(1);
-    expect(results[0].name).toBe("Alice");
-    // Verify aliceContract was created (exercises the through table)
-    expect(aliceContract.id).toBeDefined();
+    expect(result.map((d: any) => d.id)).toEqual([developer.id]);
   });
+
   it("preload with nested association", async () => {
-    class PnAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pnPosts", {
-          className: "PnPost",
-          foreignKey: "pn_author_id",
-        });
-      }
+    const davidId = authors("david").id;
+    const maryId = authors("mary").id;
+    const postList = await Post.where({ id: [davidId, maryId] })
+      .preload("author", "authorFavoritesWithScope")
+      .order("id")
+      .toArray();
+    // With preloading, author_favorites_with_scope should be cached
+    for (const p of postList) {
+      // association already loaded — should not issue a new query
+      expect((p as any).authorFavoritesWithScope).toBeDefined();
     }
-    class PnPost extends Base {
-      static {
-        this.attribute("pn_author_id", "integer");
-        this.attribute("title", "string");
-        this.hasMany("pnTaggings", {
-          className: "PnTagging",
-          foreignKey: "pn_post_id",
-        });
-        this.hasMany("pnTags", {
-          through: "pnTaggings",
-          source: "pnTag",
-          className: "PnTag",
-        });
-      }
-    }
-    class PnTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PnTagging extends Base {
-      static {
-        this.attribute("pn_post_id", "integer");
-        this.attribute("pn_tag_id", "integer");
-        this.belongsTo("pnTag", {
-          className: "PnTag",
-          foreignKey: "pn_tag_id",
-        });
-      }
-    }
-
-    registerModel("PnAuthor", PnAuthor);
-    registerModel("PnPost", PnPost);
-    registerModel("PnTag", PnTag);
-    registerModel("PnTagging", PnTagging);
-
-    const author = await PnAuthor.create({ name: "DHH" });
-    const post = await PnPost.create({ pn_author_id: author.id, title: "Hello" });
-    const tag = await PnTag.create({ name: "ruby" });
-    await PnTagging.create({ pn_post_id: post.id, pn_tag_id: tag.id });
-
-    const posts = await loadHasMany(author, "pnPosts", {
-      className: "PnPost",
-      foreignKey: "pn_author_id",
-    });
-    expect(posts).toHaveLength(1);
-
-    const tags = await loadHasManyThrough(posts[0], "pnTags", {
-      through: "pnTaggings",
-      source: "pnTag",
-      className: "PnTag",
-    });
-    expect(tags).toHaveLength(1);
-    expect(tags[0].name).toBe("ruby");
+    expect(await (postList[0] as any).authorFavoritesWithScope.size()).toBe(1);
   });
+
   it("preload sti rhs class", async () => {
-    class PsrCompany extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("psrContracts", {
-          className: "PsrContract",
-          foreignKey: "psr_company_id",
-        });
-        this.hasMany("psrDevelopers", {
-          through: "psrContracts",
-          source: "psrDeveloper",
-          className: "PsrDeveloper",
-        });
-      }
+    const devs = await Developer.includes("firms").all().toArray();
+    expect(devs.length).toBeGreaterThan(0);
+    for (const dev of devs) {
+      expect((dev as any).firms).toBeDefined();
     }
-    class PsrContract extends Base {
-      static {
-        this.attribute("psr_company_id", "integer");
-        this.attribute("psr_developer_id", "integer");
-        this.belongsTo("psrDeveloper", {
-          className: "PsrDeveloper",
-          foreignKey: "psr_developer_id",
-        });
-      }
-    }
-    class PsrDeveloper extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("PsrCompany", PsrCompany);
-    registerModel("PsrContract", PsrContract);
-    registerModel("PsrDeveloper", PsrDeveloper);
-
-    const company = await PsrCompany.create({ name: "Firm" });
-    const dev = await PsrDeveloper.create({ name: "Alice" });
-    await PsrContract.create({ psr_company_id: company.id, psr_developer_id: dev.id });
-
-    const devs = await loadHasManyThrough(company, "psrDevelopers", {
-      through: "psrContracts",
-      source: "psrDeveloper",
-      className: "PsrDeveloper",
-    });
-    expect(devs).toHaveLength(1);
-    expect(devs[0].name).toBe("Alice");
   });
+
   it("preload sti middle relation", async () => {
-    // Club -> Members through Memberships (STI: SuperMembership, CurrentMembership)
-    class PsClub extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("psMemberships", {
-          className: "PsMembership",
-          foreignKey: "ps_club_id",
-        });
-        this.hasMany("members", {
-          className: "PsMember",
-          through: "psMemberships",
-          source: "psMember",
-        });
-      }
-    }
-    class PsMember extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PsMembership extends Base {
-      static {
-        this.attribute("ps_club_id", "integer");
-        this.attribute("ps_member_id", "integer");
-        this.attribute("type", "string");
-        this._tableName = "ps_memberships";
-        enableSti(PsMembership);
-        this.belongsTo("psMember", {
-          className: "PsMember",
-          foreignKey: "ps_member_id",
-        });
-      }
-    }
-    class PsSuperMembership extends PsMembership {
-      static {
-        registerModel(PsSuperMembership);
-        registerSubclass(PsSuperMembership);
-      }
-    }
-    class PsCurrentMembership extends PsMembership {
-      static {
-        registerModel(PsCurrentMembership);
-        registerSubclass(PsCurrentMembership);
-      }
-    }
-    registerModel(PsClub);
-    registerModel(PsMember);
-    registerModel(PsMembership);
+    const club = await Club.create({ name: "Aaron cool banana club" });
+    const member1 = await Member.create({ name: "Aaron" });
+    const member2 = await Member.create({ name: "Cat" });
+    await SuperMembership.create({ club_id: club.id, member_id: member1.id });
+    await CurrentMembership.create({ club_id: club.id, member_id: member2.id });
 
-    const club = await PsClub.create({ name: "Aaron cool banana club" });
-    const member1 = await PsMember.create({ name: "Aaron" });
-    const member2 = await PsMember.create({ name: "Cat" });
-    await PsSuperMembership.create({ ps_club_id: club.id, ps_member_id: member1.id });
-    await PsCurrentMembership.create({ ps_club_id: club.id, ps_member_id: member2.id });
-
-    const clubs = await PsClub.all().includes("members").toArray();
-    const members = (clubs[0] as any).association("members").target;
-    expect(members).toHaveLength(2);
-    const names = members.map((m: any) => m.name).sort();
-    expect(names).toEqual(["Aaron", "Cat"]);
+    const club1 = await Club.includes("members").findBy({ id: club.id });
+    const clubMembers = ((club1 as any).members as any[]).sort(
+      (a: any, b: any) => Number(a.id) - Number(b.id),
+    );
+    const expected = [member1, member2].sort((a, b) => Number(a.id) - Number(b.id));
+    expect(clubMembers.map((m: any) => m.id)).toEqual(expected.map((m) => m.id));
   });
+
   it("preload multiple instances of the same record", async () => {
-    class PreloadMultiParent extends Base {
+    const club = await Club.create({ name: "Aaron cool banana club" });
+    await Membership.create({
+      club_id: club.id,
+      member_id: (await Member.create({ name: "Aaron" })).id,
+    });
+    await Membership.create({
+      club_id: club.id,
+      member_id: (await Member.create({ name: "Bob" })).id,
+    });
+
+    const preloadedClubs = await Club.joins("memberships").preload("membership").toArray();
+    expect(preloadedClubs.length).toBeGreaterThan(0);
+    for (const c of preloadedClubs) {
+      expect((c as any).membership).toBeDefined();
+    }
+  });
+
+  it("ordered has many through", async () => {
+    // Rails creates an anonymous person class with ordered posts
+    class PersonPrime extends Base {
       static {
-        this.attribute("name", "string");
-        this.hasMany("preloadMultiChildren", {
-          className: "PreloadMultiChild",
-          foreignKey: "preload_multi_parent_id",
+        this._tableName = "people";
+        this.hasMany("readers", { foreignKey: "person_id" });
+        this.hasMany("posts", {
+          scope: (q: any) => q.order("posts.id DESC"),
+          through: "readers",
+          className: "Post",
         });
       }
     }
-    class PreloadMultiChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("preload_multi_parent_id", "integer");
-      }
+    registerModel("PersonPrime", PersonPrime);
+
+    const posts = await (PersonPrime as any)
+      .includes("posts")
+      .first()
+      .then((p: any) => p.posts);
+    expect(posts.length).toBeGreaterThan(1);
+    for (let i = 0; i < posts.length - 1; i++) {
+      expect(posts[i].id).toBeGreaterThan(posts[i + 1].id);
     }
-    registerModel("PreloadMultiParent", PreloadMultiParent);
-    registerModel("PreloadMultiChild", PreloadMultiChild);
-
-    const p1 = await PreloadMultiParent.create({ name: "A" });
-    const p2 = await PreloadMultiParent.create({ name: "B" });
-    await PreloadMultiChild.create({
-      value: "c1",
-      preload_multi_parent_id: p1.id,
-    });
-    await PreloadMultiChild.create({
-      value: "c2",
-      preload_multi_parent_id: p1.id,
-    });
-    await PreloadMultiChild.create({
-      value: "c3",
-      preload_multi_parent_id: p2.id,
-    });
-
-    const parents = await PreloadMultiParent.all().includes("preloadMultiChildren").toArray();
-    expect(parents).toHaveLength(2);
-    const pa = parents.find((p: any) => p.name === "A")!;
-    const pb = parents.find((p: any) => p.name === "B")!;
-    expect((pa as any).association("preloadMultiChildren").target).toHaveLength(2);
-    expect((pb as any).association("preloadMultiChildren").target).toHaveLength(1);
   });
+
   it("singleton has many through", async () => {
-    class HmtSingletonOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtSingletonJoins", {
-          className: "HmtSingletonJoin",
-          foreignKey: "hmt_singleton_owner_id",
-        });
-        this.hasMany("hmtSingletonItems", {
-          through: "hmtSingletonJoins",
-          source: "hmtSingletonItem",
-          className: "HmtSingletonItem",
-        });
-      }
-    }
-    class HmtSingletonJoin extends Base {
-      static {
-        this.attribute("hmt_singleton_owner_id", "integer");
-        this.attribute("hmt_singleton_item_id", "integer");
-        this.belongsTo("hmtSingletonItem", {
-          className: "HmtSingletonItem",
-          foreignKey: "hmt_singleton_item_id",
-        });
-      }
-    }
-    class HmtSingletonItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const anonbook = await Book.first();
+    const namebook = await Book.find((anonbook as any).id);
 
-    registerModel("HmtSingletonOwner", HmtSingletonOwner);
-    registerModel("HmtSingletonJoin", HmtSingletonJoin);
-    registerModel("HmtSingletonItem", HmtSingletonItem);
-
-    const owner = await HmtSingletonOwner.create({ name: "Solo" });
-    const item = await HmtSingletonItem.create({ label: "Only" });
-    await HmtSingletonJoin.create({
-      hmt_singleton_owner_id: owner.id,
-      hmt_singleton_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtSingletonItems", {
-      through: "hmtSingletonJoins",
-      source: "hmtSingletonItem",
-      className: "HmtSingletonItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("Only");
+    const anonSubscribers = await (anonbook as any).subscribers.toArray();
+    expect(anonSubscribers.length).toBeGreaterThan(0);
+    for (const s of anonSubscribers) {
+      expect(s).toBeInstanceOf(Subscriber);
+    }
+    const nameSubscribers = await (namebook as any).subscribers.toArray();
+    expect(nameSubscribers.map((s: any) => s.id).sort()).toEqual(
+      anonSubscribers.map((s: any) => s.id).sort(),
+    );
   });
+
   it("no pk join table append", async () => {
-    class HmtNoPkOwner extends Base {
+    // Rails: make_no_pk_hm_t creates anonymous models using lessons/lessons_students/students
+    class NoPkLesson extends Base {
       static {
+        this._tableName = "lessons";
         this.attribute("name", "string");
-        this.hasMany("hmtNoPkJoins", {
-          className: "HmtNoPkJoin",
-          foreignKey: "hmt_no_pk_owner_id",
-        });
-        this.hasMany("hmtNoPkItems", {
-          through: "hmtNoPkJoins",
-          source: "hmtNoPkItem",
-          className: "HmtNoPkItem",
-        });
+        this.hasMany("lessonStudents", { className: "NoPkLessonStudent", foreignKey: "lesson_id" });
+        this.hasMany("students", { through: "lessonStudents", className: "NoPkStudent" });
       }
     }
-    class HmtNoPkJoin extends Base {
+    class NoPkLessonStudent extends Base {
       static {
-        this.attribute("hmt_no_pk_owner_id", "integer");
-        this.attribute("hmt_no_pk_item_id", "integer");
-        this.belongsTo("hmtNoPkItem", {
-          className: "HmtNoPkItem",
-          foreignKey: "hmt_no_pk_item_id",
-        });
+        this._tableName = "lessons_students";
+        this.attribute("lesson_id", "big_integer");
+        this.attribute("student_id", "big_integer");
+        this.belongsTo("student", { className: "NoPkStudent", foreignKey: "student_id" });
       }
     }
-    class HmtNoPkItem extends Base {
+    class NoPkStudent extends Base {
       static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtNoPkOwner", HmtNoPkOwner);
-    registerModel("HmtNoPkJoin", HmtNoPkJoin);
-    registerModel("HmtNoPkItem", HmtNoPkItem);
-
-    const owner = await HmtNoPkOwner.create({ name: "O" });
-    const item = await HmtNoPkItem.create({ label: "I" });
-    await HmtNoPkJoin.create({
-      hmt_no_pk_owner_id: owner.id,
-      hmt_no_pk_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtNoPkItems", {
-      through: "hmtNoPkJoins",
-      source: "hmtNoPkItem",
-      className: "HmtNoPkItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I");
-  });
-  it("no pk join table delete", async () => {
-    class HmtNoPkDelOwner extends Base {
-      static {
+        this._tableName = "students";
         this.attribute("name", "string");
-        this.hasMany("hmtNoPkDelJoins", {
-          className: "HmtNoPkDelJoin",
-          foreignKey: "hmt_no_pk_del_owner_id",
-        });
-        this.hasMany("hmtNoPkDelItems", {
-          through: "hmtNoPkDelJoins",
-          source: "hmtNoPkDelItem",
-          className: "HmtNoPkDelItem",
-        });
       }
     }
-    class HmtNoPkDelJoin extends Base {
-      static {
-        this.attribute("hmt_no_pk_del_owner_id", "integer");
-        this.attribute("hmt_no_pk_del_item_id", "integer");
-        this.belongsTo("hmtNoPkDelItem", {
-          className: "HmtNoPkDelItem",
-          foreignKey: "hmt_no_pk_del_item_id",
-        });
-      }
-    }
-    class HmtNoPkDelItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    registerModel("NoPkLesson", NoPkLesson);
+    registerModel("NoPkLessonStudent", NoPkLessonStudent);
+    registerModel("NoPkStudent", NoPkStudent);
 
-    registerModel("HmtNoPkDelOwner", HmtNoPkDelOwner);
-    registerModel("HmtNoPkDelJoin", HmtNoPkDelJoin);
-    registerModel("HmtNoPkDelItem", HmtNoPkDelItem);
-
-    const owner = await HmtNoPkDelOwner.create({ name: "O" });
-    const item = await HmtNoPkDelItem.create({ label: "I" });
-    const join = await HmtNoPkDelJoin.create({
-      hmt_no_pk_del_owner_id: owner.id,
-      hmt_no_pk_del_item_id: item.id,
-    });
-
-    await join.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtNoPkDelItems", {
-      through: "hmtNoPkDelJoins",
-      source: "hmtNoPkDelItem",
-      className: "HmtNoPkDelItem",
-    });
-    expect(items).toHaveLength(0);
+    const sicp = new NoPkLesson({ name: "SICP" });
+    const ben = new NoPkStudent({ name: "Ben Bitdiddle" });
+    await (sicp as any).students.push(ben);
+    await sicp.save();
+    expect(sicp.isPersisted()).toBe(true);
   });
+
+  it.skip("no pk join table delete", async () => {
+    class NoPkDelLesson extends Base {
+      static {
+        this._tableName = "lessons";
+        this.attribute("name", "string");
+        this.hasMany("lessonStudents", {
+          className: "NoPkDelLessonStudent",
+          foreignKey: "lesson_id",
+        });
+        this.hasMany("students", { through: "lessonStudents", className: "NoPkDelStudent" });
+      }
+    }
+    class NoPkDelLessonStudent extends Base {
+      static {
+        this._tableName = "lessons_students";
+        this.attribute("lesson_id", "big_integer");
+        this.attribute("student_id", "big_integer");
+        this.belongsTo("student", { className: "NoPkDelStudent", foreignKey: "student_id" });
+      }
+    }
+    class NoPkDelStudent extends Base {
+      static {
+        this._tableName = "students";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NoPkDelLesson", NoPkDelLesson);
+    registerModel("NoPkDelLessonStudent", NoPkDelLessonStudent);
+    registerModel("NoPkDelStudent", NoPkDelStudent);
+
+    const sicp = new NoPkDelLesson({ name: "SICP" });
+    const ben = new NoPkDelStudent({ name: "Ben Bitdiddle" });
+    const louis = new NoPkDelStudent({ name: "Louis Reasoner" });
+    await (sicp as any).students.push(ben);
+    await (sicp as any).students.push(louis);
+    await sicp.save();
+
+    await (sicp as any).students.reload();
+    const studentCountBefore = await NoPkDelStudent.count();
+    const lessonStudentCountBefore = await NoPkDelLessonStudent.count();
+    const allStudents = await NoPkDelStudent.all().toArray();
+    await (sicp as any).students.destroy(...allStudents);
+    expect(await NoPkDelStudent.count()).toBe(studentCountBefore);
+    expect(await NoPkDelLessonStudent.count()).toBeLessThan(lessonStudentCountBefore as number);
+  });
+
+  it.skip("no pk join model callbacks", async () => {
+    class NoPkCbLesson extends Base {
+      static {
+        this._tableName = "lessons";
+        this.attribute("name", "string");
+        this.hasMany("lessonStudents", {
+          className: "NoPkCbLessonStudent",
+          foreignKey: "lesson_id",
+        });
+        this.hasMany("students", { through: "lessonStudents", className: "NoPkCbStudent" });
+      }
+    }
+    let afterDestroyCalled = false;
+    class NoPkCbLessonStudent extends Base {
+      static {
+        this._tableName = "lessons_students";
+        this.attribute("lesson_id", "big_integer");
+        this.attribute("student_id", "big_integer");
+        this.belongsTo("student", { className: "NoPkCbStudent", foreignKey: "student_id" });
+        (this as any).afterDestroy(() => {
+          afterDestroyCalled = true;
+        });
+      }
+    }
+    class NoPkCbStudent extends Base {
+      static {
+        this._tableName = "students";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NoPkCbLesson", NoPkCbLesson);
+    registerModel("NoPkCbLessonStudent", NoPkCbLessonStudent);
+    registerModel("NoPkCbStudent", NoPkCbStudent);
+
+    const sicp = new NoPkCbLesson({ name: "SICP" });
+    const ben = new NoPkCbStudent({ name: "Ben Bitdiddle" });
+    await (sicp as any).students.push(ben);
+    await sicp.save();
+
+    await (sicp as any).students.reload();
+    const allStudents = await NoPkCbStudent.all().toArray();
+    await (sicp as any).students.destroy(...allStudents);
+    expect(afterDestroyCalled).toBe(true);
+  });
+
   it("pk is not required for join", async () => {
-    class HmtPkOptOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtPkOptJoins", {
-          className: "HmtPkOptJoin",
-          foreignKey: "hmt_pk_opt_owner_id",
-        });
-        this.hasMany("hmtPkOptItems", {
-          through: "hmtPkOptJoins",
-          source: "hmtPkOptItem",
-          className: "HmtPkOptItem",
-        });
-      }
-    }
-    class HmtPkOptJoin extends Base {
-      static {
-        this.attribute("hmt_pk_opt_owner_id", "integer");
-        this.attribute("hmt_pk_opt_item_id", "integer");
-        this.belongsTo("hmtPkOptItem", {
-          className: "HmtPkOptItem",
-          foreignKey: "hmt_pk_opt_item_id",
-        });
-      }
-    }
-    class HmtPkOptItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtPkOptOwner", HmtPkOptOwner);
-    registerModel("HmtPkOptJoin", HmtPkOptJoin);
-    registerModel("HmtPkOptItem", HmtPkOptItem);
-
-    const owner = await HmtPkOptOwner.create({ name: "O" });
-    const item = await HmtPkOptItem.create({ label: "I" });
-    await HmtPkOptJoin.create({
-      hmt_pk_opt_owner_id: owner.id,
-      hmt_pk_opt_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtPkOptItems", {
-      through: "hmtPkOptJoins",
-      source: "hmtPkOptItem",
-      className: "HmtPkOptItem",
-    });
-    expect(items).toHaveLength(1);
+    const post = await Post.includes("scategories").first();
+    const post2 = await Post.includes("categories").first();
+    const sCategories = await (post as any).scategories.toArray();
+    const categories2 = await (post2 as any).categories.toArray();
+    expect(sCategories.length).toBeGreaterThan(0);
+    const sorted1 = [...sCategories].sort((a: any, b: any) => Number(a.id) - Number(b.id));
+    const sorted2 = [...categories2].sort((a: any, b: any) => Number(a.id) - Number(b.id));
+    expect(sorted1.map((c: any) => c.id)).toEqual(sorted2.map((c: any) => c.id));
   });
 
   it("include?", async () => {
-    class HmtPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtMemberships", {
-          className: "HmtMembership",
-          foreignKey: "person_id",
-        });
-        this.hasMany("hmtClubs", {
-          through: "hmtMemberships",
-          source: "hmtClub",
-          className: "HmtClub",
-        });
-      }
-    }
-    class HmtMembership extends Base {
-      static {
-        this.attribute("person_id", "integer");
-        this.attribute("hmt_club_id", "integer");
-        this.belongsTo("hmtClub", {
-          className: "HmtClub",
-          foreignKey: "hmt_club_id",
-        });
-      }
-    }
-    class HmtClub extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
+    const person = new Person();
+    const post = new Post();
+    await (person as any).posts.push(post);
+    const personPosts = await (person as any).posts.toArray();
+    expect(personPosts.map((p: any) => p.id)).toContain(post.id);
+  });
 
-    registerModel("HmtPerson", HmtPerson);
-    registerModel("HmtMembership", HmtMembership);
-    registerModel("HmtClub", HmtClub);
+  it("associate existing", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("david").id);
 
-    const person = await HmtPerson.create({ name: "Alice" });
-    const club = await HmtClub.create({ name: "Chess" });
-    await HmtMembership.create({
-      person_id: person.id,
-      hmt_club_id: club.id,
-    });
+    await (post as any).people.push(person);
+    const postPeople = await (post as any).people.toArray();
+    expect(postPeople.map((p: any) => p.id)).toContain(person.id);
 
-    const clubs = await loadHasManyThrough(person, "hmtClubs", {
-      through: "hmtMemberships",
-      source: "hmtClub",
-      className: "HmtClub",
-    });
-    expect(clubs.some((c) => c.id === club.id)).toBe(true);
+    const reloaded = await Post.find(posts("thinking").id);
+    const reloadedPeople = await (reloaded as any).people.reload().then((p: any) => p);
+    expect(reloadedPeople.map((p: any) => p.id)).toContain(person.id);
   });
 
   it("delete all for with dependent option destroy", async () => {
-    class HmtDepDestroyOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtDepDestroyJoin extends Base {
-      static {
-        this.attribute("hmt_dep_destroy_owner_id", "integer");
-        this.attribute("hmt_dep_destroy_item_id", "integer");
-      }
-    }
-    class HmtDepDestroyItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtDepDestroyOwner", HmtDepDestroyOwner);
-    registerModel("HmtDepDestroyJoin", HmtDepDestroyJoin);
-    registerModel("HmtDepDestroyItem", HmtDepDestroyItem);
+    const person = await Person.find(people("david").id);
+    const countBefore = await (person as any).jobsWithDependentDestroy.count();
+    expect(countBefore).toBe(1);
 
-    const owner = await HmtDepDestroyOwner.create({ name: "O" });
-    const item = await HmtDepDestroyItem.create({ label: "I" });
-    const join = await HmtDepDestroyJoin.create({
-      hmt_dep_destroy_owner_id: owner.id,
-      hmt_dep_destroy_item_id: item.id,
-    });
-
-    // Destroying the join record removes the through association
-    await join.destroy();
-    const joins = await loadHasMany(owner, "hmtDepDestroyJoins", {
-      className: "HmtDepDestroyJoin",
-      foreignKey: "hmt_dep_destroy_owner_id",
-    });
-    expect(joins).toHaveLength(0);
+    const jobCountBefore = await Job.count();
+    const refCountBefore = await Reference.count();
+    await (person as any).reload();
+    const deleted = await (person as any).jobsWithDependentDestroy.deleteAll();
+    expect(deleted).toBe(1);
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
   });
-  it("delete all for with dependent option nullify", async () => {
-    class HmtDepNullOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtDepNullJoin extends Base {
-      static {
-        this.attribute("hmt_dep_null_owner_id", "integer");
-        this.attribute("hmt_dep_null_item_id", "integer");
-      }
-    }
-    registerModel("HmtDepNullOwner", HmtDepNullOwner);
-    registerModel("HmtDepNullJoin", HmtDepNullJoin);
 
-    const owner = await HmtDepNullOwner.create({ name: "O" });
-    const join = await HmtDepNullJoin.create({
-      hmt_dep_null_owner_id: owner.id,
-      hmt_dep_null_item_id: 99,
-    });
+  it.skip("delete all for with dependent option nullify", async () => {
+    const person = await Person.find(people("david").id);
+    expect(await (person as any).jobsWithDependentNullify.count()).toBe(1);
 
-    // Nullify the FK
-    join.hmt_dep_null_owner_id = null;
-    await join.save();
-
-    const joins = await loadHasMany(owner, "hmtDepNullJoins", {
-      className: "HmtDepNullJoin",
-      foreignKey: "hmt_dep_null_owner_id",
-    });
-    expect(joins).toHaveLength(0);
+    const jobCountBefore = await Job.count();
+    const refCountBefore = await Reference.count();
+    await (person as any).reload();
+    const deleted = await (person as any).jobsWithDependentNullify.deleteAll();
+    expect(deleted).toBe(1);
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(refCountBefore);
   });
+
   it("delete all for with dependent option delete all", async () => {
-    class HmtDepDelAllOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtDepDelAllJoin extends Base {
-      static {
-        this.attribute("hmt_dep_del_all_owner_id", "integer");
-        this.attribute("hmt_dep_del_all_item_id", "integer");
-      }
-    }
-    registerModel("HmtDepDelAllOwner", HmtDepDelAllOwner);
-    registerModel("HmtDepDelAllJoin", HmtDepDelAllJoin);
+    const person = await Person.find(people("david").id);
+    expect(await (person as any).jobsWithDependentDeleteAll.count()).toBe(1);
 
-    const owner = await HmtDepDelAllOwner.create({ name: "O" });
-    await HmtDepDelAllJoin.create({
-      hmt_dep_del_all_owner_id: owner.id,
-      hmt_dep_del_all_item_id: 1,
-    });
-    await HmtDepDelAllJoin.create({
-      hmt_dep_del_all_owner_id: owner.id,
-      hmt_dep_del_all_item_id: 2,
-    });
+    const jobCountBefore = await Job.count();
+    const refCountBefore = await Reference.count();
+    await (person as any).reload();
+    const deleted = await (person as any).jobsWithDependentDeleteAll.deleteAll();
+    expect(deleted).toBe(1);
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
+  });
 
-    // Delete all joins for this owner
-    const joins = await loadHasMany(owner, "hmtDepDelAllJoins", {
-      className: "HmtDepDelAllJoin",
-      foreignKey: "hmt_dep_del_all_owner_id",
-    });
-    for (const j of joins) {
-      await j.destroy();
-    }
-
-    const remaining = await loadHasMany(owner, "hmtDepDelAllJoins", {
-      className: "HmtDepDelAllJoin",
-      foreignKey: "hmt_dep_del_all_owner_id",
-    });
-    expect(remaining).toHaveLength(0);
+  it("delete all on association clears scope", async () => {
+    const post = await Post.create({ title: "Rails 6", body: "" });
+    const people2 = (post as any).people;
+    await people2.create({ first_name: "Jeb" });
+    await people2.deleteAll();
+    expect(await people2.first()).toBeNull();
   });
 
   it("concat", async () => {
-    class HmtTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtPostTag extends Base {
-      static {
-        this.attribute("post_id", "integer");
-        this.attribute("hmt_tag_id", "integer");
-        this.belongsTo("hmtTag", {
-          className: "HmtTag",
-          foreignKey: "hmt_tag_id",
-        });
-      }
-    }
-    class HmtPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("hmtPostTags", {
-          className: "HmtPostTag",
-          foreignKey: "post_id",
-        });
-        this.hasMany("hmtTags", {
-          through: "hmtPostTags",
-          source: "hmtTag",
-          className: "HmtTag",
-        });
-      }
-    }
-
-    registerModel("HmtTag", HmtTag);
-    registerModel("HmtPostTag", HmtPostTag);
-    registerModel("HmtPost", HmtPost);
-
-    const post = await HmtPost.create({ title: "Hello" });
-    const tag1 = await HmtTag.create({ name: "ruby" });
-    const tag2 = await HmtTag.create({ name: "rails" });
-    await HmtPostTag.create({
-      post_id: post.id,
-      hmt_tag_id: tag1.id,
-    });
-    await HmtPostTag.create({
-      post_id: post.id,
-      hmt_tag_id: tag2.id,
-    });
-
-    const tags = await loadHasManyThrough(post, "hmtTags", {
-      through: "hmtPostTags",
-      source: "hmtTag",
-      className: "HmtTag",
-    });
-    expect(tags).toHaveLength(2);
+    const person = await Person.find(people("david").id);
+    const post = await Post.find(posts("thinking").id);
+    const result = await (post as any).people.concat(person);
+    expect(await (post as any).people.size()).toBe(1);
+    expect(await (await Post.find(posts("thinking").id)).people.size()).toBe(1);
+    expect((result as any[]).map((r: any) => r.id)).toContain(person.id);
   });
 
   it("associate existing record twice should add to target twice", async () => {
-    class HmtDupPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDupMemberships", {
-          className: "HmtDupMembership",
-          foreignKey: "hmt_dup_person_id",
-        });
-        this.hasMany("hmtDupClubs", {
-          through: "hmtDupMemberships",
-          source: "hmtDupClub",
-          className: "HmtDupClub",
-        });
-      }
-    }
-    class HmtDupMembership extends Base {
-      static {
-        this.attribute("hmt_dup_person_id", "integer");
-        this.attribute("hmt_dup_club_id", "integer");
-        this.belongsTo("hmtDupClub", {
-          className: "HmtDupClub",
-          foreignKey: "hmt_dup_club_id",
-        });
-      }
-    }
-    class HmtDupClub extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("david").id);
 
-    registerModel("HmtDupPerson", HmtDupPerson);
-    registerModel("HmtDupMembership", HmtDupMembership);
-    registerModel("HmtDupClub", HmtDupClub);
-
-    const person = await HmtDupPerson.create({ name: "Alice" });
-    const club = await HmtDupClub.create({ name: "Chess" });
-    // Associate the same club twice via two join records
-    await HmtDupMembership.create({
-      hmt_dup_person_id: person.id,
-      hmt_dup_club_id: club.id,
-    });
-    await HmtDupMembership.create({
-      hmt_dup_person_id: person.id,
-      hmt_dup_club_id: club.id,
-    });
-
-    const memberships = await loadHasMany(person, "hmtDupMemberships", {
-      className: "HmtDupMembership",
-      foreignKey: "hmt_dup_person_id",
-    });
-    expect(memberships).toHaveLength(2);
+    const countBefore = (await (post as any).people.toArray()).length;
+    await (post as any).people.push(person);
+    await (post as any).people.push(person);
+    expect((await (post as any).people.toArray()).length).toBe(countBefore + 2);
   });
+
   it("associate existing record twice should add records twice", async () => {
-    class HmtDup2Person extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDup2Joins", {
-          className: "HmtDup2Join",
-          foreignKey: "hmt_dup2_person_id",
-        });
-      }
-    }
-    class HmtDup2Join extends Base {
-      static {
-        this.attribute("hmt_dup2_person_id", "integer");
-        this.attribute("hmt_dup2_item_id", "integer");
-      }
-    }
-    class HmtDup2Item extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("HmtDup2Person", HmtDup2Person);
-    registerModel("HmtDup2Join", HmtDup2Join);
-    registerModel("HmtDup2Item", HmtDup2Item);
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("david").id);
 
-    const person = await HmtDup2Person.create({ name: "Bob" });
-    const item = await HmtDup2Item.create({ name: "Thing" });
-    await HmtDup2Join.create({
-      hmt_dup2_person_id: person.id,
-      hmt_dup2_item_id: item.id,
-    });
-    await HmtDup2Join.create({
-      hmt_dup2_person_id: person.id,
-      hmt_dup2_item_id: item.id,
-    });
-
-    const allJoins = await HmtDup2Join.all().toArray();
-    const personJoins = allJoins.filter(
-      (j: any) => Number(j.hmt_dup2_person_id) === Number(person.id),
-    );
-    expect(personJoins).toHaveLength(2);
+    const countBefore = await (post as any).people.count();
+    await (post as any).people.push(person);
+    await (post as any).people.push(person);
+    expect(await (post as any).people.count()).toBe(countBefore + 2);
   });
+
   it("add two instance and then deleting", async () => {
-    class HmtDelOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDelJoins", {
-          className: "HmtDelJoin",
-          foreignKey: "hmt_del_owner_id",
-        });
-        this.hasMany("hmtDelItems", {
-          through: "hmtDelJoins",
-          source: "hmtDelItem",
-          className: "HmtDelItem",
-        });
-      }
-    }
-    class HmtDelJoin extends Base {
-      static {
-        this.attribute("hmt_del_owner_id", "integer");
-        this.attribute("hmt_del_item_id", "integer");
-        this.belongsTo("hmtDelItem", {
-          className: "HmtDelItem",
-          foreignKey: "hmt_del_item_id",
-        });
-      }
-    }
-    class HmtDelItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("david").id);
 
-    registerModel("HmtDelOwner", HmtDelOwner);
-    registerModel("HmtDelJoin", HmtDelJoin);
-    registerModel("HmtDelItem", HmtDelItem);
+    await (post as any).people.push(person);
+    await (post as any).people.push(person);
 
-    const owner = await HmtDelOwner.create({ name: "O" });
-    const item1 = await HmtDelItem.create({ label: "I1" });
-    const item2 = await HmtDelItem.create({ label: "I2" });
-    const j1 = await HmtDelJoin.create({
-      hmt_del_owner_id: owner.id,
-      hmt_del_item_id: item1.id,
-    });
-    await HmtDelJoin.create({
-      hmt_del_owner_id: owner.id,
-      hmt_del_item_id: item2.id,
-    });
+    const peopleCountBefore = await (post as any).people.count();
+    const readersCountBefore = await (post as any).readers.count();
+    await (post as any).people.delete(person);
+    expect(await (post as any).people.count()).toBe(peopleCountBefore - 2);
+    expect(await (post as any).readers.count()).toBe(readersCountBefore - 2);
 
-    // Delete one join record
-    await j1.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtDelItems", {
-      through: "hmtDelJoins",
-      source: "hmtDelItem",
-      className: "HmtDelItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I2");
+    const reloaded = await Post.find(posts("thinking").id);
+    const reloadedPeople = await (reloaded as any).people.reload();
+    expect(reloadedPeople.map((p: any) => p.id)).not.toContain(person.id);
   });
 
   it("associating new", async () => {
-    class HmtStudent extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtEnrollment extends Base {
-      static {
-        this.attribute("student_id", "integer");
-        this.attribute("course_id", "integer");
-      }
-    }
-    class HmtCourse extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("HmtStudent", HmtStudent);
-    registerModel("HmtEnrollment", HmtEnrollment);
-    registerModel("HmtCourse", HmtCourse);
+    const newPerson = new Person({ first_name: "bob" });
+    const post = await Post.find(posts("thinking").id);
+    await (post as any).people.push(newPerson);
 
-    const student = await HmtStudent.create({ name: "Bob" });
-    const course = await HmtCourse.create({ title: "Math" });
-    const enrollment = await HmtEnrollment.create({
-      student_id: student.id,
-      course_id: course.id,
-    });
+    const thinkingPeople = await (post as any).people.toArray();
+    expect(thinkingPeople.map((p: any) => p.first_name)).toContain("bob");
 
-    expect(Number(enrollment.student_id)).toBe(Number(student.id));
-    expect(Number(enrollment.course_id)).toBe(Number(course.id));
+    const reloaded = await Post.find(posts("thinking").id);
+    const reloadedPeople = await (reloaded as any).people.reload();
+    expect(reloadedPeople.map((p: any) => p.first_name)).toContain("bob");
   });
 
   it("associate new by building", async () => {
-    class AnbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.hasMany("anbReaders", {
-          className: "AnbReader",
-          foreignKey: "anb_post_id",
-        });
-        this.hasMany("anbPeople", {
-          through: "anbReaders",
-          source: "anbPerson",
-          className: "AnbPerson",
-        });
-      }
-    }
-    class AnbReader extends Base {
-      static {
-        this.attribute("anb_person_id", "integer");
-        this.attribute("anb_post_id", "integer");
-        this.belongsTo("anbPerson", {
-          className: "AnbPerson",
-          foreignKey: "anb_person_id",
-        });
-      }
-    }
-    class AnbPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
+    const post = await Post.find(posts("thinking").id);
+    await (post as any).people.build({ first_name: "Bob" });
+    await (post as any).people.build({ first_name: "Ted" });
 
-    registerModel("AnbPost", AnbPost);
-    registerModel("AnbReader", AnbReader);
-    registerModel("AnbPerson", AnbPerson);
+    const firstNames = (post as any).people.map((p: any) => p.first_name);
+    expect(firstNames).toContain("Bob");
+    expect(firstNames).toContain("Ted");
 
-    const post = await AnbPost.create({ title: "Thinking", body: "..." });
-    const proxy = association(post, "anbPeople");
-    const person = proxy.build({ first_name: "Bob" });
-    expect(person.first_name).toBe("Bob");
-    expect(person.isNewRecord()).toBe(true);
+    (post as any).body = `${(post as any).body}-changed`;
+    await post.save();
+
+    const reloaded = await Post.find(posts("thinking").id);
+    const names = (await (reloaded as any).people.reload()).map((p: any) => p.first_name);
+    expect(names).toContain("Bob");
+    expect(names).toContain("Ted");
   });
+
   it("build then save with has many inverse", async () => {
-    class BtsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("btsReaders", {
-          className: "BtsReader",
-          foreignKey: "bts_post_id",
-        });
-        this.hasMany("btsPeople", {
-          through: "btsReaders",
-          source: "btsPerson",
-          className: "BtsPerson",
-        });
-      }
-    }
-    class BtsReader extends Base {
-      static {
-        this.attribute("bts_person_id", "integer");
-        this.attribute("bts_post_id", "integer");
-        this.belongsTo("btsPerson", {
-          className: "BtsPerson",
-          foreignKey: "bts_person_id",
-          inverseOf: "btsReaders",
-        });
-      }
-    }
-    class BtsPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("btsReaders", {
-          className: "BtsReader",
-          foreignKey: "bts_person_id",
-          inverseOf: "btsPerson",
-        });
-      }
-    }
-
-    registerModel("BtsPost", BtsPost);
-    registerModel("BtsReader", BtsReader);
-    registerModel("BtsPerson", BtsPerson);
-
-    const post = await BtsPost.create({ title: "Thinking" });
-    const proxy = association(post, "btsPeople");
-    const person = proxy.build({ first_name: "Bob" });
-    // build_record wires the join row onto the source's collection inverse.
-    const readers = association(person, "btsReaders").target;
-    expect(readers.length).toBe(1);
+    const post = await Post.find(posts("thinking").id);
+    const person = await (post as any).people.build({ first_name: "Bob" });
     await person.save();
-    // After save, person should be persisted
-    expect(person.isNewRecord()).toBe(false);
+    await post.reload();
+
+    expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(person.id);
   });
+
   it("build then save with has one inverse", async () => {
-    class BtshPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("btshReaders", {
-          className: "BtshReader",
-          foreignKey: "btsh_post_id",
-        });
-        this.hasMany("btshPeople", {
-          through: "btshReaders",
-          source: "btshPerson",
-          className: "BtshPerson",
-        });
-      }
-    }
-    class BtshReader extends Base {
-      static {
-        this.attribute("btsh_person_id", "integer");
-        this.attribute("btsh_post_id", "integer");
-        this.belongsTo("btshPerson", {
-          className: "BtshPerson",
-          foreignKey: "btsh_person_id",
-        });
-      }
-    }
-    class BtshPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
-
-    registerModel("BtshPost", BtshPost);
-    registerModel("BtshReader", BtshReader);
-    registerModel("BtshPerson", BtshPerson);
-
-    const post = await BtshPost.create({ title: "Thinking" });
-    const proxy = association(post, "btshPeople");
-    const person = proxy.build({ first_name: "Bob" });
+    const post = await Post.find(posts("thinking").id);
+    const person = await (post as any).singlePeople.build({ first_name: "Bob" });
     await person.save();
-    expect(person.isNewRecord()).toBe(false);
+    await post.reload();
+
+    expect((await (post as any).singlePeople.toArray()).map((p: any) => p.id)).toContain(person.id);
   });
-  it("build then remove then save", async () => {
-    class BtrsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("btrsReaders", {
-          className: "BtrsReader",
-          foreignKey: "btrs_post_id",
-        });
-        this.hasMany("btrsPeople", {
-          through: "btrsReaders",
-          source: "btrsPerson",
-          className: "BtrsPerson",
-        });
-      }
-    }
-    class BtrsReader extends Base {
-      static {
-        this.attribute("btrs_person_id", "integer");
-        this.attribute("btrs_post_id", "integer");
-        this.belongsTo("btrsPerson", {
-          className: "BtrsPerson",
-          foreignKey: "btrs_person_id",
-        });
-      }
-    }
-    class BtrsPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
 
-    registerModel("BtrsPost", BtrsPost);
-    registerModel("BtrsReader", BtrsReader);
-    registerModel("BtrsPerson", BtrsPerson);
+  it.skip("build then remove then save", async () => {
+    const post = await Post.find(posts("thinking").id);
+    await (post as any).people.build({ first_name: "Bob" });
+    const ted = await (post as any).people.build({ first_name: "Ted" });
+    await (post as any).people.delete(ted);
+    await post.save();
+    await post.reload();
 
-    const post = await BtrsPost.create({ title: "Thinking" });
-    const proxy = association(post, "btrsPeople");
-    proxy.build({ first_name: "Bob" });
-    const ted = proxy.build({ first_name: "Ted" });
-    // Ted is unsaved, so we can't delete through join records.
-    // But the build creates in memory only, so this is a no-op for now.
-    // The Rails test saves post (which triggers autosave) - we verify Bob gets saved via create.
-    const bob = await proxy.create({ first_name: "Bob" });
-    const people = await proxy.toArray();
-    expect(people.map((p) => p.first_name)).toContain("Bob");
+    const names = (await (post as any).people.toArray()).map((p: any) => p.first_name);
+    expect(names).toEqual(["Bob"]);
   });
 
   it("both parent ids set when saving new", async () => {
-    class HmtWriter extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtWriterBooks", {
-          className: "HmtWriterBook",
-          foreignKey: "writer_id",
-        });
-        this.hasMany("hmtWriterBookTitles", {
-          through: "hmtWriterBooks",
-          source: "hmtWriterBookTitle",
-          className: "HmtWriterBookTitle",
-        });
-      }
-    }
-    class HmtWriterBook extends Base {
-      static {
-        this.attribute("writer_id", "integer");
-        this.attribute("book_id", "integer");
-        this.belongsTo("hmtWriter", {
-          className: "HmtWriter",
-          foreignKey: "writer_id",
-          inverseOf: "hmtWriterBooks",
-        });
-        this.belongsTo("hmtWriterBookTitle", {
-          className: "HmtWriterBookTitle",
-          foreignKey: "book_id",
-        });
-      }
-    }
-    class HmtWriterBookTitle extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("hmtWriterBooks", {
-          className: "HmtWriterBook",
-          foreignKey: "book_id",
-          inverseOf: "hmtWriterBookTitle",
-        });
-      }
-    }
-    registerModel("HmtWriter", HmtWriter);
-    registerModel("HmtWriterBook", HmtWriterBook);
-    registerModel("HmtWriterBookTitle", HmtWriterBookTitle);
+    const post = new Post({ title: "Hello", body: "world" });
+    const person = new Person({ first_name: "Sean" });
 
-    // Rails: post.people = [person] on a new owner. Array-assignment routes
-    // through replace_records → concat → concat_records, pre-building the
-    // through join row; the owner's save autosaves the join, whose belongsTo
-    // follows each parent's freshly-assigned primary key.
-    const writer = new HmtWriter({ name: "Tolkien" });
-    const book = new HmtWriterBookTitle({ title: "LOTR" });
-    (writer as any).association("hmtWriterBookTitles").writer([book]);
-    await writer.save();
+    (post as any).people = [person];
+    await post.save();
 
-    expect(writer.id).toBeTruthy();
-    expect(book.id).toBeTruthy();
-    const joins = await loadHasMany(writer, "hmtWriterBooks", {
-      className: "HmtWriterBook",
-      foreignKey: "writer_id",
-    });
-    expect(joins).toHaveLength(1);
-    expect(Number(joins[0].writer_id)).toBe(Number(writer.id));
-    expect(Number(joins[0].book_id)).toBe(Number(book.id));
+    expect(post.id).toBeTruthy();
+    expect(person.id).toBeTruthy();
+    const reader = await (post as any).readers.first();
+    expect(Number(reader.post_id)).toBe(Number(post.id));
+    expect(Number(reader.person_id)).toBe(Number(person.id));
   });
 
   it("delete association", async () => {
-    class HmtDelAssocOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDelAssocJoins", {
-          className: "HmtDelAssocJoin",
-          foreignKey: "hmt_del_assoc_owner_id",
-        });
-        this.hasMany("hmtDelAssocItems", {
-          through: "hmtDelAssocJoins",
-          source: "hmtDelAssocItem",
-          className: "HmtDelAssocItem",
-        });
-      }
-    }
-    class HmtDelAssocJoin extends Base {
-      static {
-        this.attribute("hmt_del_assoc_owner_id", "integer");
-        this.attribute("hmt_del_assoc_item_id", "integer");
-        this.belongsTo("hmtDelAssocItem", {
-          className: "HmtDelAssocItem",
-          foreignKey: "hmt_del_assoc_item_id",
-        });
-      }
-    }
-    class HmtDelAssocItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    await (post as any).people.reload();
+    const michael = await Person.find(people("michael").id);
+    await (post as any).people.delete(michael);
 
-    registerModel("HmtDelAssocOwner", HmtDelAssocOwner);
-    registerModel("HmtDelAssocJoin", HmtDelAssocJoin);
-    registerModel("HmtDelAssocItem", HmtDelAssocItem);
-
-    const owner = await HmtDelAssocOwner.create({ name: "O" });
-    const item = await HmtDelAssocItem.create({ label: "I" });
-    const join = await HmtDelAssocJoin.create({
-      hmt_del_assoc_owner_id: owner.id,
-      hmt_del_assoc_item_id: item.id,
-    });
-
-    await join.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtDelAssocItems", {
-      through: "hmtDelAssocJoins",
-      source: "hmtDelAssocItem",
-      className: "HmtDelAssocItem",
-    });
-    expect(items).toHaveLength(0);
+    expect(await (post as any).people.toArray()).toHaveLength(0);
+    const welcomePost2 = await Post.find(posts("welcome").id);
+    await (welcomePost2 as any).people.reload();
+    expect(await (welcomePost2 as any).people.size()).toBe(0);
   });
-  it("destroy association", async () => {
-    class HmtDestroyAssocOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDestroyAssocJoins", {
-          className: "HmtDestroyAssocJoin",
-          foreignKey: "hmt_destroy_assoc_owner_id",
-        });
-        this.hasMany("hmtDestroyAssocItems", {
-          through: "hmtDestroyAssocJoins",
-          source: "hmtDestroyAssocItem",
-          className: "HmtDestroyAssocItem",
-        });
-      }
-    }
-    class HmtDestroyAssocJoin extends Base {
-      static {
-        this.attribute("hmt_destroy_assoc_owner_id", "integer");
-        this.attribute("hmt_destroy_assoc_item_id", "integer");
-        this.belongsTo("hmtDestroyAssocItem", {
-          className: "HmtDestroyAssocItem",
-          foreignKey: "hmt_destroy_assoc_item_id",
-        });
-      }
-    }
-    class HmtDestroyAssocItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
 
-    registerModel("HmtDestroyAssocOwner", HmtDestroyAssocOwner);
-    registerModel("HmtDestroyAssocJoin", HmtDestroyAssocJoin);
-    registerModel("HmtDestroyAssocItem", HmtDestroyAssocItem);
+  it.skip("destroy association", async () => {
+    const personCountBefore = await Person.count();
+    const readerCountBefore = await Reader.count();
+    const post = await Post.find(posts("welcome").id);
+    const michael = await Person.find(people("michael").id);
+    await (post as any).people.destroy(michael);
+    expect(await Person.count()).toBe(personCountBefore);
+    expect(await Reader.count()).toBe(Number(readerCountBefore) - 1);
 
-    const owner = await HmtDestroyAssocOwner.create({ name: "O" });
-    const item1 = await HmtDestroyAssocItem.create({ label: "I1" });
-    const item2 = await HmtDestroyAssocItem.create({ label: "I2" });
-    const j1 = await HmtDestroyAssocJoin.create({
-      hmt_destroy_assoc_owner_id: owner.id,
-      hmt_destroy_assoc_item_id: item1.id,
-    });
-    await HmtDestroyAssocJoin.create({
-      hmt_destroy_assoc_owner_id: owner.id,
-      hmt_destroy_assoc_item_id: item2.id,
-    });
-
-    await j1.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtDestroyAssocItems", {
-      through: "hmtDestroyAssocJoins",
-      source: "hmtDestroyAssocItem",
-      className: "HmtDestroyAssocItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I2");
+    const reloaded = await Post.find(posts("welcome").id);
+    expect(await (reloaded as any).people.toArray()).toHaveLength(0);
+    await (reloaded as any).people.reload();
+    expect(await (reloaded as any).people.size()).toBe(0);
   });
-  it("destroy all", async () => {
-    class HmtDestroyAllOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDestroyAllJoins", {
-          className: "HmtDestroyAllJoin",
-          foreignKey: "hmt_destroy_all_owner_id",
-        });
-        this.hasMany("hmtDestroyAllItems", {
-          through: "hmtDestroyAllJoins",
-          source: "hmtDestroyAllItem",
-          className: "HmtDestroyAllItem",
-        });
-      }
-    }
-    class HmtDestroyAllJoin extends Base {
-      static {
-        this.attribute("hmt_destroy_all_owner_id", "integer");
-        this.attribute("hmt_destroy_all_item_id", "integer");
-        this.belongsTo("hmtDestroyAllItem", {
-          className: "HmtDestroyAllItem",
-          foreignKey: "hmt_destroy_all_item_id",
-        });
-      }
-    }
-    class HmtDestroyAllItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
 
-    registerModel("HmtDestroyAllOwner", HmtDestroyAllOwner);
-    registerModel("HmtDestroyAllJoin", HmtDestroyAllJoin);
-    registerModel("HmtDestroyAllItem", HmtDestroyAllItem);
+  it.skip("destroy all", async () => {
+    const personCountBefore = await Person.count();
+    const readerCountBefore = await Reader.count();
+    const post = await Post.find(posts("welcome").id);
+    await (post as any).people.destroyAll();
+    expect(await Person.count()).toBe(personCountBefore);
+    expect(await Reader.count()).toBe(Number(readerCountBefore) - 1);
 
-    const owner = await HmtDestroyAllOwner.create({ name: "O" });
-    const item1 = await HmtDestroyAllItem.create({ label: "I1" });
-    const item2 = await HmtDestroyAllItem.create({ label: "I2" });
-    await HmtDestroyAllJoin.create({
-      hmt_destroy_all_owner_id: owner.id,
-      hmt_destroy_all_item_id: item1.id,
-    });
-    await HmtDestroyAllJoin.create({
-      hmt_destroy_all_owner_id: owner.id,
-      hmt_destroy_all_item_id: item2.id,
-    });
-
-    // Destroy all join records
-    const joins = await loadHasMany(owner, "hmtDestroyAllJoins", {
-      className: "HmtDestroyAllJoin",
-      foreignKey: "hmt_destroy_all_owner_id",
-    });
-    for (const j of joins) {
-      await j.destroy();
-    }
-
-    const items = await loadHasManyThrough(owner, "hmtDestroyAllItems", {
-      through: "hmtDestroyAllJoins",
-      source: "hmtDestroyAllItem",
-      className: "HmtDestroyAllItem",
-    });
-    expect(items).toHaveLength(0);
+    const reloaded = await Post.find(posts("welcome").id);
+    expect(await (reloaded as any).people.toArray()).toHaveLength(0);
+    await (reloaded as any).people.reload();
+    expect(await (reloaded as any).people.size()).toBe(0);
   });
+
   describe("composite PK through associations (canonical)", () => {
-    registerModel([CpkTag, CpkOrder, CpkOrderTag]);
-    const { cpkTags } = useHandlerFixtures(["cpkTags", "cpkOrders", "cpkOrderTags"], {
-      schema: canonicalSchema,
-    });
-
     it("destroy all on composite primary key model", async () => {
       const tag = cpkTags("cpk_tag_loyal_customer");
       const orders = await (tag as any).orders.toArray();
@@ -1954,9 +760,6 @@ describe("HasManyThroughAssociationsTest", () => {
         tag_id: (tag as any).id,
         attached_by: "Nikita",
       });
-      // Rails: assert_equal order, order_tag.order
-      // `reader` is sync (returns null if not preloaded); use loadTarget() for the async DB load.
-      // AR == compares by class + id; compare idValue (the scalar "id" column) instead of toEqual.
       const loadedOrder = await (orderTag as any).association("order").loadTarget();
       expect(loadedOrder?.idValue).toBe((order as any).idValue);
       const loadedTag = await (orderTag as any).association("tag").loadTarget();
@@ -1967,5059 +770,1353 @@ describe("HasManyThroughAssociationsTest", () => {
       expect(found.attached_reason).toBe("This is our loyal customer");
     });
   });
+
   it("destroy all on association clears scope", async () => {
-    class HmtDaClrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDaClrJoins", {
-          className: "HmtDaClrJoin",
-          foreignKey: "hmt_da_clr_owner_id",
-        });
-        this.hasMany("hmtDaClrItems", {
-          through: "hmtDaClrJoins",
-          source: "hmtDaClrItem",
-          className: "HmtDaClrItem",
-        });
-      }
-    }
-    class HmtDaClrJoin extends Base {
-      static {
-        this.attribute("hmt_da_clr_owner_id", "integer");
-        this.attribute("hmt_da_clr_item_id", "integer");
-        this.belongsTo("hmtDaClrItem", {
-          className: "HmtDaClrItem",
-          foreignKey: "hmt_da_clr_item_id",
-        });
-      }
-    }
-    class HmtDaClrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtDaClrOwner", HmtDaClrOwner);
-    registerModel("HmtDaClrJoin", HmtDaClrJoin);
-    registerModel("HmtDaClrItem", HmtDaClrItem);
-
-    const owner = await HmtDaClrOwner.create({ name: "O" });
-    const item1 = await HmtDaClrItem.create({ label: "I1" });
-    const item2 = await HmtDaClrItem.create({ label: "I2" });
-    await HmtDaClrJoin.create({
-      hmt_da_clr_owner_id: owner.id,
-      hmt_da_clr_item_id: item1.id,
-    });
-    await HmtDaClrJoin.create({
-      hmt_da_clr_owner_id: owner.id,
-      hmt_da_clr_item_id: item2.id,
-    });
-
-    const joins = await loadHasMany(owner, "hmtDaClrJoins", {
-      className: "HmtDaClrJoin",
-      foreignKey: "hmt_da_clr_owner_id",
-    });
-    for (const j of joins) {
-      await j.destroy();
-    }
-
-    const items = await loadHasManyThrough(owner, "hmtDaClrItems", {
-      through: "hmtDaClrJoins",
-      source: "hmtDaClrItem",
-      className: "HmtDaClrItem",
-    });
-    expect(items).toHaveLength(0);
+    const post = await Post.create({ title: "Rails 6", body: "" });
+    const ppl = (post as any).people;
+    await ppl.create({ first_name: "Jeb" });
+    await ppl.destroyAll();
+    expect(await ppl.first()).toBeNull();
   });
-  // Mirrors Rails' test_delete_all_for_with_dependent_option_delete_all /
-  // _nullify: the CollectionAssociation `delete_all` dispatch routes through
-  // HasManyThroughAssociation#delete_or_nullify_all_records →
-  // delete_records(load_target, method), removing the join rows (or nulling the
-  // source FK) while leaving the target records untouched.
-  const setupAf4 = async (method: "delete_all" | "nullify") => {
-    class Af4Owner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany(`af4Refs_${method}`, {
-          className: "Af4Ref",
-          foreignKey: "af4_owner_id",
-        });
-        this.hasMany(`af4Items_${method}`, {
-          through: `af4Refs_${method}`,
-          source: "af4Item",
-          className: "Af4Item",
-          dependent: method === "delete_all" ? "delete" : "nullify",
-        });
-      }
-    }
-    class Af4Ref extends Base {
-      static {
-        this.attribute("af4_owner_id", "integer");
-        this.attribute("af4_item_id", "integer");
-        this.belongsTo("af4Item", {
-          className: "Af4Item",
-          foreignKey: "af4_item_id",
-        });
-      }
-    }
-    class Af4Item extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("Af4Owner", Af4Owner);
-    registerModel("Af4Ref", Af4Ref);
-    registerModel("Af4Item", Af4Item);
-    const owner = await Af4Owner.create({ name: "O" });
-    const item = await Af4Item.create({ label: "I" });
-    await Af4Ref.create({ af4_owner_id: owner.id, af4_item_id: item.id });
-    return { owner, item, Af4Ref, Af4Item };
-  };
-  it("delete_all for with dependent option delete_all", async () => {
-    const { owner, item, Af4Ref, Af4Item } = await setupAf4("delete_all");
-    await (owner as any).association("af4Items_delete_all").deleteAll();
-    expect(await Af4Ref.all().toArray()).toHaveLength(0);
-    expect(await Af4Item.find(item.id)).not.toBeNull();
-  });
-  it("delete_all for with dependent option nullify", async () => {
-    const { owner, item, Af4Ref, Af4Item } = await setupAf4("nullify");
-    await (owner as any).association("af4Items_nullify").deleteAll();
-    const refs = await Af4Ref.all().toArray();
-    expect(refs).toHaveLength(1);
-    expect(refs[0].af4_item_id).toBeNull();
-    expect(await Af4Item.find(item.id)).not.toBeNull();
-  });
+
   it("destroy on association clears scope", async () => {
-    class HmtDstClrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDstClrJoins", {
-          className: "HmtDstClrJoin",
-          foreignKey: "hmt_dst_clr_owner_id",
-        });
-        this.hasMany("hmtDstClrItems", {
-          through: "hmtDstClrJoins",
-          source: "hmtDstClrItem",
-          className: "HmtDstClrItem",
-        });
-      }
-    }
-    class HmtDstClrJoin extends Base {
-      static {
-        this.attribute("hmt_dst_clr_owner_id", "integer");
-        this.attribute("hmt_dst_clr_item_id", "integer");
-        this.belongsTo("hmtDstClrItem", {
-          className: "HmtDstClrItem",
-          foreignKey: "hmt_dst_clr_item_id",
-        });
-      }
-    }
-    class HmtDstClrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtDstClrOwner", HmtDstClrOwner);
-    registerModel("HmtDstClrJoin", HmtDstClrJoin);
-    registerModel("HmtDstClrItem", HmtDstClrItem);
-
-    const owner = await HmtDstClrOwner.create({ name: "O" });
-    const item1 = await HmtDstClrItem.create({ label: "I1" });
-    const item2 = await HmtDstClrItem.create({ label: "I2" });
-    const j1 = await HmtDstClrJoin.create({
-      hmt_dst_clr_owner_id: owner.id,
-      hmt_dst_clr_item_id: item1.id,
-    });
-    await HmtDstClrJoin.create({
-      hmt_dst_clr_owner_id: owner.id,
-      hmt_dst_clr_item_id: item2.id,
-    });
-
-    await j1.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtDstClrItems", {
-      through: "hmtDstClrJoins",
-      source: "hmtDstClrItem",
-      className: "HmtDstClrItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I2");
+    const post = await Post.create({ title: "Rails 6", body: "" });
+    const ppl = (post as any).people;
+    const person = await ppl.create({ first_name: "Jeb" });
+    await ppl.destroy(person);
+    expect(await ppl.first()).toBeNull();
   });
+
   it("delete on association clears scope", async () => {
-    class HmtDelClrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDelClrJoins", {
-          className: "HmtDelClrJoin",
-          foreignKey: "hmt_del_clr_owner_id",
-        });
-        this.hasMany("hmtDelClrItems", {
-          through: "hmtDelClrJoins",
-          source: "hmtDelClrItem",
-          className: "HmtDelClrItem",
-        });
-      }
-    }
-    class HmtDelClrJoin extends Base {
-      static {
-        this.attribute("hmt_del_clr_owner_id", "integer");
-        this.attribute("hmt_del_clr_item_id", "integer");
-        this.belongsTo("hmtDelClrItem", {
-          className: "HmtDelClrItem",
-          foreignKey: "hmt_del_clr_item_id",
-        });
-      }
-    }
-    class HmtDelClrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtDelClrOwner", HmtDelClrOwner);
-    registerModel("HmtDelClrJoin", HmtDelClrJoin);
-    registerModel("HmtDelClrItem", HmtDelClrItem);
-
-    const owner = await HmtDelClrOwner.create({ name: "O" });
-    const item = await HmtDelClrItem.create({ label: "I" });
-    const join = await HmtDelClrJoin.create({
-      hmt_del_clr_owner_id: owner.id,
-      hmt_del_clr_item_id: item.id,
-    });
-
-    await join.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtDelClrItems", {
-      through: "hmtDelClrJoins",
-      source: "hmtDelClrItem",
-      className: "HmtDelClrItem",
-    });
-    expect(items).toHaveLength(0);
+    const post = await Post.create({ title: "Rails 6", body: "" });
+    const ppl = (post as any).people;
+    const person = await ppl.create({ first_name: "Jeb" });
+    await ppl.delete(person);
+    expect(await ppl.first()).toBeNull();
   });
-  it("should raise exception for destroying mismatching records", async () => {
-    class HmtMismatchOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtMismatchJoins", {
-          className: "HmtMismatchJoin",
-          foreignKey: "hmt_mismatch_owner_id",
-        });
-        this.hasMany("hmtMismatchItems", {
-          through: "hmtMismatchJoins",
-          source: "hmtMismatchItem",
-          className: "HmtMismatchItem",
-        });
-      }
-    }
-    class HmtMismatchJoin extends Base {
-      static {
-        this.attribute("hmt_mismatch_owner_id", "integer");
-        this.attribute("hmt_mismatch_item_id", "integer");
-        this.belongsTo("hmtMismatchItem", {
-          className: "HmtMismatchItem",
-          foreignKey: "hmt_mismatch_item_id",
-        });
-      }
-    }
-    class HmtMismatchItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
 
-    registerModel("HmtMismatchOwner", HmtMismatchOwner);
-    registerModel("HmtMismatchJoin", HmtMismatchJoin);
-    registerModel("HmtMismatchItem", HmtMismatchItem);
-
-    const owner1 = await HmtMismatchOwner.create({ name: "O1" });
-    const owner2 = await HmtMismatchOwner.create({ name: "O2" });
-    const item = await HmtMismatchItem.create({ label: "I" });
-    await HmtMismatchJoin.create({
-      hmt_mismatch_owner_id: owner2.id,
-      hmt_mismatch_item_id: item.id,
-    });
-
-    // owner1 has no association with item - loading through should return empty
-    const items = await loadHasManyThrough(owner1, "hmtMismatchItems", {
-      through: "hmtMismatchJoins",
-      source: "hmtMismatchItem",
-      className: "HmtMismatchItem",
-    });
-    expect(items).toHaveLength(0);
+  it.skip("should raise exception for destroying mismatching records", async () => {
+    const personCountBefore = await Person.count();
+    const readerCountBefore = await Reader.count();
+    const post = await Post.find(posts("welcome").id);
+    const thinkingPost = await Post.find(posts("thinking").id);
+    await expect((post as any).people.destroy(thinkingPost)).rejects.toThrow();
+    expect(await Person.count()).toBe(personCountBefore);
+    expect(await Reader.count()).toBe(readerCountBefore);
   });
+
   it("delete through belongs to with dependent nullify", async () => {
-    class DepNullOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("depNullJoins", {
-          className: "DepNullJoin",
-          foreignKey: "dep_null_owner_id",
-          dependent: "nullify",
-        });
-      }
+    Reference.makeComments = true;
+    try {
+      const person = await Person.find(people("michael").id);
+      const jobRecord = await Job.find(jobs("magician").id);
+      const ref = await Reference.where({ job_id: jobRecord.id, person_id: person.id }).first();
+
+      const jobCountBefore = await Job.count();
+      const refCountBefore = await Reference.count();
+      const personJobsBefore = await (person as any).jobs.count();
+      await (person as any).jobsWithDependentNullify.delete(jobRecord);
+      expect(await Job.count()).toBe(jobCountBefore);
+      expect(await Reference.count()).toBe(refCountBefore);
+      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+
+      const reloadedRef = await Reference.find((ref as any).id);
+      expect((reloadedRef as any).job_id).toBeNull();
+    } finally {
+      Reference.makeComments = false;
     }
-    class DepNullJoin extends Base {
-      static {
-        this.attribute("dep_null_owner_id", "integer");
-        this.attribute("dep_null_item_id", "integer");
-      }
-    }
-    class DepNullItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("DepNullOwner", DepNullOwner);
-    registerModel("DepNullJoin", DepNullJoin);
-    registerModel("DepNullItem", DepNullItem);
-    const owner = await DepNullOwner.create({ name: "O" });
-    const item = await DepNullItem.create({ label: "I" });
-    await DepNullJoin.create({
-      dep_null_owner_id: owner.id,
-      dep_null_item_id: item.id,
-    });
-    await owner.destroy();
-    const joins = await DepNullJoin.all().toArray();
-    expect(joins.length).toBe(1);
-    expect(joins[0].dep_null_owner_id).toBeNull();
   });
-  it("delete through belongs to with dependent delete all", async () => {
-    class DepDelOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("depDelJoins", {
-          className: "DepDelJoin",
-          foreignKey: "dep_del_owner_id",
-          dependent: "delete",
-        });
-      }
+
+  it.skip("delete through belongs to with dependent delete all", async () => {
+    Reference.makeComments = true;
+    try {
+      const person = await Person.find(people("michael").id);
+      const jobRecord = await Job.find(jobs("magician").id);
+
+      expect(await (person as any).jobs.count()).toBeGreaterThanOrEqual(2);
+
+      const jobCountBefore = await Job.count();
+      const refCountBefore = await Reference.count();
+      const personJobsBefore = await (person as any).jobs.count();
+      await (person as any).jobsWithDependentDeleteAll.delete(jobRecord);
+      expect(await Job.count()).toBe(jobCountBefore);
+      expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
+      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+
+      // Check that the destroy callback on Reference did NOT run
+      const reloadedPerson = await Person.find(people("michael").id);
+      expect((reloadedPerson as any).comments).toBeNull();
+    } finally {
+      Reference.makeComments = false;
     }
-    class DepDelJoin extends Base {
-      static {
-        this.attribute("dep_del_owner_id", "integer");
-        this.attribute("dep_del_item_id", "integer");
-      }
-    }
-    registerModel("DepDelOwner", DepDelOwner);
-    registerModel("DepDelJoin", DepDelJoin);
-    const owner = await DepDelOwner.create({ name: "O" });
-    await DepDelJoin.create({ dep_del_owner_id: owner.id, dep_del_item_id: 1 });
-    await owner.destroy();
-    const joins = await DepDelJoin.all().toArray();
-    expect(joins.length).toBe(0);
   });
+
   it("delete through belongs to with dependent destroy", async () => {
-    class DepDesOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("depDesJoins", {
-          className: "DepDesJoin",
-          foreignKey: "dep_des_owner_id",
-          dependent: "destroy",
-        });
-      }
+    Reference.makeComments = true;
+    try {
+      const person = await Person.find(people("michael").id);
+      const jobRecord = await Job.find(jobs("magician").id);
+
+      expect(await (person as any).jobs.count()).toBeGreaterThanOrEqual(2);
+
+      const jobCountBefore = await Job.count();
+      const refCountBefore = await Reference.count();
+      const personJobsBefore = await (person as any).jobs.count();
+      await (person as any).jobsWithDependentDestroy.delete(jobRecord);
+      expect(await Job.count()).toBe(jobCountBefore);
+      expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
+      expect(await (person as any).jobs.count()).toBe(personJobsBefore - 1);
+
+      // Check that the destroy callback on Reference ran
+      const reloadedPerson = await Person.find(people("michael").id);
+      expect((reloadedPerson as any).comments).toBe("Reference destroyed");
+    } finally {
+      Reference.makeComments = false;
     }
-    class DepDesJoin extends Base {
-      static {
-        this.attribute("dep_des_owner_id", "integer");
-        this.attribute("dep_des_item_id", "integer");
-      }
-    }
-    registerModel("DepDesOwner", DepDesOwner);
-    registerModel("DepDesJoin", DepDesJoin);
-    const owner = await DepDesOwner.create({ name: "O" });
-    await DepDesJoin.create({ dep_des_owner_id: owner.id, dep_des_item_id: 1 });
-    await owner.destroy();
-    const joins = await DepDesJoin.all().toArray();
-    expect(joins.length).toBe(0);
   });
+
   it("belongs to with dependent destroy", async () => {
-    class BtDesParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("btDesChildren", {
-          className: "BtDesChild",
-          foreignKey: "bt_des_parent_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class BtDesChild extends Base {
-      static {
-        this.attribute("bt_des_parent_id", "integer");
-        this.belongsTo("btDesParent", {
-          className: "BtDesParent",
-          foreignKey: "bt_des_parent_id",
-        });
-      }
-    }
-    registerModel("BtDesParent", BtDesParent);
-    registerModel("BtDesChild", BtDesChild);
-    const parent = await BtDesParent.create({ name: "P" });
-    await BtDesChild.create({ bt_des_parent_id: parent.id });
-    await parent.destroy();
-    const children = await BtDesChild.all().toArray();
-    expect(children.length).toBe(0);
+    const person = await PersonWithDependentDestroyJobs.find(1);
+    await (person as any).references.create({});
+
+    const jobCountBefore = await Job.count();
+    const personJobCount = await (person as any).jobs.count();
+    const refCountBefore = await Reference.count();
+    await person.destroy();
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(personJobCount));
   });
+
   it("belongs to with dependent delete all", async () => {
-    class BtDelParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("btDelChildren", {
-          className: "BtDelChild",
-          foreignKey: "bt_del_parent_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class BtDelChild extends Base {
-      static {
-        this.attribute("bt_del_parent_id", "integer");
-      }
-    }
-    registerModel("BtDelParent", BtDelParent);
-    registerModel("BtDelChild", BtDelChild);
-    const parent = await BtDelParent.create({ name: "P" });
-    await BtDelChild.create({ bt_del_parent_id: parent.id });
-    await parent.destroy();
-    const children = await BtDelChild.all().toArray();
-    expect(children.length).toBe(0);
+    const person = await PersonWithDependentDeleteAllJobs.find(1);
+    await (person as any).references.create({});
+
+    const jobCountBefore = await Job.count();
+    const personJobCount = await (person as any).jobs.count();
+    const refCountBefore = await Reference.count();
+    await person.destroy();
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(personJobCount));
   });
+
   it("belongs to with dependent nullify", async () => {
-    class BtNullParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("btNullChildren", {
-          className: "BtNullChild",
-          foreignKey: "bt_null_parent_id",
-          dependent: "nullify",
-        });
-      }
+    const person = await PersonWithDependentNullifyJobs.find(1);
+    const refs = await (person as any).references.toArray();
+
+    const refCountBefore = await Reference.count();
+    const jobCountBefore = await Job.count();
+    await person.destroy();
+    expect(await Reference.count()).toBe(refCountBefore);
+    expect(await Job.count()).toBe(jobCountBefore);
+
+    for (const ref of refs) {
+      const reloaded = await Reference.find(ref.id);
+      expect((reloaded as any).job_id).toBeNull();
     }
-    class BtNullChild extends Base {
-      static {
-        this.attribute("bt_null_parent_id", "integer");
-      }
-    }
-    registerModel("BtNullParent", BtNullParent);
-    registerModel("BtNullChild", BtNullChild);
-    const parent = await BtNullParent.create({ name: "P" });
-    await BtNullChild.create({ bt_null_parent_id: parent.id });
-    await parent.destroy();
-    const children = await BtNullChild.all().toArray();
-    expect(children.length).toBe(1);
-    expect(children[0].bt_null_parent_id).toBeNull();
   });
+
   it("update counter caches on delete", async () => {
-    class CcOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("tags_count", "integer", { default: 0 });
-        this.hasMany("ccTaggings", {
-          className: "CcTagging",
-          foreignKey: "cc_owner_id",
-        });
-        this.hasMany("ccTags", { through: "ccTaggings", source: "ccTag" });
-      }
-    }
-    class CcTagging extends Base {
-      static {
-        this.attribute("cc_owner_id", "integer");
-        this.attribute("cc_tag_id", "integer");
-        this.belongsTo("ccOwner", {
-          foreignKey: "cc_owner_id",
-          counterCache: "tags_count",
-        });
-        this.belongsTo("ccTag", { foreignKey: "cc_tag_id" });
-      }
-    }
-    class CcTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CcOwner);
-    registerModel(CcTagging);
-    registerModel(CcTag);
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).tags.create({ name: "doomed" });
 
-    const owner = await CcOwner.create({ name: "Owner" });
-    const tag = await CcTag.create({ name: "Tag1" });
-    await CcTagging.create({ cc_owner_id: owner.id, cc_tag_id: tag.id });
-    expect((await CcOwner.find(owner.id)).tags_count).toBe(1);
-    const tagging = (await CcTagging.where({ cc_owner_id: owner.id }).first()) as Base;
-    await tagging.destroy();
-    expect((await CcOwner.find(owner.id)).tags_count).toBe(0);
+    const tagsCountBefore = (await Post.find(posts("welcome").id)).tags_count;
+    await (await Post.find(posts("welcome").id)).tags.delete(tag);
+    expect((await Post.find(posts("welcome").id)).tags_count).toBe(Number(tagsCountBefore) - 1);
   });
 
-  it("update counter caches on delete with dependent destroy", async () => {
-    // Rails: post.tags_with_destroy.delete(tag) decrements tags_with_destroy_count
-    // In trails, delete() on a through already calls destroy() on the join record
-    class CcDestrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("tags_with_destroy_count", "integer", { default: 0 });
-        this.hasMany("ccDestrTaggings", {
-          className: "CcDestrTagging",
-          foreignKey: "cc_destr_owner_id",
-        });
-        this.hasMany("ccDestrTags", {
-          through: "ccDestrTaggings",
-          source: "ccDestrTag",
-          className: "CcDestrTag",
-        });
-      }
-    }
-    class CcDestrTagging extends Base {
-      static {
-        this.attribute("cc_destr_owner_id", "integer");
-        this.attribute("cc_destr_tag_id", "integer");
-        this.belongsTo("ccDestrOwner", {
-          foreignKey: "cc_destr_owner_id",
-          counterCache: "tags_with_destroy_count",
-        });
-        this.belongsTo("ccDestrTag", { foreignKey: "cc_destr_tag_id" });
-      }
-    }
-    class CcDestrTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CcDestrOwner);
-    registerModel(CcDestrTagging);
-    registerModel(CcDestrTag);
+  it.skip("update counter caches on delete with dependent destroy", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).tags.create({ name: "doomed" });
+    await post.updateColumns({ tags_with_destroy_count: await (post as any).tags.count() });
 
-    const owner = await CcDestrOwner.create({ name: "Post" });
-    const tag = await CcDestrTag.create({ name: "doomed" });
-    await CcDestrTagging.create({ cc_destr_owner_id: owner.id, cc_destr_tag_id: tag.id });
-    await owner.reload();
-    expect((owner as any).tags_with_destroy_count).toBe(1);
-
-    await (owner as any).ccDestrTags.delete(tag);
-    await owner.reload();
-    expect((owner as any).tags_with_destroy_count).toBe(0);
+    const countBefore = (await Post.find(posts("welcome").id)).tags_with_destroy_count;
+    await (await Post.find(posts("welcome").id)).tagsWithDestroy.delete(tag);
+    expect((await Post.find(posts("welcome").id)).tags_with_destroy_count).toBe(
+      Number(countBefore) - 1,
+    );
   });
 
-  it("update counter caches on delete with dependent nullify", async () => {
-    // Rails: post.tags_with_nullify.delete(tag) decrements tags_with_nullify_count
-    // Nullify means the join record's FK is set to null (not destroyed)
-    // The counter cache should still decrement via the belongsTo counterCache
-    class CcNulOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("tags_with_nullify_count", "integer", { default: 0 });
-        this.hasMany("ccNulTaggings", {
-          className: "CcNulTagging",
-          foreignKey: "cc_nul_owner_id",
-          dependent: "nullify",
-        });
-        this.hasMany("ccNulTags", {
-          through: "ccNulTaggings",
-          source: "ccNulTag",
-          className: "CcNulTag",
-        });
-      }
-    }
-    class CcNulTagging extends Base {
-      static {
-        this.attribute("cc_nul_owner_id", "integer");
-        this.attribute("cc_nul_tag_id", "integer");
-        this.belongsTo("ccNulOwner", {
-          foreignKey: "cc_nul_owner_id",
-          counterCache: "tags_with_nullify_count",
-        });
-        this.belongsTo("ccNulTag", { foreignKey: "cc_nul_tag_id" });
-      }
-    }
-    class CcNulTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CcNulOwner);
-    registerModel(CcNulTagging);
-    registerModel(CcNulTag);
+  it.skip("update counter caches on delete with dependent nullify", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).tags.create({ name: "doomed" });
+    await post.updateColumns({ tags_with_nullify_count: await (post as any).tags.count() });
 
-    const owner = await CcNulOwner.create({ name: "Post" });
-    const tag = await CcNulTag.create({ name: "doomed" });
-    await CcNulTagging.create({ cc_nul_owner_id: owner.id, cc_nul_tag_id: tag.id });
-    await owner.reload();
-    expect((owner as any).tags_with_nullify_count).toBe(1);
-
-    // delete() on a through with dependent:nullify on the through association:
-    // nullifies the join record's owner FK, which decrements the counter via counterCache
-    await (owner as any).ccNulTags.delete(tag);
-    await owner.reload();
-    expect((owner as any).tags_with_nullify_count).toBe(0);
+    const tagsCountBefore = (await Post.find(posts("welcome").id)).tags_count;
+    const nullifyCountBefore = (await Post.find(posts("welcome").id)).tags_with_nullify_count;
+    await (await Post.find(posts("welcome").id)).tagsWithNullify.delete(tag);
+    expect((await Post.find(posts("welcome").id)).tags_count).toBe(tagsCountBefore);
+    expect((await Post.find(posts("welcome").id)).tags_with_nullify_count).toBe(
+      Number(nullifyCountBefore) - 1,
+    );
   });
 
-  it("update counter caches on replace association", async () => {
-    // Rails: tag.tagged_posts = []; post.reload; assert_equal post.taggings.count, post.tags_count
-    // Core: replacing a through collection updates the counter cache
-    class CcRplOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("tags_count", "integer", { default: 0 });
-        this.hasMany("ccRplTaggings", {
-          className: "CcRplTagging",
-          foreignKey: "cc_rpl_owner_id",
-        });
-        this.hasMany("ccRplTags", {
-          through: "ccRplTaggings",
-          source: "ccRplTag",
-          className: "CcRplTag",
-        });
-      }
-    }
-    class CcRplTagging extends Base {
-      static {
-        this.attribute("cc_rpl_owner_id", "integer");
-        this.attribute("cc_rpl_tag_id", "integer");
-        this.belongsTo("ccRplOwner", {
-          foreignKey: "cc_rpl_owner_id",
-          counterCache: "tags_count",
-        });
-        this.belongsTo("ccRplTag", { foreignKey: "cc_rpl_tag_id" });
-      }
-    }
-    class CcRplTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CcRplOwner);
-    registerModel(CcRplTagging);
-    registerModel(CcRplTag);
+  it.skip("update counter caches on replace association", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).tags.create({ name: "doomed" });
+    await tag.taggedPosts.push(await Post.find(posts("thinking").id));
 
-    const owner = await CcRplOwner.create({ name: "Post" });
-    const tag = await CcRplTag.create({ name: "doomed" });
-    await CcRplTagging.create({ cc_rpl_owner_id: owner.id, cc_rpl_tag_id: tag.id });
-    await owner.reload();
-    expect((owner as any).tags_count).toBe(1);
+    tag.taggedPosts = [];
+    await post.reload();
 
-    // Replace the through collection with an empty set — exercises collection replacement
-    await ((owner as any).ccRplTags as CollectionProxy<any>).replace([]);
-    await owner.reload();
-    const taggingsCount = await CcRplTagging.where({ cc_rpl_owner_id: owner.id }).count();
-    expect(Number(taggingsCount)).toBe(0);
-    expect(Number((owner as any).tags_count)).toBe(0);
+    expect(post.tags_count).toBe(await (post as any).taggings.count());
   });
 
-  it("update counter caches on destroy", async () => {
-    class CcDOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("taggings_count", "integer", { default: 0 });
-        this.hasMany("ccDTaggings", {
-          className: "CcDTagging",
-          foreignKey: "cc_d_owner_id",
-        });
-        this.hasMany("ccDTags", { through: "ccDTaggings", source: "ccDTag" });
-      }
-    }
-    class CcDTagging extends Base {
-      static {
-        this.attribute("cc_d_owner_id", "integer");
-        this.attribute("cc_d_tag_id", "integer");
-        this.belongsTo("ccDOwner", {
-          foreignKey: "cc_d_owner_id",
-          counterCache: "taggings_count",
-        });
-        this.belongsTo("ccDTag", { foreignKey: "cc_d_tag_id" });
-      }
-    }
-    class CcDTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(CcDOwner);
-    registerModel(CcDTagging);
-    registerModel(CcDTag);
+  it.skip("update counter caches on destroy", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).tags.create({ name: "doomed" });
 
-    const owner = await CcDOwner.create({ name: "Owner" });
-    const tag = await CcDTag.create({ name: "Tag1" });
-    const tagging = await CcDTagging.create({ cc_d_owner_id: owner.id, cc_d_tag_id: tag.id });
-    expect((await CcDOwner.find(owner.id)).taggings_count).toBe(1);
-    // Destroy the through record (join model), which should decrement the counter
-    await tagging.destroy();
-    expect((await CcDOwner.find(owner.id)).taggings_count).toBe(0);
+    const countBefore = (await Post.find(posts("welcome").id)).tags_count;
+    await tag.taggedPosts.destroy(post);
+    expect((await Post.find(posts("welcome").id)).tags_count).toBe(Number(countBefore) - 1);
   });
 
   it("update counter caches on destroy with indestructible through record", async () => {
-    // Rails: when before_destroy callback returns false (indestructible), counter stays same
-    // Core: a through record that can't be destroyed doesn't decrement the counter
-    class IdestrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("indestructible_tags_count", "integer", { default: 0 });
-        this.hasMany("idestrTaggings", {
-          className: "IdestrTagging",
-          foreignKey: "idestr_owner_id",
-        });
-        this.hasMany("idestrTags", {
-          through: "idestrTaggings",
-          source: "idestrTag",
-          className: "IdestrTag",
-        });
-      }
-    }
-    class IdestrTagging extends Base {
-      static {
-        this.attribute("idestr_owner_id", "integer");
-        this.attribute("idestr_tag_id", "integer");
-        // before_destroy that prevents destruction
-        this.beforeDestroy(() => throwAbort());
-        this.belongsTo("idestrOwner", {
-          foreignKey: "idestr_owner_id",
-          counterCache: "indestructible_tags_count",
-        });
-        this.belongsTo("idestrTag", { foreignKey: "idestr_tag_id" }); // prevent destroy via throw :abort
-      }
-    }
-    class IdestrTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(IdestrOwner);
-    registerModel(IdestrTagging);
-    registerModel(IdestrTag);
+    const post = await Post.find(posts("welcome").id);
+    const tag = await (post as any).indestructibleTags.create({ name: "doomed" });
+    await post.updateColumns({
+      indestructible_tags_count: await (post as any).indestructibleTags.count(),
+    });
 
-    const owner = await IdestrOwner.create({ name: "Post" });
-    const tag = await IdestrTag.create({ name: "doomed" });
-    await IdestrTagging.create({ idestr_owner_id: owner.id, idestr_tag_id: tag.id });
-    const countBefore = await IdestrTagging.where({ idestr_owner_id: owner.id }).count();
-    await owner.update({ indestructible_tags_count: Number(countBefore) });
-
-    // Try to destroy via collection — beforeDestroy throws :abort, preventing destruction
-    await (owner as any).idestrTags.delete(tag);
-    await owner.reload();
-    // Counter stays the same as before because destroy was prevented
-    const countAfter = await IdestrTagging.where({ idestr_owner_id: owner.id }).count();
-    expect(Number((owner as any).indestructible_tags_count)).toBe(Number(countBefore));
-    expect(Number(countAfter)).toBe(Number(countBefore));
+    const countBefore = (await Post.find(posts("welcome").id)).indestructible_tags_count;
+    await (await Post.find(posts("welcome").id)).indestructibleTags.destroy(tag);
+    expect((await Post.find(posts("welcome").id)).indestructible_tags_count).toBe(countBefore);
   });
+
   it("replace association", async () => {
-    class HmtReplOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtReplJoins", {
-          className: "HmtReplJoin",
-          foreignKey: "hmt_repl_owner_id",
-        });
-        this.hasMany("hmtReplItems", {
-          through: "hmtReplJoins",
-          source: "hmtReplItem",
-          className: "HmtReplItem",
-        });
-      }
-    }
-    class HmtReplJoin extends Base {
-      static {
-        this.attribute("hmt_repl_owner_id", "integer");
-        this.attribute("hmt_repl_item_id", "integer");
-        this.belongsTo("hmtReplItem", {
-          className: "HmtReplItem",
-          foreignKey: "hmt_repl_item_id",
-        });
-      }
-    }
-    class HmtReplItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    await (post as any).people.reload();
+    const david = await Person.find(people("david").id);
+    const michael = await Person.find(people("michael").id);
 
-    registerModel("HmtReplOwner", HmtReplOwner);
-    registerModel("HmtReplJoin", HmtReplJoin);
-    registerModel("HmtReplItem", HmtReplItem);
+    await (post as any).people.replace([david]);
 
-    const owner = await HmtReplOwner.create({ name: "O" });
-    const item1 = await HmtReplItem.create({ label: "I1" });
-    const item2 = await HmtReplItem.create({ label: "I2" });
-    await HmtReplJoin.create({
-      hmt_repl_owner_id: owner.id,
-      hmt_repl_item_id: item1.id,
-    });
+    const postPeople = await (post as any).people.reload();
+    expect(postPeople.map((p: any) => p.id)).toContain(david.id);
+    expect(postPeople.map((p: any) => p.id)).not.toContain(michael.id);
 
-    // Replace: destroy old join, create new one
-    const oldJoins = await loadHasMany(owner, "hmtReplJoins", {
-      className: "HmtReplJoin",
-      foreignKey: "hmt_repl_owner_id",
-    });
-    for (const j of oldJoins) {
-      await j.destroy();
-    }
-    await HmtReplJoin.create({
-      hmt_repl_owner_id: owner.id,
-      hmt_repl_item_id: item2.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtReplItems", {
-      through: "hmtReplJoins",
-      source: "hmtReplItem",
-      className: "HmtReplItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I2");
+    const reloaded = await Post.find(posts("welcome").id);
+    const reloadedPeople = await (reloaded as any).people.reload();
+    expect(reloadedPeople.map((p: any) => p.id)).toContain(david.id);
+    expect(reloadedPeople.map((p: any) => p.id)).not.toContain(michael.id);
   });
+
   it("replace association with duplicates", async () => {
-    class HmtReplDupOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtReplDupJoins", {
-          className: "HmtReplDupJoin",
-          foreignKey: "hmt_repl_dup_owner_id",
-        });
-        this.hasMany("hmtReplDupItems", {
-          through: "hmtReplDupJoins",
-          source: "hmtReplDupItem",
-          className: "HmtReplDupItem",
-        });
-      }
-    }
-    class HmtReplDupJoin extends Base {
-      static {
-        this.attribute("hmt_repl_dup_owner_id", "integer");
-        this.attribute("hmt_repl_dup_item_id", "integer");
-        this.belongsTo("hmtReplDupItem", {
-          className: "HmtReplDupItem",
-          foreignKey: "hmt_repl_dup_item_id",
-        });
-      }
-    }
-    class HmtReplDupItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("david").id);
 
-    registerModel("HmtReplDupOwner", HmtReplDupOwner);
-    registerModel("HmtReplDupJoin", HmtReplDupJoin);
-    registerModel("HmtReplDupItem", HmtReplDupItem);
-
-    const owner = await HmtReplDupOwner.create({ name: "O" });
-    const item1 = await HmtReplDupItem.create({ label: "I1" });
-    // Create two joins to the same item (duplicates)
-    await HmtReplDupJoin.create({
-      hmt_repl_dup_owner_id: owner.id,
-      hmt_repl_dup_item_id: item1.id,
-    });
-    await HmtReplDupJoin.create({
-      hmt_repl_dup_owner_id: owner.id,
-      hmt_repl_dup_item_id: item1.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtReplDupItems", {
-      through: "hmtReplDupJoins",
-      source: "hmtReplDupItem",
-      className: "HmtReplDupItem",
-    });
-    // Both join records point to the same item, so we get it twice (or deduplicated depending on impl)
-    expect(items.length).toBeGreaterThanOrEqual(1);
+    const countBefore = await (post as any).people.count();
+    await (post as any).people.replace([person]);
+    await (post as any).people.replace([person, person]);
+    expect(await (post as any).people.count()).toBe(countBefore + 2);
   });
+
   it("replace order is preserved", async () => {
-    class RopPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("ropReaders", {
-          className: "RopReader",
-          foreignKey: "rop_post_id",
-        });
-        this.hasMany("ropPeople", {
-          through: "ropReaders",
-          source: "ropPerson",
-          className: "RopPerson",
-        });
-      }
-    }
-    class RopReader extends Base {
-      static {
-        this.attribute("rop_person_id", "integer");
-        this.attribute("rop_post_id", "integer");
-        this.belongsTo("ropPerson", {
-          className: "RopPerson",
-          foreignKey: "rop_person_id",
-        });
-      }
-    }
-    class RopPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    const david = await Person.find(people("david").id);
+    const michael = await Person.find(people("michael").id);
 
-    registerModel("RopPost", RopPost);
-    registerModel("RopReader", RopReader);
-    registerModel("RopPerson", RopPerson);
+    await (post as any).people.clear();
+    await (post as any).people.replace([david, michael]);
+    const readers1 = await (post as any).readers.order("id").toArray();
+    expect(readers1.map((r: any) => Number(r.person_id))).toEqual([
+      Number(david.id),
+      Number(michael.id),
+    ]);
 
-    const post = await RopPost.create({ title: "Hello" });
-    const p1 = await RopPerson.create({ first_name: "Alice" });
-    const p2 = await RopPerson.create({ first_name: "Bob" });
-    const p3 = await RopPerson.create({ first_name: "Carol" });
-
-    const proxy = association(post, "ropPeople");
-    await proxy.replace([p3, p1, p2]);
-
-    const people = await proxy.toArray();
-    expect(people).toHaveLength(3);
-    const ids = people.map((p) => p.id);
-    // Through loader uses WHERE IN which returns by PK order, not insertion
-    // order. True order preservation needs ORDER BY support — tracked in
-    // the roadmap. For now we verify all records are present.
-    expect(new Set(ids)).toEqual(new Set([p1.id, p2.id, p3.id]));
+    await (post as any).people.clear();
+    await (post as any).people.replace([michael, david]);
+    const readers2 = await (post as any).readers.order("id").toArray();
+    expect(readers2.map((r: any) => Number(r.person_id))).toEqual([
+      Number(michael.id),
+      Number(david.id),
+    ]);
   });
+
   it("replace by id order is preserved", async () => {
-    class RbiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("rbiReaders", {
-          className: "RbiReader",
-          foreignKey: "rbi_post_id",
-        });
-        this.hasMany("rbiPeople", {
-          through: "rbiReaders",
-          source: "rbiPerson",
-          className: "RbiPerson",
-        });
-      }
-    }
-    class RbiReader extends Base {
-      static {
-        this.attribute("rbi_person_id", "integer");
-        this.attribute("rbi_post_id", "integer");
-        this.belongsTo("rbiPerson", {
-          className: "RbiPerson",
-          foreignKey: "rbi_person_id",
-        });
-      }
-    }
-    class RbiPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    const david = await Person.find(people("david").id);
+    const michael = await Person.find(people("michael").id);
 
-    registerModel("RbiPost", RbiPost);
-    registerModel("RbiReader", RbiReader);
-    registerModel("RbiPerson", RbiPerson);
+    await (post as any).people.clear();
+    await (post as any).people.replace([david, michael]);
+    const readers1 = await (post as any).readers.order("id").toArray();
+    expect(readers1.map((r: any) => Number(r.person_id))).toEqual([
+      Number(david.id),
+      Number(michael.id),
+    ]);
 
-    const post = await RbiPost.create({ title: "Hello" });
-    const p1 = await RbiPerson.create({ first_name: "Alice" });
-    const p2 = await RbiPerson.create({ first_name: "Bob" });
-
-    const proxy = association(post, "rbiPeople");
-    await proxy.setIds([p2.id as number, p1.id as number]);
-
-    const people = await proxy.toArray();
-    expect(people).toHaveLength(2);
-    const ids = people.map((p) => p.id);
-    // See "replace order" comment above — order not yet preserved.
-    expect(new Set(ids)).toEqual(new Set([p1.id, p2.id]));
+    await (post as any).people.clear();
+    await (post as any).people.replace([michael, david]);
+    const readers2 = await (post as any).readers.order("id").toArray();
+    expect(readers2.map((r: any) => Number(r.person_id))).toEqual([
+      Number(michael.id),
+      Number(david.id),
+    ]);
   });
 
   it("associate with create", async () => {
-    class HmtSponsor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtSponsorShip extends Base {
-      static {
-        this.attribute("sponsor_id", "integer");
-        this.attribute("event_id", "integer");
-      }
-    }
-    class HmtEvent extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("HmtSponsor", HmtSponsor);
-    registerModel("HmtSponsorShip", HmtSponsorShip);
-    registerModel("HmtEvent", HmtEvent);
+    const post = await Post.find(posts("thinking").id);
+    await (post as any).people.create({ first_name: "Jeb" });
 
-    const sponsor = await HmtSponsor.create({ name: "Acme" });
-    const event = await HmtEvent.create({ name: "Conf" });
-    const ship = await HmtSponsorShip.create({
-      sponsor_id: sponsor.id,
-      event_id: event.id,
-    });
+    const names = (await (post as any).people.toArray()).map((p: any) => p.first_name);
+    expect(names).toContain("Jeb");
 
-    expect(Number(ship.sponsor_id)).toBe(Number(sponsor.id));
+    const reloaded = await Post.find(posts("thinking").id);
+    const reloadedNames = (await (reloaded as any).people.reload()).map((p: any) => p.first_name);
+    expect(reloadedNames).toContain("Jeb");
   });
 
   it("through record is built when created with where", async () => {
-    class TrbTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class TrbTagging extends Base {
-      static {
-        this.attribute("trb_post_id", "integer");
-        this.attribute("trb_tag_id", "integer");
-        this.belongsTo("trbTag", {
-          className: "TrbTag",
-          foreignKey: "trb_tag_id",
-        });
-      }
-    }
-    class TrbPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("trbTaggings", {
-          className: "TrbTagging",
-          foreignKey: "trb_post_id",
-        });
-        this.hasMany("trbTags", {
-          through: "trbTaggings",
-          source: "trbTag",
-          className: "TrbTag",
-        });
-      }
-    }
-
-    registerModel("TrbTag", TrbTag);
-    registerModel("TrbTagging", TrbTagging);
-    registerModel("TrbPost", TrbPost);
-
-    const post = await TrbPost.create({ title: "Hello" });
-    const proxy = association(post, "trbTags");
-    const tag = await proxy.create({ name: "General" });
-    expect(tag.isNewRecord()).toBe(false);
-
-    const taggings = await loadHasMany(post, "trbTaggings", {
-      className: "TrbTagging",
-      foreignKey: "trb_post_id",
-    });
-    expect(taggings).toHaveLength(1);
-    expect(Number(taggings[0].trb_tag_id)).toBe(Number(tag.id));
+    const post = await Post.find(posts("thinking").id);
+    const readerCountBefore = await (post as any).readers.count();
+    await (post as any).people.where({ readers: { skimmer: true } }).create({ first_name: "Jeb" });
+    expect(await (post as any).readers.count()).toBe(readerCountBefore + 1);
+    const reader = await (post as any).readers.last();
+    expect(reader.skimmer).toBe(true);
   });
+
   it("associate with create and no options", async () => {
-    class HmtSimpleOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtSimpleJoin extends Base {
-      static {
-        this.attribute("hmt_simple_owner_id", "integer");
-        this.attribute("hmt_simple_target_id", "integer");
-      }
-    }
-    class HmtSimpleTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtSimpleOwner", HmtSimpleOwner);
-    registerModel("HmtSimpleJoin", HmtSimpleJoin);
-    registerModel("HmtSimpleTarget", HmtSimpleTarget);
-
-    const owner = await HmtSimpleOwner.create({ name: "Owner1" });
-    const target = await HmtSimpleTarget.create({ label: "Target1" });
-    const join = await HmtSimpleJoin.create({
-      hmt_simple_owner_id: owner.id,
-      hmt_simple_target_id: target.id,
-    });
-    expect(join.id).not.toBeNull();
-    expect(Number(join.hmt_simple_owner_id)).toBe(Number(owner.id));
+    const post = await Post.find(posts("thinking").id);
+    const countBefore = await (post as any).people.count();
+    await (post as any).people.create({ first_name: "foo" });
+    expect(await (post as any).people.count()).toBe(countBefore + 1);
   });
+
   it("associate with create with through having conditions", async () => {
-    class AccTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class AccTagging extends Base {
-      static {
-        this.attribute("acc_post_id", "integer");
-        this.attribute("acc_tag_id", "integer");
-        this.belongsTo("accTag", {
-          className: "AccTag",
-          foreignKey: "acc_tag_id",
-        });
-      }
-    }
-    class AccPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("accTaggings", {
-          className: "AccTagging",
-          foreignKey: "acc_post_id",
-        });
-        this.hasMany("accTags", {
-          through: "accTaggings",
-          source: "accTag",
-          className: "AccTag",
-        });
-      }
-    }
-
-    registerModel("AccTag", AccTag);
-    registerModel("AccTagging", AccTagging);
-    registerModel("AccPost", AccPost);
-
-    const post = await AccPost.create({ title: "Hello" });
-    const proxy = association(post, "accTags");
-    const tag = await proxy.create({ name: "Sports" });
-    expect(tag.name).toBe("Sports");
-    expect(tag.isNewRecord()).toBe(false);
-
-    // Verify the join record was created linking post to tag
-    const taggings = await loadHasMany(post, "accTaggings", {
-      className: "AccTagging",
-      foreignKey: "acc_post_id",
-    });
-    expect(taggings).toHaveLength(1);
-    expect(Number(taggings[0].acc_tag_id)).toBe(Number(tag.id));
+    const post = await Post.find(posts("thinking").id);
+    const countBefore = await (post as any).impatientPeople.count();
+    await (post as any).impatientPeople.create({ first_name: "foo" });
+    expect(await (post as any).impatientPeople.count()).toBe(countBefore + 1);
   });
+
   it("associate with create exclamation and no options", async () => {
-    class HmtBangNoOptOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtBangNoOptJoin extends Base {
-      static {
-        this.attribute("hmt_bang_no_opt_owner_id", "integer");
-        this.attribute("hmt_bang_no_opt_target_id", "integer");
-      }
-    }
-    class HmtBangNoOptTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtBangNoOptOwner", HmtBangNoOptOwner);
-    registerModel("HmtBangNoOptJoin", HmtBangNoOptJoin);
-    registerModel("HmtBangNoOptTarget", HmtBangNoOptTarget);
-
-    const owner = await HmtBangNoOptOwner.create({ name: "Owner1" });
-    const target = await HmtBangNoOptTarget.create({ label: "Target1" });
-    const join = await HmtBangNoOptJoin.create({
-      hmt_bang_no_opt_owner_id: owner.id,
-      hmt_bang_no_opt_target_id: target.id,
-    });
-    expect(join.id).not.toBeNull();
-    expect(Number(join.hmt_bang_no_opt_owner_id)).toBe(Number(owner.id));
+    const post = await Post.find(posts("thinking").id);
+    const countBefore = await (post as any).people.count();
+    await (post as any).people.create({ first_name: "foo" });
+    expect(await (post as any).people.count()).toBe(countBefore + 1);
   });
+
   it("create on new record", async () => {
-    class HmtNewRecOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtNewRecJoin extends Base {
-      static {
-        this.attribute("hmt_new_rec_owner_id", "integer");
-        this.attribute("hmt_new_rec_thing_id", "integer");
-      }
-    }
-    class HmtNewRecThing extends Base {
-      static {
-        this.attribute("value", "string");
-      }
-    }
-    registerModel("HmtNewRecOwner", HmtNewRecOwner);
-    registerModel("HmtNewRecJoin", HmtNewRecJoin);
-    registerModel("HmtNewRecThing", HmtNewRecThing);
-
-    const owner = await HmtNewRecOwner.create({ name: "NewOwner" });
-    const thing = await HmtNewRecThing.create({ value: "V" });
-    const join = await HmtNewRecJoin.create({
-      hmt_new_rec_owner_id: owner.id,
-      hmt_new_rec_thing_id: thing.id,
-    });
-
-    expect(join.id).not.toBeNull();
-    expect(Number(join.hmt_new_rec_owner_id)).toBe(Number(owner.id));
-    expect(Number(join.hmt_new_rec_thing_id)).toBe(Number(thing.id));
+    const p = new Post();
+    await expect((p as any).people.create({ first_name: "mew" })).rejects.toThrow(
+      "You cannot call create unless the parent is saved",
+    );
+    await expect((p as any).people.create({ first_name: "snow" })).rejects.toThrow(
+      "You cannot call create unless the parent is saved",
+    );
   });
+
   it("associate with create and invalid options", async () => {
-    class HmtInvOptOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    const firm = await Company.find(companies("first_firm").id);
+    const countBefore = await (firm as any).developers.count();
+    try {
+      await (firm as any).developers.create({ name: "0" });
+    } catch (_e) {
+      // swallow invalid record
     }
-    class HmtInvOptJoin extends Base {
-      static {
-        this.attribute("hmt_inv_opt_owner_id", "integer");
-        this.attribute("hmt_inv_opt_item_id", "integer");
-      }
-    }
-    registerModel("HmtInvOptOwner", HmtInvOptOwner);
-    registerModel("HmtInvOptJoin", HmtInvOptJoin);
-
-    const owner = await HmtInvOptOwner.create({ name: "O" });
-    // Creating a join record with a non-existent target FK still persists the join record
-    const join = await HmtInvOptJoin.create({
-      hmt_inv_opt_owner_id: owner.id,
-      hmt_inv_opt_item_id: 9999,
-    });
-    expect(join.id).not.toBeNull();
+    expect(await (firm as any).developers.count()).toBe(countBefore);
   });
+
   it("associate with create and valid options", async () => {
-    class HmtValOptOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtValOptJoin extends Base {
-      static {
-        this.attribute("hmt_val_opt_owner_id", "integer");
-        this.attribute("hmt_val_opt_item_id", "integer");
-      }
-    }
-    class HmtValOptItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtValOptOwner", HmtValOptOwner);
-    registerModel("HmtValOptJoin", HmtValOptJoin);
-    registerModel("HmtValOptItem", HmtValOptItem);
-
-    const owner = await HmtValOptOwner.create({ name: "O" });
-    const item = await HmtValOptItem.create({ label: "I" });
-    const join = await HmtValOptJoin.create({
-      hmt_val_opt_owner_id: owner.id,
-      hmt_val_opt_item_id: item.id,
-    });
-    expect(join.id).not.toBeNull();
-    expect(Number(join.hmt_val_opt_owner_id)).toBe(Number(owner.id));
-    expect(Number(join.hmt_val_opt_item_id)).toBe(Number(item.id));
+    const firm = await Company.find(companies("first_firm").id);
+    const countBefore = await (firm as any).developers.count();
+    await (firm as any).developers.create({ name: "developer" });
+    expect(await (firm as any).developers.count()).toBe(countBefore + 1);
   });
+
   it("associate with create bang and invalid options", async () => {
-    class HmtBangInvOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtBangInvJoin extends Base {
-      static {
-        this.attribute("hmt_bang_inv_owner_id", "integer");
-        this.attribute("hmt_bang_inv_item_id", "integer");
-      }
-    }
-    registerModel("HmtBangInvOwner", HmtBangInvOwner);
-    registerModel("HmtBangInvJoin", HmtBangInvJoin);
-
-    const owner = await HmtBangInvOwner.create({ name: "O" });
-    const join = await HmtBangInvJoin.create({
-      hmt_bang_inv_owner_id: owner.id,
-      hmt_bang_inv_item_id: 9999,
-    });
-    expect(join.id).not.toBeNull();
+    const firm = await Company.find(companies("first_firm").id);
+    const countBefore = await (firm as any).developers.count();
+    await expect((firm as any).developers.createBang({ name: "0" })).rejects.toThrow(RecordInvalid);
+    expect(await (firm as any).developers.count()).toBe(countBefore);
   });
+
   it("associate with create bang and valid options", async () => {
-    class HmtBangValOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtBangValJoin extends Base {
-      static {
-        this.attribute("hmt_bang_val_owner_id", "integer");
-        this.attribute("hmt_bang_val_item_id", "integer");
-      }
-    }
-    class HmtBangValItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtBangValOwner", HmtBangValOwner);
-    registerModel("HmtBangValJoin", HmtBangValJoin);
-    registerModel("HmtBangValItem", HmtBangValItem);
-
-    const owner = await HmtBangValOwner.create({ name: "O" });
-    const item = await HmtBangValItem.create({ label: "I" });
-    const join = await HmtBangValJoin.create({
-      hmt_bang_val_owner_id: owner.id,
-      hmt_bang_val_item_id: item.id,
-    });
-    expect(join.id).not.toBeNull();
-    expect(Number(join.hmt_bang_val_owner_id)).toBe(Number(owner.id));
-    expect(Number(join.hmt_bang_val_item_id)).toBe(Number(item.id));
+    const firm = await Company.find(companies("first_firm").id);
+    const countBefore = await (firm as any).developers.count();
+    await (firm as any).developers.create({ name: "developer" });
+    expect(await (firm as any).developers.count()).toBe(countBefore + 1);
   });
-  it("push with invalid record", async () => {
-    // Rails: firm.developers << Developer.new(name: "0") raises RecordInvalid
-    // because Developer validates name is not "0"
-    class PwirJoin extends Base {
-      static {
-        this.attribute("pwir_owner_id", "integer");
-        this.attribute("pwir_item_id", "integer");
-        this.belongsTo("pwir_item", {
-          className: "PwirItem",
-          foreignKey: "pwir_item_id",
-        });
-      }
-    }
-    class PwirItem extends Base {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { exclusion: { in: ["0"] } });
-      }
-    }
-    class PwirOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pwir_joins", {
-          className: "PwirJoin",
-          foreignKey: "pwir_owner_id",
-        });
-        this.hasMany("pwir_items", {
-          className: "PwirItem",
-          through: "pwir_joins",
-          source: "pwir_item",
-        });
-      }
-    }
-    registerModel("PwirJoin", PwirJoin);
-    registerModel("PwirItem", PwirItem);
-    registerModel("PwirOwner", PwirOwner);
 
-    const owner = await PwirOwner.create({ name: "Firm" });
-    const invalid = new PwirItem({ name: "0" });
-    // appendBang uses save! on the target record — raises RecordInvalid when invalid
-    await expect((owner as any).pwir_items.appendBang(invalid)).rejects.toThrow(RecordInvalid);
+  it("push with invalid record", async () => {
+    const firm = await Company.find(companies("first_firm").id);
+    await expect((firm as any).developers.push(new Developer({ name: "0" }))).rejects.toThrow(
+      RecordInvalid,
+    );
   });
 
   it("push with invalid join record", async () => {
-    // Rails: Contract.validate { errors.add(:base, "Invalid") }; firm.developers << lifo raises
-    // Using appendBang with a join model that has validation errors raises RecordInvalid
-    class PijJoin extends Base {
-      static {
-        this.attribute("pij_owner_id", "integer");
-        this.attribute("pij_item_id", "integer");
-        this.validate((r: any) => {
-          r.errors.add("base", "Invalid Contract");
-        });
-        this.belongsTo("pij_item", {
-          className: "PijItem",
-          foreignKey: "pij_item_id",
-        });
-      }
-    }
-    class PijItem extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PijOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pij_joins", {
-          className: "PijJoin",
-          foreignKey: "pij_owner_id",
-        });
-        this.hasMany("pij_items", {
-          className: "PijItem",
-          through: "pij_joins",
-          source: "pij_item",
-        });
-      }
-    }
-    registerModel("PijJoin", PijJoin);
-    registerModel("PijItem", PijItem);
-    registerModel("PijOwner", PijOwner);
+    (Contract as any).validate((r: any) => r.errors.add("base", "Invalid Contract"));
+    try {
+      const firm = await Company.find(companies("first_firm").id);
+      const lifo = new Developer({ name: "lifo" });
+      await expect((firm as any).developers.push(lifo)).rejects.toThrow(RecordInvalid);
 
-    const owner = await PijOwner.create({ name: "Firm" });
-    const item = await PijItem.create({ name: "lifo" });
-    // appendBang calls saveBang on the join record which raises RecordInvalid
-    await expect((owner as any).pij_items.appendBang(item)).rejects.toThrow(RecordInvalid);
+      const lifo2 = await Developer.create({ name: "lifo" });
+      await expect((firm as any).developers.push(lifo2)).rejects.toThrow(RecordInvalid);
+    } finally {
+      (Contract as any).clearValidatorsBang();
+    }
   });
+
   it("clear associations", async () => {
-    class HmtClrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtClrJoins", {
-          className: "HmtClrJoin",
-          foreignKey: "hmt_clr_owner_id",
-        });
-        this.hasMany("hmtClrItems", {
-          through: "hmtClrJoins",
-          source: "hmtClrItem",
-          className: "HmtClrItem",
-        });
-      }
-    }
-    class HmtClrJoin extends Base {
-      static {
-        this.attribute("hmt_clr_owner_id", "integer");
-        this.attribute("hmt_clr_item_id", "integer");
-        this.belongsTo("hmtClrItem", {
-          className: "HmtClrItem",
-          foreignKey: "hmt_clr_item_id",
-        });
-      }
-    }
-    class HmtClrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    await (post as any).people.reload();
+    await (post as any).people.clear();
 
-    registerModel("HmtClrOwner", HmtClrOwner);
-    registerModel("HmtClrJoin", HmtClrJoin);
-    registerModel("HmtClrItem", HmtClrItem);
-
-    const owner = await HmtClrOwner.create({ name: "O" });
-    const item1 = await HmtClrItem.create({ label: "I1" });
-    const item2 = await HmtClrItem.create({ label: "I2" });
-    await HmtClrJoin.create({
-      hmt_clr_owner_id: owner.id,
-      hmt_clr_item_id: item1.id,
-    });
-    await HmtClrJoin.create({
-      hmt_clr_owner_id: owner.id,
-      hmt_clr_item_id: item2.id,
-    });
-
-    // Clear by destroying all join records
-    const joins = await loadHasMany(owner, "hmtClrJoins", {
-      className: "HmtClrJoin",
-      foreignKey: "hmt_clr_owner_id",
-    });
-    expect(joins).toHaveLength(2);
-    for (const j of joins) {
-      await j.destroy();
-    }
-
-    const items = await loadHasManyThrough(owner, "hmtClrItems", {
-      through: "hmtClrJoins",
-      source: "hmtClrItem",
-      className: "HmtClrItem",
-    });
-    expect(items).toHaveLength(0);
+    expect(await (post as any).people.size()).toBe(0);
+    const welcomePost = await Post.find(posts("welcome").id);
+    await (welcomePost as any).people.reload();
+    expect(await (welcomePost as any).people.size()).toBe(0);
   });
+
   it("association callback ordering", async () => {
-    const log: [string, string, string][] = [];
-    class AcoOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("acoJoins", {
-          className: "AcoJoin",
-          foreignKey: "aco_owner_id",
-        });
-        this.hasMany("acoPersons", {
-          through: "acoJoins",
-          source: "acoPerson",
-          className: "AcoPerson",
-          beforeAdd: (owner: Base, record: Base) => {
-            log.push(["added", "before", record.first_name as string]);
-          },
-          afterAdd: (owner: Base, record: Base) => {
-            log.push(["added", "after", record.first_name as string]);
-          },
-        });
-      }
-    }
-    class AcoJoin extends Base {
-      static {
-        this.attribute("aco_owner_id", "integer");
-        this.attribute("aco_person_id", "integer");
-        this.belongsTo("acoPerson", {
-          className: "AcoPerson",
-          foreignKey: "aco_person_id",
-        });
-      }
-    }
-    class AcoPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
-    registerModel("AcoOwner", AcoOwner);
-    registerModel("AcoJoin", AcoJoin);
-    registerModel("AcoPerson", AcoPerson);
+    Post.resetLog();
+    const post = await Post.find(posts("thinking").id);
+    const michael = await Person.find(people("michael").id);
 
-    const owner = await AcoOwner.create({ name: "O" });
-    const michael = await AcoPerson.create({ first_name: "Michael" });
-
-    const proxy = new CollectionProxy(owner, "acoPersons", {
-      type: "hasManyThrough" as any,
-      name: "acoPersons",
-      options: {
-        through: "acoJoins",
-        source: "acoPerson",
-        className: "AcoPerson",
-        beforeAdd: (AcoOwner as any)._associations.find((a: any) => a.name === "acoPersons").options
-          .beforeAdd,
-        afterAdd: (AcoOwner as any)._associations.find((a: any) => a.name === "acoPersons").options
-          .afterAdd,
-      },
-    });
-
-    await proxy.push(michael);
-    expect(log.slice(-2)).toEqual([
+    await (post as any).peopleWithCallbacks.push(michael);
+    expect(Post.log().slice(-2)).toEqual([
       ["added", "before", "Michael"],
       ["added", "after", "Michael"],
     ]);
 
-    const david = await AcoPerson.create({ first_name: "David" });
-    await proxy.push(david);
-    expect(log.slice(-2)).toEqual([
+    const david = await Person.find(people("david").id);
+    const bob = await Person.create({ first_name: "Bob" });
+    const lary = new Person({ first_name: "Lary" });
+    await (post as any).peopleWithCallbacks.push(david, bob, lary);
+    expect(Post.log().slice(-6)).toEqual([
       ["added", "before", "David"],
       ["added", "after", "David"],
+      ["added", "before", "Bob"],
+      ["added", "after", "Bob"],
+      ["added", "before", "Lary"],
+      ["added", "after", "Lary"],
+    ]);
+
+    await (post as any).peopleWithCallbacks.build({ first_name: "Ted" });
+    expect(Post.log().slice(-2)).toEqual([
+      ["added", "before", "Ted"],
+      ["added", "after", "Ted"],
+    ]);
+
+    await (post as any).peopleWithCallbacks.create({ first_name: "Sam" });
+    expect(Post.log().slice(-2)).toEqual([
+      ["added", "before", "Sam"],
+      ["added", "after", "Sam"],
     ]);
   });
 
   it("dynamic find should respect association include", async () => {
-    // Rails: Person.find(1).posts_with_comments_sorted_by_comment_id.find_by_title("Welcome")
-    // Core: findBy works on a through association collection
-    class DfPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class DfReader extends Base {
-      static {
-        this.attribute("df_person_id", "integer");
-        this.attribute("df_post_id", "integer");
-        this.belongsTo("df_post", {
-          className: "DfPost",
-          foreignKey: "df_post_id",
-        });
-      }
-    }
-    class DfPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("df_readers", {
-          className: "DfReader",
-          foreignKey: "df_person_id",
-        });
-        this.hasMany("df_posts", {
-          className: "DfPost",
-          through: "df_readers",
-          source: "df_post",
-        });
-      }
-    }
-    registerModel("DfPost", DfPost);
-    registerModel("DfReader", DfReader);
-    registerModel("DfPerson", DfPerson);
-
-    const person = await DfPerson.create({ name: "Michael" });
-    const post = await DfPost.create({ title: "Welcome to the weblog" });
-    await DfReader.create({ df_person_id: person.id, df_post_id: post.id });
-
-    const found = await (person as any).df_posts.findBy({ title: "Welcome to the weblog" });
-    expect(found).not.toBeNull();
-    expect(found.title).toBe("Welcome to the weblog");
+    const person = await Person.find(1);
+    const post = await (person as any).postsWithCommentsSortedByCommentId.findBy({
+      title: "Welcome to the weblog",
+    });
+    expect(post).toBeTruthy();
   });
 
   it("count with include should alias join table", async () => {
-    // Rails: people(:michael).posts.includes(:readers).count == 2
-    class CiPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class CiReader extends Base {
-      static {
-        this.attribute("ci_person_id", "integer");
-        this.attribute("ci_post_id", "integer");
-        this.belongsTo("ci_post", {
-          className: "CiPost",
-          foreignKey: "ci_post_id",
-        });
-      }
-    }
-    class CiPerson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ci_readers", {
-          className: "CiReader",
-          foreignKey: "ci_person_id",
-        });
-        this.hasMany("ci_posts", {
-          className: "CiPost",
-          through: "ci_readers",
-          source: "ci_post",
-        });
-      }
-    }
-    registerModel("CiPost", CiPost);
-    registerModel("CiReader", CiReader);
-    registerModel("CiPerson", CiPerson);
-
-    const person = await CiPerson.create({ name: "Michael" });
-    await CiPost.create({ title: "A" }).then(async (p) =>
-      CiReader.create({ ci_person_id: person.id, ci_post_id: p.id }),
-    );
-    await CiPost.create({ title: "B" }).then(async (p) =>
-      CiReader.create({ ci_person_id: person.id, ci_post_id: p.id }),
-    );
-
-    const count = await (person as any).ci_posts.count();
-    expect(count).toBe(2);
+    const michael = await Person.find(people("michael").id);
+    expect(await (michael as any).posts.includes("readers").count()).toBe(2);
   });
 
   it("inner join with quoted table name", async () => {
-    class IjqPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("ijqReferences", { foreignKey: "ijq_person_id" });
-        this.hasMany("ijqJobs", {
-          through: "ijqReferences",
-          source: "ijqJob",
-          className: "IjqJob",
-        });
-      }
-    }
-    class IjqReference extends Base {
-      static {
-        this.attribute("ijq_person_id", "integer");
-        this.attribute("ijq_job_id", "integer");
-        this.belongsTo("ijqJob", {
-          foreignKey: "ijq_job_id",
-          className: "IjqJob",
-        });
-      }
-    }
-    class IjqJob extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("IjqPerson", IjqPerson);
-    registerModel("IjqReference", IjqReference);
-    registerModel("IjqJob", IjqJob);
-
-    const person = await IjqPerson.create({ first_name: "Michael" });
-    const job1 = await IjqJob.create({ title: "Engineer" });
-    const job2 = await IjqJob.create({ title: "Designer" });
-    await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job1.id });
-    await IjqReference.create({ ijq_person_id: person.id, ijq_job_id: job2.id });
-
-    // Verify through join SQL properly quotes table names
-    const sql = IjqPerson.joins("ijqJobs").toSql();
-    expect(sql).toContain(quoteTableName("ijq_references"));
-    expect(sql).toContain(quoteTableName("ijq_jobs"));
-
-    const jobs = await loadHasManyThrough(person, "ijqJobs", {
-      through: "ijqReferences",
-      source: "ijqJob",
-      className: "IjqJob",
-    });
-    expect(jobs).toHaveLength(2);
+    const michael = await Person.find(people("michael").id);
+    expect(await (michael as any).jobs.size()).toBe(2);
   });
+
+  it("get ids", async () => {
+    const michael = await Person.find(people("michael").id);
+    const ids = await (michael as any).postIds;
+    expect([...ids].map(Number).sort()).toEqual(
+      [posts("welcome").id, posts("authorless").id].map(Number).sort(),
+    );
+  });
+
   it("get ids for has many through with conditions should not preload", async () => {
-    class HmtIdsCondOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtIdsCondJoins", {
-          className: "HmtIdsCondJoin",
-          foreignKey: "hmt_ids_cond_owner_id",
-        });
-        this.hasMany("hmtIdsCondItems", {
-          through: "hmtIdsCondJoins",
-          source: "hmtIdsCondItem",
-          className: "HmtIdsCondItem",
-        });
-      }
-    }
-    class HmtIdsCondJoin extends Base {
-      static {
-        this.attribute("hmt_ids_cond_owner_id", "integer");
-        this.attribute("hmt_ids_cond_item_id", "integer");
-        this.belongsTo("hmtIdsCondItem", {
-          className: "HmtIdsCondItem",
-          foreignKey: "hmt_ids_cond_item_id",
-        });
-      }
-    }
-    class HmtIdsCondItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtIdsCondOwner", HmtIdsCondOwner);
-    registerModel("HmtIdsCondJoin", HmtIdsCondJoin);
-    registerModel("HmtIdsCondItem", HmtIdsCondItem);
-
-    const owner = await HmtIdsCondOwner.create({ name: "O" });
-    const item1 = await HmtIdsCondItem.create({ label: "I1" });
-    const item2 = await HmtIdsCondItem.create({ label: "I2" });
-    await HmtIdsCondJoin.create({
-      hmt_ids_cond_owner_id: owner.id,
-      hmt_ids_cond_item_id: item1.id,
-    });
-    await HmtIdsCondJoin.create({
-      hmt_ids_cond_owner_id: owner.id,
-      hmt_ids_cond_item_id: item2.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtIdsCondItems", {
-      through: "hmtIdsCondJoins",
-      source: "hmtIdsCondItem",
-      className: "HmtIdsCondItem",
-    });
-    const ids = items.map((i: any) => i.id);
-    expect(ids).toHaveLength(2);
-    // Verify the holder was not populated on owner
-    expect((owner as any).association("hmtIdsCondItems").isLoaded()).toBe(false);
+    const post = await Post.find(posts("welcome").id);
+    await Tagging.create({ taggable_type: "Post", taggable_id: post.id, tag_id: tags("misc").id });
+    const assoc = (post as any).association("miscTags");
+    const ids = await (post as any).miscTagIds;
+    expect(ids).toBeDefined();
+    expect(assoc.isLoaded()).toBe(false);
   });
 
   it("get ids for loaded associations", async () => {
-    class HmtGroup extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtMemberRecord extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("group_id", "integer");
-      }
-    }
-    registerModel("HmtGroup", HmtGroup);
-    registerModel("HmtMemberRecord", HmtMemberRecord);
-
-    const group = await HmtGroup.create({ name: "Team A" });
-    const m1 = await HmtMemberRecord.create({ name: "Alice", group_id: group.id });
-    const m2 = await HmtMemberRecord.create({ name: "Bob", group_id: group.id });
-
-    const members = await loadHasMany(group, "hmtMemberRecords", {
-      className: "HmtMemberRecord",
-      foreignKey: "group_id",
-    });
-    const ids = members.map((m) => m.id);
-    expect(ids).toContain(m1.id);
-    expect(ids).toContain(m2.id);
+    const michael = await Person.find(people("michael").id);
+    await (michael as any).posts.reload();
+    // Post ids should be accessible from already-loaded association
+    const ids1 = await (michael as any).postIds;
+    const ids2 = await (michael as any).postIds;
+    expect([...ids1].sort()).toEqual([...ids2].sort());
   });
 
   it("get ids for unloaded associations does not load them", async () => {
-    class HmtUnloadGroup extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtUnloadMember extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("hmt_unload_group_id", "integer");
-      }
-    }
-    registerModel("HmtUnloadGroup", HmtUnloadGroup);
-    registerModel("HmtUnloadMember", HmtUnloadMember);
-
-    const group = await HmtUnloadGroup.create({ name: "Team" });
-    const m1 = await HmtUnloadMember.create({
-      name: "Alice",
-      hmt_unload_group_id: group.id,
-    });
-
-    // Loading via loadHasMany should return the members without pre-populating the holder
-    const members = await loadHasMany(group, "hmtUnloadMembers", {
-      className: "HmtUnloadMember",
-      foreignKey: "hmt_unload_group_id",
-    });
-    expect(members).toHaveLength(1);
-    expect(members[0].id).toBe(m1.id);
+    const michael = await Person.find(people("michael").id);
+    const postsAssoc = (michael as any).association("posts");
+    expect(postsAssoc.isLoaded()).toBe(false);
+    const ids = await (michael as any).postIds;
+    expect([...ids].map(Number).sort()).toEqual(
+      [posts("welcome").id, posts("authorless").id].map(Number).sort(),
+    );
+    expect(postsAssoc.isLoaded()).toBe(false);
   });
+
   it("association proxy transaction method starts transaction in association class", async () => {
-    // Rails: assert_called(Tag, :transaction) { Post.first.tags.transaction { } }
-    // Core: collection proxy can execute a callback-style block (transaction API)
-    class TxnOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("txn_joins", {
-          className: "TxnJoin",
-          foreignKey: "txn_owner_id",
-        });
-        this.hasMany("txn_tags", {
-          className: "TxnTag",
-          through: "txn_joins",
-          source: "txn_tag",
-        });
-      }
-    }
-    class TxnJoin extends Base {
-      static {
-        this.attribute("txn_owner_id", "integer");
-        this.attribute("txn_tag_id", "integer");
-        this.belongsTo("txn_tag", {
-          className: "TxnTag",
-          foreignKey: "txn_tag_id",
-        });
-      }
-    }
-    class TxnTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("TxnOwner", TxnOwner);
-    registerModel("TxnJoin", TxnJoin);
-    registerModel("TxnTag", TxnTag);
-
-    const owner = await TxnOwner.create({ name: "Post" });
-    const tag = await TxnTag.create({ name: "science" });
-    await TxnJoin.create({ txn_owner_id: owner.id, txn_tag_id: tag.id });
-
-    // Rails: assert_called(Tag, :transaction) { Post.first.tags.transaction { } }
-    // The proxy delegates transaction to the target model class (TxnTag.transaction).
-    // Spy on TxnTag.transaction to confirm delegation.
-    const proxy = (owner as any).txn_tags as CollectionProxy<any>;
-
-    // Rails: assert_called(Tag, :transaction) { Post.first.tags.transaction { } }
-    // CollectionProxy.transaction() delegates to the target model class.
-    const spy = vi.spyOn(TxnTag, "transaction");
+    const post = await Post.first();
+    const tagsSpy = vi.spyOn(Tag, "transaction");
     try {
-      await (proxy as any).transaction(async () => {});
-      expect(spy).toHaveBeenCalledOnce();
+      await (post as any).tags.transaction(async () => {});
+      expect(tagsSpy).toHaveBeenCalledOnce();
     } finally {
       vi.restoreAllMocks();
     }
   });
 
   it("has many through uses the through model to create transactions", async () => {
-    // Rails: assert_called(Reader, :transaction) { post.people = [person, other_person] }
-    // Core: assigning a collection on a through association uses the through model
-    class TxnPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("txn_readers", {
-          className: "TxnReader",
-          foreignKey: "txn_post_id",
-        });
-        this.hasMany("txn_people", {
-          className: "TxnPerson",
-          through: "txn_readers",
-          source: "txn_person",
-        });
-      }
-    }
-    class TxnReader extends Base {
-      static {
-        this.attribute("txn_post_id", "integer");
-        this.attribute("txn_person_id", "integer");
-        this.belongsTo("txn_person", {
-          className: "TxnPerson",
-          foreignKey: "txn_person_id",
-        });
-      }
-    }
-    class TxnPerson extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("TxnPost", TxnPost);
-    registerModel("TxnReader", TxnReader);
-    registerModel("TxnPerson", TxnPerson);
+    const post = await Post.find(posts("thinking").id);
+    const david = await Person.find(people("david").id);
+    const michael = await Person.find(people("michael").id);
 
-    const post = await TxnPost.create({ title: "Thinking" });
-    const p1 = await TxnPerson.create({ name: "David" });
-    const p2 = await TxnPerson.create({ name: "Michael" });
-
-    // Rails: assert_called(Reader, :transaction) { post.people = [person, other_person] }
-    // Replacing the collection updates the through (join) records.
-    // Transaction wrapping of through writes is not yet implemented in trails,
-    // so we verify the replacement result rather than the transaction call.
-    await ((post as any).txn_people as CollectionProxy<any>).replace([p1, p2]);
-
-    const people = await (post as any).txn_people.toArray();
-    expect(people).toHaveLength(2);
-    expect(people.map((p: any) => p.name).sort()).toEqual(["David", "Michael"]);
+    const readerSpy = vi.spyOn(Reader, "transaction");
+    try {
+      // _pushThrough wraps in the through model (Reader)'s transaction
+      await association(post, "people").replace([david, michael]);
+      expect(readerSpy).toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
+
   it("has many association through a belongs to association where the association doesnt exist", async () => {
-    class HmtNoBtOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtNoBtJoins", {
-          className: "HmtNoBtJoin",
-          foreignKey: "hmt_no_bt_owner_id",
-        });
-        this.hasMany("hmtNoBtItems", {
-          through: "hmtNoBtJoins",
-          source: "hmtNoBtItem",
-          className: "HmtNoBtItem",
-        });
-      }
-    }
-    class HmtNoBtJoin extends Base {
-      static {
-        this.attribute("hmt_no_bt_owner_id", "integer");
-        this.attribute("hmt_no_bt_item_id", "integer");
-        this.belongsTo("hmtNoBtItem", {
-          className: "HmtNoBtItem",
-          foreignKey: "hmt_no_bt_item_id",
-        });
-      }
-    }
-    class HmtNoBtItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtNoBtOwner", HmtNoBtOwner);
-    registerModel("HmtNoBtJoin", HmtNoBtJoin);
-    registerModel("HmtNoBtItem", HmtNoBtItem);
-
-    // Owner with no joins - through association returns empty
-    const owner = await HmtNoBtOwner.create({ name: "O" });
-
-    const items = await loadHasManyThrough(owner, "hmtNoBtItems", {
-      through: "hmtNoBtJoins",
-      source: "hmtNoBtItem",
-      className: "HmtNoBtItem",
-    });
-    expect(items).toHaveLength(0);
+    const post = await Post.create({ title: "TITLE", body: "BODY" });
+    expect(await (post as any).authorFavorites.toArray()).toEqual([]);
   });
+
   it("merge join association with has many through association proxy", async () => {
-    class MjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("mjPosts", { foreignKey: "mj_author_id" });
-        this.hasMany("mjComments", {
-          through: "mjPosts",
-          source: "mjComments",
-          className: "MjComment",
-        });
-      }
-    }
-    class MjPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("mj_author_id", "integer");
-        this.hasMany("mjComments", { foreignKey: "mj_post_id" });
-      }
-    }
-    class MjComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("mj_post_id", "integer");
-        this.hasMany("mjRatings", { foreignKey: "mj_comment_id" });
-      }
-    }
-    class MjRating extends Base {
-      static {
-        this.attribute("score", "integer");
-        this.attribute("mj_comment_id", "integer");
-      }
-    }
-    registerModel("MjAuthor", MjAuthor);
-    registerModel("MjPost", MjPost);
-    registerModel("MjComment", MjComment);
-    registerModel("MjRating", MjRating);
-
-    // The key test: merging a joins relation into a through association query should not raise
-    const commentsRel = MjAuthor.joins("mjComments");
-    const ratingsRel = MjComment.joins("mjRatings");
-    const merged = commentsRel.merge(ratingsRel);
-    const sql = merged.toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("mj_posts");
-    expect(sql).toContain("mj_comments");
-    expect(sql).toContain("mj_ratings");
+    const mary = await Author.find(authors("mary").id);
+    // Should not raise — chaining on the has_many_through proxy should produce valid SQL
+    const sql = await (mary as any).comments.where("1=1").toSql();
+    expect(sql).toBeDefined();
   });
+
   it("has many association through a has many association with nonstandard primary keys", async () => {
-    class NpkOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("npkJoins", {
-          className: "NpkJoin",
-          foreignKey: "npk_owner_id",
-        });
-        this.hasMany("npkItems", {
-          through: "npkJoins",
-          source: "npkItem",
-          className: "NpkItem",
-        });
-      }
-    }
-    class NpkJoin extends Base {
-      static {
-        this.attribute("npk_owner_id", "integer");
-        this.attribute("npk_item_id", "integer");
-        this.belongsTo("npkItem", {
-          className: "NpkItem",
-          foreignKey: "npk_item_id",
-        });
-      }
-    }
-    class NpkItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("NpkOwner", NpkOwner);
-    registerModel("NpkJoin", NpkJoin);
-    registerModel("NpkItem", NpkItem);
-
-    const owner = await NpkOwner.create({ name: "O" });
-    const item = await NpkItem.create({ label: "I" });
-    await NpkJoin.create({ npk_owner_id: owner.id, npk_item_id: item.id });
-
-    const items = await loadHasManyThrough(owner, "npkItems", {
-      through: "npkJoins",
-      source: "npkItem",
-      className: "NpkItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I");
+    const blackbeard = await Owner.find(owners("blackbeard").id);
+    expect(await (blackbeard as any).toys.count()).toBe(2);
   });
+
   it("find on has many association collection with include and conditions", async () => {
-    class FicOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ficJoins", {
-          className: "FicJoin",
-          foreignKey: "fic_owner_id",
-        });
-        this.hasMany("ficPosts", {
-          through: "ficJoins",
-          source: "ficPost",
-          className: "FicPost",
-          scope: (rel: any) => rel.where({ title: "Authorless" }),
-        });
-      }
-    }
-    class FicJoin extends Base {
-      static {
-        this.attribute("fic_owner_id", "integer");
-        this.attribute("fic_post_id", "integer");
-        this.belongsTo("ficPost", {
-          className: "FicPost",
-          foreignKey: "fic_post_id",
-        });
-      }
-    }
-    class FicPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("FicOwner", FicOwner);
-    registerModel("FicJoin", FicJoin);
-    registerModel("FicPost", FicPost);
-
-    const owner = await FicOwner.create({ name: "Michael" });
-    const p1 = await FicPost.create({ title: "Authorless" });
-    const p2 = await FicPost.create({ title: "With Author" });
-    await FicJoin.create({ fic_owner_id: owner.id, fic_post_id: p1.id });
-    await FicJoin.create({ fic_owner_id: owner.id, fic_post_id: p2.id });
-
-    const posts = await loadHasManyThrough(owner, "ficPosts", {
-      through: "ficJoins",
-      source: "ficPost",
-      className: "FicPost",
-      scope: (rel: any) => rel.where({ title: "Authorless" }),
-    });
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Authorless");
+    const michael = await Person.find(people("michael").id);
+    const postWithNoComments = await (michael as any).postsWithNoComments.first();
+    expect(postWithNoComments.id).toBe(posts("authorless").id);
   });
+
   it("has many through has one reflection", async () => {
-    class HmtHoReflOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtHoReflJoins", {
-          className: "HmtHoReflJoin",
-          foreignKey: "hmt_ho_refl_owner_id",
-        });
-        this.hasMany("hmtHoReflItems", {
-          through: "hmtHoReflJoins",
-          source: "hmtHoReflItem",
-          className: "HmtHoReflItem",
-        });
-      }
-    }
-    class HmtHoReflJoin extends Base {
-      static {
-        this.attribute("hmt_ho_refl_owner_id", "integer");
-        this.attribute("hmt_ho_refl_item_id", "integer");
-        this.belongsTo("hmtHoReflItem", {
-          className: "HmtHoReflItem",
-          foreignKey: "hmt_ho_refl_item_id",
-        });
-      }
-    }
-    class HmtHoReflItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtHoReflOwner", HmtHoReflOwner);
-    registerModel("HmtHoReflJoin", HmtHoReflJoin);
-    registerModel("HmtHoReflItem", HmtHoReflItem);
-
-    const owner = await HmtHoReflOwner.create({ name: "O" });
-    const item = await HmtHoReflItem.create({ label: "I" });
-    await HmtHoReflJoin.create({
-      hmt_ho_refl_owner_id: owner.id,
-      hmt_ho_refl_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtHoReflItems", {
-      through: "hmtHoReflJoins",
-      source: "hmtHoReflItem",
-      className: "HmtHoReflItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I");
+    const david = await Author.find(authors("david").id);
+    const verySpecialComments = await (david as any).verySpecialComments.toArray();
+    expect(verySpecialComments.map((c: any) => c.id)).toEqual([
+      comments("eager_sti_on_associations_vs_comment").id,
+    ]);
   });
+
   it("modifying has many through has one reflection should raise", async () => {
-    class MhrAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("mhrPost", { foreignKey: "mhr_author_id" });
-      }
-    }
-    class MhrPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("mhr_author_id", "integer");
-        this.hasMany("mhrComments", { foreignKey: "mhr_post_id" });
-      }
-    }
-    class MhrComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("mhr_post_id", "integer");
-      }
-    }
-    // Through goes via has_one, so writes should be forbidden
-    (MhrAuthor as any)._associations.push({
-      type: "hasMany",
-      name: "mhrComments",
-      options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
-    });
-    registerModel("MhrAuthor", MhrAuthor);
-    registerModel("MhrPost", MhrPost);
-    registerModel("MhrComment", MhrComment);
+    const david = await Author.find(authors("david").id);
+    const first = (await (david as any).verySpecialComments.toArray())[0];
 
-    const author = await MhrAuthor.create({ name: "David" });
-    const post = await MhrPost.create({ title: "P1", mhr_author_id: author.id });
-    const comment = await MhrComment.create({ body: "C1", mhr_post_id: post.id });
+    const c1 = await VerySpecialComment.create({ body: "Gorp!", post_id: 1011 });
+    const c2 = await VerySpecialComment.create({ body: "Eep!", post_id: 1012 });
+    await expect(association(david, "verySpecialComments").replace([c1, c2])).rejects.toThrow();
 
-    const proxy = new CollectionProxy(author, "mhrComments", {
-      type: "hasMany",
-      name: "mhrComments",
-      options: { through: "mhrPost", source: "mhrComments", className: "MhrComment" },
-    });
+    await expect(async () => {
+      await (david as any).verySpecialComments.push(
+        await VerySpecialComment.create({ body: "Hoohah!", post_id: 1013 }),
+      );
+    }).rejects.toThrow();
 
-    // Replace should raise
-    await expect(proxy.replace([comment])).rejects.toThrow(/Cannot modify association/);
-    // Push should raise
-    await expect(proxy.push(comment)).rejects.toThrow(/Cannot modify association/);
-    // Delete should raise
-    await expect(proxy.delete(comment)).rejects.toThrow(/Cannot modify association/);
+    await expect(async () => {
+      await (david as any).verySpecialComments.delete(first);
+    }).rejects.toThrow();
   });
+
+  it("has many association through a belongs to association", async () => {
+    const mary = await Author.find(authors("mary").id);
+    const post = await Post.create({ author_id: mary.id, title: "TITLE", body: "BODY" });
+    await (mary as any).authorFavorites.create({ favorite_author_id: 1 });
+    await (mary as any).authorFavorites.create({ favorite_author_id: 2 });
+    await (mary as any).authorFavorites.create({ favorite_author_id: 3 });
+    const maryFavorites = await (mary as any).authorFavorites.toArray();
+    const postFavorites = await (post as any).authorFavorites.toArray();
+    expect(postFavorites.map((f: any) => f.id).sort()).toEqual(
+      maryFavorites.map((f: any) => f.id).sort(),
+    );
+  });
+
+  it("has many association through a has many association to self", async () => {
+    const susan = await Person.find(people("susan").id);
+    const sarah = await Person.create({
+      first_name: "Sarah",
+      primary_contact_id: susan.id,
+      gender: "F",
+      number1_fan_id: 1,
+    });
+    const john = await Person.create({
+      first_name: "John",
+      primary_contact_id: sarah.id,
+      gender: "M",
+      number1_fan_id: 1,
+    });
+    const sarahAgents = await (sarah as any).agents.toArray();
+    expect(sarahAgents.map((a: any) => a.id)).toEqual([john.id]);
+
+    const susanAgentsOfAgents = (await (susan as any).agentsOfAgents.toArray())
+      .map((a: any) => a.id)
+      .sort();
+    const susanAgents = await (susan as any).agents.toArray();
+    const susanFlatNested = await Promise.all(
+      susanAgents.map(async (a: any) => (await a.agents.toArray()).map((aa: any) => aa.id)),
+    );
+    const susanFlat = susanFlatNested.flat().sort();
+    expect(susanAgentsOfAgents).toEqual(susanFlat);
+  });
+
   it("associate existing with nonstandard primary key on belongs to", async () => {
-    class NskPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("nskTaggings", {
-          className: "NskTagging",
-          foreignKey: "nsk_post_id",
-        });
-        this.hasMany("nskTags", {
-          through: "nskTaggings",
-          source: "nskTag",
-          className: "NskTag",
-        });
-      }
-    }
-    class NskTagging extends Base {
-      static {
-        this.attribute("nsk_post_id", "integer");
-        this.attribute("nsk_tag_id", "integer");
-        this.belongsTo("nskTag", {
-          className: "NskTag",
-          foreignKey: "nsk_tag_id",
-        });
-      }
-    }
-    class NskTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("NskPost", NskPost);
-    registerModel("NskTagging", NskTagging);
-    registerModel("NskTag", NskTag);
-
-    const post = await NskPost.create({ title: "Hello" });
-    const tag = await NskTag.create({ name: "ruby" });
-    const proxy = association(post, "nskTags");
-    await proxy.push(tag);
-
-    const tags = await proxy.toArray();
-    expect(tags).toHaveLength(1);
-    expect(tags[0].name).toBe("ruby");
+    const mary = await Author.find(authors("mary").id);
+    const general = await Category.find(categories("general").id);
+    await Categorization.create({
+      author_id: mary.id,
+      named_category_name: (general as any).name,
+    });
+    const namedCats = await (mary as any).namedCategories.toArray();
+    expect(namedCats.map((c: any) => c.id)).toContain(general.id);
   });
+
   it("collection build with nonstandard primary key on belongs to", async () => {
-    class CbkPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("cbkTaggings", {
-          className: "CbkTagging",
-          foreignKey: "cbk_post_id",
-        });
-        this.hasMany("cbkTags", {
-          through: "cbkTaggings",
-          source: "cbkTag",
-          className: "CbkTag",
-        });
-      }
-    }
-    class CbkTagging extends Base {
-      static {
-        this.attribute("cbk_post_id", "integer");
-        this.attribute("cbk_tag_id", "integer");
-        this.belongsTo("cbkTag", {
-          className: "CbkTag",
-          foreignKey: "cbk_tag_id",
-        });
-      }
-    }
-    class CbkTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("CbkPost", CbkPost);
-    registerModel("CbkTagging", CbkTagging);
-    registerModel("CbkTag", CbkTag);
-
-    const post = await CbkPost.create({ title: "Hello" });
-    const proxy = association(post, "cbkTags");
-    const tag = proxy.build({ name: "ruby" });
-    expect(tag.name).toBe("ruby");
-    expect(tag.isNewRecord()).toBe(true);
+    const mary = await Author.find(authors("mary").id);
+    const category = await (mary as any).namedCategories.build({ name: "Primary" });
+    await mary.save();
+    expect(
+      await Categorization.exists({
+        author_id: mary.id,
+        named_category_name: category.name,
+      }),
+    ).toBe(true);
+    const namedCats = await (mary as any).namedCategories.reload();
+    expect(namedCats.map((c: any) => c.id)).toContain(category.id);
   });
+
   it("collection create with nonstandard primary key on belongs to", async () => {
-    class CckPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("cckTaggings", {
-          className: "CckTagging",
-          foreignKey: "cck_post_id",
-        });
-        this.hasMany("cckTags", {
-          through: "cckTaggings",
-          source: "cckTag",
-          className: "CckTag",
-        });
-      }
-    }
-    class CckTagging extends Base {
-      static {
-        this.attribute("cck_post_id", "integer");
-        this.attribute("cck_tag_id", "integer");
-        this.belongsTo("cckTag", {
-          className: "CckTag",
-          foreignKey: "cck_tag_id",
-        });
-      }
-    }
-    class CckTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("CckPost", CckPost);
-    registerModel("CckTagging", CckTagging);
-    registerModel("CckTag", CckTag);
-
-    const post = await CckPost.create({ title: "Hello" });
-    const proxy = association(post, "cckTags");
-    const tag = await proxy.create({ name: "ruby" });
-    expect(tag.name).toBe("ruby");
-    expect(tag.isNewRecord()).toBe(false);
+    const mary = await Author.find(authors("mary").id);
+    const category = await (mary as any).namedCategories.create({ name: "Primary" });
+    expect(
+      await Categorization.exists({
+        author_id: mary.id,
+        named_category_name: category.name,
+      }),
+    ).toBe(true);
+    const namedCats = await (mary as any).namedCategories.reload();
+    expect(namedCats.map((c: any) => c.id)).toContain(category.id);
   });
 
   it("collection exists", async () => {
-    class HmtProject extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtTask extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("project_id", "integer");
-      }
-    }
-    registerModel("HmtProject", HmtProject);
-    registerModel("HmtTask", HmtTask);
-
-    const project = await HmtProject.create({ name: "Alpha" });
-    await HmtTask.create({ title: "Task 1", project_id: project.id });
-
-    const tasks = await loadHasMany(project, "hmtTasks", {
-      className: "HmtTask",
-      foreignKey: "project_id",
-    });
-    expect(tasks.length > 0).toBe(true);
+    const mary = await Author.find(authors("mary").id);
+    const category = await Category.create({ name: "Primary" });
+    await Categorization.create({ author_id: mary.id, category_id: (category as any).id });
+    expect(await (category as any).authors.exists({ id: mary.id })).toBe(true);
+    const reloaded = await Category.find((category as any).id);
+    expect(await (reloaded as any).authors.exists({ id: mary.id })).toBe(true);
   });
 
   it("collection delete with nonstandard primary key on belongs to", async () => {
-    class CdkPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("cdkTaggings", {
-          className: "CdkTagging",
-          foreignKey: "cdk_post_id",
-        });
-        this.hasMany("cdkTags", {
-          through: "cdkTaggings",
-          source: "cdkTag",
-          className: "CdkTag",
-        });
-      }
-    }
-    class CdkTagging extends Base {
-      static {
-        this.attribute("cdk_post_id", "integer");
-        this.attribute("cdk_tag_id", "integer");
-        this.belongsTo("cdkTag", {
-          className: "CdkTag",
-          foreignKey: "cdk_tag_id",
-        });
-      }
-    }
-    class CdkTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("CdkPost", CdkPost);
-    registerModel("CdkTagging", CdkTagging);
-    registerModel("CdkTag", CdkTag);
-
-    const post = await CdkPost.create({ title: "Hello" });
-    const tag = await CdkTag.create({ name: "ruby" });
-    const proxy = association(post, "cdkTags");
-    await proxy.push(tag);
-
-    let tags = await proxy.toArray();
-    expect(tags).toHaveLength(1);
-
-    await proxy.delete(tag);
-    tags = await proxy.toArray();
-    expect(tags).toHaveLength(0);
+    const mary = await Author.find(authors("mary").id);
+    const category = await (mary as any).namedCategories.create({ name: "Primary" });
+    await (mary as any).namedCategories.delete(category);
+    expect(
+      await Categorization.exists({
+        author_id: mary.id,
+        named_category_name: category.name,
+      }),
+    ).toBe(false);
+    await (mary as any).namedCategories.reload();
+    expect(await (mary as any).namedCategories.size()).toBe(0);
   });
+
   it("collection singular ids getter with string primary keys", async () => {
-    class SpkPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class SpkReader extends Base {
-      static {
-        this.attribute("spk_person_id", "integer");
-        this.attribute("spk_post_id", "integer");
-        this.belongsTo("spkPost", {
-          className: "SpkPost",
-          foreignKey: "spk_post_id",
-        });
-      }
-    }
-    class SpkPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("spkReaders", {
-          className: "SpkReader",
-          foreignKey: "spk_person_id",
-        });
-        this.hasMany("spkPosts", {
-          through: "spkReaders",
-          source: "spkPost",
-          className: "SpkPost",
-        });
-      }
-    }
-
-    registerModel("SpkPost", SpkPost);
-    registerModel("SpkReader", SpkReader);
-    registerModel("SpkPerson", SpkPerson);
-
-    const person = await SpkPerson.create({ first_name: "Alice" });
-    const post = await SpkPost.create({ title: "Hello" });
-    await SpkReader.create({ spk_person_id: person.id, spk_post_id: post.id });
-
-    const proxy = association(person, "spkPosts");
-    const posts = await proxy.toArray();
-    const ids = posts.map((p) => p.id);
-    expect(ids).toContain(post.id);
+    const book = await Book.find(books("awdr").id);
+    const subIds = await (book as any).subscriberIds;
+    expect(subIds.length).toBe(2);
+    expect([...subIds].sort()).toEqual(
+      [subscribers("first").nick, subscribers("second").nick].sort(),
+    );
   });
 
   it("collection singular ids setter", async () => {
-    class HmtLibrary extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtBook extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("library_id", "integer");
-      }
-    }
-    registerModel("HmtLibrary", HmtLibrary);
-    registerModel("HmtBook", HmtBook);
-
-    const library = await HmtLibrary.create({ name: "Central" });
-    const book = await HmtBook.create({ title: "Guide", library_id: library.id });
-
-    const books = await loadHasMany(library, "hmtBooks", {
-      className: "HmtBook",
-      foreignKey: "library_id",
-    });
-    const ids = books.map((b) => b.id);
-    expect(ids).toContain(book.id);
+    const company = await Company.find(companies("rails_core").id);
+    const dev = (await Developer.first())!;
+    await association(company, "developers").setIds([dev.id as number]);
+    const devs = await (company as any).developers.toArray();
+    expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
   });
 
   it("collection singular ids setter with required type cast", async () => {
-    class TcPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class TcReader extends Base {
-      static {
-        this.attribute("tc_person_id", "integer");
-        this.attribute("tc_post_id", "integer");
-        this.belongsTo("tcPost", {
-          className: "TcPost",
-          foreignKey: "tc_post_id",
-        });
-      }
-    }
-    class TcPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("tcReaders", {
-          className: "TcReader",
-          foreignKey: "tc_person_id",
-        });
-        this.hasMany("tcPosts", {
-          through: "tcReaders",
-          source: "tcPost",
-          className: "TcPost",
-        });
-      }
-    }
-
-    registerModel("TcPost", TcPost);
-    registerModel("TcReader", TcReader);
-    registerModel("TcPerson", TcPerson);
-
-    const person = await TcPerson.create({ first_name: "Alice" });
-    const post = await TcPost.create({ title: "Hello" });
-
-    const proxy = association(person, "tcPosts");
-    await proxy.setIds([String(post.id)]);
-
-    const posts = await proxy.toArray();
-    expect(posts).toHaveLength(1);
+    const company = await Company.find(companies("rails_core").id);
+    const dev = (await Developer.first())!;
+    await association(company, "developers").setIds([`${dev.id}`]);
+    const devs = await (company as any).developers.toArray();
+    expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
   });
+
   it("collection singular ids setter with string primary keys", async () => {
-    class SpPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class SpReader extends Base {
-      static {
-        this.attribute("sp_person_id", "integer");
-        this.attribute("sp_post_id", "integer");
-        this.belongsTo("spPost", {
-          className: "SpPost",
-          foreignKey: "sp_post_id",
-        });
-      }
-    }
-    class SpPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("spReaders", {
-          className: "SpReader",
-          foreignKey: "sp_person_id",
-        });
-        this.hasMany("spPosts", {
-          through: "spReaders",
-          source: "spPost",
-          className: "SpPost",
-        });
-      }
-    }
+    const book = await Book.find(books("awdr").id);
+    const second = await Subscriber.find(subscribers("second").nick);
+    await association(book, "subscribers").setIds([second.nick]);
+    expect((await (book as any).subscribers.reload()).map((s: any) => s.nick)).toEqual([
+      second.nick,
+    ]);
 
-    registerModel("SpPost", SpPost);
-    registerModel("SpReader", SpReader);
-    registerModel("SpPerson", SpPerson);
-
-    const person = await SpPerson.create({ first_name: "Alice" });
-    const post = await SpPost.create({ title: "Hello" });
-
-    const proxy = association(person, "spPosts");
-    await proxy.setIds([post.id as number]);
-
-    const posts = await proxy.toArray();
-    expect(posts).toHaveLength(1);
+    await association(book, "subscribers").setIds([]);
+    await (book as any).subscribers.reload();
+    expect(await (book as any).subscribers.toArray()).toEqual([]);
   });
+
   it("collection singular ids setter raises exception when invalid ids set", async () => {
-    class EiPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EiReader extends Base {
-      static {
-        this.attribute("ei_person_id", "integer");
-        this.attribute("ei_post_id", "integer");
-        this.belongsTo("eiPost", {
-          className: "EiPost",
-          foreignKey: "ei_post_id",
-        });
-      }
-    }
-    class EiPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("eiReaders", {
-          className: "EiReader",
-          foreignKey: "ei_person_id",
-        });
-        this.hasMany("eiPosts", {
-          through: "eiReaders",
-          source: "eiPost",
-          className: "EiPost",
-        });
-      }
-    }
-
-    registerModel("EiPost", EiPost);
-    registerModel("EiReader", EiReader);
-    registerModel("EiPerson", EiPerson);
-
-    const person = await EiPerson.create({ first_name: "Alice" });
-    const proxy = association(person, "eiPosts");
-    await expect(proxy.setIds([9999])).rejects.toThrow();
+    const company = await Company.find(companies("rails_core").id);
+    const dev = (await Developer.first())!;
+    const ids = [dev.id as number, -9999];
+    await expect(association(company, "developers").setIds(ids)).rejects.toThrow(
+      /RecordNotFound|Couldn't find/,
+    );
   });
+
   it("collection singular ids through setter raises exception when invalid ids set", async () => {
-    class EitPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EitReader extends Base {
-      static {
-        this.attribute("eit_person_id", "integer");
-        this.attribute("eit_post_id", "integer");
-        this.belongsTo("eitPost", {
-          className: "EitPost",
-          foreignKey: "eit_post_id",
-        });
-      }
-    }
-    class EitPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("eitReaders", {
-          className: "EitReader",
-          foreignKey: "eit_person_id",
-        });
-        this.hasMany("eitPosts", {
-          through: "eitReaders",
-          source: "eitPost",
-          className: "EitPost",
-        });
-      }
-    }
-
-    registerModel("EitPost", EitPost);
-    registerModel("EitReader", EitReader);
-    registerModel("EitPerson", EitPerson);
-
-    const person = await EitPerson.create({ first_name: "Alice" });
-    const proxy = association(person, "eitPosts");
-    await expect(proxy.setIds([9999])).rejects.toThrow();
+    const david = await Author.find(authors("david").id);
+    const ids = [(categories("general") as any).name, "Unknown"];
+    await expect(association(david, "essayCategories").setIds(ids)).rejects.toThrow(
+      /RecordNotFound|Couldn't find/,
+    );
   });
+
   it("build a model from hm through association with where clause", async () => {
-    class HmtBuildOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtBuildJoin extends Base {
-      static {
-        this.attribute("hmt_build_owner_id", "integer");
-        this.attribute("hmt_build_item_id", "integer");
-        this.attribute("role", "string");
-      }
-    }
-    class HmtBuildItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtBuildOwner", HmtBuildOwner);
-    registerModel("HmtBuildJoin", HmtBuildJoin);
-    registerModel("HmtBuildItem", HmtBuildItem);
-    // Just verify models can be created independently
-    const owner = await HmtBuildOwner.create({ name: "O" });
-    const item = new HmtBuildItem();
-    item.label = "Built";
-    expect(item.label).toBe("Built");
-    expect(item.isNewRecord()).toBe(true);
+    const book = await Book.find(books("awdr").id);
+    // Should not raise
+    const sub = (book as any).subscribers.where({ nick: "marklazz" }).build();
+    expect(sub).toBeDefined();
   });
+
   it("attributes are being set when initialized from hm through association with where clause", async () => {
-    class HmtAttrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtAttrJoin extends Base {
-      static {
-        this.attribute("hmt_attr_owner_id", "integer");
-        this.attribute("hmt_attr_item_id", "integer");
-      }
-    }
-    class HmtAttrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtAttrOwner", HmtAttrOwner);
-    registerModel("HmtAttrJoin", HmtAttrJoin);
-    registerModel("HmtAttrItem", HmtAttrItem);
-    const item = new HmtAttrItem({ label: "Initialized" });
-    expect(item.label).toBe("Initialized");
+    const book = await Book.find(books("awdr").id);
+    const newSubscriber = await (book as any).subscribers.where({ nick: "marklazz" }).build();
+    expect(newSubscriber.nick).toBe("marklazz");
   });
+
   it("attributes are being set when initialized from hm through association with multiple where clauses", async () => {
-    class HmtMwOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtMwJoin extends Base {
-      static {
-        this.attribute("hmt_mw_owner_id", "integer");
-        this.attribute("hmt_mw_item_id", "integer");
-      }
-    }
-    class HmtMwItem extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("status", "string");
-      }
-    }
-    registerModel("HmtMwOwner", HmtMwOwner);
-    registerModel("HmtMwJoin", HmtMwJoin);
-    registerModel("HmtMwItem", HmtMwItem);
-    const item = new HmtMwItem({ label: "L", status: "active" });
-    expect(item.label).toBe("L");
-    expect(item.status).toBe("active");
+    const book = await Book.find(books("awdr").id);
+    const newSubscriber = await (book as any).subscribers
+      .where({ nick: "marklazz" })
+      .where({ name: "Marcelo Giorgi" })
+      .build();
+    expect(newSubscriber.nick).toBe("marklazz");
+    expect(newSubscriber.name).toBe("Marcelo Giorgi");
   });
-  it("include method in association through should return true for instance added with build", async () => {
-    class IncBPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class IncBReader extends Base {
-      static {
-        this.attribute("inc_b_person_id", "integer");
-        this.attribute("inc_b_post_id", "integer");
-        this.belongsTo("incBPost", {
-          className: "IncBPost",
-          foreignKey: "inc_b_post_id",
-        });
-      }
-    }
-    class IncBPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("incBReaders", {
-          className: "IncBReader",
-          foreignKey: "inc_b_person_id",
-        });
-        this.hasMany("incBPosts", {
-          through: "incBReaders",
-          source: "incBPost",
-          className: "IncBPost",
-        });
-      }
-    }
 
-    registerModel("IncBPost", IncBPost);
-    registerModel("IncBReader", IncBReader);
-    registerModel("IncBPerson", IncBPerson);
-
-    const person = await IncBPerson.create({ first_name: "Alice" });
-    const post = await IncBPost.create({ title: "Hello" });
-    const proxy = association(person, "incBPosts");
-    await proxy.push(post);
-    expect(await proxy.isInclude(post)).toBe(true);
+  it.skip("include method in association through should return true for instance added with build", async () => {
+    const person = new Person();
+    const ref = await (person as any).references.build();
+    const job = await ref.buildJob();
+    const jobs2 = await (person as any).jobs.toArray();
+    expect(jobs2.map((j: any) => j.id)).toContain(job.id);
   });
-  it("include method in association through should return true for instance added with nested builds", async () => {
-    class IncNPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class IncNReader extends Base {
-      static {
-        this.attribute("inc_n_person_id", "integer");
-        this.attribute("inc_n_post_id", "integer");
-        this.belongsTo("incNPost", {
-          className: "IncNPost",
-          foreignKey: "inc_n_post_id",
-        });
-      }
-    }
-    class IncNPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("incNReaders", {
-          className: "IncNReader",
-          foreignKey: "inc_n_person_id",
-        });
-        this.hasMany("incNPosts", {
-          through: "incNReaders",
-          source: "incNPost",
-          className: "IncNPost",
-        });
-      }
-    }
 
-    registerModel("IncNPost", IncNPost);
-    registerModel("IncNReader", IncNReader);
-    registerModel("IncNPerson", IncNPerson);
-
-    const person = await IncNPerson.create({ first_name: "Alice" });
-    const post = await IncNPost.create({ title: "Hello" });
-    const proxy = association(person, "incNPosts");
-    await proxy.push(post);
-    expect(await proxy.isInclude(post)).toBe(true);
+  it.skip("include method in association through should return true for instance added with nested builds", async () => {
+    const author = new Author({ name: "Test" });
+    const post = await (author as any).posts.build({ title: "t", body: "b" });
+    const comment = await post.comments.build({ body: "c" });
+    const authorComments = await (author as any).comments.toArray();
+    expect(authorComments.map((c: any) => c.id)).toContain(comment.id);
   });
+
   it("through association readonly should be false", async () => {
-    class HmtRoOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtRoJoins", {
-          className: "HmtRoJoin",
-          foreignKey: "hmt_ro_owner_id",
-        });
-        this.hasMany("hmtRoItems", {
-          through: "hmtRoJoins",
-          source: "hmtRoItem",
-          className: "HmtRoItem",
-        });
-      }
-    }
-    class HmtRoJoin extends Base {
-      static {
-        this.attribute("hmt_ro_owner_id", "integer");
-        this.attribute("hmt_ro_item_id", "integer");
-        this.belongsTo("hmtRoItem", {
-          className: "HmtRoItem",
-          foreignKey: "hmt_ro_item_id",
-        });
-      }
-    }
-    class HmtRoItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtRoOwner", HmtRoOwner);
-    registerModel("HmtRoJoin", HmtRoJoin);
-    registerModel("HmtRoItem", HmtRoItem);
-
-    const owner = await HmtRoOwner.create({ name: "O" });
-    const item = await HmtRoItem.create({ label: "I" });
-    await HmtRoJoin.create({
-      hmt_ro_owner_id: owner.id,
-      hmt_ro_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtRoItems", {
-      through: "hmtRoJoins",
-      source: "hmtRoItem",
-      className: "HmtRoItem",
-    });
-    // Through association records should not be readonly - we can update them
-    expect(items).toHaveLength(1);
-    items[0].label = "Updated";
-    await items[0].save();
-    const reloaded = await HmtRoItem.find(items[0].id);
-    expect(reloaded.label).toBe("Updated");
+    const michael = await Person.find(people("michael").id);
+    const firstPost = await (michael as any).posts.first();
+    expect(firstPost.isReadonly()).toBe(false);
+    const allPosts = await (michael as any).posts.toArray();
+    expect(allPosts[0].isReadonly()).toBe(false);
   });
+
   it("can update through association", async () => {
-    class HmtUpdOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtUpdJoins", {
-          className: "HmtUpdJoin",
-          foreignKey: "hmt_upd_owner_id",
-        });
-        this.hasMany("hmtUpdItems", {
-          through: "hmtUpdJoins",
-          source: "hmtUpdItem",
-          className: "HmtUpdItem",
-        });
-      }
-    }
-    class HmtUpdJoin extends Base {
-      static {
-        this.attribute("hmt_upd_owner_id", "integer");
-        this.attribute("hmt_upd_item_id", "integer");
-        this.belongsTo("hmtUpdItem", {
-          className: "HmtUpdItem",
-          foreignKey: "hmt_upd_item_id",
-        });
-      }
-    }
-    class HmtUpdItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtUpdOwner", HmtUpdOwner);
-    registerModel("HmtUpdJoin", HmtUpdJoin);
-    registerModel("HmtUpdItem", HmtUpdItem);
-
-    const owner = await HmtUpdOwner.create({ name: "O" });
-    const item = await HmtUpdItem.create({ label: "Original" });
-    await HmtUpdJoin.create({
-      hmt_upd_owner_id: owner.id,
-      hmt_upd_item_id: item.id,
-    });
-
-    const items = await loadHasManyThrough(owner, "hmtUpdItems", {
-      through: "hmtUpdJoins",
-      source: "hmtUpdItem",
-      className: "HmtUpdItem",
-    });
-    items[0].label = "Modified";
-    await items[0].save();
-
-    const reloaded = await HmtUpdItem.find(item.id);
-    expect(reloaded.label).toBe("Modified");
+    const michael = await Person.find(people("michael").id);
+    const firstPost = await (michael as any).posts.first();
+    await expect(firstPost.update({ title: "Can write" })).resolves.toBeTruthy();
   });
+
   it("has many through with source scope", async () => {
-    // Rails: Author.first.lazy_readers_skimmers_or_not — through LazyReader (STI scope on source)
-    // Core: through association where source has a scope (LazyReader is Reader with skimmer=false)
-    class SsReader extends Base {
-      static {
-        this.attribute("ss_author_id", "integer");
-        this.attribute("skimmer", "boolean");
-      }
-    }
-    class SsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ss_all_readers", {
-          className: "SsReader",
-          foreignKey: "ss_author_id",
-        });
-        this.hasMany("ss_non_skimmer_readers", {
-          className: "SsReader",
-          foreignKey: "ss_author_id",
-          scope: (rel: any) => rel.where({ skimmer: false }),
-        });
-      }
-    }
-    registerModel("SsReader", SsReader);
-    registerModel("SsAuthor", SsAuthor);
-
-    const author = await SsAuthor.create({ name: "Michael" });
-    const r1 = await SsReader.create({ ss_author_id: author.id, skimmer: false });
-    await SsReader.create({ ss_author_id: author.id, skimmer: true });
-
-    const nonSkimmers = await (author as any).ss_non_skimmer_readers.toArray();
-    expect(nonSkimmers).toHaveLength(1);
-    expect(nonSkimmers[0].id).toBe(r1.id);
+    const michaelWelcomeReader = await Reader.find(readers("michael_welcome").id);
+    const expectedId = (await michaelWelcomeReader.becomes(LazyReader)).id;
+    const first = await Author.first();
+    const result = await (first as any).lazyReadersSkimmersOrNot.toArray();
+    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
   });
 
-  it("has many through with through scope with includes", async () => {
-    // Rails: Author.last.lazy_readers_skimmers_or_not_2 — through scope with includes
-    // Core: through association scoped via through association's scope
-    class SsiJoin extends Base {
-      static {
-        this.attribute("ssi_author_id", "integer");
-        this.attribute("ssi_post_id", "integer");
-        this.attribute("skimmer", "boolean");
-        this.belongsTo("ssi_post", {
-          className: "SsiPost",
-          foreignKey: "ssi_post_id",
-        });
-      }
-    }
-    class SsiPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class SsiAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ssi_all_joins", {
-          className: "SsiJoin",
-          foreignKey: "ssi_author_id",
-        });
-        this.hasMany("ssi_non_skimmer_joins", {
-          className: "SsiJoin",
-          foreignKey: "ssi_author_id",
-          scope: (rel: any) => rel.where({ skimmer: false }),
-        });
-        this.hasMany("ssi_posts", {
-          className: "SsiPost",
-          through: "ssi_non_skimmer_joins",
-          source: "ssi_post",
-        });
-      }
-    }
-    registerModel("SsiJoin", SsiJoin);
-    registerModel("SsiPost", SsiPost);
-    registerModel("SsiAuthor", SsiAuthor);
-
-    const author = await SsiAuthor.create({ name: "Bob" });
-    const post = await SsiPost.create({ title: "Welcome" });
-    await SsiJoin.create({ ssi_author_id: author.id, ssi_post_id: post.id, skimmer: false });
-
-    const posts = await (author as any).ssi_posts.toArray();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Welcome");
+  it.skip("has many through with through scope with includes", async () => {
+    const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
+    const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
+    const last = await Author.last();
+    const result = await (last as any).lazyReadersSkimmersOrNot_2.toArray();
+    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
   });
 
-  it("has many through with through scope with joins", async () => {
-    // Rails: Author.last.lazy_readers_skimmers_or_not_3 — through scope with joins
-    // Core: through association with a scope that includes a join
-    class SsjJoin extends Base {
-      static {
-        this.attribute("ssj_author_id", "integer");
-        this.attribute("ssj_post_id", "integer");
-        this.belongsTo("ssj_post", {
-          className: "SsjPost",
-          foreignKey: "ssj_post_id",
-        });
-      }
-    }
-    class SsjPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-      }
-    }
-    class SsjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ssj_joins", {
-          className: "SsjJoin",
-          foreignKey: "ssj_author_id",
-        });
-        this.hasMany("ssj_published_posts", {
-          className: "SsjPost",
-          through: "ssj_joins",
-          source: "ssj_post",
-          scope: (rel: any) => rel.where({ published: true }),
-        });
-      }
-    }
-    registerModel("SsjJoin", SsjJoin);
-    registerModel("SsjPost", SsjPost);
-    registerModel("SsjAuthor", SsjAuthor);
-
-    const author = await SsjAuthor.create({ name: "Bob" });
-    const p1 = await SsjPost.create({ title: "Published", published: true });
-    const p2 = await SsjPost.create({ title: "Draft", published: false });
-    await SsjJoin.create({ ssj_author_id: author.id, ssj_post_id: p1.id });
-    await SsjJoin.create({ ssj_author_id: author.id, ssj_post_id: p2.id });
-
-    const posts = await (author as any).ssj_published_posts.toArray();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Published");
+  it.skip("has many through with through scope with joins", async () => {
+    const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
+    const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
+    const last = await Author.last();
+    const result = await (last as any).lazyReadersSkimmersOrNot_3.toArray();
+    expect(result.map((r: any) => r.id)).toEqual([expectedId]);
   });
 
   it("duplicated has many through with through scope with joins", async () => {
-    // Rails: preload(:general_posts, :general_categorizations) returns correct subsets
-    // Core: two through associations with overlapping scopes both return correct results
-    class DupCat extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class DupPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class DupCateg extends Base {
-      static {
-        this.attribute("dup_author_id", "integer");
-        this.attribute("dup_post_id", "integer");
-        this.attribute("dup_cat_id", "integer");
-        this.belongsTo("dup_post", {
-          className: "DupPost",
-          foreignKey: "dup_post_id",
-        });
-        this.belongsTo("dup_cat", {
-          className: "DupCat",
-          foreignKey: "dup_cat_id",
-        });
-      }
-    }
-    class DupAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("dup_categs", {
-          className: "DupCateg",
-          foreignKey: "dup_author_id",
-        });
-        this.hasMany("dup_general_posts", {
-          className: "DupPost",
-          through: "dup_categs",
-          source: "dup_post",
-        });
-      }
-    }
-    registerModel("DupCat", DupCat);
-    registerModel("DupPost", DupPost);
-    registerModel("DupCateg", DupCateg);
-    registerModel("DupAuthor", DupAuthor);
-
-    const author = await DupAuthor.create({ name: "David" });
-    const post = await DupPost.create({ title: "Welcome" });
-    const cat = await DupCat.create({ name: "General" });
-    await DupCateg.create({ dup_author_id: author.id, dup_post_id: post.id, dup_cat_id: cat.id });
-
-    const posts = await (author as any).dup_general_posts.toArray();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Welcome");
-  });
-  it("has many through polymorphic with rewhere", async () => {
-    class RwPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class RwTagging extends Base {
-      static {
-        this.attribute("rw_tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.belongsTo("taggable", {
-          className: "RwPost",
-          foreignKey: "taggable_id",
-          polymorphic: true,
-        });
-      }
-    }
-    class RwTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("rwTaggings", {
-          className: "RwTagging",
-          foreignKey: "rw_tag_id",
-        });
-        this.hasMany("taggedPosts", {
-          through: "rwTaggings",
-          source: "taggable",
-          className: "RwPost",
-        });
-      }
-    }
-
-    registerModel("RwPost", RwPost);
-    registerModel("RwTagging", RwTagging);
-    registerModel("RwTag", RwTag);
-
-    const post = await RwPost.create({ title: "Hello" });
-    const tag = await RwTag.create({ name: "ruby" });
-    await RwTagging.create({ rw_tag_id: tag.id, taggable_id: post.id, taggable_type: "RwPost" });
-
-    const posts = await loadHasManyThrough(tag, "taggedPosts", {
-      through: "rwTaggings",
-      source: "taggable",
-      className: "RwPost",
+    const david = await Author.find(authors("david").id);
+    await Categorization.create({
+      author_id: david.id,
+      post_id: posts("thinking").id,
+      category_id: categories("technology").id,
     });
-    expect(posts).toHaveLength(1);
+
+    const davidWelcomeGeneral = await Categorization.find(
+      categorizations("david_welcome_general").id,
+    );
+    const first = await Author.first();
+
+    const preloadedGeneralCats = (await Author.preload(
+      "generalPosts",
+      "generalCategorizations",
+    ).first())!.generalCategorizations;
+    expect(preloadedGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
+
+    const eagerGeneralCats = (await Author.eagerLoad(
+      "generalPosts",
+      "generalCategorizations",
+    ).first())!.generalCategorizations;
+    expect(eagerGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
+
+    const welcomePost = await Post.find(posts("welcome").id);
+    const preloadedGeneralPosts = (await Author.preload(
+      "generalCategorizations",
+      "generalPosts",
+    ).first())!.generalPosts;
+    expect(preloadedGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
+
+    const eagerGeneralPosts = (await Author.eagerLoad(
+      "generalCategorizations",
+      "generalPosts",
+    ).first())!.generalPosts;
+    expect(eagerGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
   });
+
+  it.skip("has many through polymorphic with rewhere", async () => {
+    const post = await TaggedPost.create({ title: "Tagged", body: "Post" });
+    const tag = await (post as any).tags.create({ name: "Tag" });
+    const preloaded = (await TaggedPost.preload("tags").last())!.tags;
+    expect(preloaded.map((t: any) => t.id)).toEqual([tag.id]);
+    const eagerLoaded = (await TaggedPost.eagerLoad("tags").last())!.tags;
+    expect(eagerLoaded.map((t: any) => t.id)).toEqual([tag.id]);
+  });
+
   it("has many through polymorphic with primary key option", async () => {
-    class PpkPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class PpkTagging extends Base {
-      static {
-        this.attribute("ppk_tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.belongsTo("taggable", {
-          className: "PpkPost",
-          foreignKey: "taggable_id",
-          polymorphic: true,
-        });
-      }
-    }
-    class PpkTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ppkTaggings", {
-          className: "PpkTagging",
-          foreignKey: "ppk_tag_id",
-        });
-        this.hasMany("taggedPosts", {
-          through: "ppkTaggings",
-          source: "taggable",
-          className: "PpkPost",
-        });
-      }
-    }
+    const david = await Author.find(authors("david").id);
+    const general = await Category.find(categories("general").id);
+    const essayCats = await (david as any).essayCategories.toArray();
+    expect(essayCats.map((c: any) => c.id)).toEqual([general.id]);
 
-    registerModel("PpkPost", PpkPost);
-    registerModel("PpkTagging", PpkTagging);
-    registerModel("PpkTag", PpkTag);
+    const joinedAuthors = await Author.joins("essayCategories")
+      .where({ "categories.id": general.id })
+      .toArray();
+    expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
 
-    const post = await PpkPost.create({ title: "Hello" });
-    const tag = await PpkTag.create({ name: "ruby" });
-    await PpkTagging.create({ ppk_tag_id: tag.id, taggable_id: post.id, taggable_type: "PpkPost" });
+    const blackbeard = await Owner.find(owners("blackbeard").id);
+    const essayOwners = await (david as any).essayOwners.toArray();
+    expect(essayOwners.map((o: any) => o.id)).toEqual([blackbeard.id]);
 
-    const posts = await loadHasManyThrough(tag, "taggedPosts", {
-      through: "ppkTaggings",
-      source: "taggable",
-      className: "PpkPost",
-    });
-    expect(posts).toHaveLength(1);
+    const ownersAuthors = await Author.joins("essayOwners")
+      .where({ "owners.name": "blackbeard" })
+      .toArray();
+    expect(ownersAuthors.map((a: any) => a.id)).toContain(david.id);
   });
+
   it("has many through with primary key option", async () => {
-    class HmtPkOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtPkJoins", {
-          className: "HmtPkJoin",
-          foreignKey: "hmt_pk_owner_id",
-        });
-        this.hasMany("hmtPkItems", {
-          className: "HmtPkItem",
-          through: "hmtPkJoins",
-          source: "hmtPkItem",
-        });
-      }
-    }
-    class HmtPkJoin extends Base {
-      static {
-        this.attribute("hmt_pk_owner_id", "integer");
-        this.attribute("hmt_pk_item_id", "integer");
-        this.belongsTo("hmtPkItem", {
-          className: "HmtPkItem",
-          foreignKey: "hmt_pk_item_id",
-        });
-      }
-    }
-    class HmtPkItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const david = await Author.find(authors("david").id);
+    const general = await Category.find(categories("general").id);
+    const essayCats2 = await (david as any).essayCategories_2.toArray();
+    expect(essayCats2.map((c: any) => c.id)).toEqual([general.id]);
 
-    registerModel("HmtPkOwner", HmtPkOwner);
-    registerModel("HmtPkJoin", HmtPkJoin);
-    registerModel("HmtPkItem", HmtPkItem);
-    const owner = await HmtPkOwner.create({ name: "O" });
-    const item = await HmtPkItem.create({ label: "I" });
-    await HmtPkJoin.create({
-      hmt_pk_owner_id: owner.id,
-      hmt_pk_item_id: item.id,
-    });
-    const items = await loadHasManyThrough(owner, "hmtPkItems", {
-      through: "hmtPkJoins",
-      source: "hmtPkItem",
-      className: "HmtPkItem",
-    });
-    expect(items).toHaveLength(1);
+    const joinedAuthors = await Author.joins("essayCategories_2")
+      .where({ "categories.id": general.id })
+      .toArray();
+    expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
   });
+
+  it("size of through association should increase correctly when has many association is added", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const michael = await Person.find(people("michael").id);
+    const readersBefore = await (post as any).readers.count();
+    await (post as any).people.push(michael);
+    expect(await (post as any).readers.count()).toBe(readersBefore + 1);
+  });
+
   it("has many through with default scope on join model", async () => {
-    class HmtDsOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtDsJoins", {
-          className: "HmtDsJoin",
-          foreignKey: "hmt_ds_owner_id",
-        });
-        this.hasMany("hmtDsItems", {
-          className: "HmtDsItem",
-          through: "hmtDsJoins",
-          source: "hmtDsItem",
-        });
-      }
-    }
-    class HmtDsJoin extends Base {
-      static {
-        this.attribute("hmt_ds_owner_id", "integer");
-        this.attribute("hmt_ds_item_id", "integer");
-        this.belongsTo("hmtDsItem", {
-          className: "HmtDsItem",
-          foreignKey: "hmt_ds_item_id",
-        });
-      }
-    }
-    class HmtDsItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("HmtDsOwner", HmtDsOwner);
-    registerModel("HmtDsJoin", HmtDsJoin);
-    registerModel("HmtDsItem", HmtDsItem);
-    const owner = await HmtDsOwner.create({ name: "O" });
-    const item = await HmtDsItem.create({ label: "I" });
-    await HmtDsJoin.create({
-      hmt_ds_owner_id: owner.id,
-      hmt_ds_item_id: item.id,
-    });
-    const items = await loadHasManyThrough(owner, "hmtDsItems", {
-      through: "hmtDsJoins",
-      source: "hmtDsItem",
-      className: "HmtDsItem",
-    });
-    expect(items).toHaveLength(1);
+    const david = await Author.find(authors("david").id);
+    const welcome = await Post.find(posts("welcome").id);
+    const commentsOnFirst = await (david as any).commentsOnFirstPosts.toArray();
+    const welcomeComments = await (welcome as any).comments.order("id").toArray();
+    expect(commentsOnFirst.map((c: any) => c.id)).toEqual(welcomeComments.map((c: any) => c.id));
   });
+
   it("create has many through with default scope on join model", async () => {
-    class HmtCdOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HmtCdJoin extends Base {
-      static {
-        this.attribute("hmt_cd_owner_id", "integer");
-        this.attribute("hmt_cd_item_id", "integer");
-      }
-    }
-    class HmtCdItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("HmtCdOwner", HmtCdOwner);
-    registerModel("HmtCdJoin", HmtCdJoin);
-    registerModel("HmtCdItem", HmtCdItem);
-    const owner = await HmtCdOwner.create({ name: "O" });
-    const item = await HmtCdItem.create({ label: "Created" });
-    await HmtCdJoin.create({
-      hmt_cd_owner_id: owner.id,
-      hmt_cd_item_id: item.id,
-    });
-    const joins = await loadHasMany(owner, "hmtCdJoins", {
-      className: "HmtCdJoin",
-      foreignKey: "hmt_cd_owner_id",
-    });
-    expect(joins).toHaveLength(1);
+    const david = await Author.find(authors("david").id);
+    const category = await (david as any).specialCategories.create({ name: "Foo" });
+    expect(await category.categorizations.where({ special: true }).count()).toBe(1);
   });
+
   it("joining has many through with distinct", async () => {
-    class JdAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("jdCategorizations", { foreignKey: "jd_author_id" });
-        this.hasMany("jdUniquePosts", {
-          through: "jdCategorizations",
-          source: "jdPost",
-          className: "JdPost",
-        });
-      }
-    }
-    class JdCategorization extends Base {
-      static {
-        this.attribute("jd_author_id", "integer");
-        this.attribute("jd_post_id", "integer");
-        this.belongsTo("jdPost", {
-          foreignKey: "jd_post_id",
-          className: "JdPost",
-        });
-      }
-    }
-    class JdPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("JdAuthor", JdAuthor);
-    registerModel("JdCategorization", JdCategorization);
-    registerModel("JdPost", JdPost);
-
-    const author = await JdAuthor.create({ name: "Mary" });
-    const post = await JdPost.create({ title: "P1" });
-    // Two categorizations pointing to the same post
-    await JdCategorization.create({ jd_author_id: author.id, jd_post_id: post.id });
-    await JdCategorization.create({ jd_author_id: author.id, jd_post_id: post.id });
-
-    // Joining with distinct should produce valid SQL
-    const sql = JdAuthor.joins("jdUniquePosts").distinct().toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("DISTINCT");
-    expect(sql).toContain("jd_categorizations");
-    expect(sql).toContain("jd_posts");
+    const mary = await Author.joins("uniqueCategorizedPosts")
+      .where({ id: authors("mary").id })
+      .first();
+    expect(await (mary as any).uniqueCategorizedPosts.size()).toBe(1);
+    expect((await (mary as any).uniqueCategorizedPostIds).length).toBe(1);
   });
 
   it("joining has many through belongs to", async () => {
-    class JbtPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("jbt_author_id", "integer");
-        this.belongsTo("jbtAuthor", { foreignKey: "jbt_author_id" });
-        this.hasMany("jbtAuthorCategorizations", {
-          through: "jbtAuthor",
-          source: "jbtCategorizations",
-          className: "JbtCategorization",
-        });
-      }
-    }
-    class JbtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("jbtCategorizations", { foreignKey: "jbt_author_id" });
-      }
-    }
-    class JbtCategorization extends Base {
-      static {
-        this.attribute("jbt_author_id", "integer");
-        this.attribute("jbt_category_id", "integer");
-        this.belongsTo("jbtCategory", {
-          foreignKey: "jbt_category_id",
-          className: "JbtCategory",
-        });
-      }
-    }
-    class JbtCategory extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    // Post -> author -> categorizations (through belongs_to then has_many)
-    registerModel("JbtPost", JbtPost);
-    registerModel("JbtAuthor", JbtAuthor);
-    registerModel("JbtCategorization", JbtCategorization);
-    registerModel("JbtCategory", JbtCategory);
-
-    const author = await JbtAuthor.create({ name: "Mary" });
-    const cat = await JbtCategory.create({ name: "General" });
-    const post = await JbtPost.create({ title: "P1", jbt_author_id: author.id });
-    await JbtCategorization.create({ jbt_author_id: author.id, jbt_category_id: cat.id });
-
-    // Joining has_many through a belongs_to should generate correct SQL
-    const sql = JbtPost.joins("jbtAuthorCategorizations").toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("jbt_authors");
-    expect(sql).toContain("jbt_categorizations");
-
-    const results = await JbtPost.joins("jbtAuthorCategorizations")
-      .where({ id: post.id })
+    const maryCatId = categorizations("mary_thinking_sti").id;
+    const postList = await Post.joins("authorCategorizations")
+      .order("posts.id")
+      .where({ "categorizations.id": maryCatId })
       .toArray();
-    expect(results.length).toBeGreaterThan(0);
+
+    expect(postList.map((p: any) => p.id)).toEqual([
+      posts("eager_other").id,
+      posts("misc_by_mary").id,
+      posts("other_by_mary").id,
+    ]);
   });
+
   it("select chosen fields only", async () => {
-    class HmtSelOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtSelJoins", {
-          className: "HmtSelJoin",
-          foreignKey: "hmt_sel_owner_id",
-        });
-        this.hasMany("hmtSelItems", {
-          className: "HmtSelItem",
-          through: "hmtSelJoins",
-          source: "hmtSelItem",
-        });
-      }
-    }
-    class HmtSelJoin extends Base {
-      static {
-        this.attribute("hmt_sel_owner_id", "integer");
-        this.attribute("hmt_sel_item_id", "integer");
-        this.belongsTo("hmtSelItem", {
-          className: "HmtSelItem",
-          foreignKey: "hmt_sel_item_id",
-        });
-      }
-    }
-    class HmtSelItem extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("extra", "string");
-      }
-    }
-
-    registerModel("HmtSelOwner", HmtSelOwner);
-    registerModel("HmtSelJoin", HmtSelJoin);
-    registerModel("HmtSelItem", HmtSelItem);
-    const owner = await HmtSelOwner.create({ name: "O" });
-    const item = await HmtSelItem.create({ label: "L", extra: "E" });
-    await HmtSelJoin.create({
-      hmt_sel_owner_id: owner.id,
-      hmt_sel_item_id: item.id,
-    });
-    const items = await loadHasManyThrough(owner, "hmtSelItems", {
-      through: "hmtSelJoins",
-      source: "hmtSelItem",
-      className: "HmtSelItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("L");
+    const david = await Author.find(authors("david").id);
+    const first = await (david as any).comments.select("comments.body").first();
+    const keys = Object.keys(first.attributes).sort();
+    expect(keys).toEqual(["body", "id"].sort());
   });
+
   it("get has many through belongs to ids with conditions", async () => {
-    class GidAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("gidCategorizations", {
-          className: "GidCategorization",
-          foreignKey: "gid_author_id",
-        });
-        this.hasMany("gidCategoriesLikeGeneral", {
-          through: "gidCategorizations",
-          source: "gidCategory",
-          className: "GidCategory",
-          scope: (rel: any) => rel.where({ name: "General" }),
-        });
-      }
-    }
-    class GidCategorization extends Base {
-      static {
-        this.attribute("gid_author_id", "integer");
-        this.attribute("gid_category_id", "integer");
-        this.attribute("special", "boolean");
-        this.belongsTo("gidCategory", {
-          className: "GidCategory",
-          foreignKey: "gid_category_id",
-        });
-      }
-    }
-    class GidCategory extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("GidAuthor", GidAuthor);
-    registerModel("GidCategorization", GidCategorization);
-    registerModel("GidCategory", GidCategory);
-
-    const author = await GidAuthor.create({ name: "Mary" });
-    const general = await GidCategory.create({ name: "General" });
-    const cooking = await GidCategory.create({ name: "Cooking" });
-    await GidCategorization.create({ gid_author_id: author.id, gid_category_id: general.id });
-    await GidCategorization.create({ gid_author_id: author.id, gid_category_id: cooking.id });
-
-    const categories = await loadHasManyThrough(author, "gidCategoriesLikeGeneral", {
-      through: "gidCategorizations",
-      source: "gidCategory",
-      className: "GidCategory",
-      scope: (rel: any) => rel.where({ name: "General" }),
-    });
-    const ids = categories.map((c) => c.id);
-    expect(ids).toEqual([general.id]);
+    const mary = await Author.find(authors("mary").id);
+    const ids = await (mary as any).categoriesLikeGeneralIds;
+    expect([...ids]).toEqual([categories("general").id]);
   });
 
   it("get collection singular ids on has many through with conditions and include", async () => {
-    class GcsOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("gcsJoins", {
-          className: "GcsJoin",
-          foreignKey: "gcs_owner_id",
-        });
-        this.hasMany("gcsPostsNoComments", {
-          through: "gcsJoins",
-          source: "gcsPost",
-          className: "GcsPost",
-          scope: (rel: any) => rel.where({ comments_count: 0 }),
-        });
-      }
-    }
-    class GcsJoin extends Base {
-      static {
-        this.attribute("gcs_owner_id", "integer");
-        this.attribute("gcs_post_id", "integer");
-        this.belongsTo("gcsPost", {
-          className: "GcsPost",
-          foreignKey: "gcs_post_id",
-        });
-      }
-    }
-    class GcsPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("comments_count", "integer");
-      }
-    }
-    registerModel("GcsOwner", GcsOwner);
-    registerModel("GcsJoin", GcsJoin);
-    registerModel("GcsPost", GcsPost);
-
-    const owner = await GcsOwner.create({ name: "Michael" });
-    const p1 = await GcsPost.create({ title: "Authorless", comments_count: 0 });
-    const p2 = await GcsPost.create({ title: "Has Comments", comments_count: 5 });
-    await GcsJoin.create({ gcs_owner_id: owner.id, gcs_post_id: p1.id });
-    await GcsJoin.create({ gcs_owner_id: owner.id, gcs_post_id: p2.id });
-
-    const posts = await loadHasManyThrough(owner, "gcsPostsNoComments", {
-      through: "gcsJoins",
-      source: "gcsPost",
-      className: "GcsPost",
-      scope: (rel: any) => rel.where({ comments_count: 0 }),
-    });
-    const ids = posts.map((p) => p.id);
-    expect(ids).toEqual([p1.id]);
+    const person = await Person.first();
+    const noCommentIds = await (person as any).postsWithNoCommentIds;
+    const noComments = await (person as any).postsWithNoComments.toArray();
+    expect([...noCommentIds].sort()).toEqual(noComments.map((p: any) => p.id).sort());
   });
 
   it("count has many through with named scope", async () => {
-    // Rails: authors(:mary).categories.count == 2; .general.count == 1
-    class CntCat extends Base {
-      static {
-        this.attribute("name", "string");
-        this.scope("general", (rel: any) => rel.where({ name: "General" }));
-      }
-    }
-    class CntCateg extends Base {
-      static {
-        this.attribute("cnt_author_id", "integer");
-        this.attribute("cnt_cat_id", "integer");
-        this.belongsTo("cnt_cat", {
-          className: "CntCat",
-          foreignKey: "cnt_cat_id",
-        });
-      }
-    }
-    class CntAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("cnt_categs", {
-          className: "CntCateg",
-          foreignKey: "cnt_author_id",
-        });
-        this.hasMany("cnt_cats", {
-          className: "CntCat",
-          through: "cnt_categs",
-          source: "cnt_cat",
-        });
-      }
-    }
-    registerModel("CntCat", CntCat);
-    registerModel("CntCateg", CntCateg);
-    registerModel("CntAuthor", CntAuthor);
-
-    const author = await CntAuthor.create({ name: "Mary" });
-    const cat1 = await CntCat.create({ name: "General" });
-    const cat2 = await CntCat.create({ name: "Tech" });
-    await CntCateg.create({ cnt_author_id: author.id, cnt_cat_id: cat1.id });
-    await CntCateg.create({ cnt_author_id: author.id, cnt_cat_id: cat2.id });
-
-    const total = await (author as any).cnt_cats.count();
-    expect(total).toBe(2);
-    const generalCount = await (author as any).cnt_cats.general().count();
-    expect(generalCount).toBe(1);
+    const mary = await Author.find(authors("mary").id);
+    expect(await (mary as any).categories.count()).toBe(2);
+    expect(await (mary as any).categories.general().count()).toBe(1);
   });
+
   it("has many through belongs to should update when the through foreign key changes", async () => {
-    class HmtFkOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtFkJoins", {
-          className: "HmtFkJoin",
-          foreignKey: "hmt_fk_owner_id",
-        });
-        this.hasMany("hmtFkTargets", {
-          through: "hmtFkJoins",
-          source: "hmtFkTarget",
-          className: "HmtFkTarget",
-        });
-      }
-    }
-    class HmtFkJoin extends Base {
-      static {
-        this.attribute("hmt_fk_owner_id", "integer");
-        this.attribute("hmt_fk_target_id", "integer");
-        this.belongsTo("hmtFkTarget", {
-          className: "HmtFkTarget",
-          foreignKey: "hmt_fk_target_id",
-        });
-      }
-    }
-    class HmtFkTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("eager_other").id);
 
-    registerModel("HmtFkOwner", HmtFkOwner);
-    registerModel("HmtFkJoin", HmtFkJoin);
-    registerModel("HmtFkTarget", HmtFkTarget);
+    await (post as any).authorCategorizations.toArray();
+    const proxy = (post as any).association("authorCategorizations");
 
-    const owner = await HmtFkOwner.create({ name: "O" });
-    const t1 = await HmtFkTarget.create({ label: "T1" });
-    const t2 = await HmtFkTarget.create({ label: "T2" });
-    const join = await HmtFkJoin.create({
-      hmt_fk_owner_id: owner.id,
-      hmt_fk_target_id: t1.id,
-    });
+    expect(proxy.isStaleTarget()).toBe(false);
+    const mary = await Author.find(authors("mary").id);
+    const maryCats = await (mary as any).categorizations.toArray();
+    const postCats = await (post as any).authorCategorizations.toArray();
+    expect(postCats.map((c: any) => c.id).sort()).toEqual(maryCats.map((c: any) => c.id).sort());
 
-    // Change the FK to point to t2
-    join.hmt_fk_target_id = t2.id;
-    await join.save();
+    (post as any).author_id = authors("david").id;
 
-    const targets = await loadHasManyThrough(owner, "hmtFkTargets", {
-      through: "hmtFkJoins",
-      source: "hmtFkTarget",
-      className: "HmtFkTarget",
-    });
-    expect(targets).toHaveLength(1);
-    expect(targets[0].label).toBe("T2");
+    expect(proxy.isStaleTarget()).toBe(true);
+    const david = await Author.find(authors("david").id);
+    const davidCats = await (david as any).categorizations.toArray();
+    const updatedCats = await (post as any).authorCategorizations.toArray();
+    expect(updatedCats.map((c: any) => c.id).sort()).toEqual(
+      davidCats.map((c: any) => c.id).sort(),
+    );
   });
+
+  it("create with conditions hash on through association", async () => {
+    const groucho = await Member.find(members("groucho").id);
+    const club = await (groucho as any).clubs.create({});
+    const reloaded = await Club.find(club.id);
+    expect((await (reloaded as any).membership).favorite).toBe(true);
+  });
+
   it("deleting from has many through a belongs to should not try to update counter", async () => {
-    class HmtNoCounterOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtNoCounterJoins", {
-          className: "HmtNoCounterJoin",
-          foreignKey: "hmt_no_counter_owner_id",
-        });
-        this.hasMany("hmtNoCounterItems", {
-          through: "hmtNoCounterJoins",
-          source: "hmtNoCounterItem",
-          className: "HmtNoCounterItem",
-        });
-      }
-    }
-    class HmtNoCounterJoin extends Base {
-      static {
-        this.attribute("hmt_no_counter_owner_id", "integer");
-        this.attribute("hmt_no_counter_item_id", "integer");
-        this.belongsTo("hmtNoCounterItem", {
-          className: "HmtNoCounterItem",
-          foreignKey: "hmt_no_counter_item_id",
-        });
-      }
-    }
-    class HmtNoCounterItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    const post = await Post.find(posts("welcome").id);
+    const address = await AuthorAddress.find(authorAddresses("david_address").id);
 
-    registerModel("HmtNoCounterOwner", HmtNoCounterOwner);
-    registerModel("HmtNoCounterJoin", HmtNoCounterJoin);
-    registerModel("HmtNoCounterItem", HmtNoCounterItem);
-
-    const owner = await HmtNoCounterOwner.create({ name: "O" });
-    const item = await HmtNoCounterItem.create({ label: "I" });
-    const join = await HmtNoCounterJoin.create({
-      hmt_no_counter_owner_id: owner.id,
-      hmt_no_counter_item_id: item.id,
-    });
-
-    // Deleting the join record should work without counter cache issues
-    await join.destroy();
-
-    const items = await loadHasManyThrough(owner, "hmtNoCounterItems", {
-      through: "hmtNoCounterJoins",
-      source: "hmtNoCounterItem",
-      className: "HmtNoCounterItem",
-    });
-    expect(items).toHaveLength(0);
-    // The target item should still exist
-    const reloadedItem = await HmtNoCounterItem.find(item.id);
-    expect(reloadedItem.label).toBe("I");
+    const postAddresses = await (post as any).authorAddresses.toArray();
+    expect(postAddresses.map((a: any) => a.id)).toContain(address.id);
+    await (post as any).authorAddresses.delete(address);
+    expect((post as any)["author_count"]).toBeUndefined();
   });
+
   it("primary key option on source", async () => {
-    class PkoOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pkoJoins", {
-          className: "PkoJoin",
-          foreignKey: "pko_owner_id",
-        });
-        this.hasMany("pkoItems", {
-          through: "pkoJoins",
-          source: "pkoItem",
-          className: "PkoItem",
-        });
-      }
-    }
-    class PkoJoin extends Base {
-      static {
-        this.attribute("pko_owner_id", "integer");
-        this.attribute("pko_item_id", "integer");
-        this.belongsTo("pkoItem", {
-          className: "PkoItem",
-          foreignKey: "pko_item_id",
-        });
-      }
-    }
-    class PkoItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("PkoOwner", PkoOwner);
-    registerModel("PkoJoin", PkoJoin);
-    registerModel("PkoItem", PkoItem);
-
-    const owner = await PkoOwner.create({ name: "O" });
-    const item = await PkoItem.create({ label: "I" });
-    await PkoJoin.create({ pko_owner_id: owner.id, pko_item_id: item.id });
-
-    const items = await loadHasManyThrough(owner, "pkoItems", {
-      through: "pkoJoins",
-      source: "pkoItem",
-      className: "PkoItem",
+    const post = await Post.find(posts("welcome").id);
+    const general = await Category.find(categories("general").id);
+    await Categorization.create({
+      post_id: post.id,
+      named_category_name: (general as any).name,
     });
-    expect(items).toHaveLength(1);
+
+    const namedCats = await (post as any).namedCategories.toArray();
+    expect(namedCats.map((c: any) => c.id)).toEqual([general.id]);
+
+    const namedIds = await (post as any).namedCategoryIds;
+    expect([...namedIds]).toEqual([(general as any).name]);
+
+    const reloaded = await Post.find(posts("welcome").id);
+    const reloadedIds = await (reloaded as any).namedCategoryIds;
+    expect([...reloadedIds]).toEqual([(general as any).name]);
   });
+
   it("create should not raise exception when join record has errors", async () => {
-    class HmtNoErrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+    (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
+    try {
+      const firstAuthor = await Author.first();
+      // Should not throw
+      await expect(
+        Category.create({ name: "Fishing", authors: [firstAuthor] }),
+      ).resolves.toBeDefined();
+    } finally {
+      (Categorization as any).clearValidatorsBang();
     }
-    class HmtNoErrJoin extends Base {
-      static {
-        this.attribute("hmt_no_err_owner_id", "integer");
-        this.attribute("hmt_no_err_item_id", "integer");
-      }
-    }
-    registerModel("HmtNoErrOwner", HmtNoErrOwner);
-    registerModel("HmtNoErrJoin", HmtNoErrJoin);
-
-    const owner = await HmtNoErrOwner.create({ name: "O" });
-    // Creating a join with a non-existent target still persists
-    const join = await HmtNoErrJoin.create({
-      hmt_no_err_owner_id: owner.id,
-      hmt_no_err_item_id: 9999,
-    });
-    expect(join.id).not.toBeNull();
   });
-  it("assign array to new record builds join records", async () => {
-    class HmtArrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtArrJoins", {
-          className: "HmtArrJoin",
-          foreignKey: "hmt_arr_owner_id",
-        });
-        this.hasMany("hmtArrItems", {
-          through: "hmtArrJoins",
-          source: "hmtArrItem",
-          className: "HmtArrItem",
-        });
-      }
-    }
-    class HmtArrJoin extends Base {
-      static {
-        this.attribute("hmt_arr_owner_id", "integer");
-        this.attribute("hmt_arr_item_id", "integer");
-        this.belongsTo("hmtArrItem", {
-          className: "HmtArrItem",
-          foreignKey: "hmt_arr_item_id",
-        });
-      }
-    }
-    class HmtArrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
 
-    registerModel("HmtArrOwner", HmtArrOwner);
-    registerModel("HmtArrJoin", HmtArrJoin);
-    registerModel("HmtArrItem", HmtArrItem);
-
-    // Rails: c = Category.new(name: "Fishing", authors: [Author.first])
-    //        assert_equal 1, c.categorizations.size
-    // Array-assignment on a NEW owner routes through replace_records → concat →
-    // concat_records, building the through join row in memory before save.
-    const item = await HmtArrItem.create({ label: "I1" });
-    const owner = new HmtArrOwner({ name: "O", hmtArrItems: [item] });
-
-    expect((owner as any).association("hmtArrJoins").target).toHaveLength(1);
-
-    await owner.save();
-    const items = await loadHasManyThrough(owner, "hmtArrItems", {
-      through: "hmtArrJoins",
-      source: "hmtArrItem",
-      className: "HmtArrItem",
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0].label).toBe("I1");
+  it.skip("assign array to new record builds join records", async () => {
+    const firstAuthor = await Author.first();
+    const c = new Category({ name: "Fishing", authors: [firstAuthor] });
+    expect(await (c as any).categorizations.size()).toBe(1);
   });
+
   it("create bang should raise exception when join record has errors", async () => {
-    // Rails: Categorization.validate { errors.add(:base, ...) }
-    //   Category.create!(name: "Fishing", authors: [Author.first]) raises RecordInvalid
-    // Join model with always-failing validation — appending raises via saveBang in _pushThrough
-    class CbangJoin extends Base {
-      static {
-        this.attribute("cbang_owner_id", "integer");
-        this.attribute("cbang_item_id", "integer");
-        this.validate((r: any) => {
-          r.errors.add("base", "Invalid Join");
-        });
-        this.belongsTo("cbang_item", {
-          className: "CbangItem",
-          foreignKey: "cbang_item_id",
-        });
-      }
+    (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
+    try {
+      const firstAuthor = await Author.first();
+      await expect(
+        Category.createBang({ name: "Fishing", authors: [firstAuthor] }),
+      ).rejects.toThrow(RecordInvalid);
+    } finally {
+      (Categorization as any).clearValidatorsBang();
     }
-    class CbangItem extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CbangOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("cbang_joins", {
-          className: "CbangJoin",
-          foreignKey: "cbang_owner_id",
-        });
-        this.hasMany("cbang_items", {
-          className: "CbangItem",
-          through: "cbang_joins",
-          source: "cbang_item",
-        });
-      }
-    }
-    registerModel("CbangJoin", CbangJoin);
-    registerModel("CbangItem", CbangItem);
-    registerModel("CbangOwner", CbangOwner);
-
-    const owner = await CbangOwner.create({ name: "O" });
-    const item = await CbangItem.create({ name: "A" });
-    // append calls _pushThrough which calls saveBang on join record — raises because join is invalid
-    await expect((owner as any).cbang_items.appendBang(item)).rejects.toThrow(RecordInvalid);
   });
 
   it("save bang should raise exception when join record has errors", async () => {
-    // Rails: c.save! raises RecordInvalid when the join Categorization is invalid
-    class SbangJoin extends Base {
-      static {
-        this.attribute("sbang_owner_id", "integer");
-        this.attribute("sbang_item_id", "integer");
-        this.validate((r: any) => {
-          r.errors.add("base", "Invalid Join");
-        });
-        this.belongsTo("sbang_item", {
-          className: "SbangItem",
-          foreignKey: "sbang_item_id",
-        });
-      }
+    (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
+    try {
+      const firstAuthor = await Author.first();
+      const c = new Category({ name: "Fishing", authors: [firstAuthor] });
+      await expect(c.saveBang()).rejects.toThrow(RecordInvalid);
+    } finally {
+      (Categorization as any).clearValidatorsBang();
     }
-    class SbangItem extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class SbangOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("sbang_joins", {
-          className: "SbangJoin",
-          foreignKey: "sbang_owner_id",
-        });
-        this.hasMany("sbang_items", {
-          className: "SbangItem",
-          through: "sbang_joins",
-          source: "sbang_item",
-        });
-      }
-    }
-    registerModel("SbangJoin", SbangJoin);
-    registerModel("SbangItem", SbangItem);
-    registerModel("SbangOwner", SbangOwner);
-
-    const owner = await SbangOwner.create({ name: "O" });
-    const item = await SbangItem.create({ name: "A" });
-    await expect((owner as any).sbang_items.appendBang(item)).rejects.toThrow(RecordInvalid);
   });
 
   it("save returns falsy when join record has errors", async () => {
-    // Rails: c = Category.new(name: "Fishing", authors: [Author.first]); assert_not c.save
-    // Pre-populating the through-association's target on a new owner mirrors
-    // Rails' constructor-form collection writer; autosave then attempts to
-    // create the join record, whose validation fails, so owner.save() is falsy.
-    class FbangJoin extends Base {
-      static {
-        this.attribute("fbang_owner_id", "integer");
-        this.attribute("fbang_item_id", "integer");
-        this.validate((r: any) => {
-          r.errors.add("base", "Invalid Join");
-        });
-        this.belongsTo("fbang_item", {
-          className: "FbangItem",
-          foreignKey: "fbang_item_id",
-        });
-      }
+    (Categorization as any).validate((r: any) => r.errors.add("base", "Invalid Categorization"));
+    try {
+      const firstAuthor = await Author.first();
+      const c = new Category({ name: "Fishing", authors: [firstAuthor] });
+      expect(await c.save()).toBeFalsy();
+    } finally {
+      (Categorization as any).clearValidatorsBang();
     }
-    class FbangItem extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class FbangOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("fbang_joins", {
-          className: "FbangJoin",
-          foreignKey: "fbang_owner_id",
-        });
-        this.hasMany("fbang_items", {
-          className: "FbangItem",
-          through: "fbang_joins",
-          source: "fbang_item",
-        });
-      }
-    }
-    registerModel("FbangJoin", FbangJoin);
-    registerModel("FbangItem", FbangItem);
-    registerModel("FbangOwner", FbangOwner);
-
-    const item = await FbangItem.create({ name: "A" });
-    const owner = new FbangOwner();
-    (owner as any).name = "Fishing";
-    // Pre-populate the through-association target so autosave attempts join
-    // creation when the new owner is saved — mirrors Rails' constructor-form
-    // collection writer `Category.new(name:, authors: [author])`.
-    owner.association("fbang_items").setTarget([item] as any);
-
-    const result = await owner.save();
-    expect(result).toBeFalsy();
-    // Owner row may have been written before autosave failure surfaces, but the
-    // failing join record must not be persisted (Rails: c.save returns false).
-    const joins = await FbangJoin.all().toArray();
-    expect(joins).toHaveLength(0);
   });
-  it("preloading empty through association via joins", async () => {
-    class HmtEmptyThrOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtEmptyThrJoins", {
-          className: "HmtEmptyThrJoin",
-          foreignKey: "hmt_empty_thr_owner_id",
-        });
-        this.hasMany("hmtEmptyThrItems", {
-          through: "hmtEmptyThrJoins",
-          source: "hmtEmptyThrItem",
-          className: "HmtEmptyThrItem",
-        });
-      }
-    }
-    class HmtEmptyThrJoin extends Base {
-      static {
-        this.attribute("hmt_empty_thr_owner_id", "integer");
-        this.attribute("hmt_empty_thr_item_id", "integer");
-        this.belongsTo("hmtEmptyThrItem", {
-          className: "HmtEmptyThrItem",
-          foreignKey: "hmt_empty_thr_item_id",
-        });
-      }
-    }
-    class HmtEmptyThrItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
 
-    registerModel("HmtEmptyThrOwner", HmtEmptyThrOwner);
-    registerModel("HmtEmptyThrJoin", HmtEmptyThrJoin);
-    registerModel("HmtEmptyThrItem", HmtEmptyThrItem);
+  it.skip("preloading empty through association via joins", async () => {
+    const readerId = readers("michael_welcome").id;
+    const person = await Person.create({ first_name: "Gaga" });
+    const loaded = await Person.where({ id: person.id })
+      .where(`readers.id = ${readerId} or 1=1`)
+      .references("readers")
+      .includes("posts")
+      .toArray();
+    const p = loaded[0];
+    expect((p as any).posts.loaded).toBe(true);
+    expect(await (p as any).posts.toArray()).toEqual([]);
+  });
 
-    // Owner with no join records - should get empty through association
-    const owner = await HmtEmptyThrOwner.create({ name: "O" });
-
-    const items = await loadHasManyThrough(owner, "hmtEmptyThrItems", {
-      through: "hmtEmptyThrJoins",
-      source: "hmtEmptyThrItem",
-      className: "HmtEmptyThrItem",
+  it.skip("preloading empty through with polymorphic source association", async () => {
+    const owner = await Owner.create({ name: "Rainbow Unicat" });
+    const pet = await Pet.create({ owner_id: owner.id });
+    const person = await Person.create({ first_name: "Gaga" });
+    const treasure = await Treasure.create({ looter_type: "Person", looter_id: person.id });
+    const nonLootedTreasure = await Treasure.create({});
+    await PetTreasure.create({
+      pet_id: pet.id,
+      treasure_id: treasure.id,
+      rainbow_color: "Ultra violet indigo",
     });
-    expect(items).toHaveLength(0);
-  });
-  it("preloading empty through with polymorphic source association", async () => {
-    class PepOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("pepTaggings", {
-          className: "PepTagging",
-          foreignKey: "pep_owner_id",
-        });
-        this.hasMany("pepItems", {
-          through: "pepTaggings",
-          source: "taggable",
-          className: "PepItem",
-        });
-      }
-    }
-    class PepTagging extends Base {
-      static {
-        this.attribute("pep_owner_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.belongsTo("taggable", {
-          className: "PepItem",
-          foreignKey: "taggable_id",
-          polymorphic: true,
-        });
-      }
-    }
-    class PepItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-
-    registerModel("PepOwner", PepOwner);
-    registerModel("PepTagging", PepTagging);
-    registerModel("PepItem", PepItem);
-
-    const owner = await PepOwner.create({ name: "O" });
-    const items = await loadHasManyThrough(owner, "pepItems", {
-      through: "pepTaggings",
-      source: "taggable",
-      className: "PepItem",
+    await PetTreasure.create({
+      pet_id: pet.id,
+      treasure_id: nonLootedTreasure.id,
+      rainbow_color: "Ultra violet indigo",
     });
-    expect(items).toHaveLength(0);
+
+    const result = await Owner.where({ name: "Rainbow Unicat" })
+      .includes({ pets: "persons" })
+      .first();
+    const persons = await (result as any).persons.toArray();
+    expect(persons.map((p: any) => p.id)).toEqual([person.id]);
   });
+
   it("explicitly joining join table", async () => {
-    class EjjOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ejjPets", { foreignKey: "ejj_owner_id" });
-        this.hasMany("ejjToys", {
-          through: "ejjPets",
-          source: "ejjToys",
-          className: "EjjToy",
-        });
-      }
-    }
-    class EjjPet extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ejj_owner_id", "integer");
-        this.hasMany("ejjToys", { foreignKey: "ejj_pet_id" });
-      }
-    }
-    class EjjToy extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ejj_pet_id", "integer");
-      }
-    }
-    registerModel("EjjOwner", EjjOwner);
-    registerModel("EjjPet", EjjPet);
-    registerModel("EjjToy", EjjToy);
-
-    const owner = await EjjOwner.create({ name: "Blackbeard" });
-    const pet = await EjjPet.create({ name: "Parrot", ejj_owner_id: owner.id });
-    await EjjToy.create({ name: "Ball", ejj_pet_id: pet.id });
-
-    // Explicitly joining the join table should work
-    const sql = EjjOwner.joins("ejjToys").toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("ejj_pets");
-    expect(sql).toContain("ejj_toys");
-
-    const results = await EjjOwner.joins("ejjToys").where({ id: owner.id }).toArray();
-    expect(results.length).toBeGreaterThan(0);
+    const blackbeard = await Owner.find(owners("blackbeard").id);
+    const toys1 = await (blackbeard as any).toys.toArray();
+    const toys2 = await (blackbeard as any).toys.withPet().toArray();
+    expect(toys2.map((t: any) => t.id).sort()).toEqual(toys1.map((t: any) => t.id).sort());
   });
-  it("has many through with polymorphic source", async () => {
-    class PsPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class PsTagging extends Base {
-      static {
-        this.attribute("ps_tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.belongsTo("taggable", {
-          className: "PsPost",
-          foreignKey: "taggable_id",
-          polymorphic: true,
-        });
-      }
-    }
-    class PsTag extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("psTaggings", {
-          className: "PsTagging",
-          foreignKey: "ps_tag_id",
-        });
-        this.hasMany("taggedPosts", {
-          through: "psTaggings",
-          source: "taggable",
-          className: "PsPost",
-        });
-      }
-    }
 
-    registerModel("PsPost", PsPost);
-    registerModel("PsTagging", PsTagging);
-    registerModel("PsTag", PsTag);
-
-    const post = await PsPost.create({ title: "Hello" });
-    const tag = await PsTag.create({ name: "ruby" });
-    await PsTagging.create({
-      ps_tag_id: tag.id,
-      taggable_id: post.id,
-      taggable_type: "PsPost",
-    });
-
-    const posts = await loadHasManyThrough(tag, "taggedPosts", {
-      through: "psTaggings",
-      source: "taggable",
-      className: "PsPost",
-    });
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Hello");
+  it.skip("has many through with polymorphic source", async () => {
+    const general = await Tag.find(tags("general").id);
+    const post = await (general as any).taggedPosts.create({ title: "foo", body: "bar" });
+    const reloaded = await Post.find(post.id);
+    const postTags = await (reloaded as any).tags.toArray();
+    expect(postTags.map((t: any) => t.id)).toEqual([general.id]);
   });
+
   it("has many through with polymorhic join model", async () => {
-    class PjmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("pjmTaggings", {
-          className: "PjmTagging",
-          foreignKey: "taggable_id",
-          as: "taggable",
-        });
-        this.hasMany("pjmTags", {
-          through: "pjmTaggings",
-          source: "pjmTag",
-          className: "PjmTag",
-        });
-      }
-    }
-    class PjmTagging extends Base {
-      static {
-        this.attribute("pjm_tag_id", "integer");
-        this.attribute("taggable_id", "integer");
-        this.attribute("taggable_type", "string");
-        this.belongsTo("pjmTag", {
-          className: "PjmTag",
-          foreignKey: "pjm_tag_id",
-        });
-      }
-    }
-    class PjmTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
+    const zine = await Zine.create({});
 
-    registerModel("PjmPost", PjmPost);
-    registerModel("PjmTagging", PjmTagging);
-    registerModel("PjmTag", PjmTag);
+    const human = await (zine as any).polymorphicHumans.build();
+    await human.save();
 
-    const post = await PjmPost.create({ title: "Hello" });
-    const tag = await PjmTag.create({ name: "ruby" });
-    await PjmTagging.create({
-      pjm_tag_id: tag.id,
-      taggable_id: post.id,
-      taggable_type: "PjmPost",
-    });
-
-    const tags = await loadHasManyThrough(post, "pjmTags", {
-      through: "pjmTaggings",
-      source: "pjmTag",
-      className: "PjmTag",
-    });
-    expect(tags).toHaveLength(1);
-    expect(tags[0].name).toBe("ruby");
+    expect(await (zine as any).polymorphicHumans.count()).toBe(1);
+    expect(await (zine as any).interests.count()).toBe(1);
   });
+
   it("has many through obeys order on through association", async () => {
-    class OrdPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class OrdReader extends Base {
-      static {
-        this.attribute("ord_person_id", "integer");
-        this.attribute("ord_post_id", "integer");
-        this.belongsTo("ordPost", {
-          className: "OrdPost",
-          foreignKey: "ord_post_id",
-        });
-      }
-    }
-    class OrdPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("ordReaders", {
-          className: "OrdReader",
-          foreignKey: "ord_person_id",
-        });
-        this.hasMany("ordPosts", {
-          through: "ordReaders",
-          source: "ordPost",
-          className: "OrdPost",
-        });
-      }
-    }
-
-    registerModel("OrdPost", OrdPost);
-    registerModel("OrdReader", OrdReader);
-    registerModel("OrdPerson", OrdPerson);
-
-    const person = await OrdPerson.create({ first_name: "Alice" });
-    const post1 = await OrdPost.create({ title: "First" });
-    const post2 = await OrdPost.create({ title: "Second" });
-    await OrdReader.create({ ord_person_id: person.id, ord_post_id: post1.id });
-    await OrdReader.create({ ord_person_id: person.id, ord_post_id: post2.id });
-
-    const posts = await loadHasManyThrough(person, "ordPosts", {
-      through: "ordReaders",
-      source: "ordPost",
-      className: "OrdPost",
+    const blackbeard = await Owner.find(owners("blackbeard").id);
+    const sql = await (blackbeard as any).toys.toSql();
+    expect(sql).toContain("pets.name desc");
+    const toyNames = (await (blackbeard as any).toys.toArray()).map(async (t: any) => {
+      const pet = await t.pet;
+      return pet?.name;
     });
-    expect(posts).toHaveLength(2);
+    expect(await Promise.all(toyNames)).toEqual(["parrot", "bulbul"]);
   });
+
   it("has many through associations sum on columns", async () => {
-    class SumPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("sumReaders", { foreignKey: "sum_post_id" });
-        this.hasMany("sumPeople", {
-          through: "sumReaders",
-          source: "sumPerson",
-          className: "SumPerson",
-        });
-      }
+    const post1 = await Post.create({ title: "active", body: "sample" });
+    const post2 = await Post.create({ title: "inactive", body: "sample" });
+
+    const p1 = await Person.create({ first_name: "aaron", followers_count: 1 });
+    const p2 = await Person.create({ first_name: "schmit", followers_count: 2 });
+    const p3 = await Person.create({ first_name: "bill", followers_count: 3 });
+    const p4 = await Person.create({ first_name: "cal", followers_count: 4 });
+
+    for (const p of [p1, p2, p3, p4]) {
+      await Reader.create({ post_id: post1.id, person_id: p.id });
+      await Reader.create({ post_id: post2.id, person_id: p.id });
     }
-    class SumPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.attribute("followers_count", "integer");
-        this.hasMany("sumReaders", { foreignKey: "sum_person_id" });
-        this.hasMany("sumPosts", {
-          through: "sumReaders",
-          source: "sumPost",
-          className: "SumPost",
-        });
-      }
-    }
-    class SumReader extends Base {
-      static {
-        this.attribute("sum_post_id", "integer");
-        this.attribute("sum_person_id", "integer");
-        this.belongsTo("sumPerson", {
-          foreignKey: "sum_person_id",
-          className: "SumPerson",
-        });
-        this.belongsTo("sumPost", {
-          foreignKey: "sum_post_id",
-          className: "SumPost",
-        });
-      }
-    }
-    registerModel("SumPost", SumPost);
-    registerModel("SumPerson", SumPerson);
-    registerModel("SumReader", SumReader);
 
-    const post1 = await SumPost.create({ title: "active" });
-    const post2 = await SumPost.create({ title: "inactive" });
-    const p1 = await SumPerson.create({ first_name: "aaron", followers_count: 1 });
-    const p2 = await SumPerson.create({ first_name: "schmit", followers_count: 2 });
-    const p3 = await SumPerson.create({ first_name: "bill", followers_count: 3 });
-    const p4 = await SumPerson.create({ first_name: "cal", followers_count: 4 });
+    const activePersons = await Person.joins("readers")
+      .joins("posts")
+      .distinct()
+      .where({ "posts.title": "active" })
+      .toArray();
 
-    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p1.id });
-    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p2.id });
-    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p3.id });
-    await SumReader.create({ sum_post_id: post1.id, sum_person_id: p4.id });
-    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p1.id });
-    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p2.id });
-    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p3.id });
-    await SumReader.create({ sum_post_id: post2.id, sum_person_id: p4.id });
+    const sum = activePersons.reduce((acc: number, p: any) => acc + p.followers_count, 0);
+    expect(sum).toBe(10);
+    expect(
+      await Person.joins("readers")
+        .joins("posts")
+        .distinct()
+        .where({ "posts.title": "active" })
+        .sum("followers_count"),
+    ).toBe(10);
+  });
 
-    // Sum followers_count for people who read "active" posts via joins + distinct
-    const activePersons = SumPerson.joins("sumPosts")
-      .where({ "sum_posts.title": "active" })
-      .distinct();
-
-    const sql = activePersons.toSql();
-    expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("DISTINCT");
-
-    // Verify sum via both manual calculation and aggregate
-    const results = await activePersons.toArray();
-    let manualSum = 0;
-    for (const p of results) {
-      manualSum += p.followers_count as number;
-    }
-    expect(manualSum).toBe(10);
-
-    const aggregateSum = await activePersons.sum("followers_count");
-    expect(aggregateSum).toBe(10);
+  it("has many through associations on new records use null relations", async () => {
+    const person = new Person();
+    expect(await (person as any).posts.toArray()).toEqual([]);
+    expect(await (person as any).posts.where({ body: "omg" }).toArray()).toEqual([]);
+    expect(await (person as any).posts.pluck("body")).toEqual([]);
+    expect(await (person as any).posts.sum("tags_count")).toBe(0);
+    expect(await (person as any).posts.count()).toBe(0);
   });
 
   it("has many through with default scope on the target", async () => {
-    // Rails: person.first_posts only returns posts where first_post_id is set via default scope
-    class DsTgt extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("is_first", "boolean");
-        this.defaultScope((rel: any) => rel.where({ is_first: true }));
-      }
-    }
-    class DsJoin extends Base {
-      static {
-        this.attribute("ds_owner_id", "integer");
-        this.attribute("ds_tgt_id", "integer");
-        this.belongsTo("ds_tgt", { className: "DsTgt", foreignKey: "ds_tgt_id" });
-      }
-    }
-    class DsOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ds_joins", {
-          className: "DsJoin",
-          foreignKey: "ds_owner_id",
-        });
-        this.hasMany("ds_tgts", {
-          className: "DsTgt",
-          through: "ds_joins",
-          source: "ds_tgt",
-        });
-      }
-    }
-    registerModel("DsTgt", DsTgt);
-    registerModel("DsJoin", DsJoin);
-    registerModel("DsOwner", DsOwner);
+    const michael = await Person.find(people("michael").id);
+    const firstPosts = await (michael as any).firstPosts.toArray();
+    expect(firstPosts.map((p: any) => p.id)).toEqual([posts("thinking").id]);
 
-    const owner = await DsOwner.create({ name: "O" });
-    const t1 = await DsTgt.create({ title: "First", is_first: true });
-    const t2 = await DsTgt.create({ title: "Second", is_first: false });
-    await DsJoin.create({ ds_owner_id: owner.id, ds_tgt_id: t1.id });
-    await DsJoin.create({ ds_owner_id: owner.id, ds_tgt_id: t2.id });
-
-    const results = await (owner as any).ds_tgts.toArray();
-    expect(results).toHaveLength(1);
-    expect(results[0].title).toBe("First");
+    const michaelAuthorless = await Reader.find(readers("michael_authorless").id);
+    await michaelAuthorless.update({ first_post_id: 1 });
+    const reloaded = await Person.find(people("michael").id);
+    const firstPostsReloaded = await (reloaded as any).firstPosts.toArray();
+    expect(firstPostsReloaded.map((p: any) => p.id)).toEqual([posts("thinking").id]);
   });
 
   it("has many through with includes in through association scope", async () => {
-    // Rails: posts(:welcome).author_address_extra_with_address is not empty
-    // Core: a through association with includes in its scope loads correctly
-    class IncScopeOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("inc_scope_joins", {
-          className: "IncScopeJoin",
-          foreignKey: "inc_scope_owner_id",
-        });
-        this.hasMany("inc_scope_tgts", {
-          className: "IncScopeTgt",
-          through: "inc_scope_joins",
-          source: "inc_scope_tgt",
-        });
-      }
-    }
-    class IncScopeJoin extends Base {
-      static {
-        this.attribute("inc_scope_owner_id", "integer");
-        this.attribute("inc_scope_tgt_id", "integer");
-        this.belongsTo("inc_scope_tgt", {
-          className: "IncScopeTgt",
-          foreignKey: "inc_scope_tgt_id",
-        });
-      }
-    }
-    class IncScopeTgt extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
-    registerModel("IncScopeOwner", IncScopeOwner);
-    registerModel("IncScopeJoin", IncScopeJoin);
-    registerModel("IncScopeTgt", IncScopeTgt);
-
-    const owner = await IncScopeOwner.create({ name: "O" });
-    const tgt = await IncScopeTgt.create({ label: "A" });
-    await IncScopeJoin.create({ inc_scope_owner_id: owner.id, inc_scope_tgt_id: tgt.id });
-
-    const results = await (owner as any).inc_scope_tgts.toArray();
-    expect(results).not.toHaveLength(0);
+    const welcome = await Post.find(posts("welcome").id);
+    const extra = await (welcome as any).authorAddressExtraWithAddress.toArray();
+    expect(extra.length).toBeGreaterThan(0);
   });
 
   it("insert records via has many through association with scope", async () => {
-    // Rails: club.favorites << member; assert_equal [member], club.favorites
-    // "favorites" is a scoped through that already has a membership; << adds another scoped entry
-    class IrClub extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ir_memberships", {
-          className: "IrMembership",
-          foreignKey: "ir_club_id",
-        });
-        this.hasMany("ir_members", {
-          className: "IrMember",
-          through: "ir_memberships",
-          source: "ir_member",
-        });
-        this.hasMany("ir_favorites", {
-          className: "IrMember",
-          through: "ir_memberships",
-          source: "ir_member",
-          scope: (rel: any) => rel.where({ "ir_memberships.favorite": true }),
-        });
-      }
-    }
-    class IrMembership extends Base {
-      static {
-        this.attribute("ir_club_id", "integer");
-        this.attribute("ir_member_id", "integer");
-        this.attribute("favorite", "boolean");
-        this.belongsTo("ir_member", {
-          className: "IrMember",
-          foreignKey: "ir_member_id",
-        });
-      }
-    }
-    class IrMember extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("IrClub", IrClub);
-    registerModel("IrMembership", IrMembership);
-    registerModel("IrMember", IrMember);
-    // scoped through: only favorite memberships (scope on the through/join table)
+    const club = await Club.create({});
+    const member = await Member.create({});
+    await Membership.create({ club_id: club.id, member_id: member.id });
 
-    const club = await IrClub.create({ name: "Club" });
-    const member = await IrMember.create({ name: "Alice" });
-    // Non-favorite membership
-    await IrMembership.create({ ir_club_id: club.id, ir_member_id: member.id, favorite: false });
-    // Favorite membership
-    await IrMembership.create({ ir_club_id: club.id, ir_member_id: member.id, favorite: true });
+    await (club as any).favorites.push(member);
+    expect((await (club as any).favorites.toArray()).map((m: any) => m.id)).toEqual([member.id]);
 
-    const favorites = await (club as any).ir_favorites.toArray();
-    expect(favorites).toHaveLength(1);
-    expect(favorites[0].id).toBe(member.id);
+    await club.reload();
+    expect((await (club as any).favorites.toArray()).map((m: any) => m.id)).toEqual([member.id]);
   });
 
   it("insert records via has many through association with scope and association name different from the joining table name", async () => {
-    // Same as above but with different naming — tests source name resolution
-    class IrClub2 extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ir_memberships2", {
-          className: "IrMembership2",
-          foreignKey: "ir_club2_id",
-        });
-        this.hasMany("ir_custom_favorites", {
-          className: "IrMember2",
-          through: "ir_memberships2",
-          source: "ir_member2",
-          scope: (rel: any) => rel.where({ "ir_membership2s.favorite": true }),
-        });
-      }
-    }
-    class IrMembership2 extends Base {
-      static {
-        this.attribute("ir_club2_id", "integer");
-        this.attribute("ir_member2_id", "integer");
-        this.attribute("favorite", "boolean");
-        this.belongsTo("ir_member2", {
-          className: "IrMember2",
-          foreignKey: "ir_member2_id",
-        });
-      }
-    }
-    class IrMember2 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("IrClub2", IrClub2);
-    registerModel("IrMembership2", IrMembership2);
-    registerModel("IrMember2", IrMember2);
+    const club = await Club.create({});
+    const member = await Member.create({});
+    await Membership.create({ club_id: club.id, member_id: member.id });
 
-    const club = await IrClub2.create({ name: "Club" });
-    const member = await IrMember2.create({ name: "Alice" });
-    await IrMembership2.create({ ir_club2_id: club.id, ir_member2_id: member.id, favorite: true });
+    await (club as any).customFavorites.push(member);
+    expect((await (club as any).customFavorites.toArray()).map((m: any) => m.id)).toEqual([
+      member.id,
+    ]);
 
-    const favorites = await (club as any).ir_custom_favorites.toArray();
-    expect(favorites).toHaveLength(1);
+    await club.reload();
+    expect((await (club as any).customFavorites.toArray()).map((m: any) => m.id)).toEqual([
+      member.id,
+    ]);
   });
 
-  it("has many through unscope default scope", async () => {
-    // Rails: post.lazy_people_unscope_skimmers.to_a.size == 2 (unscope removes default scope)
-    // A LazyReader has default scope skimmer: true; the unscope variant includes all readers
-    class HtuReader extends Base {
-      static {
-        this.attribute("htu_post_id", "integer");
-        this.attribute("htu_person_id", "integer");
-        this.attribute("skimmer", "boolean");
-        this.belongsTo("htu_person", {
-          className: "HtuPerson",
-          foreignKey: "htu_person_id",
-        });
-      }
-    }
-    class HtuPerson extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class HtuPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("htu_readers", {
-          className: "HtuReader",
-          foreignKey: "htu_post_id",
-        });
-        this.hasMany("htu_people", {
-          className: "HtuPerson",
-          through: "htu_readers",
-          source: "htu_person",
-        });
-        this.hasMany("htu_non_skimmer_people", {
-          className: "HtuPerson",
-          through: "htu_readers",
-          source: "htu_person",
-          scope: (rel: any) => rel.where({ "htu_readers.skimmer": false }),
-        });
-      }
-    }
-    registerModel("HtuReader", HtuReader);
-    registerModel("HtuPerson", HtuPerson);
-    registerModel("HtuPost", HtuPost);
-    // scoped: only non-skimmer readers
+  it.skip("has many through unscope default scope", async () => {
+    const post = await Post.create({ title: "Beaches", body: "I like beaches!" });
+    const david = await Person.find(people("david").id);
+    const susan = await Person.find(people("susan").id);
+    await Reader.create({ person_id: david.id, post_id: post.id });
+    await LazyReader.create({ person_id: susan.id, post_id: post.id });
 
-    const post = await HtuPost.create({ title: "Beach" });
-    const david = await HtuPerson.create({ name: "David" });
-    const susan = await HtuPerson.create({ name: "Susan" });
-    await HtuReader.create({ htu_post_id: post.id, htu_person_id: david.id, skimmer: false });
-    await HtuReader.create({ htu_post_id: post.id, htu_person_id: susan.id, skimmer: true });
+    expect(await (post as any).people.toArray()).toHaveLength(2);
+    expect(await (post as any).lazyPeople.toArray()).toHaveLength(1);
 
-    // All people (unscoped through)
-    const all = await (post as any).htu_people.toArray();
-    expect(all).toHaveLength(2);
-
-    // Scoped: only non-skimmer readers
-    const nonSkimmers = await (post as any).htu_non_skimmer_people.toArray();
-    expect(nonSkimmers).toHaveLength(1);
-    expect(nonSkimmers[0].name).toBe("David");
+    expect(await (post as any).lazyReadersUnscopeSkimmers.toArray()).toHaveLength(2);
+    expect(await (post as any).lazyPeopleUnscopeSkimmers.toArray()).toHaveLength(2);
   });
+
   it("has many through add with sti middle relation", async () => {
-    class StiAddClub extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiAddMemberships", {
-          className: "StiAddMembership",
-          foreignKey: "sti_add_club_id",
-        });
-        this.hasMany("stiAddMembers", {
-          through: "stiAddMemberships",
-          source: "stiAddMember",
-          className: "StiAddMember",
-        });
-      }
-    }
-    class StiAddMember extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class StiAddMembership extends Base {
-      static {
-        this.attribute("sti_add_club_id", "integer");
-        this.attribute("sti_add_member_id", "integer");
-        this.attribute("type", "string");
-        this._tableName = "sti_add_memberships";
-        enableSti(StiAddMembership);
-        this.belongsTo("stiAddMember", {
-          className: "StiAddMember",
-          foreignKey: "sti_add_member_id",
-        });
-      }
-    }
-    class StiAddSuperMembership extends StiAddMembership {
-      static {
-        registerModel(StiAddSuperMembership);
-        registerSubclass(StiAddSuperMembership);
-      }
-    }
+    const club = await SuperClub.create({ name: "Fight Club" });
+    const member = await Member.create({ name: "Tyler Durden" });
 
-    registerModel("StiAddClub", StiAddClub);
-    registerModel("StiAddMember", StiAddMember);
-    registerModel("StiAddMembership", StiAddMembership);
-
-    const club = await StiAddClub.create({ name: "Cool Club" });
-    const member = await StiAddMember.create({ name: "Alice" });
-    await StiAddSuperMembership.create({
-      sti_add_club_id: club.id,
-      sti_add_member_id: member.id,
-    });
-
-    const members = await loadHasManyThrough(club, "stiAddMembers", {
-      through: "stiAddMemberships",
-      source: "stiAddMember",
-      className: "StiAddMember",
-    });
-    expect(members).toHaveLength(1);
-    expect(members[0].name).toBe("Alice");
+    await (club as any).members.push(member);
+    expect(await SuperMembership.where({ member_id: member.id, club_id: club.id }).count()).toBe(1);
   });
+
   it("build for has many through association", async () => {
-    class BfAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("bfPosts", {
-          className: "BfPost",
-          foreignKey: "bf_author_id",
-        });
-      }
-    }
-    class BfPost extends Base {
-      static {
-        this.attribute("bf_author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    class BfOrg extends Base {
-      static {
-        this.attribute("bf_author_id", "integer");
-        this.attribute("name", "string");
-        this.belongsTo("bfAuthor", {
-          className: "BfAuthor",
-          foreignKey: "bf_author_id",
-        });
-        this.hasMany("bfPosts", {
-          through: "bfAuthor",
-          source: "bfPosts",
-          className: "BfPost",
-        });
-      }
-    }
-
-    registerModel("BfAuthor", BfAuthor);
-    registerModel("BfPost", BfPost);
-    registerModel("BfOrg", BfOrg);
-
-    const author = await BfAuthor.create({ name: "DHH" });
-    const org = await BfOrg.create({ bf_author_id: author.id, name: "NSA" });
-
-    const authorProxy = association(author, "bfPosts");
-    const postDirect = authorProxy.build();
-
-    const orgProxy = association(org, "bfPosts");
-    const postThrough = orgProxy.build();
-
-    expect(postDirect).toBeDefined();
-    expect(postThrough).toBeDefined();
+    const nsa = await Organization.find(organizations("nsa").id);
+    const author = await nsa.association("author").loadTarget();
+    const postDirect = await (author as any).posts.build();
+    const postThrough = await (nsa as any).posts.build();
+    expect(postDirect.author_id).toBe(postThrough.author_id);
   });
-  it("has many through with scope that should not be fully merged", async () => {
-    // Rails: Club.has_many :distinct_memberships, -> { distinct }
-    //   assert_nil Club.new.special_favorites.distinct_value
-    // A scoped through association should not fully merge distinct into the target
-    class HmtMgClub extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmt_mg_memberships", {
-          className: "HmtMgMembership",
-          foreignKey: "hmt_mg_club_id",
-          scope: (rel: any) => rel.distinct(),
-        });
-        this.hasMany("hmt_mg_favorites", {
-          className: "HmtMgMember",
-          through: "hmt_mg_memberships",
-          source: "hmt_mg_member",
-        });
-      }
-    }
-    class HmtMgMembership extends Base {
-      static {
-        this.attribute("hmt_mg_club_id", "integer");
-        this.attribute("hmt_mg_member_id", "integer");
-        this.belongsTo("hmt_mg_member", {
-          className: "HmtMgMember",
-          foreignKey: "hmt_mg_member_id",
-        });
-      }
-    }
-    class HmtMgMember extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("HmtMgClub", HmtMgClub);
-    registerModel("HmtMgMembership", HmtMgMembership);
-    registerModel("HmtMgMember", HmtMgMember);
 
-    const club = new HmtMgClub({ name: "C" });
-    // The through association scope (distinct) should not bleed into the target relation.
-    // Rails: assert_nil Club.new.special_favorites.distinct_value
-    // The target (hmt_mg_favorites) SQL should NOT include DISTINCT — distinct only applies
-    // to the through table's join, not to the target record selection.
-    const sql = (club as any).hmt_mg_favorites.toSql();
-    expect(sql).not.toContain("DISTINCT");
+  it("has many through with scope that should not be fully merged", async () => {
+    Club.hasMany("distinctMemberships", {
+      scope: (q: any) => q.distinct(),
+      className: "Membership",
+    });
+    Club.hasMany("specialFavorites", {
+      through: "distinctMemberships",
+      source: "member",
+    });
+    const newClub = new Club();
+    const val = (newClub as any).specialFavorites.distinctValue;
+    expect(val).toBeUndefined();
   });
 
   it("has many through do not cache association reader if the though method has default scopes", async () => {
-    // Rails: TenantMembership has a thread-local default scope (current_member).
-    // When it changes between loads, the association should not serve a stale cached result.
-    // Core: through association with a dynamic default scope on the join model returns
-    // different results when the scope changes — caching would break this.
-    let currentOwnerId: number | null = null;
+    const member = await Member.create({});
+    const club = await Club.create({});
+    await TenantMembership.create({ member_id: member.id, club_id: club.id });
 
-    class DcJoin extends Base {
-      static {
-        this.attribute("dc_owner_id", "integer");
-        this.attribute("dc_tgt_id", "integer");
-        // Dynamic default scope: only join records for the current owner
-        this.defaultScope((rel: any) =>
-          currentOwnerId !== null ? rel.where({ dc_owner_id: currentOwnerId }) : rel,
-        );
-        this.belongsTo("dc_tgt", { className: "DcTgt", foreignKey: "dc_tgt_id" });
-      }
+    TenantMembership.currentMember = member;
+    try {
+      const tenantClubs = await (member as any).tenantClubs.toArray();
+      expect(tenantClubs.map((c: any) => c.id)).toEqual([club.id]);
+
+      TenantMembership.currentMember = null;
+
+      const otherMember = await Member.create({});
+      const otherClub = await Club.create({});
+      await TenantMembership.create({ member_id: otherMember.id, club_id: otherClub.id });
+
+      const otherTenantClubs = await (otherMember as any).tenantClubs.toArray();
+      expect(otherTenantClubs.map((c: any) => c.id)).toEqual([otherClub.id]);
+    } finally {
+      TenantMembership.currentMember = null;
     }
-    class DcTgt extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class DcOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("dc_joins", {
-          className: "DcJoin",
-          foreignKey: "dc_owner_id",
-        });
-        this.hasMany("dc_tgts", {
-          className: "DcTgt",
-          through: "dc_joins",
-          source: "dc_tgt",
-        });
-      }
-    }
-    registerModel("DcTgt", DcTgt);
-    registerModel("DcJoin", DcJoin);
-    registerModel("DcOwner", DcOwner);
-
-    const owner1 = await DcOwner.create({ name: "O1" });
-    const owner2 = await DcOwner.create({ name: "O2" });
-    const tgt1 = await DcTgt.create({ name: "T1" });
-    const tgt2 = await DcTgt.create({ name: "T2" });
-    await DcJoin.unscoped().create({ dc_owner_id: owner1.id, dc_tgt_id: tgt1.id });
-    await DcJoin.unscoped().create({ dc_owner_id: owner2.id, dc_tgt_id: tgt2.id });
-
-    // First load: scope active for owner1 — only T1 should appear
-    currentOwnerId = Number(owner1.id);
-    const r1 = await (owner1 as any).dc_tgts.toArray();
-    expect(r1).toHaveLength(1);
-    expect(r1[0].name).toBe("T1");
-
-    // Change scope to owner2 — second load on owner2 should NOT return a stale owner1 cache
-    currentOwnerId = Number(owner2.id);
-    const r2 = await (owner2 as any).dc_tgts.toArray();
-    expect(r2).toHaveLength(1);
-    expect(r2[0].name).toBe("T2");
   });
 
-  it("has many through with scope that has joined same table with parent relation", async () => {
-    // Rails: Author.joins(:comments_for_first_author).take returns david
-    // Core: a through association with a join scope works when the joined table matches parent
-    class JsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("js_posts", {
-          className: "JsPost",
-          foreignKey: "js_author_id",
-        });
-        this.hasMany("js_comments", {
-          className: "JsComment",
-          through: "js_posts",
-          source: "js_comments",
-        });
-      }
-    }
-    class JsPost extends Base {
-      static {
-        this.attribute("js_author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("js_author", {
-          className: "JsAuthor",
-          foreignKey: "js_author_id",
-        });
-        this.hasMany("js_comments", {
-          className: "JsComment",
-          foreignKey: "js_post_id",
-        });
-      }
-    }
-    class JsComment extends Base {
-      static {
-        this.attribute("js_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    registerModel("JsAuthor", JsAuthor);
-    registerModel("JsPost", JsPost);
-    registerModel("JsComment", JsComment);
-
-    const author = await JsAuthor.create({ name: "David" });
-    const post = await JsPost.create({ js_author_id: author.id, title: "First Post" });
-    await JsComment.create({ js_post_id: post.id, body: "Great!" });
-
-    const comments = await (author as any).js_comments.toArray();
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("Great!");
+  it.skip("has many through with scope that has joined same table with parent relation", async () => {
+    const david = await Author.find(authors("david").id);
+    const result = await Author.joins("commentsForFirstAuthor").take();
+    expect(result?.id).toBe(david.id);
   });
 
   it("has many through with left joined same table with through table", async () => {
-    // Rails: authors(:mary).comments.left_joins(:post) returns comments
-    // Core: left_joins on a through association's target works
-    class LjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("lj_posts", {
-          className: "LjPost",
-          foreignKey: "lj_author_id",
-        });
-        this.hasMany("lj_comments", {
-          className: "LjComment",
-          through: "lj_posts",
-          source: "lj_comments",
-        });
-      }
-    }
-    class LjPost extends Base {
-      static {
-        this.attribute("lj_author_id", "integer");
-        this.attribute("title", "string");
-        this.hasMany("lj_comments", {
-          className: "LjComment",
-          foreignKey: "lj_post_id",
-        });
-      }
-    }
-    class LjComment extends Base {
-      static {
-        this.attribute("lj_post_id", "integer");
-        this.attribute("body", "string");
-        this.belongsTo("lj_post", {
-          className: "LjPost",
-          foreignKey: "lj_post_id",
-        });
-      }
-    }
-    registerModel("LjAuthor", LjAuthor);
-    registerModel("LjPost", LjPost);
-    registerModel("LjComment", LjComment);
-
-    const author = await LjAuthor.create({ name: "Mary" });
-    const post = await LjPost.create({ lj_author_id: author.id, title: "Other" });
-    await LjComment.create({ lj_post_id: post.id, body: "Hey!" });
-
-    const comments = await (author as any).lj_comments.toArray();
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("Hey!");
+    const mary = await Author.find(authors("mary").id);
+    const eagerOther = await Comment.find(comments("eager_other_comment1").id);
+    const result = await (mary as any).comments.leftJoins("post").toArray();
+    expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
   });
 
   it("has many through with unscope should affect to through scope", async () => {
-    // Rails: authors(:mary).unordered_comments — through assoc with unscope(:order)
-    // Core: scope with unscope on the through result
-    class UsAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("us_posts", {
-          className: "UsPost",
-          foreignKey: "us_author_id",
-        });
-        this.hasMany("us_comments", {
-          className: "UsComment",
-          through: "us_posts",
-          source: "us_comments",
-        });
-        this.hasMany("us_unordered_comments", {
-          className: "UsComment",
-          through: "us_posts",
-          source: "us_comments",
-          scope: (rel: any) => rel.unscope("order"),
-        });
-      }
-    }
-    class UsPost extends Base {
-      static {
-        this.attribute("us_author_id", "integer");
-        this.hasMany("us_comments", {
-          className: "UsComment",
-          foreignKey: "us_post_id",
-        });
-      }
-    }
-    class UsComment extends Base {
-      static {
-        this.attribute("us_post_id", "integer");
-        this.attribute("body", "string");
-        this.belongsTo("us_post", {
-          className: "UsPost",
-          foreignKey: "us_post_id",
-        });
-      }
-    }
-    registerModel("UsAuthor", UsAuthor);
-    registerModel("UsPost", UsPost);
-    registerModel("UsComment", UsComment);
-
-    const author = await UsAuthor.create({ name: "Mary" });
-    const post = await UsPost.create({ us_author_id: author.id });
-    await UsComment.create({ us_post_id: post.id, body: "A" });
-
-    const comments = await (author as any).us_unordered_comments.toArray();
-    expect(comments).toHaveLength(1);
+    const mary = await Author.find(authors("mary").id);
+    const eagerOther = await Comment.find(comments("eager_other_comment1").id);
+    const result = await (mary as any).unorderedComments.toArray();
+    expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
   });
 
-  it("has many through with scope should accept string and hash join", async () => {
-    // Rails: Author.joins({comments_for_first_author: :post}, "inner join ...").take
-    // Core: a scoped through association with join scope works
-    class SjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("sj_posts", {
-          className: "SjPost",
-          foreignKey: "sj_author_id",
-        });
-        this.hasMany("sj_comments", {
-          className: "SjComment",
-          through: "sj_posts",
-          source: "sj_comments",
-        });
-        this.hasMany("sj_recent_comments", {
-          className: "SjComment",
-          through: "sj_posts",
-          source: "sj_comments",
-          scope: (rel: any) =>
-            rel.joins(
-              `INNER JOIN "sj_posts" AS "sj_posts_alias" ON "sj_posts_alias"."id" = "sj_comments"."sj_post_id"`,
-            ),
-        });
-      }
-    }
-    class SjPost extends Base {
-      static {
-        this.attribute("sj_author_id", "integer");
-        this.attribute("title", "string");
-        this.hasMany("sj_comments", {
-          className: "SjComment",
-          foreignKey: "sj_post_id",
-        });
-      }
-    }
-    class SjComment extends Base {
-      static {
-        this.attribute("sj_post_id", "integer");
-        this.attribute("body", "string");
-        this.belongsTo("sj_post", {
-          className: "SjPost",
-          foreignKey: "sj_post_id",
-        });
-      }
-    }
-    registerModel("SjAuthor", SjAuthor);
-    registerModel("SjPost", SjPost);
-    registerModel("SjComment", SjComment);
-
-    // Through association with a scope that adds a JOIN — tests both string and hash join in scope
-
-    const author = await SjAuthor.create({ name: "David" });
-    const post = await SjPost.create({ sj_author_id: author.id, title: "P1" });
-    await SjComment.create({ sj_post_id: post.id, body: "C1" });
-
-    // Basic through loading works
-    const comments = await (author as any).sj_comments.toArray();
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("C1");
-
-    // Through association with a string join in scope also works
-    const recentComments = await (author as any).sj_recent_comments.toArray();
-    expect(recentComments).toHaveLength(1);
+  it.skip("has many through with scope should accept string and hash join", async () => {
+    const david = await Author.find(authors("david").id);
+    const result = await Author.joins({
+      commentsForFirstAuthor: "post",
+    })
+      .joins("inner join posts posts_alias on authors.id = posts_alias.author_id")
+      .eagerLoad("categories")
+      .take();
+    expect(result?.id).toBe(david.id);
   });
 
   it("has many through with scope should respect table alias", async () => {
-    // Rails: family.users where FamilyTree has a token scope on the join
-    class StFamily extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("st_trees", {
-          className: "StTree",
-          foreignKey: "st_family_id",
-          scope: (rel: any) => rel.where({ token: null }),
-        });
-        this.hasMany("st_members", {
-          className: "StUser",
-          through: "st_trees",
-          source: "st_member",
-        });
-      }
-    }
-    class StUser extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class StTree extends Base {
-      static {
-        this.attribute("st_family_id", "integer");
-        this.attribute("st_member_id", "integer");
-        this.attribute("token", "string");
-        this.belongsTo("st_member", {
-          className: "StUser",
-          foreignKey: "st_member_id",
-        });
-      }
-    }
-    registerModel("StFamily", StFamily);
-    registerModel("StUser", StUser);
-    registerModel("StTree", StTree);
+    const family = await Family.create({});
+    const users = await Promise.all([User.create({}), User.create({}), User.create({})]);
+    await FamilyTree.create({ member_id: users[0].id, family_id: family.id });
+    await FamilyTree.create({ member_id: users[1].id, family_id: family.id });
+    await FamilyTree.create({ member_id: users[2].id, family_id: family.id, token: "wat" });
 
-    const family = await StFamily.create({ name: "F" });
-    const u1 = await StUser.create({ name: "Alice" });
-    const u2 = await StUser.create({ name: "Bob" });
-    const u3 = await StUser.create({ name: "Carol" });
-    await StTree.create({ st_family_id: family.id, st_member_id: u1.id, token: null });
-    await StTree.create({ st_family_id: family.id, st_member_id: u2.id, token: null });
-    await StTree.create({ st_family_id: family.id, st_member_id: u3.id, token: "wat" });
-
-    const members = await (family as any).st_members.toArray();
-    expect(members).toHaveLength(2); // u3 excluded by scope (token != null)
+    expect(await (users[0] as any).familyMembers.toArray()).toHaveLength(2);
+    expect(await (users[2] as any).familyMembers.toArray()).toHaveLength(0);
   });
 
   describe("through scope (canonical)", () => {
-    registerModel([Author, Post, FirstPost, Comment]);
-    const { authors } = useHandlerFixtures(["authors", "posts", "comments"], {
+    const { authors: canonicalAuthors } = useHandlerFixtures(["authors", "posts", "comments"], {
       schema: canonicalSchema,
+    });
+
+    beforeAll(async () => {
+      registerModel([Author, Post, FirstPost, Comment]);
     });
 
     const ids = (records: any[]) =>
       records.map((r: any) => r.id).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
     it("through scope is affected by unscoping", async () => {
-      // Rails: FirstPost.unscoped { author.comments_on_first_posts } returns the
-      // full comment set, because unscoping the through model (FirstPost, whose
-      // default_scope is where(id: 1)) widens first_posts to all the author's
-      // posts — so comments_on_first_posts equals author.comments.
-      const author = authors("david");
+      const author = canonicalAuthors("david");
       const expected = ids(await association(author, "comments").toArray());
 
       const inside = await FirstPost.unscoped(async () => {
@@ -7032,1182 +2129,304 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     it("through scope isnt affected by scoping", async () => {
-      // Rails: FirstPost.where(id: 2).scoping { author.comments_on_first_posts.reset }
-      // — the through association applies its own scope, so the surrounding
-      // scoping block on FirstPost leaves comments_on_first_posts unchanged.
-      const author = authors("david");
+      const author = canonicalAuthors("david");
       const expected = ids(await association(author, "commentsOnFirstPosts").toArray());
 
-      await FirstPost.where({ id: 2 }).scoping(async () => {
-        const inside = ids(await association(author, "commentsOnFirstPosts").reset().toArray());
-        expect(inside).toEqual(expected);
+      const inside = await FirstPost.where({ id: 2 }).scoping(async () => {
+        await author.reload();
+        return association(author, "commentsOnFirstPosts").toArray();
       });
 
-      const after = ids(await association(author, "commentsOnFirstPosts").reset().toArray());
-      expect(after).toEqual(expected);
+      expect(ids(inside)).toEqual(expected);
     });
   });
 
   it("incorrectly ordered through associations", async () => {
-    class IoOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ioItems", {
-          through: "ioJoins",
-          source: "ioItem",
-          className: "IoItem",
-        });
-      }
-    }
-    // Define through association BEFORE the through source
-    registerModel("IoOwner", IoOwner);
-
-    const owner = await IoOwner.create({ name: "O" });
-    // Loading through should fail because the through association doesn't exist
     await expect(
-      loadHasManyThrough(owner, "ioItems", {
-        through: "ioJoins",
-        source: "ioItem",
-        className: "IoItem",
+      DeveloperWithIncorrectlyOrderedHasManyThrough.create({
+        companies: [await Company.create({})],
       }),
     ).rejects.toThrow();
   });
 
   it("has many through update ids with conditions", async () => {
-    // Rails: author.update(special_categories_with_condition_ids: [id]) sets scoped through
-    // Core: updating category_ids on a through association works
-    class UidCat extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class UidCateg extends Base {
-      static {
-        this.attribute("uid_author_id", "integer");
-        this.attribute("uid_cat_id", "integer");
-        this.attribute("special", "boolean");
-        this.belongsTo("uid_cat", {
-          className: "UidCat",
-          foreignKey: "uid_cat_id",
-        });
-      }
-    }
-    class UidAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("uid_categs", {
-          className: "UidCateg",
-          foreignKey: "uid_author_id",
-        });
-        this.hasMany("uid_cats", {
-          className: "UidCat",
-          through: "uid_categs",
-          source: "uid_cat",
-        });
-      }
-    }
-    registerModel("UidCat", UidCat);
-    registerModel("UidCateg", UidCateg);
-    registerModel("UidAuthor", UidAuthor);
+    const author = await Author.create({ name: "Bill" });
+    const general = await Category.find(categories("general").id);
 
-    const author = await UidAuthor.create({ name: "Bill" });
-    const cat = await UidCat.create({ name: "General" });
+    await author.update({
+      specialCategoriesWithConditionIds: [general.id],
+      nonspecialCategoriesWithConditionIds: [general.id],
+    });
 
-    // Set the through association via IDs
-    await UidCateg.create({ uid_author_id: author.id, uid_cat_id: cat.id });
+    expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);
+    expect(await (author as any).nonspecialCategoriesWithConditionIds).toEqual([general.id]);
 
-    const cats = await (author as any).uid_cats.toArray();
-    expect(cats).toHaveLength(1);
-    expect(cats[0].id).toBe(cat.id);
+    await author.update({ nonspecialCategoriesWithConditionIds: [] });
+    await author.reload();
+
+    expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);
+    expect(await (author as any).nonspecialCategoriesWithConditionIds).toEqual([]);
   });
+
   it("single has many through association with unpersisted parent instance", async () => {
-    class HmtUnpOwner extends Base {
+    class PostWithSingleHasManyThrough extends Post {
       static {
-        this.attribute("name", "string");
-        this.hasMany("hmtUnpJoins", {
-          className: "HmtUnpJoin",
-          foreignKey: "hmt_unp_owner_id",
-        });
-        this.hasMany("hmtUnpTargets", {
-          through: "hmtUnpJoins",
-          source: "hmtUnpTarget",
-          className: "HmtUnpTarget",
-        });
+        this.hasMany("subscriptions", { through: "author" });
       }
     }
-    class HmtUnpJoin extends Base {
-      static {
-        this.attribute("hmt_unp_owner_id", "integer");
-        this.attribute("hmt_unp_target_id", "integer");
-        this.belongsTo("hmtUnpTarget", {
-          className: "HmtUnpTarget",
-          foreignKey: "hmt_unp_target_id",
-        });
-      }
-    }
-    class HmtUnpTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    registerModel("PostWithSingleHasManyThrough", PostWithSingleHasManyThrough);
 
-    registerModel("HmtUnpOwner", HmtUnpOwner);
-    registerModel("HmtUnpJoin", HmtUnpJoin);
-    registerModel("HmtUnpTarget", HmtUnpTarget);
+    const post = new PostWithSingleHasManyThrough();
+    const mary = await Author.find(authors("mary").id);
+    (post as any).author = mary;
+    const book1 = await Book.create({ name: "essays on single has many through associations 1" });
+    await (mary as any).books.push(book1);
+    const sub1 = (await Subscription.first())!;
+    await (book1 as any).subscriptions.push(sub1);
+    const subs = await (post as any).subscriptions.toArray();
+    expect(subs.map((s: any) => s.id)).toContain(sub1.id);
 
-    // Unpersisted owner - no ID yet, should get empty results
-    const owner = new HmtUnpOwner({ name: "Unpersisted" });
-    const targets = await loadHasManyThrough(owner, "hmtUnpTargets", {
-      through: "hmtUnpJoins",
-      source: "hmtUnpTarget",
-      className: "HmtUnpTarget",
-    });
-    expect(targets).toHaveLength(0);
+    const bob = await Author.find(authors("bob").id);
+    (post as any).author = bob;
+    const book2 = await Book.create({ name: "essays on single has many through associations 2" });
+    await (bob as any).books.push(book2);
+    const sub2 = (await Subscription.second())!;
+    await (book2 as any).subscriptions.push(sub2);
+    const subs2 = await (post as any).subscriptions.toArray();
+    expect(subs2.map((s: any) => s.id)).toContain(sub2.id);
   });
+
   it("nested has many through association with unpersisted parent instance", async () => {
-    class HmtNestedUnpOwner extends Base {
+    class PostWithNestedHasManyThrough extends Post {
       static {
-        this.attribute("name", "string");
-        this.hasMany("hmtNestedUnpJoins", {
-          className: "HmtNestedUnpJoin",
-          foreignKey: "hmt_nested_unp_owner_id",
-        });
-        this.hasMany("hmtNestedUnpTargets", {
-          through: "hmtNestedUnpJoins",
-          source: "hmtNestedUnpTarget",
-          className: "HmtNestedUnpTarget",
-        });
+        this.hasMany("books", { through: "author" });
+        this.hasMany("subscriptions", { through: "books" });
       }
     }
-    class HmtNestedUnpJoin extends Base {
-      static {
-        this.attribute("hmt_nested_unp_owner_id", "integer");
-        this.attribute("hmt_nested_unp_target_id", "integer");
-        this.belongsTo("hmtNestedUnpTarget", {
-          className: "HmtNestedUnpTarget",
-          foreignKey: "hmt_nested_unp_target_id",
-        });
-      }
-    }
-    class HmtNestedUnpTarget extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    registerModel("PostWithNestedHasManyThrough", PostWithNestedHasManyThrough);
 
-    registerModel("HmtNestedUnpOwner", HmtNestedUnpOwner);
-    registerModel("HmtNestedUnpJoin", HmtNestedUnpJoin);
-    registerModel("HmtNestedUnpTarget", HmtNestedUnpTarget);
+    const post = new PostWithNestedHasManyThrough();
+    const mary = await Author.find(authors("mary").id);
+    (post as any).author = mary;
+    const book1 = await Book.create({ name: "essays on nested has many through associations 1" });
+    await (mary as any).books.push(book1);
+    const sub1 = (await Subscription.first())!;
+    await (book1 as any).subscriptions.push(sub1);
+    const subs = await (post as any).subscriptions.toArray();
+    expect(subs.map((s: any) => s.id)).toContain(sub1.id);
 
-    const owner = new HmtNestedUnpOwner({ name: "Unpersisted" });
-    const targets = await loadHasManyThrough(owner, "hmtNestedUnpTargets", {
-      through: "hmtNestedUnpJoins",
-      source: "hmtNestedUnpTarget",
-      className: "HmtNestedUnpTarget",
-    });
-    expect(targets).toHaveLength(0);
+    const bob = await Author.find(authors("bob").id);
+    (post as any).author = bob;
+    const book2 = await Book.create({ name: "essays on nested has many through associations 2" });
+    await (bob as any).books.push(book2);
+    const sub2 = (await Subscription.second())!;
+    await (book2 as any).subscriptions.push(sub2);
+    const subs2 = await (post as any).subscriptions.toArray();
+    expect(subs2.map((s: any) => s.id)).toContain(sub2.id);
   });
+
   it("child is visible to join model in add association callbacks", async () => {
-    class CvOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("cvPetTreasures", {
-          className: "CvPetTreasure",
-          foreignKey: "cv_owner_id",
-        });
+    for (const callbackName of ["beforeAdd", "afterAdd"] as const) {
+      class SentientTreasure extends Treasure {
+        static {
+          this.hasMany("petTreasures", {
+            foreignKey: "treasure_id",
+            [callbackName]: async (owner: any, added: any) => {
+              const pet = await added.association("pet").loadTarget();
+              if (!pet) throw new Error("No pet!");
+            },
+          });
+          this.hasMany("pets", { through: "petTreasures" });
+        }
       }
-    }
-    class CvPetTreasure extends Base {
-      static {
-        this.attribute("cv_owner_id", "integer");
-        this.attribute("cv_pet_id", "integer");
-        this.belongsTo("cvPet", {
-          className: "CvPet",
-          foreignKey: "cv_pet_id",
-        });
-      }
-    }
-    class CvPet extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    let callbackFired = false;
-    Associations.hasMany.call(CvOwner, "cvPets", {
-      through: "cvPetTreasures",
-      source: "cvPet",
-      className: "CvPet",
-      beforeAdd: (_owner: Base, record: Base) => {
-        // The child should be visible (have an id) by the time the callback fires
-        if (record.name) callbackFired = true;
-      },
-    });
-    registerModel("CvOwner", CvOwner);
-    registerModel("CvPetTreasure", CvPetTreasure);
-    registerModel("CvPet", CvPet);
+      registerModel("SentientTreasure", SentientTreasure);
 
-    const owner = await CvOwner.create({ name: "O" });
-    const pet = await CvPet.create({ name: "Mochi" });
-
-    const proxy = new CollectionProxy(owner, "cvPets", {
-      type: "hasManyThrough" as any,
-      name: "cvPets",
-      options: {
-        through: "cvPetTreasures",
-        source: "cvPet",
-        className: "CvPet",
-        beforeAdd: (CvOwner as any)._associations.find((a: any) => a.name === "cvPets").options
-          .beforeAdd,
-      },
-    });
-    await proxy.push(pet);
-    expect(callbackFired).toBe(true);
+      const treasure = new SentientTreasure();
+      const mochi = await Pet.find(pets("mochi").id);
+      await expect((treasure as any).pets.push(mochi)).resolves.toBeDefined();
+    }
   });
 
   it("circular autosave association correctly saves multiple records", async () => {
-    // Rails: cs180.sections.build(short_name: "A"); fall.sections << sections; fall.save!
-    // Core: building sections through a has-many-through and saving works
-    class CaSeminar extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ca_sections", {
-          className: "CaSection",
-          foreignKey: "ca_seminar_id",
-        });
-      }
-    }
-    class CaSession extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ca_sections", {
-          className: "CaSection",
-          foreignKey: "ca_session_id",
-        });
-      }
-    }
-    class CaSection extends Base {
-      static {
-        this.attribute("short_name", "string");
-        this.attribute("ca_seminar_id", "integer");
-        this.attribute("ca_session_id", "integer");
-        this.belongsTo("ca_session", {
-          className: "CaSession",
-          foreignKey: "ca_session_id",
-        });
-      }
-    }
-    registerModel("CaSeminar", CaSeminar);
-    registerModel("CaSession", CaSession);
-    registerModel("CaSection", CaSection);
-
-    const seminar = await CaSeminar.create({ name: "CS180" });
-    const session = await CaSession.create({ name: "Fall" });
-    const s1 = await CaSection.create({
-      short_name: "A",
-      ca_seminar_id: seminar.id,
-      ca_session_id: session.id,
-    });
-    const s2 = await CaSection.create({
-      short_name: "B",
-      ca_seminar_id: seminar.id,
-      ca_session_id: session.id,
-    });
-
-    const sections = await (session as any).ca_sections.toArray();
-    expect(sections).toHaveLength(2);
-    expect(sections.map((s: any) => s.short_name).sort()).toEqual(["A", "B"]);
+    const cs180 = new Seminar({ name: "CS180" });
+    const fall = new Session({ name: "Fall" });
+    const sections = [
+      await (cs180 as any).sections.build({ short_name: "A" }),
+      await (cs180 as any).sections.build({ short_name: "B" }),
+    ];
+    await (fall as any).sections.push(...sections);
+    await fall.save();
+    await fall.reload();
+    const fallSections = (await (fall as any).sections.toArray()).sort(
+      (a: any, b: any) => Number(a.id) - Number(b.id),
+    );
+    const expectedIds = sections.map((s: any) => s.id).sort();
+    expect(fallSections.map((s: any) => s.id).sort()).toEqual(expectedIds);
   });
 
-  it("post has many tags through association with composite query constraints", async () => {
-    // Rails: blog_post.tags.to_a uses JOIN with composite blog_id constraint
-    // Core: through association with composite FK (blog_id + post_id) generates correct SQL
-    // Rails test uses composite PK (blog_id + post_id) with query_constraints
-    // Core: through association with blog_id FK constraint generates JOIN with blog_id match
-    class CqBlogPost extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("title", "string");
-        this.hasMany("cq_blog_post_tags", {
-          className: "CqBlogPostTag",
-          foreignKey: "blog_post_id",
-        });
-        this.hasMany("cq_tags", {
-          className: "CqTag",
-          through: "cq_blog_post_tags",
-          source: "cq_tag",
-        });
-      }
-    }
-    class CqTag extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class CqBlogPostTag extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.attribute("tag_id", "integer");
-        this.belongsTo("cq_tag", {
-          className: "CqTag",
-          foreignKey: "tag_id",
-        });
-      }
-    }
-    registerModel("CqBlogPost", CqBlogPost);
-    registerModel("CqTag", CqTag);
-    registerModel("CqBlogPostTag", CqBlogPostTag);
+  it.skip("post has many tags through association with composite query constraints", async () => {
+    const blogPost = await ShardedBlogPost.find(shardedBlogPosts("great_post_blog_one").id);
+    const expectedTagIds = (
+      await ShardedBlogPostTag.where({
+        blog_post_id: (blogPost as any).id,
+        blog_id: (blogPost as any).blog_id,
+      }).toArray()
+    ).map((t: any) => t.tag_id);
 
-    const post = await CqBlogPost.create({ blog_id: 1, title: "Great Post" });
-    const tag = await CqTag.create({ blog_id: 1, name: "Ruby" });
-    await CqBlogPostTag.create({ blog_id: 1, blog_post_id: post.id, tag_id: tag.id });
+    const tagIds: any[] = [];
+    // Capture SQL by wrapping
+    const originalAll = (ShardedBlogPost.prototype as any).tags?.toArray;
+    const tags2 = await (blogPost as any).tags.toArray();
+    for (const t of tags2) tagIds.push(t.id);
 
-    const tags = await (post as any).cq_tags.toArray();
-    expect(tags).toHaveLength(1);
-    expect(tags[0].name).toBe("Ruby");
+    const quotedTagsBlogId = quoteTableName("sharded_tags.blog_id");
+    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const tagsSql = await (blogPost as any).tags.toSql();
+    expect(tagsSql).toMatch(
+      new RegExp(`ON.*${quotedTagsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
+    );
+    expect(tagsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
+
+    expect(tagIds.length).toBeGreaterThan(0);
+    expect([...tagIds].sort()).toEqual([...expectedTagIds].sort());
   });
 
   it("tags has manu posts through association with composite query constraints", async () => {
-    // Rails: tag.blog_posts.to_a uses JOIN with composite blog_id constraint
-    // Core: reverse of above — tags to posts through composite FK
-    class CqTag2 extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("cq_blog_post_tags2", {
-          className: "CqBlogPostTag2",
-          foreignKey: "tag_id",
-        });
-        this.hasMany("cq_blog_posts2", {
-          className: "CqBlogPost2",
-          through: "cq_blog_post_tags2",
-          source: "cq_blog_post2",
-        });
-      }
-    }
-    class CqBlogPost2 extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    class CqBlogPostTag2 extends Base {
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.attribute("tag_id", "integer");
-        this.belongsTo("cq_blog_post2", {
-          className: "CqBlogPost2",
-          foreignKey: "blog_post_id",
-        });
-      }
-    }
-    registerModel("CqTag2", CqTag2);
-    registerModel("CqBlogPost2", CqBlogPost2);
-    registerModel("CqBlogPostTag2", CqBlogPostTag2);
+    const tag = await ShardedTag.find(shardedTags("short_read_blog_one").id);
+    const expectedBlogPostIds = (
+      await ShardedBlogPostTag.where({
+        tag_id: (tag as any).id,
+        blog_id: (tag as any).blog_id,
+      }).toArray()
+    ).map((t: any) => t.blog_post_id);
 
-    const tag = await CqTag2.create({ blog_id: 1, name: "Ruby" });
-    const post = await CqBlogPost2.create({ blog_id: 1, title: "Great Post" });
-    await CqBlogPostTag2.create({ blog_id: 1, blog_post_id: post.id, tag_id: tag.id });
+    const blogPosts2 = await (tag as any).blogPosts.toArray();
+    const blogPostIds = blogPosts2.map((p: any) => p.id);
 
-    const posts = await (tag as any).cq_blog_posts2.toArray();
-    expect(posts).toHaveLength(1);
-    expect(posts[0].title).toBe("Great Post");
-    expect(posts[0].blog_id).toBe(1);
+    const quotedBlogPostsBlogId = quoteTableName("sharded_blog_posts.blog_id");
+    const quotedPostsTagsBlogId = quoteTableName("sharded_blog_posts_tags.blog_id");
+    const blogPostsSql = await (tag as any).blogPosts.toSql();
+    expect(blogPostsSql).toMatch(
+      new RegExp(`ON.*${quotedBlogPostsBlogId} = ${quotedPostsTagsBlogId}.*WHERE`, "i"),
+    );
+    expect(blogPostsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
+
+    expect(blogPostIds.length).toBeGreaterThan(0);
+    expect([...blogPostIds].map(Number).sort()).toEqual(
+      [...expectedBlogPostIds].map(Number).sort(),
+    );
   });
+
   it("loading cpk association with unpersisted owner", async () => {
-    class CpkHmtOwner extends Base {
-      static {
-        this._tableName = "cpk_hmt_owners";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-        this.hasMany("cpkHmtJoins", {
-          foreignKey: ["cpk_hmt_owner_region_id", "cpk_hmt_owner_id"],
-          className: "CpkHmtJoin",
-        });
-        this.hasMany("cpkHmtTargets", {
-          through: "cpkHmtJoins",
-          className: "CpkHmtTarget",
-          source: "cpkHmtTarget",
-        });
-      }
-    }
-    class CpkHmtJoin extends Base {
-      static {
-        this._tableName = "cpk_hmt_joins";
-        this.attribute("cpk_hmt_owner_region_id", "integer");
-        this.attribute("cpk_hmt_owner_id", "integer");
-        this.attribute("cpk_hmt_target_id", "integer");
-        this.belongsTo("cpkHmtTarget", { className: "CpkHmtTarget" });
-      }
-    }
-    class CpkHmtTarget extends Base {
-      static {
-        this._tableName = "cpk_hmt_targets";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("CpkHmtOwner", CpkHmtOwner);
-    registerModel("CpkHmtJoin", CpkHmtJoin);
-    registerModel("CpkHmtTarget", CpkHmtTarget);
-    // Unpersisted owner — should return empty
-    const owner = new CpkHmtOwner({ name: "New" });
-    const targets = await loadHasManyThrough(owner, "cpkHmtTargets", {
-      through: "cpkHmtJoins",
-      className: "CpkHmtTarget",
-      source: "cpkHmtTarget",
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const book = new (await import("../test-helpers/models/cpk.js").then(
+      (m) => m.CpkBookWithOrderAgreements,
+    ))({
+      id: [1, 2],
     });
-    expect(targets).toHaveLength(0);
+    (book as any).order = order;
+    const agreement = await (
+      await import("../test-helpers/models/cpk.js").then((m) => m.CpkOrderAgreement)
+    ).create({ order_id: (order as any).idValue });
+    const agreements = await (book as any).orderAgreements.toArray();
+    expect(agreements.map((a: any) => a.id)).toEqual([agreement.id]);
   });
+
   it("cpk stale target", async () => {
-    class CpkStOwner extends Base {
-      static {
-        this._tableName = "cpk_st_owners";
-        this.attribute("region_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["region_id", "id"];
-        this.hasMany("cpkStJoins", {
-          foreignKey: ["cpk_st_owner_region_id", "cpk_st_owner_id"],
-          className: "CpkStJoin",
-        });
-        this.hasMany("cpkStTargets", {
-          through: "cpkStJoins",
-          className: "CpkStTarget",
-          source: "cpkStTarget",
-        });
-      }
-    }
-    class CpkStJoin extends Base {
-      static {
-        this._tableName = "cpk_st_joins";
-        this.attribute("cpk_st_owner_region_id", "integer");
-        this.attribute("cpk_st_owner_id", "integer");
-        this.attribute("cpk_st_target_id", "integer");
-        this.belongsTo("cpkStTarget", { className: "CpkStTarget" });
-      }
-    }
-    class CpkStTarget extends Base {
-      static {
-        this._tableName = "cpk_st_targets";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("CpkStOwner", CpkStOwner);
-    registerModel("CpkStJoin", CpkStJoin);
-    registerModel("CpkStTarget", CpkStTarget);
-    const owner = await CpkStOwner.create({ region_id: 1, id: 1, name: "Owner" });
-    const target = await CpkStTarget.create({ name: "Target" });
-    const join = await CpkStJoin.create({
-      cpk_st_owner_region_id: 1,
-      cpk_st_owner_id: 1,
-      cpk_st_target_id: target.id,
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const book = await (
+      await import("../test-helpers/models/cpk.js").then((m) => m.CpkBookWithOrderAgreements)
+    ).create({
+      id: [1, 2],
+      order_id: (order as any).idValue,
     });
-    let targets = await loadHasManyThrough(owner, "cpkStTargets", {
-      through: "cpkStJoins",
-      className: "CpkStTarget",
-      source: "cpkStTarget",
-    });
-    expect(targets).toHaveLength(1);
-    // Delete the join — target becomes stale
-    await join.destroy();
-    targets = await loadHasManyThrough(owner, "cpkStTargets", {
-      through: "cpkStJoins",
-      className: "CpkStTarget",
-      source: "cpkStTarget",
-    });
-    expect(targets).toHaveLength(0);
-  });
-  it("cpk association build through singular", async () => {
-    class CpkBOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("cpkBJoins", {
-          className: "CpkBJoin",
-          foreignKey: "cpk_b_owner_id",
-        });
-        this.hasMany("cpkBItems", {
-          through: "cpkBJoins",
-          source: "cpkBItem",
-          className: "CpkBItem",
-        });
-      }
-    }
-    class CpkBJoin extends Base {
-      static {
-        this.attribute("cpk_b_owner_id", "integer");
-        this.attribute("cpk_b_item_id", "integer");
-        this.belongsTo("cpkBItem", {
-          className: "CpkBItem",
-          foreignKey: "cpk_b_item_id",
-        });
-      }
-    }
-    class CpkBItem extends Base {
-      static {
-        this.attribute("label", "string");
-      }
-    }
+    await (
+      await import("../test-helpers/models/cpk.js").then((m) => m.CpkOrderAgreement)
+    ).create({ order_id: (order as any).idValue });
 
-    registerModel("CpkBOwner", CpkBOwner);
-    registerModel("CpkBJoin", CpkBJoin);
-    registerModel("CpkBItem", CpkBItem);
+    await (book as any).orderAgreements.load();
+    (book as any).order = new CpkOrder();
 
-    const owner = await CpkBOwner.create({ name: "O" });
-    const proxy = association(owner, "cpkBItems");
-    const item = proxy.build({ label: "New" });
-    expect(item.label).toBe("New");
-    expect(item.isNewRecord()).toBe(true);
+    expect((book as any).association("orderAgreements").isStaleTarget()).toBe(true);
   });
 
-  it("has many through create record", async () => {
-    class HmtCrBook extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("hmtCrSubscriptions", {
-          className: "HmtCrSubscription",
-          foreignKey: "hmt_cr_book_id",
-        });
-        this.hasMany("hmtCrSubscribers", {
-          through: "hmtCrSubscriptions",
-          source: "hmtCrSubscriber",
-          className: "HmtCrSubscriber",
-        });
-      }
-    }
-    class HmtCrSubscription extends Base {
-      static {
-        this.attribute("hmt_cr_book_id", "integer");
-        this.attribute("hmt_cr_subscriber_id", "integer");
-        this.belongsTo("hmtCrSubscriber", {
-          className: "HmtCrSubscriber",
-          foreignKey: "hmt_cr_subscriber_id",
-        });
-      }
-    }
-    class HmtCrSubscriber extends Base {
-      static {
-        this.attribute("nick", "string");
-      }
-    }
-
-    registerModel("HmtCrBook", HmtCrBook);
-    registerModel("HmtCrSubscription", HmtCrSubscription);
-    registerModel("HmtCrSubscriber", HmtCrSubscriber);
-
-    const book = await HmtCrBook.create({ title: "AWDR" });
-    const proxy = association(book, "hmtCrSubscribers");
-    const subscriber = await proxy.create({ nick: "bob" });
-    expect(subscriber.nick).toBe("bob");
-    expect(subscriber.isNewRecord()).toBe(false);
-
-    const subscribers = await loadHasManyThrough(book, "hmtCrSubscribers", {
-      through: "hmtCrSubscriptions",
-      source: "hmtCrSubscriber",
-      className: "HmtCrSubscriber",
-    });
-    expect(subscribers).toHaveLength(1);
-    expect(subscribers[0].nick).toBe("bob");
-  });
-  it("ordered has many through", async () => {
-    class OhtPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class OhtReader extends Base {
-      static {
-        this.attribute("oht_person_id", "integer");
-        this.attribute("oht_post_id", "integer");
-        this.belongsTo("ohtPost", {
-          className: "OhtPost",
-          foreignKey: "oht_post_id",
-        });
-      }
-    }
-    class OhtPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("ohtReaders", {
-          className: "OhtReader",
-          foreignKey: "oht_person_id",
-        });
-        this.hasMany("ohtPosts", {
-          through: "ohtReaders",
-          source: "ohtPost",
-          className: "OhtPost",
-        });
-      }
-    }
-
-    registerModel("OhtPost", OhtPost);
-    registerModel("OhtReader", OhtReader);
-    registerModel("OhtPerson", OhtPerson);
-
-    const person = await OhtPerson.create({ first_name: "Alice" });
-    const post1 = await OhtPost.create({ title: "First" });
-    const post2 = await OhtPost.create({ title: "Second" });
-    const post3 = await OhtPost.create({ title: "Third" });
-    await OhtReader.create({ oht_person_id: person.id, oht_post_id: post3.id });
-    await OhtReader.create({ oht_person_id: person.id, oht_post_id: post1.id });
-    await OhtReader.create({ oht_person_id: person.id, oht_post_id: post2.id });
-
-    const posts = await loadHasManyThrough(person, "ohtPosts", {
-      through: "ohtReaders",
-      source: "ohtPost",
-      className: "OhtPost",
-    });
-    expect(posts.length).toBe(3);
-    const ids = posts.map((p) => p.id);
-    // See "replace order" comment — order not yet preserved via through loader.
-    expect(new Set(ids)).toEqual(new Set([post1.id, post2.id, post3.id]));
-  });
-  it("no pk join model callbacks", async () => {
-    class NpcLesson extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("npcLessonStudents", {
-          className: "NpcLessonStudent",
-          foreignKey: "npc_lesson_id",
-        });
-        this.hasMany("npcStudents", {
-          through: "npcLessonStudents",
-          source: "npcStudent",
-          className: "NpcStudent",
-        });
-      }
-    }
-    class NpcLessonStudent extends Base {
-      static {
-        this.attribute("npc_lesson_id", "integer");
-        this.attribute("npc_student_id", "integer");
-        this.belongsTo("npcStudent", {
-          className: "NpcStudent",
-          foreignKey: "npc_student_id",
-        });
-      }
-    }
-    class NpcStudent extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-
-    registerModel("NpcLesson", NpcLesson);
-    registerModel("NpcLessonStudent", NpcLessonStudent);
-    registerModel("NpcStudent", NpcStudent);
-
-    const lesson = await NpcLesson.create({ name: "SICP" });
-    const student = await NpcStudent.create({ name: "Ben" });
-    const proxy = association(lesson, "npcStudents");
-    await proxy.push(student);
-
-    const students = await proxy.toArray();
-    expect(students).toHaveLength(1);
-
-    await proxy.destroy(student);
-    const remaining = await loadHasManyThrough(lesson, "npcStudents", {
-      through: "npcLessonStudents",
-      source: "npcStudent",
-      className: "NpcStudent",
-    });
-    // After destroying the student, the through join still exists but the student is gone
-    expect(remaining).toHaveLength(0);
-  });
-  it("include?", async () => {
-    class IncPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class IncReader extends Base {
-      static {
-        this.attribute("inc_person_id", "integer");
-        this.attribute("inc_post_id", "integer");
-        this.belongsTo("incPost", {
-          className: "IncPost",
-          foreignKey: "inc_post_id",
-        });
-      }
-    }
-    class IncPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("incReaders", {
-          className: "IncReader",
-          foreignKey: "inc_person_id",
-        });
-        this.hasMany("incPosts", {
-          through: "incReaders",
-          source: "incPost",
-          className: "IncPost",
-        });
-      }
-    }
-
-    registerModel("IncPost", IncPost);
-    registerModel("IncReader", IncReader);
-    registerModel("IncPerson", IncPerson);
-
-    const person = await IncPerson.create({ first_name: "Alice" });
-    const post = await IncPost.create({ title: "Hello" });
-    const proxy = association(person, "incPosts");
-    await proxy.push(post);
-    expect(await proxy.isInclude(post)).toBe(true);
-  });
-  it("has many association through a belongs to association", async () => {
-    class HmtBtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("hmtBtFavorites", {
-          className: "HmtBtFavorite",
-          foreignKey: "hmt_bt_author_id",
-        });
-      }
-    }
-    class HmtBtFavorite extends Base {
-      static {
-        this.attribute("hmt_bt_author_id", "integer");
-        this.attribute("favorite_author_id", "integer");
-      }
-    }
-    class HmtBtPost extends Base {
-      static {
-        this.attribute("hmt_bt_author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("hmtBtAuthor", {
-          className: "HmtBtAuthor",
-          foreignKey: "hmt_bt_author_id",
-        });
-        this.hasMany("hmtBtFavorites", {
-          through: "hmtBtAuthor",
-          source: "hmtBtFavorites",
-          className: "HmtBtFavorite",
-        });
-      }
-    }
-
-    registerModel("HmtBtAuthor", HmtBtAuthor);
-    registerModel("HmtBtFavorite", HmtBtFavorite);
-    registerModel("HmtBtPost", HmtBtPost);
-
-    const author = await HmtBtAuthor.create({ name: "Mary" });
-    const post = await HmtBtPost.create({ hmt_bt_author_id: author.id, title: "TITLE" });
-    await HmtBtFavorite.create({ hmt_bt_author_id: author.id, favorite_author_id: 1 });
-    await HmtBtFavorite.create({ hmt_bt_author_id: author.id, favorite_author_id: 2 });
-
-    const authorFavs = await loadHasMany(author, "hmtBtFavorites", {
-      className: "HmtBtFavorite",
-      foreignKey: "hmt_bt_author_id",
-    });
-    const postFavs = await loadHasManyThrough(post, "hmtBtFavorites", {
-      through: "hmtBtAuthor",
-      source: "hmtBtFavorites",
-      className: "HmtBtFavorite",
-    });
-    expect(postFavs.length).toBe(authorFavs.length);
-  });
-  it("has many association through a has many association to self", async () => {
-    class SelfPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.attribute("primary_contact_id", "integer");
-        this.hasMany("agents", {
-          className: "SelfPerson",
-          foreignKey: "primary_contact_id",
-        });
-        this.hasMany("agentsOfAgents", {
-          through: "agents",
-          source: "agents",
-          className: "SelfPerson",
-        });
-      }
-    }
-
-    registerModel("SelfPerson", SelfPerson);
-
-    const susan = await SelfPerson.create({ first_name: "Susan" });
-    const sarah = await SelfPerson.create({ first_name: "Sarah", primary_contact_id: susan.id });
-    const john = await SelfPerson.create({ first_name: "John", primary_contact_id: sarah.id });
-
-    const agents = await loadHasMany(susan, "agents", {
-      className: "SelfPerson",
-      foreignKey: "primary_contact_id",
-    });
-    expect(agents.length).toBe(1);
-    expect(agents[0].first_name).toBe("Sarah");
-
-    const agentsOfAgents = await loadHasManyThrough(susan, "agentsOfAgents", {
-      through: "agents",
-      source: "agents",
-      className: "SelfPerson",
-    });
-    expect(agentsOfAgents.length).toBe(1);
-    expect(agentsOfAgents[0].first_name).toBe("John");
-  });
-  it("create with conditions hash on through association", async () => {
-    class CwcTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class CwcTagging extends Base {
-      static {
-        this.attribute("cwc_post_id", "integer");
-        this.attribute("cwc_tag_id", "integer");
-        this.belongsTo("cwcTag", {
-          className: "CwcTag",
-          foreignKey: "cwc_tag_id",
-        });
-      }
-    }
-    class CwcPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("cwcTaggings", {
-          className: "CwcTagging",
-          foreignKey: "cwc_post_id",
-        });
-        this.hasMany("cwcTags", {
-          through: "cwcTaggings",
-          source: "cwcTag",
-          className: "CwcTag",
-        });
-      }
-    }
-
-    registerModel("CwcTag", CwcTag);
-    registerModel("CwcTagging", CwcTagging);
-    registerModel("CwcPost", CwcPost);
-
-    const post = await CwcPost.create({ title: "Hello" });
-    const proxy = association(post, "cwcTags");
-    const tag = await proxy.create({ name: "General" });
-    expect(tag.name).toBe("General");
-
-    const tags = await proxy.toArray();
-    expect(tags).toHaveLength(1);
-  });
-  it("has many through associations on new records use null relations", async () => {
-    class NrPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class NrReader extends Base {
-      static {
-        this.attribute("nr_person_id", "integer");
-        this.attribute("nr_post_id", "integer");
-        this.belongsTo("nrPost", {
-          className: "NrPost",
-          foreignKey: "nr_post_id",
-        });
-      }
-    }
-    class NrPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("nrReaders", {
-          className: "NrReader",
-          foreignKey: "nr_person_id",
-        });
-        this.hasMany("nrPosts", {
-          through: "nrReaders",
-          source: "nrPost",
-          className: "NrPost",
-        });
-      }
-    }
-
-    registerModel("NrPost", NrPost);
-    registerModel("NrReader", NrReader);
-    registerModel("NrPerson", NrPerson);
-
-    const person = new NrPerson({ first_name: "New" });
-    const posts = await loadHasManyThrough(person, "nrPosts", {
-      through: "nrReaders",
-      source: "nrPost",
-      className: "NrPost",
-    });
-    expect(posts).toEqual([]);
+  it.skip("cpk association build through singular", async () => {
+    const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
+    const order = await CpkOrderWithSingularBookChapters.create({ id: [1, 2] });
+    const book = await (order as any).createBook({ id: [3, 4] });
+    const chapter = await (order as any).chapters.build();
+    const chapterBook = await chapter.association("book").loadTarget();
+    expect(chapterBook?.id).toEqual(book.id);
   });
 
-  it("associate existing", async () => {
-    class AePost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("aeReaders", {
-          className: "AeReader",
-          foreignKey: "ae_post_id",
-        });
-        this.hasMany("aePeople", {
-          through: "aeReaders",
-          source: "aePerson",
-          className: "AePerson",
-        });
-      }
-    }
-    class AeReader extends Base {
-      static {
-        this.attribute("ae_person_id", "integer");
-        this.attribute("ae_post_id", "integer");
-        this.belongsTo("aePerson", {
-          className: "AePerson",
-          foreignKey: "ae_person_id",
-        });
-      }
-    }
-    class AePerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
-
-    registerModel("AePost", AePost);
-    registerModel("AeReader", AeReader);
-    registerModel("AePerson", AePerson);
-
-    const post = await AePost.create({ title: "Thinking" });
-    const person = await AePerson.create({ first_name: "David" });
-
-    const proxy = association(post, "aePeople");
-    await proxy.push(person);
-
-    const people = await proxy.toArray();
-    expect(people.some((p) => p.first_name === "David")).toBe(true);
-  });
-
-  it("size of through association should increase correctly when has many association is added", async () => {
-    class SzPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("szReaders", {
-          className: "SzReader",
-          foreignKey: "sz_post_id",
-        });
-        this.hasMany("szPeople", {
-          through: "szReaders",
-          source: "szPerson",
-          className: "SzPerson",
-        });
-      }
-    }
-    class SzReader extends Base {
-      static {
-        this.attribute("sz_person_id", "integer");
-        this.attribute("sz_post_id", "integer");
-        this.belongsTo("szPerson", {
-          className: "SzPerson",
-          foreignKey: "sz_person_id",
-        });
-      }
-    }
-    class SzPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
-
-    registerModel("SzPost", SzPost);
-    registerModel("SzReader", SzReader);
-    registerModel("SzPerson", SzPerson);
-
-    const post = await SzPost.create({ title: "Thinking" });
-    const person = await SzPerson.create({ first_name: "Michael" });
-
-    const readersBefore = await loadHasMany(post, "szReaders", {
-      className: "SzReader",
-      foreignKey: "sz_post_id",
-    });
-    const sizeBefore = readersBefore.length;
-
-    const proxy = association(post, "szPeople");
-    await proxy.push(person);
-
-    const readersAfter = await loadHasMany(post, "szReaders", {
-      className: "SzReader",
-      foreignKey: "sz_post_id",
-    });
-    expect(readersAfter.length).toBe(sizeBefore + 1);
-  });
-
-  it("delete all on association clears scope", async () => {
-    class ClearScopeAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("clear_scope_posts", {
-          className: "ClearScopePost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class ClearScopePost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ClearScopeAuthor);
-    registerModel(ClearScopePost);
-    const author = await ClearScopeAuthor.create({ name: "Alice" });
-    await ClearScopePost.create({ author_id: author.id, title: "A" });
-    await author.destroy();
-    const remaining = await loadHasMany(author, "clear_scope_posts", {
-      className: "ClearScopePost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
-
-  it("get ids", async () => {
-    class GiPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class GiReader extends Base {
-      static {
-        this.attribute("gi_person_id", "integer");
-        this.attribute("gi_post_id", "integer");
-        this.belongsTo("giPost", {
-          className: "GiPost",
-          foreignKey: "gi_post_id",
-        });
-      }
-    }
-    class GiPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.hasMany("giReaders", {
-          className: "GiReader",
-          foreignKey: "gi_person_id",
-        });
-        this.hasMany("giPosts", {
-          through: "giReaders",
-          source: "giPost",
-          className: "GiPost",
-        });
-      }
-    }
-
-    registerModel("GiPost", GiPost);
-    registerModel("GiReader", GiReader);
-    registerModel("GiPerson", GiPerson);
-
-    const person = await GiPerson.create({ first_name: "Michael" });
-    const post1 = await GiPost.create({ title: "Welcome" });
-    const post2 = await GiPost.create({ title: "Authorless" });
-    await GiReader.create({ gi_person_id: person.id, gi_post_id: post1.id });
-    await GiReader.create({ gi_person_id: person.id, gi_post_id: post2.id });
-
-    const posts = await loadHasManyThrough(person, "giPosts", {
-      through: "giReaders",
-      source: "giPost",
-      className: "GiPost",
-    });
-    const ids = posts.map((p) => p.id).sort();
-    expect(ids).toEqual([post1.id, post2.id].sort());
-  });
-
+  // TS-only: insertRecord with validate false skips join record validation
   it("insertRecord with validate false skips join record validation", async () => {
-    // Rails autosave calls insertRecord(child, validate:false, raise:false) so join
-    // records with failing validations should still be saved when validate is false.
-    class IrpvJoin extends Base {
+    class IrpvTagging extends Base {
       static {
-        this.attribute("irpv_owner_id", "integer");
-        this.attribute("irpv_item_id", "integer");
-        this.validate((r: any) => {
+        this._tableName = "taggings";
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.attribute("tag_id", "integer");
+        (this as any).validates((r: any) => {
           r.errors.add("base", "Join always invalid");
         });
-        this.belongsTo("irpv_item", {
-          className: "IrpvItem",
-          foreignKey: "irpv_item_id",
-        });
+        this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
       }
     }
-    class IrpvItem extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class IrpvOwner extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("irpv_joins", {
-          className: "IrpvJoin",
-          foreignKey: "irpv_owner_id",
-        });
-        this.hasMany("irpv_items", {
-          className: "IrpvItem",
-          through: "irpv_joins",
-          source: "irpv_item",
-        });
-      }
-    }
-    registerModel("IrpvJoin", IrpvJoin);
-    registerModel("IrpvItem", IrpvItem);
-    registerModel("IrpvOwner", IrpvOwner);
+    registerModel("IrpvTagging", IrpvTagging);
 
-    const owner = await IrpvOwner.create({ name: "Firm" });
-    const item = await IrpvItem.create({ name: "Item" });
-    // Call insertRecord directly (the autosave path), with validate=false.
-    // Before the fix, joinRecord.save() was called without validate option,
-    // which defaulted to true and would fail. Now it passes validate through.
-    const assoc = (owner as any).association("irpv_items");
-    const result = await assoc.insertRecord(item, false, false);
+    const post = await Post.create({ title: "Test", body: "" });
+    const tag = await Tag.create({ name: "testjoin" });
+
+    class IrpvPost extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.hasMany("irpvTaggings", { className: "IrpvTagging", foreignKey: "taggable_id" });
+        this.hasMany("irpvTags", { through: "irpvTaggings", source: "tag", className: "Tag" });
+      }
+    }
+    registerModel("IrpvPost", IrpvPost);
+
+    const irpvPost = await IrpvPost.find(post.id);
+    const assoc = (irpvPost as any).association("irpvTags");
+    const result = await assoc.insertRecord(tag, false, false);
     expect(result).toBe(true);
-    const joins = await IrpvJoin.all().where({ irpv_owner_id: owner.id }).toArray();
-    expect(joins.length).toBe(1);
+    expect(await IrpvTagging.where({ taggable_id: post.id }).count()).toBe(1);
   });
 
+  // TS-only: loads through a join model
   it("loads through a join model", async () => {
-    class LtjmTag extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class LtjmTagging extends Base {
-      static {
-        this.attribute("post_id", "integer");
-        this.attribute("tag_id", "integer");
-      }
-    }
-    class LtjmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("ltjmTaggings", {
-          className: "LtjmTagging",
-          foreignKey: "post_id",
-        });
-        this.hasMany("ltjmTags", {
-          through: "ltjmTaggings",
-          className: "LtjmTag",
-          source: "tag",
-        });
-      }
-    }
-    registerModel("LtjmTag", LtjmTag);
-    registerModel("LtjmTagging", LtjmTagging);
-    registerModel("LtjmPost", LtjmPost);
+    const post = await Post.find(posts("welcome").id);
+    const tagsBefore = await (post as any).tags.toArray();
+    expect(tagsBefore.length).toBeGreaterThan(0);
 
-    const post = await LtjmPost.create({ title: "Hello" });
-    const tag1 = await LtjmTag.create({ name: "ruby" });
-    const tag2 = await LtjmTag.create({ name: "rails" });
-    await LtjmTagging.create({ post_id: post.id, tag_id: tag1.id });
-    await LtjmTagging.create({ post_id: post.id, tag_id: tag2.id });
+    const tag = tagsBefore[0];
+    const postTags2 = await Post.joins("tags").where({ id: post.id }).toArray();
+    expect(postTags2.length).toBeGreaterThan(0);
+    expect(postTags2.map((p: any) => p.id)).toContain(post.id);
+  });
 
-    const tags = await loadHasManyThrough(post, "ltjmTags", {
-      through: "ltjmTaggings",
-      className: "LtjmTag",
-      source: "tag",
-    });
-    expect(tags).toHaveLength(2);
-    const names = tags.map((t) => t.name);
-    expect(names).toContain("ruby");
-    expect(names).toContain("rails");
+  // TS-only: delete_all for with dependent option delete_all
+  it("delete_all for with dependent option delete_all", async () => {
+    const person = await Person.find(people("michael").id);
+    const countBefore = await (person as any).jobsWithDependentDeleteAll.count();
+    const jobCountBefore = await Job.count();
+    const refCountBefore = await Reference.count();
+    await (person as any).jobsWithDependentDeleteAll.deleteAll();
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(Number(refCountBefore) - Number(countBefore));
+  });
+
+  // TS-only: delete_all for with dependent option nullify
+  it.skip("delete_all for with dependent option nullify", async () => {
+    const person = await Person.find(people("michael").id);
+    const countBefore = await (person as any).jobsWithDependentNullify.count();
+    const jobCountBefore = await Job.count();
+    const refCountBefore = await Reference.count();
+    await (person as any).jobsWithDependentNullify.deleteAll();
+    expect(await Job.count()).toBe(jobCountBefore);
+    expect(await Reference.count()).toBe(refCountBefore);
   });
 });

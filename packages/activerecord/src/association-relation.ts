@@ -106,7 +106,14 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return (this._association as CollectionProxy<T>).create(merged, block);
+    const proxy = this._association as CollectionProxy<T> & { _pendingThroughScope?: unknown };
+    const prev = proxy._pendingThroughScope;
+    proxy._pendingThroughScope = this;
+    try {
+      return await proxy.create(merged, block);
+    } finally {
+      proxy._pendingThroughScope = prev;
+    }
   }
 
   /**

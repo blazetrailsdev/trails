@@ -561,7 +561,7 @@ function assertLockingColumnNotExplicitly(
  * setter so records are built / marked-for-destruction in memory before save.
  * @internal
  */
-function assignUpdateAttribute(self: any, key: string, value: unknown): void {
+function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<void> | void {
   const configs = self.constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
     | undefined;
@@ -577,6 +577,22 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): void {
   if (key === "id") {
     self.id = value;
     return;
+  }
+  // Dispatch through prototype setter for generated writers (e.g. *Ids writers
+  // from CollectionAssociation builder). Mirrors Rails' public_send("#{key}=").
+  // *Ids writers are async (they query the DB to resolve records); return the
+  // Promise so update() can await it before save().
+  let proto = Object.getPrototypeOf(self);
+  while (proto && proto !== Object.prototype) {
+    const desc = Object.getOwnPropertyDescriptor(proto, key);
+    if (desc) {
+      if (typeof desc.set === "function") {
+        const result: unknown = desc.set.call(self, value);
+        return result instanceof Promise ? result : undefined;
+      }
+      break;
+    }
+    proto = Object.getPrototypeOf(proto);
   }
   self.writeAttribute(key, value);
 }
@@ -608,9 +624,12 @@ export async function update<T extends UpdateRecord>(
     // through their setter (assignUpdateAttribute). A column with a custom writer
     // would be missed; none exist today. TODO: unify on `public_send`-equivalent
     // setter dispatch if/when a custom column writer is introduced.
+    const pending: Promise<void>[] = [];
     for (const [key, value] of Object.entries(attrs)) {
-      assignUpdateAttribute(self, key, value);
+      const p = assignUpdateAttribute(self, key, value);
+      if (p) pending.push(p);
     }
+    if (pending.length) await Promise.all(pending);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
 }

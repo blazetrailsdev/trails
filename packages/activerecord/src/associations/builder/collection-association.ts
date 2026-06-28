@@ -152,7 +152,7 @@ export class CollectionAssociation extends Association {
     Object.defineProperty(mixin, idsName, {
       get: existing?.get,
       set(this: AssociationInstanceHost, ids: unknown) {
-        this.association(name).idsWriter(ids);
+        return (this.association(name) as any).idsWriter(ids);
       },
       configurable: true,
     });

@@ -426,8 +426,12 @@ export class CollectionAssociation extends Association {
     // baseline directly via doAsyncFindTarget to avoid the loadedBang short-circuit
     // and without mutating this.target (mirrors Rails' load_target in replace).
     if (!pending.wasLoaded) {
-      const dbRecords = await this.doAsyncFindTarget();
-      pending.originalTarget = Array.isArray(dbRecords) ? [...dbRecords] : [];
+      // Query the DB directly via scope() to get the persisted baseline.
+      // doAsyncFindTarget() hits the association-instance cache (which may
+      // already reflect the in-memory replace) and returns the wrong diff.
+      const rel = this.scope() as { toArray?: () => Promise<Base[]> } | null | undefined;
+      const dbRecords = rel?.toArray ? await rel.toArray() : [];
+      pending.originalTarget = [...dbRecords];
     }
     const currentTarget = this.target;
     await transaction(this, async () => {

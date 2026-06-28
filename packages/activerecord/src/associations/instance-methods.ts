@@ -52,7 +52,15 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
   const cached = this._associationCache(name);
   if (cached === instance) return;
   if (cached !== undefined) {
-    instance.setTarget((cached.target as Base | Base[] | null) ?? null);
+    if (instance.isLoaded()) {
+      // The stale state was captured at actual load time; re-snapshotting via
+      // loadedBang (inside setTarget) after a FK change would reset the
+      // detector and mask stale-target detection. Update the target directly
+      // without re-marking loaded.
+      instance.target = (cached.target as Base | Base[] | null) ?? null;
+    } else {
+      instance.setTarget((cached.target as Base | Base[] | null) ?? null);
+    }
     return;
   }
   // Route through the real holder (`_preloadedHolderTarget`) so an
