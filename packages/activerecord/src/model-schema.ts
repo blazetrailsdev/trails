@@ -420,7 +420,7 @@ export async function createTable(this: typeof Base): Promise<void> {
       ? `${a.quoteIdentifier(pk)} SERIAL PRIMARY KEY`
       : isMysql
         ? `${a.quoteIdentifier(pk)} BIGINT AUTO_INCREMENT PRIMARY KEY`
-        : `${a.quoteIdentifier(pk)} INTEGER PRIMARY KEY AUTOINCREMENT`;
+        : `${a.quoteIdentifier(pk)} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL`;
     colDefs.push(pkDef);
   } else {
     for (const pk of pks) {

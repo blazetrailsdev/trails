@@ -58,13 +58,6 @@ describe("DefaultTest", () => {
     const columns = Entrant.columnsHash();
     for (const name of ["id", "name", "course_id"]) {
       const column = columns[name];
-      // TRACKED DEVIATION (convergence story sqlite-pk-not-null-ddl): trails'
-      // SQLite `create_table` emits `"id" integer PRIMARY KEY` without the
-      // `NOT NULL` Rails adds (`"id" integer PRIMARY KEY AUTOINCREMENT NOT NULL`),
-      // so PRAGMA reports `notnull=0` and `id.null` reflects `true` on the SQLite
-      // lane only. Rails asserts NOT NULL on every adapter; PG/MySQL bigint PKs
-      // already reflect NOT NULL here.
-      if (name === "id" && adapterType === "sqlite") continue;
       expect(column.null).toBe(false);
       expect(column.default).toBeFalsy();
     }

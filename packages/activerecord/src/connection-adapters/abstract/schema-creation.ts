@@ -442,7 +442,7 @@ export class SchemaCreation {
       case "primary_key":
         if (this.adapterName === "postgres") sql = "SERIAL PRIMARY KEY";
         else if (this.adapterName === "mysql") sql = "BIGINT AUTO_INCREMENT PRIMARY KEY";
-        else sql = "INTEGER PRIMARY KEY AUTOINCREMENT";
+        else sql = "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL";
         break;
       case "virtual": {
         // Resolve to the real column type declared via options.type (Rails pattern:

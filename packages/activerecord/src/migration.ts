@@ -2220,7 +2220,7 @@ export class MigrationContext {
       case "primary_key":
         if (an === "postgres") return "SERIAL PRIMARY KEY";
         if (an === "mysql") return "BIGINT AUTO_INCREMENT PRIMARY KEY";
-        return "INTEGER PRIMARY KEY AUTOINCREMENT";
+        return "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL";
       default:
         return type.toUpperCase();
     }
