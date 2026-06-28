@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
@@ -50,20 +50,18 @@ describeIfPg("PostgreSQLAdapter", () => {
   setupHandlerSuite();
 
   let adapter: PostgreSQLAdapter;
-  // The default search_path captured before any schema-scoping test mutates it.
   // The scoped tests qualify enum sql_types relative to the live search_path, so
   // a path leaked by a prior test (e.g. one whose `withTestSchema` cleanup raced
   // a timeout) would flip `test_schema.mood_in_test_schema` to the unqualified
-  // `mood_in_test_schema`. Restoring it here makes each test's qualification
-  // independent of what ran before it on this connection.
-  let defaultSearchPath: string | null = null;
+  // `mood_in_test_schema`. Mirror the schema_test.rb port (schema.test.ts): capture
+  // the default once and restore it (plus clear the schema cache) after every test,
+  // recovering the `ensure` of Rails' `with_schema_search_path` at suite level.
+  let defaultSearchPath: string;
+  beforeAll(async () => {
+    defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
+  });
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    if (defaultSearchPath === null) {
-      defaultSearchPath = await adapter.schemaSearchPath();
-    } else {
-      await adapter.setSchemaSearchPath(defaultSearchPath);
-    }
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.createEnum("mood", ["sad", "ok", "happy"]);
@@ -87,6 +85,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
     // test_schema is managed by withTestSchema — no DROP here
+    await adapter.setSchemaSearchPath(defaultSearchPath);
+    adapter.schemaCache?.clear();
     PostgresqlEnum.resetColumnInformation();
     vi.restoreAllMocks();
   });
