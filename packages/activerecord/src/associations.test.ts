@@ -8,13 +8,13 @@
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
+import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import type { Firm as FirmT } from "./test-helpers/models/company.js";
 import type { Tag as TagT } from "./test-helpers/models/tag.js";
 import type { Tagging as TaggingT } from "./test-helpers/models/tagging.js";
@@ -68,56 +68,23 @@ function expectQuotedColumnInSql(
 describe("AssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      cpk_orders: {
-        columns: { id: "integer", shop_id: "integer", status: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_order_items: {
-        cpk_order_id: "integer",
-        cpk_order_shop_id: "integer",
-        name: "string",
-        order_id: "integer",
-        order_shop_id: "integer",
-      },
-    });
+  beforeAll(() => {
+    registerModel("CpkOrder", CpkOrder);
+    registerModel("CpkBook", CpkBook);
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
-    class CpkOrder extends Base {
-      static {
-        this._tableName = "cpk_orders";
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasMany("cpkOrderItems", {
-          foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-          className: "CpkOrderItem",
-        });
-      }
-    }
-    class CpkOrderItem extends Base {
-      static {
-        this._tableName = "cpk_order_items";
-        this.attribute("cpk_order_shop_id", "integer");
-        this.attribute("cpk_order_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("CpkOrder", CpkOrder);
-    registerModel("CpkOrderItem", CpkOrderItem);
-    const order = await CpkOrder.create({ shop_id: 1, id: 1, status: "open" });
-    await CpkOrderItem.create({ cpk_order_shop_id: 1, cpk_order_id: 1, name: "Widget" });
+    const order = await CpkOrder.create({ shop_id: 1, status: "open" });
+    const orderId = (order.id as [number, number])[1];
+    await CpkBook.create({ shop_id: 1, order_id: orderId, author_id: 1, id: 1, title: "Widget" });
     // Change in memory but don't persist
-    order.status = "closed";
-    // Loading association should still find items by persisted CPK
-    const items = await loadHasMany(order, "cpkOrderItems", {
-      foreignKey: ["cpk_order_shop_id", "cpk_order_id"],
-      className: "CpkOrderItem",
+    (order as any).status = "closed";
+    // Loading association should still find books by persisted CPK
+    const books = await loadHasMany(order, "books", {
+      foreignKey: ["shop_id", "order_id"],
+      className: "CpkBook",
     });
-    expect(items.length).toBe(1);
+    expect(books.length).toBe(1);
   });
 });
 
@@ -425,35 +392,6 @@ describe("AssociationProxyTest", () => {
 describe("PreloaderTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      // Canonical tables for PreloaderTest conversions
-      authors: canonicalSchema.authors,
-      posts: canonicalSchema.posts,
-      comments: canonicalSchema.comments,
-      books: canonicalSchema.books,
-      categories: canonicalSchema.categories,
-      categories_posts: canonicalSchema.categories_posts,
-      author_favorites: canonicalSchema.author_favorites,
-      postesques: canonicalSchema.postesques,
-      essays: canonicalSchema.essays,
-      invoices: canonicalSchema.invoices,
-      line_items: canonicalSchema.line_items,
-      line_item_discount_applications: canonicalSchema.line_item_discount_applications,
-      shipping_lines: canonicalSchema.shipping_lines,
-      shipping_line_discount_applications: canonicalSchema.shipping_line_discount_applications,
-      discounts: canonicalSchema.discounts,
-      sharded_blogs: canonicalSchema.sharded_blogs,
-      sharded_blog_posts: canonicalSchema.sharded_blog_posts,
-      sharded_comments: canonicalSchema.sharded_comments,
-      sharded_tags: canonicalSchema.sharded_tags,
-      sharded_blog_posts_tags: canonicalSchema.sharded_blog_posts_tags,
-      cpk_orders: canonicalSchema.cpk_orders,
-      cpk_order_agreements: canonicalSchema.cpk_order_agreements,
-      dogs: canonicalSchema.dogs,
-      author_addresses: canonicalSchema.author_addresses,
-    });
-  });
 
   afterEach(() => vi.restoreAllMocks());
 
@@ -1557,154 +1495,70 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records no ops", async () => {
-    class PKAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("pkPosts", { className: "PKPost", foreignKey: "author_id" });
-      }
-    }
-    class PKPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    registerModel("PKAuthor", PKAuthor);
-    registerModel("PKPost", PKPost);
+    const author = await Author.create({ name: "Auth" });
+    await Post.create({ title: "P1", body: "body", author_id: author.id });
 
-    const author = await PKAuthor.create({ name: "Auth" });
-    await PKPost.create({ title: "P1", body: "body", author_id: author.id });
-
-    const authors = await PKAuthor.all().includes("pkPosts").toArray();
+    const authors = await Author.all().includes("posts").toArray();
     expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any).association("pkPosts").target;
+    const preloaded = (authors[0] as any).association("posts").target;
     expect(preloaded).toHaveLength(1);
     expect(preloaded[0].title).toBe("P1");
   });
 
   it("preload keeps built has many records after query", async () => {
-    class PKQAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("pkqPosts", { className: "PKQPost", foreignKey: "author_id" });
-      }
-    }
-    class PKQPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    registerModel("PKQAuthor", PKQAuthor);
-    registerModel("PKQPost", PKQPost);
+    const author = await Author.create({ name: "Auth" });
+    await Post.create({ title: "P1", body: "body", author_id: author.id });
+    await Post.create({ title: "P2", body: "body", author_id: author.id });
 
-    const author = await PKQAuthor.create({ name: "Auth" });
-    await PKQPost.create({ title: "P1", body: "body", author_id: author.id });
-    await PKQPost.create({ title: "P2", body: "body", author_id: author.id });
-
-    const authors = await PKQAuthor.all().includes("pkqPosts").toArray();
+    const authors = await Author.all().includes("posts").toArray();
     expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any).association("pkqPosts").target;
+    const preloaded = (authors[0] as any).association("posts").target;
     expect(preloaded).toHaveLength(2);
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    class PKBAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PKBPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.belongsTo("pkbAuthor", { className: "PKBAuthor", foreignKey: "author_id" });
-      }
-    }
-    registerModel("PKBAuthor", PKBAuthor);
-    registerModel("PKBPost", PKBPost);
+    const a = await Author.create({ name: "Auth" });
+    await Post.create({ title: "P1", body: "body", author_id: a.id });
 
-    const a = await PKBAuthor.create({ name: "Auth" });
-    await PKBPost.create({ title: "P1", body: "body", author_id: a.id });
-
-    const posts = await PKBPost.all().includes("pkbAuthor").toArray();
+    const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any).association("pkbAuthor").target;
+    const preloaded = (posts[0] as any).association("author").target;
     expect(preloaded).toBeDefined();
     expect(preloaded.name).toBe("Auth");
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    class PKBAAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PKBAPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.belongsTo("pkbaAuthor", { className: "PKBAAuthor", foreignKey: "author_id" });
-      }
-    }
-    registerModel("PKBAAuthor", PKBAAuthor);
-    registerModel("PKBAPost", PKBAPost);
+    const a1 = await Author.create({ name: "A1" });
+    const a2 = await Author.create({ name: "A2" });
+    await Post.create({ title: "P1", body: "body", author_id: a1.id });
+    await Post.create({ title: "P2", body: "body", author_id: a2.id });
 
-    const a1 = await PKBAAuthor.create({ name: "A1" });
-    const a2 = await PKBAAuthor.create({ name: "A2" });
-    await PKBAPost.create({ title: "P1", body: "body", author_id: a1.id });
-    await PKBAPost.create({ title: "P2", body: "body", author_id: a2.id });
-
-    const posts = await PKBAPost.all().includes("pkbaAuthor").toArray();
+    const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(2);
     for (const p of posts) {
-      expect((p as any).association("pkbaAuthor").isLoaded()).toBe(true);
+      expect((p as any).association("author").isLoaded()).toBe(true);
     }
   });
 
   it("preload marks belongs_to association loaded on owner", async () => {
-    class PTLBAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class PTLBPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.belongsTo("ptlbAuthor", { className: "PTLBAuthor", foreignKey: "author_id" });
-      }
-    }
-    registerModel("PTLBAuthor", PTLBAuthor);
-    registerModel("PTLBPost", PTLBPost);
+    const a = await Author.create({ name: "A" });
+    await Post.create({ title: "P", body: "body", author_id: a.id });
 
-    const a = await PTLBAuthor.create({ name: "A" });
-    await PTLBPost.create({ title: "P", body: "body", author_id: a.id });
-
-    const posts = await PTLBPost.all().includes("ptlbAuthor").toArray();
+    const posts = await Post.all().includes("author").toArray();
     expect(posts).toHaveLength(1);
-    const assoc = (posts[0] as any).association("ptlbAuthor");
+    const assoc = (posts[0] as any).association("author");
     expect(assoc.isLoaded()).toBe(true);
     expect(assoc.target?.name).toBe("A");
   });
 
   it("preload sets has_many association target on owner", async () => {
-    class PTLCAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.hasMany("ptlcPosts", { className: "PTLCPost", foreignKey: "author_id" });
-      }
-    }
-    class PTLCPost extends Base {
-      static {
-        this._tableName = "posts";
-      }
-    }
-    registerModel("PTLCAuthor", PTLCAuthor);
-    registerModel("PTLCPost", PTLCPost);
+    const a = await Author.create({ name: "A" });
+    await Post.create({ title: "P1", body: "body", author_id: a.id });
+    await Post.create({ title: "P2", body: "body", author_id: a.id });
 
-    const a = await PTLCAuthor.create({ name: "A" });
-    await PTLCPost.create({ title: "P1", body: "body", author_id: a.id });
-    await PTLCPost.create({ title: "P2", body: "body", author_id: a.id });
-
-    const authors = await PTLCAuthor.all().includes("ptlcPosts").toArray();
+    const authors = await Author.all().includes("posts").toArray();
     const owner = authors.find((x) => x.id === a.id)!;
-    const assoc = (owner as any).association("ptlcPosts");
+    const assoc = (owner as any).association("posts");
     expect(assoc.isLoaded()).toBe(true);
     const titles = (assoc.target as Base[]).map((r: any) => r.title).sort();
     expect(titles).toEqual(["P1", "P2"]);
