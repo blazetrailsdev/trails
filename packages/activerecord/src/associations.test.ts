@@ -1695,22 +1695,23 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    // Rails: `include MyModule` (def comments; :none end) before `has_many :comments`
-    // inserts MyModule above GeneratedAssociationMethods in Ruby's ancestor chain, so the
-    // module method wins. JS equivalent: redefine the property on the prototype after
-    // hasMany sets it (configurable: true), which mirrors the override outcome.
+    // Rails: `include MyModule` (def comments; :none end) BEFORE `has_many :comments`;
+    // the module is inserted above GeneratedAssociationMethods in the ancestor chain so
+    // the module method wins. JS equivalent: define as non-configurable before hasMany —
+    // defineReaders' guard (`if (existing && !existing.configurable) return`) skips it,
+    // matching Ruby's outcome that a pre-included method is not replaced by the association.
     class MyArticle extends Base {
       static {
+        Object.defineProperty(this.prototype, "comments", {
+          get() {
+            return "none" as const;
+          },
+          configurable: false,
+        });
         this._tableName = "articles";
         this.hasMany("comments", { inverseOf: false });
       }
     }
-    Object.defineProperty((MyArticle as any).prototype, "comments", {
-      get() {
-        return "none" as const;
-      },
-      configurable: true,
-    });
     expect(new (MyArticle as any)().comments).toBe("none");
   });
 });
