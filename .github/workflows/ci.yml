@@ -759,27 +759,23 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # Required, flag-off run — preserves the default CI signal (validates the
-      # AR_ONE_SCHEMA-off behavior this job is supposed to gate).
-      - run: pnpm vitest run packages/activerecord/
-      # Spike branch only: a SECOND, non-blocking AR run under AR_ONE_SCHEMA=1
-      # (no-drop mode) + DDL profiling, for discovery. `continue-on-error` so a
-      # discovery failure never fails this required lane, and the `if`-gate makes
-      # it a no-op on every other PR/branch. Remove once the exclude list is
+      # On the spike branch `existing-db-schema-rc-9807c5`, AR_ONE_SCHEMA/DDL_PROFILE
+      # turn this existing lane into the one-schema discovery run (no-drop mode +
+      # DDL profiling). The expressions resolve to "" on every other PR/branch, so
+      # this is a no-op there. Discovery steps below upload the candidate exclude
+      # list + DROP-count aggregate. Remove this wiring once the exclude list is
       # populated and the permanent behavior is decided.
-      - name: One-schema discovery run (spike branch, non-blocking)
-        if: github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
-        continue-on-error: true
+      - name: AR suite (one-schema on spike branch)
         env:
-          AR_ONE_SCHEMA: "1"
-          DDL_PROFILE: "1"
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery artifacts (spike branch only)
+      - name: One-schema discovery (spike branch only)
         if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
@@ -999,30 +995,24 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # Required, flag-off run — preserves the default CI signal. Postgres is
-      # where teardown DROP TABLE dominates suite time, so the discovery run
-      # below (non-blocking) is the headline DROP-count signal.
-      - run: pnpm vitest run packages/activerecord/
+      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
+      # branch only (expressions resolve to "" elsewhere — no-op). Postgres is
+      # where teardown DROP TABLE dominates suite time, so the DROP-count
+      # aggregate uploaded below is the headline signal.
+      - name: AR suite (one-schema on spike branch)
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
-      - name: One-schema discovery run (spike branch, non-blocking)
-        if: github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
-        continue-on-error: true
-        env:
-          ARCONN: postgresql
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
-          AR_DB_FORKS: 8
-          AR_ONE_SCHEMA: "1"
-          DDL_PROFILE: "1"
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery artifacts (spike branch only)
+      - name: One-schema discovery (spike branch only)
         if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
@@ -1150,30 +1140,23 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # Required, flag-off run — preserves the default CI signal. MariaDB is the
-      # other DDL-dominated lane, so the discovery run below (non-blocking) is a
-      # headline DROP-count signal.
-      - run: pnpm vitest run packages/activerecord/
+      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
+      # branch only (expressions resolve to "" elsewhere — no-op). MariaDB is the
+      # other DDL-dominated lane, so its DROP-count aggregate is a headline signal.
+      - name: AR suite (one-schema on spike branch)
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
-      - name: One-schema discovery run (spike branch, non-blocking)
-        if: github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
-        continue-on-error: true
-        env:
-          ARCONN: mysql2
-          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
-          AR_DB_FORKS: 8
-          AR_ONE_SCHEMA: "1"
-          DDL_PROFILE: "1"
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery artifacts (spike branch only)
+      - name: One-schema discovery (spike branch only)
         if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
