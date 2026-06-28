@@ -36,6 +36,10 @@ import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { buildHasManyRelation, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import { Bird } from "./test-helpers/models/bird.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
+import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -1691,41 +1695,115 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    const ref = reflectOnAssociation(Post, "author");
-    expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("author");
+    // Rails: `include MyModule` (def comments; :none end) before `has_many :comments`
+    // inserts MyModule above GeneratedAssociationMethods in Ruby's ancestor chain, so the
+    // module method wins. JS equivalent: redefine the property on the prototype after
+    // hasMany sets it (configurable: true), which mirrors the override outcome.
+    class MyArticle extends Base {
+      static {
+        this._tableName = "articles";
+        this.hasMany("comments", { inverseOf: false });
+      }
+    }
+    Object.defineProperty((MyArticle as any).prototype, "comments", {
+      get() {
+        return "none" as const;
+      },
+      configurable: true,
+    });
+    expect(new (MyArticle as any)().comments).toBe("none");
   });
 });
 
 describe("WithAnnotationsTest", () => {
-  it("belongs to with annotation includes a query comment", () => {
-    const sql = Post.all().annotate("belongs-to-hint").toSql();
-    expect(sql).toContain("belongs-to-hint");
+  // Mirrors Rails pirate.rb:SpacePirate (table "pirates") with annotated association scopes.
+  // vendor/rails/activerecord/test/models/pirate.rb:108-118
+  class SpacePirateAnnotated extends Base {
+    static {
+      this.tableName = "pirates";
+      this.belongsTo("parrotWithAnnotation", {
+        scope: (q: any) => q.annotate("that tells jokes"),
+        className: "Parrot",
+        foreignKey: "parrot_id",
+      });
+      this.hasAndBelongsToMany("parrotsWithAnnotation", {
+        scope: (q: any) => q.annotate("that are very colorful"),
+        className: "Parrot",
+        foreignKey: "pirate_id",
+      });
+      this.hasOne("shipWithAnnotation", {
+        scope: (q: any) => q.annotate("that is a rocket"),
+        className: "Ship",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("birdsWithAnnotation", {
+        scope: (q: any) => q.annotate("that are also parrots"),
+        className: "Bird",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("treasures", { as: "looter" });
+      this.hasMany("treasureEstimatesWithAnnotation", {
+        scope: (q: any) => q.annotate("yarrr"),
+        through: "treasures",
+        source: "priceEstimates",
+      });
+    }
+  }
+
+  setupHandlerSuite();
+  const { pirates } = useHandlerFixtures(
+    ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
+    { schema: canonicalSchema },
+  );
+
+  beforeAll(() => {
+    registerModel("Ship", Ship);
+    registerModel("Bird", Bird);
+    registerModel("Treasure", Treasure);
+    registerModel("PriceEstimate", PriceEstimate);
   });
 
-  it("has and belongs to many with annotation includes a query comment", () => {
-    const sql = Post.all().annotate("habtm-hint").toSql();
-    expect(sql).toContain("habtm-hint");
+  it("belongs to with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const sqls = await captureSql(() => (pirate as any).loadBelongsTo("parrotWithAnnotation"));
+    expect(sqls.some((s) => s.includes("that tells jokes"))).toBe(true);
   });
 
-  it("has one with annotation includes a query comment", () => {
-    const sql = Post.all().annotate("has-one-hint").toSql();
-    expect(sql).toContain("has-one-hint");
+  it("has and belongs to many with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).parrotsWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("that are very colorful"))).toBe(true);
   });
 
-  it("has many with annotation includes a query comment", () => {
-    const sql = Post.all().annotate("has-many-hint").toSql();
-    expect(sql).toContain("has-many-hint");
+  it("has one with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const sqls = await captureSql(() => (pirate as any).loadHasOne("shipWithAnnotation"));
+    expect(sqls.some((s) => s.includes("that is a rocket"))).toBe(true);
   });
 
-  it("has many through with annotation includes a query comment", () => {
-    const sql = Post.all().annotate("hmt-hint").toSql();
-    expect(sql).toContain("hmt-hint");
+  it("has many with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).birdsWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("that are also parrots"))).toBe(true);
   });
 
-  it("has many through with annotation includes a query comment when eager loading", () => {
-    const sql = Post.all().annotate("eager-hmt-hint").toSql();
-    expect(sql).toContain("eager-hmt-hint");
+  it("has many through with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("redbeard").id);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).treasureEstimatesWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
+  });
+
+  it("has many through with annotation includes a query comment when eager loading", async () => {
+    const sqls = await captureSql(async () => {
+      await SpacePirateAnnotated.includes("treasureEstimatesWithAnnotation").first();
+    });
+    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
 });
 
