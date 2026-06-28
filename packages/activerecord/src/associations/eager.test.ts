@@ -515,8 +515,13 @@ describe("EagerAssociationTest", () => {
     const pirate = pirates("redbeard");
     const attackerMatey = await (pirate as any).attackerMatey;
     const eagerLoaded = await Pirate.eagerLoad("attackerMatey").where({ id: pirate.id }).first();
+    const mateyAttrs = (m: any) => ({
+      pirate_id: m?.pirate_id,
+      target_id: m?.target_id,
+      weight: m?.weight,
+    });
     await assertNoQueries(false, () => {
-      expect((eagerLoaded as any)?.attackerMatey?.id).toBe(attackerMatey?.id);
+      expect(mateyAttrs((eagerLoaded as any)?.attackerMatey)).toEqual(mateyAttrs(attackerMatey));
     });
   });
   it("eager loaded has many association without primary key", async () => {
@@ -524,9 +529,14 @@ describe("EagerAssociationTest", () => {
     const mateysList: Matey[] = await pirate.mateys.toArray();
     const eagerLoaded = await Pirate.eagerLoad("mateys").where({ id: pirate.id }).first();
     expect(mateysList.length).toBeGreaterThan(0);
+    const mateyAttrs = (m: any) => ({
+      pirate_id: m?.pirate_id,
+      target_id: m?.target_id,
+      weight: m?.weight,
+    });
     await assertNoQueries(false, async () => {
       const eagerMateys: Matey[] = await (eagerLoaded as any).mateys.toArray();
-      expect(eagerMateys.map((m) => m.id)).toEqual(mateysList.map((m) => m.id));
+      expect(eagerMateys.map(mateyAttrs)).toEqual(mateysList.map(mateyAttrs));
     });
   });
   it("duplicate middle objects", async () => {
