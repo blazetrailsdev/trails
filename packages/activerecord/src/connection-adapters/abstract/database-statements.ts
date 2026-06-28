@@ -19,7 +19,11 @@ import {
 import { Attribute as ModelAttribute, ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { TransactionIsolationError, NotImplementedError } from "../../errors.js";
+import {
+  TransactionIsolationError,
+  NotImplementedError,
+  RangeError as ARRangeError,
+} from "../../errors.js";
 import {
   formatInstantForSql,
   formatPlainDateTimeForSql,
@@ -1542,8 +1546,10 @@ export const DatabaseStatements = {
         prepare,
       });
     } catch (e) {
-      // Mirrors: database_statements.rb:78 — rescue ::RangeError → Result.empty
-      if (e instanceof ActiveModelRangeError) return Result.empty();
+      // Mirrors: database_statements.rb:78 — rescue ::RangeError → Result.empty.
+      // Ruby ::RangeError covers both ActiveModel::RangeError (type-level, client-side)
+      // and ActiveRecord::RangeError (adapter-level, server-side wire rejection).
+      if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return Result.empty();
       throw e;
     }
   },

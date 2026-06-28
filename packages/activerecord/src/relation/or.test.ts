@@ -46,8 +46,8 @@ describe("OrTest", () => {
     expect(await Post.where("id = 1").or(Post.none()).toArray()).toEqual(expected);
   });
 
-  // 2^63 overflows the bigint column range. The bind's isUnboundable() fires,
-  // the Arel visitor emits "1=0" for that equality, so the OR collapses to id=1.
+  // 2^63 overflows the bigint wire range. selectAll rescues ActiveRecord::RangeError
+  // → Result.empty (database_statements.rb:78), matching the raw SQL expected value.
   it("or with large number", async () => {
     const expected = await Post.where("id = 1 or id = 9223372036854775808").toArray();
     expect(

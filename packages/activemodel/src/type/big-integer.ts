@@ -10,37 +10,18 @@ export class BigIntegerType extends IntegerType {
     return "integer";
   }
 
+  // Mirrors Rails: serialize_cast_value returns value as-is (no range guard).
+  // big_integer.rb:29 — overrides Integer's ensureInRange call with a pass-through.
   override serializeCastValue(value: number | null): number | null {
-    return this.ensureInRange(value);
+    return value;
   }
 
-  /**
-   * @internal Rails-private helper. Bigint columns are always 8 bytes; default
-   * to 8 so the range check covers `[-2^63, 2^63-1]` when no explicit limit is set.
-   */
-  protected override _limit(): number {
-    return this.limit ?? 8;
-  }
-
-  /**
-   * @internal Rails-private helper. Uses BigInt arithmetic for BigInt cast values
-   * so the check is exact (float comparison loses precision near 2^63).
-   */
-  protected override isInRange(value: number | null): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") {
-      const bytes = this._limit();
-      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
-      const min = -(1n << BigInt(bytes * 8 - 1));
-      return value >= min && value <= max;
-    }
-    return super.isInRange(value);
-  }
-
-  override isSerializable(value: unknown): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
-    return super.isSerializable(value);
+  // Mirrors Rails: max_value returns Float::INFINITY so Integer's range check
+  // never fires for standalone BigIntegerType (big_integer.rb:33).
+  // Adapter column types that need an 8-byte bound are registered as
+  // IntegerType({ limit: 8 }) — e.g. PostgreSQL int8, MySQL bigint.
+  protected override maxValue(): number {
+    return Number.POSITIVE_INFINITY;
   }
 
   /** @internal Rails-private helper. */
@@ -65,6 +46,6 @@ export class BigIntegerType extends IntegerType {
   }
 
   override serialize(value: unknown): unknown {
-    return this.ensureInRange(this.cast(value));
+    return this.cast(value);
   }
 }

@@ -82,25 +82,15 @@ describe("BigIntegerTest", () => {
     expect(type.serialize(BIG)).toBe(BIG);
   });
 
-  it("maxValue returns 2^63 (8-byte signed max)", () => {
+  it("maxValue returns Infinity", () => {
     const type = new BigIntegerType();
-    expect((type as unknown as { maxValue(): number }).maxValue()).toBe(2 ** 63);
+    expect((type as unknown as { maxValue(): number }).maxValue()).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("serialize raises RangeError for values outside [-2^63, 2^63-1]", () => {
+  it("no range error for absurdly large values", () => {
     const type = new BigIntegerType();
     const huge = BigInt("9".repeat(100));
-    expect(() => type.serialize(huge)).toThrowError(/out of range for BigIntegerType/);
-    expect(() => type.serialize(9223372036854775808n)).toThrowError(
-      /out of range for BigIntegerType/,
-    );
-    expect(() => type.serialize(-(1n << 63n) - 1n)).toThrowError(/out of range for BigIntegerType/);
-  });
-
-  it("serialize accepts values at the 8-byte signed boundary", () => {
-    const type = new BigIntegerType();
-    expect(type.serialize((1n << 63n) - 1n)).toBe((1n << 63n) - 1n);
-    expect(type.serialize(-(1n << 63n))).toBe(-(1n << 63n));
+    expect(() => type.serialize(huge)).not.toThrow();
   });
 
   it("blank string casts to null", () => {

@@ -7,7 +7,7 @@
  * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
  */
 
-import { Attribute, Type, ActiveModelRangeError } from "@blazetrails/activemodel";
+import { Attribute, Type } from "@blazetrails/activemodel";
 
 type CastType = Pick<Type, "cast" | "serialize">;
 
@@ -72,18 +72,7 @@ export class QueryAttribute extends Attribute {
     );
   }
 
-  isUnboundable(): 1 | -1 | false {
-    try {
-      void this.valueForDatabase;
-    } catch (e) {
-      if (e instanceof ActiveModelRangeError) {
-        // Mirror Rails: serializable? yields value <=> 0 → sign for comparison operators.
-        const v = this.value;
-        if (typeof v === "bigint") return v >= 0n ? 1 : -1;
-        if (typeof v === "number") return v >= 0 ? 1 : -1;
-        return 1;
-      }
-    }
+  isUnboundable(): boolean {
     return false;
   }
 }
