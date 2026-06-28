@@ -1787,7 +1787,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         primaryKey = reflection.activeRecordPrimaryKey;
       }
     }
-    const typeCol = asName ? `${underscore(asName)}_type` : null;
+    const typeCol = asName
+      ? (this._assocDef.options.foreignType ?? `${underscore(asName)}_type`)
+      : null;
     // insert_record: assign the owner's FK/type onto the record, then save.
     // Mirrors Rails' `CollectionAssociation#insert_record` →
     // `set_owner_attributes` + `record.save`.
