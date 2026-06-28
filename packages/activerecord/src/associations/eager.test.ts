@@ -373,14 +373,11 @@ describe("EagerAssociationTest", () => {
     registerSponsorableModels();
   });
   it("should work inverse of with eager load", async () => {
-    const author = await Author.create({ name: "P" });
-    await Post.create({ title: "C1", body: "b1", author_id: author.id });
-    await Post.create({ title: "C2", body: "b2", author_id: author.id });
-
-    const parents = await Author.where({ id: author.id }).includes("posts").toArray();
-    expect(parents).toHaveLength(1);
-    const children = (parents[0] as any).association("posts").target;
-    expect(children).toHaveLength(2);
+    const author = authors("david");
+    const firstPost = await author.posts.first();
+    expect((firstPost as any).association("author").target).toBe(author);
+    const eagerFirst = await author.posts.eagerLoad("comments").first();
+    expect((eagerFirst as any).association("author").target).toBe(author);
   });
   it("loading conditions with or", async () => {
     const author = authors("david");
