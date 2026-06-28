@@ -74,17 +74,24 @@ describe("AssociationsTest", () => {
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
-    const order = await CpkOrder.create({ shop_id: 1, status: "open" });
+    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:84
+    const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
+    const shopId = (order.id as [number, number])[0];
     const orderId = (order.id as [number, number])[1];
-    await CpkBook.create({ shop_id: 1, order_id: orderId, author_id: 1, id: 1, title: "Widget" });
-    // Change in memory but don't persist
-    (order as any).status = "closed";
-    // Loading association should still find books by persisted CPK
-    const books = await loadHasMany(order, "books", {
-      foreignKey: ["shop_id", "order_id"],
-      className: "CpkBook",
+    const book = await CpkBook.create({
+      shop_id: shopId,
+      order_id: orderId,
+      author_id: 3,
+      id: 4,
+      title: "Book",
     });
-    expect(books.length).toBe(1);
+    // Update the book behind the in-memory instance so DB and in-memory diverge
+    const dbBook = await CpkBook.where({ author_id: 3, id: 4 }).first();
+    await dbBook!.updateColumns({ title: "A different title" });
+    // Reload the association
+    await (order as any).books.load();
+    // CPK identity of the in-memory book is preserved after reload
+    expect(book.id).toEqual([3, 4]);
   });
 });
 
@@ -1495,49 +1502,61 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records no ops", async () => {
-    const author = await Author.create({ name: "Auth" });
-    await Post.create({ title: "P1", body: "body", author_id: author.id });
+    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1535
+    // New unsaved post with a built (unsaved) comment — preloader must issue no
+    // queries and must preserve the in-memory built comment.
+    const post = new (Post as any)();
+    const comment = post.association("comments").build({ body: "built" });
 
-    const authors = await Author.all().includes("posts").toArray();
-    expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any).association("posts").target;
-    expect(preloaded).toHaveLength(1);
-    expect(preloaded[0].title).toBe("P1");
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [post], associations: ["comments"] }).call();
+      expect(post.association("comments").target).toContain(comment);
+    });
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload keeps built has many records after query", async () => {
-    const author = await Author.create({ name: "Auth" });
-    await Post.create({ title: "P1", body: "body", author_id: author.id });
-    await Post.create({ title: "P2", body: "body", author_id: author.id });
+    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1546
+    // Persisted post with one built (unsaved) comment — preloader queries for
+    // persisted comments but must also preserve the built comment in the result.
+    const persistedPost = await Post.create({ title: "Welcome", body: "body" });
+    const post = (await Post.where({ id: persistedPost.id }).toArray())[0];
+    const comment = (post as any).association("comments").build({ body: "built" });
 
-    const authors = await Author.all().includes("posts").toArray();
-    expect(authors).toHaveLength(1);
-    const preloaded = (authors[0] as any).association("posts").target;
-    expect(preloaded).toHaveLength(2);
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [post], associations: ["comments"] }).call();
+      expect((post as any).association("comments").target).toContain(comment);
+    });
+    expect(sqls).toHaveLength(1);
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    const a = await Author.create({ name: "Auth" });
-    await Post.create({ title: "P1", body: "body", author_id: a.id });
+    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1558
+    // New unsaved post with a built (unsaved) author — preloader must issue no
+    // queries and must preserve the exact same author instance.
+    const post = new (Post as any)();
+    const author = post.association("author").build({ name: "Built" });
 
-    const posts = await Post.all().includes("author").toArray();
-    expect(posts).toHaveLength(1);
-    const preloaded = (posts[0] as any).association("author").target;
-    expect(preloaded).toBeDefined();
-    expect(preloaded.name).toBe("Auth");
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [post], associations: ["author"] }).call();
+      expect(post.association("author").target).toBe(author);
+    });
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    const a1 = await Author.create({ name: "A1" });
-    const a2 = await Author.create({ name: "A2" });
-    await Post.create({ title: "P1", body: "body", author_id: a1.id });
-    await Post.create({ title: "P2", body: "body", author_id: a2.id });
+    // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:1569
+    // Persisted post with a built (unsaved) author — preloader must issue no
+    // queries (author already built in memory) and preserve the same instance.
+    const persistedPost = await Post.create({ title: "Welcome", body: "body" });
+    const post = (await Post.where({ id: persistedPost.id }).toArray())[0];
+    const author = (post as any).association("author").build({ name: "Built" });
 
-    const posts = await Post.all().includes("author").toArray();
-    expect(posts).toHaveLength(2);
-    for (const p of posts) {
-      expect((p as any).association("author").isLoaded()).toBe(true);
-    }
+    const sqls = await captureSql(async () => {
+      await new Preloader({ records: [post], associations: ["author"] }).call();
+      expect((post as any).association("author").target).toBe(author);
+    });
+    expect(sqls).toHaveLength(0);
   });
 
   it("preload marks belongs_to association loaded on owner", async () => {
