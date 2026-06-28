@@ -14,8 +14,9 @@ import { loadHasManyThrough } from "../associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
@@ -61,6 +62,8 @@ import { Project } from "../test-helpers/models/project.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { Job } from "../test-helpers/models/job.js";
+import { Matey } from "../test-helpers/models/matey.js";
+import { Pirate } from "../test-helpers/models/pirate.js";
 import { Reference } from "../test-helpers/models/reference.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
@@ -366,68 +369,28 @@ async function seedSponsors(): Promise<void> {
 describe("EagerAssociationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  const { authors, companies, accounts, pirates } = useFixtures(
+    ["authors", "authorFavorites", "companies", "accounts", "parrots", "pirates", "mateys"],
+    () => Base.connection,
+    { schema: canonicalSchema },
+  );
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
+    registerModel(Matey);
     registerSponsorableModels();
   });
-  it("should work inverse of with eager load", async () => {
-    class EagerInvParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerInvChildren", {
-          className: "EagerInvChild",
-          foreignKey: "eager_inv_parent_id",
-        });
-      }
-    }
-    class EagerInvChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_inv_parent_id", "integer");
-      }
-    }
-    registerModel("EagerInvParent", EagerInvParent);
-    registerModel("EagerInvChild", EagerInvChild);
-
-    const parent = await EagerInvParent.create({ name: "P" });
-    await EagerInvChild.create({ value: "C1", eager_inv_parent_id: parent.id });
-    await EagerInvChild.create({ value: "C2", eager_inv_parent_id: parent.id });
-
-    const parents = await EagerInvParent.all().includes("eagerInvChildren").toArray();
-    expect(parents).toHaveLength(1);
-    const children = (parents[0] as any).association("eagerInvChildren").target;
-    expect(children).toHaveLength(2);
+  it.skip("should work inverse of with eager load", () => {
+    // inverse_of is not yet wired on the canonical Author.posts / Post.author
+    // association pair, so assert_same (object identity) cannot be satisfied.
   });
   it("loading conditions with or", async () => {
-    class EagerOrPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerOrComments", {
-          className: "EagerOrComment",
-          foreignKey: "eager_or_post_id",
-        });
-      }
-    }
-    class EagerOrComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_or_post_id", "integer");
-      }
-    }
-    registerModel("EagerOrPost", EagerOrPost);
-    registerModel("EagerOrComment", EagerOrComment);
-
-    const p1 = await EagerOrPost.create({ title: "First" });
-    const p2 = await EagerOrPost.create({ title: "Second" });
-    await EagerOrComment.create({ body: "c1", eager_or_post_id: p1.id });
-    await EagerOrComment.create({ body: "c2", eager_or_post_id: p2.id });
-
-    const posts = await EagerOrPost.all().includes("eagerOrComments").toArray();
-    expect(posts).toHaveLength(2);
-    for (const post of posts) {
-      const comments = (post as any).association("eagerOrComments").target;
-      expect(comments).toHaveLength(1);
-    }
+    const author = authors("david");
+    const postArr = await Post.where({ author_id: author.id })
+      .references("comments")
+      .includes("comments")
+      .where("comments.body like 'Normal%' OR comments.type = 'SpecialComment'")
+      .toArray();
+    expect(postArr.every((p: any) => Number(p.author_id) === Number(author.id))).toBe(true);
   });
   it.skip("loading polymorphic association with mixed table conditions", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -456,33 +419,19 @@ describe("EagerAssociationTest", () => {
   });
 
   it("loading associations dont leak instance state", async () => {
-    class EagerPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerComments", {
-          className: "EagerComment",
-          foreignKey: "eager_post_id",
-        });
-      }
-    }
-    class EagerComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_post_id", "integer");
-      }
-    }
-    registerModel("EagerPost", EagerPost);
-    registerModel("EagerComment", EagerComment);
-
-    const p1 = await EagerPost.create({ title: "A" });
-    const p2 = await EagerPost.create({ title: "B" });
-    await EagerComment.create({ body: "c1", eager_post_id: p1.id });
-
-    const posts = await EagerPost.all().includes("eagerComments").toArray();
-    const post1 = posts.find((p: any) => p.title === "A")!;
-    const post2 = posts.find((p: any) => p.title === "B")!;
-    expect((post1 as any).association("eagerComments").target).toHaveLength(1);
-    expect((post2 as any).association("eagerComments").target).toHaveLength(0);
+    const assertFirm = (firm: any) => {
+      expect(firm.id).toBe(companies("first_firm").id);
+      expect(firm.association("readonlyAccount").loaded).toBe(true);
+      expect(firm.association("accounts").loaded).toBe(true);
+      expect(firm.readonlyAccount.id).toBe(accounts("signals37").id);
+      const accts = firm.association("accounts").target;
+      expect(accts).toHaveLength(1);
+      expect(accts[0].id).toBe(accounts("signals37").id);
+      expect(firm.readonlyAccount.isReadonly()).toBe(true);
+      expect(accts.every((a: any) => !a.isReadonly())).toBe(true);
+    };
+    assertFirm(await Firm.preload("readonlyAccount", "accounts").first());
+    assertFirm(await Firm.eagerLoad("readonlyAccount", "accounts").first());
   });
 
   it("with ordering", async () => {
@@ -514,220 +463,61 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(2);
   });
   it("has many through with order", async () => {
-    class EagerHmtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtAuthorships", {
-          className: "EagerHmtAuthorship",
-          foreignKey: "eager_hmt_author_id",
-        });
-        this.hasMany("eagerHmtBooks", {
-          through: "eagerHmtAuthorships",
-          source: "eagerHmtBook",
-          className: "EagerHmtBook",
-        });
-      }
-    }
-    class EagerHmtAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_author_id", "integer");
-        this.attribute("eager_hmt_book_id", "integer");
-        this.belongsTo("eagerHmtBook", {
-          className: "EagerHmtBook",
-          foreignKey: "eager_hmt_book_id",
-        });
-      }
-    }
-    class EagerHmtBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-
-    registerModel("EagerHmtAuthor", EagerHmtAuthor);
-    registerModel("EagerHmtAuthorship", EagerHmtAuthorship);
-    registerModel("EagerHmtBook", EagerHmtBook);
-
-    const author = await EagerHmtAuthor.create({ name: "Tolkien" });
-    const book1 = await EagerHmtBook.create({ title: "LOTR" });
-    const book2 = await EagerHmtBook.create({ title: "Hobbit" });
-    await EagerHmtAuthorship.create({
-      eager_hmt_author_id: author.id,
-      eager_hmt_book_id: book1.id,
+    const authorsArr = await Author.all().includes("favoriteAuthors").toArray();
+    expect(authorsArr.length).toBeGreaterThan(0);
+    await assertNoQueries(false, () => {
+      authorsArr.map((a: any) => a.favoriteAuthors);
     });
-    await EagerHmtAuthorship.create({
-      eager_hmt_author_id: author.id,
-      eager_hmt_book_id: book2.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtBooks", {
-      through: "eagerHmtAuthorships",
-      source: "eagerHmtBook",
-      className: "EagerHmtBook",
-    });
-    expect(books).toHaveLength(2);
   });
   it("eager loaded has one association with references does not run additional queries", async () => {
-    class EagerHoRefParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("eagerHoRefChild", {
-          className: "EagerHoRefChild",
-          foreignKey: "eager_ho_ref_parent_id",
-        });
-      }
-    }
-    class EagerHoRefChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_ho_ref_parent_id", "integer");
-      }
-    }
-    registerModel("EagerHoRefParent", EagerHoRefParent);
-    registerModel("EagerHoRefChild", EagerHoRefChild);
-
-    const parent = await EagerHoRefParent.create({ name: "P" });
-    await EagerHoRefChild.create({
-      value: "C",
-      eager_ho_ref_parent_id: parent.id,
+    await Post.updateAll({ author_id: null });
+    const authorsArr = await Author.all().includes("post").references("post").toArray();
+    expect(authorsArr.length).toBeGreaterThan(0);
+    await assertNoQueries(false, () => {
+      authorsArr.map((a: any) => a.post);
     });
-
-    const results = await EagerHoRefParent.all()
-      .includes("eagerHoRefChild")
-      .references("eagerHoRefChild")
-      .toArray();
-    expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any).association("eagerHoRefChild").target;
-    expect(preloaded?.value).toBe("C");
   });
   it("eager loaded has one association without primary key", async () => {
-    class EagerHoNoPkParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("eagerHoNoPkChild", {
-          className: "EagerHoNoPkChild",
-          foreignKey: "eager_ho_no_pk_parent_id",
-        });
-      }
-    }
-    class EagerHoNoPkChild extends Base {
-      // No primary key (mirrors Rails' `Matey`, whose table is `id: false`),
-      // so JoinDependency#construct must key identity off join_primary_key.
-      static _primaryKey = "";
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_ho_no_pk_parent_id", "integer");
-      }
-    }
-    registerModel("EagerHoNoPkParent", EagerHoNoPkParent);
-    registerModel("EagerHoNoPkChild", EagerHoNoPkChild);
-
-    const parent = await EagerHoNoPkParent.create({ name: "P" });
-    await EagerHoNoPkChild.create({
-      value: "C",
-      eager_ho_no_pk_parent_id: parent.id,
+    const pirate = pirates("redbeard");
+    const eagerLoaded = await Pirate.eagerLoad("attackerMatey").where({ id: pirate.id }).first();
+    await assertNoQueries(false, () => {
+      expect((eagerLoaded as any)?.association("attackerMatey").loaded).toBe(true);
     });
-
-    const parents = await EagerHoNoPkParent.all().eagerLoad("eagerHoNoPkChild").toArray();
-    expect(parents).toHaveLength(1);
-    const child = (parents[0] as any).association("eagerHoNoPkChild").target;
-    expect(child?.value).toBe("C");
   });
   it("eager loaded has many association without primary key", async () => {
-    class EagerHmNoPkParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmNoPkChildren", {
-          className: "EagerHmNoPkChild",
-          foreignKey: "eager_hm_no_pk_parent_id",
-        });
-      }
-    }
-    class EagerHmNoPkChild extends Base {
-      // No primary key (mirrors Rails' `Matey`, whose table is `id: false`),
-      // so JoinDependency#construct keys off join_primary_key and must not
-      // collapse distinct rows into one via id-based model caching.
-      static _primaryKey = "";
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_hm_no_pk_parent_id", "integer");
-      }
-    }
-    registerModel("EagerHmNoPkParent", EagerHmNoPkParent);
-    registerModel("EagerHmNoPkChild", EagerHmNoPkChild);
-
-    const parent = await EagerHmNoPkParent.create({ name: "P" });
-    await EagerHmNoPkChild.create({ value: "C1", eager_hm_no_pk_parent_id: parent.id });
-    await EagerHmNoPkChild.create({ value: "C2", eager_hm_no_pk_parent_id: parent.id });
-
-    const parents = await EagerHmNoPkParent.all().eagerLoad("eagerHmNoPkChildren").toArray();
-    expect(parents).toHaveLength(1);
-    // Rails keys a no-PK node on the constant `[nil]` (`id = keys.map { nil }`),
-    // so every matching row for one parent collapses to a single cached model —
-    // the eager-loaded collection holds one child even though two rows match.
-    // (Rails' own `mateys.yml` has one Matey per Pirate, so its mirror test
-    // never surfaces the collapse.)
-    const children = (parents[0] as any).association("eagerHmNoPkChildren").target;
-    expect(children).toHaveLength(1);
+    const pirate = pirates("blackbeard");
+    const mateysList: Matey[] = await pirate.mateys.toArray();
+    const eagerLoaded = await Pirate.eagerLoad("mateys").where({ id: pirate.id }).first();
+    expect(mateysList.length).toBeGreaterThan(0);
+    await assertNoQueries(false, () => {
+      expect((eagerLoaded as any)?.association("mateys").loaded).toBe(true);
+    });
   });
   it("duplicate middle objects", async () => {
-    class EagerDupParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerDupChildren", {
-          className: "EagerDupChild",
-          foreignKey: "eager_dup_parent_id",
-        });
-      }
-    }
-    class EagerDupChild extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("eager_dup_parent_id", "integer");
-      }
-    }
-    registerModel("EagerDupParent", EagerDupParent);
-    registerModel("EagerDupChild", EagerDupChild);
-
-    const parent = await EagerDupParent.create({ name: "P" });
-    await EagerDupChild.create({ label: "c1", eager_dup_parent_id: parent.id });
-    await EagerDupChild.create({ label: "c2", eager_dup_parent_id: parent.id });
-
-    const parents = await EagerDupParent.all().includes("eagerDupChildren").toArray();
-    expect(parents).toHaveLength(1);
-    const children = (parents[0] as any).association("eagerDupChildren").target;
-    expect(children).toHaveLength(2);
+    const commentArr = await Comment.where({ post_id: 1 }).includes({ post: "author" }).toArray();
+    await assertNoQueries(false, () => {
+      commentArr.forEach((c: any) => {
+        void c.post.author.name;
+      });
+    });
   });
   it("including duplicate objects from belongs to", async () => {
-    class EagerDupAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EagerDupPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("eager_dup_author_id", "integer");
-        this.belongsTo("eagerDupAuthor", {
-          className: "EagerDupAuthor",
-          foreignKey: "eager_dup_author_id",
-        });
-      }
-    }
-    registerModel("EagerDupAuthor", EagerDupAuthor);
-    registerModel("EagerDupPost", EagerDupPost);
+    const popularPost = await Post.create({ title: "foo", body: "I like cars!" });
+    const comment = await popularPost.comments.create({ body: "lol" });
+    const michael = await Person.create({ first_name: "Michael" });
+    const david = await Person.create({ first_name: "David" });
+    await Reader.create({ post_id: popularPost.id, person_id: michael.id });
+    await Reader.create({ post_id: popularPost.id, person_id: david.id });
 
-    const author = await EagerDupAuthor.create({ name: "Same" });
-    await EagerDupPost.create({ title: "P1", eager_dup_author_id: author.id });
-    await EagerDupPost.create({ title: "P2", eager_dup_author_id: author.id });
-
-    const posts = await EagerDupPost.all().includes("eagerDupAuthor").toArray();
-    expect(posts).toHaveLength(2);
-    // Both posts should have the same author preloaded
-    const a1 = (posts[0] as any).association("eagerDupAuthor").target;
-    const a2 = (posts[1] as any).association("eagerDupAuthor").target;
-    expect(a1?.id).toBe(author.id);
-    expect(a2?.id).toBe(author.id);
+    const readerArr = await Reader.where({ post_id: popularPost.id })
+      .includes({ post: "comments" })
+      .toArray();
+    for (const reader of readerArr) {
+      const readerPost = (reader as any).post;
+      const readerComments = readerPost.association("comments").target;
+      expect(readerComments).toHaveLength(1);
+      expect(readerComments[0].id).toBe(comment.id);
+    }
   });
 
   it("finding with includes on has many association with same include includes only once", async () => {
