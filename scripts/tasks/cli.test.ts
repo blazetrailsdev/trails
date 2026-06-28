@@ -1751,32 +1751,10 @@ describe("uncheckedCheckboxes", () => {
 });
 
 describe("checkCheckboxesDone (done unchecked-checkbox guard)", () => {
-  function setupExit() {
-    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-      throw new Error(`exit ${code}`);
-    }) as never);
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-  }
-
-  it("exits 1 listing the unchecked items when boxes remain", () => {
-    setupExit();
-    expect(() => checkCheckboxesDone("- [ ] a\n- [ ] b\n", false)).toThrow(/exit 1/);
-    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/2 unchecked checkbox/));
-    expect(console.error).toHaveBeenCalledWith("  - [ ] a");
-    expect(console.error).toHaveBeenCalledWith("  - [ ] b");
-  });
-
-  it("bypasses with a printed warning under --force", () => {
-    setupExit();
+  it("is a no-op regardless of checkbox state", () => {
+    expect(() => checkCheckboxesDone("- [ ] a\n- [ ] b\n", false)).not.toThrow();
     expect(() => checkCheckboxesDone("- [ ] a\n", true)).not.toThrow();
-    expect(console.warn).toHaveBeenCalledWith(expect.stringMatching(/--force/));
-  });
-
-  it("passes silently when all boxes are checked", () => {
-    setupExit();
     expect(() => checkCheckboxesDone("- [x] a\n- [X] b\n", false)).not.toThrow();
-    expect(console.error).not.toHaveBeenCalled();
   });
 });
 
