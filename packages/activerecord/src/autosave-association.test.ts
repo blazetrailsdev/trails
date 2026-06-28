@@ -3847,7 +3847,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     org.name = "Modified";
     const saved = await member.save();
     expect(saved).toBe(true);
-    // Org should NOT have been persisted with the change
     const reloadedOrg = await HotOrg.find(org.id);
     expect(reloadedOrg.name).toBe("Org");
   });
@@ -4134,7 +4133,6 @@ describe("should update children when autosave is true and parent is new but chi
     }
     registerModel("UcParent", UcParent);
     registerModel("UcChild", UcChild);
-    // Child exists, parent is new
     const child = await UcChild.create({ name: "existing" });
     const parent = new UcParent({ name: "new parent" });
     child.name = "updated";
@@ -4228,7 +4226,6 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(NUCArticle);
     const article = await NUCArticle.create({ name: "parent" });
     const tag = await NUCTag.create({ name: "child", author_id: article.id });
-    // Save parent again without changes - child should not be modified
     await article.save();
     const reloaded = await NUCTag.find(tag.id);
     expect(reloaded.name).toBe("child");
@@ -4283,11 +4280,9 @@ describe("should update children when autosave is true and parent is new but chi
     acceptsNestedAttributesFor(NDIArticle, "ndiTags");
     registerModel(NDITag);
     registerModel(NDIArticle);
-    // The child model's own error messages should appear, not a generic "is invalid"
     const tag = new NDITag({ name: "" });
     const valid = await tag.isValid();
     expect(valid).toBe(false);
-    // Errors should be on the child's own attribute, not a generic "invalid" error
     const nameMessages = tag.errors.fullMessagesFor("name");
     expect(nameMessages.length).toBeGreaterThan(0);
   });
@@ -4317,7 +4312,6 @@ describe("should update children when autosave is true and parent is new but chi
     const tag = new DITag({ name: "" });
     const valid = await tag.isValid();
     expect(valid).toBe(false);
-    // Should have a default error message for the invalid attribute
     expect(tag.errors.size).toBeGreaterThan(0);
   });
 
@@ -4400,7 +4394,6 @@ describe("should update children when autosave is true and parent is new but chi
     acceptsNestedAttributesFor(BVArticle, "bvTags");
     registerModel(BVTag);
     registerModel(BVArticle);
-    // Creating a tag with valid name should work
     const article = await BVArticle.create({ name: "test" });
     assignNestedAttributes(article, "bvTags", [{ name: "valid" }]);
     await article.save();
@@ -4427,7 +4420,6 @@ describe("should update children when autosave is true and parent is new but chi
     }
     registerModel(CBTag);
     registerModel(CBArticle);
-    // A tag with name "cancel" should return false from save
     const tag = new CBTag({ name: "cancel" });
     const result = await tag.save();
     expect(result).toBe(false);
@@ -4455,7 +4447,6 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(NLTag);
     registerModel(NLArticle);
     const article = await NLArticle.create({ name: "no load" });
-    // Not loading association, just saving parent should work
     const saved = await article.save();
     expect(saved).toBe(true);
   });
@@ -4481,7 +4472,6 @@ describe("should update children when autosave is true and parent is new but chi
     acceptsNestedAttributesFor(MEArticle, "meTags");
     registerModel(METag);
     registerModel(MEArticle);
-    // Validate that METag with blank name is invalid
     const invalidTag = new METag({ name: "" });
     const valid = await invalidTag.isValid();
     expect(valid).toBe(false);
