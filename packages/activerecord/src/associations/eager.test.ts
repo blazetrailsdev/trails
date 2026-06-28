@@ -370,7 +370,17 @@ describe("EagerAssociationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   const { authors, companies, accounts, pirates } = useFixtures(
-    ["authors", "authorFavorites", "companies", "accounts", "parrots", "pirates", "mateys"],
+    [
+      "authors",
+      "authorFavorites",
+      "posts",
+      "comments",
+      "companies",
+      "accounts",
+      "parrots",
+      "pirates",
+      "mateys",
+    ],
     () => Base.connection,
     { schema: canonicalSchema },
   );
@@ -1740,13 +1750,13 @@ describe("EagerAssociationTest", () => {
   it("circular preload does not modify unscoped", async () => {
     // Rails: FirstPost.preload(comments: :first_post).find(1) must not let
     // FirstPost's default scope (where id: 1) leak into a later unscoped lookup.
+    // Uses fixture post id=1 (welcome) as the FirstPost target; creates a fresh post2.
     registerModel("FirstPost", FirstPost);
-    const post1 = await Post.create({ id: 1, title: "P1", body: "b" });
-    const post2 = await Post.create({ id: 2, title: "P2", body: "b" });
-    await Comment.create({ post_id: post1.id, body: "c1" });
+    const post2 = await Post.create({ title: "P2", body: "b" });
+    await Comment.create({ post_id: 1, body: "c1" });
 
     const expected = await (FirstPost as any).unscoped().find(post2.id);
-    await (FirstPost as any).all().preload({ comments: "firstPost" }).find(post1.id);
+    await (FirstPost as any).all().preload({ comments: "firstPost" }).find(1);
     const after = await (FirstPost as any).unscoped().find(post2.id);
     expect(after.id).toBe(expected.id);
   });
