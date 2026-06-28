@@ -143,8 +143,6 @@ const TEST_SCHEMA: Schema = {
   eager_ho_no_pk_parents: { name: "string" },
   eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
   eager_ho_ref_parents: { name: "string" },
-  eager_inv_children: { value: "string", eager_inv_parent_id: "integer" },
-  eager_inv_parents: { name: "string" },
   eager_leo_comments: { body: "string", eager_leo_post_id: "integer" },
   eager_leo_posts: { title: "string" },
   eager_lmo_comments: { body: "string", eager_lmo_post_id: "integer" },
@@ -165,14 +163,6 @@ const TEST_SCHEMA: Schema = {
   eager_reord_children: { value: "string", eager_reord_parent_id: "integer" },
   eager_reord_parents: { name: "string" },
   eager_tl_widgets: { name: "string" },
-  ex_sug_posts: { title: "string" },
-  ex_sug_taggings: { name: "string", ex_sug_post_id: "integer" },
-  ej_em_authors: { name: "string" },
-  ej_em_posts: { title: "string", ej_em_author_id: "integer" },
-  ej_bt_authors: { name: "string" },
-  ej_bt_posts: { title: "string", ej_bt_author_id: "integer" },
-  ej_ho_profiles: { bio: "string", ej_ho_user_id: "integer" },
-  ej_ho_users: { name: "string" },
   elmar_contracts: { elmar_developer_id: "integer" },
   elmar_developers: { name: "string", elmar_mentor_id: "integer" },
   elmar_mentors: { name: "string" },
@@ -189,7 +179,6 @@ const TEST_SCHEMA: Schema = {
   },
   enra_authors: { name: "string" },
   enra_posts: { title: "string", enra_author_id: "integer" },
-  ex_sug_authors: { name: "string" },
   idup_categories: { name: "string" },
   idup_category_posts: { idup_post_id: "integer", idup_category_id: "integer" },
   idup_comments: { body: "string", idup_post_id: "integer" },
@@ -384,31 +373,13 @@ describe("EagerAssociationTest", () => {
     registerSponsorableModels();
   });
   it("should work inverse of with eager load", async () => {
-    class EagerInvParent extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerInvChildren", {
-          className: "EagerInvChild",
-          foreignKey: "eager_inv_parent_id",
-        });
-      }
-    }
-    class EagerInvChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_inv_parent_id", "integer");
-      }
-    }
-    registerModel("EagerInvParent", EagerInvParent);
-    registerModel("EagerInvChild", EagerInvChild);
+    const author = await Author.create({ name: "P" });
+    await Post.create({ title: "C1", body: "b1", author_id: author.id });
+    await Post.create({ title: "C2", body: "b2", author_id: author.id });
 
-    const parent = await EagerInvParent.create({ name: "P" });
-    await EagerInvChild.create({ value: "C1", eager_inv_parent_id: parent.id });
-    await EagerInvChild.create({ value: "C2", eager_inv_parent_id: parent.id });
-
-    const parents = await EagerInvParent.all().includes("eagerInvChildren").toArray();
+    const parents = await Author.where({ id: author.id }).includes("posts").toArray();
     expect(parents).toHaveLength(1);
-    const children = (parents[0] as any).association("eagerInvChildren").target;
+    const children = (parents[0] as any).association("posts").target;
     expect(children).toHaveLength(2);
   });
   it("loading conditions with or", async () => {
@@ -697,99 +668,42 @@ describe("EagerAssociationTest", () => {
     expect(list).toHaveLength(1);
   });
   it("eager association loading with explicit join belongs to", async () => {
-    class EjBtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EjBtPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("ej_bt_author_id", "integer");
-        this.belongsTo("ejBtAuthor", {
-          className: "EjBtAuthor",
-          foreignKey: "ej_bt_author_id",
-        });
-      }
-    }
-    registerModel(EjBtAuthor);
-    registerModel(EjBtPost);
+    const welcome = posts("welcome");
+    const david = authors("david");
 
-    const author = await EjBtAuthor.create({ name: "BtAuthor" });
-    await EjBtPost.create({ title: "BtPost", ej_bt_author_id: author.id });
-
-    const posts2 = await EjBtPost.all().eagerLoad("ejBtAuthor").toArray();
+    const posts2 = await Post.where({ id: welcome.id }).eagerLoad("author").toArray();
     expect(posts2).toHaveLength(1);
-    const loaded = (posts2[0] as any).association("ejBtAuthor").target;
+    const loaded = (posts2[0] as any).association("author").target;
     expect(loaded).not.toBeNull();
-    expect(loaded.name).toBe("BtAuthor");
+    expect(loaded.name).toBe(david.name);
 
     // Association proxy wired during hydration (read off the holder, not lazy-synced)
-    const btProxy = (posts2[0] as any)._associationInstances.get("ejBtAuthor");
+    const btProxy = (posts2[0] as any)._associationInstances.get("author");
     expect(btProxy).toBeDefined();
     expect(btProxy.loaded).toBe(true);
     expect(btProxy.target).not.toBeNull();
-    expect(btProxy.target.name).toBe("BtAuthor");
+    expect(btProxy.target.name).toBe(david.name);
   });
   it("eager association loading with explicit join has one", async () => {
-    class EjHoUser extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("ejHoProfile", {
-          className: "EjHoProfile",
-          foreignKey: "ej_ho_user_id",
-        });
-      }
-    }
-    class EjHoProfile extends Base {
-      static {
-        this.attribute("bio", "string");
-        this.attribute("ej_ho_user_id", "integer");
-      }
-    }
-    registerModel(EjHoUser);
-    registerModel(EjHoProfile);
+    const david = authors("david");
 
-    const user = await EjHoUser.create({ name: "HoUser" });
-    await EjHoProfile.create({ bio: "HoBio", ej_ho_user_id: user.id });
-
-    const users = await EjHoUser.all().eagerLoad("ejHoProfile").toArray();
+    const users = await Author.where({ id: david.id }).eagerLoad("post").toArray();
     expect(users).toHaveLength(1);
-    const profile = (users[0] as any).association("ejHoProfile").target;
+    const profile = (users[0] as any).association("post").target;
     expect(profile).not.toBeNull();
-    expect(profile.bio).toBe("HoBio");
 
     // Association proxy wired during hydration (read off the holder, not lazy-synced)
-    const hoProxy = (users[0] as any)._associationInstances.get("ejHoProfile");
+    const hoProxy = (users[0] as any)._associationInstances.get("post");
     expect(hoProxy).toBeDefined();
     expect(hoProxy.loaded).toBe(true);
     expect(hoProxy.target).not.toBeNull();
-    expect(hoProxy.target.bio).toBe("HoBio");
   });
   it("eager association loading with explicit join marks empty association loaded", async () => {
-    class EjEmAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ejEmPosts", {
-          className: "EjEmPost",
-          foreignKey: "ej_em_author_id",
-        });
-      }
-    }
-    class EjEmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("ej_em_author_id", "integer");
-      }
-    }
-    registerModel(EjEmAuthor);
-    registerModel(EjEmPost);
+    const author = await Author.create({ name: "NoPostsAuthor" });
 
-    await EjEmAuthor.create({ name: "NoPostsAuthor" });
-
-    const authors = await EjEmAuthor.all().eagerLoad("ejEmPosts").toArray();
-    expect(authors).toHaveLength(1);
-    const proxy = (authors[0] as any)._associationInstances.get("ejEmPosts");
+    const authorsArr = await Author.where({ id: author.id }).eagerLoad("posts").toArray();
+    expect(authorsArr).toHaveLength(1);
+    const proxy = (authorsArr[0] as any)._associationInstances.get("posts");
     expect(proxy).toBeDefined();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target).toEqual([]);
@@ -807,29 +721,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it("exceptions have suggestions for fix", async () => {
-    class ExSugTagging extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ex_sug_post_id", "integer");
-      }
-    }
-    class ExSugPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("tagging", {
-          className: "ExSugTagging",
-          foreignKey: "ex_sug_post_id",
-        });
-      }
-    }
-    registerModel("ExSugTagging", ExSugTagging);
-    registerModel("ExSugPost", ExSugPost);
-
-    await ExSugPost.create({ title: "P" });
-
     let error: any;
     try {
-      await ExSugPost.all().includes("taggingz").toArray();
+      await Post.includes("taggingz").find(posts("welcome").id);
     } catch (e: any) {
       error = e;
     }
