@@ -794,6 +794,34 @@ jobs:
           if-no-files-found: warn
       - run: pnpm vitest run packages/activerecord-cli
 
+  # Coverage for the files excluded from one-schema mode. The AR lanes run with
+  # AR_ONE_SCHEMA=1 and skip everything in eslint/one-schema-exclude.json, so
+  # without this lane those files (some core: base/core/finder/associations)
+  # would have NO CI coverage. This runs exactly that list flag-off on sqlite
+  # (the cheapest backend) — a small fraction of the full suite, not a second
+  # full run — so the excluded set stays green and the flag-off path keeps a
+  # required signal. Reads the JSON so it can never drift from the exclude list.
+  ar-one-schema-excluded:
+    name: Active Record One-Schema Excluded (flag-off)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      - name: Run one-schema-excluded files (flag-off, sqlite)
+        run: |
+          FILES=$(node -e "process.stdout.write(require('./eslint/one-schema-exclude.json').join(' '))")
+          if [ -z "$FILES" ]; then echo "exclude list empty — nothing to cover"; exit 0; fi
+          echo "Running flag-off coverage for:"; echo "$FILES" | tr ' ' '\n'
+          pnpm vitest run $FILES
+
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
   # publishes the numbers to the run UI + lcov/json artifacts. This is a
@@ -1515,6 +1543,7 @@ jobs:
       - postgres-tests
       - mysql-tests
       - maria-tests
+      - ar-one-schema-excluded
       - website
       - rails-comparison
       - schema-parity-rails
@@ -1586,7 +1615,7 @@ jobs:
                   # legitimate until the job is re-enabled.
                   continue
                   ;;
-                sqlite-tests|postgres-tests|maria-tests)
+                sqlite-tests|postgres-tests|maria-tests|ar-one-schema-excluded)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
