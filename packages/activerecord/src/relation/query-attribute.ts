@@ -72,11 +72,17 @@ export class QueryAttribute extends Attribute {
     );
   }
 
-  isUnboundable(): boolean {
+  isUnboundable(): 1 | -1 | false {
     try {
       void this.valueForDatabase;
     } catch (e) {
-      if (e instanceof ActiveModelRangeError) return true;
+      if (e instanceof ActiveModelRangeError) {
+        // Mirror Rails: serializable? yields value <=> 0 → sign for comparison operators.
+        const v = this.value;
+        if (typeof v === "bigint") return v >= 0n ? 1 : -1;
+        if (typeof v === "number") return v >= 0 ? 1 : -1;
+        return 1;
+      }
     }
     return false;
   }
