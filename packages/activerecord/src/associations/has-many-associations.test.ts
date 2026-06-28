@@ -6590,9 +6590,7 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(HmReply);
   });
 
-  // BLOCKED: clear() with no dependent nullifies FKs via SQL UPDATE but does not
-  // call _decrementCounterCache. Story: assoc-has-many-counter-cache-clear (RFC 0019).
-  it.skip("custom named counter cache", async () => {
+  it("custom named counter cache", async () => {
     const topic = topics("first") as any;
     const before = topic.replies_count as number;
     await topic.approvedReplies.clear();
