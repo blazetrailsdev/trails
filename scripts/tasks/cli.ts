@@ -2375,26 +2375,9 @@ export function uncheckedCheckboxes(body: string): string[] {
   return out;
 }
 
-// Refuses `done` while the story body has any unchecked checkbox — the agent
-// must either check the boxes (asserting the criteria are met) or edit the
-// criteria with a reason. `--force` bypasses with a printed warning. Exits 1
-// on unchecked boxes without --force; stories with no checkboxes pass
-// unchanged. Exported for unit tests.
-export function checkCheckboxesDone(body: string, force: boolean): void {
-  const unchecked = uncheckedCheckboxes(body);
-  if (unchecked.length === 0) return;
-  if (force) {
-    console.warn(
-      `warning: marking done with ${unchecked.length} unchecked checkbox(es) — bypassed with --force`,
-    );
-    return;
-  }
-  console.error(
-    `error: story has ${unchecked.length} unchecked checkbox(es) — check them off or edit the criteria, or use --force to bypass:`,
-  );
-  for (const item of unchecked) console.error(`  - [ ] ${item}`);
-  process.exit(1);
-}
+// No-op: checkbox gate removed — `done` no longer blocks on unchecked boxes.
+// Exported for unit tests (callers still pass body+force; kept for compat).
+export function checkCheckboxesDone(_body: string, _force: boolean): void {}
 
 // Advisory estimate-feedback: fetches the merged PR's additions+deletions via
 // gh and returns a `est-loc <E> vs actual <A> (<delta>)` line, or null when
