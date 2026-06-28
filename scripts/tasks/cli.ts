@@ -237,9 +237,12 @@ export function nextBundle(
   // est_loc (treated as 0 for the budget) — the missing-estimate exclusion
   // below is only for the unprioritized knapsack path. Absent any priorities
   // this branch is skipped and the original packing runs unchanged.
-  const prioritized = inScope
-    .filter((s) => s.priority !== null)
-    .sort((a, b) => (a.priority as number) - (b.priority as number));
+  //
+  // `ready()` already returns stories sorted by priority (lower N first), and
+  // `.filter()` preserves order, so `prioritized[0]` is the highest-priority
+  // candidate without re-sorting here — the ordering source of truth stays in
+  // `ready()`.
+  const prioritized = inScope.filter((s) => s.priority !== null);
   if (prioritized.length > 0) {
     const lead = prioritized[0];
     const leadLoc = lead.est_loc ?? 0;
