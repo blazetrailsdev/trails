@@ -985,7 +985,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
     if (asName) {
-      buildAttrs[`${underscore(asName)}_type`] = polymorphicName(ctor);
+      const typeCol = this._assocDef.options.foreignType ?? `${underscore(asName)}_type`;
+      buildAttrs[typeCol] = polymorphicName(ctor);
     }
 
     let targetModel = this.model;
@@ -1096,7 +1097,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       skipAssign.add(foreignKey);
     }
     const asName = this._assocDef.options.as;
-    if (asName) skipAssign.add(`${underscore(asName)}_type`);
+    if (asName) skipAssign.add(this._assocDef.options.foreignType ?? `${underscore(asName)}_type`);
 
     const assigned = new Set<string>(
       ((record as any).changedAttributeNamesToSave ?? []) as string[],
@@ -1787,7 +1788,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         primaryKey = reflection.activeRecordPrimaryKey;
       }
     }
-    const typeCol = asName ? `${underscore(asName)}_type` : null;
+    const typeCol = asName
+      ? (this._assocDef.options.foreignType ?? `${underscore(asName)}_type`)
+      : null;
     // insert_record: assign the owner's FK/type onto the record, then save.
     // Mirrors Rails' `CollectionAssociation#insert_record` →
     // `set_owner_attributes` + `record.save`.
@@ -2540,7 +2543,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       updates[foreignKey] = null;
     }
-    if (asName) updates[`${underscore(asName)}_type`] = null;
+    if (asName) updates[this._assocDef.options.foreignType ?? `${underscore(asName)}_type`] = null;
     return updates;
   }
 

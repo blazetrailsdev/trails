@@ -6441,10 +6441,7 @@ describe("HasManyAssociationsTest", () => {
     expect(Number(taggings[0].id)).toBe(Number(tagging.id));
   });
 
-  // BLOCKED: has_many `as:` with custom `foreignType` not implemented on write path —
-  // collection-association.ts:649 always writes `${as}_type` (imageable_type) but the
-  // images table uses imageable_class. Story: assoc-has-many-custom-foreign-type (RFC 0019).
-  it.skip("with polymorphic has many with custom columns name", async () => {
+  it("with polymorphic has many with custom columns name", async () => {
     const post = (await HmPost.create({ title: "foo", body: "bar" })) as any;
     const image = (await HmImage.create({})) as any;
     await post.images.push(image);

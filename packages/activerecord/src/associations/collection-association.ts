@@ -650,7 +650,7 @@ export class CollectionAssociation extends Association {
     }
 
     if (this.reflection.options.as) {
-      const typeCol = `${underscore(this.reflection.options.as)}_type`;
+      const typeCol = this.polymorphicTypeColumn()!;
       // Rails writes `owner.class.base_class.name` (polymorphic_name) for the
       // `as:` type column, so STI subclasses store their base class name.
       const typeName = polymorphicName(ctor as typeof Base);
@@ -694,6 +694,18 @@ export class CollectionAssociation extends Association {
 
   private foreignKeyColumn(): string {
     return this.foreignKeyColumns()[0];
+  }
+
+  /**
+   * Resolve the polymorphic `as:` type column, honoring a custom
+   * `foreignType` option (e.g. `imageable_class` instead of the default
+   * `imageable_type`). Mirrors Rails `reflection.type`. Returns null for
+   * non-polymorphic associations.
+   */
+  private polymorphicTypeColumn(): string | null {
+    const opts = this.reflection.options as { as?: string; foreignType?: string };
+    if (!opts.as) return null;
+    return opts.foreignType ?? `${underscore(opts.as)}_type`;
   }
 
   protected async deleteOrDestroy(
@@ -798,8 +810,9 @@ export class CollectionAssociation extends Association {
     for (const fk of this.foreignKeyColumns()) {
       nullAttrs[fk] = null;
     }
-    if (this.reflection.options.as) {
-      nullAttrs[`${underscore(this.reflection.options.as)}_type`] = null;
+    const typeCol = this.polymorphicTypeColumn();
+    if (typeCol) {
+      nullAttrs[typeCol] = null;
     }
     return nullAttrs;
   }
