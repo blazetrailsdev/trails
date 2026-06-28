@@ -560,7 +560,10 @@ describe("EagerAssociationTest", () => {
 
   it("finding with includes on has many association with same include includes only once", async () => {
     const authorId = authors("david").id;
-    const author = await Author.includes({ postsWithComments: "comments" }).find(authorId);
+    let author!: Author;
+    await assertQueriesCount(3, false, async () => {
+      author = await Author.includes({ postsWithComments: "comments" }).find(authorId);
+    });
     const postsLoaded = (author as any).association("postsWithComments").target as any[];
     for (const post of postsLoaded) {
       const loaded = post.association("comments").target as any[];
@@ -574,9 +577,12 @@ describe("EagerAssociationTest", () => {
     const davidAuthor = authors("david");
     const post = await davidAuthor.postAboutThinkingWithLastComment;
     const lastComment = await (post as any).lastComment;
-    const author = await Author.includes({ postAboutThinkingWithLastComment: "lastComment" }).find(
-      davidAuthor.id,
-    );
+    let author!: Author;
+    await assertQueriesCount(3, false, async () => {
+      author = await Author.includes({ postAboutThinkingWithLastComment: "lastComment" }).find(
+        davidAuthor.id,
+      );
+    });
     await assertNoQueries(false, () => {
       expect((author as any).postAboutThinkingWithLastComment?.id).toBe(post?.id);
       expect(
@@ -588,7 +594,10 @@ describe("EagerAssociationTest", () => {
     const welcomePost = posts("welcome");
     const author = await welcomePost.author;
     const authorAddress = await (author as any).authorAddress;
-    const post = await Post.includes({ authorWithAddress: "authorAddress" }).find(welcomePost.id);
+    let post!: Post;
+    await assertQueriesCount(3, false, async () => {
+      post = await Post.includes({ authorWithAddress: "authorAddress" }).find(welcomePost.id);
+    });
     await assertNoQueries(false, () => {
       expect((post as any).authorWithAddress?.id).toBe(author?.id);
       expect((post as any).authorWithAddress?.association("authorAddress").target?.id).toBe(
@@ -599,7 +608,10 @@ describe("EagerAssociationTest", () => {
   it("finding with includes on null belongs to association with same include includes only once", async () => {
     const welcomePost = posts("welcome");
     await Post.where({ id: welcomePost.id }).updateAll({ author_id: null });
-    const post = await Post.includes({ authorWithAddress: "authorAddress" }).find(welcomePost.id);
+    let post!: Post;
+    await assertQueriesCount(1, false, async () => {
+      post = await Post.includes({ authorWithAddress: "authorAddress" }).find(welcomePost.id);
+    });
     await assertNoQueries(false, () => {
       expect((post as any).authorWithAddress).toBeNull();
     });
@@ -610,7 +622,10 @@ describe("EagerAssociationTest", () => {
       sponsorable_id: null,
       sponsorable_type: null,
     });
-    const sponsor = await Sponsor.includes("sponsorable").find(sponsorRecord.id);
+    let sponsor!: Sponsor;
+    await assertQueriesCount(1, false, async () => {
+      sponsor = await Sponsor.includes("sponsorable").find(sponsorRecord.id);
+    });
     await assertNoQueries(false, () => {
       expect((sponsor as any).sponsorable).toBeNull();
     });
@@ -621,7 +636,10 @@ describe("EagerAssociationTest", () => {
       sponsorable_type: "",
       sponsorable_id: null,
     });
-    const sponsor = await Sponsor.includes("sponsorable").find(sponsorRecord.id);
+    let sponsor!: Sponsor;
+    await assertQueriesCount(1, false, async () => {
+      sponsor = await Sponsor.includes("sponsorable").find(sponsorRecord.id);
+    });
     await assertNoQueries(false, () => {
       expect((sponsor as any).sponsorable).toBeNull();
     });
