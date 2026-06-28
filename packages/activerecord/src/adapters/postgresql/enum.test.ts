@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
@@ -50,6 +50,16 @@ describeIfPg("PostgreSQLAdapter", () => {
   setupHandlerSuite();
 
   let adapter: PostgreSQLAdapter;
+  // The scoped tests qualify enum sql_types relative to the live search_path, so
+  // a path leaked by a prior test (e.g. one whose `withTestSchema` cleanup raced
+  // a timeout) would flip `test_schema.mood_in_test_schema` to the unqualified
+  // `mood_in_test_schema`. Mirror the schema_test.rb port (schema.test.ts): capture
+  // the default once and restore it (plus clear the schema cache) after every test,
+  // recovering the `ensure` of Rails' `with_schema_search_path` at suite level.
+  let defaultSearchPath: string;
+  beforeAll(async () => {
+    defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
+  });
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
@@ -75,6 +85,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
     // test_schema is managed by withTestSchema — no DROP here
+    await adapter.setSchemaSearchPath(defaultSearchPath);
+    adapter.schemaCache?.clear();
     PostgresqlEnum.resetColumnInformation();
     vi.restoreAllMocks();
   });
@@ -281,7 +293,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("schema dump scoped to schemas", async () => {
+    // `SchemaDumper.dump` walks every table on the search_path. On the shared
+    // worker DB (hundreds of accumulated tables under parallel forks) a full
+    // dump legitimately runs past the 5s default and the abort would leak this
+    // test's `test_schema` search_path into the next test — so allow more time.
+    it("schema dump scoped to schemas", { timeout: 60_000 }, async () => {
       await adapter.dropSchema("other_schema", { ifExists: true });
       await adapter.createSchema("other_schema");
       try {
