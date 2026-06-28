@@ -108,6 +108,11 @@ import {
  * (float64 cannot distinguish 2^63 from 2^63-1: Number(2^63n) === Number((2^63-1)n)).
  */
 class MysqlBigInteger extends BigIntegerType {
+  // MySQL schema introspection uses castType.name to derive the column type string.
+  // BigIntegerType.name is "big_integer"; override to "integer" so columns()
+  // reports the same type as IntegerType({limit:8}) would.
+  override readonly name: string = "integer";
+
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
   }
