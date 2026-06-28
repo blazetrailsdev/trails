@@ -681,20 +681,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Load and return all associated records.
    */
   async toArray(): Promise<T[]> {
-    // Rails `to_a` runs `merge_target_lists` (preferring in-memory records over
-    // fresh DB rows); we apply the same merge here. We deliberately do NOT yet
-    // hydrate/cache `_target` or mark the association loaded the way Rails'
-    // `load_target` does — `toArray` stays the cache-bypassing re-query path
-    // because two existing gaps surface as stale-cache reads once it caches:
-    //   (1) bang mutations (`whereBang`/etc.) must re-query with the mutated
-    //       scope without hydrating the association cache;
-    //   (2) `_deleteThrough` looks up join rows with a scalar-PK read, so for
-    //       composite-PK target models it can't prune the destroyed records
-    //       from a cached `_target` (re-querying masks this today).
-    // Converging `toArray` onto full `load_target` hydration is tracked
-    // separately and is gated on fixing (2).
+    // Rails `to_a` / `load_target`: re-uses the cached target when already
+    // loaded, otherwise queries and caches. Mutated proxies (_cpMutated, e.g.
+    // from whereBang) always re-query and must NOT hydrate the association
+    // cache — the mutated scope is not the canonical association scope.
+    if (!this._cpMutated && this._targetLoaded) return this._target;
     const results = await this._execLoad();
-    return this._mergeTargetLists(results);
+    const merged = this._mergeTargetLists(results);
+    if (!this._cpMutated) {
+      this._target = merged;
+      this._targetLoaded = true;
+    }
+    return merged;
   }
 
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
@@ -2457,6 +2455,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
     }
     this._removeFromTarget(removed);
+    // If any records were not pruned (e.g. composite-PK target whose join row
+    // the scalar findBy couldn't locate), invalidate the cache so the next
+    // toArray re-queries rather than returning a stale target.
+    if (removed.length !== records.length && this._targetLoaded) {
+      this._targetLoaded = false;
+    }
   }
 
   private async _deleteThroughAllSql(): Promise<number> {
