@@ -165,22 +165,33 @@ function isIndexStale(indexPath: string): boolean {
 export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
   const rfcStatus = new Map(index.rfcs.map((r) => [r.id, r.status]));
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
-  return index.stories.filter((s) => {
-    if (s.status !== "ready") return false;
-    // A story is only claimable if its OWN RFC is active. A `ready` story
-    // under a draft/postponed/superseded RFC violates the lifecycle invariant
-    // (README: draft-RFC stories "should not be claimed"); a `ready` story
-    // under a closed RFC is almost certainly stale. Only active RFCs feed
-    // pickup. Uses index.rfcs status already in scope — no extra fs reads.
-    // A null status or an rfc absent from the index also fails this check and
-    // is excluded — the conservative default: don't surface a story whose RFC
-    // can't be confirmed active.
-    if (rfcStatus.get(s.rfc) !== "active") return false;
-    if (opts.rfc && s.rfc !== opts.rfc) return false;
-    if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
-    if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
-    return true;
-  });
+  return (
+    index.stories
+      .filter((s) => {
+        if (s.status !== "ready") return false;
+        // A story is only claimable if its OWN RFC is active. A `ready` story
+        // under a draft/postponed/superseded RFC violates the lifecycle invariant
+        // (README: draft-RFC stories "should not be claimed"); a `ready` story
+        // under a closed RFC is almost certainly stale. Only active RFCs feed
+        // pickup. Uses index.rfcs status already in scope — no extra fs reads.
+        // A null status or an rfc absent from the index also fails this check and
+        // is excluded — the conservative default: don't surface a story whose RFC
+        // can't be confirmed active.
+        if (rfcStatus.get(s.rfc) !== "active") return false;
+        if (opts.rfc && s.rfc !== opts.rfc) return false;
+        if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
+        if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
+        return true;
+      })
+      // Order the ready queue by priority (lower N first), honoring the
+      // `priority` frontmatter's documented contract ("ready-queue priority").
+      // Unprioritized stories (null) sort last. Array.sort is stable, so ties —
+      // including the all-null common case — keep index order, leaving callers
+      // that don't set priority (and their tests) unaffected. `next-bundle`
+      // re-derives its own ordering on top of this; the gain here is that the
+      // `ready` command's output reflects priority too.
+      .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity))
+  );
 }
 
 // 0/1 knapsack: max total est_loc within budget. N ≤ a few dozen in

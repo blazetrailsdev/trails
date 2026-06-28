@@ -210,6 +210,17 @@ describe("ready", () => {
     ]);
     expect(ready(idx, { rfc: "0001-r" }).map((s) => s.id)).toEqual(["a"]);
   });
+
+  it("orders by priority (lower N first), unprioritized last, ties stable", () => {
+    const idx = index([
+      story({ id: "none1" }),
+      story({ id: "p5", priority: 5 }),
+      story({ id: "none2" }),
+      story({ id: "p1", priority: 1 }),
+    ]);
+    // p1 < p5 < the two unprioritized, which keep their index order.
+    expect(ready(idx).map((s) => s.id)).toEqual(["p1", "p5", "none1", "none2"]);
+  });
 });
 
 describe("resolveEditTarget", () => {
