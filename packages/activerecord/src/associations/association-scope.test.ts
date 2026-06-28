@@ -638,10 +638,7 @@ describe("AssociationScope", () => {
     expect(posts.map((p) => p.title)).toEqual(["p1"]);
   });
 
-  // story: association-scope-test-np-uuid-canonical
-  // The np_* tables (uuid-PK polymorphic target, no schema.rb analog) require
-  // bespoke defineSchema which this file no longer uses. The follow-up story
-  // tracks converging or relocating this test so it can run without bespoke DDL.
+  // story: association-scope-test-np-uuid-canonical (np_* tables have no schema.rb analog)
   it.skip("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {});
 
   it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
