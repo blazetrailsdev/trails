@@ -150,7 +150,13 @@ describe("HasManyThroughAssociationsTest", () => {
       "cpkOrderTags",
       "organizations",
     ],
-    { schema: canonicalSchema },
+    {
+      schema: canonicalSchema,
+      // "update counter caches on destroy with indestructible through record"
+      // intentionally raises on destroy, which aborts the PG transaction and
+      // poisons transactional-fixture teardown for all subsequent tests.
+      usesTransaction: ["update counter caches on destroy with indestructible through record"],
+    },
   );
 
   // Register models at describe-time (synchronously) so reflections
