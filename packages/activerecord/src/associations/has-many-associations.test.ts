@@ -6485,6 +6485,48 @@ describe("HasManyAssociationsTest", () => {
     expect(await AuthorWithErrorDestroyingAssociation.count()).toBe(countBefore);
   });
 
+  it("destroy with bang bubbles errors from associations", async () => {
+    class PostWithErrorDestroying2 extends Base {
+      static {
+        this._tableName = "posts";
+        this.beforeDestroy(function () {
+          throwAbort();
+        });
+      }
+    }
+    class AuthorWithErrorDestroyingAssociation2 extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.hasMany("postsWithErrorDestroying2", {
+          className: "PostWithErrorDestroying2",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel(AuthorWithErrorDestroyingAssociation2);
+    registerModel(PostWithErrorDestroying2);
+    const author = await AuthorWithErrorDestroyingAssociation2.create({ name: "Alice" });
+    const post = await PostWithErrorDestroying2.create({
+      author_id: author.id,
+      title: "A",
+      body: "body",
+    });
+    const { RecordNotDestroyed: RND } = await import("../index.js");
+    let error: InstanceType<typeof RND> | undefined;
+    try {
+      await (author as any).destroyBang();
+    } catch (e) {
+      if (e instanceof RND) error = e;
+    }
+    // Rails: assert_instance_of PostWithErrorDestroying, error.record
+    expect(error).toBeDefined();
+    expect((error as any).record).toBeInstanceOf(PostWithErrorDestroying2);
+    // Suppress unused-variable warning; post was created to trigger the association destroy.
+    void post;
+  });
+
   it("has many preloading with duplicate records", async () => {
     const allPosts = await HmPost.joins("comments").preload("comments").order("id").toArray();
     const first = allPosts[0] as any;

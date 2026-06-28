@@ -3,7 +3,6 @@ import type { AssociationDefinition } from "../associations.js";
 import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordInvalid } from "../validations.js";
-import { RecordNotDestroyed } from "../errors.js";
 import { CollectionAssociation } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
@@ -67,17 +66,18 @@ export class HasManyAssociation extends CollectionAssociation {
         for (const record of records) {
           (record as any).destroyedByAssociation = this.reflection;
         }
-        // Rails: rescues RecordNotDestroyed from destroy!, adds error to owner,
-        // and throws :abort to halt the owner's destroy (returns false).
-        try {
-          await this.destroyAll();
-        } catch (e) {
-          if (e instanceof RecordNotDestroyed) {
-            (this.owner as any).errors?.add("base", e.message);
-            return false;
-          }
-          throw e;
-        }
+        // Rails: `handle_dependency` does NOT rescue here. The child's
+        // RecordNotDestroyed propagates through the before_destroy callback chain
+        // and is rescued by Callbacks#destroy on the OWNER, which stores it as
+        // @_association_destroy_exception and returns false. destroy! then
+        // re-raises that stored exception via _raise_record_not_destroyed so
+        // error.record is the failed child, not the owner.
+        //
+        // Mirrors that: let RecordNotDestroyed propagate; addDestroyCallbacks
+        // (builder/association.ts) catches it, stores it on the owner, and
+        // calls throwAbort() so the owner's destroy() returns false. destroyBang
+        // then calls _raiseRecordNotDestroyed() which re-raises the child exception.
+        await this.destroyAll();
         break;
       }
 
