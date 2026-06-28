@@ -1100,10 +1100,10 @@ interface UpdateColumnsRecord {
 
 /** Mirrors: ActiveRecord::Persistence#update_column */
 export async function updateColumn<T extends UpdateColumnsRecord>(
-  this: T & { updateColumns(attrs: Record<string, unknown>): Promise<void> },
+  this: T & { updateColumns(attrs: Record<string, unknown>): Promise<boolean> },
   name: string,
   value: unknown,
-): Promise<void> {
+): Promise<boolean> {
   return this.updateColumns({ [name]: value });
 }
 
@@ -1124,7 +1124,7 @@ export async function updateColumn<T extends UpdateColumnsRecord>(
 export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
   attrs: Record<string, unknown>,
-): Promise<void> {
+): Promise<boolean> {
   if (this._readonly) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
@@ -1136,7 +1136,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   // SQL statement. Our UpdateManager would emit `UPDATE t WHERE ...` with
   // no SET clause, which is invalid SQL.
   if (Object.keys(attrs).length === 0) {
-    return;
+    return true;
   }
 
   const ctor = this.constructor;
@@ -1221,6 +1221,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   }
 
   this.changesApplied();
+  return true;
 }
 
 // ---------------------------------------------------------------------------

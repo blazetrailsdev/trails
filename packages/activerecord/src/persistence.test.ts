@@ -57,7 +57,7 @@ import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 // `Topic`/`Item`: a bespoke in-function `class Post` declaration still exists in
 // the not-yet-converted update-all block.
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
-import { CpkBook } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Company, LargeClient, Client, Firm } from "./test-helpers/models/company.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
@@ -81,6 +81,7 @@ for (const klass of [
   Parrot,
   CanonicalPost,
   CpkBook,
+  CpkOrder,
   Minivan,
   Company,
   Firm,
@@ -1093,6 +1094,7 @@ describe("PersistenceTest", () => {
     await defineSchema({
       topics: canonicalSchema.topics,
       minimalistics: canonicalSchema.minimalistics,
+      cpk_orders: canonicalSchema.cpk_orders,
     });
   });
 
@@ -1120,8 +1122,9 @@ describe("PersistenceTest", () => {
   });
 
   it("populates non primary key autoincremented column for a cpk model", async () => {
-    const t = await Topic.create({ title: "test" });
-    expect(t.id).toBeTruthy();
+    const order = await CpkOrder.create({ shop_id: 111222 });
+    const [_shopId, orderId] = order.id as [number, number];
+    expect(orderId).not.toBeNull();
   });
 
   it("update many!", async () => {
@@ -1170,16 +1173,20 @@ describe("PersistenceTest", () => {
   });
 
   it("build many through factory with block", () => {
-    const topicList = [{ title: "a" }, { title: "b" }].map((attrs) => Topic.new(attrs));
+    const topicList = Topic.build([{ title: "first" }, { title: "second" }], (t: any) => {
+      t.author_name = "David";
+    });
     expect(topicList.length).toBe(2);
-    expect(topicList.every((t: any) => t.isNewRecord())).toBe(true);
+    const [t1, t2] = topicList as any[];
+    expect(t1.title).toBe("first");
+    expect(t1.author_name).toBe("David");
+    expect(t2.title).toBe("second");
+    expect(t2.author_name).toBe("David");
+    expect(topicList.every((t: any) => !t.isPersisted())).toBe(true);
   });
 
   it("save for record with only primary key that is provided", async () => {
-    const m = new Minimalistic();
-    await m.save();
-    expect(m.isPersisted()).toBe(true);
-    expect(m.id).toBeDefined();
+    await expect(Minimalistic.createBang({ id: 2 })).resolves.not.toThrow();
   });
 
   // Rails: test_update_columns_not_equal_attributes — saving a record that was
@@ -1223,13 +1230,15 @@ describe("PersistenceTest", () => {
     await expect(Topic.update(99999, { title: "x" })).rejects.toThrow();
   });
 
-  // Rails: test_update_attribute_with_one_updated — update_attribute on one
-  // column clears dirty state; the persisted value is confirmed after reload.
+  // Rails: test_update_attribute_with_one_updated — update_attribute clears
+  // aggregate and per-attribute dirty state.
   it("update attribute with one updated", async () => {
     const t = await Topic.create({ title: "a" });
     await t.updateAttribute("title", "super_title");
     expect(t.title).toBe("super_title");
     expect(t.changed).toBe(false);
+    expect(t.attributeChanged("title")).toBe(false);
+    expect(t.attributeChange("title")).toBeNull();
     await t.reload();
     expect(t.title).toBe("super_title");
   });
@@ -1264,9 +1273,7 @@ describe("PersistenceTest", () => {
 
   it("update columns returns boolean", async () => {
     const t = await Topic.create({ title: "old" });
-    // updateColumns returns void (Promise<void>), but should not throw
-    await t.updateColumns({ title: "new" });
-    expect(t.title).toBe("new");
+    expect(await t.updateColumns({ title: "new" })).toBe(true);
   });
 
   it("class level destroy", async () => {
