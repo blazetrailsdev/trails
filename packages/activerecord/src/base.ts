@@ -4418,8 +4418,8 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   assignAttributes(attrs: Record<string, unknown>): void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
-  updateColumn(name: string, value: unknown): Promise<void>;
-  updateColumns(attrs: Record<string, unknown>): Promise<void>;
+  updateColumn(name: string, value: unknown): Promise<boolean>;
+  updateColumns(attrs: Record<string, unknown>): Promise<boolean>;
   dup(): this;
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
