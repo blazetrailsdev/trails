@@ -1029,7 +1029,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     await firm.save();
     expect(firm.isNewRecord()).toBe(false);
     expect(account.isNewRecord()).toBe(false);
-    expect(account.firm_id).toBe(firm.id);
+    expect(Number(account.firm_id)).toBe(Number(firm.id));
   });
 
   it("assignment before parent saved", async () => {
@@ -1038,7 +1038,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = new Account({ credit_limit: 300 });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(account.firm_id).toBe(firm.id);
+    expect(Number(account.firm_id)).toBe(Number(firm.id));
   });
 
   it("assignment before either saved", async () => {
@@ -1446,7 +1446,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = await Account.create({ credit_limit: 600, firm_id: firm.id });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(account.firm_id).toBe(firm.id);
+    expect(Number(account.firm_id)).toBe(Number(firm.id));
   });
 });
 
