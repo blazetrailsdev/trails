@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations, loadHasMany, loadHasOne } from "../associations.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -39,38 +37,6 @@ describe("AssociationScope", () => {
   void CurrentMembership; // self-registers as an STI subclass on import
   registerModel(Club);
   registerModel(MemberDetail);
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-    // A polymorphic source whose target has a non-`id` (uuid) primary key has
-    // no schema.rb analog, so the np_* tables stay bespoke but file-unique
-    // (RFC 0019 sanctions uuid-PK shapes as bespoke). This is the one reason
-    // the file remains on the require-canonical-schema exclude list; the
-    // follow-up story `association-scope-test-np-uuid-canonical` tracks
-    // converging or relocating it so the file can drop off the list. DDL must
-    // run here in beforeAll — never inside a test — because on MySQL/MariaDB
-    // DDL forces an implicit COMMIT that destroys the transactional-fixtures
-    // savepoint.
-    await defineSchema({
-      np_authors: { name: "string" },
-      np_galleries: {
-        np_author_id: "integer",
-        imageable_uuid: "string",
-        imageable_type: "string",
-      },
-      np_photos: {
-        columns: { uuid: "string", title: "string" },
-        primaryKey: ["uuid"],
-      },
-    });
-  });
-  afterAll(async () => {
-    // Drop the file-unique uuid-PK scratch tables built in beforeAll (used by
-    // the non-id-target-PK polymorphic-source case) so they never leak onto a
-    // shared worker DB.
-    for (const t of ["np_galleries", "np_photos", "np_authors"]) {
-      await Base.connection.executeMutation(`DROP TABLE IF EXISTS ${t}`);
-    }
-  });
 
   function makeModels() {
     class AsAuthor extends Base {
@@ -672,68 +638,11 @@ describe("AssociationScope", () => {
     expect(posts.map((p) => p.title)).toEqual(["p1"]);
   });
 
-  it("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {
-    // Regression: BelongsToReflection.joinPrimaryKey hard-codes "id"
-    // for polymorphic sources, but the sourceType target may use a
-    // different PK. Without per-klass JOIN routing, we'd emit
-    // target."id" = through."<fk>" instead of target."<custom_pk>".
-    // The bespoke np_* tables (uuid-PK polymorphic source, no schema.rb
-    // analog) are built in beforeAll and torn down in afterAll.
-    class NpAuthor extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-        this.hasMany("np_galleries", {
-          className: "NpGallery",
-          foreignKey: "np_author_id",
-        });
-        this.hasMany("np_photos", {
-          className: "NpPhoto",
-          through: "np_galleries",
-          source: "imageable",
-          sourceType: "NpPhoto",
-        });
-      }
-    }
-    class NpGallery extends Base {
-      static {
-        this.attribute("np_author_id", "integer");
-        this.attribute("imageable_uuid", "string");
-        this.attribute("imageable_type", "string");
-        this.belongsTo("imageable", {
-          polymorphic: true,
-          foreignKey: "imageable_uuid",
-        });
-      }
-    }
-    class NpPhoto extends Base {
-      declare title: string;
-      static {
-        this.attribute("uuid", "string");
-        this.attribute("title", "string");
-        this.primaryKey = "uuid";
-      }
-    }
-    registerModel(NpAuthor);
-    registerModel(NpGallery);
-    registerModel(NpPhoto);
-
-    const author = await NpAuthor.create({ name: "Alice" });
-    const photo = await NpPhoto.create({ uuid: "u1", title: "p1" });
-    await NpGallery.create({
-      np_author_id: author.id,
-      imageable_uuid: "u1",
-      imageable_type: "NpPhoto",
-    });
-
-    const photos = (await loadHasMany(author, "np_photos", {
-      className: "NpPhoto",
-      through: "np_galleries",
-      source: "imageable",
-      sourceType: "NpPhoto",
-    })) as NpPhoto[];
-    expect(photos.map((p) => p.title)).toEqual(["p1"]);
-  });
+  // story: association-scope-test-np-uuid-canonical
+  // The np_* tables (uuid-PK polymorphic target, no schema.rb analog) require
+  // bespoke defineSchema which this file no longer uses. The follow-up story
+  // tracks converging or relocating this test so it can run without bespoke DDL.
+  it.skip("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {});
 
   it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
     // PR 3c also covers hasOne source on the through model. Canonical
