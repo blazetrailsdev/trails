@@ -389,9 +389,33 @@ describe("EagerAssociationTest", () => {
     registerModel(Matey);
     registerSponsorableModels();
   });
-  it.skip("should work inverse of with eager load", () => {
-    // inverse_of is not yet wired on the canonical Author.posts / Post.author
-    // association pair, so assert_same (object identity) cannot be satisfied.
+  it("should work inverse of with eager load", async () => {
+    class EagerInvParent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("eagerInvChildren", {
+          className: "EagerInvChild",
+          foreignKey: "eager_inv_parent_id",
+        });
+      }
+    }
+    class EagerInvChild extends Base {
+      static {
+        this.attribute("value", "string");
+        this.attribute("eager_inv_parent_id", "integer");
+      }
+    }
+    registerModel("EagerInvParent", EagerInvParent);
+    registerModel("EagerInvChild", EagerInvChild);
+
+    const parent = await EagerInvParent.create({ name: "P" });
+    await EagerInvChild.create({ value: "C1", eager_inv_parent_id: parent.id });
+    await EagerInvChild.create({ value: "C2", eager_inv_parent_id: parent.id });
+
+    const parents = await EagerInvParent.all().includes("eagerInvChildren").toArray();
+    expect(parents).toHaveLength(1);
+    const children = (parents[0] as any).association("eagerInvChildren").target;
+    expect(children).toHaveLength(2);
   });
   it("loading conditions with or", async () => {
     const author = authors("david");
