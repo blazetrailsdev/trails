@@ -1211,17 +1211,18 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     (threadedConnectionFor(ctor as unknown as typeof import("./base.js").Base) as
       | typeof ctor.connection
       | null) ?? ctor.connection;
+  let affectedRows: number;
   if (typeof adapter.update === "function") {
-    await adapter.update(um);
+    affectedRows = await adapter.update(um);
   } else {
     const sql = adapter.toSql(um);
     // The SQL is arel-built via `adapter.toSql(um)`; the "Update Columns" string
     // is the operation-name label (Rails' log subscriber name), not raw SQL.
-    await adapter.execUpdate(sql, "Update Columns");
+    affectedRows = await adapter.execUpdate(sql, "Update Columns");
   }
 
   this.changesApplied();
-  return true;
+  return affectedRows === 1;
 }
 
 // ---------------------------------------------------------------------------
