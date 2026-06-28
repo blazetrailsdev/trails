@@ -16,3 +16,15 @@ export class Wheel extends Base {
     });
   }
 }
+
+export class WheelPolymorphicTouch extends Base {
+  declare wheelable: Base | null;
+  declare wheelable_id: number;
+  declare wheelable_type: string;
+  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
+
+  static {
+    this.tableName = "wheels";
+    this.belongsTo("wheelable", { polymorphic: true, touch: true });
+  }
+}

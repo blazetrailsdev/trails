@@ -5,6 +5,5 @@
   "packages/activerecord/src/associations/has-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
   "packages/activerecord/src/persistence.test.ts",
-  "packages/activerecord/src/relation/where.test.ts",
-  "packages/activerecord/src/timestamp.test.ts"
+  "packages/activerecord/src/relation/where.test.ts"
 ]

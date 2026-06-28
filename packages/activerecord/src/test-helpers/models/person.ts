@@ -304,3 +304,36 @@ export class SerializedPerson extends Base {
 }
 
 registerModel(Person);
+
+export class PersonWithTimestampInCreate extends Base {
+  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+
+  static {
+    this._tableName = "people";
+    this.beforeCreate(function (this: PersonWithTimestampInCreate) {
+      (this as any).born_at = (this as any).created_at;
+    });
+  }
+}
+
+export class PersonWithTimestampInUpdate extends Base {
+  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+
+  static {
+    this._tableName = "people";
+    this.beforeUpdate(function (this: PersonWithTimestampInUpdate) {
+      (this as any).born_at = (this as any).created_at;
+    });
+  }
+}
+
+export class PersonWithTimestampInSave extends Base {
+  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+
+  static {
+    this._tableName = "people";
+    this.beforeCreate(function (this: PersonWithTimestampInSave) {
+      (this as any).born_at = (this as any).created_at;
+    });
+  }
+}

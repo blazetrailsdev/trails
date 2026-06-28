@@ -604,3 +604,65 @@ export class AuditRequiredDeveloper extends Base {
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
   }
 }
+
+export class DevWithAfterTouch extends Base {
+  afterTouchCalled = false;
+
+  static {
+    this.tableName = "developers";
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
+    this.afterTouch(function (this: DevWithAfterTouch) {
+      this.afterTouchCalled = true;
+    });
+  }
+}
+
+export class MutatingSaveKlass extends Base {
+  declare name: string;
+
+  static {
+    this.tableName = "developers";
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
+    this.beforeSave(function (this: MutatingSaveKlass) {
+      if (!this.isNewRecord()) {
+        this.name = "Jack Bauer";
+      }
+    });
+  }
+}
+
+export class MutatingUpdateKlass extends Base {
+  declare name: string;
+
+  static {
+    this.tableName = "developers";
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
+    this.beforeUpdate(function (this: MutatingUpdateKlass) {
+      if (!this.isNewRecord()) {
+        this.name = "Jack Bauer";
+      }
+    });
+  }
+}
+
+export class NonMutatingUpdateKlass extends Base {
+  static {
+    this.tableName = "developers";
+    this.aliasAttribute("created_at", "legacy_created_at");
+    this.aliasAttribute("updated_at", "legacy_updated_at");
+    this.aliasAttribute("created_on", "legacy_created_on");
+    this.aliasAttribute("updated_on", "legacy_updated_on");
+    this.beforeUpdate(function () {
+      // no-op
+    });
+  }
+}
