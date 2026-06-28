@@ -865,10 +865,11 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
   this: T,
 ): Promise<T> {
   const result = await this.destroy();
-  if (result === false) {
-    throw new RecordNotDestroyed("Failed to destroy the record", this as unknown as object);
-  }
-  return result;
+  // Rails: `destroy || _raise_record_not_destroyed` — re-raises the stored
+  // @_association_destroy_exception (child RecordNotDestroyed with error.record
+  // pointing at the failed child) when set, otherwise raises owner-level error.
+  if (result === false) (this as any)._raiseRecordNotDestroyed();
+  return result as T;
 }
 
 // ---------------------------------------------------------------------------

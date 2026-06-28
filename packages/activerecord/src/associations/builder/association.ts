@@ -7,6 +7,7 @@
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
+import { RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
 
@@ -283,7 +284,20 @@ export class Association {
       // handleDependency signals that with a `false` return; translate it to the
       // abort sentinel here so the before_destroy chain halts (Rails 5+ only
       // halts on throw :abort, never on a `false` return).
-      if ((await record.association(name).handleDependency()) === false) throwAbort();
+      //
+      // When handleDependency propagates a child RecordNotDestroyed (dependent:
+      // :destroy and a child's before_destroy aborts), mirror Callbacks#destroy:
+      // store the child exception on the owner so _raiseRecordNotDestroyed can
+      // re-raise it with the correct error.record (the failed child, not the owner).
+      try {
+        if ((await record.association(name).handleDependency()) === false) throwAbort();
+      } catch (e) {
+        if (e instanceof RecordNotDestroyed) {
+          record._associationDestroyException = e;
+          throwAbort();
+        }
+        throw e;
+      }
     });
   }
 
