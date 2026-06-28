@@ -1158,24 +1158,11 @@ describe("PersistenceTest", () => {
     await expect(Topic.destroy([99999])).rejects.toThrow();
   });
 
-  // Rails: Base.delete(ids[]) should delete every matching row — single-column
-  // PK case routes through `where(pk: ids).delete_all` (delete_by semantics).
-  // Rails: Base.delete accepts an array of composite-PK tuples and deletes
-  // each matching row. Predicate builder emits an OR-of-AND — e.g.
-  // `(shop_id = 1 AND order_id = 10) OR (shop_id = 1 AND order_id = 11)`
-  // — NOT a per-column IN cross-product (which would also match
-  // [shop_id=2, order_id=10]).
-  // Rails: update(id, attrs) on a composite-PK model must treat a flat
-  // tuple as ONE id (not parallel ids). Mirrors destroy's detection.
-  // Rails: destroy(id) on a composite-PK model with a single tuple must
-  // destroy ONE record, not iterate the tuple as N ids.
   // Guard for partial_inserts=true (Rails' test ambient; harness currently runs
-  // false via load_defaults 7.0). Under partial inserts the create path selects
-  // columns from changed_attribute_names_to_save; a user-assigned composite PK
-  // must survive into the INSERT so the row can be found/destroyed by that key.
-  // Pins the callbacks.ts null-only PK skip-set; flip-the-ambient or a refactor
-  // that drops it regresses this without a guard. Mirrors Rails _create_record
-  // writing a returning column back only when _read_attribute(column) is nil.
+  // false via load_defaults 7.0). Pins the callbacks.ts null-only PK skip-set;
+  // flip-the-ambient or a refactor that drops it regresses this without a guard.
+  // Mirrors Rails _create_record writing a returning column back only when
+  // _read_attribute(column) is nil.
   it("create prefetched pk", async () => {
     const t = await Topic.create({ title: "prefetched" });
     expect(t.id).toBeTruthy();
@@ -1269,17 +1256,17 @@ describe("PersistenceTest", () => {
 
   it("update columns should not leave the object dirty", async () => {
     const t = await Topic.create({ title: "old" });
-    (t as any).title = "dirty";
+    t.title = "dirty";
     expect(t.changed).toBe(true);
-    await (t as any).updateColumns({ title: "clean" });
+    await t.updateColumns({ title: "clean" });
     expect(t.changed).toBe(false);
   });
 
   it("update columns returns boolean", async () => {
     const t = await Topic.create({ title: "old" });
     // updateColumns returns void (Promise<void>), but should not throw
-    await (t as any).updateColumns({ title: "new" });
-    expect((t as any).title).toBe("new");
+    await t.updateColumns({ title: "new" });
+    expect(t.title).toBe("new");
   });
 
   it("class level destroy", async () => {
@@ -1310,7 +1297,7 @@ describe("PersistenceTest", () => {
     it("primary key stays the same", async () => {
       const t = await Topic.create({ title: "test" });
       const id = t.id;
-      (t as any).title = "updated";
+      t.title = "updated";
       await t.save();
       expect(t.id).toBe(id);
     });
