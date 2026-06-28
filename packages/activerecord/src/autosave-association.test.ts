@@ -28,6 +28,8 @@ import { Developer } from "./test-helpers/models/developer.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
+import { Invoice } from "./test-helpers/models/invoice.js";
+import { LineItem } from "./test-helpers/models/line-item.js";
 import {
   markForDestruction,
   isMarkedForDestruction,
@@ -4003,39 +4005,13 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 
 describe("TestAutosaveAssociationWithTouch", () => {
   useHandlerTransactionalFixtures();
+  beforeAll(() => {
+    registerModel(Invoice);
+    registerModel(LineItem);
+  });
   it("autosave with touch should not raise system stack error", async () => {
-    class TchParent extends Base {
-      static {
-        this._tableName = "developers";
-        this.attribute("name", "string");
-        this.attribute("updated_at", "string");
-        this.hasMany("tchChildren", {
-          className: "TchChild",
-          foreignKey: "author_id",
-          autosave: true,
-        });
-      }
-    }
-    class TchChild extends Base {
-      static {
-        this._tableName = "books";
-        this.attribute("name", "string");
-        this.attribute("author_id", "integer");
-        this.belongsTo("tchParent", {
-          className: "TchParent",
-          foreignKey: "author_id",
-          touch: true,
-        });
-      }
-    }
-    registerModel("TchParent", TchParent);
-    registerModel("TchChild", TchChild);
-    const parent = await TchParent.create({ name: "P" });
-    const child = new TchChild({ name: "C", author_id: parent.id });
-    cacheAssoc(parent, "tchChildren", [child]);
-    // Should not infinite-loop (autosave -> touch -> save -> autosave...)
-    const saved = await parent.save();
-    expect(saved).toBe(true);
+    const invoice = await Invoice.create({});
+    await expect(invoice.lineItems.create({ amount: 10 })).resolves.not.toThrow();
   });
 });
 
