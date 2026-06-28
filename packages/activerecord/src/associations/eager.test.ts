@@ -99,13 +99,10 @@ const TEST_SCHEMA: Schema = {
   eager_cnt_ho_comments: { body: "string", eager_cnt_ho_post_id: "integer" },
   eager_cnt_ho_posts: { title: "string" },
   eager_comments: { body: "string", eager_post_id: "integer" },
-  eager_count_comments: { body: "string", eager_count_post_id: "integer" },
-  eager_count_posts: { title: "string" },
   eager_dup_authors: { name: "string" },
   eager_dup_children: { label: "string", eager_dup_parent_id: "integer" },
   eager_dup_parents: { name: "string" },
   eager_dup_posts: { title: "string", eager_dup_author_id: "integer" },
-  eager_edges: { label: "string", eager_node_id: "integer" },
   eager_empty_bt_children: { value: "string", eager_empty_bt_parent_id: "integer" },
   eager_empty_bt_parents: { name: "string" },
   eager_hm_cond_comments: { body: "string", eager_hm_cond_post_id: "integer" },
@@ -160,7 +157,6 @@ const TEST_SCHEMA: Schema = {
   eager_multi_ho_profiles: { bio: "string", eager_multi_ho_parent_id: "integer" },
   eager_no_res_comments: { body: "string", eager_no_res_post_id: "integer" },
   eager_no_res_posts: { title: "string" },
-  eager_nodes: { value: "string" },
   eager_or_comments: { body: "string", eager_or_post_id: "integer" },
   eager_or_posts: { title: "string" },
   eager_pk_authors: { name: "string" },
@@ -169,17 +165,14 @@ const TEST_SCHEMA: Schema = {
   eager_reord_children: { value: "string", eager_reord_parent_id: "integer" },
   eager_reord_parents: { name: "string" },
   eager_tl_widgets: { name: "string" },
-  eager_widgets: { name: "string" },
   ex_sug_posts: { title: "string" },
   ex_sug_taggings: { name: "string", ex_sug_post_id: "integer" },
   ej_em_authors: { name: "string" },
   ej_em_posts: { title: "string", ej_em_author_id: "integer" },
-  ej_authors: { name: "string" },
   ej_bt_authors: { name: "string" },
   ej_bt_posts: { title: "string", ej_bt_author_id: "integer" },
   ej_ho_profiles: { bio: "string", ej_ho_user_id: "integer" },
   ej_ho_users: { name: "string" },
-  ej_posts: { title: "string", ej_author_id: "integer" },
   elmar_contracts: { elmar_developer_id: "integer" },
   elmar_developers: { name: "string", elmar_mentor_id: "integer" },
   elmar_mentors: { name: "string" },
@@ -695,41 +688,13 @@ describe("EagerAssociationTest", () => {
     );
   });
   it("eager association loading with explicit join", async () => {
-    class EjAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("ejPosts", {
-          className: "EjPost",
-          foreignKey: "ej_author_id",
-        });
-      }
-    }
-    class EjPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("ej_author_id", "integer");
-      }
-    }
-    registerModel(EjAuthor);
-    registerModel(EjPost);
-
-    const alice = await EjAuthor.create({ name: "Alice" });
-    await EjPost.create({ title: "P1", ej_author_id: alice.id });
-    await EjPost.create({ title: "P2", ej_author_id: alice.id });
-
-    const authors = await EjAuthor.all().eagerLoad("ejPosts").toArray();
-    expect(authors).toHaveLength(1);
-    const posts = (authors[0] as any).association("ejPosts").target;
-    expect(posts).toHaveLength(2);
-    const titles = posts.map((p: any) => p.title).sort();
-    expect(titles).toEqual(["P1", "P2"]);
-
-    // Association proxy wired during hydration (read off the holder, not lazy-synced)
-    const proxyInstance = (authors[0] as any)._associationInstances.get("ejPosts");
-    expect(proxyInstance).toBeDefined();
-    expect(proxyInstance.loaded).toBe(true);
-    expect(Array.isArray(proxyInstance.target)).toBe(true);
-    expect(proxyInstance.target).toHaveLength(2);
+    const list = await Post.all()
+      .includes("comments")
+      .joins("INNER JOIN authors ON posts.author_id = authors.id AND authors.name = 'Mary'")
+      .limit(1)
+      .order("author_id")
+      .toArray();
+    expect(list).toHaveLength(1);
   });
   it("eager association loading with explicit join belongs to", async () => {
     class EjBtAuthor extends Base {
@@ -830,25 +795,15 @@ describe("EagerAssociationTest", () => {
     expect(proxy.target).toEqual([]);
   });
   it("eager with invalid association reference", async () => {
-    class EagerWidget extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("EagerWidget", EagerWidget);
-
-    await EagerWidget.create({ name: "w1" });
     const expected =
-      /Association named 'monkeys' was not found on EagerWidget; perhaps you misspelled it\?/;
-    await expect(EagerWidget.all().includes("monkeys").toArray()).rejects.toThrow(expected);
+      /Association named 'monkeys' was not found on Post; perhaps you misspelled it\?/;
+    await expect(Post.all().includes("monkeys").toArray()).rejects.toThrow(expected);
     await expect(
-      EagerWidget.all()
+      Post.all()
         .includes(["monkeys"] as any)
         .toArray(),
     ).rejects.toThrow(expected);
-    await expect(EagerWidget.all().includes("monkeys", "elephants").toArray()).rejects.toThrow(
-      expected,
-    );
+    await expect(Post.all().includes("monkeys", "elephants").toArray()).rejects.toThrow(expected);
   });
 
   it("exceptions have suggestions for fix", async () => {
@@ -1160,30 +1115,13 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager with valid association as string not symbol", async () => {
-    class EagerNode extends Base {
-      static {
-        this.attribute("value", "string");
-        this.hasMany("eagerEdges", {
-          className: "EagerEdge",
-          foreignKey: "eager_node_id",
-        });
-      }
+    let raised = false;
+    try {
+      await Post.all().includes("comments").toArray();
+    } catch {
+      raised = true;
     }
-    class EagerEdge extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("eager_node_id", "integer");
-      }
-    }
-    registerModel("EagerNode", EagerNode);
-    registerModel("EagerEdge", EagerEdge);
-
-    const node = await EagerNode.create({ value: "root" });
-    await EagerEdge.create({ label: "e1", eager_node_id: node.id });
-
-    // Passing association name as string (not symbol — no difference in TS)
-    const nodes = await EagerNode.all().includes("eagerEdges").toArray();
-    expect(nodes).toHaveLength(1);
+    expect(raised).toBe(false);
   });
 
   it.skip("eager association with scope with joins", () => {
@@ -1192,29 +1130,12 @@ describe("EagerAssociationTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it("count with include", async () => {
-    class EagerCountPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerCountComments", {
-          className: "EagerCountComment",
-          foreignKey: "eager_count_post_id",
-        });
-      }
-    }
-    class EagerCountComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_count_post_id", "integer");
-      }
-    }
-    registerModel("EagerCountPost", EagerCountPost);
-    registerModel("EagerCountComment", EagerCountComment);
-
-    await EagerCountPost.create({ title: "P1" });
-    await EagerCountPost.create({ title: "P2" });
-
-    const count = await EagerCountPost.all().includes("eagerCountComments").count();
-    expect(count).toBe(2);
+    const david = authors("david");
+    const count = await david.postsWithComments
+      .where("length(comments.body) > 15")
+      .references("comments")
+      .count();
+    expect(count).toBe(3);
   });
 
   it("load with sti sharing association", async () => {
