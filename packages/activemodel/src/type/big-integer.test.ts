@@ -101,6 +101,16 @@ describe("BigIntegerTest", () => {
     expect(type.serialize(-(1n << 63n))).toBe(-(1n << 63n));
   });
 
+  it("isSerializable uses BigInt-precision for BigInt values when limit is set", () => {
+    const limited = new BigIntegerType({ limit: 8 });
+    expect(limited.isSerializable(9223372036854775808n)).toBe(false);
+    expect(limited.isSerializable(9223372036854775807n)).toBe(true);
+    expect(limited.isSerializable(-(1n << 63n))).toBe(true);
+    expect(limited.isSerializable(-(1n << 63n) - 1n)).toBe(false);
+    const standalone = new BigIntegerType();
+    expect(standalone.isSerializable(BigInt("9".repeat(100)))).toBe(true);
+  });
+
   it("blank string casts to null", () => {
     const type = new BigIntegerType();
     expect(type.cast("")).toBeNull();

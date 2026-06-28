@@ -41,6 +41,15 @@ export class BigIntegerType extends IntegerType {
     return super.isInRange(value);
   }
 
+  // Overrides IntegerType.isSerializable, which converts BigInt via Number() before
+  // calling isInRange — Number(2^63n) === Number((2^63-1)n) in float64, so the
+  // inherited path reports true for out-of-range BigInt values (wrong).
+  override isSerializable(value: unknown): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
+    return super.isSerializable(value);
+  }
+
   /** @internal Rails-private helper. */
   protected override castValue(value: unknown): number | null {
     if (typeof value === "bigint") return value as unknown as number;
