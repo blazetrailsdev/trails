@@ -10,12 +10,25 @@ import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { Developer, DeveloperCalledJamis } from "./test-helpers/models/developer.js";
-import { Owner } from "./test-helpers/models/owner.js";
-import { Pet } from "./test-helpers/models/pet.js";
-import { Toy } from "./test-helpers/models/toy.js";
+import {
+  Developer,
+  DeveloperCalledJamis,
+  DevWithAfterTouch,
+  MutatingSaveKlass,
+  MutatingUpdateKlass,
+  NonMutatingUpdateKlass,
+} from "./test-helpers/models/developer.js";
+import { Owner, InvalidOwner } from "./test-helpers/models/owner.js";
+import { Pet, PetTouchHappyAt, PetCounterCacheTouch } from "./test-helpers/models/pet.js";
+import { Toy, ToyTouchPet } from "./test-helpers/models/toy.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Task } from "./test-helpers/models/task.js";
+import { WheelPolymorphicTouch } from "./test-helpers/models/wheel.js";
+import {
+  PersonWithTimestampInCreate,
+  PersonWithTimestampInUpdate,
+  PersonWithTimestampInSave,
+} from "./test-helpers/models/person.js";
 
 registerModel("Developer", Developer);
 registerModel("DeveloperCalledJamis", DeveloperCalledJamis);
@@ -259,20 +272,6 @@ describe("TimestampTest", () => {
   });
 
   it("no touching with callbacks", async () => {
-    class DevWithAfterTouch extends Base {
-      afterTouchCalled = false;
-      static {
-        this.tableName = "developers";
-        this.aliasAttribute("created_at", "legacy_created_at");
-        this.aliasAttribute("updated_at", "legacy_updated_at");
-        this.aliasAttribute("created_on", "legacy_created_on");
-        this.aliasAttribute("updated_on", "legacy_updated_on");
-        this.afterTouch(function (this: DevWithAfterTouch) {
-          this.afterTouchCalled = true;
-        });
-      }
-    }
-
     const dev = await DevWithAfterTouch.find(developers("david").id);
     await DevWithAfterTouch.noTouching(async () => {
       await dev.touch();
@@ -281,22 +280,6 @@ describe("TimestampTest", () => {
   });
 
   it("saving an unchanged record with a mutating before save callback updates its timestamp", async () => {
-    class MutatingSaveKlass extends Base {
-      static {
-        this.tableName = "developers";
-        this.aliasAttribute("created_at", "legacy_created_at");
-        this.aliasAttribute("updated_at", "legacy_updated_at");
-        this.aliasAttribute("created_on", "legacy_created_on");
-        this.aliasAttribute("updated_on", "legacy_updated_on");
-        this.beforeSave(function (this: MutatingSaveKlass) {
-          if (!this.isNewRecord()) {
-            this.name = "Jack Bauer";
-          }
-        });
-      }
-      declare name: string;
-    }
-
     const dev = await MutatingSaveKlass.create({});
     const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
     const previousName = dev.name;
@@ -313,22 +296,6 @@ describe("TimestampTest", () => {
   });
 
   it("saving an unchanged record with a mutating before update callback updates its timestamp", async () => {
-    class MutatingUpdateKlass extends Base {
-      static {
-        this.tableName = "developers";
-        this.aliasAttribute("created_at", "legacy_created_at");
-        this.aliasAttribute("updated_at", "legacy_updated_at");
-        this.aliasAttribute("created_on", "legacy_created_on");
-        this.aliasAttribute("updated_on", "legacy_updated_on");
-        this.beforeUpdate(function (this: MutatingUpdateKlass) {
-          if (!this.isNewRecord()) {
-            this.name = "Jack Bauer";
-          }
-        });
-      }
-      declare name: string;
-    }
-
     const dev = await MutatingUpdateKlass.create({});
     const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
     const previousName = dev.name;
@@ -347,19 +314,6 @@ describe("TimestampTest", () => {
   });
 
   it("saving an unchanged record with a non mutating before update callback does not update its timestamp", async () => {
-    class NonMutatingUpdateKlass extends Base {
-      static {
-        this.tableName = "developers";
-        this.aliasAttribute("created_at", "legacy_created_at");
-        this.aliasAttribute("updated_at", "legacy_updated_at");
-        this.aliasAttribute("created_on", "legacy_created_on");
-        this.aliasAttribute("updated_on", "legacy_updated_on");
-        this.beforeUpdate(function () {
-          // no-op
-        });
-      }
-    }
-
     const dev = await NonMutatingUpdateKlass.create({});
     const previousUpdatedAt = dev.legacy_updated_at as Temporal.Instant;
 
@@ -412,14 +366,6 @@ describe("TimestampTest", () => {
   });
 
   it("saving a new record belonging to invalid parent with touch should not raise exception", async () => {
-    class InvalidOwner extends Owner {
-      static {
-        this.validate(function (this: InvalidOwner) {
-          (this as any).errors.add("base", "invalid");
-        });
-      }
-    }
-
     const pet = new Pet({ owner: new InvalidOwner() });
     await pet.save();
 
@@ -427,15 +373,6 @@ describe("TimestampTest", () => {
   });
 
   it("saving a record with a belongs to that specifies touching a specific attribute the parent should update that attribute", async () => {
-    class PetTouchHappyAt extends Base {
-      static {
-        this.tableName = "pets";
-        this._primaryKey = "pet_id";
-        this.belongsTo("owner", { touch: "happy_at" });
-      }
-    }
-    registerModel("PetTouchHappyAt", PetTouchHappyAt);
-
     const pet = await PetTouchHappyAt.find((pets("parrot") as any).readAttribute("pet_id"));
     const ownerInst = await (pet as any).loadBelongsTo("owner");
     const previousOwnerHappyAt = ownerInst.happy_at;
@@ -447,15 +384,6 @@ describe("TimestampTest", () => {
   });
 
   it("touching a record with a belongs to that uses a counter cache should update the parent", async () => {
-    class PetCounterCacheTouch extends Base {
-      static {
-        this.tableName = "pets";
-        this._primaryKey = "pet_id";
-        this.belongsTo("owner", { counterCache: "use_count", touch: true });
-      }
-    }
-    registerModel("PetCounterCacheTouch", PetCounterCacheTouch);
-
     const pet = await PetCounterCacheTouch.find((pets("parrot") as any).readAttribute("pet_id"));
     const ownerInst = await (pet as any).loadBelongsTo("owner");
     const threeDAgo = Temporal.Now.instant().subtract({ hours: 24 * 3 });
@@ -474,15 +402,6 @@ describe("TimestampTest", () => {
   });
 
   it("touching a record touches parent record and grandparent record", async () => {
-    class ToyTouchPet extends Base {
-      static {
-        this.tableName = "toys";
-        this._primaryKey = "toy_id";
-        this.belongsTo("pet", { touch: true });
-      }
-    }
-    registerModel("ToyTouchPet", ToyTouchPet);
-
     const toy = await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"));
     const pet = await (toy as any).loadBelongsTo("pet");
     const ownerInst = await pet.loadBelongsTo("owner");
@@ -496,23 +415,7 @@ describe("TimestampTest", () => {
   });
 
   it("touching a record touches polymorphic record", async () => {
-    class ToyAnon extends Base {
-      static {
-        this.tableName = "toys";
-        this._primaryKey = "toy_id";
-      }
-    }
-
-    class WheelPolymorphicTouch extends Base {
-      static {
-        this.tableName = "wheels";
-        this.belongsTo("wheelable", { polymorphic: true, touch: true });
-      }
-    }
-    registerModel("ToyAnon", ToyAnon);
-    registerModel("WheelPolymorphicTouch", WheelPolymorphicTouch);
-
-    const toy = (await ToyAnon.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const toy = (await Toy.find((toys("bone") as any).readAttribute("toy_id"))) as any;
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
     await toy.updateColumns({ updated_at: time });
 
@@ -525,19 +428,10 @@ describe("TimestampTest", () => {
   });
 
   it("changing parent of a record touches both new and old parent record", async () => {
-    class ToyTouchPet2 extends Base {
-      static {
-        this.tableName = "toys";
-        this._primaryKey = "toy_id";
-        this.belongsTo("pet", { touch: true });
-      }
-    }
-    registerModel("ToyTouchPet2", ToyTouchPet2);
-
-    const toy1 = (await ToyTouchPet2.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const toy1 = (await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"))) as any;
     const oldPet = await toy1.loadBelongsTo("pet");
 
-    const toy2 = (await ToyTouchPet2.find((toys("doll") as any).readAttribute("toy_id"))) as any;
+    const toy2 = (await ToyTouchPet.find((toys("doll") as any).readAttribute("toy_id"))) as any;
     const newPet = await toy2.loadBelongsTo("pet");
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
@@ -555,18 +449,10 @@ describe("TimestampTest", () => {
   });
 
   it("changing parent of a record touches both new and old polymorphic parent record changes within same class", async () => {
-    class WheelPolymorphicTouch2 extends Base {
-      static {
-        this.tableName = "wheels";
-        this.belongsTo("wheelable", { polymorphic: true, touch: true });
-      }
-    }
-    registerModel("WheelPolymorphicTouch2", WheelPolymorphicTouch2);
-
     const car1 = await Car.find(cars("honda").id);
     const car2 = await Car.find(cars("zyke").id);
 
-    const wheel = (await WheelPolymorphicTouch2.create({ wheelable: car1 })) as any;
+    const wheel = (await WheelPolymorphicTouch.create({ wheelable: car1 })) as any;
 
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
@@ -581,26 +467,10 @@ describe("TimestampTest", () => {
   });
 
   it("changing parent of a record touches both new and old polymorphic parent record changes with other class", async () => {
-    class ToyAnon2 extends Base {
-      static {
-        this.tableName = "toys";
-        this._primaryKey = "toy_id";
-      }
-    }
-
-    class WheelPolymorphicTouch3 extends Base {
-      static {
-        this.tableName = "wheels";
-        this.belongsTo("wheelable", { polymorphic: true, touch: true });
-      }
-    }
-    registerModel("ToyAnon2", ToyAnon2);
-    registerModel("WheelPolymorphicTouch3", WheelPolymorphicTouch3);
-
     const car = await Car.find(cars("honda").id);
-    const toy = (await ToyAnon2.find((toys("bulbuli") as any).readAttribute("toy_id"))) as any;
+    const toy = (await Toy.find((toys("bulbuli") as any).readAttribute("toy_id"))) as any;
 
-    const wheel = (await WheelPolymorphicTouch3.create({ wheelable: car })) as any;
+    const wheel = (await WheelPolymorphicTouch.create({ wheelable: car })) as any;
 
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
@@ -611,20 +481,11 @@ describe("TimestampTest", () => {
     await wheel.save();
 
     expect((await Car.find(car.id)).updated_at).not.toEqual(time);
-    expect((await ToyAnon2.find(toy.toy_id)).updated_at).not.toEqual(time);
+    expect((await Toy.find(toy.toy_id)).updated_at).not.toEqual(time);
   });
 
   it("clearing association touches the old record", async () => {
-    class ToyTouchPet3 extends Base {
-      static {
-        this.tableName = "toys";
-        this._primaryKey = "toy_id";
-        this.belongsTo("pet", { touch: true });
-      }
-    }
-    registerModel("ToyTouchPet3", ToyTouchPet3);
-
-    const toy = (await ToyTouchPet3.find((toys("bone") as any).readAttribute("toy_id"))) as any;
+    const toy = (await ToyTouchPet.find((toys("bone") as any).readAttribute("toy_id"))) as any;
     const pet = await toy.loadBelongsTo("pet");
     const time = Temporal.Now.instant().subtract({ hours: 24 * 3 });
 
@@ -639,44 +500,17 @@ describe("TimestampTest", () => {
   });
 
   it("timestamp column values are present in create callbacks", async () => {
-    class PersonWithTimestampInCreate extends Base {
-      static {
-        this.tableName = "people";
-        this.beforeCreate(function (this: PersonWithTimestampInCreate) {
-          (this as any).born_at = (this as any).created_at;
-        });
-      }
-    }
-
     const person = await PersonWithTimestampInCreate.create({ first_name: "David" });
     expect((person as any).born_at).not.toBeNull();
   });
 
   it("timestamp column values are present in update callbacks", async () => {
-    class PersonWithTimestampInUpdate extends Base {
-      static {
-        this.tableName = "people";
-        this.beforeUpdate(function (this: PersonWithTimestampInUpdate) {
-          (this as any).born_at = (this as any).created_at;
-        });
-      }
-    }
-
     const person = await PersonWithTimestampInUpdate.create({ first_name: "David" });
     await person.update({ first_name: "John" });
     expect((person as any).born_at).not.toBeNull();
   });
 
   it("timestamp column values are present in save callbacks", async () => {
-    class PersonWithTimestampInSave extends Base {
-      static {
-        this.tableName = "people";
-        this.beforeCreate(function (this: PersonWithTimestampInSave) {
-          (this as any).born_at = (this as any).created_at;
-        });
-      }
-    }
-
     const person = await PersonWithTimestampInSave.create({ first_name: "David" });
     expect((person as any).born_at).not.toBeNull();
   });

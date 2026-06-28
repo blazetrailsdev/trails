@@ -41,3 +41,29 @@ export class Pet extends Base {
     });
   }
 }
+
+export class PetTouchHappyAt extends Base {
+  declare name: string;
+  declare owner_id: number;
+  declare pet_id: number;
+  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
+
+  static {
+    this._primaryKey = "pet_id";
+    this.tableName = "pets";
+    this.belongsTo("owner", { touch: "happy_at" });
+  }
+}
+
+export class PetCounterCacheTouch extends Base {
+  declare name: string;
+  declare owner_id: number;
+  declare pet_id: number;
+  declare loadBelongsTo: (name: "owner") => Promise<Owner | null>;
+
+  static {
+    this._primaryKey = "pet_id";
+    this.tableName = "pets";
+    this.belongsTo("owner", { counterCache: "use_count", touch: true });
+  }
+}

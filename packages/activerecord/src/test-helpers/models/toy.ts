@@ -25,3 +25,16 @@ export class Toy extends Base {
     this.scope("withPet", (q: any) => q.joins("pet"));
   }
 }
+
+export class ToyTouchPet extends Base {
+  declare name: string;
+  declare pet_id: number;
+  declare toy_id: number;
+  declare loadBelongsTo: (name: "pet") => Promise<Pet | null>;
+
+  static {
+    this._primaryKey = "toy_id";
+    this.tableName = "toys";
+    this.belongsTo("pet", { touch: true });
+  }
+}
