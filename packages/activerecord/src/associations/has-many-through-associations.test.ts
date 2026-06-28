@@ -1228,7 +1228,9 @@ describe("HasManyThroughAssociationsTest", () => {
   it("get ids", async () => {
     const michael = await Person.find(people("michael").id);
     const ids = await (michael as any).postIds;
-    expect([...ids].sort()).toEqual([posts("welcome").id, posts("authorless").id].sort());
+    expect([...ids].map(Number).sort()).toEqual(
+      [posts("welcome").id, posts("authorless").id].map(Number).sort(),
+    );
   });
 
   it("get ids for has many through with conditions should not preload", async () => {
@@ -1254,7 +1256,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const postsAssoc = (michael as any).association("posts");
     expect(postsAssoc.isLoaded()).toBe(false);
     const ids = await (michael as any).postIds;
-    expect([...ids].sort()).toEqual([posts("welcome").id, posts("authorless").id].sort());
+    expect([...ids].map(Number).sort()).toEqual(
+      [posts("welcome").id, posts("authorless").id].map(Number).sort(),
+    );
     expect(postsAssoc.isLoaded()).toBe(false);
   });
 
@@ -2254,7 +2258,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await fall.save();
     await fall.reload();
     const fallSections = (await (fall as any).sections.toArray()).sort(
-      (a: any, b: any) => a.id - b.id,
+      (a: any, b: any) => Number(a.id) - Number(b.id),
     );
     const expectedIds = sections.map((s: any) => s.id).sort();
     expect(fallSections.map((s: any) => s.id).sort()).toEqual(expectedIds);
@@ -2308,7 +2312,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(blogPostsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
 
     expect(blogPostIds.length).toBeGreaterThan(0);
-    expect([...blogPostIds].sort()).toEqual([...expectedBlogPostIds].sort());
+    expect([...blogPostIds].map(Number).sort()).toEqual(
+      [...expectedBlogPostIds].map(Number).sort(),
+    );
   });
 
   it("loading cpk association with unpersisted owner", async () => {
