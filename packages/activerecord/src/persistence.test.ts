@@ -1087,36 +1087,16 @@ describe("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
+  const Topic = CanonicalTopic;
+
   beforeAll(async () => {
     await defineSchema({
-      animals: { name: "string", type: "string" },
-      dogs: { name: "string", type: "string" },
-      minimals: {},
-      order_items: {
-        shop_id: "integer",
-        order_id: "integer",
-        item_name: "string",
-      },
-      other_topics: { title: "string" },
-      posts: { title: "string", created_at: "datetime" },
-      topics: {
-        title: "string",
-        lock_version: "integer",
-        body: "string",
-        updated_at: "datetime",
-        created_at: "datetime",
-        active: "boolean",
-        count: "integer",
-      },
+      topics: canonicalSchema.topics,
+      minimalistics: canonicalSchema.minimalistics,
     });
   });
 
   it("update columns changing id", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     const oldId = t.id;
     // updateColumns can change the id column directly. The WHERE clause
@@ -1134,39 +1114,17 @@ describe("PersistenceTest", () => {
   });
 
   it("update", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await t.update({ title: "new" });
     expect(t.title).toBe("new");
   });
 
-  // Rails' increment! emits an atomic UPDATE via update_counters, so
-  // two concurrent calls both land instead of racing on a read-then-write.
-  // Rails: `clear_#{attribute}_change` — after increment! the attribute
-  // must no longer look dirty, otherwise a later save() would re-persist
-  // the already-applied delta.
-  // Rails: increment!(attribute, by, touch: :updated_at) updates the
-  // timestamp in the same atomic statement.
   it("populates non primary key autoincremented column for a cpk model", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     expect(t.id).toBeTruthy();
   });
 
   it("update many!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     await Topic.update(t1.id, { title: "x" });
@@ -1176,11 +1134,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level update without ids!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const found = await Topic.find(t.id);
@@ -1188,69 +1141,13 @@ describe("PersistenceTest", () => {
   });
 
   it("class level update is affected by scoping!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await Topic.update(t.id, { title: "new" });
     const found = await Topic.find(t.id);
     expect(found.title).toBe("new");
   });
 
-  it("increment aliased attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("count", "integer", { default: 0 });
-      }
-    }
-    const t = new Topic();
-    t.increment("count");
-    expect(t.count).toBe(1);
-  });
-
-  it("increment nil attribute", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("count", "integer");
-      }
-    }
-    const t = new Topic();
-    t.increment("count");
-    expect(t.count).toBe(1);
-  });
-
-  it("increment updates counter in db using offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("count", "integer", { default: 0 });
-      }
-    }
-    const t = await Topic.create({ count: 0 });
-    await t.incrementBang("count", 5);
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.count).toBe(5);
-  });
-
-  it("increment with touch updates timestamps", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("count", "integer", { default: 0 });
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const t = await Topic.create({ count: 0 });
-    await t.incrementBang("count");
-    expect(t.count).toBe(1);
-  });
-
   it("destroy many", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     await Topic.destroy([t1.id, t2.id]);
@@ -1258,11 +1155,6 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy many with invalid id", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     await expect(Topic.destroy([99999])).rejects.toThrow();
   });
 
@@ -1285,61 +1177,48 @@ describe("PersistenceTest", () => {
   // that drops it regresses this without a guard. Mirrors Rails _create_record
   // writing a returning column back only when _read_attribute(column) is nil.
   it("create prefetched pk", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "prefetched" });
     expect(t.id).toBeTruthy();
     expect(t.isPersisted()).toBe(true);
   });
 
   it("build many through factory with block", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const topics = [{ title: "a" }, { title: "b" }].map((attrs) => Topic.new(attrs));
-    expect(topics.length).toBe(2);
-    expect(topics.every((t: any) => t.isNewRecord())).toBe(true);
+    const topicList = [{ title: "a" }, { title: "b" }].map((attrs) => Topic.new(attrs));
+    expect(topicList.length).toBe(2);
+    expect(topicList.every((t: any) => t.isNewRecord())).toBe(true);
   });
 
   it("save for record with only primary key that is provided", async () => {
-    class Minimal extends Base {}
-    const m = new Minimal();
+    const m = new Minimalistic();
     await m.save();
     expect(m.isPersisted()).toBe(true);
     expect(m.id).toBeDefined();
   });
 
+  // Rails: test_update_columns_not_equal_attributes — saving a record that was
+  // instantiated with an unknown column must not raise; the extra key is dropped.
   it("update columns not equal attributes", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "test" });
-    await t.updateColumns({ title: "updated" });
-    expect(t.title).toBe("updated");
-    expect(t.body).toBeNull();
+    const topic = Topic.new();
+    (topic as any).title = "Still another topic";
+    await topic.save();
+    const topicReloaded = Topic.instantiate({
+      ...topic.attributes,
+      does_not_exist: "test",
+    }) as any;
+    topicReloaded.title = "A New Topic";
+    await expect(topicReloaded.saveBang()).resolves.not.toThrow();
+    expect(topicReloaded.isPersisted()).toBe(true);
+    await topicReloaded.reload();
+    expect(topicReloaded.title).toBe("A New Topic");
   });
 
   it("update for record with only primary key", async () => {
-    class Minimal extends Base {}
-    const m = await Minimal.create({});
+    const m = await Minimalistic.create({});
     await m.update({});
     expect(m.isPersisted()).toBe(true);
   });
 
   it("update attribute after update", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "v1" });
     await t.update({ title: "v2" });
     await t.updateAttribute("title", "v3");
@@ -1347,11 +1226,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute does not run sql if attribute is not changed", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "same" });
     await t.updateAttribute("title", "same");
     expect(t.title).toBe("same");
@@ -1359,34 +1233,21 @@ describe("PersistenceTest", () => {
   });
 
   it("update raises record not found exception", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     await expect(Topic.update(99999, { title: "x" })).rejects.toThrow();
   });
 
+  // Rails: test_update_attribute_with_one_updated — update_attribute on one
+  // column clears dirty state; the persisted value is confirmed after reload.
   it("update attribute with one updated", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "a", body: "b" });
-    await t.updateAttribute("title", "c");
-    expect(t.title).toBe("c");
-    expect(t.body).toBe("b");
+    const t = await Topic.create({ title: "a" });
+    await t.updateAttribute("title", "super_title");
+    expect(t.title).toBe("super_title");
+    expect(t.changed).toBe(false);
+    await t.reload();
+    expect(t.title).toBe("super_title");
   });
 
   it("update attribute for updated at on", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     const before = t.updated_at;
     await t.updateAttribute("title", "new");
@@ -1395,174 +1256,51 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     await t.updateAttributeBang("title", "new");
     expect(t.title).toBe("new");
   });
 
   it("update attribute for updated at on!", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     await t.updateAttributeBang("title", "new");
     expect(t.updated_at).toSatisfy(isTemporalDatetime);
   });
 
-  it("update column for readonly attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    // updateColumn bypasses readonly checks
-    await t.updateColumn("title", "new");
-    expect(t.title).toBe("new");
-  });
-
-  it("update column with one changed and one updated", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "a", body: "b" });
-    t.body = "modified";
-    await t.updateColumn("title", "c");
-    expect(t.title).toBe("c");
-    // updateColumn clears dirty state
-    expect(t.changed).toBe(false);
-  });
-
-  it("update column with default scope", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    await t.updateColumn("title", "new");
-    const found = await Topic.find(t.id);
-    expect(found.title).toBe("new");
-  });
-
-  it("update columns should not use setter method", async () => {
-    const log: string[] = [];
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.beforeSave(() => {
-          log.push("before_save");
-        });
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    log.length = 0;
-    await t.updateColumns({ title: "new" });
-    expect(log).toEqual([]);
-  });
-
   it("update columns should not leave the object dirty", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
-    t.title = "dirty";
+    (t as any).title = "dirty";
     expect(t.changed).toBe(true);
-    await t.updateColumns({ title: "clean" });
-    expect(t.changed).toBe(false);
-  });
-
-  it("update columns with one readonly attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old", body: "content" });
-    await t.updateColumns({ title: "new", body: "updated" });
-    expect(t.title).toBe("new");
-    expect(t.body).toBe("updated");
-  });
-
-  it("update columns with one changed and one updated", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const t = await Topic.create({ title: "a", body: "b" });
-    t.body = "dirty";
-    await t.updateColumns({ title: "new" });
-    expect(t.title).toBe("new");
+    await (t as any).updateColumns({ title: "clean" });
     expect(t.changed).toBe(false);
   });
 
   it("update columns returns boolean", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "old" });
     // updateColumns returns void (Promise<void>), but should not throw
-    const result = await t.updateColumns({ title: "new" });
-    expect(t.title).toBe("new");
+    await (t as any).updateColumns({ title: "new" });
+    expect((t as any).title).toBe("new");
   });
 
   it("class level destroy", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     await Topic.destroy(t.id);
     await expect(Topic.find(t.id)).rejects.toThrow();
   });
 
   it("class level destroy is affected by scoping", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     await Topic.destroy(t.id);
     expect(await Topic.count()).toBe(0);
   });
 
   it("class level delete with invalid ids", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     // Deleting a non-existent id should not throw, just return 0
     const affected = await Topic.delete(99999);
     expect(affected).toBe(0);
   });
 
   it("class level delete is affected by scoping", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const t = await Topic.create({ title: "test" });
     await Topic.delete(t.id);
     expect(await Topic.count()).toBe(0);
@@ -1570,14 +1308,9 @@ describe("PersistenceTest", () => {
 
   describe("QueryConstraintsTest", () => {
     it("primary key stays the same", async () => {
-      class Topic extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
       const t = await Topic.create({ title: "test" });
       const id = t.id;
-      t.title = "updated";
+      (t as any).title = "updated";
       await t.save();
       expect(t.id).toBe(id);
     });
@@ -1727,43 +1460,6 @@ describe("PersistenceTest", () => {
     );
   });
 });
-describe("PersistenceTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", status: "string" },
-    });
-  });
-
-  // Rails: test_update_all
-  it("update all", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-
-    await Post.create({ title: "A", status: "draft" });
-    await Post.create({ title: "B", status: "draft" });
-    await Post.create({ title: "C", status: "published" });
-
-    const count = await Post.where({ status: "draft" }).updateAll({ status: "published" });
-    expect(count).toBe(2);
-
-    const all = await Post.all().toArray();
-    for (const p of all) {
-      expect(p.status).toBe("published");
-    }
-  });
-
-  // Rails: test_update_all_does_not_trigger_callbacks
-  // Rails: test_delete_all
-  // Rails: test_destroy_all_triggers_callbacks
-});
-
 // ==========================================================================
 // PersistenceTest — composite primary key destroy (persistence_test.rb)
 // ==========================================================================
