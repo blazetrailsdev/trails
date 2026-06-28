@@ -34,6 +34,7 @@ async function withTestSchema(
 ): Promise<void> {
   const { drop = true } = options;
   const oldSearchPath = await adapter.schemaSearchPath();
+  await adapter.dropSchema(name, { ifExists: true });
   await adapter.createSchema(name);
   await adapter.setSchemaSearchPath(`${name}, public`);
   try {
@@ -258,6 +259,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rails uses create_schema + ensure { drop_schema } without changing search_path.
     // withTestSchema is intentionally NOT used here — qualified names are used throughout.
     it("enum type explicit schema", async () => {
+      await adapter.dropSchema("test_schema", { ifExists: true });
       await adapter.createSchema("test_schema");
       try {
         await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
@@ -280,6 +282,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump scoped to schemas", async () => {
+      await adapter.dropSchema("other_schema", { ifExists: true });
       await adapter.createSchema("other_schema");
       try {
         await adapter.createEnum("other_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
@@ -303,7 +306,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(output).not.toContain("other_schema.mood_in_other_schema");
         });
       } finally {
-        await adapter.dropSchema("other_schema", {});
+        await adapter.dropSchema("other_schema", { ifExists: true });
       }
     });
 
@@ -344,7 +347,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(col).toBeDefined();
         expect(col!.sqlType).toBe("test_schema.mood_in_test_schema");
       } finally {
-        await adapter.dropSchema("test_schema", {});
+        await adapter.dropSchema("test_schema", { ifExists: true });
       }
     });
   });
