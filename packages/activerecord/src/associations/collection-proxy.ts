@@ -2650,12 +2650,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // association scope and remove MORE rows than the caller constrained, so
       // go through `super.*`.
       const diverged = this._relationStateDiverged();
+      let count: number;
       if (deleteRows) {
-        await (diverged ? super.deleteAll() : this.scope().deleteAll());
+        count = await (diverged ? super.deleteAll() : this.scope().deleteAll());
       } else {
         const nullUpdates = this._buildNullifyUpdates();
-        await (diverged ? super.updateAll(nullUpdates) : this.scope().updateAll(nullUpdates));
+        count = await (diverged
+          ? super.updateAll(nullUpdates)
+          : this.scope().updateAll(nullUpdates));
       }
+      // Rails `delete_records` else-branch: update_counter(-delete_count). The
+      // bulk DELETE/UPDATE bypasses the child's belongs_to callbacks, so decrement
+      // the owner's counter cache by the affected count here (matching the
+      // per-record `delete` path). `clear` collapses `:destroy` to a bulk delete,
+      // so this fires for delete_all/nullify alike, never the gated destroy branch.
+      if (count > 0) await this._decrementCounterCache(count);
       this._removeFromTarget(records);
       this._invalidateAssociationIds();
     });
