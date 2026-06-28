@@ -759,24 +759,22 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # On the spike branch `existing-db-schema-rc-9807c5`, AR_ONE_SCHEMA/DDL_PROFILE
-      # turn this existing lane into the one-schema discovery run (no-drop mode +
-      # DDL profiling). The expressions resolve to "" on every other PR/branch, so
-      # this is a no-op there. Discovery steps below upload the candidate exclude
-      # list + DROP-count aggregate. Remove this wiring once the exclude list is
-      # populated and the permanent behavior is decided.
-      - name: AR suite (one-schema on spike branch)
+      # AR suite runs in one-schema (no-drop) mode: AR_ONE_SCHEMA=1 lays the
+      # canonical schema once and truncates between tests instead of dropping.
+      # DDL_PROFILE + the discovery steps below publish the candidate exclude
+      # list and the residual DROP-count aggregate as artifacts.
+      - name: AR suite (one-schema)
         env:
-          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
-          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          AR_ONE_SCHEMA: "1"
+          DDL_PROFILE: "1"
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: One-schema discovery report
+        if: always()
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
             > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
@@ -784,8 +782,8 @@ jobs:
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
           echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
-      - name: Upload one-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: Upload one-schema discovery
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: one-schema-discovery-sqlite
@@ -995,25 +993,24 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
-      # branch only (expressions resolve to "" elsewhere — no-op). Postgres is
-      # where teardown DROP TABLE dominates suite time, so the DROP-count
-      # aggregate uploaded below is the headline signal.
-      - name: AR suite (one-schema on spike branch)
+      # One-schema (no-drop) mode. Postgres is where teardown DROP TABLE
+      # dominates suite time, so the DROP-count aggregate uploaded below is the
+      # headline signal.
+      - name: AR suite (one-schema)
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
-          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
-          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          AR_ONE_SCHEMA: "1"
+          DDL_PROFILE: "1"
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: One-schema discovery report
+        if: always()
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
             > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
@@ -1021,8 +1018,8 @@ jobs:
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
           echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
-      - name: Upload one-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: Upload one-schema discovery
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: one-schema-discovery-postgres
@@ -1140,24 +1137,23 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
-      # branch only (expressions resolve to "" elsewhere — no-op). MariaDB is the
-      # other DDL-dominated lane, so its DROP-count aggregate is a headline signal.
-      - name: AR suite (one-schema on spike branch)
+      # One-schema (no-drop) mode. MariaDB is the other DDL-dominated lane, so
+      # its DROP-count aggregate is a headline signal.
+      - name: AR suite (one-schema)
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
-          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
-          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          AR_ONE_SCHEMA: "1"
+          DDL_PROFILE: "1"
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
           mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: One-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: One-schema discovery report
+        if: always()
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
             > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
@@ -1165,8 +1161,8 @@ jobs:
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
           echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
-      - name: Upload one-schema discovery (spike branch only)
-        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+      - name: Upload one-schema discovery
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: one-schema-discovery-maria
