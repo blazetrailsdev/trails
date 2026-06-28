@@ -144,7 +144,12 @@ export async function repairWorkerSchema(
 
   const { defineSchema } = await import("./define-schema.js");
   for (const table of drifted) {
-    await defineSchema(adapter, { [table]: canonical[table] }, { dropExisting: true });
+    // `force: true` so this recovery actually issues DDL under AR_ONE_SCHEMA=1
+    // (where per-file defineSchema is a no-op). Repair is a boot-time recovery
+    // path — when a legitimate DDL test drops/reshapes a canonical table, this
+    // restores it for the next file; without forcing, the no-op would leave the
+    // table missing and every later file on the worker would fail boot.
+    await defineSchema(adapter, { [table]: canonical[table] }, { dropExisting: true, force: true });
   }
   return drifted;
 }
