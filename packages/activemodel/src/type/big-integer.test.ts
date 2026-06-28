@@ -87,10 +87,18 @@ describe("BigIntegerTest", () => {
     expect((type as unknown as { maxValue(): number }).maxValue()).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("no range error for absurdly large values", () => {
+  it("no range error for absurdly large values on standalone type", () => {
     const type = new BigIntegerType();
     const huge = BigInt("9".repeat(100));
     expect(() => type.serialize(huge)).not.toThrow();
+  });
+
+  it("raises RangeError for values outside [-2^63, 2^63-1] when limit is set", () => {
+    const type = new BigIntegerType({ limit: 8 });
+    expect(() => type.serialize(9223372036854775808n)).toThrowError(/out of range/);
+    expect(() => type.serialize(-(1n << 63n) - 1n)).toThrowError(/out of range/);
+    expect(type.serialize((1n << 63n) - 1n)).toBe((1n << 63n) - 1n);
+    expect(type.serialize(-(1n << 63n))).toBe(-(1n << 63n));
   });
 
   it("blank string casts to null", () => {
