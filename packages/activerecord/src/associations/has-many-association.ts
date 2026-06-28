@@ -3,6 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordInvalid } from "../validations.js";
+import { RecordNotDestroyed } from "../errors.js";
 import { CollectionAssociation } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
@@ -66,7 +67,17 @@ export class HasManyAssociation extends CollectionAssociation {
         for (const record of records) {
           (record as any).destroyedByAssociation = this.reflection;
         }
-        await this.destroyAll();
+        // Rails: rescues RecordNotDestroyed from destroy!, adds error to owner,
+        // and throws :abort to halt the owner's destroy (returns false).
+        try {
+          await this.destroyAll();
+        } catch (e) {
+          if (e instanceof RecordNotDestroyed) {
+            (this.owner as any).errors?.add("base", e.message);
+            return false;
+          }
+          throw e;
+        }
         break;
       }
 

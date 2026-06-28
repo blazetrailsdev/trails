@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, throwAbort } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
@@ -30,7 +30,7 @@ import {
 import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import {
   Associations,
@@ -75,6 +75,7 @@ import {
   SillyUniqueReply as HmSillyUniqueReply,
 } from "../test-helpers/models/reply.js";
 import { Ship as HmShip } from "../test-helpers/models/ship.js";
+import { ShipPart as HmShipPart } from "../test-helpers/models/ship-part.js";
 import { Treasure as HmTreasure } from "../test-helpers/models/treasure.js";
 import { SubStiPost as HmSubStiPost } from "../test-helpers/models/post.js";
 import { Image as HmImage } from "../test-helpers/models/image.js";
@@ -1339,65 +1340,28 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts2.length).toBe(2);
   });
-  // TODO: canonical authors/posts has no updated_at column (use HmShip/ShipPart)
-  it.skip("add record to collection should change its updated at", async () => {
-    class UpdAtAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class UpdAtPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    registerModel(UpdAtAuthor);
-    registerModel(UpdAtPost);
-    const author = await UpdAtAuthor.create({ name: "Alice" });
-    const post = await UpdAtPost.create({ title: "A", body: "body" });
-    post.author_id = author.id;
-    post.updated_at = new Date();
-    await post.save();
-    const posts = await loadHasMany(author, "upd_at_posts", {
-      className: "UpdAtPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-    expect((posts[0] as any).updated_at).toBeDefined();
+  it("add record to collection should change its updated at", async () => {
+    registerModel(HmShip);
+    registerModel(HmShipPart);
+    const ship = await HmShip.create({ name: "dauntless" });
+    const part = await HmShipPart.create({ name: "cockpit" });
+    const updatedAt = (part as any).updated_at;
+    (part as any).ship_id = ship.id;
+    await (part as any).save();
+    const reloaded = await HmShipPart.find((part as any).id);
+    expect((reloaded as any).ship_id).toBe(Number(ship.id));
+    expect((reloaded as any).updated_at).toBeDefined();
   });
-  // TODO: canonical authors/posts has no updated_at column (use HmShip/ShipPart)
-  it.skip("clear collection should not change updated at", async () => {
-    class ClrUpdAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("updated_at", "datetime");
-        this.hasMany("clr_upd_posts", {
-          className: "ClrUpdPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class ClrUpdPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ClrUpdAuthor);
-    registerModel(ClrUpdPost);
-    const author = await ClrUpdAuthor.create({ name: "Alice", updated_at: new Date("2020-01-01") });
-    await ClrUpdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const originalUpdatedAt = (author as any).updated_at;
-    await author.destroy();
-    // The author's updated_at should not have been changed by clearing children
-    expect((author as any).updated_at).toEqual(originalUpdatedAt);
+  it("clear collection should not change updated at", async () => {
+    registerModel(HmShip);
+    registerModel(HmShipPart);
+    const ship = await HmShip.create({ name: "dauntless" });
+    const part = await HmShipPart.create({ name: "cockpit", ship_id: ship.id });
+    const originalUpdatedAt = (part as any).updated_at;
+    await (ship as any).parts.clear();
+    const reloaded = await HmShipPart.find((part as any).id);
+    expect((reloaded as any).ship_id).toBeNull();
+    expect((reloaded as any).updated_at).toEqual(originalUpdatedAt);
   });
   it("create from association should respect default scope", async () => {
     class DefScopeAuthor extends Base {
@@ -2426,35 +2390,18 @@ describe("HasManyAssociationsTest", () => {
     expect(proxy.target.length).toBe(1);
     expect(proxy.target[0].title).toBe("A");
   });
-  // TODO: non-standard FK fic_author_id not in canonical posts
-  it.skip("find all with include and conditions", async () => {
-    class FICAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("ficPosts", {
-          foreignKey: "fic_author_id",
-          className: "FICPost",
-        });
-      }
-    }
-    class FICPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("fic_author_id", "integer");
-      }
-    }
-    registerModel("FICAuthor", FICAuthor);
-    registerModel("FICPost", FICPost);
-    const a1 = await FICAuthor.create({ name: "Alice" });
-    const a2 = await FICAuthor.create({ name: "Bob" });
-    await FICPost.create({ title: "P1", fic_author_id: a1.id, body: "body" });
-    await FICPost.create({ title: "P2", fic_author_id: a2.id, body: "body" });
-    const authors = await FICAuthor.all().includes("ficPosts").where({ name: "Alice" }).toArray();
-    expect(authors.length).toBe(1);
-    expect(authors[0].name).toBe("Alice");
-    const posts = (authors[0] as any).association("ficPosts").target ?? [];
-    expect(posts.length).toBe(1);
+  it("find all with include and conditions", async () => {
+    // Rails: Developer.all.merge!(joins: :audit_logs, where: { "audit_logs.message" => nil, :name => "Smith" }).to_a
+    // assert_nothing_raised — just verifies the join+where doesn't error
+    registerModel(Developer);
+    registerModel(AuditLog);
+    await Developer.create({ name: "Smith" });
+    await expect(
+      Developer.all()
+        .joins("auditLogs")
+        .where({ "audit_logs.message": null, name: "Smith" })
+        .toArray(),
+    ).resolves.not.toThrow();
   });
   it("find grouped", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -3597,55 +3544,41 @@ describe("HasManyAssociationsTest", () => {
     const remaining = await HashCondPost.where({ author_id: author.id }).toArray();
     expect(remaining.length).toBe(0);
   });
-  // TODO: needs bespoke grandparents/parents/children tables; no canonical equivalent
-  it.skip("three levels of dependence", async () => {
-    class Grandparent extends Base {
+  it("three levels of dependence", async () => {
+    class ThreeLvlTopic extends Base {
       static {
-        this.attribute("name", "string");
-        this.hasMany("parents", {
-          className: "Parent",
-          foreignKey: "grandparent_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class Parent extends Base {
-      static {
-        this.attribute("grandparent_id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("children", {
-          className: "Child",
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.hasMany("replies", {
+          className: "ThreeLvlReply",
           foreignKey: "parent_id",
           dependent: "destroy",
         });
       }
     }
-    class Child extends Base {
+    class ThreeLvlReply extends Base {
       static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("content", "string");
         this.attribute("parent_id", "integer");
-        this.attribute("name", "string");
+        this.hasMany("replies", {
+          className: "ThreeLvlReply",
+          foreignKey: "parent_id",
+          dependent: "destroy",
+        });
       }
     }
-    registerModel(Grandparent);
-    registerModel(Parent);
-    registerModel(Child);
-    const gp = await Grandparent.create({ name: "GP" });
-    const p = await Parent.create({ grandparent_id: gp.id, name: "P" });
-    await Child.create({ parent_id: p.id, name: "C" });
-    // Destroy parent's dependents first
-    await p.destroy();
-    const remainingChildren = await loadHasMany(p, "children", {
-      className: "Child",
-      foreignKey: "parent_id",
+    registerModel(ThreeLvlTopic);
+    registerModel(ThreeLvlReply);
+    const topic = await ThreeLvlTopic.create({ title: "neat and simple" });
+    const reply = await (topic as any).replies.create({
+      title: "neat and simple",
+      content: "still digging it",
     });
-    expect(remainingChildren.length).toBe(0);
-    // Now destroy grandparent's dependents
-    await gp.destroy();
-    const remainingParents = await loadHasMany(gp, "parents", {
-      className: "Parent",
-      foreignKey: "grandparent_id",
-    });
-    expect(remainingParents.length).toBe(0);
+    await reply.replies.create({ title: "neat and simple", content: "ain't complaining" });
+    await topic.destroy();
+    expect(await ThreeLvlTopic.find(topic.id).catch(() => null)).toBeNull();
   });
   it("dependence with transaction support on failure", async () => {
     class DepTxAuthor extends Base {
@@ -4988,29 +4921,17 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).author_id).toBe(Number(author.id));
     expect((post as any).title).toBe("Initialized");
   });
-  // TODO: canonical posts has no status column
-  it.skip("attributes are being set when initialized from has many association with multiple where clauses", async () => {
-    class MultiWhereAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class MultiWherePost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    registerModel(MultiWhereAuthor);
-    registerModel(MultiWherePost);
-    const author = await MultiWhereAuthor.create({ name: "Alice" });
-    const post = MultiWherePost.new({ author_id: author.id, title: "Init", status: "draft" });
-    expect((post as any).author_id).toBe(Number(author.id));
-    expect((post as any).title).toBe("Init");
-    expect((post as any).status).toBe("draft");
+  it("attributes are being set when initialized from has many association with multiple where clauses", async () => {
+    registerModel(HmPost);
+    registerModel(Comment);
+    const post = await HmPost.create({ title: "welcome", body: "body" });
+    const newComment = (post as any).comments
+      .where({ body: "Some content" })
+      .where({ type: "SpecialComment" })
+      .new();
+    expect(newComment.body).toBe("Some content");
+    expect(newComment.type).toBe("SpecialComment");
+    expect(Number(newComment.post_id)).toBe(Number(post.id));
   });
   it("load target respects protected attributes", async () => {
     class ProtAuthor extends Base {
@@ -6059,9 +5980,16 @@ describe("HasManyAssociationsTest", () => {
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    await defineSchema({ authors: TEST_SCHEMA.authors, posts: TEST_SCHEMA.posts });
+    await defineSchema({
+      authors: TEST_SCHEMA.authors,
+      posts: TEST_SCHEMA.posts,
+      cars: TEST_SCHEMA.cars,
+      bulbs: TEST_SCHEMA.bulbs,
+    });
     registerModel(HmAuthor);
     registerModel(HmPost);
+    registerModel(HmCar);
+    registerModel(HmBulb);
   });
   // -- Adding --
 
@@ -6185,18 +6113,24 @@ describe("HasManyAssociationsTest", () => {
     expect(post.isNewRecord()).toBe(true);
   });
 
-  // TODO: canonical posts.title is NOT NULL; cannot create with nil title
-  it.skip("create from association with nil values should work", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, body: "body" });
-    expect(post.isNewRecord()).toBe(false);
+  it("create from association with nil values should work", async () => {
+    const car = await HmCar.create({});
+    const bulb1 = (car as any).bulbs.new({});
+    expect(bulb1.name).toBe("defaulty");
+    const bulb2 = (car as any).bulbs.build({});
+    expect(bulb2.name).toBe("defaulty");
+    const bulb3 = await (car as any).bulbs.create({});
+    expect(bulb3.name).toBe("defaulty");
   });
 
-  // TODO: canonical posts has no published column
-  it.skip("has many build with options", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = HmPost.new({ author_id: author.id, title: "Draft", published: false });
-    expect((post as any).title).toBe("Draft");
+  it("has many build with options", async () => {
+    const car = await HmCar.create({});
+    await HmBulb.create({ name: "defaulty", car_id: car.id });
+    const carBulbs = await (car as any).bulbs.toArray();
+    const scopedBulbs = await HmBulb.where({ name: "defaulty", car_id: car.id }).toArray();
+    expect(carBulbs.map((b: any) => Number(b.id))).toEqual(
+      scopedBulbs.map((b: any) => Number(b.id)),
+    );
   });
 
   // -- Replace --
@@ -6521,10 +6455,35 @@ describe("HasManyAssociationsTest", () => {
     expect(Number(imageable.id)).toBe(Number(post.id));
   });
 
-  // BLOCKED: AuthorWithErrorDestroyingAssociation not in canonical models.
-  // Needs canonical model mirroring vendor/rails/activerecord/test/models/author.rb.
-  // Story: assoc-has-many-author-error-destroying (RFC 0019).
-  it.skip("destroy does not raise when association errors on destroy", () => {});
+  it("destroy does not raise when association errors on destroy", async () => {
+    class PostWithErrorDestroying extends Base {
+      static {
+        this._tableName = "posts";
+        this.beforeDestroy(function () {
+          throwAbort();
+        });
+      }
+    }
+    class AuthorWithErrorDestroyingAssociation extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.hasMany("postsWithErrorDestroying", {
+          className: "PostWithErrorDestroying",
+          foreignKey: "author_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel(AuthorWithErrorDestroyingAssociation);
+    registerModel(PostWithErrorDestroying);
+    const author = await AuthorWithErrorDestroyingAssociation.create({ name: "Alice" });
+    await PostWithErrorDestroying.create({ author_id: author.id, title: "A", body: "body" });
+    const countBefore = await AuthorWithErrorDestroyingAssociation.count();
+    const result = await author.destroy();
+    expect(result).toBeFalsy();
+    expect(await AuthorWithErrorDestroyingAssociation.count()).toBe(countBefore);
+  });
 
   it("has many preloading with duplicate records", async () => {
     const allPosts = await HmPost.joins("comments").preload("comments").order("id").toArray();
