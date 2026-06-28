@@ -51,7 +51,7 @@ async function buildTemplateSchema(
   close: () => Promise<void>,
 ): Promise<void> {
   try {
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(adapter, TEST_SCHEMA, { force: true });
   } finally {
     await close();
   }
@@ -151,7 +151,7 @@ const pgAdapter: DbTemplateAdapter = {
       max: 1,
     }) as unknown as DatabaseAdapter;
     try {
-      await defineSchema(adapter, TEST_SCHEMA);
+      await defineSchema(adapter, TEST_SCHEMA, { force: true });
       // Stamp ar_internal_metadata so every slot cloned from this template
       // reports `schemaUpToDate` → each worker's reconstructFromSchema only
       // TRUNCATEs (no DDL) instead of paying a full purge+reload per test

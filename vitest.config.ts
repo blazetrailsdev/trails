@@ -1,5 +1,18 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import fs from "fs";
+
+// One-schema mode (AR_ONE_SCHEMA=1): the canonical schema is laid down once per
+// worker and never dropped during the run (truncate-only resets). Files that
+// genuinely need a bespoke table shape can't run under this constraint yet, so
+// they're excluded here and tracked as conversion stories. The list is empty
+// when the mode is off (zero behavioral change on normal runs).
+const ONE_SCHEMA_EXCLUDE: string[] =
+  process.env.AR_ONE_SCHEMA === "1"
+    ? (JSON.parse(
+        fs.readFileSync(path.resolve(__dirname, "eslint/one-schema-exclude.json"), "utf8"),
+      ) as string[])
+    : [];
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the vitest worker count
 // via TEST_FORKS below. The advisory-lock slot pool is sized SEPARATELY, with
@@ -316,7 +329,12 @@ export default defineConfig({
         test: {
           name: "activerecord",
           include: ["packages/activerecord/src/**/*.test.ts"],
-          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
+          exclude: [
+            ...SHARED_EXCLUDE,
+            ...ADAPTER_SPECIFIC_EXCLUDE,
+            ...SQLITE_DRIVER_TESTS,
+            ...ONE_SCHEMA_EXCLUDE,
+          ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.

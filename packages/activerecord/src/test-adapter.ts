@@ -19,6 +19,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { canonicalTableNames, oneSchemaMode } from "./test-helpers/one-schema.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
 
@@ -290,6 +291,18 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
 export async function resetTestAdapterState(): Promise<void> {
   await _pool.withConnection(
     async (adapter) => {
+      if (oneSchemaMode()) {
+        // One-schema mode: the canonical tables were laid into the slot DB
+        // once at boot and must survive the whole run. Truncate them instead
+        // of dropping (no DDL), and leave the signature cache + schema cache
+        // intact so the next file's defineSchema(TEST_SCHEMA) stays a cache hit.
+        const a = adapter as typeof adapter & {
+          truncateTables?: (...names: string[]) => Promise<void>;
+        };
+        if (a.truncateTables) await a.truncateTables(...canonicalTableNames());
+        Base._modelsByName.clear();
+        return;
+      }
       await dropAllTables(adapter);
       // Clear schema cache on all live pool connections (mirrors Rails'
       // ConnectionPool#clear_cache!). Tests that construct raw adapters directly

@@ -91,6 +91,14 @@ export type Schema = Record<string, TableSchema>;
 
 export interface DefineSchemaOpts {
   dropExisting?: boolean;
+  /**
+   * Force real DDL even under `AR_ONE_SCHEMA=1`. Boot-time builders (the
+   * template-global-setup that lays the canonical schema into the template
+   * DB) set this so the one-schema no-op guard doesn't suppress the very
+   * `CREATE TABLE`s the run depends on. Test files never set it.
+   * @internal
+   */
+  force?: boolean;
 }
 
 /** @internal */
@@ -578,6 +586,23 @@ export async function defineSchema(
     warm = true;
   }
 
+  if (process.env.AR_ONE_SCHEMA === "1" && !resolvedOpts?.force) {
+    // One-schema mode: the canonical tables already exist (laid down once at
+    // boot) and must never be dropped or reshaped mid-run. Verify the request
+    // only names canonical tables/columns — a deviation throws so the file is
+    // excluded — then return without issuing any DDL. A partial request (fewer
+    // tables/columns than canonical) is intentionally a no-op: the full
+    // canonical table stays in place. Imported lazily to avoid a load cycle.
+    const { assertCanonicalSchema } = await import("./one-schema.js");
+    assertCanonicalSchema(schema);
+    if (warm) {
+      // Keep the model-facing form's cache-warming contract: reflect each
+      // requested canonical table so synchronous columnsHash()/columnNames()
+      // take the DB-sourced branch, exactly as the normal path does on a hit.
+      for (const table of Object.keys(schema)) await _warmSchemaCache(adapter, table);
+    }
+    return;
+  }
   return _defineSchemaImpl(adapter, schema, resolvedOpts, warm);
 }
 
