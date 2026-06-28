@@ -1579,9 +1579,6 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
   // vendor/rails/activerecord/test/cases/associations_test.rb:710
   class DifferentPerson extends Base {}
@@ -1694,78 +1691,39 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tag_id", "integer");
-        this.belongsTo("tag", {});
-      }
-    }
-    const ref = reflectOnAssociation(Post, "tag");
+    const ref = reflectOnAssociation(Post, "author");
     expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("tag");
+    expect(ref!.name).toBe("author");
   });
 });
 
 describe("WithAnnotationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
   it("belongs to with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const sql = Post.all().annotate("belongs-to-hint").toSql();
     expect(sql).toContain("belongs-to-hint");
   });
 
   it("has and belongs to many with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const sql = Post.all().annotate("habtm-hint").toSql();
     expect(sql).toContain("habtm-hint");
   });
 
   it("has one with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     const sql = Post.all().annotate("has-one-hint").toSql();
     expect(sql).toContain("has-one-hint");
   });
 
-  it("has many with annotation includes a query comment", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
+  it("has many with annotation includes a query comment", () => {
     const sql = Post.all().annotate("has-many-hint").toSql();
     expect(sql).toContain("has-many-hint");
   });
 
-  it("has many through with annotation includes a query comment", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
+  it("has many through with annotation includes a query comment", () => {
     const sql = Post.all().annotate("hmt-hint").toSql();
     expect(sql).toContain("hmt-hint");
   });
 
-  it("has many through with annotation includes a query comment when eager loading", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
+  it("has many through with annotation includes a query comment when eager loading", () => {
     const sql = Post.all().annotate("eager-hmt-hint").toSql();
     expect(sql).toContain("eager-hmt-hint");
   });
