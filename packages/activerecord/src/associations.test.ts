@@ -75,20 +75,14 @@ describe("AssociationsTest", () => {
 
   it("loading cpk association when persisted and in memory differ", async () => {
     // Mirrors vendor/rails/activerecord/test/cases/associations_test.rb:84
+    // book is created THROUGH order.books so it lives in the association's
+    // in-memory target before the reload — exercises the CPK reconciliation path.
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
-    const shopId = (order.id as [number, number])[0];
-    const orderId = (order.id as [number, number])[1];
-    const book = await CpkBook.create({
-      shop_id: shopId,
-      order_id: orderId,
-      author_id: 3,
-      id: 4,
-      title: "Book",
-    });
-    // Update the book behind the in-memory instance so DB and in-memory diverge
+    const book = await (order as any).books.create({ author_id: 3, id: 4, title: "Book" });
+    // Update the book in DB behind the in-memory instance so persisted/in-memory diverge
     const dbBook = await CpkBook.where({ author_id: 3, id: 4 }).first();
     await dbBook!.updateColumns({ title: "A different title" });
-    // Reload the association
+    // Reload the association — must reconcile the existing in-memory book by CPK
     await (order as any).books.load();
     // CPK identity of the in-memory book is preserved after reload
     expect(book.id).toEqual([3, 4]);
