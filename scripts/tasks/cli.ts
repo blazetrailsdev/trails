@@ -213,9 +213,36 @@ export function nextBundle(
   index: Index,
   opts: { maxLoc: number; cluster?: string; rfc?: string },
 ): StoryEntry[] {
-  const candidates = ready(index, { rfc: opts.rfc })
-    .filter((s) => s.est_loc !== null)
-    .filter((s) => (opts.cluster ? s.cluster === opts.cluster : true));
+  const inScope = ready(index, { rfc: opts.rfc }).filter((s) =>
+    opts.cluster ? s.cluster === opts.cluster : true,
+  );
+  // Priority overrides cluster-LOC packing. The legend says "lower N = higher
+  // priority"; honor it literally — any prioritized story outranks every
+  // unprioritized one, regardless of cluster or how well it fills the budget.
+  // The loop takes stories[0], so the head must be the globally-highest
+  // priority candidate; we then fill the rest of the budget from that story's
+  // cluster (so a prioritized cluster still bundles together). A prioritized
+  // story is an explicit "do this" signal, so it leads even when it has no
+  // est_loc (treated as 0 for the budget) — the missing-estimate exclusion
+  // below is only for the unprioritized knapsack path. Absent any priorities
+  // this branch is skipped and the original packing runs unchanged.
+  const prioritized = inScope
+    .filter((s) => s.priority !== null)
+    .sort((a, b) => (a.priority as number) - (b.priority as number));
+  if (prioritized.length > 0) {
+    const lead = prioritized[0];
+    const leadLoc = lead.est_loc ?? 0;
+    const rest = inScope.filter(
+      (s) => s.id !== lead.id && s.cluster === lead.cluster && s.est_loc !== null,
+    );
+    const fill = bestBundle(rest, opts.maxLoc - leadLoc).sort(
+      (a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity),
+    );
+    return [lead, ...fill];
+  }
+  // Unprioritized path: knapsack same-cluster stories by est_loc, so stories
+  // without an estimate can't be packed and are excluded here.
+  const candidates = inScope.filter((s) => s.est_loc !== null);
   // Use Map<string | null, ...> so `null` (unclustered) stays distinct
   // from any real cluster name, even one literally called "_none".
   const byCluster = new Map<string | null, StoryEntry[]>();
