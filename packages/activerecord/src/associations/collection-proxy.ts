@@ -2543,7 +2543,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       updates[foreignKey] = null;
     }
-    if (asName) updates[`${underscore(asName)}_type`] = null;
+    if (asName) updates[this._assocDef.options.foreignType ?? `${underscore(asName)}_type`] = null;
     return updates;
   }
 
