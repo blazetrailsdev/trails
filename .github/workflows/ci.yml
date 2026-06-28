@@ -759,66 +759,42 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
-      - run: pnpm vitest run packages/activerecord-cli
-
-  # One-schema discovery (temporary, branch-scoped). Runs the sqlite AR suite
-  # under AR_ONE_SCHEMA=1 to enumerate which files can't yet run under the
-  # no-drop constraint. Non-blocking (continue-on-error, off the `ci` needs
-  # graph) and gated to the spike branch so it never burns CI on other PRs.
-  # Uploads the candidate exclude list (parsed from the vitest JSON report) and
-  # the DDL drop-count aggregate as artifacts; remove this job once the exclude
-  # list is populated and a permanent lane (if any) is decided.
-  one-schema-discovery:
-    name: One-Schema Discovery (sqlite, reporting-only)
-    needs: changes
-    if: github.ref == 'refs/heads/existing-db-schema-rc-9807c5'
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - uses: ./.github/actions/cache-build
-      - run: pnpm build
-      - name: Run AR suite under AR_ONE_SCHEMA=1
-        continue-on-error: true
+      # On the spike branch `existing-db-schema-rc-9807c5`, AR_ONE_SCHEMA/DDL_PROFILE
+      # turn this existing lane into the one-schema discovery run (no-drop mode +
+      # DDL profiling). The expressions resolve to "" on every other PR/branch, so
+      # this is a no-op there. Discovery steps below upload the candidate exclude
+      # list + DROP-count aggregate. Remove this wiring once the exclude list is
+      # populated and the permanent behavior is decided.
+      - name: AR suite (one-schema on spike branch)
         env:
-          AR_ONE_SCHEMA: "1"
-          DDL_PROFILE: "1"
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
           DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
         run: |
-          mkdir -p "$DDL_PROFILE_OUT_DIR"
+          mkdir -p "${{ runner.temp }}/ddlprof"
           pnpm vitest run packages/activerecord/ \
             --reporter=default --reporter=json \
             --outputFile.json="${{ runner.temp }}/one-schema-report.json"
-      - name: Parse candidate exclude list
-        if: always()
+      - name: One-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
         run: |
           node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
             > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
-          echo "::group::Candidate exclude list"
-          cat "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
-          echo "::endgroup::"
-      - name: Aggregate DDL profile (DROP-count signal)
-        if: always()
-        run: |
+          echo "::group::Candidate exclude list"; cat "${{ runner.temp }}/one-schema-exclude.candidate.json" || true; echo "::endgroup::"
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
-          echo "::group::DDL aggregate"
-          cat "${{ runner.temp }}/ddl-aggregate.txt" || true
-          echo "::endgroup::"
-      - name: Upload discovery artifacts
-        if: always()
+          echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
+      - name: Upload one-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
         uses: actions/upload-artifact@v4
         with:
-          name: one-schema-discovery
+          name: one-schema-discovery-sqlite
           path: |
             ${{ runner.temp }}/one-schema-report.json
             ${{ runner.temp }}/one-schema-exclude.candidate.json
             ${{ runner.temp }}/ddl-aggregate.txt
           if-no-files-found: warn
+      - run: pnpm vitest run packages/activerecord-cli
 
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
@@ -1019,11 +995,42 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
+      # branch only (expressions resolve to "" elsewhere — no-op). Postgres is
+      # where teardown DROP TABLE dominates suite time, so the DROP-count
+      # aggregate uploaded below is the headline signal.
+      - name: AR suite (one-schema on spike branch)
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
+        run: |
+          mkdir -p "${{ runner.temp }}/ddlprof"
+          pnpm vitest run packages/activerecord/ \
+            --reporter=default --reporter=json \
+            --outputFile.json="${{ runner.temp }}/one-schema-report.json"
+      - name: One-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+        run: |
+          node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
+            > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
+          echo "::group::Candidate exclude list"; cat "${{ runner.temp }}/one-schema-exclude.candidate.json" || true; echo "::endgroup::"
+          node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
+          echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
+      - name: Upload one-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+        uses: actions/upload-artifact@v4
+        with:
+          name: one-schema-discovery-postgres
+          path: |
+            ${{ runner.temp }}/one-schema-report.json
+            ${{ runner.temp }}/one-schema-exclude.candidate.json
+            ${{ runner.temp }}/ddl-aggregate.txt
+          if-no-files-found: warn
       - run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
@@ -1133,11 +1140,41 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      # AR_ONE_SCHEMA/DDL_PROFILE activate the no-drop discovery run on the spike
+      # branch only (expressions resolve to "" elsewhere — no-op). MariaDB is the
+      # other DDL-dominated lane, so its DROP-count aggregate is a headline signal.
+      - name: AR suite (one-schema on spike branch)
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
+          AR_ONE_SCHEMA: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE: ${{ (github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5') && '1' || '' }}
+          DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
+        run: |
+          mkdir -p "${{ runner.temp }}/ddlprof"
+          pnpm vitest run packages/activerecord/ \
+            --reporter=default --reporter=json \
+            --outputFile.json="${{ runner.temp }}/one-schema-report.json"
+      - name: One-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+        run: |
+          node scripts/ci/one-schema-discovery.mjs "${{ runner.temp }}/one-schema-report.json" \
+            > "${{ runner.temp }}/one-schema-exclude.candidate.json" || true
+          echo "::group::Candidate exclude list"; cat "${{ runner.temp }}/one-schema-exclude.candidate.json" || true; echo "::endgroup::"
+          node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            > "${{ runner.temp }}/ddl-aggregate.txt" 2>&1 || true
+          echo "::group::DDL aggregate"; cat "${{ runner.temp }}/ddl-aggregate.txt" || true; echo "::endgroup::"
+      - name: Upload one-schema discovery (spike branch only)
+        if: always() && github.event_name == 'pull_request' && github.head_ref == 'existing-db-schema-rc-9807c5'
+        uses: actions/upload-artifact@v4
+        with:
+          name: one-schema-discovery-maria
+          path: |
+            ${{ runner.temp }}/one-schema-report.json
+            ${{ runner.temp }}/one-schema-exclude.candidate.json
+            ${{ runner.temp }}/ddl-aggregate.txt
+          if-no-files-found: warn
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
