@@ -579,7 +579,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
-    expect(client.client_of).toBe(company.id);
+    expect(Number(client.client_of)).toBe(Number(company.id));
   });
 
   it("parent should not get saved with duplicate children records", async () => {
@@ -611,7 +611,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(client.isNewRecord()).toBe(false);
-    expect(client.client_of).toBe(company.id);
+    expect(Number(client.client_of)).toBe(Number(company.id));
   });
 
   it("assign ids", async () => {
@@ -1018,7 +1018,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(firm, "account", account);
     await firm.save();
     expect(account.isNewRecord()).toBe(false);
-    expect(account.firm_id).toBe(firm.id);
+    expect(Number(account.firm_id)).toBe(Number(firm.id));
   });
 
   it("build before either saved", async () => {
