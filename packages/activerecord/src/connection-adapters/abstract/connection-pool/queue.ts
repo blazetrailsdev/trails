@@ -10,7 +10,7 @@
  * internal array (if fairness allows) or creates a new waiter promise.
  */
 
-import type { DatabaseAdapter } from "../../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
 

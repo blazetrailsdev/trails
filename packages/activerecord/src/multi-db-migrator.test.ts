@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 async function makeSqliteAdapter(): Promise<DatabaseAdapter> {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");

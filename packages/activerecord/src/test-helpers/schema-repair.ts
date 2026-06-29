@@ -42,7 +42,7 @@
  * scratch table, so it is deliberately left out.
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { columnsOf, type Schema } from "./define-schema.js";
 
 /** Tables the test harness must never touch — migration + environment state. */

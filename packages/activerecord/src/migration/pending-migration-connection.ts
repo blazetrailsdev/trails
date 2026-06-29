@@ -10,7 +10,7 @@
  * to obtain a database connection.
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
 export class PendingMigrationConnection {

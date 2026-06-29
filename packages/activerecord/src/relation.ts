@@ -128,8 +128,9 @@ import {
   renderBind as _renderBind,
   collectingQueriesForExplain as _collectingQueriesForExplain,
 } from "./explain.js";
-import { inspectExplainOption } from "./adapter.js";
-import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
+import { inspectExplainOption } from "./connection-adapters/abstract/database-statements.js";
+import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";

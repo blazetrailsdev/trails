@@ -1,5 +1,5 @@
 import { beforeAll, afterAll } from "vitest";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { defineSchema, type Schema } from "./define-schema.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 

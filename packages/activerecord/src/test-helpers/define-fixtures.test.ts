@@ -8,7 +8,7 @@ import {
   FixtureSetPrimaryKeyError,
 } from "./define-fixtures.js";
 import { primaryKeyErrorFixtureData } from "./fixtures/primary-key-error/primary-key-error.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { Base } from "../base.js";
 
 function makeAdapter(): DatabaseAdapter {

@@ -12,7 +12,7 @@
  * semantics stay in one place.
  */
 
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import {
   SchemaStatements,
   assertSchemaAdapter,
@@ -115,7 +115,7 @@ export async function introspectIndexes(
   adapter: DatabaseAdapter,
   table: string,
 ): Promise<IntrospectedIndex[]> {
-  if (hasIndexes(adapter)) return adapter.indexes(table);
+  if (hasIndexes(adapter)) return adapter.indexes(table) as Promise<IntrospectedIndex[]>;
   return schemaStatementsFor(adapter).indexes(table);
 }
 

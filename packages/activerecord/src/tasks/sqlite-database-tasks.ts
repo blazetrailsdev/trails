@@ -17,7 +17,7 @@ import {
   getChildProcessAsync,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
@@ -109,7 +109,7 @@ export class SQLiteDatabaseTasks {
       // does not await driver.close() for async SQLite drivers (#1269).
       for (const conn of pool.connections) {
         try {
-          const c = conn as { close?: () => Promise<void> };
+          const c = conn as unknown as { close?: () => Promise<void> };
           if (typeof c.close === "function") await c.close();
         } catch {
           // best effort per connection
@@ -303,7 +303,7 @@ export class SQLiteDatabaseTasks {
   }
 
   private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-    const close = (adapter as { close?: () => Promise<void> }).close;
+    const close = (adapter as unknown as { close?: () => Promise<void> }).close;
     if (typeof close === "function") await close.call(adapter);
   }
 

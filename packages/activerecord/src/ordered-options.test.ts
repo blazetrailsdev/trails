@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 
 import { OrderedOptions, InheritableOptions } from "@blazetrails/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {

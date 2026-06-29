@@ -7,7 +7,7 @@ import { Base, Migration, Schema, TableDefinition } from "./index.js";
 import { MigrationContext } from "./migration.js";
 
 import { createTestAdapter, adapterType } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 beforeAll(() => {

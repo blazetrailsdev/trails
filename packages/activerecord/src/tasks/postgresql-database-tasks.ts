@@ -11,7 +11,7 @@ import {
   getChildProcessAsync,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
@@ -277,7 +277,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-    const maybeClose = (adapter as { close?: () => Promise<void> }).close;
+    const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
     if (typeof maybeClose === "function") {
       await maybeClose.call(adapter);
     }

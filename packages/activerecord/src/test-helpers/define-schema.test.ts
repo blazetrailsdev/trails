@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import {
   clearAppliedSchemaSignatures,
   clearAppliedSchemaSignaturesForTables,

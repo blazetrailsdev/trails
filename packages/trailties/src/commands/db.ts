@@ -21,7 +21,7 @@ import {
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-  const maybeClose = (adapter as { close?: () => Promise<void> }).close;
+  const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
   if (typeof maybeClose === "function") await maybeClose.call(adapter);
 }
 

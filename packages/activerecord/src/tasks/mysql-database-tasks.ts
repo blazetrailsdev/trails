@@ -5,7 +5,7 @@
  */
 
 import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";

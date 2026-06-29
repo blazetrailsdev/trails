@@ -1,6 +1,6 @@
 import { ExplainRegistry } from "./explain-registry.js";
 import type { Base } from "./base.js";
-import type { ExplainOption } from "./adapter.js";
+import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import { Attribute } from "@blazetrails/activemodel";
 
 /**

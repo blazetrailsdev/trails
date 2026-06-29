@@ -21,7 +21,7 @@ import type { MigrationProxy } from "./migration.js";
 import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
 
 function makeMigration(
@@ -1018,7 +1018,7 @@ describe("Migrator advisory lock wrapping", () => {
       releaseAdvisoryLock: async (_id: unknown) => true,
       isNoDatabaseError: () => false,
       // currentDatabase intentionally absent
-    } as unknown as import("./adapter.js").DatabaseAdapter;
+    } as unknown as import("./connection-adapters/abstract-adapter.js").AbstractAdapter;
     const migrator = new Migrator(rawAdapter, []);
     await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });

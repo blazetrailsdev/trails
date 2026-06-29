@@ -14,7 +14,7 @@ import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";

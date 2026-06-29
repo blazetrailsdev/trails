@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
 import { buildExplainClause } from "./explain.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Car } from "./test-helpers/models/car.js";

@@ -15,7 +15,7 @@
  * declare their tables up front.
  */
 
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";

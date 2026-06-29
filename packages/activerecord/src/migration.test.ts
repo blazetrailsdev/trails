@@ -10,7 +10,7 @@ import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
 import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";

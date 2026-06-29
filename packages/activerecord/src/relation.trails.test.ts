@@ -13,7 +13,7 @@ import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";

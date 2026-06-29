@@ -7,7 +7,7 @@ import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
-import type { AdapterName } from "./adapter.js";
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 
 type ModelClass = typeof Base;
@@ -154,7 +154,9 @@ export class InsertAll {
    * @internal
    */
   toSql(): string {
-    return this.connection.buildInsertSql(new Builder(this, this.connection.adapterName));
+    return this.connection.buildInsertSql(
+      new Builder(this, this.connection.adapterName as AdapterName),
+    );
   }
 
   updatableColumns(): string[] {

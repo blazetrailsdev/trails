@@ -4,7 +4,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Rollback, ConnectionFailed } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";

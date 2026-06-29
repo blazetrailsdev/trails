@@ -6,7 +6,6 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors, relationName } from "@blazetrails/arel";
 import {
@@ -1271,8 +1270,8 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  schemaStatements(host?: DatabaseAdapter): SchemaStatements {
-    return new SchemaStatements((host ?? this) as unknown as DatabaseAdapter);
+  schemaStatements(host?: AbstractAdapter): SchemaStatements {
+    return new SchemaStatements((host ?? this) as unknown as AbstractAdapter);
   }
 
   get schemaCache(): SchemaCache {

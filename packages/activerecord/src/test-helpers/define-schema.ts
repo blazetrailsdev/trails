@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 
 export type PrimitiveColumnSpec =

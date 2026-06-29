@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterEach, afterAll, type TaskContext } from "vitest";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";

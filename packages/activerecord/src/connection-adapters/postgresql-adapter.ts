@@ -44,7 +44,7 @@ import {
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";

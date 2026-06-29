@@ -10,7 +10,7 @@
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
-import type { AdapterName } from "../adapter.js";
+import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
 import type { JoinDependency } from "../associations/join-dependency.js";

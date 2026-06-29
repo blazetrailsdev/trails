@@ -9,7 +9,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 export { Base };
 import { Configurable } from "./configurable.js";

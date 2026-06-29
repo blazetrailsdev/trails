@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Quoting } from "./quoting-interface.js";
 
 /**

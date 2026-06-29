@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";

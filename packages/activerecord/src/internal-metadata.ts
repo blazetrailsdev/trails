@@ -5,7 +5,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import {

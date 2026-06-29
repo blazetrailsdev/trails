@@ -2,7 +2,7 @@ import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables } from "./drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
 
