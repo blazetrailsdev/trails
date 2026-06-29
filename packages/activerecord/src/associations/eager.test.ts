@@ -11,6 +11,8 @@ import {
   EagerLoadPolymorphicError,
 } from "../index.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { HasManyThroughAssociation } from "./has-many-through-association.js";
+import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -1177,17 +1179,22 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad("nope").count()).rejects.toThrow(/misspelled it/);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
-    // Rails: Author.preload(:readonly_comments).first! — CollectionProxy#reader
-    // is expensive, so the preloader populates the target directly rather than
-    // going through the association reader. We assert the through target is
-    // loaded without invoking the reader.
-    const author = await Author.preload("readonlyComments").first();
+    // Rails: assert_not_called_on_instance_of(HasManyAssociation, :reader) { Author.preload(:readonly_comments).first! }
+    // — CollectionProxy#reader is expensive, so the preloader populates the
+    // target directly rather than going through the association reader. trails'
+    // `reader` getter lives on CollectionAssociation, the superclass of
+    // HasManyThroughAssociation; spy there so any through-instance access is
+    // caught.
+    let author: any;
+    await assertNotCalledOnInstanceOf(HasManyThroughAssociation, "reader", async () => {
+      author = await Author.preload("readonlyComments").first();
+    });
     expect(author).toBeTruthy();
-    expect((author as any).association("readonlyComments").isLoaded()).toBe(true);
+    expect(author.association("readonlyComments").isLoaded()).toBe(true);
     // The preloader populated the through target directly, so reading it must
     // not fire a query (it never goes through the expensive reader path).
     await assertNoQueries(false, async () => {
-      await (author as any).readonlyComments.toArray();
+      await author.readonlyComments.toArray();
     });
   });
   it("preloading through a polymorphic association doesn't require the association to exist", async () => {
