@@ -67,6 +67,7 @@ import { Job } from "../test-helpers/models/job.js";
 import { Matey } from "../test-helpers/models/matey.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Reference } from "../test-helpers/models/reference.js";
+import { CpkOrder, CpkBook, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -76,24 +77,6 @@ const TEST_SCHEMA: Schema = {
   alar_category_posts: { alar_post_id: "integer", alar_category_id: "integer" },
   alar_comments: { body: "string", type: "string", alar_post_id: "integer" },
   alar_posts: { title: "string" },
-  cpk_hm_items: { order_shop_id: "integer", order_id: "integer", product: "string" },
-  cpk_hm_orders: {
-    columns: { shop_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_ho_orders: {
-    columns: { shop_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  cpk_ho_receipts: { order_shop_id: "integer", order_id: "integer", number: "string" },
-  cpk_line_items: { order_shop_id: "integer", order_id: "integer", product: "string" },
-  cpk_orders: {
-    columns: { shop_id: "integer", id: "integer", name: "string" },
-    primaryKey: ["shop_id", "id"],
-  },
-  dp_authors: { name: "string" },
-  dp_comments: { body: "string", dp_post_id: "integer" },
-  dp_posts: { title: "string", dp_author_id: "integer" },
   eager_cnt_ho_comments: { body: "string", eager_cnt_ho_post_id: "integer" },
   eager_cnt_ho_posts: { title: "string" },
   eager_comments: { body: "string", eager_post_id: "integer" },
@@ -145,9 +128,6 @@ const TEST_SCHEMA: Schema = {
   idup_category_posts: { idup_post_id: "integer", idup_category_id: "integer" },
   idup_comments: { body: "string", idup_post_id: "integer" },
   idup_posts: { title: "string" },
-  psta_clubs: { name: "string" },
-  psta_members: { name: "string" },
-  psta_memberships: { psta_member_id: "integer", psta_club_id: "integer", active: "boolean" },
   sg_authors: { name: "string" },
   sg_comments: { body: "string", sg_post_id: "integer" },
   sg_posts: { title: "string", sg_author_id: "integer" },
@@ -333,6 +313,9 @@ describe("EagerAssociationTest", () => {
     registerModel(Subscription);
     registerModel(Book);
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
+    registerModel(CpkOrder);
+    registerModel(CpkBook);
+    registerModel(CpkOrderAgreement);
     registerSponsorableModels();
   });
   it("should work inverse of with eager load", async () => {
@@ -1244,106 +1227,47 @@ describe("EagerAssociationTest", () => {
     );
   });
   it("preloading belongs_to with cpk", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    class CpkLineItem extends Base {
-      static {
-        this.attribute("order_shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.attribute("product", "string");
-        this.belongsTo("cpkOrder", {
-          foreignKey: ["order_shop_id", "order_id"],
-          className: "CpkOrder",
-        });
-      }
-    }
-    registerModel(CpkOrder);
-    registerModel(CpkLineItem);
+    // CpkOrder's PK is composite (["shop_id", "id"]), so `order.id` is the
+    // `[shop_id, id]` array; the `order_id` FK column wants the scalar `id`.
+    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const orderId = (order as any).id[1];
+    const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
-    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
-    await CpkLineItem.create({ order_shop_id: 1, order_id: 1, product: "Widget" });
-
-    const lineItem = (await CpkLineItem.first()) as any;
-    const found = (await CpkLineItem.all()
-      .eagerLoad("cpkOrder")
-      .findBy({ id: lineItem.id })) as any;
-    const order = found.association("cpkOrder").target;
-    expect(order).not.toBeNull();
-    expect(order.name).toBe("Order1");
+    const found = (await CpkOrderAgreement.all()
+      .eagerLoad("order")
+      .findBy({ id: orderAgreement.id })) as any;
+    const loaded = found.association("order").target;
+    expect(loaded).not.toBeNull();
+    expect(loaded.id).toEqual(order.id);
   });
 
   it("preloading has_many with cpk", async () => {
-    class CpkHmOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasMany("cpkHmItems", {
-          className: "CpkHmItem",
-          foreignKey: ["order_shop_id", "order_id"],
-        });
-      }
-    }
-    class CpkHmItem extends Base {
-      static {
-        this.attribute("order_shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.attribute("product", "string");
-      }
-    }
-    registerModel(CpkHmOrder);
-    registerModel(CpkHmItem);
+    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const orderId = (order as any).id[1];
+    const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
-    await CpkHmOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
-    await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "A" });
-    await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "B" });
-
-    const order = (await CpkHmOrder.first()) as any;
-    const found = (await CpkHmOrder.all().eagerLoad("cpkHmItems").findBy({ id: order.id })) as any;
-    const items = found.association("cpkHmItems").target;
-    expect(items).toHaveLength(2);
+    const found = (await CpkOrder.all()
+      .eagerLoad("orderAgreements")
+      .findBy({ id: orderId })) as any;
+    const agreements = found.association("orderAgreements").target;
+    expect(agreements).toHaveLength(1);
+    expect(agreements[0].id).toEqual(orderAgreement.id);
   });
 
   it("preloading has_one with cpk", async () => {
-    class CpkHoOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.hasOne("cpkHoReceipt", {
-          className: "CpkHoReceipt",
-          foreignKey: ["order_shop_id", "order_id"],
-        });
-      }
-    }
-    class CpkHoReceipt extends Base {
-      static {
-        this.attribute("order_shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.attribute("number", "string");
-      }
-    }
-    registerModel(CpkHoOrder);
-    registerModel(CpkHoReceipt);
+    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const orderId = (order as any).id[1];
+    const book = await CpkBook.create({
+      author_id: 1,
+      id: 3,
+      shop_id: order.shop_id,
+      order_id: orderId,
+    });
 
-    await CpkHoOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
-    await CpkHoReceipt.create({ order_shop_id: 1, order_id: 1, number: "R001" });
-
-    const order = (await CpkHoOrder.first()) as any;
-    const found = (await CpkHoOrder.all()
-      .eagerLoad("cpkHoReceipt")
-      .findBy({ id: order.id })) as any;
-    const receipt = found.association("cpkHoReceipt").target;
-    expect(receipt).not.toBeNull();
-    expect(receipt.number).toBe("R001");
+    const found = (await CpkOrder.all().eagerLoad("book").findBy({ id: orderId })) as any;
+    const loaded = found.association("book").target;
+    expect(loaded).not.toBeNull();
+    expect(loaded.id).toEqual(book.id);
   });
 
   it("including duplicate objects from has many", async () => {
@@ -1565,116 +1489,28 @@ describe("EagerAssociationTest", () => {
   });
   it("deep preload", async () => {
     // Rails: Post.preload(author: :posts, comments: :post).first
-    // — author.association(:posts) is loaded, comments[0].association(:post) is loaded
-    class DpPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("dp_author_id", "integer");
-        this.belongsTo("dpAuthor", {
-          className: "DpAuthor",
-          foreignKey: "dp_author_id",
-        });
-        this.hasMany("dpComments", {
-          className: "DpComment",
-          foreignKey: "dp_post_id",
-        });
-      }
-    }
-    class DpAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("dpPosts", {
-          className: "DpPost",
-          foreignKey: "dp_author_id",
-        });
-      }
-    }
-    class DpComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("dp_post_id", "integer");
-        this.belongsTo("dpPost", {
-          className: "DpPost",
-          foreignKey: "dp_post_id",
-        });
-      }
-    }
-    registerModel("DpPost", DpPost);
-    registerModel("DpAuthor", DpAuthor);
-    registerModel("DpComment", DpComment);
+    const post = await (Post as any).all().preload({ author: "posts", comments: "post" }).first();
 
-    const author = await DpAuthor.create({ name: "Alice" });
-    const post = await DpPost.create({ title: "Hello", dp_author_id: author.id });
-    await DpComment.create({ body: "Nice", dp_post_id: post.id });
-
-    const posts = await (DpPost as any)
-      .all()
-      .preload({ dpAuthor: "dpPosts", dpComments: "dpPost" })
-      .toArray();
-
-    expect(posts).toHaveLength(1);
-    const p = posts[0];
-    // author.dpPosts should be preloaded
-    const preloadedAuthor = p.association("dpAuthor").target;
-    expect(preloadedAuthor).toBeDefined();
-    expect(preloadedAuthor).not.toBeNull();
-    expect(preloadedAuthor.name).toBe("Alice");
-    expect(preloadedAuthor.association("dpPosts").isLoaded()).toBe(true);
-    // comment.dpPost should be preloaded
-    const preloadedComments = p.association("dpComments").target;
-    expect(preloadedComments).toHaveLength(1);
-    expect(preloadedComments[0].association("dpPost").isLoaded()).toBe(true);
+    expect(post.association("author").target.association("posts").isLoaded()).toBe(true);
+    expect(post.association("comments").target[0].association("post").isLoaded()).toBe(true);
   });
   it("preloading the same association twice works", async () => {
-    // Rails: Member.preload(:current_membership).includes(current_membership: :club)
-    // — double-loading the same association should not error or reset it
-    class PstaMembership extends Base {
-      static {
-        this.attribute("psta_member_id", "integer");
-        this.attribute("psta_club_id", "integer");
-        this.attribute("active", "boolean");
-        this.belongsTo("pstaClub", {
-          className: "PstaClub",
-          foreignKey: "psta_club_id",
-        });
-      }
-    }
-    class PstaClub extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class PstaMember extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasOne("pstaCurrentMembership", {
-          className: "PstaMembership",
-          foreignKey: "psta_member_id",
-          scope: (rel: any) => rel.where({ active: true }),
-        });
-      }
-    }
-    registerModel("PstaMember", PstaMember);
-    registerModel("PstaMembership", PstaMembership);
-    registerModel("PstaClub", PstaClub);
-
-    const club = await PstaClub.create({ name: "Club" });
-    const member = await PstaMember.create({ name: "Alice" });
-    await PstaMembership.create({ psta_member_id: member.id, psta_club_id: club.id, active: true });
-
-    // Preload the same association twice — second preload is a no-op if already loaded
-    const members = await (PstaMember as any)
+    await Member.create({});
+    const members = await (Member as any)
+      .preload("currentMembership")
+      .includes({ currentMembership: "club" })
       .all()
-      .preload("pstaCurrentMembership")
-      .includes({ pstaCurrentMembership: "pstaClub" })
       .toArray();
 
-    expect(members).toHaveLength(1);
-    const m = members[0];
-    const membership = m.association("pstaCurrentMembership").target;
-    expect(membership).toBeDefined();
-    expect(membership).not.toBeNull();
-    expect(Number(membership.psta_club_id)).toBe(Number(club.id));
+    await assertNoQueries(false, async () => {
+      const membersWithMembership = members.filter(
+        (m: any) => m.association("currentMembership").target,
+      );
+      const clubs = membersWithMembership.map(
+        (m: any) => m.association("currentMembership").target.association("club").target,
+      );
+      expect(clubs).toHaveLength(3);
+    });
   });
 });
 
