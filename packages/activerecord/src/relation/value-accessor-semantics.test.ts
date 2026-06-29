@@ -86,6 +86,12 @@ describe("Relation value accessor Rails semantics", () => {
     expect(rel.unscope("readonly").readonlyValue).toBeUndefined();
   });
 
+  it("except(:strict_loading) clears strict_loading_value back to nil (undefined)", () => {
+    const rel = relation().strictLoading();
+    expect(rel.strictLoadingValue).toBe(true);
+    expect(rel.except("strictLoading").strictLoadingValue).toBeUndefined();
+  });
+
   it("group_values returns the stored reference", () => {
     const rel = relation().group("title");
     expect(rel.groupValues).toBe(internals(rel)._groupColumns);

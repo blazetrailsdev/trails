@@ -1753,7 +1753,9 @@ export class Relation<T extends Base> {
           rel._isDistinct = false;
           break;
         case "strictLoading":
-          rel._isStrictLoading = false;
+          // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
+          // the key reads back as unset, distinct from an explicit `false`.
+          rel._isStrictLoading = undefined;
           break;
         case "references":
           // `:references` is a single Rails value key; trails splits its local
