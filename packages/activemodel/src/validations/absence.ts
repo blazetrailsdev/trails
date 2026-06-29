@@ -10,18 +10,27 @@ import { isBlank } from "@blazetrails/activesupport";
  * In Rails this module is reopened in each validator file. All methods
  * are implemented on Model as static methods.
  */
+/**
+ * A `validates_*_of` argument: an attribute name, a (possibly nested) array of
+ * names, or the trailing options hash. Mirrors Rails' `_merge_attributes`,
+ * which extracts the trailing options hash and then `attr_names.flatten!`s the
+ * rest (activemodel/lib/active_model/validations/helper_methods.rb:7-10), so
+ * `validates_presence_of %w(name email)` is valid alongside the splat form.
+ */
+export type AttrNameArg = string | readonly AttrNameArg[] | Record<string, unknown>;
+
 export interface HelperMethods {
-  validatesAbsenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesAcceptanceOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesConfirmationOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesExclusionOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesFormatOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesInclusionOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesLengthOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesSizeOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesNumericalityOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesPresenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesComparisonOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesAbsenceOf(...attrNames: AttrNameArg[]): void;
+  validatesAcceptanceOf(...attrNames: AttrNameArg[]): void;
+  validatesConfirmationOf(...attrNames: AttrNameArg[]): void;
+  validatesExclusionOf(...attrNames: AttrNameArg[]): void;
+  validatesFormatOf(...attrNames: AttrNameArg[]): void;
+  validatesInclusionOf(...attrNames: AttrNameArg[]): void;
+  validatesLengthOf(...attrNames: AttrNameArg[]): void;
+  validatesSizeOf(...attrNames: AttrNameArg[]): void;
+  validatesNumericalityOf(...attrNames: AttrNameArg[]): void;
+  validatesPresenceOf(...attrNames: AttrNameArg[]): void;
+  validatesComparisonOf(...attrNames: AttrNameArg[]): void;
 }
 
 export class AbsenceValidator extends EachValidator {

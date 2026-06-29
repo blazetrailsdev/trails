@@ -3,17 +3,19 @@ import { Model, StrictValidationFailed } from "../index.js";
 
 describe("PresenceValidationTest", () => {
   it("accepts array arguments", () => {
-    class Person extends Model {
+    // Rails: `Topic.validates_presence_of %w(title content)` — a single array
+    // argument, flattened by `_merge_attributes` (`attr_names.flatten!`).
+    class Topic extends Model {
       static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.validatesPresenceOf("name", "email");
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.validatesPresenceOf(["title", "content"]);
       }
     }
-    const p = new Person();
-    p.isValid();
-    expect(p.errors.get("name").length).toBeGreaterThan(0);
-    expect(p.errors.get("email").length).toBeGreaterThan(0);
+    const t = new Topic();
+    t.isValid();
+    expect(t.errors.get("title").length).toBeGreaterThan(0);
+    expect(t.errors.get("content").length).toBeGreaterThan(0);
   });
 
   it("validates presence of for ruby class", () => {

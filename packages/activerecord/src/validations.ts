@@ -5,7 +5,7 @@
  * database-aware validators (uniqueness, association validity, etc.)
  * and overrides save/valid? to run validations with context awareness.
  */
-import type { ValidationContext } from "@blazetrails/activemodel";
+import type { AttrNameArg, ValidationContext } from "@blazetrails/activemodel";
 import { I18n } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
@@ -82,13 +82,13 @@ export interface Validations {
  * Mirrors: ActiveRecord::Validations::ClassMethods
  */
 export interface ValidationsClassMethods {
-  validatesAbsenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesAssociated(...args: (string | Record<string, unknown>)[]): void;
-  validatesLengthOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesSizeOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesNumericalityOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesPresenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesUniquenessOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesAbsenceOf(...attrNames: AttrNameArg[]): void;
+  validatesAssociated(...args: AttrNameArg[]): void;
+  validatesLengthOf(...attrNames: AttrNameArg[]): void;
+  validatesSizeOf(...attrNames: AttrNameArg[]): void;
+  validatesNumericalityOf(...attrNames: AttrNameArg[]): void;
+  validatesPresenceOf(...attrNames: AttrNameArg[]): void;
+  validatesUniquenessOf(...attrNames: AttrNameArg[]): void;
 }
 
 /** Minimal instance-side surface used by Validations instance helpers. */
