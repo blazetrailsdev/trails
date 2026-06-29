@@ -1,4 +1,1 @@
-[
-  "packages/activerecord/src/associations/eager.test.ts",
-  "packages/activerecord/src/relation/where.test.ts"
-]
+["packages/activerecord/src/relation/where.test.ts"]
