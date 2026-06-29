@@ -24,7 +24,7 @@ describe("assertNotCalledOnInstanceOf", () => {
       assertNotCalledOnInstanceOf(Widget, "build", async () => {
         new Widget().build();
       }),
-    ).rejects.toThrow(/Widget#build to not be called/);
+    ).rejects.toThrow(/build to be called 0 times, but was called 1 times/);
   });
 
   it("detects calls on subclass instances by spying the named class", async () => {
@@ -32,7 +32,7 @@ describe("assertNotCalledOnInstanceOf", () => {
       assertNotCalledOnInstanceOf(SubWidget, "build", async () => {
         new SubWidget().build();
       }),
-    ).rejects.toThrow(/SubWidget#build to not be called/);
+    ).rejects.toThrow(/build to be called 0 times, but was called 1 times/);
   });
 
   it("spies inherited getters and counts accesses", async () => {
@@ -40,7 +40,20 @@ describe("assertNotCalledOnInstanceOf", () => {
       assertNotCalledOnInstanceOf(SubWidget, "reader", async () => {
         void new SubWidget().reader;
       }),
-    ).rejects.toThrow(/SubWidget#reader to not be called/);
+    ).rejects.toThrow(/reader to be called 0 times, but was called 1 times/);
+  });
+
+  it("prepends the optional message", async () => {
+    await expect(
+      assertNotCalledOnInstanceOf(
+        Widget,
+        "build",
+        async () => {
+          new Widget().build();
+        },
+        "should not build",
+      ),
+    ).rejects.toThrow(/should not build\./);
   });
 
   it("restores the prototype after the block", async () => {
@@ -65,13 +78,26 @@ describe("assertCalledOnInstanceOf", () => {
         new Widget().build();
         new Widget().build();
       },
-      2,
+      { times: 2 },
     );
+  });
+
+  it("does not call the original implementation, returning the stub value", async () => {
+    let result: unknown;
+    await assertCalledOnInstanceOf(
+      Widget,
+      "build",
+      async () => {
+        result = new Widget().build();
+      },
+      { returns: "stubbed" },
+    );
+    expect(result).toBe("stubbed");
   });
 
   it("throws on a count mismatch", async () => {
     await expect(assertCalledOnInstanceOf(Widget, "build", async () => {})).rejects.toThrow(
-      /to be called 1 time\(s\), but was called 0/,
+      /to be called 1 times, but was called 0 times/,
     );
   });
 });

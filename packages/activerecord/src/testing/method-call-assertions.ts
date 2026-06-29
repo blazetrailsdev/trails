@@ -10,8 +10,15 @@
 // (which governs ported domain error classes) does not apply here.
 /* eslint-disable blazetrails/rails-error-parity */
 
-/** A constructor-like value with a prototype we can spy on. */
+/** A constructor-like value with a prototype we can stub on. */
 type ClassLike = { prototype: object; name: string };
+
+/** Mirrors the Ruby keyword args of `assert_called_on_instance_of`. */
+export interface CallAssertionOptions {
+  times?: number;
+  returns?: unknown;
+  message?: string;
+}
 
 interface FoundDescriptor {
   owner: object;
@@ -29,14 +36,20 @@ function findDescriptor(proto: object, name: string): FoundDescriptor | null {
 }
 
 /**
- * Replace `methodName` on `klass.prototype` with a spy that counts calls and
- * delegates to the original implementation (supporting both plain methods and
- * accessor getters), runs `block`, then restores the prototype. Returns the
+ * Replace `methodName` on `klass.prototype` with a stub that counts calls and
+ * returns `returns` (it does NOT call the original — matching Rails'
+ * `define_method("stubbed_#{method_name}")`), run `block`, then restore the
+ * prototype. Supports both plain methods and accessor getters. Returns the
  * number of times the member was accessed/called.
+ *
+ * Mirrors the stub-and-restore body of `assert_called_on_instance_of`, where
+ * Rails aliases the original away, installs the stub, yields, and restores in
+ * an `ensure` block.
  */
 async function countInstanceCalls(
   klass: ClassLike,
   methodName: string,
+  returns: unknown,
   block: () => void | Promise<void>,
 ): Promise<number> {
   const proto = klass.prototype;
@@ -49,26 +62,24 @@ async function countInstanceCalls(
   const original = found.descriptor;
 
   let count = 0;
-  const spy: PropertyDescriptor = { configurable: true, enumerable: original.enumerable };
+  const stub: PropertyDescriptor = { configurable: true, enumerable: original.enumerable };
   if (typeof original.get === "function") {
-    const originalGet = original.get;
-    spy.get = function (this: unknown) {
+    stub.get = function () {
       count += 1;
-      return originalGet.call(this);
+      return returns;
     };
-    if (original.set) spy.set = original.set;
+    if (original.set) stub.set = original.set;
   } else if (typeof original.value === "function") {
-    const originalFn = original.value as (...args: unknown[]) => unknown;
-    spy.writable = original.writable;
-    spy.value = function (this: unknown, ...args: unknown[]) {
+    stub.writable = original.writable;
+    stub.value = function () {
       count += 1;
-      return originalFn.apply(this, args);
+      return returns;
     };
   } else {
     throw new Error(`${klass.name}#${methodName} is not a callable method or getter`);
   }
 
-  Object.defineProperty(proto, methodName, spy);
+  Object.defineProperty(proto, methodName, stub);
   try {
     await block();
   } finally {
@@ -82,39 +93,36 @@ async function countInstanceCalls(
 }
 
 /**
- * Assert that `methodName` is NOT invoked on any instance of `klass` during
- * `block`.
+ * Assert that `methodName` is invoked exactly `times` (default 1) on instances
+ * of `klass` during `block`.
  *
- * Mirrors: assert_not_called_on_instance_of(klass, method_name, &block)
- */
-export async function assertNotCalledOnInstanceOf(
-  klass: ClassLike,
-  methodName: string,
-  block: () => void | Promise<void>,
-): Promise<void> {
-  const count = await countInstanceCalls(klass, methodName, block);
-  if (count > 0) {
-    throw new Error(
-      `Expected ${klass.name}#${methodName} to not be called, but was called ${count} time(s).`,
-    );
-  }
-}
-
-/**
- * Assert that `methodName` IS invoked on an instance of `klass` during `block`.
- *
- * Mirrors: assert_called_on_instance_of(klass, method_name, times:, &block)
+ * Mirrors: assert_called_on_instance_of(klass, method_name, message, times:, returns:, &block)
  */
 export async function assertCalledOnInstanceOf(
   klass: ClassLike,
   methodName: string,
   block: () => void | Promise<void>,
-  times = 1,
+  { times = 1, returns = null, message }: CallAssertionOptions = {},
 ): Promise<void> {
-  const count = await countInstanceCalls(klass, methodName, block);
+  const count = await countInstanceCalls(klass, methodName, returns, block);
   if (count !== times) {
-    throw new Error(
-      `Expected ${klass.name}#${methodName} to be called ${times} time(s), but was called ${count} time(s).`,
-    );
+    let error = `Expected ${methodName} to be called ${times} times, but was called ${count} times`;
+    if (message) error = `${message}.\n${error}`;
+    throw new Error(error);
   }
+}
+
+/**
+ * Assert that `methodName` is NOT invoked on any instance of `klass` during
+ * `block`.
+ *
+ * Mirrors: assert_not_called_on_instance_of(klass, method_name, message, &block)
+ */
+export async function assertNotCalledOnInstanceOf(
+  klass: ClassLike,
+  methodName: string,
+  block: () => void | Promise<void>,
+  message?: string,
+): Promise<void> {
+  await assertCalledOnInstanceOf(klass, methodName, block, { times: 0, message });
 }
