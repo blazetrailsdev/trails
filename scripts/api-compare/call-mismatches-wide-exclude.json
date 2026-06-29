@@ -48357,13 +48357,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "secure-token.ts",
-    "rubyName": "has_secure_token",
-    "call": "update!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "serialization.ts",
     "rubyName": "serializable_hash",
     "call": "inheritance_column",

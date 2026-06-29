@@ -90,11 +90,14 @@ export function hasSecureToken(
       : `regenerate${attribute.charAt(0).toUpperCase() + attribute.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
 
   Object.defineProperty(modelClass.prototype, methodName, {
-    value: async function (this: Base): Promise<string> {
+    value: function (this: Base): Promise<true | undefined> {
       const newToken = generateToken(tokenLength);
-      this._attributes.set(attribute, newToken);
-      await this.updateColumn(attribute, newToken);
-      return newToken;
+      // Mirrors Rails: `update! attribute => generate_unique_secure_token(...)`
+      // (secure_token.rb:53) — a full validated save with callbacks and a
+      // timestamp bump, not a direct-SQL `update_column` that bypasses them.
+      // The method returns the `update!` result (Rails' last expression), not
+      // the token value, so callers see the same `true`/raise contract.
+      return this.updateBang({ [attribute]: newToken });
     },
     writable: true,
     configurable: true,

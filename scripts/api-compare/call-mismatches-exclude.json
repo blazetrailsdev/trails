@@ -95,21 +95,21 @@
     "tsFile": "base.ts",
     "rubyName": "update",
     "call": "save",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): base.ts's class-level `update` mirrors Rails `Persistence::ClassMethods#update` / `Relation#update` (persistence.rb:132, relation.rb:623), which never call `save` directly -- they delegate per record to the instance `#update`. base.ts does the same via `record.update(a)` (base.ts:454); the `save` lands in persistence.ts instance `update` (`self.save()`), which is itself unflagged. Indirect delegation, not an omission."
   },
   {
     "package": "activerecord",
     "tsFile": "base.ts",
     "rubyName": "update!",
     "call": "save!",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): base.ts's class-level `update!` mirrors Rails `Persistence::ClassMethods#update!` / `Relation#update!` (persistence.rb:158, relation.rb:631), which delegate per record to the instance `#update!` rather than calling `save!` directly. base.ts does the same via `record.updateBang(a)` (base.ts:453); the `save!` lands in persistence.ts `updateBang` (`self.saveBang()`). Indirect delegation, not an omission."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mismatched_foreign_key",
     "call": "update",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): Rails `mismatched_foreign_key` (abstract_mysql_adapter.rb:1009) calls `options.update mismatched_foreign_key_details(...)` -- `Hash#update` (merge), not record `#update`. trails merges via object spread `{ message, sql, binds, cause, ...details }` (abstract-mysql-adapter.ts:1539). Semantically unrelated same-named symbol, not an omission."
   },
   {
     "package": "activerecord",
@@ -123,7 +123,7 @@
     "tsFile": "internal-metadata.ts",
     "rubyName": "update_entry",
     "call": "update",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): Rails `update_entry` (internal_metadata.rb:151) calls `connection.update(um, ...)` -- a connection-level SQL execute, not record `#update`. trails' `updateEntry` issues the equivalent UPDATE via `this._connection.executeMutation(...)` (internal-metadata.ts:251). Semantically unrelated same-named symbol, not an omission."
   },
   {
     "package": "activerecord",
@@ -151,21 +151,14 @@
     "tsFile": "nested-attributes.ts",
     "rubyName": "accepts_nested_attributes_for",
     "call": "update",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): Rails `accepts_nested_attributes_for` (nested_attributes.rb:353) calls `options.update(attr_names.extract_options!)` -- `Hash#update` (merge!), not record `#update`. trails' `acceptsNestedAttributesFor` merges options with object spread. Semantically unrelated same-named symbol, not an omission."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "update",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "secure-token.ts",
-    "rubyName": "has_secure_token",
-    "call": "update!",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): Rails `Relation#update_all` (relation.rb:617) calls `c.update(stmt, \"... Update All\")` -- the *connection*-level bulk SQL execute, not record `#update`. trails' `updateAll` issues the same bulk UPDATE via `this._conn().execUpdate(...)` (relation.ts:4068). Semantically unrelated same-named symbol, not an omission."
   },
   {
     "package": "activerecord",
