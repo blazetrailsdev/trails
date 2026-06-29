@@ -94,6 +94,10 @@ describe("WhereTest", () => {
   });
 
   it("type cast is not evaluated at relation build time", async () => {
+    // PARTIAL: Rails wraps each `where` in `assert_not_called_on_instance_of(
+    // Type::Value, :cast)` to assert the cast is deferred to query time. There is
+    // no TS equivalent of that mock without a spy, so only the result equality is
+    // ported — the lazy-cast timing invariant is NOT covered here.
     const welcome = posts("welcome");
     expect(ids(await Post.where({ id: "1-foo" }).toArray())).toStrictEqual([(welcome as any).id]);
     expect(ids(await Post.where({ id: ["1-foo", "bar"] }).toArray())).toStrictEqual([
@@ -529,6 +533,10 @@ describe("WhereTest", () => {
   });
 
   it("where with decimal for string column", async () => {
+    // SUBSTITUTION: Rails uses `BigDecimal(0)`; JS has no built-in BigDecimal, so
+    // the numeric literal `0` stands in. The cast-to-string behaviour under test
+    // (a numeric query value never matches a string column) is identical for
+    // either, unlike the Rational case which has no JS analog at all (skipped).
     expect(await Post.where({ title: 0 }).count()).toBe(0);
   });
 
