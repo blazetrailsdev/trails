@@ -67,7 +67,7 @@ export async function setupSecondPool(): Promise<void> {
 
   // The primary database owns only `entrants`; remove the canonical schema's
   // `arunit2`-only tables so the two pools stay disjoint.
-  const ss = primary.schemaStatements!();
+  const ss = primary.schemaStatements();
   await ss.dropTable("courses_professors", { ifExists: true });
   await ss.dropTable("courses", { ifExists: true });
   await ss.dropTable("colleges", { ifExists: true });
