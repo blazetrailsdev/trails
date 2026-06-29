@@ -719,14 +719,25 @@ export class Association {
 
   protected raiseOnTypeMismatchBang(record: Base): void {
     const klass = this.klass;
+    // Rails (association.rb:340-347) does a two-step check: `record.is_a?(reflection.klass)`
+    // and, on failure, `record.is_a?(reflection.class_name.safe_constantize)`. The second
+    // step exists only to tolerate constant reloading in development mode, which has no
+    // JS analogue, so a single `instanceof` is faithful here.
     if (klass && !(record instanceof (klass as any))) {
       const expectedType =
         (klass as any).name ??
         (this.reflection as any).klass?.name ??
         (this.reflection as any).className ??
         this.reflection.name;
-      const actualType = record.constructor.name;
-      throw new AssociationTypeMismatch(expectedType, `an instance of ${actualType}`);
+      const actualType =
+        record == null ? String(record) : (record.constructor as { name?: string }).name;
+      // Mirrors Rails' message shape: `<Expected> expected, got <record.inspect>
+      // which is an instance of <record.class>`. The `(#<object_id>)` segments
+      // Rails appends are unreplicable in JS and omitted.
+      throw new AssociationTypeMismatch(
+        expectedType,
+        `${inspectMismatchedRecord(record)} which is an instance of ${actualType}`,
+      );
     }
   }
 
@@ -883,4 +894,25 @@ export function filterScopeForCreate(
     any = true;
   }
   return any ? out : null;
+}
+
+/**
+ * Best-effort analogue of Ruby's `record.inspect` for the `AssociationTypeMismatch`
+ * message. Non-record values (the wrong-type primitives Rails' tests assign, e.g.
+ * `1` or `"wrong value"`) render via `JSON.stringify` so a string shows quoted
+ * exactly as Ruby's `"wrong value"`; records render as `#<ClassName>` since the
+ * full attribute dump Rails emits is not needed by the message's consumers.
+ * @internal
+ */
+function inspectMismatchedRecord(record: unknown): string {
+  if (record == null) return String(record);
+  if (typeof record === "object") {
+    const ctorName = (record.constructor as { name?: string })?.name ?? "Object";
+    return `#<${ctorName}>`;
+  }
+  try {
+    return JSON.stringify(record) ?? String(record);
+  } catch {
+    return String(record);
+  }
 }

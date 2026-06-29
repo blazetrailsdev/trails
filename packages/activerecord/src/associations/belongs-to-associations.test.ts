@@ -378,7 +378,13 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", () => {
-    expect(() => new AdminUser({ account: "wrong value" })).toThrow(AssociationTypeMismatch);
+    // The mismatch message names the resolved namespaced klass (AdminAccount),
+    // proving the wrong-type guard ran against the association's actual class —
+    // mirrors Rails' assertion shape `<Klass>(#...) expected, got "wrong value"
+    // which is an instance of String(#...)`.
+    expect(() => new AdminUser({ account: "wrong value" })).toThrow(
+      /^AdminAccount expected, got "wrong value" which is an instance of String$/,
+    );
   });
 
   it("natural assignment", async () => {
