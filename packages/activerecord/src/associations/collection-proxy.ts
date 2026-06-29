@@ -2184,6 +2184,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
+    this._offsetMemo.clear();
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
       assocInstance._associationIds = null;
