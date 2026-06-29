@@ -61,6 +61,11 @@ import { Essay as HmEssay } from "../test-helpers/models/essay.js";
 import { Person as HmPerson } from "../test-helpers/models/person.js";
 import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
+import {
+  CommentOverlappingCounterCache,
+  UserCommentsCount,
+  PostCommentsCount,
+} from "../test-helpers/models/comment-overlapping-counter-cache.js";
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
 import { Car as HmCar } from "../test-helpers/models/car.js";
@@ -132,8 +137,8 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
       expect(await subscriptions.size()).toBe(2);
     });
 
-    const expected = await HmSubscription.where({ subscriber_id: "webster132" }).toArray();
-    const actual = await subscriptions.toArray();
+    const expected = await HmSubscription.where({ subscriber_id: "webster132" });
+    const actual = await subscriptions;
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
@@ -146,14 +151,14 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
       expect(await essays.size()).toBe(1);
     });
 
-    const expected = await HmEssay.where({ writer_id: "David" }).toArray();
-    const actual = await essays.toArray();
+    const expected = await HmEssay.where({ writer_id: "David" });
+    const actual = await essays;
     expect(actual.map((r) => r.id).sort()).toEqual(expected.map((r) => r.id).sort());
   });
 
   it("ids on unloaded association with custom primary key", async () => {
     const david = people("david");
-    const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
+    const expected = (await HmEssay.where({ writer_id: "David" })).map((e) => e.id);
     const ids = await (david.association("essays") as any).idsReader();
     expect(ids).toEqual(expected);
   });
@@ -162,7 +167,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     const david = people("david");
     const assoc = david.association("essays") as any;
     await assoc.loadTarget();
-    const expected = (await HmEssay.where({ writer_id: "David" }).toArray()).map((e) => e.id);
+    const expected = (await HmEssay.where({ writer_id: "David" })).map((e) => e.id);
     const ids = await assoc.idsReader();
     expect(ids).toEqual(expected);
   });
@@ -400,7 +405,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clients.size()).toBe(3);
     await firm.destroy();
-    expect((await Client.where(`firm_id=${firm.id}`).toArray()).length).toBe(0);
+    expect((await Client.where(`firm_id=${firm.id}`)).length).toBe(0);
   });
 
   it("delete all with option nullify", async () => {
@@ -485,7 +490,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("counting with association limit", async () => {
     const firm = companies("first_firm") as any;
-    const len = (await firm.limitedClients.toArray()).length;
+    const len = (await firm.limitedClients).length;
     expect(await firm.limitedClients.size()).toBe(len);
     expect(await firm.limitedClients.count()).toBe(len);
   });
@@ -494,13 +499,13 @@ describe("HasManyAssociationsTest", () => {
 
   it("finding", async () => {
     const firm = (await HmFirm.first()) as any;
-    expect((await firm.clients.toArray()).length).toBe(3);
+    expect((await firm.clients).length).toBe(3);
   });
 
   it("find all", async () => {
     const firm = (await HmFirm.first()) as any;
-    expect((await firm.clients.where("type = 'Client'").toArray()).length).toBe(3);
-    expect((await firm.clients.where("name = 'Summit'").toArray()).length).toBe(1);
+    expect((await firm.clients.where("type = 'Client'")).length).toBe(3);
+    expect((await firm.clients.where("name = 'Summit'")).length).toBe(1);
   });
 
   it("find first", async () => {
@@ -581,7 +586,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting", async () => {
     const firm = companies("first_firm") as any;
-    await firm.clientsOfFirm.toArray();
+    await firm.clientsOfFirm;
 
     const first = await firm.clientsOfFirm.first();
     await firm.clientsOfFirm.delete(first);
@@ -592,12 +597,12 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting a collection", async () => {
     const firm = companies("first_firm") as any;
-    await firm.clientsOfFirm.toArray();
+    await firm.clientsOfFirm;
 
     await firm.clientsOfFirm.create({ name: "Another Client" });
     expect(await firm.clientsOfFirm.size()).toBe(3);
 
-    const all = (await firm.clientsOfFirm.toArray()) as any[];
+    const all = (await firm.clientsOfFirm) as any[];
     await firm.clientsOfFirm.delete(all[0], all[1], all[2]);
     expect(await firm.clientsOfFirm.size()).toBe(0);
     await firm.clientsOfFirm.reload();
@@ -1211,7 +1216,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "Old", body: "body" });
     await HmPost.where({ author_id: author.id }).updateAll({ title: "Updated" });
-    const posts = await HmPost.where({ author_id: author.id }).toArray();
+    const posts = await HmPost.where({ author_id: author.id });
     expect(posts.every((p: any) => p.title === "Updated")).toBe(true);
   });
 
@@ -2252,7 +2257,7 @@ describe("HasManyAssociationsTest", () => {
     for (let i = 0; i < 5; i++) {
       await FibPost.create({ author_id: author.id, title: `Post ${i}`, body: "body" });
     }
-    const allPosts = await FibPost.where({ author_id: author.id }).toArray();
+    const allPosts = await FibPost.where({ author_id: author.id });
     expect(allPosts).toHaveLength(5);
   });
   it("find all sanitized", async () => {
@@ -2886,7 +2891,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await DcFirm.create({ name: "Odegy" });
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
-    expect((await DcClient.where({ firm_id: firm.id }).toArray()).length).toBe(2);
+    expect((await DcClient.where({ firm_id: firm.id })).length).toBe(2);
     const scoped = await loadHasMany(firm, "conditionalClients", {
       className: "DcClient",
       foreignKey: "firm_id",
@@ -2894,7 +2899,7 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(scoped.length).toBe(1);
     await firm.destroy();
-    expect((await DcClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+    expect((await DcClient.where({ firm_id: firm.id })).length).toBe(1);
   });
   it("dependent association respects optional sanitized conditions on delete", async () => {
     class DsFirm extends Base {
@@ -2922,7 +2927,7 @@ describe("HasManyAssociationsTest", () => {
     await DsClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DsClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     await firm.destroy();
-    expect((await DsClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+    expect((await DsClient.where({ firm_id: firm.id })).length).toBe(1);
   });
   it("dependent association respects optional hash conditions on delete", async () => {
     class DhFirm extends Base {
@@ -2950,7 +2955,7 @@ describe("HasManyAssociationsTest", () => {
     await DhClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DhClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     await firm.destroy();
-    expect((await DhClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
+    expect((await DhClient.where({ firm_id: firm.id })).length).toBe(1);
   });
   it("delete all association with primary key deletes correct records", async () => {
     class DelPkAuthor extends Base {
@@ -3170,7 +3175,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HashCondAuthor.create({ name: "Alice" });
     await HashCondPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await HashCondPost.where({ author_id: author.id }).toArray();
+    const remaining = await HashCondPost.where({ author_id: author.id });
     expect(remaining.length).toBe(0);
   });
   it("three levels of dependence", async () => {
@@ -5709,8 +5714,8 @@ describe("HasManyAssociationsTest", () => {
   it("has many build with options", async () => {
     const car = await HmCar.create({});
     await HmBulb.create({ name: "defaulty", car_id: car.id });
-    const carBulbs = await (car as any).bulbs.toArray();
-    const scopedBulbs = await HmBulb.where({ name: "defaulty", car_id: car.id }).toArray();
+    const carBulbs = await (car as any).bulbs;
+    const scopedBulbs = await HmBulb.where({ name: "defaulty", car_id: car.id });
     expect(carBulbs.map((b: any) => Number(b.id))).toEqual(
       scopedBulbs.map((b: any) => Number(b.id)),
     );
@@ -5796,7 +5801,7 @@ describe("HasManyAssociationsTest", () => {
     const bulb1 = await HmBulb.create({ name: "defaulty", car_id: car.id });
     const bulb2 = await HmBulb.create({ name: "other", car_id: car.id });
 
-    const bulbs = await (car as any).bulbs.toArray();
+    const bulbs = await (car as any).bulbs;
     expect(bulbs.map((b: any) => b.id)).toEqual([bulb1.id]);
 
     const allBulbs = await (car as any).allBulbs.sortBy((b: any) => b.id);
@@ -5821,10 +5826,10 @@ describe("HasManyAssociationsTest", () => {
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "other", car_id: car.id });
 
-    const bulbs = await (car as any).bulbs.toArray();
+    const bulbs = await (car as any).bulbs;
     expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
 
-    const others = await (car as any).otherBulbs.toArray();
+    const others = await (car as any).otherBulbs;
     expect(others.map((b: any) => b.name)).toEqual(["other"]);
   });
 
@@ -5834,10 +5839,10 @@ describe("HasManyAssociationsTest", () => {
     await HmBulb.create({ name: "defaulty", car_id: car.id });
     await HmBulb.create({ name: "old", car_id: car.id });
 
-    const bulbs = await (car as any).bulbs.toArray();
+    const bulbs = await (car as any).bulbs;
     expect(bulbs.map((b: any) => b.name)).toEqual(["defaulty"]);
 
-    const old = await (car as any).oldBulbs.toArray();
+    const old = await (car as any).oldBulbs;
     expect(old.map((b: any) => b.name)).toEqual(["old"]);
   });
 });
@@ -5892,10 +5897,8 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     // `Author#essays` uses primary_key :name (as: :writer), so David's
     // essays are exactly those with writer_id == "David".
     const david = authors("david");
-    const expected = (await HmEssay.where({ writer_id: "David" }).toArray())
-      .map((e) => e.id)
-      .sort();
-    const actual = (await association(david, "essays").toArray()).map((e) => e.id).sort();
+    const expected = (await HmEssay.where({ writer_id: "David" })).map((e) => e.id).sort();
+    const actual = (await association(david, "essays")).map((e) => e.id).sort();
     expect(actual).toEqual(expected);
   });
 
@@ -5907,13 +5910,13 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     //   assert_equal ["Remote Work"], david.essays.map(&:name)
     // `Person#essays` uses primary_key :first_name, foreign_key :writer_id.
     const david = people("david");
-    const names = ((await association(david, "essays").toArray()) as HmEssay[]).map((e) => e.name);
+    const names = (await association(david, "essays")).map((e) => e.name);
     expect(names).toEqual(["A Modest Proposal"]);
 
     const remote = await HmEssay.create({ name: "Remote Work" });
     await association(david, "essays").replace([remote]);
 
-    const names2 = ((await association(david, "essays").toArray()) as HmEssay[]).map((e) => e.name);
+    const names2 = (await association(david, "essays")).map((e) => e.name);
     expect(names2).toEqual(["Remote Work"]);
   });
 });
@@ -5981,12 +5984,12 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting updates counter cache", async () => {
     const topic = (await HmTopic.order("id ASC").first()) as any;
-    const actual = (await topic.replies.toArray()).length;
+    const actual = (await topic.replies).length;
     expect(actual).toBe(topic.replies_count);
     const firstReply = await topic.replies.first();
     await topic.replies.delete(firstReply);
     await topic.reload();
-    expect((await topic.replies.toArray()).length).toBe(topic.replies_count);
+    expect((await topic.replies).length).toBe(topic.replies_count);
   });
 
   it("destroy dependent when deleted from association", async () => {
@@ -6015,7 +6018,7 @@ describe("HasManyAssociationsTest", () => {
   it("abstract class with polymorphic has many", async () => {
     const post = (await HmSubStiPost.create({ title: "fooo", body: "baa" })) as any;
     const tagging = (await HmTagging.create({ taggable: post })) as any;
-    const taggings = await post.taggings.toArray();
+    const taggings = await post.taggings;
     expect(taggings).toHaveLength(1);
     expect(Number(taggings[0].id)).toBe(Number(tagging.id));
   });
@@ -6024,7 +6027,7 @@ describe("HasManyAssociationsTest", () => {
     const post = (await HmPost.create({ title: "foo", body: "bar" })) as any;
     const image = (await HmImage.create({})) as any;
     await post.images.push(image);
-    const images = await post.images.toArray();
+    const images = await post.images;
     expect(images.some((i: any) => Number(i.id) === Number(image.id))).toBe(true);
     const reloaded = (await HmImage.find(Number(image.id))) as any;
     const imageable = await reloaded.loadBelongsTo("imageable");
@@ -6104,9 +6107,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many preloading with duplicate records", async () => {
-    const allPosts = await HmPost.joins("comments").preload("comments").order("id").toArray();
+    const allPosts = await HmPost.joins("comments").preload("comments").order("id");
     const first = allPosts[0] as any;
-    const commentIds = (await first.comments.toArray())
+    const commentIds = (await first.comments)
       .map((c: any) => Number(c.id))
       .sort((a: number, b: number) => a - b);
     expect(commentIds).toEqual([1, 2]);
@@ -6190,7 +6193,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling update on id changes the counter cache", async () => {
     const topic = (await HmTopic.order("id ASC").first()) as any;
-    const originalCount = (await topic.replies.toArray()).length;
+    const originalCount = (await topic.replies).length;
     expect(topic.replies_count).toBe(originalCount);
 
     const firstReply = await topic.replies.first();
@@ -6204,8 +6207,8 @@ describe("HasManyAssociationsTest", () => {
   it("calling update changing ids changes the counter cache", async () => {
     const topic1 = (await HmTopic.find(1)) as any;
     const topic2 = (await HmTopic.find(3)) as any;
-    const originalCount1 = (await topic1.replies.toArray()).length;
-    const originalCount2 = (await topic2.replies.toArray()).length;
+    const originalCount1 = (await topic1.replies).length;
+    const originalCount2 = (await topic2.replies).length;
 
     const reply1 = await topic1.replies.first();
     const reply2 = await topic2.replies.first();
@@ -6222,8 +6225,8 @@ describe("HasManyAssociationsTest", () => {
   it("calling update changing ids of inversed association changes the counter cache", async () => {
     const topic1 = (await HmTopic.find(1)) as any;
     const topic2 = (await HmTopic.find(3)) as any;
-    const originalCount1 = (await topic1.replies.toArray()).length;
-    const originalCount2 = (await topic2.replies.toArray()).length;
+    const originalCount1 = (await topic1.replies).length;
+    const originalCount2 = (await topic2.replies).length;
 
     const reply1 = await topic1.replies.first();
     await reply1.update({ parent_id: topic2.id });
@@ -6428,7 +6431,7 @@ describe("HasManyAssociationsTest", () => {
   // be nullified.
   it("deleting models with composite keys", async () => {
     const greatAuthor = cpkAuthors("cpk_great_author") as any;
-    const books = await greatAuthor.books.toArray();
+    const books = await greatAuthor.books;
 
     expect(books.length).toBe(2);
 
@@ -6445,7 +6448,7 @@ describe("HasManyAssociationsTest", () => {
   // the proxy delete DELETEs the rows rather than nullifying the composite FK.
   it("sharded deleting models", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
-    const comments = await blogPost.deleteComments.toArray();
+    const comments = await blogPost.deleteComments;
 
     expect(comments.length).toBe(3);
 
@@ -6501,9 +6504,42 @@ describe("HasManyAssociationsTest", () => {
     await category.categorizations.destroyAll();
     expect(await category.categorizations.count()).toBe(0);
   });
+});
 
-  // BLOCKED: Rails' test_counter_cache_updates_in_memory_after_create_with_overlapping_counter_cache_columns
-  // uses the bespoke UserCommentsCount / PostCommentsCount / CommentOverlappingCounterCache
-  // models, which are not part of the canonical schema. Keep skipped until those models land.
-  it.skip("counter cache updates in memory after create with overlapping counter cache columns", async () => {});
+describe("HasManyAssociationsTest", () => {
+  useHandlerFixtures(
+    {
+      user_comments_counts: [UserCommentsCount, {}],
+      post_comments_counts: [PostCommentsCount, {}],
+      comment_overlapping_counter_caches: [CommentOverlappingCounterCache, {}],
+    },
+    { schema: TEST_SCHEMA },
+  );
+
+  beforeAll(() => {
+    registerModel(CommentOverlappingCounterCache);
+    registerModel(UserCommentsCount);
+    registerModel(PostCommentsCount);
+  });
+
+  it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
+    const user = (await UserCommentsCount.create({})) as any;
+    const post = (await PostCommentsCount.create({})) as any;
+
+    const before1 = user.comments_count;
+    const postBefore1 = post.comments_count;
+    await post.comments.push(
+      await CommentOverlappingCounterCache.create({ userCommentsCount: user }),
+    );
+    expect(user.comments_count).toBe(before1 + 1);
+    expect(post.comments_count).toBe(postBefore1);
+
+    const before2 = user.comments_count;
+    const postBefore2 = post.comments_count;
+    await user.comments.push(
+      await CommentOverlappingCounterCache.create({ postCommentsCount: post }),
+    );
+    expect(user.comments_count).toBe(before2 + 1);
+    expect(post.comments_count).toBe(postBefore2);
+  });
 });
