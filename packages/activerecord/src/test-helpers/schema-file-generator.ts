@@ -147,23 +147,33 @@ function generateCode(schema: Schema, adapterName?: string): string {
     const tOptsEntries: string[] = [];
     if (pk === false) tOptsEntries.push(`id: false`);
     else if (serialPkName !== null) {
-      tOptsEntries.push(`primaryKey: ${JSON.stringify(serialPkName)}`);
-      // Preserve INTEGER width per adapter (serialIdType). The default
-      // `primary_key` type widens to BIGINT on MySQL and breaks integer FK
-      // references. Keep in sync with define-schema.ts.
-      tOptsEntries.push(
-        `id: { type: ${JSON.stringify(serialIdType(cols[serialPkName], adapterName))} }`,
-      );
+      // Suppress the auto `id` column; the serial PK is emitted INLINE at its
+      // declared offset in the column loop below (mirrors define-schema.ts)
+      // rather than via createTable's string-`primaryKey` option, which hoists
+      // the PK column first. Inline emission keeps the reflected column order
+      // matching Rails — e.g. `auto_id_tests` declares `t.primary_key :auto_id`
+      // LAST (persistence_test `test_populates_autoincremented_id_pk_...`).
+      tOptsEntries.push(`id: false`);
     } else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
     if (needsForce) tOptsEntries.push(`force: "cascade"`);
     const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 
-    const colEntries = Object.entries(cols).filter(([colName]) => colName !== serialPkName);
+    const colEntries = Object.entries(cols);
     if (colEntries.length === 0) {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts});`);
     } else {
       lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${tOpts}, (t) => {`);
       for (const [colName, colSpec] of colEntries) {
+        // Emit the single-column integer PK inline at its declared offset.
+        // Preserve the declared INTEGER width per adapter (serialIdType); the
+        // default `primary_key` type widens to BIGINT on MySQL and breaks
+        // integer FK references. Keep in sync with define-schema.ts.
+        if (colName === serialPkName) {
+          lines.push(
+            `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(serialIdType(colSpec, adapterName))}, { primaryKey: true });`,
+          );
+          continue;
+        }
         const primitive = typeof colSpec === "string" ? colSpec : colSpec.type;
         lines.push(
           `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive, adapterName))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
