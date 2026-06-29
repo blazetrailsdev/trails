@@ -81,15 +81,15 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("construct finder sql does not table name collide on duplicate associations", async () => {
     const queries = await captureSql(async () => {
-      await Person.leftOuterJoins({ agents: { agents: "agents" } })
-        .leftOuterJoins({ agents: { agents: { primaryContact: "agents" } } })
-        .toArray();
+      await Person.leftOuterJoins({ agents: { agents: "agents" } }).leftOuterJoins({
+        agents: { agents: { primaryContact: "agents" } },
+      });
     });
     expect(queries.some((sql) => /agents_people_4/i.test(sql))).toBe(true);
   });
 
   it("left outer joins count is same as size of loaded results", async () => {
-    expect((await Post.leftOuterJoins("comments").toArray()).length).toBe(18);
+    expect((await Post.leftOuterJoins("comments")).length).toBe(18);
     expect(await Post.leftOuterJoins("comments").count()).toBe(18);
   });
 
@@ -114,14 +114,14 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("left outer joins actually does a left outer join", async () => {
     const queries = await captureSql(async () => {
-      await Author.leftOuterJoins("posts").toArray();
+      await Author.leftOuterJoins("posts");
     });
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(true);
   });
 
   it("left outer joins is deduped when same association is joined", async () => {
     const queries = await captureSql(async () => {
-      await Author.joins("posts").leftOuterJoins("posts").toArray();
+      await Author.joins("posts").leftOuterJoins("posts");
     });
     expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBe(true);
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
@@ -129,14 +129,14 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("construct finder sql ignores empty left outer joins hash", async () => {
     const queries = await captureSql(async () => {
-      await Author.leftOuterJoins({}).toArray();
+      await Author.leftOuterJoins({});
     });
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
   });
 
   it("construct finder sql ignores empty left outer joins array", async () => {
     const queries = await captureSql(async () => {
-      await Author.leftOuterJoins([]).toArray();
+      await Author.leftOuterJoins([]);
     });
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
   });
@@ -166,7 +166,7 @@ describe("LeftOuterJoinAssociationTest", () => {
 
   it("join conditions added to join clause", async () => {
     const queries = await captureSql(async () => {
-      await Author.leftOuterJoins("essays").toArray();
+      await Author.leftOuterJoins("essays");
     });
     expect(queries.some((sql) => /writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql))).toBe(true);
     expect(queries.some((sql) => /WHERE/i.test(sql))).toBe(false);
@@ -177,13 +177,9 @@ describe("LeftOuterJoinAssociationTest", () => {
       id: (posts("sti_comments") as any).id,
     });
 
-    expect(await scope.where({ "comments.type": "Comment" }).toArray()).toHaveLength(0);
-    expect(
-      (await scope.where({ "comments.type": "SpecialComment" }).toArray()).length,
-    ).toBeGreaterThan(0);
-    expect(
-      (await scope.where({ "comments.type": "SubSpecialComment" }).toArray()).length,
-    ).toBeGreaterThan(0);
+    expect(await scope.where({ "comments.type": "Comment" })).toHaveLength(0);
+    expect((await scope.where({ "comments.type": "SpecialComment" })).length).toBeGreaterThan(0);
+    expect((await scope.where({ "comments.type": "SubSpecialComment" })).length).toBeGreaterThan(0);
   });
 
   it("does not override select", async () => {
@@ -200,9 +196,7 @@ describe("LeftOuterJoinAssociationTest", () => {
     await (author as any).association("categorizations").create({});
     await (author as any).association("categorizations").create({ special: true });
 
-    const result = await Author.where({ id: author.id })
-      .leftOuterJoins("specialCategorizations")
-      .toArray();
+    const result = await Author.where({ id: author.id }).leftOuterJoins("specialCategorizations");
     expect(result.map((a) => a.id)).toEqual([author.id]);
   });
 
@@ -211,7 +205,7 @@ describe("LeftOuterJoinAssociationTest", () => {
       await Friendship.leftOuterJoins([
         "friendFavoriteReferenceJob",
         "followerFavoriteReferenceJob",
-      ]).toArray();
+      ]);
     });
     const sql = queries.join("\n");
     // Mirrors Rails' quote_table_name("friendships.friend_id"): identifier

@@ -146,7 +146,7 @@ describe("QueryLogsTest", () => {
   it("select is commented", async () => {
     queryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
-      await Dashboard.all().toArray();
+      await Dashboard.all();
     });
   });
 

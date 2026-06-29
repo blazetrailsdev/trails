@@ -192,7 +192,7 @@ describe("RelationTest", () => {
   });
 
   it("to a should dup target", async () => {
-    const arr = await CanonPost.all().toArray();
+    const arr = await CanonPost.all();
     expect(Array.isArray(arr)).toBe(true);
   });
 
@@ -228,7 +228,7 @@ describe("RelationTest", () => {
 
   it("find on hash conditions", async () => {
     await CanonPost.create({ title: "reltest-onhash", body: "b" });
-    const results = await CanonPost.where({ title: "reltest-onhash" }).toArray();
+    const results = await CanonPost.where({ title: "reltest-onhash" });
     expect(results.length).toBe(1);
   });
 
@@ -467,7 +467,7 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty IN", async () => {
-    const results = await CanonPost.where({ id: [] }).toArray();
+    const results = await CanonPost.where({ id: [] });
     expect(results).toEqual([]);
   });
 
@@ -571,7 +571,7 @@ describe("RelationTest", () => {
 
   it("relation merging with merged symbol joins keeps inner joins", async () => {
     const queries = await captureSql(async () => {
-      await CanonAuthor.joins("posts").merge(CanonPost.joins("comments")).toArray();
+      await CanonAuthor.joins("posts").merge(CanonPost.joins("comments"));
     });
 
     const nbInnerJoin = queries.reduce(
@@ -610,8 +610,7 @@ describe("RelationTest", () => {
     const queries = await captureSql(async () => {
       await CanonPost.joins("author", "categorizations")
         .merge(CanonAuthor.select("id"))
-        .merge(categorizationsWithAuthors)
-        .toArray();
+        .merge(categorizationsWithAuthors);
     });
 
     const nbInnerJoin = queries.reduce(

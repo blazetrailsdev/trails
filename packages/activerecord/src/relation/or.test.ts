@@ -27,77 +27,63 @@ describe("OrTest", () => {
   });
 
   it("or with relation", async () => {
-    const expected = await Post.where("id = 1 or id = 2").toArray();
-    expect(await Post.where("id = 1").or(Post.where("id = 2")).toArray()).toEqual(expected);
+    const expected = await Post.where("id = 1 or id = 2");
+    expect(await Post.where("id = 1").or(Post.where("id = 2"))).toEqual(expected);
   });
 
   it("or identity", async () => {
-    const expected = await Post.where("id = 1").toArray();
-    expect(await Post.where("id = 1").or(Post.where("id = 1")).toArray()).toEqual(expected);
+    const expected = await Post.where("id = 1");
+    expect(await Post.where("id = 1").or(Post.where("id = 1"))).toEqual(expected);
   });
 
   it("or with null left", async () => {
-    const expected = await Post.where("id = 1").toArray();
-    expect(await Post.none().or(Post.where("id = 1")).toArray()).toEqual(expected);
+    const expected = await Post.where("id = 1");
+    expect(await Post.none().or(Post.where("id = 1"))).toEqual(expected);
   });
 
   it("or with null right", async () => {
-    const expected = await Post.where("id = 1").toArray();
-    expect(await Post.where("id = 1").or(Post.none()).toArray()).toEqual(expected);
+    const expected = await Post.where("id = 1");
+    expect(await Post.where("id = 1").or(Post.none())).toEqual(expected);
   });
 
   // 2^63 overflows the int8 column range. QueryAttribute#isUnboundable() fires
   // (query_attribute.rb:46-50) and the Arel equality visitor emits "1=0" for that
   // predicate (to_sql.rb:643-647), so the OR collapses to id=1 only.
   it("or with large number", async () => {
-    const expected = await Post.where("id = 1 or id = 9223372036854775808").toArray();
-    expect(
-      await Post.where({ id: 1 })
-        .or(Post.where({ id: 9223372036854775808n }))
-        .toArray(),
-    ).toEqual(expected);
+    const expected = await Post.where("id = 1 or id = 9223372036854775808");
+    expect(await Post.where({ id: 1 }).or(Post.where({ id: 9223372036854775808n }))).toEqual(
+      expected,
+    );
   });
 
   it("or with bind params", async () => {
     const expected = byId((await Post.find([1, 2])) as any[]);
-    expect(
-      byId(
-        await Post.where({ id: 1 })
-          .or(Post.where({ id: 2 }))
-          .toArray(),
-      ),
-    ).toEqual(expected);
+    expect(byId(await Post.where({ id: 1 }).or(Post.where({ id: 2 })))).toEqual(expected);
   });
 
   it("or with null both", async () => {
-    const expected = await Post.none().toArray();
-    expect(await Post.none().or(Post.none()).toArray()).toEqual(expected);
+    const expected = await Post.none();
+    expect(await Post.none().or(Post.none())).toEqual(expected);
   });
 
   it("or without left where", async () => {
-    const expected = await Post.all().toArray();
-    expect(await Post.or(Post.where("id = 1")).toArray()).toEqual(expected);
+    const expected = await Post.all();
+    expect(await Post.or(Post.where("id = 1"))).toEqual(expected);
   });
 
   it("or without right where", async () => {
-    const expected = await Post.all().toArray();
-    expect(await Post.where("id = 1").or(Post.all()).toArray()).toEqual(expected);
+    const expected = await Post.all();
+    expect(await Post.where("id = 1").or(Post.all())).toEqual(expected);
   });
 
   it("or preserves other querying methods", async () => {
-    const expected = await Post.where("id = 1 or id = 2 or id = 3").order("body asc").toArray();
+    const expected = await Post.where("id = 1 or id = 2 or id = 3").order("body asc");
     const partial = Post.order("body asc");
-    expect(
-      await partial
-        .where("id = 1")
-        .or(partial.where({ id: [2, 3] }))
-        .toArray(),
-    ).toEqual(expected);
+    expect(await partial.where("id = 1").or(partial.where({ id: [2, 3] }))).toEqual(expected);
     expect(
       await Post.order("body asc")
         .where("id = 1")
-        .or(Post.order("body asc").where({ id: [2, 3] }))
-        .toArray(),
+        .or(Post.order("body asc").where({ id: [2, 3] })),
     ).toEqual(expected);
   });
 
@@ -122,36 +108,27 @@ describe("OrTest", () => {
   });
 
   it("or with unscope where", async () => {
-    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const expected = await Post.where("id = 1 or id = 2");
     const partial = Post.where("id = 1 and id != 2");
-    expect(await partial.or(partial.unscope("where").where("id = 2")).toArray()).toEqual(expected);
+    expect(await partial.or(partial.unscope("where").where("id = 2"))).toEqual(expected);
   });
 
   it("or with unscope where column", async () => {
-    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const expected = await Post.where("id = 1 or id = 2");
     const partial = Post.where({ id: 1 }).whereNot({ id: 2 });
-    expect(await partial.or(partial.unscope({ where: "id" }).where("id = 2")).toArray()).toEqual(
-      expected,
-    );
+    expect(await partial.or(partial.unscope({ where: "id" }).where("id = 2"))).toEqual(expected);
   });
 
   it("or with unscope order", async () => {
-    const expected = byId(await Post.where("id = 1 or id = 2").toArray());
+    const expected = byId(await Post.where("id = 1 or id = 2"));
     expect(
-      byId(
-        await Post.order("body asc")
-          .where("id = 1")
-          .unscope("order")
-          .or(Post.where("id = 2"))
-          .toArray(),
-      ),
+      byId(await Post.order("body asc").where("id = 1").unscope("order").or(Post.where("id = 2"))),
     ).toEqual(expected);
     expect(
       byId(
         await Post.order("id")
           .where("id = 1")
-          .or(Post.order("id").where("id = 2").unscope("order"))
-          .toArray(),
+          .or(Post.order("id").where("id = 2").unscope("order")),
       ),
     ).toEqual(expected);
   });
@@ -176,34 +153,28 @@ describe("OrTest", () => {
   });
 
   it("or with named scope", async () => {
-    const expected = await Post.where("id = 1 or body LIKE '%a%'").toArray();
-    expect(
-      await Post.where("id = 1")
-        .or((Post as any).containingTheLetterA())
-        .toArray(),
-    ).toEqual(expected);
+    const expected = await Post.where("id = 1 or body LIKE '%a%'");
+    expect(await Post.where("id = 1").or((Post as any).containingTheLetterA())).toEqual(expected);
   });
 
   it("or inside named scope", async () => {
-    const expected = await Post.where("body LIKE '%a%' OR title LIKE ?", "%'%")
-      .order("id DESC")
-      .toArray();
+    const expected = await Post.where("body LIKE '%a%' OR title LIKE ?", "%'%").order("id DESC");
     expect(
       await (Post.order({ id: "desc" }) as any).typographicallyInteresting().toArray(),
     ).toEqual(expected);
   });
 
   it("or with sti relation", async () => {
-    const expected = byId(await Post.where("id = 1 or id = 2").toArray());
-    expect(byId(await Post.where({ id: 1 }).or(SpecialPost.all()).toArray())).toEqual(expected);
+    const expected = byId(await Post.where("id = 1 or id = 2"));
+    expect(byId(await Post.where({ id: 1 }).or(SpecialPost.all()))).toEqual(expected);
   });
 
   it("or on loaded relation", async () => {
-    const expected = await Post.where("id = 1 or id = 2").toArray();
+    const expected = await Post.where("id = 1 or id = 2");
     const p = Post.where("id = 1");
     await p.load();
     expect(p.loaded).toBe(true);
-    expect(await p.or(Post.where("id = 2")).toArray()).toEqual(expected);
+    expect(await p.or(Post.where("id = 2"))).toEqual(expected);
   });
 
   it("or with non relation object raises error", () => {
@@ -220,7 +191,7 @@ describe("OrTest", () => {
     const author = (await Author.find(1)) as any;
     const expected = [
       ...(await author.posts.toArray()),
-      ...(await Post.where({ title: "I don't have any comments" }).toArray()),
+      ...(await Post.where({ title: "I don't have any comments" })),
     ];
     expect(byId(await actual.toArray()).map((p: any) => p.id)).toEqual(
       byId(expected).map((p: any) => p.id),

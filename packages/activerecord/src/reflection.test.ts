@@ -783,7 +783,7 @@ describe("ReflectionTest", () => {
     const dept = await Department.create({ hotel_id: hotel.id, name: "Kitchen" });
     await Chef.create({ department_id: dept.id, name: "Gordon" });
     // includes should accept string association names
-    const hotels = await Hotel.all().includes("departments").toArray();
+    const hotels = await Hotel.all().includes("departments");
     expect(hotels).toHaveLength(1);
   });
   it("reflect on association accepts symbols", () => {
@@ -1577,7 +1577,7 @@ describe("ReflectionTest", () => {
     const chef = await Chef.create({ department_id: dept.id, name: "Gordon" });
     // includes should accept a nested association hash (Rails `[departments: :chefs]`)
     // and actually preload the nested association onto the loaded records.
-    const hotels = await Hotel.all().includes({ departments: "chefs" }).toArray();
+    const hotels = await Hotel.all().includes({ departments: "chefs" });
     expect(hotels).toHaveLength(1);
     const departments = hotels[0].association("departments").target as Base[];
     expect(departments).toHaveLength(1);

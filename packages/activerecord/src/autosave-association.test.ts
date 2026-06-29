@@ -300,7 +300,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     cacheAssoc(pirate, "birds", [b1, b2]);
     await expect(pirate.save()).rejects.toThrow("Oh noes!");
     // Both destructions should be rolled back
-    const remaining = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const remaining = await Bird.where({ pirate_id: pirate.id });
     expect(remaining.length).toBe(2);
   });
 
@@ -2323,7 +2323,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("Polly");
   });
@@ -2333,7 +2333,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     assignNestedAttributes(pirate, "birds", [{ name: "" }]);
     await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBeLessThanOrEqual(1);
   });
 
@@ -2351,7 +2351,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Valid" }, { name: "" }]);
     await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.some((b: any) => b.name === "Valid")).toBe(true);
   });
 
@@ -4105,7 +4105,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
   });
 });
@@ -4168,7 +4168,7 @@ describe("should update children when autosave is true and parent is new but chi
     const article = await NAutoArticle.create({ name: "auto save" });
     assignNestedAttributes(article, "nautoTags", [{ name: "saved" }]);
     await article.save();
-    const tags = await NAutoTag.where({ author_id: article.id }).toArray();
+    const tags = await NAutoTag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
     expect(tags[0].name).toBe("saved");
     expect(tags[0].isPersisted()).toBe(true);
@@ -4198,7 +4198,7 @@ describe("should update children when autosave is true and parent is new but chi
     const article = await ASB1Article.create({ name: "bang save" });
     assignNestedAttributes(article, "asb1Tags", [{ name: "banged" }]);
     await article.save();
-    const tags = await ASB1Tag.where({ author_id: article.id }).toArray();
+    const tags = await ASB1Tag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
     expect(tags[0].isPersisted()).toBe(true);
   });
@@ -4397,7 +4397,7 @@ describe("should update children when autosave is true and parent is new but chi
     const article = await BVArticle.create({ name: "test" });
     assignNestedAttributes(article, "bvTags", [{ name: "valid" }]);
     await article.save();
-    const tags = await BVTag.where({ author_id: article.id }).toArray();
+    const tags = await BVTag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
   });
 
@@ -4506,7 +4506,7 @@ describe("should update children when autosave is true and parent is new but chi
       { name: "bad", unknownCol: "boom" },
     ]);
     await expect(article.save()).rejects.toThrow(/unknown attribute/);
-    const tags = await RBTag.where({ author_id: article.id }).toArray();
+    const tags = await RBTag.where({ author_id: article.id });
     expect(tags.length).toBeLessThanOrEqual(1);
   });
 

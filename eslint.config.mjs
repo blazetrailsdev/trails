@@ -463,7 +463,7 @@ export default defineConfig(
       // materializer across ~1700 call sites. Surfacing it advisory-only
       // (autofixable via `--fix`) lets the codebase converge to direct awaits
       // without breaking lint or forcing a mass rewrite in one PR.
-      "blazetrails/prefer-await-relation": "warn",
+      "blazetrails/prefer-await-relation": "error",
     },
   },
 

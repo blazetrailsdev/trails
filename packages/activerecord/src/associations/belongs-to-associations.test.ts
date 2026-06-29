@@ -240,7 +240,7 @@ describe("BelongsToAssociationsTest", () => {
   it("where with custom primary key", async () => {
     const david = authors("david");
     const essay = essays("david_modest_proposal");
-    const result = await Author.where({ ownedEssay: essay }).toArray();
+    const result = await Author.where({ ownedEssay: essay });
     expect(result.map((a) => a.id)).toContain(david.id);
   });
 
@@ -260,7 +260,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("where on polymorphic association with empty array", async () => {
-    const result = await Comment.where({ author: [] }).toArray();
+    const result = await Comment.where({ author: [] });
     expect(result).toHaveLength(0);
   });
 
@@ -704,9 +704,10 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (sponsor as any).loadBelongsTo("sponsorable"))!.id).toBe(member.id);
     expect(await (sponsor as any).loadBelongsTo("sponsorableWithConditions")).toBeNull();
 
-    const [sponsorPreloaded] = await Sponsor.includes("sponsorable", "sponsorableWithConditions")
-      .where({ id: sponsor.id })
-      .toArray();
+    const [sponsorPreloaded] = await Sponsor.includes(
+      "sponsorable",
+      "sponsorableWithConditions",
+    ).where({ id: sponsor.id });
     expect((sponsorPreloaded as any).sponsorable!.id).toBe(member.id);
     expect((sponsorPreloaded as any).sponsorableWithConditions).toBeNull();
   });
@@ -1178,7 +1179,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("association assignment sticks", async () => {
     const post = await Post.first();
-    const [author1, author2] = await Author.limit(2).toArray();
+    const [author1, author2] = await Author.limit(2);
     expect(author1).not.toBeNull();
     expect(author2).not.toBeNull();
 
@@ -1330,9 +1331,9 @@ describe("BelongsToAssociationsTest", () => {
     await authors("david").destroy();
     expect(await AuthorAddress.count()).toBe(initialCount - 2);
 
-    expect(
-      await AuthorAddress.where({ id: [authorAddress.id, authorAddressExtra.id] }).toArray(),
-    ).toEqual([]);
+    expect(await AuthorAddress.where({ id: [authorAddress.id, authorAddressExtra.id] })).toEqual(
+      [],
+    );
     expect(AuthorAddress.destroyedAuthorAddressIds).toContain(authorAddress.id);
   });
 
@@ -1699,7 +1700,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("reflect the most recent change", async () => {
-    const [author1, author2] = await Author.limit(2).toArray();
+    const [author1, author2] = await Author.limit(2);
     const post = Post.new({ title: "foo", body: "bar" });
 
     (post as any).author = author1;

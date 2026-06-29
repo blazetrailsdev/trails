@@ -1487,9 +1487,7 @@ export class Relation<T extends Base> {
    */
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
     const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
-    const subject = this._loaded
-      ? this._records
-      : await this.annotate("loading for pp").limit(max).toArray();
+    const subject = this._loaded ? this._records : await this.annotate("loading for pp").limit(max);
     const entries = subject.slice(0, max) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);
@@ -4199,7 +4197,7 @@ export class Relation<T extends Base> {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
-    const records = await this.where(conditions).limit(1).toArray();
+    const records = await this.where(conditions).limit(1);
     if (records.length > 0) return records[0];
     // Rails' scope_for_create: `where_values_hash.merge(create_with_value)` —
     // scope attrs first, createWith overrides, then the caller's conditions
@@ -4304,7 +4302,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#first_or_initialize
    */
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
-    const records = await this.limit(1).toArray();
+    const records = await this.limit(1);
     if (records.length > 0) return records[0];
     return new (this._modelClass as any)({ ...this.scopeForCreate(), ...extra }) as T;
   }

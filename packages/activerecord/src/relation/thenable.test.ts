@@ -67,7 +67,7 @@ describe("Thenable", () => {
   });
 
   it(".toArray() still works", async () => {
-    const authors = await Author.where({ id: 1 }).toArray();
+    const authors = await Author.where({ id: 1 });
     expect(Array.isArray(authors)).toBe(true);
     expect(authors).toHaveLength(1);
   });

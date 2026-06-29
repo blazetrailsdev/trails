@@ -158,7 +158,7 @@ describe("BasicsTest", () => {
       }
     }
     await User.create({ name: "a" });
-    const all = await User.all().toArray();
+    const all = await User.all();
     expect(all.length).toBe(1);
   });
 
@@ -511,7 +511,7 @@ describe("BasicsTest", () => {
     }
     await Post.create({ title: "match" });
     await Post.create({ title: "no-match" });
-    const results = await Post.where({ title: "match" }).toArray();
+    const results = await Post.where({ title: "match" });
     expect(results.length).toBe(1);
   });
 
@@ -599,7 +599,7 @@ describe("BasicsTest", () => {
       }
     }
     await Post.create({ title: "a" });
-    const arr = await Post.all().toArray();
+    const arr = await Post.all();
     expect(Array.isArray(arr)).toBe(true);
     expect(arr.length).toBe(1);
   });
@@ -708,7 +708,7 @@ describe("BasicsTest", () => {
       }
     }
     await Post.create({ title: "hello" });
-    const results = await Post.select("title").toArray();
+    const results = await Post.select("title");
     expect(results.length).toBe(1);
   });
 
@@ -1025,7 +1025,7 @@ describe("BasicsTest", () => {
     const t1 = await Topic.create({ title: "first" });
     const results = await Topic.where({
       id: [`${t1.id}-meowmeow`, "9223372036854775808-hello"],
-    }).toArray();
+    });
     expect(results).toHaveLength(1);
     expect(results[0].title).toBe("first");
   });
@@ -1058,8 +1058,8 @@ describe("BasicsTest", () => {
     const t2 = await Topic.create({ title: "second", priority: 2 });
     const slugRange = new ArRange(`${t1.priority}-meowmeow`, `${t2.priority}-hello`);
     const intRange = new ArRange(t1.priority, t2.priority);
-    const bySlug = await Topic.where({ priority: slugRange }).toArray();
-    const byInt = await Topic.where({ priority: intRange }).toArray();
+    const bySlug = await Topic.where({ priority: slugRange });
+    const byInt = await Topic.where({ priority: intRange });
     // Both queries must find the two created records (not empty)
     expect(byInt).toHaveLength(2);
     expect(bySlug).toHaveLength(2);
@@ -1085,7 +1085,7 @@ describe("BasicsTest", () => {
     await Bulb.create({ car_id: car.id });
 
     const proxyResults = await (car as any).bulbs.toArray();
-    const relationResults = await Bulb.where({ car_id: car.id }).toArray();
+    const relationResults = await Bulb.where({ car_id: car.id });
     expect(proxyResults).toHaveLength(1);
     expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
       relationResults.map((r: any) => r.id).sort(),
@@ -1490,9 +1490,9 @@ describe("BasicsTest", () => {
     const r1 = await Reply.create({ title: "first" });
     const r2 = await Reply.create({ title: "second" });
     await Reply.create({ title: "third" });
-    const results = await Reply.where({ id: [r1.id, r2.id] }).toArray();
+    const results = await Reply.where({ id: [r1.id, r2.id] });
     expect(results).toHaveLength(2);
-    const emptyResults = await Reply.where({ id: [] }).toArray();
+    const emptyResults = await Reply.where({ id: [] });
     expect(emptyResults).toHaveLength(0);
   });
   it("dont clear sequence name when setting explicitly", () => {
@@ -2020,7 +2020,7 @@ describe("BasicsTest", () => {
     const Topic = makeTopic();
     await Topic.create({ title: "One" });
     await Topic.create({ title: "Two" });
-    const all = await Topic.all().toArray();
+    const all = await Topic.all();
     expect(all.length).toBe(2);
   });
 
@@ -2028,7 +2028,7 @@ describe("BasicsTest", () => {
     const Topic = makeTopic();
     await Topic.create({ title: "A", approved: true });
     await Topic.create({ title: "B", approved: false });
-    const approved = await Topic.where({ approved: true }).toArray();
+    const approved = await Topic.where({ approved: true });
     expect(approved.length).toBe(1);
   });
 

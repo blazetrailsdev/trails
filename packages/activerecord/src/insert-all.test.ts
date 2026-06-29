@@ -680,9 +680,7 @@ describe("InsertAllTest", () => {
         uniqueBy: "index_books_on_isbn",
       });
 
-      const names = ((await Book.where({ isbn: "1974522598" }).toArray()) as any[])
-        .map((b) => b.name)
-        .sort();
+      const names = ((await Book.where({ isbn: "1974522598" })) as any[]).map((b) => b.name).sort();
       expect(names).toEqual(["Out of the Silent Planet", "Perelandra"]);
     },
   );
@@ -1134,11 +1132,9 @@ describe("InsertAllTest", () => {
       { status: "published", isbn: "1234566", name: "Rework", author_id: 1 },
       { status: "proposed", isbn: "1234567", name: "Remote", author_id: 2 },
     ]);
-    const statuses = (
-      await Book.where({ isbn: ["1234566", "1234567"] })
-        .order("id")
-        .toArray()
-    ).map((b: any) => b.status);
+    const statuses = (await Book.where({ isbn: ["1234566", "1234567"] }).order("id")).map(
+      (b: any) => b.status,
+    );
     expect(statuses).toEqual(["published", "proposed"]);
   });
 

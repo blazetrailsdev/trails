@@ -242,13 +242,13 @@ describe("InheritanceTest", () => {
   });
 
   it("inheritance find all", async () => {
-    const companies = await Company.all().order("id").toArray();
+    const companies = await Company.all().order("id");
     expect(companies[0]).toBeInstanceOf(Firm);
     expect(companies[1]).toBeInstanceOf(Client);
   });
 
   it("alt inheritance find all", async () => {
-    const veggies = await Vegetable.all().order("id").toArray();
+    const veggies = await Vegetable.all().order("id");
     expect(veggies[0]).toBeInstanceOf(Cucumber);
     expect(veggies[1]).toBeInstanceOf(Cabbage);
   });
@@ -410,13 +410,13 @@ describe("InheritanceTest", () => {
   it("update all within inheritance", async () => {
     await Client.updateAll({ name: "I am a client" });
     expect(((await Client.first()) as any).name).toBe("I am a client");
-    expect(((await Firm.all().order("id").toArray())[0] as any).name).toBe("37signals");
+    expect(((await Firm.all().order("id"))[0] as any).name).toBe("37signals");
   });
 
   it("alt update all within inheritance", async () => {
     await Cabbage.updateAll({ name: "the cabbage" });
     expect(((await Cabbage.first()) as any).name).toBe("the cabbage");
-    const cucumberNames = (await Cucumber.all().toArray()).map((v: any) => v.name);
+    const cucumberNames = (await Cucumber.all()).map((v: any) => v.name);
     expect([...new Set(cucumberNames)]).toEqual(["my cucumber"]);
   });
 
@@ -454,7 +454,7 @@ describe("InheritanceTest", () => {
     );
     expect((await Company.where({ name: "veryspecial" }).first())?.id).toBe(verySpecialClient.id);
     expect((await Client.where({ name: "veryspecial" }).first())?.id).toBe(verySpecialClient.id);
-    expect((await Client.where({ name: "Summit" }).toArray()).length).toBe(1);
+    expect((await Client.where({ name: "Summit" })).length).toBe(1);
     expect((await Client.find(verySpecialClient.id))?.id).toBe(verySpecialClient.id);
   });
 
@@ -464,7 +464,7 @@ describe("InheritanceTest", () => {
     expect((await GreenCabbage.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
     expect((await Cabbage.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
     expect((await Vegetable.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
-    expect((await Cabbage.where({ name: "his cabbage" }).toArray()).length).toBe(1);
+    expect((await Cabbage.where({ name: "his cabbage" })).length).toBe(1);
     expect((await Cabbage.find(kingCole.id))?.id).toBe(kingCole.id);
   });
 
@@ -645,9 +645,9 @@ describe("InheritanceAttributeMappingTest", () => {
       type: `omg_${underscore("IamtEmpire")}`,
     });
 
-    const modelPairs = (await IamtCompany.all().toArray())
-      .map((a: any) => [a.name, a.type])
-      .sort() as Array<[string, string]>;
+    const modelPairs = (await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort() as Array<
+      [string, string]
+    >;
     expect(modelPairs[0]).toEqual(["a Startup", "IamtStartup"]);
     expect(modelPairs[1]).toEqual(["an Empire", "IamtEmpire"]);
 
@@ -655,9 +655,9 @@ describe("InheritanceAttributeMappingTest", () => {
     const startupAsEmpire = startup!.becomesBang(IamtEmpire);
     await startupAsEmpire.save();
 
-    const afterPairs = (await IamtCompany.all().toArray())
-      .map((a: any) => [a.name, a.type])
-      .sort() as Array<[string, string]>;
+    const afterPairs = (await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort() as Array<
+      [string, string]
+    >;
     expect(afterPairs[0]).toEqual(["a Startup", "IamtEmpire"]);
     expect(afterPairs[1]).toEqual(["an Empire", "IamtEmpire"]);
   });

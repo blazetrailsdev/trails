@@ -440,12 +440,12 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("all() returns all records", async () => {
-      const products = await Product.all().toArray();
+      const products = await Product.all();
       expect(products).toHaveLength(5);
     });
 
     it("where filters correctly", async () => {
-      const fruits = await Product.where({ category: "fruit" }).toArray();
+      const fruits = await Product.where({ category: "fruit" });
       expect(fruits).toHaveLength(3);
     });
 

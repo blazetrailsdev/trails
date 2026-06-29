@@ -97,18 +97,18 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope", async () => {
-    const expected = salaries(await Developer.order("salary DESC").toArray());
-    const received = salaries(await DeveloperOrderedBySalary.all().toArray());
+    const expected = salaries(await Developer.order("salary DESC"));
+    const received = salaries(await DeveloperOrderedBySalary.all());
     expect(received).toEqual(expected);
   });
 
   it("default scope as class method", async () => {
-    const all = await ClassMethodDeveloperCalledDavid.all().toArray();
+    const all = await ClassMethodDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
   it("default scope as class method referencing scope", async () => {
-    const all = await ClassMethodReferencingScopeDeveloperCalledDavid.all().toArray();
+    const all = await ClassMethodReferencingScopeDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
@@ -123,22 +123,22 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope as block referencing scope", async () => {
-    const all = await LazyBlockReferencingScopeDeveloperCalledDavid.all().toArray();
+    const all = await LazyBlockReferencingScopeDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
   it("default scope with lambda", async () => {
-    const all = await LazyLambdaDeveloperCalledDavid.all().toArray();
+    const all = await LazyLambdaDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
   it("default scope with block", async () => {
-    const all = await LazyBlockDeveloperCalledDavid.all().toArray();
+    const all = await LazyBlockDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
   it("default scope with callable", async () => {
-    const all = await CallableDeveloperCalledDavid.all().toArray();
+    const all = await CallableDeveloperCalledDavid.all();
     expect(all.map((d: any) => d.id)).toEqual([developers("david").id]);
   });
 
@@ -153,10 +153,8 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope with conditions string", async () => {
-    const expected = (await Developer.where({ name: "David" }).toArray())
-      .map((d: any) => d.id)
-      .sort();
-    const received = (await DeveloperCalledDavid.all().toArray()).map((d: any) => d.id).sort();
+    const expected = (await Developer.where({ name: "David" })).map((d: any) => d.id).sort();
+    const received = (await DeveloperCalledDavid.all()).map((d: any) => d.id).sort();
     expect(received).toEqual(expected);
     expect(((await DeveloperCalledDavid.create()) as any).name).toBeNull();
   });
@@ -312,167 +310,149 @@ describe("DefaultScopingTest", () => {
   });
 
   it("scope overwrites default", async () => {
-    const expected = names(await Developer.order("salary DESC, name DESC").toArray());
+    const expected = names(await Developer.order("salary DESC, name DESC"));
     const received = names(await (DeveloperOrderedBySalary as any).byName().toArray());
     expect(received).toEqual(expected);
   });
 
   it("reorder overrides default scope order", async () => {
-    const expected = names(await Developer.order("name DESC").toArray());
-    const received = names(await DeveloperOrderedBySalary.reorder("name DESC").toArray());
+    const expected = names(await Developer.order("name DESC"));
+    const received = names(await DeveloperOrderedBySalary.reorder("name DESC"));
     expect(received).toEqual(expected);
   });
 
   it("order after reorder combines orders", async () => {
-    const expected = namesAndIds(await Developer.order("name DESC, id DESC").toArray());
+    const expected = namesAndIds(await Developer.order("name DESC, id DESC"));
     const received = namesAndIds(
-      await Developer.order("name ASC").reorder("name DESC").order("id DESC").toArray(),
+      await Developer.order("name ASC").reorder("name DESC").order("id DESC"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope overrides default scope", async () => {
-    const expected = namesAndIds(await Developer.all().toArray());
-    const received = namesAndIds(await DeveloperCalledJamis.unscope("where").toArray());
+    const expected = namesAndIds(await Developer.all());
+    const received = namesAndIds(await DeveloperCalledJamis.unscope("where"));
     expect(received).toEqual(expected);
   });
 
   it("unscope after reordering and combining", async () => {
-    const expected = namesAndIds(await Developer.order("id DESC, name DESC").toArray());
+    const expected = namesAndIds(await Developer.order("id DESC, name DESC"));
     const received = namesAndIds(
       await DeveloperOrderedBySalary.reorder("name DESC")
         .unscope("order")
-        .order("id DESC, name DESC")
-        .toArray(),
+        .order("id DESC, name DESC"),
     );
     expect(received).toEqual(expected);
 
-    const expected2 = namesAndIds(await Developer.all().toArray());
-    const received2 = namesAndIds(
-      await Developer.order("id DESC, name DESC").unscope("order").toArray(),
-    );
+    const expected2 = namesAndIds(await Developer.all());
+    const received2 = namesAndIds(await Developer.order("id DESC, name DESC").unscope("order"));
     expect(received2).toEqual(expected2);
 
-    const expected3 = namesAndIds(await Developer.all().toArray());
-    const received3 = namesAndIds(await Developer.reorder("name DESC").unscope("order").toArray());
+    const expected3 = namesAndIds(await Developer.all());
+    const received3 = namesAndIds(await Developer.reorder("name DESC").unscope("order"));
     expect(received3).toEqual(expected3);
   });
 
   it("unscope with where attributes", async () => {
-    const expected = names(await Developer.order("salary DESC").toArray());
+    const expected = names(await Developer.order("salary DESC"));
     const received = names(
-      await DeveloperOrderedBySalary.where({ name: "David" }).unscope({ where: "name" }).toArray(),
+      await DeveloperOrderedBySalary.where({ name: "David" }).unscope({ where: "name" }),
     );
     expect(received.sort()).toEqual(expected.sort());
 
     // Mixed args: selectively unscope only `name` from where, plus fully unscope select.
-    const expected2 = names(await Developer.order("salary DESC").toArray());
+    const expected2 = names(await Developer.order("salary DESC"));
     const received2 = names(
       await DeveloperOrderedBySalary.select("id")
         .where({ name: "Jamis" })
-        .unscope({ where: "name" }, "select")
-        .toArray(),
+        .unscope({ where: "name" }, "select"),
     );
     expect(received2.sort()).toEqual(expected2.sort());
 
-    const expected3 = names(await Developer.order("salary DESC").toArray());
+    const expected3 = names(await Developer.order("salary DESC"));
     const received3 = names(
       await DeveloperOrderedBySalary.select("id")
         .where({ name: "Jamis" })
-        .unscope("select", "where")
-        .toArray(),
+        .unscope("select", "where"),
     );
     expect(received3.sort()).toEqual(expected3.sort());
 
-    const expected4 = names(await Developer.order("salary DESC").toArray());
+    const expected4 = names(await Developer.order("salary DESC"));
     const received4 = names(
-      await DeveloperOrderedBySalary.whereNot({ name: "Jamis" })
-        .unscope({ where: "name" })
-        .toArray(),
+      await DeveloperOrderedBySalary.whereNot({ name: "Jamis" }).unscope({ where: "name" }),
     );
     expect(received4.sort()).toEqual(expected4.sort());
 
-    const expected5 = names(await Developer.order("salary DESC").toArray());
+    const expected5 = names(await Developer.order("salary DESC"));
     const received5 = names(
-      await DeveloperOrderedBySalary.whereNot({ name: ["Jamis", "David"] })
-        .unscope({ where: "name" })
-        .toArray(),
+      await DeveloperOrderedBySalary.whereNot({ name: ["Jamis", "David"] }).unscope({
+        where: "name",
+      }),
     );
     expect(received5.sort()).toEqual(expected5.sort());
 
-    const expected6 = names(await Developer.order("salary DESC").toArray());
+    const expected6 = names(await Developer.order("salary DESC"));
     const received6 = names(
-      await DeveloperOrderedBySalary.where(Developer.arelTable.get("name").eq("David") as any)
-        .unscope({ where: "name" })
-        .toArray(),
+      await DeveloperOrderedBySalary.where(
+        Developer.arelTable.get("name").eq("David") as any,
+      ).unscope({ where: "name" }),
     );
     expect(received6.sort()).toEqual(expected6.sort());
   });
 
   it("unscope multiple where clauses", async () => {
-    const expected = names(await Developer.order("salary DESC").toArray());
+    const expected = names(await Developer.order("salary DESC"));
     const received = names(
       await DeveloperOrderedBySalary.where({ name: "Jamis" })
         .where({ id: 1 })
-        .unscope({ where: ["name", "id"] })
-        .toArray(),
+        .unscope({ where: ["name", "id"] }),
     );
     expect(received.sort()).toEqual(expected.sort());
   });
 
   it("unscope with grouping attributes", async () => {
-    const expected = names(await Developer.order("salary DESC").toArray());
-    const received = names(await DeveloperOrderedBySalary.group("name").unscope("group").toArray());
+    const expected = names(await Developer.order("salary DESC"));
+    const received = names(await DeveloperOrderedBySalary.group("name").unscope("group"));
     expect(received.sort()).toEqual(expected.sort());
 
-    const expected2 = names(await Developer.order("salary DESC").toArray());
-    const received2 = names(
-      await DeveloperOrderedBySalary.group("name").unscope("group").toArray(),
-    );
+    const expected2 = names(await Developer.order("salary DESC"));
+    const received2 = names(await DeveloperOrderedBySalary.group("name").unscope("group"));
     expect(received2.sort()).toEqual(expected2.sort());
   });
 
   it("unscope with limit in query", async () => {
-    const expected = names(await Developer.order("salary DESC").toArray());
-    const received = names(await DeveloperOrderedBySalary.limit(1).unscope("limit").toArray());
+    const expected = names(await Developer.order("salary DESC"));
+    const received = names(await DeveloperOrderedBySalary.limit(1).unscope("limit"));
     expect(received.sort()).toEqual(expected.sort());
   });
 
   it("unscope reverse order", async () => {
-    const expected = names(await Developer.all().toArray());
-    const received = names(
-      await Developer.order("salary DESC").reverseOrder().unscope("order").toArray(),
-    );
+    const expected = names(await Developer.all());
+    const received = names(await Developer.order("salary DESC").reverseOrder().unscope("order"));
     expect(received).toEqual(expected);
   });
 
   it("unscope select", async () => {
-    const expected = names(await Developer.order("salary ASC").toArray());
+    const expected = names(await Developer.order("salary ASC"));
     const received = names(
-      await Developer.order("salary DESC")
-        .reverseOrder()
-        .select("name")
-        .unscope("select")
-        .toArray(),
+      await Developer.order("salary DESC").reverseOrder().select("name").unscope("select"),
     );
     expect(received).toEqual(expected);
 
-    const expected2 = (await Developer.all().toArray()).map((d: any) => d.id);
-    const received2 = (await Developer.select("name").unscope("select").toArray()).map(
-      (d: any) => d.id,
-    );
+    const expected2 = (await Developer.all()).map((d: any) => d.id);
+    const received2 = (await Developer.select("name").unscope("select")).map((d: any) => d.id);
     expect(received2).toEqual(expected2);
   });
 
   it("unscope offset", async () => {
-    const expected = names(await Developer.all().toArray());
-    const received = names(await Developer.offset(5).unscope("offset").toArray());
+    const expected = names(await Developer.all());
+    const received = names(await Developer.offset(5).unscope("offset"));
     expect(received).toEqual(expected);
   });
 
   it("order in default scope should not prevail", async () => {
-    const expected = salaries(await Developer.order("salary desc").toArray());
-    const received = salaries(await DeveloperOrderedBySalary.order("salary").toArray());
+    const expected = salaries(await Developer.order("salary desc"));
+    const received = salaries(await DeveloperOrderedBySalary.order("salary"));
     expect(received).toEqual(expected);
   });
 
@@ -537,15 +517,13 @@ describe("DefaultScopingTest", () => {
     );
     expect(unscopedPoorIds).toContain(developers("david").id);
 
-    expect((await DeveloperCalledJamis.unscoped().toArray()).length).toBe(11);
+    expect((await DeveloperCalledJamis.unscoped()).length).toBe(11);
     expect((await (DeveloperCalledJamis as any).poor().toArray()).length).toBe(1);
     expect((await (DeveloperCalledJamis.unscoped() as any).poor().toArray()).length).toBe(10);
   });
 
   it("default scope select ignored by aggregations", async () => {
-    expect((await DeveloperWithSelect.all().toArray()).length).toBe(
-      await DeveloperWithSelect.count(),
-    );
+    expect((await DeveloperWithSelect.all()).length).toBe(await DeveloperWithSelect.count());
   });
 
   it("default scope order ignored by aggregations", async () => {
@@ -576,7 +554,7 @@ describe("DefaultScopingTest", () => {
     const scope = (DeveloperCalledJamis as any).david2();
     expect(scope._whereClause.ast).toBeInstanceOf(Nodes.Equality);
     expect((await scope.toArray()).map((d: any) => d.id)).toEqual(
-      (await Developer.where({ name: "David" }).toArray()).map((d: any) => d.id),
+      (await Developer.where({ name: "David" })).map((d: any) => d.id),
     );
   });
 
@@ -591,7 +569,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope select ignored by grouped aggregations", async () => {
-    const all = await Developer.all().toArray();
+    const all = await Developer.all();
     const expected: Record<string, number> = {};
     for (const d of all as any[]) expected[d.salary] = (expected[d.salary] ?? 0) + 1;
     const received = await DeveloperWithSelect.group("salary").count();
@@ -599,36 +577,31 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope having", async () => {
-    const expected = names(await DeveloperOrderedBySalary.all().toArray());
+    const expected = names(await DeveloperOrderedBySalary.all());
     const received = names(
-      await DeveloperOrderedBySalary.having("name IN ('Jamis', 'David')")
-        .unscope("having")
-        .toArray(),
+      await DeveloperOrderedBySalary.having("name IN ('Jamis', 'David')").unscope("having"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope includes", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = names(
-      await Developer.includes("projects").select("id").unscope("includes", "select").toArray(),
+      await Developer.includes("projects").select("id").unscope("includes", "select"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope left outer joins", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = names(
-      await Developer.leftOuterJoins("projects")
-        .select("id")
-        .unscope("leftOuterJoins", "select")
-        .toArray(),
+      await Developer.leftOuterJoins("projects").select("id").unscope("leftOuterJoins", "select"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope eager load", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = Developer.eagerLoad("projects").select("id").unscope("eagerLoad", "select");
     const rows = await received.toArray();
     expect(names(rows)).toEqual(expected);
@@ -636,7 +609,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope preloads", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = Developer.preload("projects").select("id").unscope("preload", "select");
     const rows = await received.toArray();
     expect(names(rows)).toEqual(expected);
@@ -644,45 +617,43 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope joins and select on developers projects", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = names(
       await Developer.joins("JOIN developers_projects ON id = developer_id")
         .select("id")
-        .unscope("joins", "select")
-        .toArray(),
+        .unscope("joins", "select"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope comparison where clauses", async () => {
     // unscoped for WHERE (`developers`.`id` <= 2) — Rails uses -Float::INFINITY..2
-    const expected = names(await Developer.order("salary DESC").toArray());
+    const expected = names(await Developer.order("salary DESC"));
     const received = names(
-      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lteq(2) as any)
-        .unscope({ where: "id" })
-        .toArray(),
+      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lteq(2) as any).unscope({
+        where: "id",
+      }),
     );
     expect(received.sort()).toEqual(expected.sort());
 
     // unscoped for WHERE (`developers`.`id` < 2) — Rails uses -Float::INFINITY...2
-    const expected2 = names(await Developer.order("salary DESC").toArray());
+    const expected2 = names(await Developer.order("salary DESC"));
     const received2 = names(
-      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lt(2) as any)
-        .unscope({ where: "id" })
-        .toArray(),
+      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lt(2) as any).unscope({
+        where: "id",
+      }),
     );
     expect(received2.sort()).toEqual(expected2.sort());
   });
 
   it("unscope string where clauses involved", async () => {
     const expected = names(
-      await Developer.order("salary DESC").where("legacy_created_at > ?", "2020-01-01").toArray(),
+      await Developer.order("salary DESC").where("legacy_created_at > ?", "2020-01-01"),
     );
     const received = names(
       await DeveloperOrderedBySalary.where({ name: "Jamis" })
         .where("legacy_created_at > ?", "2020-01-01")
-        .unscope({ where: ["name"] })
-        .toArray(),
+        .unscope({ where: ["name"] }),
     );
     expect(received.sort()).toEqual(expected.sort());
   });
@@ -711,10 +682,8 @@ describe("DefaultScopingTest", () => {
   //    the missing capability.
 
   it("default scope with conditions hash", async () => {
-    const expected = (await Developer.where({ name: "Jamis" }).toArray())
-      .map((d: any) => d.id)
-      .sort();
-    const received = (await DeveloperCalledJamis.all().toArray()).map((d: any) => d.id).sort();
+    const expected = (await Developer.where({ name: "Jamis" })).map((d: any) => d.id).sort();
+    const received = (await DeveloperCalledJamis.all()).map((d: any) => d.id).sort();
     expect(received).toEqual(expected);
     expect(((await DeveloperCalledJamis.create()) as any).name).toBe("Jamis");
   });
@@ -818,7 +787,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope left joins", async () => {
-    const expected = names(await Developer.all().toArray());
+    const expected = names(await Developer.all());
     const received = names(
       await (Developer.leftJoins("projects") as any)
         .select("id")
@@ -851,18 +820,18 @@ describe("DefaultScopingTest", () => {
   });
 
   it("joins not affected by scope other than default or unscoped", async () => {
-    const without = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+    const without = (await Comment.joins("post")).map((c: any) => c.id).sort();
     let withScope: any[] = [];
     await (Post.where({ id: [1, 5, 6] }) as any).scoping(async () => {
-      withScope = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+      withScope = (await Comment.joins("post")).map((c: any) => c.id).sort();
     });
     expect(withScope).toEqual(without);
   });
 
   it("unscoped with joins should not have default scope", async () => {
-    const expected = (await Comment.joins("post").toArray()).map((c: any) => c.id).sort();
+    const expected = (await Comment.joins("post")).map((c: any) => c.id).sort();
     const received = await (SpecialPostWithDefaultScope as any).unscoped(async () =>
-      (await Comment.joins("specialPostWithDefaultScope").toArray()).map((c: any) => c.id).sort(),
+      (await Comment.joins("specialPostWithDefaultScope")).map((c: any) => c.id).sort(),
     );
     expect(received).toEqual(expected);
   });
@@ -962,12 +931,12 @@ describe("DefaultScopingTest", () => {
     await SubConditionalStiPost.create({ body: "" });
     await SubConditionalStiPost.create({ title: "Hello world", body: "" });
     expect(await ConditionalStiPost.count()).toBe(2);
-    expect((await ConditionalStiPost.all().toArray()).length).toBe(2);
-    expect((await ConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(3);
+    expect((await ConditionalStiPost.all()).length).toBe(2);
+    expect((await ConditionalStiPost.unscope({ where: "title" })).length).toBe(3);
 
     expect(await SubConditionalStiPost.count()).toBe(1);
-    expect((await SubConditionalStiPost.all().toArray()).length).toBe(1);
-    expect((await SubConditionalStiPost.unscope({ where: "title" }).toArray()).length).toBe(2);
+    expect((await SubConditionalStiPost.all()).length).toBe(1);
+    expect((await SubConditionalStiPost.unscope({ where: "title" })).length).toBe(2);
   });
 
   it("default scope include with count", async () => {
@@ -1037,6 +1006,6 @@ describe.skipIf(inMemoryDb())("DefaultScopingWithThreadTest", () => {
     await ThreadsafeDeveloper.unscoped().create();
     await ThreadsafeDeveloper.unscoped().create();
     expect(await ThreadsafeDeveloper.unscoped().count()).not.toBe(1);
-    expect((await ThreadsafeDeveloper.all().toArray()).length).toBe(1);
+    expect((await ThreadsafeDeveloper.all()).length).toBe(1);
   });
 });

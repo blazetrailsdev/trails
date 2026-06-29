@@ -88,7 +88,7 @@ describe("bigint model round-trip (all adapters)", () => {
     const Metric = makeModel();
     await Metric.create({ score: BIG, label: "target" });
     await Metric.create({ score: BIG + 1n, label: "other" });
-    const results = await Metric.where({ score: BIG }).toArray();
+    const results = await Metric.where({ score: BIG });
     expect(results).toHaveLength(1);
     expect(results[0].label).toBe("target");
   });

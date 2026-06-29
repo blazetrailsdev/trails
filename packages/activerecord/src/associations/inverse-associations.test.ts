@@ -415,7 +415,7 @@ describe("InverseHasOneTests", () => {
   });
 
   it("parent instance should be shared with eager loaded child on find", async () => {
-    let human = (await Human.where({ name: "Gordon" }).includes("face").toArray())[0];
+    let human = (await Human.where({ name: "Gordon" }).includes("face"))[0];
     let face = (human as any).face;
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
@@ -423,7 +423,7 @@ describe("InverseHasOneTests", () => {
     face.human.name = "Mungo";
     expect(face.human.name).toBe((human as any).name);
 
-    human = (await Human.where({ name: "Gordon" }).includes("face").order("faces.id").toArray())[0];
+    human = (await Human.where({ name: "Gordon" }).includes("face").order("faces.id"))[0];
     face = (human as any).face;
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
@@ -565,7 +565,7 @@ describe("InverseHasManyTests", () => {
   });
 
   it("parent instance should be shared with eager loaded children", async () => {
-    let human = (await Human.where({ name: "Gordon" }).includes("interests").toArray())[0];
+    let human = (await Human.where({ name: "Gordon" }).includes("interests"))[0];
     let interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
       expect(interest.human.name).toBe((human as any).name);
@@ -575,9 +575,7 @@ describe("InverseHasManyTests", () => {
       expect(interest.human.name).toBe((human as any).name);
     }
 
-    human = (
-      await Human.where({ name: "Gordon" }).includes("interests").order("interests.id").toArray()
-    )[0];
+    human = (await Human.where({ name: "Gordon" }).includes("interests").order("interests.id"))[0];
     interests = (human as any).interests;
     for (const interest of await interests.toArray()) {
       expect(interest.human.name).toBe((human as any).name);
@@ -862,9 +860,7 @@ describe("InverseBelongsToTests", () => {
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
-    let face = (
-      await Face.where({ description: "trusting" }).includes("human").toArray()
-    )[0] as any;
+    let face = (await Face.where({ description: "trusting" }).includes("human"))[0] as any;
     let human = face.human;
     expect(human.face.description).toBe(face.description);
     face.description = "gormless";
@@ -873,7 +869,7 @@ describe("InverseBelongsToTests", () => {
     expect(human.face.description).toBe(face.description);
 
     face = (
-      await Face.where({ description: "trusting" }).includes("human").order("humans.id").toArray()
+      await Face.where({ description: "trusting" }).includes("human").order("humans.id")
     )[0] as any;
     human = face.human;
     expect(human.face.description).toBe(face.description);
@@ -1073,9 +1069,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it("eager loaded child instance should be shared with parent on find", async () => {
-    let face = (
-      await Face.where({ description: "confused" }).includes("human").toArray()
-    )[0] as any;
+    let face = (await Face.where({ description: "confused" }).includes("human"))[0] as any;
     let human = (await loadBelongsTo(face, "polymorphicHuman", {
       polymorphic: true,
       inverseOf: "polymorphicFace",
@@ -1087,7 +1081,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(human.polymorphicFace.description).toBe(face.description);
 
     face = (
-      await Face.where({ description: "confused" }).includes("human").order("humans.id").toArray()
+      await Face.where({ description: "confused" }).includes("human").order("humans.id")
     )[0] as any;
     human = (await loadBelongsTo(face, "polymorphicHuman", {
       polymorphic: true,

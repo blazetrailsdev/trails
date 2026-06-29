@@ -28,7 +28,7 @@ describe("RelationTest", () => {
     // Rails `exec_main_query` returns `[].freeze` for a contradiction without
     // touching the database — no SELECT is sent.
     await assertNoQueries(false, async () => {
-      expect(await Author.all().where({ id: [] }).toArray()).toEqual([]);
+      expect(await Author.all().where({ id: [] })).toEqual([]);
     });
   });
 

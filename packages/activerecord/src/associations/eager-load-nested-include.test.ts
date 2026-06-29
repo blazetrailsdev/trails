@@ -165,7 +165,7 @@ describe("EagerLoadPolyAssocsTest", () => {
       });
     }
 
-    const res = await ShapeExpression.all().includes("shape", { paint: "nonPoly" }).toArray();
+    const res = await ShapeExpression.all().includes("shape", { paint: "nonPoly" });
     expect(res).toHaveLength(NUM_SHAPE_EXPRESSIONS);
     await assertNoQueries(false, async () => {
       for (const se of res) {
@@ -225,7 +225,6 @@ describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
         { authorFavorites: "favoriteAuthor" },
       )
       .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
-      .order("categories.name")
-      .toArray();
+      .order("categories.name");
   });
 });

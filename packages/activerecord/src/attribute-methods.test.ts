@@ -984,7 +984,7 @@ describe("AttributeMethodsTest", () => {
       }
     }
     await Topic.create({ title: "t", body: "b" });
-    const rec = (await Topic.all().toArray())[0] as any;
+    const rec = (await Topic.all())[0] as any;
     const names = rec.attributeNames ? rec.attributeNames() : Topic.attributeNames();
     expect(names).toContain("title");
   });

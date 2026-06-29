@@ -121,14 +121,14 @@ describe("RelationTest", () => {
   it("do not double quote string id", async () => {
     const van = await Minivan.last();
     expect(van).toBeTruthy();
-    const result = await Minivan.where({ minivan_id: van }).toArray();
+    const result = await Minivan.where({ minivan_id: van });
     expect(result[0].minivan_id).toBe(van!.id);
   });
 
   it("do not double quote string id with array", async () => {
     const van = await Minivan.last();
     expect(van).toBeTruthy();
-    const result = await Minivan.where({ minivan_id: [van] }).toArray();
+    const result = await Minivan.where({ minivan_id: [van] });
     expect(result[0].minivan_id).toBe(van!.minivan_id);
     expect(result[0].id).toBe(van!.id);
   });
@@ -150,7 +150,7 @@ describe("RelationTest", () => {
   });
 
   it("multivalue where", async () => {
-    const result = await Post.where("author_id = ? AND id = ?", 1, 1).toArray();
+    const result = await Post.where("author_id = ? AND id = ?", 1, 1);
     expect(result).toHaveLength(1);
   });
 
@@ -161,28 +161,28 @@ describe("RelationTest", () => {
   });
 
   it("to json", async () => {
-    const birds = await Bird.all().toArray();
+    const birds = await Bird.all();
     expect(() => JSON.stringify(birds)).not.toThrow();
-    const arr = await Bird.all().toArray();
+    const arr = await Bird.all();
     expect(() => JSON.stringify(arr)).not.toThrow();
   });
 
   it("to yaml", async () => {
-    const birds = await Bird.all().toArray();
+    const birds = await Bird.all();
     expect(birds).toBeDefined();
-    const arr = await Bird.all().toArray();
+    const arr = await Bird.all();
     expect(arr).toBeDefined();
   });
 
   it("to xml", async () => {
-    const birds = await Bird.all().toArray();
+    const birds = await Bird.all();
     expect(birds).toBeDefined();
-    const arr = await Bird.all().toArray();
+    const arr = await Bird.all();
     expect(arr).toBeDefined();
   });
 
   it("scoped all", async () => {
-    const topicsArr = await Topic.all().toArray();
+    const topicsArr = await Topic.all();
     expect(Array.isArray(topicsArr)).toBe(true);
     expect(topicsArr).toHaveLength(5);
   });
@@ -247,11 +247,11 @@ describe("RelationTest", () => {
   it("finding with subquery", async () => {
     const relation = Topic.where({ approved: true });
     const direct = await relation.toArray();
-    const fromSubquery = await Topic.select("*").from(relation).toArray();
+    const fromSubquery = await Topic.select("*").from(relation);
     expect(fromSubquery.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
-    const fromSubqueryNamed = await Topic.select("subquery.*").from(relation).toArray();
+    const fromSubqueryNamed = await Topic.select("subquery.*").from(relation);
     expect(fromSubqueryNamed.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
-    const fromSubqueryAliased = await Topic.select("a.*").from(relation, "a").toArray();
+    const fromSubqueryAliased = await Topic.select("a.*").from(relation, "a");
     expect(fromSubqueryAliased.map((t) => t.id).sort()).toEqual(direct.map((t) => t.id).sort());
   });
 
@@ -259,11 +259,11 @@ describe("RelationTest", () => {
     const post = await Post.first();
     const commentRel = Comment.where({ post_id: post!.id });
     const direct = await commentRel.toArray();
-    const fromSubquery = await Comment.select("*").from(commentRel).toArray();
+    const fromSubquery = await Comment.select("*").from(commentRel);
     expect(fromSubquery.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
-    const fromSubqueryNamed = await Comment.select("subquery.*").from(commentRel).toArray();
+    const fromSubqueryNamed = await Comment.select("subquery.*").from(commentRel);
     expect(fromSubqueryNamed.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
-    const fromSubqueryAliased = await Comment.select("a.*").from(commentRel, "a").toArray();
+    const fromSubqueryAliased = await Comment.select("a.*").from(commentRel, "a");
     expect(fromSubqueryAliased.map((c) => c.id).sort()).toEqual(direct.map((c) => c.id).sort());
   });
 
@@ -376,9 +376,9 @@ describe("RelationTest", () => {
   });
 
   it("finding with conditions", async () => {
-    expect((await Author.where({ name: "David" }).toArray()).map((a) => a.name)).toEqual(["David"]);
-    expect((await Author.where("name = ?", "Mary").toArray()).map((a) => a.name)).toEqual(["Mary"]);
-    expect((await Author.where("name = ?", "Mary").toArray()).map((a) => a.name)).toEqual(["Mary"]);
+    expect((await Author.where({ name: "David" })).map((a) => a.name)).toEqual(["David"]);
+    expect((await Author.where("name = ?", "Mary")).map((a) => a.name)).toEqual(["Mary"]);
+    expect((await Author.where("name = ?", "Mary")).map((a) => a.name)).toEqual(["Mary"]);
   });
 
   it("finding with order", async () => {
@@ -561,7 +561,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with reorder", async () => {
-    const topicsArr = await Topic.order("author_name").order("title").reorder("id").toArray();
+    const topicsArr = await Topic.order("author_name").order("title").reorder("id");
     expect(topicsArr.map((t) => t.title)).toEqual([
       "The First Topic",
       "The Second Topic of the day",
@@ -590,7 +590,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with order and take", async () => {
-    const entrantsArr = await Entrant.order("id ASC").limit(2).toArray();
+    const entrantsArr = await Entrant.order("id ASC").limit(2);
     expect(entrantsArr).toHaveLength(2);
     expect(entrantsArr[0].name).toBe(entrants("first").name);
   });
@@ -641,24 +641,24 @@ describe("RelationTest", () => {
   });
 
   it("finding with order limit and offset", async () => {
-    const e1 = await Entrant.order("id ASC").limit(2).offset(1).toArray();
+    const e1 = await Entrant.order("id ASC").limit(2).offset(1);
     expect(e1).toHaveLength(2);
     expect(e1[0].name).toBe(entrants("second").name);
 
-    const e2 = await Entrant.order("id ASC").limit(2).offset(2).toArray();
+    const e2 = await Entrant.order("id ASC").limit(2).offset(2);
     expect(e2).toHaveLength(1);
     expect(e2[0].name).toBe(entrants("third").name);
   });
 
   it("finding with group", async () => {
-    const devsArr = await Developer.group("salary").select("salary").toArray();
+    const devsArr = await Developer.group("salary").select("salary");
     expect(devsArr).toHaveLength(4);
     const salaries = devsArr.map((d: any) => d.salary);
     expect(new Set(salaries).size).toBe(4);
   });
 
   it("select with block", async () => {
-    const evenIds = (await Developer.all().toArray())
+    const evenIds = (await Developer.all())
       .filter((d) => Number(d.id) % 2 === 0)
       .map((d) => Number(d.id));
     expect(evenIds.sort((a, b) => a - b)).toEqual([2, 4, 6, 8, 10]);
@@ -678,18 +678,14 @@ describe("RelationTest", () => {
     const railsCore = companies("rails_core");
     const firms = await DependentFirm.joins(
       "INNER JOIN accounts ON accounts.firm_id = companies.id",
-    )
-      .where({ name: railsCore.name, accounts: { credit_limit: [55, 56, 57, 58, 59, 60] } })
-      .toArray();
+    ).where({ name: railsCore.name, accounts: { credit_limit: [55, 56, 57, 58, 59, 60] } });
     expect(firms).toHaveLength(1);
   });
 
   it("find all with join", async () => {
     const devs = await Developer.joins(
       "LEFT JOIN developers_projects ON developers.id = developers_projects.developer_id",
-    )
-      .where("project_id=1")
-      .toArray();
+    ).where("project_id=1");
     expect(devs).toHaveLength(3);
     const names = devs.map((d) => d.name);
     expect(names).toContain("David");
@@ -697,10 +693,8 @@ describe("RelationTest", () => {
   });
 
   it("find on hash conditions", async () => {
-    const a = await Topic.all()
-      .merge(Topic.where({ approved: false }))
-      .toArray();
-    const b = await Topic.where({ approved: false }).toArray();
+    const a = await Topic.all().merge(Topic.where({ approved: false }));
+    const b = await Topic.where({ approved: false });
     expect(a.map((t) => t.id).sort()).toEqual(b.map((t) => t.id).sort());
   });
 
@@ -708,7 +702,7 @@ describe("RelationTest", () => {
     const postsArr = await Post.joins([
       "INNER JOIN categorizations ON categorizations.post_id = posts.id",
       "INNER JOIN categories ON categories.id = categorizations.category_id AND categories.type = 'SpecialCategory'",
-    ]).toArray();
+    ]);
     expect(postsArr).toHaveLength(1);
   });
 
@@ -735,11 +729,11 @@ describe("RelationTest", () => {
   });
 
   it("find with readonly option", async () => {
-    const devs = await Developer.all().toArray();
+    const devs = await Developer.all();
     for (const d of devs) {
       expect((d as any).readonly).toBeFalsy();
     }
-    const readonlyDevs = await Developer.all().readonly().toArray();
+    const readonlyDevs = await Developer.all().readonly();
     for (const d of readonlyDevs) {
       expect((d as any)._readonly).toBe(true);
     }
@@ -750,12 +744,12 @@ describe("RelationTest", () => {
   });
 
   it("find with preloaded associations", async () => {
-    const posts1 = await Post.preload("comments").order("posts.id").toArray();
+    const posts1 = await Post.preload("comments").order("posts.id");
     const firstPost = posts1.find((p) => Number(p.id) === 1)!;
     const firstComments = await firstPost.comments.toArray();
     expect(firstComments.length).toBeGreaterThan(0);
 
-    const posts2 = await Post.preload("author").order("posts.id").toArray();
+    const posts2 = await Post.preload("author").order("posts.id");
     const withAuthor = posts2[0];
     const author = await withAuthor.author;
     expect(author).toBeTruthy();
@@ -771,22 +765,18 @@ describe("RelationTest", () => {
   });
 
   it("find with included associations", async () => {
-    const posts1 = await Post.includes("comments").order("posts.id").toArray();
+    const posts1 = await Post.includes("comments").order("posts.id");
     const firstComments = await posts1[0].comments.toArray();
     expect(firstComments.length).toBeGreaterThan(0);
 
-    const posts2 = await Post.includes("author").order("posts.id").toArray();
+    const posts2 = await Post.includes("author").order("posts.id");
     const author = await posts2[0].author;
     expect(author).toBeTruthy();
   });
 
   it("default scoping finder methods", async () => {
-    const devIds = (await DeveloperCalledDavid.order("id").toArray())
-      .map((d) => Number(d.id))
-      .sort();
-    const expectedIds = (await Developer.where({ name: "David" }).toArray())
-      .map((d) => Number(d.id))
-      .sort();
+    const devIds = (await DeveloperCalledDavid.order("id")).map((d) => Number(d.id)).sort();
+    const expectedIds = (await Developer.where({ name: "David" })).map((d) => Number(d.id)).sort();
     expect(devIds).toEqual(expectedIds);
   });
 
@@ -812,7 +802,7 @@ describe("RelationTest", () => {
     const postRel = PostWithPreloadDefaultScope.preload("readers")
       .joins("INNER JOIN readers ON readers.post_id = posts.id")
       .where({ title: "Uhuu" });
-    const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel).toArray();
+    const resultPosts = await PostWithPreloadDefaultScope.all().merge(postRel);
     expect(resultPosts).toHaveLength(1);
     const preloadedReaders = await resultPosts[0].readers.toArray();
     expect(preloadedReaders).toHaveLength(1);
@@ -820,7 +810,7 @@ describe("RelationTest", () => {
 
     // includes branch: PostWithIncludesDefaultScope
     const postRel2 = PostWithIncludesDefaultScope.includes("readers").where({ title: "Uhuu" });
-    const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2).toArray();
+    const resultPosts2 = await PostWithIncludesDefaultScope.all().merge(postRel2);
     expect(resultPosts2).toHaveLength(1);
     const includedReaders = await resultPosts2[0].readers.toArray();
     expect(includedReaders).toHaveLength(1);
@@ -828,7 +818,7 @@ describe("RelationTest", () => {
   });
 
   it("loading with one association", async () => {
-    const allPosts = await Post.preload("comments").toArray();
+    const allPosts = await Post.preload("comments");
     const post = allPosts.find((p) => Number(p.id) === 1)!;
     const postComments = await post.comments.toArray();
     expect(postComments).toHaveLength(2);
@@ -839,7 +829,7 @@ describe("RelationTest", () => {
     expect(post2Comments).toHaveLength(2);
     expect(post2Comments.map((c: any) => c.id)).toContain(comments("greetings").id);
 
-    const postsWithLastComment = await Post.preload("lastComment").toArray();
+    const postsWithLastComment = await Post.preload("lastComment");
     const postWithLastComment = postsWithLastComment.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
     const directLastComment = await freshPost.loadHasOne("lastComment");
@@ -860,7 +850,7 @@ describe("RelationTest", () => {
 
   it("loading with one association with non preload", async () => {
     void posts("welcome");
-    const postsEager = await Post.eagerLoad("lastComment").order("comments.id DESC").toArray();
+    const postsEager = await Post.eagerLoad("lastComment").order("comments.id DESC");
     const post = postsEager.find((p) => Number(p.id) === 1)!;
     const freshPost = await Post.find(1);
     const directLastComment = await freshPost.loadHasOne("lastComment");
@@ -908,20 +898,20 @@ describe("RelationTest", () => {
   });
 
   it("find in empty array", async () => {
-    const result = await Author.all().where({ id: [] }).toArray();
+    const result = await Author.all().where({ id: [] });
     expect(result).toHaveLength(0);
   });
 
   it("where with ar object", async () => {
     const author = await Author.first();
-    const result = await Author.all().where({ id: author }).toArray();
+    const result = await Author.all().where({ id: author });
     expect(result).toHaveLength(1);
   });
 
   it("where with ar relation", async () => {
     const lastPost = await Post.last();
     const author = await lastPost!.author;
-    const result = await Post.all().where({ author: author }).toArray();
+    const result = await Post.all().where({ author: author });
     expect(result).toHaveLength(3);
   });
 
@@ -978,8 +968,8 @@ describe("RelationTest", () => {
   it("typecasting where with array", async () => {
     const ids = await Author.pluck("id");
     const slugs = ids.map((id: unknown) => `${id}-as-a-slug`);
-    const byIds = await Author.where({ id: ids }).toArray();
-    const bySlugs = await Author.where({ id: slugs }).toArray();
+    const byIds = await Author.where({ id: ids });
+    const bySlugs = await Author.where({ id: slugs });
     expect(byIds.map((a) => a.id)).toEqual(bySlugs.map((a) => a.id));
   });
 
@@ -999,22 +989,16 @@ describe("RelationTest", () => {
 
   it("find all using where with relation with bound values", async () => {
     const david = authors("david");
-    const davidsPosts = await david.posts.order("id").toArray();
+    const davidsPosts = await david.posts.order("id");
 
     const rel1 = Post.where({ id: david.posts.select("id") });
-    expect((await rel1.order("id").toArray()).map((p) => p.id)).toEqual(
-      davidsPosts.map((p: any) => p.id),
-    );
+    expect((await rel1.order("id")).map((p) => p.id)).toEqual(davidsPosts.map((p: any) => p.id));
 
     const rel2 = Post.where("id in (?)", david.posts.select("id"));
-    expect((await rel2.order("id").toArray()).map((p) => p.id)).toEqual(
-      davidsPosts.map((p: any) => p.id),
-    );
+    expect((await rel2.order("id")).map((p) => p.id)).toEqual(davidsPosts.map((p: any) => p.id));
 
     const rel3 = Post.where("id in (:post_ids)", { post_ids: david.posts.select("id") });
-    expect((await rel3.order("id").toArray()).map((p) => p.id)).toEqual(
-      davidsPosts.map((p: any) => p.id),
-    );
+    expect((await rel3.order("id")).map((p) => p.id)).toEqual(davidsPosts.map((p: any) => p.id));
   });
 
   it("find all using where with relation and alternate primary key", async () => {
@@ -1031,7 +1015,7 @@ describe("RelationTest", () => {
 
     let error: unknown;
     try {
-      await CpkOrder.where({ id: subquery }).toArray();
+      await CpkOrder.where({ id: subquery });
     } catch (e) {
       error = e;
     }
@@ -1100,7 +1084,7 @@ describe("RelationTest", () => {
   });
 
   it("count with block", async () => {
-    const postsRel = await Post.all().toArray();
+    const postsRel = await Post.all();
     const evenCount = postsRel.filter(
       (p) => ((p as any).commentsCount ?? (p as any).legacy_comments_count ?? 0) % 2 === 0,
     ).length;
@@ -1680,7 +1664,7 @@ describe("RelationTest", () => {
     const authorPostsArr = (await authorPosts.toArray()).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
-    const directPosts = (await Post.where({ author_id: 1 }).toArray()).sort(
+    const directPosts = (await Post.where({ author_id: 1 })).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
     expect(authorPostsArr.map((p) => p.id)).toEqual(directPosts.map((p) => p.id));
@@ -1694,16 +1678,14 @@ describe("RelationTest", () => {
     const authorPostsArr = (await authorPosts.toArray()).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
-    const directPosts = (await Post.where({ author_id: 1 }).toArray()).sort(
+    const directPosts = (await Post.where({ author_id: 1 })).sort(
       (a: Post, b: Post) => Number(a.id) - Number(b.id),
     );
     expect(authorPostsArr.map((p) => p.id)).toEqual(directPosts.map((p) => p.id));
 
     const allPosts = relation.only("order");
     const allArr = await allPosts.toArray();
-    expect(allArr.map((p) => p.id)).toEqual(
-      (await Post.order("id ASC").toArray()).map((p) => p.id),
-    );
+    expect(allArr.map((p) => p.id)).toEqual((await Post.order("id ASC")).map((p) => p.id));
   });
 
   it("anonymous extension", () => {
@@ -1725,8 +1707,8 @@ describe("RelationTest", () => {
   });
 
   it("order by relation attribute", async () => {
-    const byArel = await Post.order(Post.arelTable.get("title")).toArray();
-    const byStr = await Post.order("title").toArray();
+    const byArel = await Post.order(Post.arelTable.get("title"));
+    const byStr = await Post.order("title");
     expect(byArel.map((p) => p.id)).toEqual(byStr.map((p) => p.id));
   });
 
@@ -1796,7 +1778,7 @@ describe("RelationTest", () => {
   });
 
   it("grouping by column with reserved name", async () => {
-    const result = await Possession.select("where").group("where").toArray();
+    const result = await Possession.select("where").group("where");
     expect(result).toEqual([]);
   });
 
@@ -2028,7 +2010,7 @@ describe("RelationTest", () => {
 
   it("relations show the records in #inspect", async () => {
     const relation = Post.limit(2);
-    const records = await Post.limit(2).toArray();
+    const records = await Post.limit(2);
     await relation.load();
     const str = relation.inspect();
     for (const record of records) {
@@ -2165,9 +2147,7 @@ describe("RelationTest", () => {
     }
     const ordered = await Company.joins(
       "INNER JOIN contracts ON contracts.company_id = companies.id",
-    )
-      .order("contracts.metadata", "companies.id")
-      .toArray();
+    ).order("contracts.metadata", "companies.id");
     expect(ordered.slice(-2).map((c) => c.name)).toEqual(["test1", "test2"]);
   });
 
@@ -2183,9 +2163,8 @@ describe("RelationTest", () => {
 
     const comments1 = await Comment.where({ post_id: p1 })
       .unscope({ where: "post_id" })
-      .where({ post_id: p2 })
-      .toArray();
-    const comments2 = await Comment.where({ post_id: p2 }).toArray();
+      .where({ post_id: p2 });
+    const comments2 = await Comment.where({ post_id: p2 });
     expect(comments1.map((c) => c.id).sort()).toEqual(comments2.map((c) => c.id).sort());
   });
 
@@ -2198,9 +2177,8 @@ describe("RelationTest", () => {
 
     const commentsResult = await Comment.merge(p0)
       .unscope({ where: "author_id" })
-      .where({ post_id: p1 })
-      .toArray();
-    const p1Comments = await Comment.where({ post_id: p1 }).toArray();
+      .where({ post_id: p1 });
+    const p1Comments = await Comment.where({ post_id: p1 });
     expect(commentsResult.map((c) => c.id).sort()).toEqual(p1Comments.map((c) => c.id).sort());
   });
 
@@ -2208,9 +2186,7 @@ describe("RelationTest", () => {
     const comment = comments("greetings");
     await (comment as any).update({ body: "updated" });
 
-    const result = await Comment.where({ id: comment.id })
-      .unscope({ where: "unknown_column" })
-      .toArray();
+    const result = await Comment.where({ id: comment.id }).unscope({ where: "unknown_column" });
     expect(result.map((c) => c.id)).toContain(comment.id);
   });
 
@@ -2223,7 +2199,7 @@ describe("RelationTest", () => {
 
   it("unscope with aliased column", async () => {
     const mary = authors("mary");
-    const postsByMary = await Post.where({ author_id: mary.id }).order("id").toArray();
+    const postsByMary = await Post.where({ author_id: mary.id }).order("id");
 
     const unscoped = Post.where({ author_id: mary.id }).order("id").unscope({ where: "author_id" });
     const unscopedArr = await unscoped.toArray();
@@ -2331,14 +2307,12 @@ describe("RelationTest", () => {
   it("#where with set", async () => {
     const david = authors("david");
     const mary = authors("mary");
-    const result = await Author.where({ name: new Set(["David", "Mary"]) })
-      .order("id")
-      .toArray();
+    const result = await Author.where({ name: new Set(["David", "Mary"]) }).order("id");
     expect(result.map((a) => a.id)).toEqual([david.id, mary.id]);
   });
 
   it("#where with empty set", async () => {
-    const result = await Author.where({ name: new Set() }).toArray();
+    const result = await Author.where({ name: new Set() });
     expect(result).toHaveLength(0);
   });
 

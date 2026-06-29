@@ -117,7 +117,7 @@ describe("EnumTest", () => {
       }
     }
     await Post.create({ status: 0 });
-    const results = await Post.where({ status: 0 }).toArray();
+    const results = await Post.where({ status: 0 });
     expect(results.length).toBeGreaterThan(0);
   });
 
@@ -127,7 +127,7 @@ describe("EnumTest", () => {
         this.attribute("status", "integer");
       }
     }
-    const results = await Post.where({ status: 9999 }).toArray();
+    const results = await Post.where({ status: 9999 });
     expect(results.length).toBe(0);
   });
 
@@ -260,7 +260,7 @@ describe("EnumTest", () => {
     expect(readEnumValue(b, "status")).toBe("published");
     expect(readEnumValue(b, "language")).toBe("english");
     // Verify we can find via the stored integer value
-    const found = await Book.where({ status: 2 }).toArray();
+    const found = await Book.where({ status: 2 });
     expect(found.length).toBe(1);
     expect(readEnumValue(found[0], "status")).toBe("published");
   });
@@ -283,14 +283,14 @@ describe("EnumTest", () => {
   it("find via where with values.to_s", async () => {
     const Book = await makeBook();
     await Book.create({ status: castEnumValue(Book, "status", "published"), name: "Test" });
-    const books = await Book.where({ status: 2 }).toArray();
+    const books = await Book.where({ status: 2 });
     expect(books.length).toBe(1);
   });
 
   it("find via where with symbols", async () => {
     const Book = await makeBook();
     await Book.create({ status: castEnumValue(Book, "status", "proposed"), name: "Test" });
-    const books = await Book.where({ status: 0 }).toArray();
+    const books = await Book.where({ status: 0 });
     expect(books.length).toBe(1);
   });
 

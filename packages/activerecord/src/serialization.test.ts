@@ -148,9 +148,10 @@ describe("SerializationTest", () => {
       author as unknown as { serializedPosts: { create(attrs: object): Promise<unknown> } }
     ).serializedPosts.create({ title: "Hello\n" });
 
-    const results = await Author.joins("serializedPosts")
-      .where({ name: "David", serialized_posts: { title: "Hello\n" } })
-      .toArray();
+    const results = await Author.joins("serializedPosts").where({
+      name: "David",
+      serialized_posts: { title: "Hello\n" },
+    });
     expect(results.length).toBe(1);
   });
 });

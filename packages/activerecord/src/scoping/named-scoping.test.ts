@@ -50,8 +50,8 @@ describe("NamedScopingTest", () => {
   );
 
   it("implements enumerable", async () => {
-    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.all()).length).toBeGreaterThan(0);
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all()));
     expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
   });
 
@@ -75,8 +75,8 @@ describe("NamedScopingTest", () => {
   });
 
   it("delegates finds and calculations to the base class", async () => {
-    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.all()).length).toBeGreaterThan(0);
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all()));
     expect((await Topic.count()) as number).toBe(await Topic.base().count());
   });
 
@@ -111,9 +111,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
-    expect((await Topic.where({ approved: true }).toArray()).length).toBeGreaterThan(0);
+    expect((await Topic.where({ approved: true })).length).toBeGreaterThan(0);
     expect(sortedIds(await Topic.approved().toArray())).toEqual(
-      sortedIds(await Topic.where({ approved: true }).toArray()),
+      sortedIds(await Topic.where({ approved: true })),
     );
     expect(await Topic.approved().count()).toBe(await Topic.where({ approved: true }).count());
   });
@@ -125,8 +125,8 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes are composable", async () => {
-    const approved = sortedIds(await Topic.where({ approved: true }).toArray());
-    const replied = sortedIds(await Topic.where("replies_count > 0").toArray());
+    const approved = sortedIds(await Topic.where({ approved: true }));
+    const replied = sortedIds(await Topic.where("replies_count > 0"));
     expect(approved).not.toEqual(replied);
     expect(sortedIds(await (Topic as any).approved().replied().toArray())).toEqual(
       approved.filter((id) => replied.includes(id)),
@@ -136,10 +136,8 @@ describe("NamedScopingTest", () => {
   it("procedural scopes", async () => {
     const third = topics("third");
     const second = topics("second");
-    const beforeThird = sortedIds(await Topic.where("written_on < ?", third.written_on).toArray());
-    const beforeSecond = sortedIds(
-      await Topic.where("written_on < ?", second.written_on).toArray(),
-    );
+    const beforeThird = sortedIds(await Topic.where("written_on < ?", third.written_on));
+    const beforeSecond = sortedIds(await Topic.where("written_on < ?", second.written_on));
     expect(beforeThird).not.toEqual(beforeSecond);
     expect(sortedIds(await Topic.writtenBefore(third.written_on).toArray())).toEqual(beforeThird);
     expect(sortedIds(await Topic.writtenBefore(second.written_on).toArray())).toEqual(beforeSecond);
@@ -147,7 +145,7 @@ describe("NamedScopingTest", () => {
 
   it("procedural scopes returning nil", async () => {
     expect(sortedIds(await Topic.writtenBefore(null).toArray())).toEqual(
-      sortedIds(await Topic.all().toArray()),
+      sortedIds(await Topic.all()),
     );
   });
 
@@ -257,8 +255,8 @@ describe("NamedScopingTest", () => {
   });
 
   it("active records have scope named  all  ", async () => {
-    expect((await Topic.all().toArray()).length).toBeGreaterThan(0);
-    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all().toArray()));
+    expect((await Topic.all()).length).toBeGreaterThan(0);
+    expect(ids(await Topic.base().toArray())).toEqual(ids(await Topic.all()));
   });
 
   it("active records have scope named  scoped  ", async () => {
@@ -267,7 +265,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("first and last should allow integers for limit", async () => {
-    const ordered = await Topic.base().order("id").toArray();
+    const ordered = await Topic.base().order("id");
     const first2 = await Topic.base().first(2);
     expect(ids(first2)).toEqual(ids(ordered.slice(0, 2)));
     const last2 = await Topic.base().last(2);
@@ -446,12 +444,12 @@ describe("NamedScopingTest", () => {
     Topic.scope("title containing space", (q: any, opts: { space?: string } = {}) =>
       q.where(`title LIKE '%${opts.space ?? " "}%'`),
     );
-    const expected = sortedIds(await Topic.where("title LIKE '% %'").toArray());
+    const expected = sortedIds(await Topic.where("title LIKE '% %'"));
     const got = sortedIds(await (Topic as any)["title containing space"]({ space: " " }).toArray());
     expect(got).toEqual(expected);
     // (2) chained onto an already-constrained relation: the space-named scope
     // must not reset the prior `approved` condition.
-    const chainedExpected = sortedIds(await Topic.approved().where("title LIKE '% %'").toArray());
+    const chainedExpected = sortedIds(await Topic.approved().where("title LIKE '% %'"));
     const chainedGot = sortedIds(
       await (Topic as any).approved()["title containing space"]({ space: " " }).toArray(),
     );
@@ -472,10 +470,8 @@ describe("NamedScopingTest", () => {
   });
 
   it("should use where in query for scope", async () => {
-    const byName = sortedIds(await Developer.where({ name: "Jamis" }).toArray());
-    const byScope = sortedIds(
-      await Developer.where({ id: Developer.jamises().select("id") }).toArray(),
-    );
+    const byName = sortedIds(await Developer.where({ name: "Jamis" }));
+    const byScope = sortedIds(await Developer.where({ id: Developer.jamises().select("id") }));
     expect(byScope).toEqual(byName);
   });
 
@@ -523,10 +519,10 @@ describe("NamedScopingTest", () => {
   it("chaining combines conditions when searching", async () => {
     // Normal hash conditions
     expect(sortedIds(await (Topic as any).rejected().approved().toArray())).toEqual(
-      sortedIds(await Topic.where({ approved: false }).where({ approved: true }).toArray()),
+      sortedIds(await Topic.where({ approved: false }).where({ approved: true })),
     );
     expect(sortedIds(await (Topic as any).approved().rejected().toArray())).toEqual(
-      sortedIds(await Topic.where({ approved: true }).where({ approved: false }).toArray()),
+      sortedIds(await Topic.where({ approved: true }).where({ approved: false })),
     );
     // Nested hash conditions with same keys
     expect(await (Post as any).withSpecialComments().withVerySpecialComments().toArray()).toEqual(
@@ -745,7 +741,7 @@ describe("NamedScopingTest", () => {
     expect(sql).toContain("from-scope");
     // Rails also asserts the annotation does not filter records.
     expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
-      sortedIds(await Topic.all().toArray()),
+      sortedIds(await Topic.all()),
     );
   });
 });

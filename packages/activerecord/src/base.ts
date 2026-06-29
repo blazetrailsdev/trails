@@ -482,7 +482,7 @@ async function performClassUpdate(
         "update: attributes must be a plain object (missing or invalid attrs for the :all / nil form)",
       );
     }
-    const records = await this.all().toArray();
+    const records = await this.all();
     for (const r of records) await run(r, candidate);
     return records;
   }

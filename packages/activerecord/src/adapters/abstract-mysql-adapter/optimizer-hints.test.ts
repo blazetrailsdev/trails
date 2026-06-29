@@ -32,8 +32,7 @@ describeIfMysql("Mysql2Adapter", () => {
       const sqls = await captureSql(async () => {
         await Post.optimizerHints(hint)
           .select("id")
-          .where({ author_id: [0, 1] })
-          .toArray();
+          .where({ author_id: [0, 1] });
       });
       // Rails: assert_queries_match(%r{\ASELECT /\*\+ NO_RANGE_OPTIMIZATION(...) \*/})
       expect(sqls[0]).toMatch(

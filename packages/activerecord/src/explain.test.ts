@@ -30,7 +30,7 @@ describe("ExplainTest", () => {
 
   itIfSupports("explain", "collecting queries for explain", async () => {
     const { queries } = await Base.collectingQueriesForExplain(async () => {
-      await Car.where({ name: "honda" }).toArray();
+      await Car.where({ name: "honda" });
     });
 
     const [sql, binds] = queries[0];

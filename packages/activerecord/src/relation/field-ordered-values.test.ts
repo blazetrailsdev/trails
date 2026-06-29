@@ -145,7 +145,7 @@ describe("FieldOrderedValuesTest", () => {
     const order = [3, 4, 1];
     const posts = Post.inOrderOf("id", order, false);
 
-    expect((await posts.limit(3).toArray()).map((p: any) => Number(p.id))).toEqual(order);
+    expect((await posts.limit(3)).map((p: any) => Number(p.id))).toEqual(order);
     expect(await posts.count()).toBe(11);
   });
 });

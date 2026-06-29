@@ -365,7 +365,7 @@ describe("RelationMergingTest", () => {
       undefined,
       false,
       async () => {
-        await posts.merge(posts).toArray();
+        await posts.merge(posts);
       },
     );
     await assertQueriesMatch(
@@ -373,7 +373,7 @@ describe("RelationMergingTest", () => {
       undefined,
       false,
       async () => {
-        await Post.annotate("foo").merge(Post.annotate("bar")).merge(posts).toArray();
+        await Post.annotate("foo").merge(Post.annotate("bar")).merge(posts);
       },
     );
     await assertQueriesMatch(
@@ -381,7 +381,7 @@ describe("RelationMergingTest", () => {
       undefined,
       false,
       async () => {
-        await Post.annotate("bar").merge(Post.annotate("foo")).merge(posts).toArray();
+        await Post.annotate("bar").merge(Post.annotate("foo")).merge(posts);
       },
     );
   });

@@ -3580,7 +3580,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (relation.rb:1291); carry the annotation onto the bounded query.
     const subject = this._targetLoaded
       ? this._target
-      : await this.annotate("loading for inspect").limit(take).toArray();
+      : await this.annotate("loading for inspect").limit(take);
     const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
     if (entries.length === 11) entries[10] = "...";
     return `#<${this.constructor.name} [${entries.join(", ")}]>`;
@@ -3602,7 +3602,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const take = limitValue != null ? Math.min(limitValue, 11) : 11;
     const subject = this._targetLoaded
       ? this._target
-      : await this.annotate("loading for pp").limit(take).toArray();
+      : await this.annotate("loading for pp").limit(take);
     const entries = subject.slice(0, take) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);

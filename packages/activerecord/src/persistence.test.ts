@@ -380,7 +380,7 @@ describe("PersistenceTest", () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
     const result = await Topic.update({ title: "same" });
-    const all = await Topic.all().toArray();
+    const all = await Topic.all();
     expect(result).toHaveLength(all.length);
     expect(all.every((t) => t.title === "same")).toBe(true);
   });
@@ -578,7 +578,7 @@ describe("PersistenceTest", () => {
   // — the non-bang class-level update returns every record in scope even
   // though the salary inclusion validation (50_000..200_000) rejects 1_000_000.
   it("returns object even if validations failed", async () => {
-    const all = await CanonicalDeveloper.all().toArray();
+    const all = await CanonicalDeveloper.all();
     const result = await CanonicalDeveloper.update({ salary: 1_000_000 });
     expect(result.map((d) => d.id)).toEqual(all.map((d) => d.id));
   });

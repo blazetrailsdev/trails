@@ -61,7 +61,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const scope = (loader as any)._buildThroughScope();
     expect(scope.toSql()).toContain("preload-through");
 
-    const [row] = await Author.where({ id: david.id }).preload("annotatedComments").toArray();
+    const [row] = await Author.where({ id: david.id }).preload("annotatedComments");
     const comments = (row.association("annotatedComments").target ?? []) as any[];
     expect(comments.length).toBeGreaterThan(0);
   });

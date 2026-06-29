@@ -504,7 +504,7 @@ describe("SerializedAttributeTest", () => {
     // topic (content: {}) and topic2 (content: nil) appear in where(content: nil).
     const topic = await HashTopic.create({ content: {} as any });
     const topic2 = await HashTopic.create({ content: null as any });
-    const found = await HashTopic.where({ content: null }).order("id").toArray();
+    const found = await HashTopic.where({ content: null }).order("id");
     const ids = found.map((t: any) => t.id as number);
     expect(ids).toContain(topic.id);
     expect(ids).toContain(topic2.id);
@@ -525,7 +525,7 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await Subclass.create({ content: { foo: 1 } as any });
     // Verify the abstract-class serializer is inherited and round-trips correctly.
-    const byId = await Subclass.where({ id: topic.id }).toArray();
+    const byId = await Subclass.where({ id: topic.id });
     expect(byId.length).toBe(1);
     expect((byId[0] as any).content).toEqual({ foo: 1 });
     // Rails also asserts: subclass.where(content: { foo: 1 }).to_a == [topic]
@@ -541,7 +541,7 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
-    const found = await HashTopic.where({ content: null }).toArray();
+    const found = await HashTopic.where({ content: null });
     expect(found.map((t: any) => t.id as number)).toContain(topic.id);
   });
 
@@ -648,7 +648,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     }
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
-    const found = await HashTopic.where({ content: null }).toArray();
+    const found = await HashTopic.where({ content: null });
     expect(found.map((t: any) => t.id as number)).toContain(topic.id);
   });
 

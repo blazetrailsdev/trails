@@ -84,9 +84,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
 
   it("includes() preloads polymorphic-through with source_type into the association target", async () => {
     const { hotel, cake1, cake2 } = await seed();
-    const [h] = await Hotel.where({ id: (hotel as any).id })
-      .includes("cakeDesigners")
-      .toArray();
+    const [h] = await Hotel.where({ id: (hotel as any).id }).includes("cakeDesigners");
     const preloaded = (h.association("cakeDesigners").target ?? []) as any[];
     expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
       [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
@@ -110,8 +108,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const { hotel, cake1, cake2, drink } = await seed();
     const [h] = await Hotel.where({ id: (hotel as any).id })
       .includes("cakeDesigners")
-      .includes("drinkDesigners")
-      .toArray();
+      .includes("drinkDesigners");
     const cakes = (h.association("cakeDesigners").target ?? []) as any[];
     const drinks = (h.association("drinkDesigners").target ?? []) as any[];
     expect(cakes.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
@@ -131,9 +128,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
 
   it("includes() + outer where preserves every preloaded polymorphic-through target", async () => {
     const { hotel, cake1, cake2 } = await seed();
-    const [h] = await Hotel.where({ id: (hotel as any).id })
-      .includes("cakeDesigners")
-      .toArray();
+    const [h] = await Hotel.where({ id: (hotel as any).id }).includes("cakeDesigners");
     const preloaded = (h.association("cakeDesigners").target ?? []) as any[];
     // Filtering the outer relation must not silently drop preloaded targets.
     expect(preloaded.map((d: any) => d.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
@@ -145,9 +140,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const { hotel: h1, cake1, cake2 } = await seed();
     const { hotel: h2, cake1: h2cake1, cake2: h2cake2 } = await seed();
 
-    const [first] = await Hotel.where({ id: (h1 as any).id })
-      .includes("cakeDesigners")
-      .toArray();
+    const [first] = await Hotel.where({ id: (h1 as any).id }).includes("cakeDesigners");
     const firstIds = ((first.association("cakeDesigners").target ?? []) as any[])
       .map((d) => d.id)
       .sort((a: any, b: any) => Number(a) - Number(b));
@@ -155,9 +148,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       [(cake1 as any).id, (cake2 as any).id].sort((a: any, b: any) => Number(a) - Number(b)),
     );
 
-    const [second] = await Hotel.where({ id: (h2 as any).id })
-      .includes("cakeDesigners")
-      .toArray();
+    const [second] = await Hotel.where({ id: (h2 as any).id }).includes("cakeDesigners");
     const secondIds = ((second.association("cakeDesigners").target ?? []) as any[])
       .map((d) => d.id)
       .sort((a: any, b: any) => Number(a) - Number(b));

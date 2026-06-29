@@ -452,11 +452,8 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include has many through", async () => {
-    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
-    const postsWithAuthors = (await Post.all()
-      .includes("authors")
-      .order("posts.id")
-      .toArray()) as Base[];
+    const allPosts = (await Post.all().order("posts.id")) as Base[];
+    const postsWithAuthors = (await Post.all().includes("authors").order("posts.id")) as Base[];
     expect(postsWithAuthors.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).authors.toArray()) as Base[]).length;
@@ -485,8 +482,8 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has many through", async () => {
-    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
-    const postsWithTags = (await Post.all().includes("tags").order("posts.id").toArray()) as Base[];
+    const allPosts = (await Post.all().order("posts.id")) as Base[];
+    const postsWithTags = (await Post.all().includes("tags").order("posts.id")) as Base[];
     expect(postsWithTags.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
@@ -497,11 +494,8 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has many", async () => {
-    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
-    const postsWithTaggings = (await Post.all()
-      .includes("taggings")
-      .order("posts.id")
-      .toArray()) as Base[];
+    const allPosts = (await Post.all().order("posts.id")) as Base[];
+    const postsWithTaggings = (await Post.all().includes("taggings").order("posts.id")) as Base[];
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
@@ -976,8 +970,7 @@ describe("AssociationsJoinModelTest", () => {
     // non-nil taggables on PG/MySQL too (heap order isn't guaranteed there).
     const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
       .includes("taggable")
-      .order("taggings.id")
-      .toArray()) as Base[];
+      .order("taggings.id")) as Base[];
     await assertNoQueries(false, async () => {
       void ((taggingList[0] as any).association("taggable").target as Base).id;
       void ((taggingList[1] as any).association("taggable").target as Base).id;
@@ -994,7 +987,7 @@ describe("AssociationsJoinModelTest", () => {
   it("preload nil polymorphic belongs to", async () => {
     let error: unknown;
     try {
-      await Tagging.where("taggable_type IS NULL").includes("taggable").toArray();
+      await Tagging.where("taggable_type IS NULL").includes("taggable");
     } catch (e) {
       error = e;
     }
@@ -1002,11 +995,8 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("preload polymorphic has many", async () => {
-    const allPosts = (await Post.all().order("posts.id").toArray()) as Base[];
-    const postsWithTaggings = (await Post.all()
-      .includes("taggings")
-      .order("posts.id")
-      .toArray()) as Base[];
+    const allPosts = (await Post.all().order("posts.id")) as Base[];
+    const postsWithTaggings = (await Post.all().includes("taggings").order("posts.id")) as Base[];
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
@@ -1017,9 +1007,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("belongs to shared parent", async () => {
-    const commentList = (await Comment.where(`post_id = ${posts("welcome").id}`)
-      .includes("post")
-      .toArray()) as Base[];
+    const commentList = (await Comment.where(`post_id = ${posts("welcome").id}`).includes(
+      "post",
+    )) as Base[];
     await assertNoQueries(false, async () => {
       const p0 = (commentList[0] as any).association("post").target as Base;
       const p1 = (commentList[1] as any).association("post").target as Base;
@@ -1274,8 +1264,8 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("preload polymorphic has many through", async () => {
-    const allPosts = (await Post.order("posts.id").toArray()) as Base[];
-    const postsWithTags = (await Post.includes("tags").order("posts.id").toArray()) as Base[];
+    const allPosts = (await Post.order("posts.id")) as Base[];
+    const postsWithTags = (await Post.includes("tags").order("posts.id")) as Base[];
     expect(allPosts.length).toBe(postsWithTags.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expectedLen = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;

@@ -379,9 +379,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
   it("should be able to encode relation", async () => {
     const [david, mary] = [await getDavid(), await getMary()];
     await setIncludeRootInJsonAsync(true, async () => {
-      const relation = await Author.where({ id: [david.id, mary.id] })
-        .order("id")
-        .toArray();
+      const relation = await Author.where({ id: [david.id, mary.id] }).order("id");
       const encoded = ActiveSupportJSON.encode(relation, { only: "name" });
       expect(encoded).toBe('[{"author":{"name":"David"}},{"author":{"name":"Mary"}}]');
     });

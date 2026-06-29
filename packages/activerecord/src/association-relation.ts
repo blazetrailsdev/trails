@@ -84,7 +84,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Mirrors: ActiveRecord::AssociationRelation#first_or_initialize
    */
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
-    const records = await this.limit(1).toArray();
+    const records = await this.limit(1);
     if (records.length > 0) return records[0];
     return this.build(extra ?? {});
   }

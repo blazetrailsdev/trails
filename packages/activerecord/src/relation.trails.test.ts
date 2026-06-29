@@ -614,7 +614,7 @@ describe("RelationTest", () => {
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
-      records = await CanonPost.where({ author_id: subquery }).order("id").toArray();
+      records = await CanonPost.where({ author_id: subquery }).order("id");
     });
 
     const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
@@ -647,7 +647,7 @@ describe("RelationTest", () => {
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
-      records = await CanonPost.where({ author_id: subquery }).toArray();
+      records = await CanonPost.where({ author_id: subquery });
     });
 
     expect(records).toEqual([]);

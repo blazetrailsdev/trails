@@ -1172,14 +1172,14 @@ describe("CalculationsTest", () => {
   });
 
   it("ids", async () => {
-    const all = (await Company.all().toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.all().ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(all);
   });
 
   it("ids for a composite primary key", async () => {
     // Rails: CpkBook.ids == CpkBook.pluck(*CpkBook.primary_key)
-    const all = await CpkBook.all().toArray();
+    const all = await CpkBook.all();
     const byPluck = ((await CpkBook.all().pluck("author_id", "id")) as [unknown, unknown][]).map(
       ([a, b]) => [Number(a), Number(b)],
     );
@@ -1187,7 +1187,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck for a composite primary key", async () => {
-    const all = await CpkBook.all().toArray();
+    const all = await CpkBook.all();
     const rows = ((await CpkBook.all().pluck("author_id", "id")) as [unknown, unknown][]).map(
       ([a, b]) => [Number(a), Number(b)],
     );
@@ -1196,7 +1196,7 @@ describe("CalculationsTest", () => {
 
   it("ids for a composite primary key with scope", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
-    const books = await CpkBook.where({ title: book.title }).toArray();
+    const books = await CpkBook.where({ title: book.title });
     expect(books.length).toBe(1);
     expect(books[0].title).toBe(book.title);
   });
@@ -1211,7 +1211,7 @@ describe("CalculationsTest", () => {
 
   it("ids with scope", async () => {
     const scopedIds = [1, 2];
-    const expected = (await Company.where({ id: scopedIds }).toArray())
+    const expected = (await Company.where({ id: scopedIds }))
       .map((c) => Number(c.id))
       .sort((a, b) => a - b);
     const ids = (await Company.where({ id: scopedIds }).ids()).map(Number).sort((a, b) => a - b);
@@ -1226,7 +1226,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids on loaded relation", async () => {
-    const loadedCompanies = await Company.all().toArray();
+    const loadedCompanies = await Company.all();
     const companyIds = loadedCompanies.map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.all().ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(companyIds);
@@ -1234,14 +1234,14 @@ describe("CalculationsTest", () => {
 
   it("ids on loaded relation with scope", async () => {
     const scopedIds = [1, 2];
-    const loaded = await Company.where({ id: scopedIds }).toArray();
+    const loaded = await Company.where({ id: scopedIds });
     const companyIds = loaded.map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.where({ id: scopedIds }).ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(companyIds);
   });
 
   it("ids async on loaded relation", async () => {
-    const loaded = await Company.all().order("id").toArray();
+    const loaded = await Company.all().order("id");
     const ids = (await Company.all().order("id").ids()).map(Number);
     expect(ids).toEqual(loaded.map((c) => Number(c.id)));
   });
@@ -1273,7 +1273,7 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with eager load", async () => {
-    const all = (await Company.all().toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.all().eagerLoad("contracts").ids())
       .map(Number)
       .sort((a, b) => a - b);
@@ -1281,26 +1281,26 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with preload", async () => {
-    const all = (await Company.all().toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.all().preload("contracts").ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(all);
   });
 
   it("ids with includes", async () => {
-    const all = (await Company.all().toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    const all = (await Company.all()).map((c) => Number(c.id)).sort((a, b) => a - b);
     const ids = (await Company.all().includes("contracts").ids()).map(Number).sort((a, b) => a - b);
     expect(ids).toEqual(all);
   });
 
   it("ids with includes and non primary key order", async () => {
-    const all = (await Company.all().order("id").toArray()).map((c) => Number(c.id));
+    const all = (await Company.all().order("id")).map((c) => Number(c.id));
     const ids = (await Company.all().includes("contracts").order("id").ids()).map(Number);
     expect(ids).toEqual(all);
   });
 
   it("ids with includes and scope", async () => {
     const scopedIds = [1, 2];
-    const expected = (await Company.where({ id: scopedIds }).toArray())
+    const expected = (await Company.where({ id: scopedIds }))
       .map((c) => Number(c.id))
       .sort((a, b) => a - b);
     const ids = (await Company.includes("contracts").where({ id: scopedIds }).ids())
@@ -1322,9 +1322,7 @@ describe("CalculationsTest", () => {
   it("ids on loaded relation with includes and table scope", async () => {
     const company = await Company.first();
     const contract = await Contract.create({ company_id: company!.id });
-    const loaded = await Company.includes("contracts")
-      .where({ "contracts.id": contract.id })
-      .toArray();
+    const loaded = await Company.includes("contracts").where({ "contracts.id": contract.id });
     const ids = loaded.map((c) => Number(c.id));
     expect(ids).toEqual([Number(company!.id)]);
   });
@@ -1357,7 +1355,7 @@ describe("CalculationsTest", () => {
     const ids = (await Reply.order("id").pluck("id")).map(Number);
     expect(ids).toEqual([2, 4]);
     // Verify includes(:topic) works (preloads parent topic via parent_id)
-    const replies = await Reply.includes("topic").order("id").toArray();
+    const replies = await Reply.includes("topic").order("id");
     expect(replies.map((r) => Number(r.id))).toEqual([2, 4]);
   });
 
@@ -1597,7 +1595,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck loaded relation", async () => {
-    const companies = await Company.order("id").limit(3).toArray();
+    const companies = await Company.order("id").limit(3);
     const names = await Company.order("id").limit(3).pluck("name");
     expect(names).toEqual(["37signals", "Summit", "Microsoft"]);
     void companies;
@@ -1615,7 +1613,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck loaded relation sql fragment", async () => {
-    const companies = await Company.order("name").limit(3).toArray();
+    const companies = await Company.order("name").limit(3);
     const names = await Company.order("name").limit(3).pluck(arelSql("DISTINCT name"));
     expect(names).toEqual(["37signals", "Apex", "Ex Nihilo"]);
     void companies;
@@ -1646,7 +1644,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation", async () => {
-    const companies = await Company.order("id").limit(3).toArray();
+    const companies = await Company.order("id").limit(3);
     const rel = Company.order("id").limit(3);
     await rel.toArray();
     const name = await rel.pick("name");
@@ -1711,13 +1709,13 @@ describe("CalculationsTest", () => {
   });
 
   it("sum uses enumerable version when block is given", async () => {
-    const clients = await Client.all().toArray();
+    const clients = await Client.all();
     const total = clients.reduce((sum: number) => sum + 0, 0);
     expect(total).toBe(0);
   });
 
   it("having with strong parameters", async () => {
-    const result = await Account.group("id").having({ credit_limit: 50 }).toArray();
+    const result = await Account.group("id").having({ credit_limit: 50 });
     expect(result.length).toBeGreaterThan(0);
     expect(result[0].credit_limit).toBe(50);
     expect(result[1].credit_limit).toBe(50);
