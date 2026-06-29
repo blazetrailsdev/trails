@@ -131,6 +131,7 @@ import { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredDistinctPkIn,
   DeferredDistinctPkNotIn,
+  DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
@@ -1187,7 +1188,9 @@ export class Relation<T extends Base> {
    * arguments, flatten one level of array nesting, compact nils, then validate
    * that every remaining record and relation belongs to this model — raising
    * the same ArgumentError keyed on the public `__callee__`. Returns the
-   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`.
+   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`:
+   * scalars, the spread of any loaded relation's cached records, and any still-
+   * unloaded relation left in place for `excludingBang` to defer.
    */
   private _excludingArgs(records: unknown[], callee: string): unknown[] {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
@@ -1208,9 +1211,11 @@ export class Relation<T extends Base> {
     // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
     // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
     // and re-queries otherwise. A loaded relation's records are already in
-    // memory, so spread them in to match Rails exactly; an unloaded relation
-    // flows through `excludingBang` as a `NOT IN (subquery)` since trails'
-    // synchronous builder cannot run its id-select here.
+    // memory, so spread them into the literal `records` collection to match
+    // Rails exactly (no extra query). An unloaded relation is deferred:
+    // `excludingBang` records a marker that the load pipeline materializes into a
+    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
+    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
     const combined: unknown[] = [...recs];
     for (const rel of relations) {
       if (rel.isLoaded) combined.push(...rel._records);
@@ -5166,7 +5171,8 @@ export class Relation<T extends Base> {
   /**
    * Load-time hook for Rails' `distinct_relation_for_primary_key`
    * materialization. Before the where clause is compiled, replace each deferred
-   * marker (recorded synchronously by `RelationHandler`) with a literal
+   * marker (recorded synchronously by `RelationHandler`, or by `excludingBang`
+   * for an unloaded `excluding`/`without` relation arg) with a literal
    * `attribute IN (...ids)` / `NOT IN (...ids)`. An empty id set yields an empty
    * `IN`, which `WhereClause#isContradiction` short-circuits to a no-query empty
    * result (Rails' `none!` semantics). Idempotent: substituted nodes are plain
@@ -5186,13 +5192,31 @@ export class Relation<T extends Base> {
     const predicates = this._whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];
-      const deferred =
-        node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn;
-      if (!deferred) continue;
-      const ids = await node.innerRelation._materializeDistinctPkIds();
-      const attribute = node.left as Nodes.Attribute;
-      predicates[i] =
-        node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
+      if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
+        const attribute = node.left as Nodes.Attribute;
+        const ids = await node.innerRelation._materializeDistinctPkIds();
+        predicates[i] =
+          node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
+      } else if (node instanceof DeferredIdsNotIn) {
+        const attribute = node.left as Nodes.Attribute;
+        // Rails `excluding`/`without`: one predicate over
+        // `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1588).
+        // Concatenate the known literal ids with each relation's materialized
+        // ids so the substitution stays a single predicate, not an `AND` of them.
+        // `flat_map(&:ids)` runs each `Relation#ids` select sequentially in
+        // argument order (calculations.rb:390-404), so await them in order
+        // rather than concurrently (also avoids contending the connection).
+        const ids = [...node.literalIds];
+        for (const rel of node.innerRelations) {
+          ids.push(...(await rel.ids()));
+        }
+        // Route through the negated predicate builder — trails' equivalent of
+        // Rails `predicate_builder[primary_key, records].invert`
+        // (query_methods.rb:1587) — instead of hardcoding `NOT IN`, so the
+        // materialized array shares the loaded/`where.not` array-negation logic
+        // (e.g. an eventual single-id `!=` collapse) rather than diverging.
+        predicates[i] = this.predicateBuilder.buildNegated(attribute, ids);
+      }
     }
   }
 
