@@ -283,19 +283,18 @@ describe("CustomPropertiesTest", () => {
     await loadSchemaFromAdapter.call(Klass);
     const columnCount = Klass.columns().length;
 
-    // Rails counts `attribute_types` (column-inclusive) alongside column_defaults
-    // and attribute_names. trails' `attributeTypes()` is the ActiveModel
-    // declared-only registry (it omits schema-reflected columns); the
-    // column-inclusive analogue is `columnDefaults` / `attributeNames`, so assert
-    // the cache invalidation there.
+    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
     expect(Klass.attributeNames().length).toBe(columnCount + 1);
+    expect(Object.keys(Klass.attributeTypes())).not.toContain("wibble");
     expect(Klass.attributeNames()).not.toContain("wibble");
 
     Klass.attribute("wibble", typeRegistry.lookup("value"));
 
+    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
     expect(Klass.attributeNames().length).toBe(columnCount + 2);
+    expect(Object.keys(Klass.attributeTypes())).toContain("wibble");
     expect(Klass.attributeNames()).toContain("wibble");
   });
 
