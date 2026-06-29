@@ -1227,42 +1227,47 @@ describe("EagerAssociationTest", () => {
     );
   });
   it("preloading belongs_to with cpk", async () => {
+    // CpkOrder's PK is composite (["shop_id", "id"]), so `order.id` is the
+    // `[shop_id, id]` array; the `order_id` FK column wants the scalar `id`.
     const order = await CpkOrder.create({ shop_id: 2, id: 2 });
-    const orderAgreement = await CpkOrderAgreement.create({ order_id: order.id });
+    const orderId = (order as any).id[1];
+    const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
     const found = (await CpkOrderAgreement.all()
       .eagerLoad("order")
       .findBy({ id: orderAgreement.id })) as any;
     const loaded = found.association("order").target;
     expect(loaded).not.toBeNull();
-    expect(Number(loaded.id)).toBe(Number(order.id));
+    expect(loaded.id).toEqual(order.id);
   });
 
   it("preloading has_many with cpk", async () => {
     const order = await CpkOrder.create({ shop_id: 2, id: 2 });
-    const orderAgreement = await CpkOrderAgreement.create({ order_id: order.id });
+    const orderId = (order as any).id[1];
+    const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
     const found = (await CpkOrder.all()
       .eagerLoad("orderAgreements")
-      .findBy({ id: order.id })) as any;
+      .findBy({ id: orderId })) as any;
     const agreements = found.association("orderAgreements").target;
     expect(agreements).toHaveLength(1);
-    expect(Number(agreements[0].id)).toBe(Number(orderAgreement.id));
+    expect(agreements[0].id).toEqual(orderAgreement.id);
   });
 
   it("preloading has_one with cpk", async () => {
     const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const orderId = (order as any).id[1];
     const book = await CpkBook.create({
       author_id: 1,
       id: 3,
       shop_id: order.shop_id,
-      order_id: order.id,
+      order_id: orderId,
     });
 
-    const found = (await CpkOrder.all().eagerLoad("book").findBy({ id: order.id })) as any;
+    const found = (await CpkOrder.all().eagerLoad("book").findBy({ id: orderId })) as any;
     const loaded = found.association("book").target;
     expect(loaded).not.toBeNull();
-    expect(Number(loaded.id)).toBe(Number(book.id));
+    expect(loaded.id).toEqual(book.id);
   });
 
   it("including duplicate objects from has many", async () => {
