@@ -777,7 +777,26 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it.todo("belongs to counter after touch");
+  it("belongs to counter after touch", async () => {
+    const topic = await Topic.create({ title: "topic" });
+
+    expect(topic.readAttribute("replies_count")).toBe(0);
+    expect((topic as any).afterTouchCalled).toBe(0);
+
+    const reply = await Reply.create({
+      title: "blah!",
+      content: "world around!",
+      topicWithPrimaryKey: topic,
+    });
+
+    expect(topic.readAttribute("replies_count")).toBe(1);
+    expect((topic as any).afterTouchCalled).toBe(1);
+
+    await reply.destroyBang();
+
+    expect(topic.readAttribute("replies_count")).toBe(0);
+    expect((topic as any).afterTouchCalled).toBe(2);
+  });
 
   it("belongs to touch with reassigning", async () => {
     const debate = await Topic.create({ title: "debate" });

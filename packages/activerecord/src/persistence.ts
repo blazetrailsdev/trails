@@ -488,6 +488,16 @@ export async function incrementBang<T extends CounterBangRecord>(
   // otherwise a later write would still diff against the pre-increment
   // original.
   this.clearAttributeChange(attribute);
+  // Mirrors Rails Callbacks#increment! (callbacks.rb:435-437):
+  //   `touch ? _run_touch_callbacks { super } : super`
+  // — when a `touch:` is requested, the counter UPDATE timestamps the row and
+  // the after_touch callbacks must fire on this in-memory instance (e.g. a
+  // belongs_to `counter_cache` + `touch:` bumps the parent's `after_touch`
+  // counter). The class-level `updateCounters` above only emits SQL.
+  if (options.touch != null) {
+    const ctor = this.constructor as unknown as { prototype: object };
+    await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+  }
   return this;
 }
 
