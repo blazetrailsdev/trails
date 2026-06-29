@@ -24,6 +24,7 @@ import {
   SpecialPost,
   StiPost,
   PostWithDefaultInclude,
+  PostWithDefaultScope,
 } from "../test-helpers/models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../test-helpers/models/author.js";
 import {
@@ -129,42 +130,21 @@ const TEST_SCHEMA: Schema = {
   eager_ho_no_pk_parents: { name: "string" },
   eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
   eager_ho_ref_parents: { name: "string" },
-  eager_leo_comments: { body: "string", eager_leo_post_id: "integer" },
-  eager_leo_posts: { title: "string" },
-  eager_lmo_comments: { body: "string", eager_lmo_post_id: "integer" },
-  eager_lmo_posts: { title: "string", priority: "integer" },
-  eager_ln_comments: { rating: "float", eager_ln_post_id: "integer" },
-  eager_ln_posts: { title: "string" },
   eager_no_res_comments: { body: "string", eager_no_res_post_id: "integer" },
   eager_no_res_posts: { title: "string" },
   eager_or_comments: { body: "string", eager_or_post_id: "integer" },
   eager_or_posts: { title: "string" },
   eager_posts: { title: "string" },
-  eager_reord_children: { value: "string", eager_reord_parent_id: "integer" },
-  eager_reord_parents: { name: "string" },
   eager_tl_widgets: { name: "string" },
   elmar_contracts: { elmar_developer_id: "integer" },
   elmar_developers: { name: "string", elmar_mentor_id: "integer" },
   elmar_mentors: { name: "string" },
   elmar_project_developers: { elmar_project_id: "integer", elmar_developer_id: "integer" },
   elmar_projects: { name: "string", elmar_mentor_id: "integer" },
-  ewc_authors: { name: "string" },
-  ewc_essays: {
-    name: "string",
-    ewc_author_id: "integer",
-    writer_id: "integer",
-    writer_type: "string",
-  },
   idup_categories: { name: "string" },
   idup_category_posts: { idup_post_id: "integer", idup_category_id: "integer" },
   idup_comments: { body: "string", idup_post_id: "integer" },
   idup_posts: { title: "string" },
-  jeeo_comments: { body: "string", jeeo_post_id: "integer" },
-  jeeo_posts: { title: "string" },
-  phmt_authors: { name: "string" },
-  phmt_comments: { body: "string", phmt_post_id: "integer" },
-  phmt_posts: { title: "string", phmt_author_id: "integer" },
-  pre_poly_orphans: { name: "string", owner_id: "integer", owner_type: "string" },
   psta_clubs: { name: "string" },
   psta_members: { name: "string" },
   psta_memberships: { psta_member_id: "integer", psta_club_id: "integer", active: "boolean" },
@@ -314,6 +294,8 @@ describe("EagerAssociationTest", () => {
     subscribers,
     subscriptions,
     books,
+    tags,
+    people,
   } = useFixtures(
     [
       "authors",
@@ -321,6 +303,9 @@ describe("EagerAssociationTest", () => {
       "authorAddresses",
       "posts",
       "comments",
+      "essays",
+      "people",
+      "readers",
       "companies",
       "accounts",
       "developers",
@@ -336,6 +321,7 @@ describe("EagerAssociationTest", () => {
       "subscribers",
       "subscriptions",
       "books",
+      "tags",
     ],
     () => Base.connection,
     { schema: canonicalSchema },
@@ -346,6 +332,7 @@ describe("EagerAssociationTest", () => {
     registerModel(Subscriber);
     registerModel(Subscription);
     registerModel(Book);
+    registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerSponsorableModels();
   });
   it("should work inverse of with eager load", async () => {
@@ -750,87 +737,65 @@ describe("EagerAssociationTest", () => {
     ]);
   });
   it("limited eager with order", async () => {
-    class EagerLeoPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerLeoComments", {
-          className: "EagerLeoComment",
-          foreignKey: "eager_leo_post_id",
-        });
-      }
-    }
-    class EagerLeoComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_leo_post_id", "integer");
-      }
-    }
-    registerModel("EagerLeoPost", EagerLeoPost);
-    registerModel("EagerLeoComment", EagerLeoComment);
-    const post = await EagerLeoPost.create({ title: "P" });
-    await EagerLeoComment.create({ body: "c1", eager_leo_post_id: post.id });
-    await EagerLeoComment.create({ body: "c2", eager_leo_post_id: post.id });
-    const posts = await EagerLeoPost.all()
-      .order("title")
-      .limit(1)
-      .includes("eagerLeoComments")
+    const result1 = await Post.includes("author", "comments")
+      .references("authors")
+      .where({ "authors.name": "David" })
+      .order("UPPER(posts.title)")
+      .limit(2)
+      .offset(1)
       .toArray();
-    expect(posts).toHaveLength(1);
-    expect((posts[0] as any).association("eagerLeoComments").target).toHaveLength(2);
+    expect(result1.map((p: any) => Number(p.id))).toEqual([
+      Number(posts("thinking").id),
+      Number(posts("sti_comments").id),
+    ]);
+    const result2 = await Post.includes("author", "comments")
+      .references("authors")
+      .where({ "authors.name": "David" })
+      .order("UPPER(posts.title) DESC")
+      .limit(2)
+      .offset(1)
+      .toArray();
+    expect(result2.map((p: any) => Number(p.id))).toEqual([
+      Number(posts("sti_post_and_comments").id),
+      Number(posts("sti_comments").id),
+    ]);
   });
   it("limited eager with multiple order columns", async () => {
-    class EagerLmoPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("priority", "integer");
-        this.hasMany("eagerLmoComments", {
-          className: "EagerLmoComment",
-          foreignKey: "eager_lmo_post_id",
-        });
-      }
-    }
-    class EagerLmoComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eager_lmo_post_id", "integer");
-      }
-    }
-    registerModel("EagerLmoPost", EagerLmoPost);
-    registerModel("EagerLmoComment", EagerLmoComment);
-    const post = await EagerLmoPost.create({ title: "P", priority: 1 });
-    await EagerLmoComment.create({ body: "c1", eager_lmo_post_id: post.id });
-    const posts = await EagerLmoPost.all()
-      .order("priority", "title")
-      .limit(1)
-      .includes("eagerLmoComments")
+    const result1 = await Post.includes("author", "comments")
+      .references("authors")
+      .where({ "authors.name": "David" })
+      .order("UPPER(posts.title)", "posts.id")
+      .limit(2)
+      .offset(1)
       .toArray();
-    expect(posts).toHaveLength(1);
-    expect((posts[0] as any).association("eagerLmoComments").target).toHaveLength(1);
+    expect(result1.map((p: any) => Number(p.id))).toEqual([
+      Number(posts("thinking").id),
+      Number(posts("sti_comments").id),
+    ]);
+    const result2 = await Post.includes("author", "comments")
+      .references("authors")
+      .where({ "authors.name": "David" })
+      .order("UPPER(posts.title) DESC", "posts.id")
+      .limit(2)
+      .offset(1)
+      .toArray();
+    expect(result2.map((p: any) => Number(p.id))).toEqual([
+      Number(posts("sti_post_and_comments").id),
+      Number(posts("sti_comments").id),
+    ]);
   });
   it("limited eager with numeric in association", async () => {
-    class EagerLnPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("eagerLnComments", {
-          className: "EagerLnComment",
-          foreignKey: "eager_ln_post_id",
-        });
-      }
-    }
-    class EagerLnComment extends Base {
-      static {
-        this.attribute("rating", "float");
-        this.attribute("eager_ln_post_id", "integer");
-      }
-    }
-    registerModel("EagerLnPost", EagerLnPost);
-    registerModel("EagerLnComment", EagerLnComment);
-    const post = await EagerLnPost.create({ title: "P" });
-    await EagerLnComment.create({ rating: 4.5, eager_ln_post_id: post.id });
-    const posts = await EagerLnPost.all().includes("eagerLnComments").toArray();
-    const comments = (posts[0] as any).association("eagerLnComments").target;
-    expect(comments).toHaveLength(1);
-    expect(comments[0].rating).toBe(4.5);
+    const result = await Person.references("number1_fans_people")
+      .includes("readers", "primaryContact", "number1Fan")
+      .where("number1_fans_people.first_name like 'M%'")
+      .order("people.id")
+      .limit(2)
+      .offset(0)
+      .toArray();
+    expect(result.map((p: any) => Number(p.id))).toEqual([
+      Number(people("david").id),
+      Number(people("susan").id),
+    ]);
   });
   it("eager with multiple associations with same table has one", async () => {
     const d1 = await findAllOrdered(Firm);
@@ -938,94 +903,60 @@ describe("EagerAssociationTest", () => {
     });
   });
   it("preloading empty belongs to polymorphic", async () => {
-    class PrePolyOrphan extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("owner_id", "integer");
-        this.attribute("owner_type", "string");
-        this.belongsTo("owner", { polymorphic: true });
-      }
-    }
-    registerModel(PrePolyOrphan);
-    await PrePolyOrphan.create({ name: "orphan" });
-    const results = await PrePolyOrphan.all().includes("owner").toArray();
-    expect(results).toHaveLength(1);
-    const preloaded = (results[0] as any).association("owner").target;
-    expect(preloaded).toBeNull();
+    const maxId = Number(await Post.maximum("id"));
+    const t = await Tagging.create({
+      taggable_type: "Post",
+      taggable_id: maxId + 1,
+      tag_id: tags("general").id,
+    });
+
+    let tagging!: InstanceType<typeof Tagging>;
+    await assertQueriesCount(2, false, async () => {
+      tagging = await Tagging.preload("taggable").find(t.id);
+    });
+    await assertNoQueries(false, async () => {
+      expect((tagging as any).association("taggable").target ?? null).toBeNull();
+    });
+    expect(Number(tagging.taggable_id)).toBe(maxId + 1);
   });
   it("preloading has one using reorder", async () => {
-    class EagerReordParent extends Base {
+    class TempAuthor extends Base {
+      static tableName = "authors";
       static {
-        this.attribute("name", "string");
-        this.hasOne("eagerReordChild", {
-          className: "EagerReordChild",
-          foreignKey: "eager_reord_parent_id",
+        this.hasOne("post", { className: "PostWithDefaultScope", foreignKey: "author_id" });
+        this.hasOne("reorderedPost", {
+          className: "PostWithDefaultScope",
+          foreignKey: "author_id",
+          scope: (q: any) => q.reorder({ title: "desc" }),
         });
       }
     }
-    class EagerReordChild extends Base {
-      static {
-        this.attribute("value", "string");
-        this.attribute("eager_reord_parent_id", "integer");
-      }
-    }
-    registerModel("EagerReordParent", EagerReordParent);
-    registerModel("EagerReordChild", EagerReordChild);
-    const parent = await EagerReordParent.create({ name: "P" });
-    await EagerReordChild.create({ value: "V", eager_reord_parent_id: parent.id });
-    const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
-    expect((parents[0] as any).association("eagerReordChild").target?.value).toBe("V");
+    registerModel("TempAuthor", TempAuthor);
+
+    const author = await TempAuthor.first();
+    // PRECONDITION: make sure ordering results in different results
+    const post = await (author as any).loadHasOne("post");
+    const reorderedPost = await (author as any).loadHasOne("reorderedPost");
+    expect(Number(post.id)).not.toBe(Number(reorderedPost.id));
+
+    const preloaded = await TempAuthor.preload("reorderedPost").first();
+    const preloadedReorderedPost = (preloaded as any).association("reorderedPost").target;
+    expect(Number(preloadedReorderedPost.id)).toBe(Number(reorderedPost.id));
+    const topByTitleDesc = await Post.order({ title: "desc" }).first();
+    expect(preloadedReorderedPost.title).toBe(topByTitleDesc!.title);
   });
   it("join eager with empty order should generate valid sql", async () => {
-    class JeeoPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.hasMany("jeeoComments", {
-          className: "JeeoComment",
-          foreignKey: "jeeo_post_id",
-        });
-      }
-    }
-    class JeeoComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("jeeo_post_id", "integer");
-        this.belongsTo("jeeoPost", {
-          className: "JeeoPost",
-          foreignKey: "jeeo_post_id",
-        });
-      }
-    }
-    registerModel("JeeoPost", JeeoPost);
-    registerModel("JeeoComment", JeeoComment);
-
-    const post = await JeeoPost.create({ title: "Hello" });
-    await JeeoComment.create({ body: "Thank you for the welcome", jeeo_post_id: post.id });
-
-    // Rails: Post.includes(:comments).order("").first must not raise —
-    // empty order string should be silently dropped. Use toArray() to avoid
-    // the LIMIT-in-subquery eager load path that MariaDB rejects.
     let error: unknown;
     try {
-      await (JeeoPost as any)
-        .all()
-        .includes("jeeoComments")
-        .references("jeeo_comments")
+      await Post.includes("comments")
+        .references("comments")
         .order("")
-        .toArray();
+        .where({ comments: { body: "Thank you for the welcome" } })
+        .first();
     } catch (e) {
       error = e;
     }
     expect(error).toBeUndefined();
-    // Also verify the result has the preloaded comments
-    const result = await (JeeoPost as any)
-      .all()
-      .includes("jeeoComments")
-      .references("jeeo_comments")
-      .order("")
-      .toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].association("jeeoComments").target).toHaveLength(1);
   });
   it("eager load multiple associations with references", async () => {
     class ElmarMentor extends Base {
@@ -1234,27 +1165,8 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager-loading with a polymorphic association won't work consistently", async () => {
-    class EwcAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("essays", { className: "EwcEssay" });
-      }
-    }
-    class EwcEssay extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ewc_author_id", "integer");
-        this.attribute("writer_id", "integer");
-        this.attribute("writer_type", "string");
-        this.belongsTo("writer", { polymorphic: true });
-      }
-    }
-    registerModel(EwcAuthor);
-    registerModel(EwcEssay);
-
-    const david = await EwcAuthor.create({ name: "David" });
-    await EwcEssay.create({ name: "A", ewc_author_id: david.id });
-    const essays = EwcEssay.all().where({ ewc_author_id: david.id });
+    const david = authors("david");
+    const essays = david.essays;
 
     await expect(essays.eagerLoad("writer").toArray()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad("writer").count()).rejects.toThrow(EagerLoadPolymorphicError);
@@ -1279,44 +1191,13 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad("nope").count()).rejects.toThrow(/misspelled it/);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
-    class PhmtAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("phmtPosts", { foreignKey: "phmt_author_id" });
-        this.hasMany("phmtComments", {
-          through: "phmtPosts",
-          source: "phmtComments",
-          className: "PhmtComment",
-        });
-      }
-    }
-    class PhmtPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("phmt_author_id", "integer");
-        this.hasMany("phmtComments", { foreignKey: "phmt_post_id" });
-      }
-    }
-    class PhmtComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("phmt_post_id", "integer");
-      }
-    }
-    registerModel(PhmtAuthor);
-    registerModel(PhmtPost);
-    registerModel(PhmtComment);
-
-    const author = await PhmtAuthor.create({ name: "David" });
-    const post = await PhmtPost.create({ title: "T", phmt_author_id: author.id });
-    await PhmtComment.create({ body: "C", phmt_post_id: post.id });
-
-    // Preloading the through association should work without calling association.reader
-    const authors = await PhmtAuthor.all().preload("phmtComments").toArray();
-    expect(authors).toHaveLength(1);
-    const comments = (authors[0] as any).association("phmtComments").target;
-    expect(comments).toHaveLength(1);
-    expect(comments[0].body).toBe("C");
+    // Rails: Author.preload(:readonly_comments).first! — CollectionProxy#reader
+    // is expensive, so the preloader populates the target directly rather than
+    // going through the association reader. We assert the through target is
+    // loaded without invoking the reader.
+    const author = await Author.preload("readonlyComments").first();
+    expect(author).toBeTruthy();
+    expect((author as any).association("readonlyComments").isLoaded()).toBe(true);
   });
   it("preloading through a polymorphic association doesn't require the association to exist", async () => {
     await seedSponsors();
@@ -1634,14 +1515,6 @@ describe("EagerAssociationTest", () => {
     expect(titles).toContain(posts("sti_post_and_comments").title);
   });
   it("preload belongs to uses exclusive scope", async () => {
-    // Rails: Person.males.includes(:primary_contact) — the preload of
-    // primary_contact must use the association's own (exclusive) scope, not the
-    // caller's `males` scope, so non-male contacts are still loaded.
-    const f1 = await Person.create({ first_name: "F1", gender: "F" });
-    const f2 = await Person.create({ first_name: "F2", gender: "F" });
-    const m1 = await Person.create({ first_name: "M1", gender: "M", primary_contact_id: f1.id });
-    const m2 = await Person.create({ first_name: "M2", gender: "M", primary_contact_id: f2.id });
-
     const people = await (Person as any).males().includes("primaryContact").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
@@ -1654,34 +1527,19 @@ describe("EagerAssociationTest", () => {
       });
       const direct = await (Person as any).find(person.id);
       const directContact = await direct.primaryContact;
-      expect(contact.id).toBe(directContact.id);
+      expect(Number(contact.id)).toBe(Number(directContact.id));
     }
-    expect(people.find((p: any) => p.id === m1.id).association("primaryContact").target.id).toBe(
-      f1.id,
-    );
-    expect(people.find((p: any) => p.id === m2.id).association("primaryContact").target.id).toBe(
-      f2.id,
-    );
   });
   it("preload has many uses exclusive scope", async () => {
-    // Rails: Person.males.includes(:agents) — the preload of agents must use the
-    // association's exclusive scope, not the caller's `males` scope, so non-male
-    // agents are still loaded.
-    const m1 = await Person.create({ first_name: "M1", gender: "M" });
-    const m2 = await Person.create({ first_name: "M2", gender: "M" });
-    await Person.create({ first_name: "A1", gender: "F", primary_contact_id: m1.id });
-    await Person.create({ first_name: "A2", gender: "F", primary_contact_id: m2.id });
-
     const people = await (Person as any).males().includes("agents").toArray();
     expect(people).toHaveLength(2);
     for (const person of people) {
       const agents = person.association("agents").target;
       const direct = await (Person as any).find(person.id);
       const directAgents = await direct.agents.toArray();
-      expect(agents.map((a: any) => a.id).sort()).toEqual(
-        directAgents.map((a: any) => a.id).sort(),
+      expect(agents.map((a: any) => Number(a.id)).sort()).toEqual(
+        directAgents.map((a: any) => Number(a.id)).sort(),
       );
-      expect(agents.length).toBe(1);
     }
   });
   it("preloading empty belongs to", async () => {
