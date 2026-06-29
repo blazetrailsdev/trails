@@ -29,9 +29,10 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
-  type Type,
+  Type,
   typeRegistry,
   pushPendingDecorator,
+  type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
@@ -1041,13 +1042,11 @@ export class Base extends Model {
    */
   static attribute(
     name: string,
-    typeName: string | Type,
-    options?: {
-      default?: unknown;
-      virtual?: boolean;
-      userProvidedDefault?: boolean;
-      limit?: number | null;
-    },
+    // Type is optional, mirroring Rails' `attribute(name, type = nil, **options)`.
+    // When omitted (`attribute("col", { default: "x" })`) the attribute keeps its
+    // existing schema-reflected / declared type and only the default is applied.
+    typeName?: string | Type | AttributeOptions,
+    options?: AttributeOptions,
   ): void {
     // STI subclasses share the base's `_attributeDefinitions` — matching
     // Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
@@ -1070,7 +1069,14 @@ export class Base extends Model {
     // Patch _attributeDefinitions immediately (read path) and also push a
     // PendingDecorator so _defaultAttributes() replay sees the hooked type
     // after the PendingType for this attribute.
-    const def = this._attributeDefinitions.get(name);
+    //
+    // Gated on an explicit type, mirroring Rails' `type = hook_attribute_type(name, type) if type`
+    // (attribute_registration.rb:15). On a no-type call (`attribute("col", { default })`)
+    // the existing type is already hooked from schema reflection — re-hooking would
+    // double-wrap unconditional wrappers like LockingType (`LockingType(LockingType(...))`).
+    const typeWasProvided =
+      typeName !== undefined && (typeof typeName === "string" || typeName instanceof Type);
+    const def = typeWasProvided ? this._attributeDefinitions.get(name) : undefined;
     if (def) {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
