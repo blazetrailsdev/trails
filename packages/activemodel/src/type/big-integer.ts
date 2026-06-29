@@ -10,19 +10,20 @@ export class BigIntegerType extends IntegerType {
     return "integer";
   }
 
-  serializeCastValue(value: number | null): number | null {
+  // Mirrors Rails big_integer.rb:29 — serialize_cast_value returns value as-is,
+  // bypassing Integer's ensureInRange. BigIntegerType is unconditionally unlimited.
+  override serializeCastValue(value: number | null): number | null {
     return value;
   }
 
-  /**
-   * @internal Rails-private helper. Returns Infinity to bypass Integer's range check.
-   */
-  protected maxValue(): number {
+  // Mirrors Rails big_integer.rb:33 — max_value is Float::INFINITY regardless of
+  // limit, so Integer's number-path range check never fires.
+  protected override maxValue(): number {
     return Number.POSITIVE_INFINITY;
   }
 
   /** @internal Rails-private helper. */
-  protected castValue(value: unknown): number | null {
+  protected override castValue(value: unknown): number | null {
     if (typeof value === "bigint") return value as unknown as number;
     if (typeof value === "number") {
       if (isNaN(value) || !isFinite(value)) return null;
@@ -42,8 +43,7 @@ export class BigIntegerType extends IntegerType {
     return super.castValue(value);
   }
 
-  serialize(value: unknown): unknown {
-    // No range check — maxValue is Infinity. Return cast value as-is (matches Rails).
+  override serialize(value: unknown): unknown {
     return this.cast(value);
   }
 }

@@ -88,11 +88,60 @@ import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
   IntegerType,
+  BigIntegerType,
   FloatType,
   BooleanType,
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
+
+/**
+ * Adapter-specific column type for MySQL signed bigint.
+ *
+ * MySQL returns bigint column values as strings from the mysql2 driver.
+ * BigIntegerType.castValue parses strings to BigInt (preserving precision
+ * for values > Number.MAX_SAFE_INTEGER). BigIntegerType itself is unconditionally
+ * unlimited (big_integer.rb:33 — max_value = Float::INFINITY regardless of limit).
+ * This subclass re-establishes the 8-byte signed bound on the column type,
+ * mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic
+ * so that 9223372036854775808n (= 2^63) is correctly detected as out-of-range
+ * (float64 cannot distinguish 2^63 from 2^63-1: Number(2^63n) === Number((2^63-1)n)).
+ */
+class MysqlBigInteger extends BigIntegerType {
+  // MySQL schema introspection uses castType.name to derive the column type string.
+  // BigIntegerType.name is "big_integer"; override to "integer" so columns()
+  // reports the same type as IntegerType({limit:8}) would.
+  override readonly name: string = "integer";
+
+  protected override maxValue(): number {
+    return 2 ** (this._limit() * 8 - 1);
+  }
+
+  protected override isInRange(value: number | null): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") {
+      const bytes = this._limit();
+      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
+      const min = -(1n << BigInt(bytes * 8 - 1));
+      return value >= min && value <= max;
+    }
+    return super.isInRange(value);
+  }
+
+  override isSerializable(value: unknown): boolean {
+    if (value == null) return true;
+    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
+    return super.isSerializable(value);
+  }
+
+  override serializeCastValue(value: number | null): number | null {
+    return this.ensureInRange(value);
+  }
+
+  override serialize(value: unknown): unknown {
+    return this.ensureInRange(this.cast(value));
+  }
+}
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 import { Date as DateType } from "../type/date.js";
@@ -1826,6 +1875,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): void {
     mapping.registerType(key, undefined, (sqlType: string) => {
       if (/\bunsigned\b/i.test(sqlType)) return new UnsignedInteger(options);
+      if (options.limit === 8) return new MysqlBigInteger(options);
       return new IntegerType(options);
     });
   }

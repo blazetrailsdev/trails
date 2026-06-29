@@ -46,15 +46,10 @@ describe("OrTest", () => {
     expect(await Post.where("id = 1").or(Post.none()).toArray()).toEqual(expected);
   });
 
-  // Rails returns `[post(1)]`: the `2^63` bind overflows the `id` column, and
-  // `select_all` rescues the resulting `ActiveRecord::RangeError` →
-  // `Result.empty` (database_statements.rb:78), so the OR collapses to `id = 1`.
-  // trails has no client-side range guard + `selectAll` rescue yet, so on
-  // PG/MySQL the out-of-range bind reaches the wire and the adapter raises
-  // (poisoning the transaction). SQLite is untyped and stores the value, so the
-  // query runs and the result matches. Skipped on the strict-typed lanes pending
-  // the `relation-or-large-number-rangeerror-empty` convergence (RFC 0019).
-  it.skipIf(adapterType !== "sqlite")("or with large number", async () => {
+  // 2^63 overflows the int8 column range. QueryAttribute#isUnboundable() fires
+  // (query_attribute.rb:46-50) and the Arel equality visitor emits "1=0" for that
+  // predicate (to_sql.rb:643-647), so the OR collapses to id=1 only.
+  it("or with large number", async () => {
     const expected = await Post.where("id = 1 or id = 9223372036854775808").toArray();
     expect(
       await Post.where({ id: 1 })

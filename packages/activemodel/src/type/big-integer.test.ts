@@ -93,6 +93,14 @@ describe("BigIntegerTest", () => {
     expect(() => type.serialize(huge)).not.toThrow();
   });
 
+  it("no range error for values outside int8 range even when limit is set", () => {
+    // BigIntegerType is unconditionally unlimited (big_integer.rb:33 — max_value = Infinity).
+    // The 8-byte guard belongs on the adapter column type, not on BigIntegerType itself.
+    const type = new BigIntegerType({ limit: 8 });
+    expect(() => type.serialize(9223372036854775808n)).not.toThrow();
+    expect(type.isSerializable(BigInt("9".repeat(100)))).toBe(true);
+  });
+
   it("blank string casts to null", () => {
     const type = new BigIntegerType();
     expect(type.cast("")).toBeNull();
