@@ -2146,6 +2146,11 @@ export function addReflection(
   const hasOwn = Object.prototype.hasOwnProperty.call(activeRecord, "_reflections");
   const inherited: Record<string, unknown> = (activeRecord as any)._reflections ?? {};
   const reflections = hasOwn ? inherited : { ...inherited };
+  // Rails: `_reflections.except(name).merge!(name => reflection)` — redefining an
+  // existing association deletes it first so the new reflection is re-appended at
+  // the end (preserving the subclass's declaration order, which the has_many
+  // :through order check in checkValidityBang depends on).
+  delete reflections[name];
   reflections[name] = reflection;
   (activeRecord as any)._reflections = reflections;
 }
