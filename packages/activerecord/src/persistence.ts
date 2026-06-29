@@ -807,6 +807,19 @@ export async function save<T extends SaveRecord>(
       // so a cancelling filter's DB write (`Book.create`) rolls back with it.
       // A drained thunk that `throw :abort`s halts the save (status false →
       // Rollback), matching Rails' halted validation callback.
+      //
+      // ORDERING DEVIATION: Rails layers save as `Transactions#save {
+      // Validations#save { perform_validations; Persistence#save } }`
+      // (transactions.rb:360, validations.rb:47), so `before_validation` runs
+      // *inside* the transaction and *before* `valid?`. trails runs
+      // `performValidations` above (outside the transaction, line 778), so the
+      // deferred thunk's async body runs here — after the validators, not
+      // before. Observable only when a record has BOTH a failing validation and
+      // an aborting async `before_validation`: trails reports `errors.any`
+      // (validators already ran) where Rails reports none (abort halts first).
+      // The four cancellation tests don't hit this (validations pass); the
+      // governing constraint is the strict-sync validation chain — see the
+      // Topic wiring and `validations.ts#isValid`.
       const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
       for (const thunk of sideEffects) {
         try {
