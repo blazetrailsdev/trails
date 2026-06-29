@@ -56,6 +56,7 @@ export { jsonCodec } from "./attribute-set/codecs/json.js";
 export { Trailtie } from "./trailtie.js";
 export { WithValidator } from "./validations/with.js";
 export { AbsenceValidator } from "./validations/absence.js";
+export type { AttrNameArg } from "./validations/absence.js";
 export { PresenceValidator } from "./validations/presence.js";
 export { LengthValidator } from "./validations/length.js";
 export { NumericalityValidator } from "./validations/numericality.js";

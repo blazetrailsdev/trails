@@ -353,27 +353,29 @@ describe("LengthValidationTest", () => {
   });
 
   it("validates length of with allow nil", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
         this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 3, allowNil: true } });
+        this.validatesLengthOf("title", { is: 5, allowNil: true });
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(new Topic({ title: "ab" }).isValid()).toBe(false);
+    expect(new Topic({ title: "" }).isValid()).toBe(false);
+    expect(new Topic({ title: null }).isValid()).toBe(true);
+    expect(new Topic({ title: "abcde" }).isValid()).toBe(true);
   });
 
   it("validates length of with allow blank", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
         this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 3, allowBlank: true } });
+        this.validatesLengthOf("title", { is: 5, allowBlank: true });
       }
     }
-    expect(new Person({ title: "" }).isValid()).toBe(true);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(new Topic({ title: "ab" }).isValid()).toBe(false);
+    expect(new Topic({ title: "" }).isValid()).toBe(true);
+    expect(new Topic({ title: null }).isValid()).toBe(true);
+    expect(new Topic({ title: "abcde" }).isValid()).toBe(true);
   });
 
   it("optionally validates length of using minimum", () => {

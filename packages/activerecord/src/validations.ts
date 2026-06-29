@@ -5,7 +5,7 @@
  * database-aware validators (uniqueness, association validity, etc.)
  * and overrides save/valid? to run validations with context awareness.
  */
-import type { ValidationContext } from "@blazetrails/activemodel";
+import type { AttrNameArg, ValidationContext } from "@blazetrails/activemodel";
 import { I18n } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
@@ -82,12 +82,16 @@ export interface Validations {
  * Mirrors: ActiveRecord::Validations::ClassMethods
  */
 export interface ValidationsClassMethods {
-  validatesAbsenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesAbsenceOf(...attrNames: AttrNameArg[]): void;
+  validatesLengthOf(...attrNames: AttrNameArg[]): void;
+  validatesSizeOf(...attrNames: AttrNameArg[]): void;
+  validatesNumericalityOf(...attrNames: AttrNameArg[]): void;
+  validatesPresenceOf(...attrNames: AttrNameArg[]): void;
+  // validatesAssociated / validatesUniquenessOf are out of this story's scope:
+  // their implementations don't yet delegate through `_merge_attributes`
+  // (no array flattening / multi-attr support), so keep the narrow typing
+  // until they're converged. See associated.ts / uniqueness.ts.
   validatesAssociated(...args: (string | Record<string, unknown>)[]): void;
-  validatesLengthOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesSizeOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesNumericalityOf(...attrNames: (string | Record<string, unknown>)[]): void;
-  validatesPresenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
   validatesUniquenessOf(...attrNames: (string | Record<string, unknown>)[]): void;
 }
 
@@ -363,6 +367,51 @@ export function _setSuperValidates(
 }
 
 /**
+ * Host shape for the `validates_*_of` helper overrides: the AR-specific
+ * `validatesWith` plus `_mergeAttributes` (inherited from Model).
+ */
+interface HelperMethodHost {
+  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+}
+
+// Each `validates_*_of` helper in AR re-opens
+// `ActiveRecord::Validations::ClassMethods` to delegate to `validates_with`
+// with the AR-specific validator constant (association/column-aware), shadowing
+// the ActiveModel helper that would otherwise wire the base validator. Mirrors
+// activerecord/lib/active_record/validations/{presence,absence,length,
+// numericality}.rb.
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_presence_of */
+export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_absence_of */
+export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_length_of */
+export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+/**
+ * Mirrors: ActiveRecord re-aliasing `validates_size_of` onto its own
+ * `validates_length_of` so the AR LengthValidator (marked-for-destruction
+ * aware) backs both spellings.
+ */
+export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_numericality_of */
+export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
+}
+
+/**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveRecord::Validations::ClassMethods` / `ActiveSupport::Concern#ClassMethods`.
  * `validatesAssociated` and `validatesUniqueness` live next to their
@@ -373,6 +422,11 @@ export const ClassMethods = {
   validates,
   validatesAssociated,
   validatesUniqueness,
+  validatesPresenceOf,
+  validatesAbsenceOf,
+  validatesLengthOf,
+  validatesSizeOf,
+  validatesNumericalityOf,
 };
 
 /**

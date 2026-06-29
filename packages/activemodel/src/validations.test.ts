@@ -2384,6 +2384,53 @@ describe("validates_*_of shorthand methods", () => {
     const u = new User({ password: "secret", passwordConfirmation: "mismatch" });
     expect(u.isValid()).toBe(false);
   });
+
+  it("validatesLengthOf accepts multiple attributes", () => {
+    class Topic extends Model {
+      static {
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.validatesLengthOf("title", "content", { minimum: 2 });
+      }
+    }
+    const t = new Topic({ title: "", content: "" });
+    expect(t.isValid()).toBe(false);
+    expect(t.errors.get("title").length).toBeGreaterThan(0);
+    expect(t.errors.get("content").length).toBeGreaterThan(0);
+    expect(new Topic({ title: "ok", content: "ok" }).isValid()).toBe(true);
+  });
+
+  it("validatesPresenceOf passes through strict option", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validatesPresenceOf("name", { strict: true });
+      }
+    }
+    expect(() => new User({}).isValid()).toThrow();
+    expect(new User({ name: "Alice" }).isValid()).toBe(true);
+  });
+
+  it("validatesPresenceOf passes through if and on options", () => {
+    class Topic extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validatesPresenceOf("title", { if: () => true, on: "update" });
+      }
+    }
+    expect(new Topic({ title: "" }).isValid()).toBe(true); // no context
+    expect(new Topic({ title: "" }).isInvalid("update")).toBe(true);
+  });
+
+  it("validatesPresenceOf passes through unless option", () => {
+    class Topic extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validatesPresenceOf("title", { unless: () => true });
+      }
+    }
+    expect(new Topic({ title: "" }).isValid()).toBe(true);
+  });
 });
 
 describe("Errors#generateMessage", () => {
