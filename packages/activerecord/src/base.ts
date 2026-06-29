@@ -29,7 +29,7 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
-  type Type,
+  Type,
   typeRegistry,
   pushPendingDecorator,
   type AttributeOptions,
@@ -1069,7 +1069,14 @@ export class Base extends Model {
     // Patch _attributeDefinitions immediately (read path) and also push a
     // PendingDecorator so _defaultAttributes() replay sees the hooked type
     // after the PendingType for this attribute.
-    const def = this._attributeDefinitions.get(name);
+    //
+    // Gated on an explicit type, mirroring Rails' `type = hook_attribute_type(name, type) if type`
+    // (attribute_registration.rb:15). On a no-type call (`attribute("col", { default })`)
+    // the existing type is already hooked from schema reflection — re-hooking would
+    // double-wrap unconditional wrappers like LockingType (`LockingType(LockingType(...))`).
+    const typeWasProvided =
+      typeName !== undefined && (typeof typeName === "string" || typeName instanceof Type);
+    const def = typeWasProvided ? this._attributeDefinitions.get(name) : undefined;
     if (def) {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
