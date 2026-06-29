@@ -1,4 +1,4 @@
-import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
+import { underscore, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
@@ -10,7 +10,6 @@ import {
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { belongsToRequiredValidatesForeignKey } from "../../ar-config.js";
-import { BelongsToRequiredValidator } from "../../validations/belongs-to-required.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -324,15 +323,13 @@ export class BelongsTo extends SingularAssociation {
 
     super.defineValidations(model, reflection);
 
-    if (required && typeof model.validatesWith === "function") {
+    if (required && typeof model.validatesPresenceOf === "function") {
       // Mirrors Rails BelongsToBuilder.define_validations: presence is
       // validated on the association NAME (reflection.name), not the foreign
       // key column, so `read_attribute_for_validation` reads the loaded
       // in-memory target. Assigning an unsaved `record.parent = Parent.new`
       // satisfies presence, and autosave persists the new parent before the
-      // owner (see autosave-association saveBelongsTo). BelongsToRequiredValidator
-      // additionally treats a populated FK as present (trails validations are
-      // sync and cannot load an unloaded target — see CLAUDE.md).
+      // owner (see autosave-association saveBelongsTo).
       const name = reflection.name;
       const polymorphic = !!reflection.options?.polymorphic;
       const rawFk =
@@ -344,13 +341,19 @@ export class BelongsTo extends SingularAssociation {
           : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
         : [];
 
-      const validatorOptions: Record<string, unknown> = {
-        attributes: [name],
-        message: "required",
-        belongsToForeignKeys: foreignKeys,
-        belongsToForeignTypes: foreignTypes,
-        belongsToPolymorphic: polymorphic,
+      // trails validations are synchronous (see CLAUDE.md) and cannot load an
+      // unloaded target, so we suppress the presence check when the FK is
+      // already populated — keeping `create({ parentId: id })` valid and
+      // matching Rails' observable behavior (where reading the association
+      // loads the record from the FK).
+      const foreignKeyPresent = (record: any): boolean => {
+        if (foreignKeys.length === 0) return false;
+        if (!foreignKeys.every((key) => !isBlank(record._readAttribute(key)))) return false;
+        if (!polymorphic) return true;
+        return foreignTypes.every((type) => !isBlank(record._readAttribute(type)));
       };
+
+      let condition: (record: any) => boolean = (record) => !foreignKeyPresent(record);
 
       if (!belongsToRequiredValidatesForeignKey) {
         // Rails' conditional branch only runs the presence check when the FK
@@ -362,12 +365,13 @@ export class BelongsTo extends SingularAssociation {
               record._readAttribute(attr) == null ||
               (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
           );
-        validatorOptions.if = (record: any) =>
+        const railsCondition = (record: any) =>
           needsValidation(record, foreignKeys) ||
           (polymorphic && needsValidation(record, foreignTypes));
+        condition = (record) => railsCondition(record) && !foreignKeyPresent(record);
       }
 
-      model.validatesWith(BelongsToRequiredValidator, validatorOptions);
+      model.validatesPresenceOf(name, { message: "required", if: condition });
     }
   }
 
