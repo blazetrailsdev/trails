@@ -2525,10 +2525,27 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `CollectionAssociation#update_counter` for the bulk delete/nullify path.
    */
   private async _decrementCounterCache(count: number): Promise<void> {
-    const counterCol = this._assocDef.options.counterCache;
-    if (!counterCol) return;
+    let column: string | null = this._assocDef.options.counterCache
+      ? String(this._assocDef.options.counterCache)
+      : null;
+    // A has_many without an explicit `counter_cache:` may still update a counter
+    // through the child's belongs_to inverse (e.g. Car.engines ← Engine
+    // belongs_to :my_car, counter_cache: :engines_count). The bulk delete path
+    // bypasses the child callbacks, so resolve the reflection's cached-counter
+    // column and decrement it here, matching Rails' `update_counter(-count)`.
+    if (!column) {
+      const refl = (
+        this._record.constructor as typeof Base & {
+          _reflectOnAssociation?: (n: string) => {
+            hasCachedCounter?: () => boolean;
+            counterCacheColumn?: () => string | null;
+          };
+        }
+      )._reflectOnAssociation?.(this._assocName);
+      if (refl?.hasCachedCounter?.()) column = refl.counterCacheColumn?.() ?? null;
+    }
+    if (!column) return;
     const owner = this._record as any;
-    const column = String(counterCol);
     if (typeof owner.incrementBang === "function") {
       await owner.incrementBang(column, -count);
     } else if (typeof owner.updateCounters === "function") {
