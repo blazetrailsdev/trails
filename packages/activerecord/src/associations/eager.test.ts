@@ -941,7 +941,9 @@ describe("EagerAssociationTest", () => {
     expect(Number(post.id)).not.toBe(Number(reorderedPost.id));
 
     const preloaded = await TempAuthor.preload("reorderedPost").first();
-    const preloadedReorderedPost = (preloaded as any).association("reorderedPost").target;
+    // Rails: klass.preload(:reordered_post).first.reordered_post — go through the
+    // reader so a preloaded-but-re-querying bug would be caught.
+    const preloadedReorderedPost = await (preloaded as any).reorderedPost;
     expect(Number(preloadedReorderedPost.id)).toBe(Number(reorderedPost.id));
     const topByTitleDesc = await Post.order({ title: "desc" }).first();
     expect(preloadedReorderedPost.title).toBe(topByTitleDesc!.title);
