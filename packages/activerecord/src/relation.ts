@@ -470,6 +470,13 @@ type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown 
  */
 type SpecForest = Map<string, SpecForest>;
 
+/**
+ * Shared frozen empty array returned by value readers whose backing field is
+ * unset. Mirrors Rails' `FROZEN_EMPTY_ARRAY` constant — a single shared
+ * instance so the unset read is a stable reference, not a fresh allocation.
+ */
+const EMPTY_VALUE_ARRAY: readonly never[] = Object.freeze([]);
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
@@ -478,7 +485,9 @@ export class Relation<T extends Base> {
   private _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node> =
     [];
   private _rawOrderClauses: string[] = [];
-  private _reordering = false;
+  // Tri-state (Rails `@values.fetch(:reordering, nil)`): `undefined` = unset,
+  // distinct from an explicit `false`. Mirrors `_isStrictLoading` below.
+  private _reordering: boolean | undefined = undefined;
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
   private _selectColumns: (string | symbol | Nodes.Node)[] | null = null;
@@ -525,7 +534,8 @@ export class Relation<T extends Base> {
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
-  private _isReadonly = false;
+  // Tri-state (Rails `@values.fetch(:readonly, nil)`): `undefined` = unset.
+  private _isReadonly: boolean | undefined = undefined;
   private _isStrictLoading: boolean | undefined = undefined;
   private _annotations: string[] = [];
   private _optimizerHints: string[] = [];
@@ -539,7 +549,8 @@ export class Relation<T extends Base> {
   private _extending: Array<Record<string, (...args: any[]) => any>> = [];
   private _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }> = [];
   private _skipPreloading = false;
-  private _skipQueryCache = false;
+  // Tri-state (Rails `@values.fetch(:skip_query_cache, nil)`): `undefined` = unset.
+  private _skipQueryCache: boolean | undefined = undefined;
   private _loaded = false;
   private _records: T[] = [];
   /**
@@ -1544,7 +1555,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#readonly?
    */
   get isReadonly(): boolean {
-    return this._isReadonly;
+    return this._isReadonly ?? false;
   }
 
   /**
@@ -1742,7 +1753,9 @@ export class Relation<T extends Base> {
           rel._isDistinct = false;
           break;
         case "strictLoading":
-          rel._isStrictLoading = false;
+          // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
+          // the key reads back as unset, distinct from an explicit `false`.
+          rel._isStrictLoading = undefined;
           break;
         case "references":
           // `:references` is a single Rails value key; trails splits its local
@@ -1758,10 +1771,11 @@ export class Relation<T extends Base> {
           rel._unscopeValues = [];
           break;
         case "reordering":
-          rel._reordering = false;
+          // `values.except(:reordering)` deletes the key → unset (`nil`).
+          rel._reordering = undefined;
           break;
         case "skipQueryCache":
-          rel._skipQueryCache = false;
+          rel._skipQueryCache = undefined;
           break;
         default:
           _qm.resetValueForScope(rel as any, skip);
@@ -4445,16 +4459,28 @@ export class Relation<T extends Base> {
   /**
    * Return the SELECT columns.
    *
-   * Mirrors: ActiveRecord::Relation#select_values
+   * Mirrors: ActiveRecord::Relation#select_values — `@values.fetch(:select,
+   * FROZEN_EMPTY_ARRAY)`: the stored array is returned by reference (not a
+   * copy). trails stores `null` for the unset state, so the unset read returns
+   * the shared `EMPTY_VALUE_ARRAY` (Rails' frozen-empty-array) rather than a
+   * fresh allocation, matching the stored-reference semantics of the other
+   * value readers.
    */
   get selectValues(): (string | symbol | Nodes.Node)[] {
-    return this._selectColumns ?? [];
+    return (
+      this._selectColumns ?? (EMPTY_VALUE_ARRAY as unknown as (string | symbol | Nodes.Node)[])
+    );
   }
 
   /**
    * Return the ORDER clauses.
    *
-   * Mirrors: ActiveRecord::Relation#order_values
+   * Mirrors: ActiveRecord::Relation#order_values. Unlike the other value
+   * readers this one cannot return the stored reference: trails keeps raw SQL
+   * orderings as `{ raw }` markers in `_orderClauses`, so the reader normalizes
+   * them to `SqlLiteral` nodes on read (Rails stores `Arel::Nodes::SqlLiteral`
+   * directly). The mapped array is therefore necessarily a fresh allocation —
+   * a documented, accessor-local exception to the stored-reference rule.
    */
   get orderValues(): Array<string | [string, "asc" | "desc"] | Nodes.Node> {
     return this._orderClauses.map((clause) =>
@@ -4467,10 +4493,12 @@ export class Relation<T extends Base> {
   /**
    * Return the GROUP BY columns.
    *
-   * Mirrors: ActiveRecord::Relation#group_values
+   * Mirrors: ActiveRecord::Relation#group_values — returns the stored array by
+   * reference (Rails' `@values.fetch` semantics), matching the other value
+   * readers; no defensive copy.
    */
   get groupValues(): string[] {
-    return [...this._groupColumns];
+    return this._groupColumns;
   }
 
   /**
@@ -4533,12 +4561,38 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#joins_values — Rails stores every `.joins`
    * argument (association names and raw SQL/Arel joins) in one array; trails
    * splits them into `_namedInnerJoins` (resolved through JoinDependency) and
-   * `_joinValues` (raw string/Arel), so the accessor recombines them. Because of
-   * that split there is no single field to round-trip, so no faithful `=` writer
-   * exists yet — tracked by story relation-value-accessor-rails-semantics.
+   * `_joinValues` (raw string/Arel), so the accessor recombines them.
    */
   get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
     return [...this._namedInnerJoins, ...this._joinValues];
+  }
+  /**
+   * Split-routing writer for `joins_values=`. trails has no single field to
+   * round-trip (the reader concatenates `_namedInnerJoins` + `_joinValues`), so
+   * the setter re-routes each entry using the same rule as `joins` itself
+   * (relation.ts `joins`): Arel `Join` nodes and non-association strings go to
+   * `_joinValues`; association-name strings and nested-association hashes go to
+   * `_namedInnerJoins`. A value assigned then read back is preserved by
+   * category, but — matching the reader's concat order — named joins always
+   * precede raw joins regardless of their original interleaving. The
+   * SQL-emitted `_joinClauses` (trails-only `joins(table, on)` form) are not
+   * part of `joins_values` and are left untouched.
+   */
+  set joinsValues(value: (AssociationSpec | string | Nodes.Join)[]) {
+    this.assertModifiableBang();
+    this._namedInnerJoins = [];
+    this._joinValues = [];
+    for (const arg of value) {
+      if (arg instanceof Nodes.Join) {
+        this._joinValues.push(arg);
+      } else if (_isPlainObject(arg)) {
+        this._namedInnerJoins.push(arg as AssociationSpec);
+      } else if (typeof arg === "string" && this._isAssociationName(arg)) {
+        this._namedInnerJoins.push(arg);
+      } else {
+        this._joinValues.push(arg as string | Nodes.Join);
+      }
+    }
   }
 
   /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
@@ -4613,20 +4667,27 @@ export class Relation<T extends Base> {
     this._ctes = value;
   }
 
-  /** Mirrors: ActiveRecord::Relation#readonly_value */
-  get readonlyValue(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Relation#readonly_value — `@values.fetch(:readonly,
+   * nil)`: `undefined` when unset, distinct from an explicit `false`.
+   */
+  get readonlyValue(): boolean | undefined {
     return this._isReadonly;
   }
-  set readonlyValue(value: boolean) {
+  set readonlyValue(value: boolean | undefined) {
     this.assertModifiableBang();
     this._isReadonly = value;
   }
 
-  /** Mirrors: ActiveRecord::Relation#reordering_value */
-  get reorderingValue(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Relation#reordering_value — `@values.fetch(
+   * :reordering, nil)`: `undefined` when unset, distinct from an explicit
+   * `false`.
+   */
+  get reorderingValue(): boolean | undefined {
     return this._reordering;
   }
-  set reorderingValue(value: boolean) {
+  set reorderingValue(value: boolean | undefined) {
     this.assertModifiableBang();
     this._reordering = value;
   }
@@ -4649,11 +4710,15 @@ export class Relation<T extends Base> {
     this._createWithAttrs = value;
   }
 
-  /** Mirrors: ActiveRecord::Relation#skip_query_cache_value */
-  get skipQueryCacheValue(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Relation#skip_query_cache_value — `@values.fetch(
+   * :skip_query_cache, nil)`: `undefined` when unset, distinct from an explicit
+   * `false`.
+   */
+  get skipQueryCacheValue(): boolean | undefined {
     return this._skipQueryCache;
   }
-  set skipQueryCacheValue(value: boolean) {
+  set skipQueryCacheValue(value: boolean | undefined) {
     this.assertModifiableBang();
     this._skipQueryCache = value;
   }

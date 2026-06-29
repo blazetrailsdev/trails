@@ -145,7 +145,7 @@ interface QueryMethodsHost {
   _whereClause: WhereClause;
   _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node>;
   _rawOrderClauses: string[];
-  _reordering: boolean;
+  _reordering: boolean | undefined;
   _limitValue: number | null;
   _offsetValue: number | null;
   _selectColumns: any[] | null;
@@ -182,8 +182,8 @@ interface QueryMethodsHost {
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
-  _isReadonly: boolean;
-  _isStrictLoading: boolean;
+  _isReadonly: boolean | undefined;
+  _isStrictLoading: boolean | undefined;
   _annotations: string[];
   _optimizerHints: string[];
   _referencesValues: string[];
@@ -198,7 +198,7 @@ interface QueryMethodsHost {
   _extending: Array<Record<string, (...args: any[]) => any>>;
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
-  _skipQueryCache: boolean;
+  _skipQueryCache: boolean | undefined;
   _modelClass: typeof import("../base.js").Base;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
   _castWhereValue(key: string, value: unknown): unknown;
@@ -819,7 +819,8 @@ export function resetValueForScope(host: QueryMethodsHost, scope: UnscopeType): 
       host._lockValue = null;
       break;
     case "readonly":
-      host._isReadonly = false;
+      // unscope(:readonly) deletes the value key → unset (`nil`).
+      host._isReadonly = undefined;
       break;
     case "from":
       host._fromClause = FromClause.empty();

@@ -60205,5 +60205,75 @@
     "rubyName": "migration_template",
     "call": "split",
     "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "apply_join_dependency",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_join_buckets",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_join_dependencies",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_joins",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "apply_join_dependency",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "associated",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_join_buckets",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_join_dependencies",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_joins",
+    "call": "joins_values",
+    "reason": "Split join storage: the join-building paths read the named/raw join fields (_namedInnerJoins/_joinValues) directly; the joins_values accessor concatenates them and erases the named-vs-raw distinction these builders require. See joinsValues doc in relation.ts. Flag appeared once joins_values= writer completed the accessor."
   }
 ]
