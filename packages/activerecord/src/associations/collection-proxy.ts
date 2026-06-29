@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { Rollback } from "../errors.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
@@ -1837,6 +1838,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
       return record.save();
     };
+    // Rails' `concat_records` accumulates `result &&= insert_record(...)` and
+    // `raise ActiveRecord::Rollback unless result` (collection_association.rb:438-452),
+    // so a record whose `save` merely *returns false* (a validation/callback abort
+    // that doesn't raise) still rolls back the records already inserted in this
+    // batch. Mirror that here rather than relying on a thrown error.
+    let result = true;
     const insertAll = async (): Promise<void> => {
       for (const record of records) {
         // Route through replace_on_target (via _addToTarget) so set_inverse_instance
@@ -1855,10 +1862,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // check is evaluated per record at save time (after `before_add` fires),
         // so a callback that persists the owner mid-loop flips the remaining
         // records onto the insert path — matching Rails' control flow.
-        await this._addToTarget(record, { replace: this.distinctValue }, () =>
-          this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
-        );
+        await this._addToTarget(record, { replace: this.distinctValue }, async () => {
+          if (this._record.isNewRecord()) return true;
+          const saved = await insertRecord(record);
+          if (!saved) result = false;
+          return saved;
+        });
       }
+      if (!result) throw new Rollback();
     };
     // Rails' `CollectionAssociation#concat` wraps the inserts in a transaction
     // for a persisted owner (`transaction { concat_records(records) }`,
