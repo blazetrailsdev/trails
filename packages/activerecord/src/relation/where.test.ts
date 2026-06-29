@@ -5,7 +5,10 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
+import { Range } from "../index.js";
+import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
+import { ProtectedParams } from "../test-helpers/protected-params.js";
 import { adapterType } from "../test-adapter.js";
 import { seconds } from "@blazetrails/activesupport";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -129,13 +132,14 @@ describe("WhereTest", () => {
     expect(ids(chefs)).toStrictEqual([(chef as any).id]);
   });
 
-  // SKIP: trails predicate-builder casts an un-castable query value (a non-numeric
-  // string for an integer column, etc.) to `null` and emits `IS NULL`, so the
-  // query matches NULL rows instead of nothing. Rails treats an un-boundable value
-  // as a contradiction (`QueryAttribute#boundable?` → `1=0`), so all five asserts
-  // are empty. Tracked-pending-convergence: RFC 0023
-  // `predicate-builder-blank-and-unboundable-contradiction`.
   it.skip("where with invalid value", async () => {
+    // BLOCKED: predicate-builder — an un-castable query value (non-numeric string
+    // for an integer column, "" for date/time) casts to `null` and emits `IS NULL`,
+    // so the query matches NULL rows instead of nothing.
+    // ROOT-CAUSE: relation/predicate-builder.ts not implementing Rails'
+    // QueryAttribute#boundable? contradiction (`1=0`) for un-boundable values.
+    // SCOPE: convergence tracked by RFC 0023
+    // predicate-builder-blank-and-unboundable-contradiction.
     const first = topics("first") as any;
     await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
     expect(await Topic.where({ parent_id: "not-a-number" }).toArray()).toHaveLength(0);
@@ -416,6 +420,16 @@ describe("WhereTest", () => {
     expect(actual.toSql()).toEqual(expected.toSql());
   });
 
+  it("polymorphic nested where", () => {
+    const thing = new Post();
+    (thing as any).id = 1;
+    const expected = Treasure.where({
+      priceEstimates: { thing_type: "Post", thing_id: 1 },
+    }).joins("priceEstimates");
+    const actual = Treasure.where({ priceEstimates: { thing } }).joins("priceEstimates");
+    expect(actual.toSql()).toEqual(expected.toSql());
+  });
+
   it("polymorphic sti nested where", () => {
     const treasure = new HiddenTreasure();
     (treasure as any).id = 1;
@@ -462,12 +476,13 @@ describe("WhereTest", () => {
     expect((found as any).id).toBe((post as any).id);
   });
 
-  // SKIP: Rails expand_from_hash returns `["1=0"]` for an empty (associated/nested)
-  // hash (predicate_builder.rb:85), so `where(posts: {})` matches nothing. trails'
-  // buildFromHashInternal expands the empty hash to zero predicate nodes, so the
-  // condition is dropped and all rows match. Tracked-pending-convergence: RFC 0023
-  // `predicate-builder-blank-and-unboundable-contradiction`.
   it.skip("where with table name and empty hash", async () => {
+    // BLOCKED: predicate-builder — `where(posts: {})` should match nothing.
+    // ROOT-CAUSE: relation/predicate-builder.ts buildFromHashInternal expands an
+    // empty nested hash to zero predicate nodes (condition dropped → all rows),
+    // vs Rails expand_from_hash returning `["1=0"]` (predicate_builder.rb:85).
+    // SCOPE: convergence tracked by RFC 0023
+    // predicate-builder-blank-and-unboundable-contradiction.
     expect(await Post.where({ posts: {} }).count()).toBe(0);
   });
 
@@ -475,21 +490,24 @@ describe("WhereTest", () => {
     expect(await Post.where({ id: [] }).count()).toBe(0);
   });
 
-  // SKIP: same empty-hash deviation as "where with table name and empty hash" —
-  // Rails expand_from_hash returns `["1=0"]` for the empty `sink: {}` hash, trails
-  // drops it. Tracked-pending-convergence: RFC 0023
-  // `predicate-builder-blank-and-unboundable-contradiction`.
   it.skip("where with empty hash and no foreign key", async () => {
+    // BLOCKED: predicate-builder — `where(sink: {})` should match nothing.
+    // ROOT-CAUSE: same empty-nested-hash gap as "where with table name and empty
+    // hash"; relation/predicate-builder.ts drops the empty hash instead of
+    // emitting Rails' `["1=0"]`.
+    // SCOPE: convergence tracked by RFC 0023
+    // predicate-builder-blank-and-unboundable-contradiction.
     expect(await Edge.where({ sink: {} }).count()).toBe(0);
   });
 
-  // SKIP: Rails treats an empty array `[]` as a blank condition (where_clause
-  // ignores it → all rows). trails' `where([])` routes the array into the
-  // composite-key tuple form and raises ArgumentError ("requires a tuples
-  // argument"). The `{}`, `null`, `""` blanks already behave Rails-faithfully.
-  // Tracked-pending-convergence: RFC 0023
-  // `predicate-builder-blank-and-unboundable-contradiction`.
   it.skip("where with blank conditions", async () => {
+    // BLOCKED: predicate-builder — an empty array `[]` should be a blank condition
+    // (all rows), like `{}`/`null`/`""` (which already behave Rails-faithfully).
+    // ROOT-CAUSE: relation/query-methods.ts routes `where([])` into the
+    // composite-key tuple form and raises ArgumentError instead of treating it
+    // as blank.
+    // SCOPE: convergence tracked by RFC 0023
+    // predicate-builder-blank-and-unboundable-contradiction.
     for (const blank of [[], {}, null, ""]) {
       const result = await Edge.where(blank as any)
         .order("sink_id")
@@ -597,7 +615,9 @@ describe("WhereTest", () => {
 
   it("where with strong parameters", async () => {
     const author = authors("david") as any;
-    const found = await Author.where({ name: author.name }).first();
+    const params = new ProtectedParams({ name: author.name });
+    expect(() => Author.where(params as any)).toThrow(ForbiddenAttributesError);
+    const found = await Author.where(params.permit() as any).first();
     expect((found as any).id).toBe(author.id);
   });
 
@@ -605,13 +625,16 @@ describe("WhereTest", () => {
     const bob = authors("bob") as any;
     const r1 = await Author.where({ id: [3, 9223372036854775808n] }).toArray();
     expect(ids(r1)).toStrictEqual([bob.id]);
+    const r2 = await Author.where({ id: new Range(3, 9223372036854775808n) }).toArray();
+    expect(ids(r2)).toStrictEqual([bob.id]);
   });
 
   it("to sql with large number", async () => {
     const bob = authors("bob") as any;
-    const sql = Author.where({ id: [3, 9223372036854775808n] }).toSql();
-    const r1 = await Author.findBySql(sql);
-    expect(ids(r1)).toStrictEqual([bob.id]);
+    const sql1 = Author.where({ id: [3, 9223372036854775808n] }).toSql();
+    expect(ids(await Author.findBySql(sql1))).toStrictEqual([bob.id]);
+    const sql2 = Author.where({ id: new Range(3, 9223372036854775808n) }).toSql();
+    expect(ids(await Author.findBySql(sql2))).toStrictEqual([bob.id]);
   });
 
   it("where with unsupported arguments", () => {
