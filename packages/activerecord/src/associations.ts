@@ -134,6 +134,11 @@ export interface AssociationOptions {
   validate?: boolean;
   required?: boolean;
   optional?: boolean;
+  /** belongs_to-only: sets the association from this block when the foreign
+   * key is nil. The block runs on save (Rails runs it on before_validation;
+   * trails defers to before_save because the validation chain is synchronous
+   * and the block may be async, e.g. `() => Developer.first()`). */
+  default?: (owner: Base) => Base | null | Promise<Base | null>;
   beforeAdd?:
     | ((owner: Base, record: Base) => void | false)
     | ((owner: Base, record: Base) => void | false)[];

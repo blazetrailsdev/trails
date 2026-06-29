@@ -331,8 +331,50 @@ describe("BelongsToAssociationsTest", () => {
     }
   });
 
-  it.todo("default");
-  it.todo("default with lambda");
+  it("default", async () => {
+    const david = await Developer.find(developers("david").id);
+    const jamis = await Developer.find(developers("jamis").id);
+
+    class TempDefault extends Base {
+      static _tableName = "ships";
+      static {
+        this.belongsTo("developer", { default: () => david, inverseOf: false });
+      }
+    }
+
+    let ship = await TempDefault.create({});
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+
+    ship = await TempDefault.create({ developer: jamis });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
+
+    await ship.update({ developer: null });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+  });
+
+  it("default with lambda", async () => {
+    class TempDefault extends Base {
+      static _tableName = "ships";
+      static {
+        this.belongsTo("developer", {
+          default: () => (TempDefault as any).defaultDeveloper(),
+          inverseOf: false,
+        });
+      }
+      static defaultDeveloper(): Promise<any> {
+        return Developer.first();
+      }
+    }
+
+    const david = await Developer.find(developers("david").id);
+    const jamis = await Developer.find(developers("jamis").id);
+
+    let ship = await TempDefault.create({});
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+
+    ship = await TempDefault.create({ developer: jamis });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
+  });
 
   it("default scope on relations is not cached", async () => {
     const counter = 0;
