@@ -159,14 +159,14 @@ describe("InnerJoinAssociationTest", () => {
 
   it("construct finder sql ignores empty joins hash", () => {
     const { Post } = makeModels();
-    const sql = Post.joins().toSql();
+    const sql = Post.joins({}).toSql();
     expect(sql).toContain("SELECT");
     expect(sql).not.toContain("JOIN");
   });
 
   it("construct finder sql ignores empty joins array", () => {
     const { Post } = makeModels();
-    const sql = Post.joins().toSql();
+    const sql = Post.joins([]).toSql();
     expect(sql).toContain("SELECT");
     expect(sql).not.toContain("JOIN");
   });

@@ -1225,7 +1225,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { normalize: false });
+    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { flatten: false });
     return this._clone().orderBang(...args);
   }
 
@@ -1348,9 +1348,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, {
-      normalize: false,
-    });
+    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, { flatten: false });
     return this._clone().reorderBang(...args);
   }
 
@@ -5865,7 +5863,7 @@ export class Relation<T extends Base> {
     methodName: string | symbol,
     args: unknown[],
     message?: string,
-    options?: { normalize?: boolean },
+    options?: { normalize?: boolean; flatten?: boolean },
   ): void {
     // Rails passes a Symbol via __callee__; we collapse it to its
     // description so the error message reads `.select()` rather than
@@ -5873,15 +5871,30 @@ export class Relation<T extends Base> {
     // description) fall through to "<anonymous>".
     const name =
       typeof methodName === "symbol" ? (methodName.description ?? "<anonymous>") : methodName;
-    // `normalize: false` performs only Rails' `args.blank?` raise, skipping the
-    // shared `flatten!`/`compact_blank!` mutation. Used by methods (order,
-    // reorder, joins-family) whose own bang variants do bespoke argument
-    // processing that the flatten step would corrupt — e.g. order's bind-array
-    // form `[Arel.sql("x = ?"), bind]`, which flattening would split apart.
-    if (options?.normalize === false) {
+    const raiseIfBlank = () => {
+      // Rails raises on `args.blank?` — the *outer* varargs array being empty —
+      // BEFORE any flatten/compact, so `joins([])` / `reorder(nil)` (a single
+      // blank element) do not raise.
       if (!args || args.length === 0) {
         throw argumentError(message ?? `The method .${name}() must contain arguments.`);
       }
+    };
+    // `normalize: false` performs only the blank raise, skipping the shared
+    // `flatten!`/`compact_blank!` mutation. Used by the joins family, whose bang
+    // variants do their own array flattening and blank-skipping.
+    if (options?.normalize === false) {
+      raiseIfBlank();
+      return;
+    }
+    // `flatten: false` keeps Rails' `compact_blank!` (so `reorder(nil)` drops the
+    // blank and clears the order) but skips `flatten!`. Used by order/reorder,
+    // whose bang variants treat an array argument structurally — e.g. the
+    // bind-array form `[Arel.sql("x = ?"), bind]` that flattening would split.
+    if (options?.flatten === false) {
+      raiseIfBlank();
+      const kept = args.filter((a) => !_qm.isBlankArgument(a));
+      args.length = 0;
+      args.push(...kept);
       return;
     }
     return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message);

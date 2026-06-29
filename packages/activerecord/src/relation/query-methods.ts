@@ -130,7 +130,10 @@ export type OrderArg =
   | Nodes.Node
   | string[]
   | [Nodes.Node, ...unknown[]]
-  | Map<Nodes.Node | string, OrderDirection>;
+  | Map<Nodes.Node | string, OrderDirection>
+  // Rails' order/reorder accept nil (`reorder(nil)` clears the order); the empty
+  // -argument guard compact_blanks it away before it reaches the bang variant.
+  | null;
 
 // ---------------------------------------------------------------------------
 // Host interface: the shape of `this` for bang methods mixed into Relation.

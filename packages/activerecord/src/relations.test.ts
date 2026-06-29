@@ -714,9 +714,12 @@ describe("RelationTest", () => {
     expect(() => (Topic as any).reorder([])).not.toThrow();
     expect(() => (Topic as any).order([])).not.toThrow();
     expect(() => (Topic as any).eagerLoad([])).not.toThrow();
+    expect(() => (Topic as any).reselect([])).not.toThrow();
     expect(() => (Topic as any).unscope([])).not.toThrow();
     expect(() => (Topic as any).joins([])).not.toThrow();
     expect(() => (Topic as any).leftJoins([])).not.toThrow();
+    expect(() => (Topic as any).optimizerHints([])).not.toThrow();
+    expect(() => (Topic as any).annotate([])).not.toThrow();
   });
 
   it("respond to dynamic finders", () => {
@@ -1869,12 +1872,12 @@ describe("RelationTest", () => {
   });
 
   it("order with reorder nil removes the order", () => {
-    const sql = Topic.order("title").reorder().toSql();
+    const sql = Topic.order("title").reorder(null).toSql();
     expect(sql).not.toContain("ORDER BY");
   });
 
   it("reverse order with reorder nil removes the order", () => {
-    const sql = Topic.order("title").reorder().reverseOrder().toSql();
+    const sql = Topic.order("title").reorder(null).reverseOrder().toSql();
     expect(sql).not.toContain("ORDER BY");
   });
 
@@ -2347,23 +2350,6 @@ describe("RelationTest", () => {
       expect(() => invoke(Topic.all())).toThrow(`The method .${method}() must contain arguments.`);
     });
   }
-
-  it("blank like arguments to query methods dont raise errors", () => {
-    const rel = () => Topic.all() as any;
-    expect(() => rel().references([])).not.toThrow();
-    expect(() => rel().includes([])).not.toThrow();
-    expect(() => rel().preload([])).not.toThrow();
-    expect(() => rel().group([])).not.toThrow();
-    expect(() => rel().reorder([])).not.toThrow();
-    expect(() => rel().order([])).not.toThrow();
-    expect(() => rel().eagerLoad([])).not.toThrow();
-    expect(() => rel().reselect([])).not.toThrow();
-    expect(() => rel().unscope([])).not.toThrow();
-    expect(() => rel().joins([])).not.toThrow();
-    expect(() => rel().leftJoins([])).not.toThrow();
-    expect(() => rel().optimizerHints([])).not.toThrow();
-    expect(() => rel().annotate([])).not.toThrow();
-  });
 
   // Rails gates CreateOrFindByWithinTransactions `unless current_adapter?(:SQLite3Adapter)`
   describe.skipIf(adapterType === "sqlite")("CreateOrFindByWithinTransactions", () => {
