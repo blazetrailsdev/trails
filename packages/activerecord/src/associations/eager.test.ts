@@ -1198,6 +1198,11 @@ describe("EagerAssociationTest", () => {
     const author = await Author.preload("readonlyComments").first();
     expect(author).toBeTruthy();
     expect((author as any).association("readonlyComments").isLoaded()).toBe(true);
+    // The preloader populated the through target directly, so reading it must
+    // not fire a query (it never goes through the expensive reader path).
+    await assertNoQueries(false, async () => {
+      await (author as any).readonlyComments.toArray();
+    });
   });
   it("preloading through a polymorphic association doesn't require the association to exist", async () => {
     await seedSponsors();
