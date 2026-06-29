@@ -80,7 +80,11 @@ import {
   compareValuesForOrder as _compareValuesForOrder,
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
-import { wrapWithScopeProxy, DelegationMethods } from "./relation/delegation.js";
+import {
+  wrapWithScopeProxy,
+  DelegationMethods,
+  type ToSentenceOptions,
+} from "./relation/delegation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
@@ -7798,11 +7802,7 @@ export interface Relation<T extends Base> {
   split(valueOrFn: T | ((record: T) => boolean)): Promise<T[][]>;
   inGroups(number: number, fillWith?: T | null | false): Promise<(T | null | false)[][]>;
   inGroupsOf(number: number, fillWith?: T | null | false): Promise<(T | null | false)[][]>;
-  toSentence(options?: {
-    wordsConnector?: string;
-    twoWordsConnector?: string;
-    lastWordConnector?: string;
-  }): Promise<string>;
+  toSentence(options?: ToSentenceOptions): Promise<string>;
   asJson(options?: SerializeOptions): Promise<unknown[]>;
   toFs(format?: string): Promise<string>;
   toFormattedS(format?: string): Promise<string>;

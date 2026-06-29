@@ -3125,13 +3125,10 @@ function wrapCollectionProxy<T extends Base = Base>(
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
       // Curated `to: :records` delegations (`each`, `join`, `reverse`, …) are now
-      // real *async* methods on the Relation base (DelegationMethods). On a
-      // *loaded* proxy they must keep Rails' synchronous `records`-delegation
-      // semantics, so for those names — which CollectionProxy itself does NOT
-      // specialize — fall through to the sync record delegate below rather than
-      // resolving to the inherited async method. Names CollectionProxy
-      // specializes (slice/reduce/indexOf/…) are absent from
-      // DELEGATION_RECORD_METHOD_NAMES, so they keep winning here.
+      // real *async* methods on the Relation base. On a *loaded* proxy they must
+      // keep Rails' synchronous `records` delegation, so fall through to the sync
+      // record delegate below. CollectionProxy-specialized names (slice/reduce/
+      // indexOf/…) are absent from DELEGATION_RECORD_METHOD_NAMES, so they win here.
       const preferSyncRecordDelegate =
         typeof prop === "string" && target.loaded && DELEGATION_RECORD_METHOD_NAMES.has(prop);
       if (value !== undefined && !preferSyncRecordDelegate) return value;

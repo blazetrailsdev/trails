@@ -638,14 +638,18 @@ export interface DelegationHost {
  * Mirrors: ActiveRecord::Delegation
  */
 type RecordDelegate = (records: Base[], ...args: any[]) => unknown;
+type GroupFill = Base | null | false;
+export type GroupedRecords = GroupFill[][];
+export type ToSentenceOptions = {
+  wordsConnector?: string;
+  twoWordsConnector?: string;
+  lastWordConnector?: string;
+};
 
 /**
- * The `delegate ... to: :records` operations (delegation.rb:101) as pure,
- * synchronous functions over an already-loaded `records` array. Rails reads the
- * loaded `records` and applies these synchronously; trails reuses each from two
- * call sites so both stay identical: `DelegationMethods` (async — load via
- * `toArray()`, then apply) for a `Relation`, and `delegateRecordMethodSync`
- * (sync) for an already-loaded `CollectionProxy`.
+ * The `delegate ... to: :records` operations (delegation.rb:101) as pure sync
+ * functions over an already-loaded `records` array, reused by `DelegationMethods`
+ * (async, self-loading) and `delegateRecordMethodSync` (sync, loaded proxy).
  */
 const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   each: (records, fn: (record: Base, index: number) => void) => {
@@ -727,12 +731,11 @@ export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
 
 /**
  * Sync delegation of a curated `to: :records` method against an already-loaded
- * `records` array. `wrapCollectionProxy` uses this so a *loaded* CollectionProxy
- * keeps Rails' synchronous `records`-delegation semantics (delegation.rb:101,
- * `CollectionProxy#records` → `load_target`) for the full curated set —
- * including Rails-named entries (`each`, `index`, …) the JS-name array delegate
- * doesn't cover — instead of resolving the inherited async `Relation` method.
- * Returns `undefined` for non-record names so callers fall through.
+ * `records` array, so a *loaded* CollectionProxy keeps Rails' synchronous
+ * `records` delegation (delegation.rb:101, `CollectionProxy#records` →
+ * `load_target`) for the full curated set — including Rails-named entries
+ * (`each`, `index`, …) the JS-name array delegate doesn't cover. Returns
+ * `undefined` for non-record names so callers fall through.
  */
 export function delegateRecordMethodSync(
   prop: string,
@@ -745,11 +748,9 @@ export function delegateRecordMethodSync(
 
 export class DelegationMethods {
   // ---- to: :records (Array / Enumerable) ----
-  //
-  // Each loads via `toArray()` first (trails has no blocking IO) and then applies
-  // the shared `RECORD_DELEGATES` helper — the same pure function the synchronous
-  // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses, so both call
-  // sites stay byte-for-byte consistent with Rails' `records` delegation.
+  // Each loads via `toArray()` (trails has no blocking IO) then applies the
+  // shared `RECORD_DELEGATES` helper — the same pure function the synchronous
+  // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses.
 
   /** `Array#each` — yields each loaded record, returning the records. */
   async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
@@ -771,33 +772,20 @@ export class DelegationMethods {
     return RECORD_DELEGATES.compact(await this.toArray()) as Base[];
   }
 
-  /**
-   * `Array#index` — the index of the first matching record (by predicate or
-   * value), or `null` (Ruby's `nil`) when none matches.
-   */
-  async index(
-    this: DelegationHost,
-    valueOrFn: Base | ((record: Base) => unknown),
-  ): Promise<number | null> {
-    return RECORD_DELEGATES.index(await this.toArray(), valueOrFn) as number | null;
+  /** `Array#index` — index of the first matching record, or `null` (Ruby `nil`). */
+  async index(this: DelegationHost, v: Base | ((record: Base) => unknown)): Promise<number | null> {
+    return RECORD_DELEGATES.index(await this.toArray(), v) as number | null;
   }
 
-  /**
-   * `Array#rindex` — the index of the last matching record, or `null` when none
-   * matches.
-   */
+  /** `Array#rindex` — index of the last matching record, or `null` (Ruby `nil`). */
   async rindex(
     this: DelegationHost,
-    valueOrFn: Base | ((record: Base) => unknown),
+    v: Base | ((record: Base) => unknown),
   ): Promise<number | null> {
-    return RECORD_DELEGATES.rindex(await this.toArray(), valueOrFn) as number | null;
+    return RECORD_DELEGATES.rindex(await this.toArray(), v) as number | null;
   }
 
-  /**
-   * `Array#sample` — a random record, or (with `n`) up to `n` distinct random
-   * records. Returns `null` (Ruby's `nil`) when sampling a single record from an
-   * empty collection.
-   */
+  /** `Array#sample` — a random record, or (with `n`) up to `n`; `null` if empty. */
   async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
     return RECORD_DELEGATES.sample(await this.toArray(), n) as Base | Base[] | null;
   }
@@ -813,48 +801,26 @@ export class DelegationMethods {
   }
 
   /** `Array#split` — split records on a value or predicate (ActiveSupport). */
-  async split(
-    this: DelegationHost,
-    valueOrFn: Base | ((record: Base) => boolean),
-  ): Promise<Base[][]> {
-    return RECORD_DELEGATES.split(await this.toArray(), valueOrFn) as Base[][];
+  async split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Promise<Base[][]> {
+    return RECORD_DELEGATES.split(await this.toArray(), v) as Base[][];
   }
 
   /** `Array#in_groups` — split records into `number` groups (ActiveSupport). */
-  async inGroups(
-    this: DelegationHost,
-    number: number,
-    fillWith: Base | null | false = null,
-  ): Promise<(Base | null | false)[][]> {
-    return RECORD_DELEGATES.inGroups(await this.toArray(), number, fillWith) as (
-      | Base
-      | null
-      | false
-    )[][];
+  async inGroups(this: DelegationHost, n: number, fill: GroupFill = null): Promise<GroupedRecords> {
+    return RECORD_DELEGATES.inGroups(await this.toArray(), n, fill) as GroupedRecords;
   }
 
   /** `Array#in_groups_of` — split records into groups of `number` (ActiveSupport). */
   async inGroupsOf(
     this: DelegationHost,
-    number: number,
-    fillWith: Base | null | false = null,
-  ): Promise<(Base | null | false)[][]> {
-    return RECORD_DELEGATES.inGroupsOf(await this.toArray(), number, fillWith) as (
-      | Base
-      | null
-      | false
-    )[][];
+    n: number,
+    fill: GroupFill = null,
+  ): Promise<GroupedRecords> {
+    return RECORD_DELEGATES.inGroupsOf(await this.toArray(), n, fill) as GroupedRecords;
   }
 
   /** `Array#to_sentence` — comma/`and`-joined record strings (ActiveSupport). */
-  async toSentence(
-    this: DelegationHost,
-    options?: {
-      wordsConnector?: string;
-      twoWordsConnector?: string;
-      lastWordConnector?: string;
-    },
-  ): Promise<string> {
+  async toSentence(this: DelegationHost, options?: ToSentenceOptions): Promise<string> {
     return RECORD_DELEGATES.toSentence(await this.toArray(), options) as string;
   }
 
@@ -864,10 +830,9 @@ export class DelegationMethods {
   }
 
   /**
-   * `Array#to_fs` / `Array#to_formatted_s` (conversions.rb:94-104): the `:db`
-   * format yields `"null"` for an empty collection else the records' ids joined
-   * by `","`; any other format falls back to `Array#to_s` (the bracketed inspect
-   * form).
+   * `Array#to_fs` / `Array#to_formatted_s` (conversions.rb:94-104): `:db` →
+   * `"null"` when empty else ids joined by `","`; else `Array#to_s` (bracketed
+   * inspect form).
    */
   async toFs(this: DelegationHost, format?: string): Promise<string> {
     return RECORD_DELEGATES.toFs(await this.toArray(), format) as string;

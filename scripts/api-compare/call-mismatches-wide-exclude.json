@@ -17434,7 +17434,7 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "_create_record",
     "call": "new",
-    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` — the `new` operator, not a recognized method call."
+    "reason": "Rails `RecordNotSaved.new(...)` maps to TS `new RecordNotSaved(...)` \u2014 the `new` operator, not a recognized method call."
   },
   {
     "package": "activerecord",
@@ -60233,5 +60233,124 @@
     "rubyName": "add_default_callbacks",
     "call": "before_validation",
     "reason": "Intentional deviation: Rails registers the default on before_validation, but trails' validation chain is strictly synchronous and the default block may be async (e.g. () => Developer.first()), so addDefaultCallbacks registers it on beforeSave instead. Documented in belongs-to.ts and AssociationOptions.default."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-assignment.ts",
+    "rubyName": "extract_callstack_for_multiparameter_attributes",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "accept",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-statements.ts",
+    "rubyName": "insert_versions_sql",
+    "call": "reverse",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/oid/legacy-point.ts",
+    "rubyName": "cast",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/oid/range.ts",
+    "rubyName": "extract_bounds",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/sqlite3/schema-dumper.ts",
+    "rubyName": "virtual_tables",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "initialize",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "does_not_support_reverse?",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "resolve_arel_attributes",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "reverse_sql_order",
+    "call": "reverse",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "reverse_sql_order",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "type_for",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_for",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/predicate-builder.ts",
+    "rubyName": "convert_dot_notation_to_hash",
+    "call": "rindex",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/predicate-builder.ts",
+    "rubyName": "references",
+    "call": "rindex",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/migration.ts",
+    "rubyName": "migration_template",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
   }
 ]

@@ -447,19 +447,6 @@ describe("DelegationTest", () => {
       });
     }
 
-    it("each yields every record and returns them", async () => {
-      const seen: number[] = [];
-      const returned = await Comment.all().each((c) => seen.push(c.id as number));
-      expect(seen.length).toBeGreaterThan(0);
-      expect(returned.map((c) => c.id)).toEqual(seen);
-    });
-
-    it("reverse returns a reversed copy of the records", async () => {
-      const forward = await Comment.all();
-      const reversed = await Comment.all().reverse();
-      expect(reversed.map((c) => c.id)).toEqual([...forward].reverse().map((c) => c.id));
-    });
-
     it("index and rindex locate records by value", async () => {
       // Same loaded relation, so index()/rindex() see the cached instances and
       // identity comparison matches.
@@ -472,13 +459,6 @@ describe("DelegationTest", () => {
       );
     });
 
-    it("inGroupsOf splits the records into fixed-size groups", async () => {
-      const records = await Comment.all();
-      const groups = await Comment.all().inGroupsOf(2);
-      expect(groups.length).toBe(Math.ceil(records.length / 2));
-      expect(groups[0].length).toBe(2);
-    });
-
     it("to_fs(:db) joins the record ids", async () => {
       const records = await Comment.all();
       expect(await Comment.all().toFs("db")).toBe(records.map((c) => c.id).join(","));
@@ -489,7 +469,6 @@ describe("DelegationTest", () => {
       const fs = await Comment.all().toFs();
       // Ruby Array#to_s == Array#inspect: `[<elem.inspect>, …]` — not `"a,b"`.
       expect(fs).toBe(`[${records.map((c) => (c as any).inspect()).join(", ")}]`);
-      expect(fs.startsWith("[")).toBe(true);
     });
 
     it("on a loaded proxy each/index delegate to records synchronously", async () => {
@@ -506,16 +485,12 @@ describe("DelegationTest", () => {
       expect(proxy.index(proxy.target[0])).toBe(0);
     });
 
-    it("delegates connection, primary_key and table_name to the model", () => {
+    it("delegates connection, primary_key, table_name and transaction to the model", async () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);
       expect(relation.primaryKey).toBe(Comment.primaryKey);
       expect(relation.connection).toBe(Comment.connection);
-    });
-
-    it("delegates transaction to the model", async () => {
-      const result = await Comment.all().transaction(async () => 42);
-      expect(result).toBe(42);
+      expect(await Comment.all().transaction(async () => 42)).toBe(42);
     });
   }); // DelegationNamedMethods
 });
