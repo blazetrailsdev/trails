@@ -6504,12 +6504,25 @@ describe("HasManyAssociationsTest", () => {
     await category.categorizations.destroyAll();
     expect(await category.categorizations.count()).toBe(0);
   });
+});
 
-  it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
+describe("HasManyAssociationsTest", () => {
+  useHandlerFixtures(
+    {
+      user_comments_counts: [UserCommentsCount, {}],
+      post_comments_counts: [PostCommentsCount, {}],
+      comment_overlapping_counter_caches: [CommentOverlappingCounterCache, {}],
+    },
+    { schema: TEST_SCHEMA },
+  );
+
+  beforeAll(() => {
     registerModel(CommentOverlappingCounterCache);
     registerModel(UserCommentsCount);
     registerModel(PostCommentsCount);
+  });
 
+  it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
     const user = (await UserCommentsCount.create({})) as any;
     const post = (await PostCommentsCount.create({})) as any;
 
