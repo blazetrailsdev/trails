@@ -381,12 +381,23 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const path = getPath();
     const expanded = path.resolve(fs.cwd(), filename);
     const dirname = path.dirname(expanded);
+    // Mirrors Rails' `unless File.directory?(dirname)`: a missing parent — or
+    // one that exists as a regular file — falls into the mkdir branch, where
+    // `FileUtils.mkdir_p` raises (caught as NoDatabaseError). An `existsSync`
+    // guard would skip the file case and leak the driver's open failure as a
+    // DatabaseConnectionError instead.
+    let dirExists = false;
     try {
-      if (!fs.existsSync(dirname)) {
+      dirExists = fs.statSync(dirname).isDirectory();
+    } catch {
+      dirExists = false;
+    }
+    if (!dirExists) {
+      try {
         fs.mkdirSync(dirname, { recursive: true });
+      } catch (e) {
+        throw new NoDatabaseError(`Could not create database directory '${dirname}'`, { cause: e });
       }
-    } catch (e) {
-      throw new NoDatabaseError(`Could not create database directory '${dirname}'`, { cause: e });
     }
     return expanded;
   }
