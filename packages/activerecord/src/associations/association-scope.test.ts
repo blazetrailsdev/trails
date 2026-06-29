@@ -1,3 +1,4 @@
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations, loadHasMany, loadHasOne } from "../associations.js";
@@ -40,6 +41,9 @@ describe("AssociationScope", () => {
 
   function makeModels() {
     class AsAuthor extends Base {
+      declare name: string | null;
+      declare as_posts: AssociationProxy<AsPost>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
@@ -50,6 +54,11 @@ describe("AssociationScope", () => {
       }
     }
     class AsPost extends Base {
+      declare as_author_id: number | null;
+      declare title: string | null;
+      declare as_author: AsAuthor | null;
+      declare loadBelongsTo: (name: "as_author") => Promise<AsAuthor | null>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("as_author_id", "integer");
@@ -144,6 +153,9 @@ describe("AssociationScope", () => {
     }
     let calls = 0;
     class CountPost extends Base {
+      declare count_author_id: number | null;
+      declare published: boolean | null;
+
       static {
         this.attribute("count_author_id", "integer");
         this.attribute("published", "boolean");
@@ -178,6 +190,8 @@ describe("AssociationScope", () => {
     // Rails' klass.unscoped applies STI type_condition via core.rb's
     // relation() override; ours doesn't, so AssociationScope re-adds it.
     class StiOwner extends Base {
+      declare sti_specials: AssociationProxy<StiSpecial>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("sti_specials", {
@@ -187,6 +201,9 @@ describe("AssociationScope", () => {
       }
     }
     class StiBase extends Base {
+      declare "type": string | null;
+      declare sti_owner_id: number | null;
+
       static {
         this.attribute("type", "string");
         this.attribute("sti_owner_id", "integer");
@@ -221,6 +238,8 @@ describe("AssociationScope", () => {
     // path must merge in the target's default_scope so behavior matches
     // the inline path (targetModel.all().where(...)).
     class DsAuthor extends Base {
+      declare ds_posts: AssociationProxy<DsPost>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("ds_posts", {
@@ -230,6 +249,9 @@ describe("AssociationScope", () => {
       }
     }
     class DsPost extends Base {
+      declare ds_author_id: number | null;
+      declare published: boolean | null;
+
       static {
         this.attribute("ds_author_id", "integer");
         this.attribute("published", "boolean");
@@ -282,6 +304,8 @@ describe("AssociationScope", () => {
     // as the relation, so we must bind `this` rather than passing the
     // relation as the first arg.
     class ZeroArityAuthor extends Base {
+      declare zero_arity_posts: AssociationProxy<ZeroArityPost>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("zero_arity_posts", {
@@ -297,6 +321,9 @@ describe("AssociationScope", () => {
       }
     }
     class ZeroArityPost extends Base {
+      declare zero_arity_author_id: number | null;
+      declare active: boolean | null;
+
       static {
         this.attribute("zero_arity_author_id", "integer");
         this.attribute("active", "boolean");
@@ -319,6 +346,8 @@ describe("AssociationScope", () => {
     // comments.commentable_type = OwnerClass.name`. The type filter
     // comes from reflection.type === foreignType (`commentable_type`).
     class AsOwner extends Base {
+      declare as_comments: AssociationProxy<AsComment>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("as_comments", {
@@ -328,6 +357,9 @@ describe("AssociationScope", () => {
       }
     }
     class AsComment extends Base {
+      declare commentable_id: number | null;
+      declare commentable_type: string | null;
+
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
@@ -349,6 +381,8 @@ describe("AssociationScope", () => {
     // `owner.class.polymorphic_name` (= base_class.name), so an STI subclass
     // owner stores the base class name in the *_type column, not the subclass.
     class StiAsOwner extends Base {
+      declare "type": string | null;
+
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
@@ -358,6 +392,9 @@ describe("AssociationScope", () => {
     enableSti(StiAsOwner);
     registerSubclass(StiAsSubOwner);
     class StiAsComment extends Base {
+      declare commentable_id: number | null;
+      declare commentable_type: string | null;
+
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
@@ -380,6 +417,9 @@ describe("AssociationScope", () => {
 
   it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
     class AsOneOwner extends Base {
+      declare as_one_image: AsOneImage | null;
+      declare loadHasOne: (name: "as_one_image") => Promise<AsOneImage | null>;
+
       static {
         this.attribute("id", "integer");
         this.hasOne("as_one_image", {
@@ -389,6 +429,9 @@ describe("AssociationScope", () => {
       }
     }
     class AsOneImage extends Base {
+      declare imageable_id: number | null;
+      declare imageable_type: string | null;
+
       static {
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
@@ -418,6 +461,11 @@ describe("AssociationScope", () => {
       }
     }
     class PolyComment extends Base {
+      declare commentable_id: number | null;
+      declare commentable_type: string | null;
+      declare commentable: Base | null;
+      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
+
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
@@ -444,6 +492,9 @@ describe("AssociationScope", () => {
     // join_id_for; only the no-id case is unrepresentable.)
     const { loadHasMany, CompositePrimaryKeyMismatchError } = await import("../index.js");
     class CpkAsOwner extends Base {
+      declare a: number | null;
+      declare b: number | null;
+
       static {
         this.attribute("a", "integer");
         this.attribute("b", "integer");
@@ -451,6 +502,9 @@ describe("AssociationScope", () => {
       }
     }
     class CpkAsTarget extends Base {
+      declare commentable_id: number | null;
+      declare commentable_type: string | null;
+
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
@@ -478,11 +532,17 @@ describe("AssociationScope", () => {
     // `["broken_order_id"]` array the old guard produced.
     const { CompositePrimaryKeyMismatchError } = await import("../index.js");
     class AscCpkBook extends Base {
+      declare broken_order_id: number | null;
+
       static {
         this.attribute("broken_order_id", "integer");
       }
     }
     class AscCpkBrokenOrder extends Base {
+      declare shop_id: number | null;
+      declare status: string | null;
+      declare books: AssociationProxy<AscCpkBook>;
+
       static {
         this.attribute("shop_id", "integer");
         this.attribute("status", "string");
@@ -513,12 +573,19 @@ describe("AssociationScope", () => {
     // so a target with a non-default PK (e.g. "uuid") gets the right
     // WHERE column. Regression for Copilot review on PR #618.
     class UuidTarget extends Base {
+      declare uuid: string | null;
+
       static {
         this.attribute("uuid", "string");
         this.primaryKey = "uuid";
       }
     }
     class UuidComment extends Base {
+      declare commentable_id: string | null;
+      declare commentable_type: string | null;
+      declare commentable: Base | null;
+      declare loadBelongsTo: (name: "commentable") => Promise<Base | null>;
+
       static {
         this.attribute("commentable_id", "string");
         this.attribute("commentable_type", "string");
@@ -556,6 +623,9 @@ describe("AssociationScope", () => {
     // `hasMany :memberships, scope: r => r.where(active: true)`) must
     // emit `WHERE memberships.active = TRUE` on the JOINed-in table.
     class CcAuthor extends Base {
+      declare cc_memberships: AssociationProxy<CcMembership>;
+      declare cc_tags: AssociationProxy<CcTag>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("cc_memberships", {
@@ -573,6 +643,12 @@ describe("AssociationScope", () => {
       }
     }
     class CcMembership extends Base {
+      declare cc_author_id: number | null;
+      declare cc_tag_id: number | null;
+      declare active: boolean | null;
+      declare cc_tag: CcTag | null;
+      declare loadBelongsTo: (name: "cc_tag") => Promise<CcTag | null>;
+
       static {
         this.attribute("cc_author_id", "integer");
         this.attribute("cc_tag_id", "integer");
@@ -758,6 +834,11 @@ describe("AssociationScope", () => {
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
     class HotUser extends Base {
+      declare hot_account: HotAccount | null;
+      declare hot_settings: HotSettings | null;
+      declare loadHasOne: ((name: "hot_account") => Promise<HotAccount | null>) &
+        ((name: "hot_settings") => Promise<HotSettings | null>);
+
       static {
         this.attribute("id", "integer");
         this.hasOne("hot_account", {
@@ -771,6 +852,10 @@ describe("AssociationScope", () => {
       }
     }
     class HotAccount extends Base {
+      declare hot_user_id: number | null;
+      declare hot_settings: HotSettings | null;
+      declare loadHasOne: (name: "hot_settings") => Promise<HotSettings | null>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("hot_user_id", "integer");
@@ -781,6 +866,8 @@ describe("AssociationScope", () => {
       }
     }
     class HotSettings extends Base {
+      declare hot_account_id: number | null;
+
       static {
         this.attribute("hot_account_id", "integer");
       }
@@ -820,6 +907,9 @@ describe("AssociationScope", () => {
     //     ON through_posts.id = through_memberships.through_post_id
     //   WHERE through_memberships.through_author_id = 1
     class ThroughAuthor extends Base {
+      declare through_memberships: AssociationProxy<ThroughMembership>;
+      declare through_posts: AssociationProxy<ThroughPost>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("through_memberships", {
@@ -833,6 +923,11 @@ describe("AssociationScope", () => {
       }
     }
     class ThroughMembership extends Base {
+      declare through_author_id: number | null;
+      declare through_post_id: number | null;
+      declare through_post: ThroughPost | null;
+      declare loadBelongsTo: (name: "through_post") => Promise<ThroughPost | null>;
+
       static {
         this.attribute("through_author_id", "integer");
         this.attribute("through_post_id", "integer");
@@ -889,6 +984,14 @@ describe("AssociationScope", () => {
     // `pst_galleries.imageable_type` (the FROM side) would match the
     // wrong rows.
     class PstGallery extends Base {
+      declare pst_gallery_id: number | null;
+      declare imageable_id: number | null;
+      declare imageable_type: string | null;
+      declare children: AssociationProxy<PstGallery>;
+      declare imageable: Base | null;
+      declare imageables: AssociationProxy<PstGallery>;
+      declare loadBelongsTo: (name: "imageable") => Promise<Base | null>;
+
       static {
         this._tableName = "pst_galleries";
         this.attribute("pst_gallery_id", "integer");
