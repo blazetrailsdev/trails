@@ -2320,6 +2320,51 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
 
+  // Mirrors the parametrized `test_no_arguments_to_#{method}_raise_errors`
+  // block in relations_test.rb: every query method guarded by
+  // check_if_method_has_arguments! raises ArgumentError when called with no
+  // arguments. The display name is the Rails method (so test:compare matches),
+  // while the invoker uses the trails camelCase port.
+  const noArgGuardedMethods: Array<[string, (rel: any) => unknown]> = [
+    ["references", (rel) => rel.references()],
+    ["includes", (rel) => rel.includes()],
+    ["preload", (rel) => rel.preload()],
+    ["eager_load", (rel) => rel.eagerLoad()],
+    ["group", (rel) => rel.group()],
+    ["order", (rel) => rel.order()],
+    ["reorder", (rel) => rel.reorder()],
+    ["reselect", (rel) => rel.reselect()],
+    ["unscope", (rel) => rel.unscope()],
+    ["joins", (rel) => rel.joins()],
+    ["left_joins", (rel) => rel.leftJoins()],
+    ["left_outer_joins", (rel) => rel.leftOuterJoins()],
+    ["optimizer_hints", (rel) => rel.optimizerHints()],
+    ["annotate", (rel) => rel.annotate()],
+    ["regroup", (rel) => rel.regroup()],
+  ];
+  for (const [method, invoke] of noArgGuardedMethods) {
+    it(`no arguments to ${method} raise errors`, () => {
+      expect(() => invoke(Topic.all())).toThrow(`The method .${method}() must contain arguments.`);
+    });
+  }
+
+  it("blank like arguments to query methods dont raise errors", () => {
+    const rel = () => Topic.all() as any;
+    expect(() => rel().references([])).not.toThrow();
+    expect(() => rel().includes([])).not.toThrow();
+    expect(() => rel().preload([])).not.toThrow();
+    expect(() => rel().group([])).not.toThrow();
+    expect(() => rel().reorder([])).not.toThrow();
+    expect(() => rel().order([])).not.toThrow();
+    expect(() => rel().eagerLoad([])).not.toThrow();
+    expect(() => rel().reselect([])).not.toThrow();
+    expect(() => rel().unscope([])).not.toThrow();
+    expect(() => rel().joins([])).not.toThrow();
+    expect(() => rel().leftJoins([])).not.toThrow();
+    expect(() => rel().optimizerHints([])).not.toThrow();
+    expect(() => rel().annotate([])).not.toThrow();
+  });
+
   // Rails gates CreateOrFindByWithinTransactions `unless current_adapter?(:SQLite3Adapter)`
   describe.skipIf(adapterType === "sqlite")("CreateOrFindByWithinTransactions", () => {
     it("multiple find or create by within transactions", async () => {

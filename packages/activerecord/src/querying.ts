@@ -319,7 +319,11 @@ export function leftOuterJoins<T extends typeof Base>(
   on?: string,
 ): Relation<InstanceType<T>> {
   const rel = this.all();
-  if (table === undefined) return rel.leftOuterJoins();
+  // Rails' Querying#left_outer_joins delegates to Relation, whose guard raises
+  // ArgumentError on no arguments; surface that same raise here.
+  if (table === undefined) {
+    return (rel.leftOuterJoins as (...a: unknown[]) => Relation<InstanceType<T>>)();
+  }
   if (on !== undefined) {
     if (typeof table !== "string")
       throw argumentError("leftOuterJoins(table, on) requires a string table name");

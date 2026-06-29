@@ -1657,7 +1657,12 @@ export function isBlankArgument(value: unknown): boolean {
   if (value === null || value === undefined || value === false) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
-  if (isPlainObject(value)) return Object.keys(value).length === 0;
+  if (isPlainObject(value)) {
+    // A hash is blank only with no keys. trails represents Ruby symbol hash keys
+    // (e.g. `select(foo: :post_title)`) as Symbol-keyed objects, which
+    // Object.keys omits — count those too so a symbol-keyed hash isn't compacted.
+    return Object.keys(value).length === 0 && Object.getOwnPropertySymbols(value).length === 0;
+  }
   return false;
 }
 
