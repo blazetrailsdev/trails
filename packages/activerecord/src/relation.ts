@@ -6659,6 +6659,11 @@ export class Relation<T extends Base> {
       this._limitValue === null &&
       this._offsetValue === null &&
       this._selectColumns === null &&
+      // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and a
+      // `readonly` relation carries `@values[:readonly]`, so it is NOT empty.
+      // Omitting this dropped a `readonly()` reflection scope on the preload
+      // through/HABTM source path (build_scope skips merging an empty scope).
+      this._isReadonly !== true &&
       !this._isDistinct &&
       this._groupColumns.length === 0 &&
       this._havingClause.isEmpty() &&
