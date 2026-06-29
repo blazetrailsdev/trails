@@ -10,6 +10,7 @@ import {
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { belongsToRequiredValidatesForeignKey } from "../../ar-config.js";
+import { BelongsToRequiredValidator } from "../../validations/belongs-to-required.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -323,49 +324,50 @@ export class BelongsTo extends SingularAssociation {
 
     super.defineValidations(model, reflection);
 
-    if (required) {
-      // Rails validates the association name (reflection.name) which
-      // checks whether the associated record can be loaded. Our codebase
-      // validates the foreign key directly since association-aware presence
-      // validation is not yet wired. The effect is the same: reject nil FK.
+    if (required && typeof model.validatesWith === "function") {
+      // Mirrors Rails BelongsToBuilder.define_validations: presence is
+      // validated on the association NAME (reflection.name), not the foreign
+      // key column, so `read_attribute_for_validation` reads the loaded
+      // in-memory target. Assigning an unsaved `record.parent = Parent.new`
+      // satisfies presence, and autosave persists the new parent before the
+      // owner (see autosave-association saveBelongsTo). BelongsToRequiredValidator
+      // additionally treats a populated FK as present (trails validations are
+      // sync and cannot load an unloaded target — see CLAUDE.md).
+      const name = reflection.name;
+      const polymorphic = !!reflection.options?.polymorphic;
       const rawFk =
         reflection.foreignKey ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
       const foreignKeys = Array.isArray(rawFk) ? rawFk : [rawFk];
+      const foreignTypes = polymorphic
+        ? Array.isArray(reflection.foreignType)
+          ? (reflection.foreignType as string[])
+          : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
+        : [];
 
-      if (belongsToRequiredValidatesForeignKey) {
-        if (typeof model.validatesPresenceOf === "function") {
-          for (const key of foreignKeys) {
-            model.validatesPresenceOf(key, { message: "required" });
-          }
-        } else if (typeof model.validates === "function") {
-          for (const key of foreignKeys) {
-            model.validates(key, { presence: true });
-          }
-        }
-      } else {
-        const foreignTypes = reflection.options?.polymorphic
-          ? Array.isArray(reflection.foreignType)
-            ? (reflection.foreignType as string[])
-            : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
-          : [];
+      const validatorOptions: Record<string, unknown> = {
+        attributes: [name],
+        message: "required",
+        belongsToForeignKeys: foreignKeys,
+        belongsToForeignTypes: foreignTypes,
+        belongsToPolymorphic: polymorphic,
+      };
 
+      if (!belongsToRequiredValidatesForeignKey) {
+        // Rails' conditional branch only runs the presence check when the FK
+        // (or polymorphic type) is nil or changed, so an already-persisted,
+        // untouched FK doesn't re-validate the (possibly unloaded) target.
         const needsValidation = (record: any, attrs: string[]) =>
           attrs.some(
             (attr) =>
               record._readAttribute(attr) == null ||
               (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
           );
-
-        const condition = (record: any) =>
+        validatorOptions.if = (record: any) =>
           needsValidation(record, foreignKeys) ||
-          (reflection.options?.polymorphic && needsValidation(record, foreignTypes));
-
-        if (typeof model.validates === "function") {
-          for (const key of foreignKeys) {
-            model.validates(key, { presence: true, if: condition });
-          }
-        }
+          (polymorphic && needsValidation(record, foreignTypes));
       }
+
+      model.validatesWith(BelongsToRequiredValidator, validatorOptions);
     }
   }
 

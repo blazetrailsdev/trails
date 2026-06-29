@@ -71,8 +71,7 @@ describe("RequiredAssociationsTest", () => {
     expect(await record.save()).toBe(false);
     expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
 
-    const parent = await Parent.create({});
-    record.writeAttribute("parent_id", parent.id);
+    record.parent = new Parent();
     expect(await record.save()).toBe(true);
   });
 
@@ -97,8 +96,7 @@ describe("RequiredAssociationsTest", () => {
       expect(await record.save()).toBe(false);
       expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
 
-      const parent = await Parent.create({});
-      record.writeAttribute("parent_id", parent.id);
+      record.parent = new Parent();
       expect(await record.save()).toBe(true);
     } finally {
       if (prev === undefined) {

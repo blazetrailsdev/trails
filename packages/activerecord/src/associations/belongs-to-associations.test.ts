@@ -307,7 +307,7 @@ describe("BelongsToAssociationsTest", () => {
       }
       const account = new TempModel({});
       expect(await account.isValid()).toBe(false);
-      expect((account as any).errors.details.get("company_id")).toEqual([{ error: "blank" }]);
+      expect((account as any).errors.details.get("company")).toEqual([{ error: "blank" }]);
     } finally {
       (Base as any).belongsToRequiredByDefault = prev;
     }
@@ -325,7 +325,7 @@ describe("BelongsToAssociationsTest", () => {
       }
       const account = new TempModel({});
       expect(await account.isValid()).toBe(false);
-      expect((account as any).errors.details.get("company_id")).toEqual([{ error: "blank" }]);
+      expect((account as any).errors.details.get("company")).toEqual([{ error: "blank" }]);
     } finally {
       (Base as any).belongsToRequiredByDefault = prev;
     }
