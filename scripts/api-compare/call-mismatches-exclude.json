@@ -9,16 +9,9 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
-    "rubyName": "concat",
-    "call": "transaction",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
     "rubyName": "replace",
     "call": "transaction",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): trails splits Rails' synchronous `CollectionAssociation#replace` (which wraps `replace_records` in `transaction` for a persisted owner — collection_association.rb:251) into a sync `replace` that records `_pendingReplace` plus an async `persistReplace`. The persisted-owner diff/save runs inside `transaction(this, ...)` in `persistReplace` (collection-association.ts:437), not literally inside `replace`, so the call-set extractor — which scopes to the Ruby-named `replace` body — flags it. The atomic wrap is present; false positive, no omission."
   },
   {
     "package": "activerecord",
@@ -116,7 +109,7 @@
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "alter_table",
     "call": "transaction",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): Rails wraps the table rebuild in `transaction { disable_referential_integrity { move_table(...) } }` (sqlite3_adapter.rb:586). trails' `alterTable` achieves the same atomicity via an explicit transaction boundary — `beginTransaction()` + `commit()`/`rollback()` around the `disableReferentialIntegrity` rebuild (sqlite3-adapter.ts:2312-2349), using a savepoint when already inside a transaction since SQLite forbids nested BEGIN. The wrap uses the begin/commit primitives rather than the `transaction` closure helper, so the extractor doesn't see a literal `transaction` call — false positive, no omission."
   },
   {
     "package": "activerecord",
@@ -144,7 +137,7 @@
     "tsFile": "migration.ts",
     "rubyName": "ddl_transaction",
     "call": "transaction",
-    "reason": "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet landed; pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): Rails' `Migrator#ddl_transaction` calls `connection.transaction(&block)` when `use_transaction?` (migration.rb:1584-1590). trails' `ddlTransaction` delegates to `_ddlTransaction`, which on the same `_useTransaction` guard wraps the migration body in an explicit `beginTransaction()` + `commit()`/`rollback()` boundary (migration.ts:3325-3347), skipping the wrap when the adapter is already in a transaction. The atomic wrap is present via begin/commit primitives, not the `transaction` closure helper, and lives in the `_ddlTransaction` delegate rather than the Ruby-named `ddlTransaction` body — false positive, no omission."
   },
   {
     "package": "activerecord",

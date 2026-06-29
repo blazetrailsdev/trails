@@ -227,6 +227,29 @@ describe("HasManyAssociationsTest", () => {
       await firm.clientsOfFirm.destroy(client);
     });
   });
+
+  it("transactions when adding to persisted", async () => {
+    const good = Client.new({ name: "Good" }) as any;
+    const bad = Client.new({ name: "Bad" }) as any;
+    bad.raiseOnSave = true;
+
+    const firstFirm = companies("first_firm") as any;
+    try {
+      await firstFirm.clientsOfFirm.concat(good, bad);
+    } catch (e) {
+      if (!(e instanceof Client.RaisedOnSave)) throw e;
+    }
+
+    const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
+    expect(reloaded.map((c) => c.id)).not.toContain(good.id);
+  });
+
+  it("transactions when adding to new record", async () => {
+    const firm = HmFirm.new() as any;
+    await assertQueriesCount(0, false, async () => {
+      await firm.clientsOfFirm.concat(Client.new({ name: "Natural Company" }));
+    });
+  });
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
@@ -2539,49 +2562,6 @@ describe("HasManyAssociationsTest", () => {
     // Creating a post with a valid FK still works regardless of "mismatch"
     const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isNewRecord()).toBe(false);
-  });
-  it("transactions when adding to persisted", async () => {
-    class TxAddAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class TxAddPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(TxAddAuthor);
-    registerModel(TxAddPost);
-    const author = await TxAddAuthor.create({ name: "Alice" });
-    const post = await TxAddPost.create({ author_id: author.id, title: "Added", body: "body" });
-    expect(post.isPersisted()).toBe(true);
-    expect((post as any).author_id).toBe(Number(author.id));
-  });
-  it("transactions when adding to new record", async () => {
-    class TxNewAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class TxNewPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(TxNewAuthor);
-    registerModel(TxNewPost);
-    const author = new TxNewAuthor({ name: "Alice" });
-    expect(author.isNewRecord()).toBe(true);
-    // Can build a post referencing a new (unsaved) author
-    const post = new TxNewPost({ author_id: null, title: "Pending" });
-    expect(post.isNewRecord()).toBe(true);
   });
   it("inverse on before validate", async () => {
     class InvValAuthor extends Base {

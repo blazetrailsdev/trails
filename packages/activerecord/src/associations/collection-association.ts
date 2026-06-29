@@ -183,7 +183,10 @@ export class CollectionAssociation extends Association {
       await this.loadTarget();
       await this.concatRecords(flattened);
     } else {
-      await this.concatRecords(flattened);
+      // Rails wraps the persisted-owner concat in a transaction so a mid-batch
+      // save failure rolls back the records already inserted
+      // (collection_association.rb:133 — `transaction { concat_records(records) }`).
+      await transaction(this, () => this.concatRecords(flattened).then(() => undefined));
     }
     return flattened;
   }
