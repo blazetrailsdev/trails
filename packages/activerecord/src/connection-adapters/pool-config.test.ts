@@ -100,7 +100,7 @@ describe("PoolConfig", () => {
     it("discards and nulls the pool", async () => {
       const pool = config.pool;
       expect(config.poolInitialized).toBe(true);
-      const spy = vi.spyOn(pool, "discardBang");
+      const spy = vi.spyOn(pool, "discardBangDraining");
       const promise = config.discardPoolBang();
       // Rails nils @pool inside the synchronous discard! critical section, so
       // the pool is gone before the async drain resolves.
@@ -119,7 +119,7 @@ describe("PoolConfig", () => {
 
     it("retains the pool when the synchronous discard fails", async () => {
       const pool = config.pool;
-      const spy = vi.spyOn(pool, "discardBang").mockImplementation(() => {
+      const spy = vi.spyOn(pool, "discardBangDraining").mockImplementation(() => {
         throw new Error("discard failed");
       });
       // Rails assigns `@pool = nil` only after `@pool.discard!` returns, so a
