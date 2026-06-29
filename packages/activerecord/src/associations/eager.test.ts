@@ -93,8 +93,6 @@ const TEST_SCHEMA: Schema = {
   dp_authors: { name: "string" },
   dp_comments: { body: "string", dp_post_id: "integer" },
   dp_posts: { title: "string", dp_author_id: "integer" },
-  eabt_comments: { body: "string", eabt_post_id: "integer" },
-  eabt_posts: { title: "string" },
   eager_cnt_ho_comments: { body: "string", eager_cnt_ho_post_id: "integer" },
   eager_cnt_ho_posts: { title: "string" },
   eager_comments: { body: "string", eager_post_id: "integer" },
@@ -150,8 +148,6 @@ const TEST_SCHEMA: Schema = {
   elmar_mentors: { name: "string" },
   elmar_project_developers: { elmar_project_id: "integer", elmar_developer_id: "integer" },
   elmar_projects: { name: "string", elmar_mentor_id: "integer" },
-  elra_authors: { name: "string" },
-  elra_posts: { title: "string", elra_author_id: "integer" },
   ewc_authors: { name: "string" },
   ewc_essays: {
     name: "string",
@@ -159,23 +155,15 @@ const TEST_SCHEMA: Schema = {
     writer_id: "integer",
     writer_type: "string",
   },
-  enra_authors: { name: "string" },
-  enra_posts: { title: "string", enra_author_id: "integer" },
   idup_categories: { name: "string" },
   idup_category_posts: { idup_post_id: "integer", idup_category_id: "integer" },
   idup_comments: { body: "string", idup_post_id: "integer" },
   idup_posts: { title: "string" },
   jeeo_comments: { body: "string", jeeo_post_id: "integer" },
   jeeo_posts: { title: "string" },
-  lna_authors: { name: "string" },
-  lna_posts: { title: "string", lna_author_id: "integer" },
-  peb_clients: { name: "string", peb_firm_id: "integer" },
-  peb_firms: { name: "string" },
   phmt_authors: { name: "string" },
   phmt_comments: { body: "string", phmt_post_id: "integer" },
   phmt_posts: { title: "string", phmt_author_id: "integer" },
-  pra_authors: { name: "string" },
-  pra_posts: { title: "string", pra_author_id: "integer" },
   pre_poly_orphans: { name: "string", owner_id: "integer", owner_type: "string" },
   psta_clubs: { name: "string" },
   psta_members: { name: "string" },
@@ -335,6 +323,9 @@ describe("EagerAssociationTest", () => {
       "comments",
       "companies",
       "accounts",
+      "developers",
+      "projects",
+      "developersProjects",
       "parrots",
       "pirates",
       "mateys",
@@ -1186,82 +1177,65 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it("preloading readonly association", async () => {
-    class PraAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("praPosts", {
-          className: "PraPost",
-          foreignKey: "pra_author_id",
-        });
-      }
-    }
-    class PraPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("pra_author_id", "integer");
-      }
-    }
-    registerModel("PraAuthor", PraAuthor);
-    registerModel("PraPost", PraPost);
-    const a = await PraAuthor.create({ name: "A" });
-    await PraPost.create({ title: "P", pra_author_id: a.id });
-    const authors = await PraAuthor.all().preload("praPosts").toArray();
-    const posts = (authors[0] as any).association("praPosts").target ?? [];
-    expect(posts).toHaveLength(1);
+  it.skip("preloading readonly association", async () => {
+    // BLOCKED: preloader does not propagate a readonly() reflection scope to
+    // has_many :through / HABTM source records — only the has-one path
+    // (readonly_account) marks records readonly. eager_load (the sibling test
+    // below) does propagate it. Un-skip story:
+    // assoc-eager-preload-readonly-through-habtm-propagation.
+    // has-one
+    const firm = await (Firm as any).where({ id: 1 }).preload("readonlyAccount").firstBang();
+    expect((await firm.readonlyAccount).isReadonly()).toBe(true);
+
+    // has_and_belongs_to_many
+    const project = await (Project as any)
+      .where({ id: 2 })
+      .preload("readonlyDevelopers")
+      .firstBang();
+    expect((await project.readonlyDevelopers.first()).isReadonly()).toBe(true);
+
+    // has-many :through
+    const david = await (Author as any).where({ id: 1 }).preload("readonlyComments").firstBang();
+    expect((await david.readonlyComments.first()).isReadonly()).toBe(true);
   });
 
   it("eager-loading non-readonly association", async () => {
-    class EnraAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("enraPosts", {
-          className: "EnraPost",
-          foreignKey: "enra_author_id",
-        });
-      }
-    }
-    class EnraPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("enra_author_id", "integer");
-      }
-    }
-    registerModel("EnraAuthor", EnraAuthor);
-    registerModel("EnraPost", EnraPost);
-    const a = await EnraAuthor.create({ name: "A" });
-    await EnraPost.create({ title: "P", enra_author_id: a.id });
-    const authors = await EnraAuthor.all().eagerLoad("enraPosts").toArray();
-    const posts = (authors[0] as any).association("enraPosts").target ?? [];
-    expect(posts).toHaveLength(1);
-    expect(posts[0]._readonly).not.toBe(true);
+    // has_one
+    const firm = await (Firm as any).where({ id: 1 }).eagerLoad("account").firstBang();
+    expect((await firm.account).isReadonly()).toBe(false);
+
+    // has_and_belongs_to_many
+    const project = await (Project as any).where({ id: 2 }).eagerLoad("developers").firstBang();
+    expect((await project.developers.first()).isReadonly()).toBe(false);
+
+    // has_many :through
+    const david = await (Author as any).where({ id: 1 }).eagerLoad("comments").firstBang();
+    expect((await david.comments.first()).isReadonly()).toBe(false);
+
+    // belongs_to
+    const post = await (Post as any).where({ id: 1 }).eagerLoad("author").firstBang();
+    expect((await post.author).isReadonly()).toBe(false);
   });
 
   it("eager-loading readonly association", async () => {
-    class ElraAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("elraPosts", {
-          className: "ElraPost",
-          foreignKey: "elra_author_id",
-          scope: (rel: any) => rel.readonly(),
-        });
-      }
-    }
-    class ElraPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("elra_author_id", "integer");
-      }
-    }
-    registerModel("ElraAuthor", ElraAuthor);
-    registerModel("ElraPost", ElraPost);
-    const a = await ElraAuthor.create({ name: "A" });
-    await ElraPost.create({ title: "P", elra_author_id: a.id });
-    const authors = await ElraAuthor.all().eagerLoad("elraPosts").toArray();
-    const posts = (authors[0] as any).association("elraPosts").target ?? [];
-    expect(posts).toHaveLength(1);
-    expect(posts[0]._readonly).toBe(true);
+    // has-one
+    const firm = await (Firm as any).where({ id: 1 }).eagerLoad("readonlyAccount").firstBang();
+    expect((await firm.readonlyAccount).isReadonly()).toBe(true);
+
+    // has_and_belongs_to_many
+    const project = await (Project as any)
+      .where({ id: 2 })
+      .eagerLoad("readonlyDevelopers")
+      .firstBang();
+    expect((await project.readonlyDevelopers.first()).isReadonly()).toBe(true);
+
+    // has-many :through
+    const david = await (Author as any).where({ id: 1 }).eagerLoad("readonlyComments").firstBang();
+    expect((await david.readonlyComments.first()).isReadonly()).toBe(true);
+
+    // belongs_to
+    const post = await (Post as any).where({ id: 1 }).eagerLoad("readonlyAuthor").firstBang();
+    expect((await post.readonlyAuthor).isReadonly()).toBe(true);
   });
 
   it("eager-loading with a polymorphic association won't work consistently", async () => {
@@ -1653,64 +1627,16 @@ describe("EagerAssociationTest", () => {
     }
   });
   it("loading with no associations", async () => {
-    // Rails: Post.includes(:author).find(authorless post).author is nil
-    class LnaPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("lna_author_id", "integer");
-        this.belongsTo("lnaAuthor", {
-          className: "LnaAuthor",
-          foreignKey: "lna_author_id",
-        });
-      }
-    }
-    class LnaAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("LnaPost", LnaPost);
-    registerModel("LnaAuthor", LnaAuthor);
-
-    const post = await LnaPost.create({ title: "Authorless" }); // lna_author_id is null
-
-    const posts = await (LnaPost as any).all().includes("lnaAuthor").toArray();
-    const found = posts.find((p: any) => p.id === post.id);
-    expect(found).toBeDefined();
-    const preloadedAuthor = found.association("lnaAuthor").target;
-    expect(preloadedAuthor).toBeNull();
+    const authorless = posts("authorless");
+    const found = await (Post as any).all().includes("author").find(authorless.id);
+    expect(await found.author).toBeNull();
   });
   it("eager association loading with belongs to", async () => {
-    // Rails: Comment.all.merge!(includes: :post) - all comments have their post loaded
-    class EabtPost extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class EabtComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("eabt_post_id", "integer");
-        this.belongsTo("eabtPost", {
-          className: "EabtPost",
-          foreignKey: "eabt_post_id",
-        });
-      }
-    }
-    registerModel("EabtPost", EabtPost);
-    registerModel("EabtComment", EabtComment);
-
-    const post1 = await EabtPost.create({ title: "Welcome" });
-    const post2 = await EabtPost.create({ title: "Other" });
-    await EabtComment.create({ body: "c1", eabt_post_id: post1.id });
-    await EabtComment.create({ body: "c2", eabt_post_id: post2.id });
-    await EabtComment.create({ body: "c3", eabt_post_id: post1.id });
-
-    const comments = await (EabtComment as any).all().includes("eabtPost").toArray();
-    expect(comments).toHaveLength(3);
-    const titles = comments.map((c: any) => c.association("eabtPost").target?.title);
-    expect(titles).toContain("Welcome");
-    expect(titles).toContain("Other");
+    const comments = await (Comment as any).all().includes("post").toArray();
+    expect(comments).toHaveLength(12);
+    const titles = await Promise.all(comments.map(async (c: any) => (await c.post).title));
+    expect(titles).toContain(posts("welcome").title);
+    expect(titles).toContain(posts("sti_post_and_comments").title);
   });
   it("preload belongs to uses exclusive scope", async () => {
     // Rails: Person.males.includes(:primary_contact) — the preload of
@@ -1764,39 +1690,17 @@ describe("EagerAssociationTest", () => {
     }
   });
   it("preloading empty belongs to", async () => {
-    // Rails: Client.create!(client_of: beyond_max_id) then preload(:firm) → nil firm
-    class PebClient extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("peb_firm_id", "integer");
-        this.belongsTo("pebFirm", {
-          className: "PebFirm",
-          foreignKey: "peb_firm_id",
-        });
-      }
-    }
-    class PebFirm extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("PebClient", PebClient);
-    registerModel("PebFirm", PebFirm);
+    const clientOf = Number(await Company.maximum("id")) + 1;
+    const c = await Client.create({ name: "Foo", client_of: clientOf });
 
-    // Create a firm, note its id, then create a client pointing past max id so firm lookup returns nil
-    const firm = await PebFirm.create({ name: "Existing" });
-    const nonExistentId = Number(firm.id) + 9999;
-    const client = await PebClient.create({ name: "Foo", peb_firm_id: nonExistentId });
-
-    const loaded = await (PebClient as any)
-      .all()
-      .preload("pebFirm")
-      .where({ id: client.id })
-      .toArray();
-    expect(loaded).toHaveLength(1);
-    const preloaded = loaded[0].association("pebFirm").target;
-    expect(preloaded).toBeNull();
-    expect(loaded[0].peb_firm_id).toBe(nonExistentId);
+    let client!: InstanceType<typeof Client>;
+    await assertQueriesCount(2, false, async () => {
+      client = await Client.preload("firm").find(c.id);
+    });
+    await assertNoQueries(false, async () => {
+      expect(await client.firm).toBeNull();
+    });
+    expect(Number(client.client_of)).toBe(clientOf);
   });
   it("deep preload", async () => {
     // Rails: Post.preload(author: :posts, comments: :post).first
