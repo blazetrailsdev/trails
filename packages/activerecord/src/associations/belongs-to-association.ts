@@ -189,7 +189,7 @@ export class BelongsToAssociation extends SingularAssociation {
 
   protected override replace(record: Base | null): void {
     if (record) {
-      (this as any).raiseOnTypeMismatchBang(record);
+      this.raiseOnTypeMismatchBang(record);
       this.setInverseInstance(record);
       this._updated = true;
     } else if (this.target) {
