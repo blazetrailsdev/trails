@@ -3672,14 +3672,12 @@ describe("EagerAssociationTest", () => {
       .where({ id: authors("mary").id })
       .first()) as Author;
     expect((mary.association("uniqueCategorizedPosts").target as Base[]).length).toBe(1);
-    // Mary has two categorizations both pointing at the "thinking" post, so
-    // `distinct` must collapse them to a single unique post id. Rails' second
-    // assertion (`unique_categorized_post_ids.length == 1`) exercises the
-    // generated `_ids` collection reader; trails does not generate that reader,
-    // so we assert the concrete collapsed post identity instead — add an `_ids`
-    // assertion here if/when `uniqueCategorizedPostIds` lands on Author.
-    const ids = (mary.association("uniqueCategorizedPosts").target as Base[]).map((p) => p.id);
-    expect(ids).toEqual([posts("thinking").id]);
+    expect(
+      (
+        await (mary as Author & { uniqueCategorizedPostIds: Promise<unknown[]> })
+          .uniqueCategorizedPostIds
+      ).length,
+    ).toBe(1);
   });
 
   it("preloading has many through with custom scope", async () => {
