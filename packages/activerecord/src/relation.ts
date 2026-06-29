@@ -1166,9 +1166,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#excluding / #without
    */
   excluding(...records: unknown[]): Relation<T> {
-    const { records: recs, relations } = this._excludingArgs(records, "excluding");
-    if (recs.length === 0 && relations.length === 0) return this;
-    return this._clone().excludingBang(recs, relations);
+    const combined = this._excludingArgs(records, "excluding");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**
@@ -1177,9 +1177,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#without
    */
   without(...records: unknown[]): Relation<T> {
-    const { records: recs, relations } = this._excludingArgs(records, "without");
-    if (recs.length === 0 && relations.length === 0) return this;
-    return this._clone().excludingBang(recs, relations);
+    const combined = this._excludingArgs(records, "without");
+    if (combined.length === 0) return this;
+    return this._clone().excludingBang(combined);
   }
 
   /**
@@ -1188,14 +1188,11 @@ export class Relation<T extends Base> {
    * arguments, flatten one level of array nesting, compact nils, then validate
    * that every remaining record and relation belongs to this model — raising
    * the same ArgumentError keyed on the public `__callee__`. Returns the
-   * `records + relations.flat_map(&:ids)` collection split into already-known
-   * `records` (scalars + the spread of any loaded relation's cached records) and
-   * the still-`unloaded` relations whose ids the load pipeline materializes.
+   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`:
+   * scalars, the spread of any loaded relation's cached records, and any still-
+   * unloaded relation left in place for `excludingBang` to defer.
    */
-  private _excludingArgs(
-    records: unknown[],
-    callee: string,
-  ): { records: unknown[]; relations: Relation<T>[] } {
+  private _excludingArgs(records: unknown[], callee: string): unknown[] {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
     const recs = records
       .filter((r) => !(r instanceof Relation))
@@ -1220,12 +1217,11 @@ export class Relation<T extends Base> {
     // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
     // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
     const combined: unknown[] = [...recs];
-    const unloaded: Relation<T>[] = [];
     for (const rel of relations) {
       if (rel.isLoaded) combined.push(...rel._records);
-      else unloaded.push(rel);
+      else combined.push(rel);
     }
-    return { records: combined, relations: unloaded };
+    return combined;
   }
 
   /**

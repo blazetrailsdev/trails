@@ -1478,27 +1478,36 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
   return this;
 }
 
-function excludingBang(this: QueryMethodsHost, records: any[], unloadedRelations: any[] = []): any {
+function excludingBang(this: QueryMethodsHost, records: any[]): any {
   const primaryKey = this._modelClass.primaryKey;
   if (Array.isArray(primaryKey)) {
     throw new Error("excluding does not support models with composite primary keys");
   }
   const pk = primaryKey;
-  // Rails `excluding!`: `predicate_builder[primary_key, records].invert`. The
-  // array handler dereferences AR records to their ids, so pass the literal
-  // collection (scalars + any loaded relation's spread records) straight through
-  // rather than pre-mapping. Skip when empty so an all-unloaded-relations call
-  // doesn't append a spurious `id NOT IN ()` (always-true) predicate.
-  if (records.length > 0) {
+
+  // Rails `excluding!`: `predicate_builder[primary_key, records].invert`, where
+  // `records` is `records + relations.flat_map(&:ids)` — scalar AR records plus
+  // every relation arg's eagerly-materialized ids. Ruby materializes those ids
+  // before this call (synchronous query execution); trails' builder is
+  // synchronous-and-lazy, so `_excludingArgs` leaves any UNLOADED relation in
+  // `records` for us to defer here. Partition: literal records go through the
+  // array handler unchanged; each unloaded relation becomes a `DeferredIdsNotIn`.
+  const unloadedRelations = records.filter((r) => isRelationLike(r));
+  const literalRecords = records.filter((r) => !isRelationLike(r));
+
+  // The array handler dereferences AR records to their ids. Skip when empty so
+  // an all-unloaded-relations call doesn't append a spurious `id NOT IN ()`
+  // (always-true) predicate.
+  if (literalRecords.length > 0) {
     this._whereClause.predicates.push(
-      ...this.predicateBuilder.buildNegatedFromHash({ [pk]: records }),
+      ...this.predicateBuilder.buildNegatedFromHash({ [pk]: literalRecords }),
     );
   }
 
   // Rails materializes relation args eagerly (`relations.flat_map(&:ids)`,
   // query_methods.rb:1583): a separate `SELECT <pk>` query yielding a literal
-  // `id NOT IN (1, 2, 3)`. trails' query builder is synchronous and cannot run
-  // that id-select here, so record a `DeferredIdsNotIn` marker carrying the
+  // `id NOT IN (1, 2, 3)`. trails cannot run that id-select synchronously here,
+  // so record a `DeferredIdsNotIn` marker carrying the
   // inner relation; the load pipeline substitutes the literal id list (via
   // `Relation#ids`) before compile, matching Rails' SQL shape and 2-query count
   // rather than emitting a `NOT IN (SELECT ...)` subquery. The marker carries
