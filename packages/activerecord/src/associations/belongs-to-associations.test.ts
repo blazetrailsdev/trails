@@ -357,11 +357,11 @@ describe("BelongsToAssociationsTest", () => {
       static _tableName = "ships";
       static {
         this.belongsTo("developer", {
-          default: () => (TempDefault as any).defaultDeveloper(),
+          default: (owner) => (owner as any).defaultDeveloper(),
           inverseOf: false,
         });
       }
-      static defaultDeveloper(): Promise<any> {
+      defaultDeveloper(): Promise<any> {
         return Developer.first();
       }
     }

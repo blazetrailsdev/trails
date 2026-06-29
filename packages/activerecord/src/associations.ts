@@ -137,7 +137,14 @@ export interface AssociationOptions {
   /** belongs_to-only: sets the association from this block when the foreign
    * key is nil. The block runs on save (Rails runs it on before_validation;
    * trails defers to before_save because the validation chain is synchronous
-   * and the block may be async, e.g. `() => Developer.first()`). */
+   * and the block may be async, e.g. `() => Developer.first()`).
+   *
+   * Limitation vs Rails: because the default fires on before_save rather than
+   * before_validation, it does NOT satisfy a presence validation on a required
+   * association. `belongsTo(name, { default, optional: false })` validates the
+   * still-nil FK first and fails before the default can fill it — in Rails the
+   * same combination saves cleanly. Use `default` only with optional (the
+   * trails default) associations. */
   default?: (owner: Base) => Base | null | Promise<Base | null>;
   beforeAdd?:
     | ((owner: Base, record: Base) => void | false)
