@@ -611,6 +611,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       Object.defineProperty(this, name, {
         value: function (this: CollectionProxy<T>, ...args: unknown[]) {
           (this as unknown as { _cpMutated: boolean })._cpMutated = true;
+          // Rails Relation#reset clears @offsets alongside loaded state
+          // (relation.rb:1194). The Relation.prototype.reset below doesn't see
+          // our subclass field, so drop the find_nth memo here too — otherwise a
+          // memoized first()/last()/take() row would survive the scope mutation.
+          (this as unknown as { _offsetMemo: Map<string, unknown> })._offsetMemo.clear();
           // Use Relation#reset so all inherited load-state — including
           // `_loadToken` — is invalidated atomically. Bumping the token
           // lets in-flight super.toArray() completions detect that
