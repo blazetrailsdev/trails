@@ -10,7 +10,15 @@
  */
 
 import type { Base } from "../base.js";
-import { Delegation as ASDelegation } from "@blazetrails/activesupport";
+import type { DatabaseAdapter } from "../adapter.js";
+import type { SerializeOptions } from "@blazetrails/activemodel";
+import {
+  Delegation as ASDelegation,
+  inGroups,
+  inGroupsOf,
+  splitArray,
+  toSentence,
+} from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
@@ -602,4 +610,285 @@ function includeRelationMethods(target: object, methods: GeneratedRelationMethod
  */
 function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
   return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
+}
+
+/**
+ * The host surface `DelegationMethods` operates against once mixed into
+ * `Relation` — the `model` accessor (Rails' delegation target `:model`) and the
+ * loaded `records` (`:records`), reached through `toArray()` since trails loads
+ * asynchronously.
+ */
+export interface DelegationHost {
+  readonly model: typeof Base;
+  toArray(): Promise<Base[]>;
+}
+
+/**
+ * DelegationMethods — the curated `delegate ... to: :records` and
+ * `delegate ... to: :model` surface (delegation.rb:101-106) realized as real
+ * named methods on `Relation` (mixed in via `include(Relation, DelegationMethods)`),
+ * so `relation.each`, `relation.connection`, `relation.toSentence`, … resolve
+ * exactly as in Rails rather than only through the runtime delegation Proxy.
+ *
+ * The `to: :records` methods are async + self-loading: Rails reads the loaded
+ * `records` array synchronously, but trails loads asynchronously, so each forces
+ * `toArray()` first and then applies the corresponding `Array`/`Enumerable`
+ * helper to a copy (preserving Ruby's non-mutating semantics).
+ *
+ * Mirrors: ActiveRecord::Delegation
+ */
+type RecordDelegate = (records: Base[], ...args: any[]) => unknown;
+type GroupFill = Base | null | false;
+export type GroupedRecords = GroupFill[][];
+export type ToSentenceOptions = {
+  wordsConnector?: string;
+  twoWordsConnector?: string;
+  lastWordConnector?: string;
+};
+
+/**
+ * The `delegate ... to: :records` operations (delegation.rb:101) as pure sync
+ * functions over an already-loaded `records` array, reused by `DelegationMethods`
+ * (async, self-loading) and `delegateRecordMethodSync` (sync, loaded proxy).
+ */
+const RECORD_DELEGATES: Record<string, RecordDelegate> = {
+  each: (records, fn: (record: Base, index: number) => void) => {
+    records.forEach(fn);
+    return records;
+  },
+  join: (records, separator?: string) => records.join(separator),
+  reverse: (records) => [...records].reverse(),
+  compact: (records) => records.filter((record) => record != null),
+  index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
+    const found =
+      typeof valueOrFn === "function"
+        ? records.findIndex(valueOrFn as (record: Base) => unknown)
+        : records.indexOf(valueOrFn);
+    return found === -1 ? null : found;
+  },
+  rindex: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
+    if (typeof valueOrFn !== "function") {
+      const found = records.lastIndexOf(valueOrFn);
+      return found === -1 ? null : found;
+    }
+    const predicate = valueOrFn as (record: Base) => unknown;
+    for (let i = records.length - 1; i >= 0; i--) {
+      if (predicate(records[i])) return i;
+    }
+    return null;
+  },
+  sample: (records, n?: number) => {
+    const shuffled = shuffleInPlace([...records]);
+    if (n === undefined) return shuffled.length === 0 ? null : shuffled[0];
+    return shuffled.slice(0, Math.max(0, n));
+  },
+  rotate: (records, count = 1) => {
+    if (records.length === 0) return [];
+    const shift = ((count % records.length) + records.length) % records.length;
+    return records.slice(shift).concat(records.slice(0, shift));
+  },
+  shuffle: (records) => shuffleInPlace([...records]),
+  split: (records, valueOrFn: Base | ((record: Base) => boolean)) => splitArray(records, valueOrFn),
+  inGroups: (records, number: number, fillWith: Base | null | false = null) =>
+    inGroups(records, number, fillWith),
+  inGroupsOf: (records, number: number, fillWith: Base | null | false = null) =>
+    inGroupsOf(records, number, fillWith),
+  toSentence: (
+    records,
+    options?: { wordsConnector?: string; twoWordsConnector?: string; lastWordConnector?: string },
+  ) =>
+    toSentence(
+      records.map((record) => String(record)),
+      options,
+    ),
+  asJson: (records, options?: SerializeOptions) =>
+    records.map((record) =>
+      (record as unknown as { asJson(o?: SerializeOptions): unknown }).asJson(options),
+    ),
+  toFs: (records, format?: string) => {
+    if (format === "db") {
+      if (records.length === 0) return "null";
+      return records.map((record) => (record as unknown as { id: unknown }).id).join(",");
+    }
+    // Non-`:db` falls back to Ruby `Array#to_s` == `Array#inspect`
+    // (conversions.rb:103): bracketed, comma-separated element inspects, NOT a
+    // bare comma-join.
+    return `[${records
+      .map((record) => (record as unknown as { inspect(): string }).inspect())
+      .join(", ")}]`;
+  },
+};
+// `alias_method :to_formatted_s, :to_fs` (conversions.rb).
+RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
+
+/**
+ * The curated `to: :records` delegate names backed by `RECORD_DELEGATES` — the
+ * methods `wrapCollectionProxy` resolves synchronously on a loaded proxy.
+ */
+export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
+  Object.keys(RECORD_DELEGATES),
+);
+
+/**
+ * Sync delegation of a curated `to: :records` method against an already-loaded
+ * `records` array, so a *loaded* CollectionProxy keeps Rails' synchronous
+ * `records` delegation (delegation.rb:101, `CollectionProxy#records` →
+ * `load_target`) for the full curated set — including Rails-named entries
+ * (`each`, `index`, …) the JS-name array delegate doesn't cover. Returns
+ * `undefined` for non-record names so callers fall through.
+ */
+export function delegateRecordMethodSync(
+  prop: string,
+  records: () => Base[],
+): ((...args: any[]) => unknown) | undefined {
+  const fn = RECORD_DELEGATES[prop];
+  if (!fn) return undefined;
+  return (...args: any[]) => fn(records(), ...args);
+}
+
+export class DelegationMethods {
+  // ---- to: :records (Array / Enumerable) ----
+  // Each loads via `toArray()` (trails has no blocking IO) then applies the
+  // shared `RECORD_DELEGATES` helper — the same pure function the synchronous
+  // loaded-CollectionProxy path (`delegateRecordMethodSync`) uses.
+
+  /** `Array#each` — yields each loaded record, returning the records. */
+  async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
+    return RECORD_DELEGATES.each(await this.toArray(), fn) as Base[];
+  }
+
+  /** `Array#join`. */
+  async join(this: DelegationHost, separator?: string): Promise<string> {
+    return RECORD_DELEGATES.join(await this.toArray(), separator) as string;
+  }
+
+  /** `Array#reverse` (non-mutating). */
+  async reverse(this: DelegationHost): Promise<Base[]> {
+    return RECORD_DELEGATES.reverse(await this.toArray()) as Base[];
+  }
+
+  /** `Array#compact` — drop nil records. */
+  async compact(this: DelegationHost): Promise<Base[]> {
+    return RECORD_DELEGATES.compact(await this.toArray()) as Base[];
+  }
+
+  /** `Array#index` — index of the first matching record, or `null` (Ruby `nil`). */
+  async index(this: DelegationHost, v: Base | ((record: Base) => unknown)): Promise<number | null> {
+    return RECORD_DELEGATES.index(await this.toArray(), v) as number | null;
+  }
+
+  /** `Array#rindex` — index of the last matching record, or `null` (Ruby `nil`). */
+  async rindex(
+    this: DelegationHost,
+    v: Base | ((record: Base) => unknown),
+  ): Promise<number | null> {
+    return RECORD_DELEGATES.rindex(await this.toArray(), v) as number | null;
+  }
+
+  /** `Array#sample` — a random record, or (with `n`) up to `n`; `null` if empty. */
+  async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
+    return RECORD_DELEGATES.sample(await this.toArray(), n) as Base | Base[] | null;
+  }
+
+  /** `Array#rotate` — rotate left by `count` (negative rotates right). */
+  async rotate(this: DelegationHost, count = 1): Promise<Base[]> {
+    return RECORD_DELEGATES.rotate(await this.toArray(), count) as Base[];
+  }
+
+  /** `Array#shuffle` (non-mutating). */
+  async shuffle(this: DelegationHost): Promise<Base[]> {
+    return RECORD_DELEGATES.shuffle(await this.toArray()) as Base[];
+  }
+
+  /** `Array#split` — split records on a value or predicate (ActiveSupport). */
+  async split(this: DelegationHost, v: Base | ((record: Base) => boolean)): Promise<Base[][]> {
+    return RECORD_DELEGATES.split(await this.toArray(), v) as Base[][];
+  }
+
+  /** `Array#in_groups` — split records into `number` groups (ActiveSupport). */
+  async inGroups(this: DelegationHost, n: number, fill: GroupFill = null): Promise<GroupedRecords> {
+    return RECORD_DELEGATES.inGroups(await this.toArray(), n, fill) as GroupedRecords;
+  }
+
+  /** `Array#in_groups_of` — split records into groups of `number` (ActiveSupport). */
+  async inGroupsOf(
+    this: DelegationHost,
+    n: number,
+    fill: GroupFill = null,
+  ): Promise<GroupedRecords> {
+    return RECORD_DELEGATES.inGroupsOf(await this.toArray(), n, fill) as GroupedRecords;
+  }
+
+  /** `Array#to_sentence` — comma/`and`-joined record strings (ActiveSupport). */
+  async toSentence(this: DelegationHost, options?: ToSentenceOptions): Promise<string> {
+    return RECORD_DELEGATES.toSentence(await this.toArray(), options) as string;
+  }
+
+  /** `Array#as_json` — each record's `as_json`. */
+  async asJson(this: DelegationHost, options?: SerializeOptions): Promise<unknown[]> {
+    return RECORD_DELEGATES.asJson(await this.toArray(), options) as unknown[];
+  }
+
+  /**
+   * `Array#to_fs` / `Array#to_formatted_s` (conversions.rb:94-104): `:db` →
+   * `"null"` when empty else ids joined by `","`; else `Array#to_s` (bracketed
+   * inspect form).
+   */
+  async toFs(this: DelegationHost, format?: string): Promise<string> {
+    return RECORD_DELEGATES.toFs(await this.toArray(), format) as string;
+  }
+
+  /** Alias of {@link toFs} — `alias_method :to_formatted_s, :to_fs`. */
+  async toFormattedS(this: DelegationHost, format?: string): Promise<string> {
+    return RECORD_DELEGATES.toFormattedS(await this.toArray(), format) as string;
+  }
+
+  // ---- to: :model ----
+
+  /** `delegate :connection, to: :model`. */
+  get connection(): DatabaseAdapter {
+    return (this as unknown as DelegationHost).model.connection;
+  }
+
+  /** `delegate :primary_key, to: :model`. */
+  get primaryKey(): string | string[] {
+    return (this as unknown as DelegationHost).model.primaryKey;
+  }
+
+  /** `delegate :table_name, to: :model`. */
+  get tableName(): string {
+    return (this as unknown as DelegationHost).model.tableName;
+  }
+
+  /** `delegate :with_connection, to: :model`. */
+  withConnection<R>(
+    this: DelegationHost,
+    fn: (conn: DatabaseAdapter) => R | Promise<R>,
+    options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
+  ): Promise<R> {
+    return this.model.withConnection(fn, options);
+  }
+
+  /** `delegate :transaction, to: :model`. */
+  transaction<R>(
+    this: DelegationHost,
+    fn: (tx: any) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined> {
+    return this.model.transaction(fn, options);
+  }
+
+  /** `delegate :sanitize_sql_like, to: :model`. */
+  sanitizeSqlLike(this: DelegationHost, value: string, escapeChar?: string): string {
+    return this.model.sanitizeSqlLike(value, escapeChar);
+  }
+}
+
+/** Fisher–Yates in-place shuffle (Ruby `Array#shuffle`/`#sample` semantics). */
+function shuffleInPlace<T>(array: T[]): T[] {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }

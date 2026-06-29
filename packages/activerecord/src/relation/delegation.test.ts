@@ -414,6 +414,85 @@ describe("DelegationTest", () => {
       expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
   }); // DelegationRelationTest
+
+  // The `delegate ... to: :records` / `to: :model` set exposed under their exact
+  // Rails names (delegation.rb:101-106) via DelegationMethods. Each `to: :records`
+  // method is async + self-loading in trails (Rails reads the loaded `records`
+  // synchronously). Rails generates `test_delegates_<method>_to_Array` per
+  // ARRAY_DELEGATES entry as an `assert_respond_to`.
+  describe("DelegationNamedMethods", () => {
+    // ruby name → trails camelCase property
+    const RECORD_DELEGATES: ReadonlyArray<readonly [string, string]> = [
+      ["each", "each"],
+      ["join", "join"],
+      ["reverse", "reverse"],
+      ["compact", "compact"],
+      ["shuffle", "shuffle"],
+      ["rotate", "rotate"],
+      ["sample", "sample"],
+      ["index", "index"],
+      ["rindex", "rindex"],
+      ["in_groups", "inGroups"],
+      ["in_groups_of", "inGroupsOf"],
+      ["to_sentence", "toSentence"],
+      ["to_formatted_s", "toFormattedS"],
+      ["to_fs", "toFs"],
+      ["as_json", "asJson"],
+    ];
+
+    for (const [rubyName, jsName] of RECORD_DELEGATES) {
+      it(`test_delegates_${rubyName}_to_Array`, () => {
+        // assert_respond_to: present as a real named method on an unloaded relation.
+        expect(typeof (Comment.all() as any)[jsName]).toBe("function");
+      });
+    }
+
+    it("index and rindex locate records by value", async () => {
+      // Same loaded relation, so index()/rindex() see the cached instances and
+      // identity comparison matches.
+      const relation = Comment.all();
+      const records = await relation.toArray();
+      const mid = records[Math.floor(records.length / 2)];
+      expect(await relation.index(mid)).toBe(records.findIndex((c) => c.id === mid.id));
+      expect(await relation.rindex((c: any) => c.id === mid.id)).toBe(
+        records.map((c) => c.id).lastIndexOf(mid.id),
+      );
+    });
+
+    it("to_fs(:db) joins the record ids", async () => {
+      const records = await Comment.all();
+      expect(await Comment.all().toFs("db")).toBe(records.map((c) => c.id).join(","));
+    });
+
+    it("to_fs default falls back to Array#to_s (bracketed inspect, not a bare join)", async () => {
+      const records = await Comment.all();
+      const fs = await Comment.all().toFs();
+      // Ruby Array#to_s == Array#inspect: `[<elem.inspect>, …]` — not `"a,b"`.
+      expect(fs).toBe(`[${records.map((c) => (c as any).inspect()).join(", ")}]`);
+    });
+
+    it("on a loaded proxy each/index delegate to records synchronously", async () => {
+      const post = await Post.first();
+      const proxy = (post as any).comments;
+      await proxy.load();
+      expect(proxy.loaded).toBe(true);
+      // Rails delegates `each`/`index` to the loaded `records` synchronously; a
+      // loaded proxy must not resolve the inherited async Relation method.
+      const seen: number[] = [];
+      const ret = proxy.each((c: any) => seen.push(c.id));
+      expect(ret).not.toBeInstanceOf(Promise);
+      expect(seen).toEqual(proxy.target.map((c: any) => c.id));
+      expect(proxy.index(proxy.target[0])).toBe(0);
+    });
+
+    it("delegates connection, primary_key, table_name and transaction to the model", async () => {
+      const relation = Comment.all();
+      expect(relation.tableName).toBe(Comment.tableName);
+      expect(relation.primaryKey).toBe(Comment.primaryKey);
+      expect(relation.connection).toBe(Comment.connection);
+      expect(await Comment.all().transaction(async () => 42)).toBe(42);
+    });
+  }); // DelegationNamedMethods
 });
 
 describe("DelegationCachingTest", () => {

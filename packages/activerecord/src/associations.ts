@@ -12,6 +12,8 @@ import {
   generateRelationMethod,
   lookupGeneratedRelationMethod,
   uncacheableMethods,
+  DELEGATION_RECORD_METHOD_NAMES,
+  delegateRecordMethodSync,
 } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -3122,8 +3124,15 @@ function wrapCollectionProxy<T extends Base = Base>(
   return new Proxy(proxy, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
-      if (value !== undefined) return value;
-      if (prop in target) return value;
+      // Curated `to: :records` delegations (`each`, `join`, `reverse`, …) are now
+      // real *async* methods on the Relation base. On a *loaded* proxy they must
+      // keep Rails' synchronous `records` delegation, so fall through to the sync
+      // record delegate below. CollectionProxy-specialized names (slice/reduce/
+      // indexOf/…) are absent from DELEGATION_RECORD_METHOD_NAMES, so they win here.
+      const preferSyncRecordDelegate =
+        typeof prop === "string" && target.loaded && DELEGATION_RECORD_METHOD_NAMES.has(prop);
+      if (value !== undefined && !preferSyncRecordDelegate) return value;
+      if (prop in target && !preferSyncRecordDelegate) return value;
       if (typeof prop === "symbol") return value;
 
       // Numeric indexing — `proxy[0]`, `proxy[1]` read the loaded target
@@ -3155,8 +3164,17 @@ function wrapCollectionProxy<T extends Base = Base>(
       // Array-method delegation (sync fast-path) — when already loaded, delegate
       // synchronously against `target.target` (the hydrated records array).
       // Checked before scope lookup so it matches `wrapWithScopeProxy`'s pattern
-      // and returns the same sync value a caller expects post-load.
+      // and returns the same sync value a caller expects post-load. The curated
+      // `to: :records` set (Rails names: `each`, `index`, `to_sentence`, …) goes
+      // first so a loaded proxy delegates those to its records synchronously
+      // (delegation.rb:101), matching Rails; the JS-name array delegate covers
+      // the broader Enumerable surface (map/filter/sort/…).
       if (target.loaded) {
+        const recordDelegate =
+          typeof prop === "string"
+            ? delegateRecordMethodSync(prop, () => target.target)
+            : undefined;
+        if (recordDelegate) return recordDelegate;
         const arrayDelegate = delegateArrayMethod(prop, () => target.target);
         if (arrayDelegate) return arrayDelegate;
       }

@@ -275,51 +275,42 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveRecord::Delegation delegates a curated Array/Enumerable set " +
-      "(`delegate ... to: :records`, delegation.rb:101) and a model set " +
-      "(`to: :model`, delegation.rb:106). trails realizes both through the " +
-      "runtime delegation Proxy in relation/delegation.ts (delegateArrayMethod / " +
-      "delegateEnumerableMethod for records, classMethodDelegator for the model), " +
-      "not as named methods on Relation — Ruby-only entries (sample, rotate, " +
-      "in_groups, to_sentence, to_fs, as_json, …) have no JS analogue and are " +
-      "intentionally dropped, while the rest route through native JS names " +
-      "(each → forEach, index → indexOf) via the Proxy. Tracked for convergence " +
-      "(expose under Rails names) by story relation-delegation-rails-named-methods.",
-    names: [
-      "to_xml",
-      "each",
-      "join",
-      "sample",
-      "reverse",
-      "rotate",
-      "compact",
-      "in_groups",
-      "in_groups_of",
-      "to_sentence",
-      "to_fs",
-      "to_formatted_s",
-      "as_json",
-      "shuffle",
-      "split",
-      "index",
-      "rindex",
-      "primary_key",
-      "with_connection",
-      "connection",
-      "table_name",
-      "sanitize_sql_like",
-    ],
+      "`Array#to_xml` (active_support/core_ext/array/conversions.rb) is the one " +
+      "`delegate ... to: :records` entry (delegation.rb:101) still unported: it is " +
+      "a bespoke collection XML serializer (root element derived from the model " +
+      "name, per-record `<post>` wrapping, type attributes) distinct from a " +
+      "record's own `toXml`, and ActiveSupport's `Array#to_xml` is itself not yet " +
+      "ported. The other `to: :records` value/Enumerable delegates this story " +
+      "covers now resolve as real methods on Relation via DelegationMethods " +
+      "(relation/delegation.ts, mixed in with `include(Relation, DelegationMethods)`); " +
+      "the remaining delegation.rb:101-104 entries are credited by other " +
+      "conventions, NOT by this story — operator delegates (`[]`, `&`, `|`, `+`, " +
+      "`-`) by the OPERATORS exclusion (conventions.ts), `encode_with` by the " +
+      "object-protocol skip group above, and `intersect?`/`length` by api:compare's " +
+      "existing predicate/method matching (`intersect?` → Relation#intersect). " +
+      "Tracked for convergence (port `Array#to_xml`) by story " +
+      "array-to-xml-collection-serializer.",
+    names: ["to_xml"],
     rubyFiles: ["relation.rb", "relation/delegation.rb"],
   },
   {
     reason:
-      "Same ActiveRecord::Delegation surface as above, but these names are only " +
-      "an unmatched gap on the aggregate Relation class (relation.rb): the " +
-      "delegation.rb module compare already credits trails counterparts (e.g. " +
-      "delegation.ts' own name()), so the skip is scoped to relation.rb to avoid " +
-      "un-crediting those. Tracked for convergence by story " +
+      "Two `ActiveRecord::Delegation` names where exposing a real Relation method " +
+      "is actively harmful rather than merely unported: (1) `slice` — CollectionProxy " +
+      "already defines a synchronous, array-backed `slice(start, end): T[]` " +
+      "(collection-proxy.ts) over its eager `_target`; a `to: :records` async " +
+      "`slice` on the Relation base would be an incompatible override of that tested " +
+      "surface. (2) `name` — adding a `name: string` getter to the structurally-typed " +
+      "Relation collides with the ubiquitous `{ name }` object shape, silently " +
+      "flipping `Array#reduce` accumulator inference (e.g. " +
+      "`[...].reduce((r, p) => r.where(p), Model.unscoped())`) from Relation to " +
+      "`{ name }`. Both are reachable at runtime through the delegation Proxy. " +
+      "Both are reachable at runtime through the delegation Proxy, and the " +
+      "relation/delegation.rb module compare already credits trails counterparts " +
+      "(CollectionProxy#slice; delegation.ts' own name()), so the skip is scoped to " +
+      "relation.rb. Tracked for convergence by story " +
       "relation-delegation-rails-named-methods.",
-    names: ["slice", "transaction", "name"],
+    names: ["slice", "name"],
     rubyFiles: ["relation.rb"],
   },
   {
