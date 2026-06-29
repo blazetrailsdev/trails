@@ -1583,6 +1583,14 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
+  // Tests are synchronous reflection checks — no DB queries. setupHandlerSuite +
+  // useHandlerTransactionalFixtures keep _skipGlobalResetDepth > 0 so the global
+  // beforeEach does not call resetTestAdapterState() (dropAllTables) between tests,
+  // which would silently drop canonical tables (cpk_order_agreements, cpk_cars, etc.)
+  // needed by the later AssociationsTest describe block.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
   // vendor/rails/activerecord/test/cases/associations_test.rb:710
   class DifferentPerson extends Base {}
