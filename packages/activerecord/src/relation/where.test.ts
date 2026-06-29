@@ -1,1591 +1,636 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/where_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, defineEnum, registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
+import "../index.js";
+import { registerModel } from "../associations.js";
 import { adapterType } from "../test-adapter.js";
-import { Associations } from "../associations.js";
-
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { seconds } from "@blazetrails/activesupport";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Author, AuthorAddress } from "../test-helpers/models/author.js";
+import { Essay } from "../test-helpers/models/essay.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Binary } from "../test-helpers/models/binary.js";
+import { Edge } from "../test-helpers/models/edge.js";
+import { Treasure, HiddenTreasure } from "../test-helpers/models/treasure.js";
+import { Car } from "../test-helpers/models/car.js";
+import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
+import { Chef } from "../test-helpers/models/chef.js";
+import { CakeDesigner } from "../test-helpers/models/cake-designer.js";
+import { Category } from "../test-helpers/models/category.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
+import { CpkBook, CpkOrder } from "../test-helpers/models/cpk.js";
 
-// -- Helpers --
-const woaCols = {
-  authors: { name: "string" } as const,
-  essays: { writer_id: "string" } as const,
-};
-const woaSuffixes = ["", "cr_", "sp_", "ab_", "ai_"];
-const woaTables: Schema = {};
-for (const s of woaSuffixes) {
-  woaTables[`woa_${s}authors`] = { ...woaCols.authors };
-  woaTables[`woa_${s}essays`] = { ...woaCols.essays };
-}
+registerModel(Post);
+registerModel(Comment);
+registerModel(Author);
+registerModel(AuthorAddress);
+registerModel(Essay);
+registerModel(Topic);
+registerModel(Binary);
+registerModel(Edge);
+registerModel(Treasure);
+registerModel(HiddenTreasure);
+registerModel(Car);
+registerModel(PriceEstimate);
+registerModel(Chef);
+registerModel(CakeDesigner);
+registerModel(Category);
+registerModel(Categorization);
+registerModel(CpkBook);
+registerModel(CpkOrder);
 
-const SCHEMA: Schema = {
-  posts: {
-    title: "string",
-    body: "string",
-    status: "integer",
-    views: "integer",
-    likes: "integer",
-    age: "integer",
-    data: "string",
-    published: "boolean",
-    author: "string",
-    author_id: "integer",
-  },
-  authors: { name: "string", age: "integer", author_id: "integer" },
-  users: {
-    name: "string",
-    email: "string",
-    age: "integer",
-    role: "string",
-    active: "boolean",
-    status: "string",
-  },
-  wr_people: { name: "string", age: "integer" },
-  rawsql_people: { name: "string", age: "integer", status: "string", role: "string" },
-  products: { name: "string", price: "integer" },
-  topics: { title: "string", body: "string" },
-  enum_posts: { title: "string", status: "integer" },
-  ...woaTables,
-  woar_authors: { name: "string" },
-  woar_posts: { author_id: "integer" },
-  wm_authors: { name: "string" },
-  wm_posts: { title: "string", author_id: "integer" },
-  wm_editors: {},
-  wm_authors2: {},
-  wm_posts2: { author_id: "integer", editor_id: "integer" },
-  wa_authors: {},
-  wa_posts: { title: "string", author_id: "integer" },
-  wahm_authors: { name: "string" },
-  wahm_posts: { title: "string", wahm_author_id: "integer" },
-  wa_authors2: {},
-  wa_editors2: {},
-  wa_posts2: { author_id: "integer", editor_id: "integer" },
-  wna_posts: { title: "string", author_id: "integer" },
-  wnahm_authors: { name: "string" },
-  wnahm_posts: { title: "string", wnahm_author_id: "integer" },
-  wnamm_authors: { name: "string" },
-  wnamm_posts: { wnamm_author_id: "integer" },
-  wnamm_comments: { wnamm_author_id: "integer" },
-  bts_authors: {},
-  bts_posts: { author_id: "integer" },
-  btn_authors: {},
-  btn_posts: { author_id: "integer" },
-  btav_authors: {},
-  btav_posts: { author_id: "integer" },
-  btnr_authors: {},
-  btnr_posts: { author_id: "integer" },
-  bnwr_authors: {},
-  bnwr_posts: { author_id: "integer" },
-  // wnil_* tables for "where with nil cpk association": wnil_orders uses auto-id
-  // + shop_id; wnil_books uses shop_id + order_id as the composite FK.
-  // Model-level CPK ["shop_id", "id"] is set on WnilOrder at runtime.
-  wnil_orders: { shop_id: "integer" },
-  wnil_books: { shop_id: "integer", order_id: "integer" },
-  // poly_* tables for polymorphic WHERE tests (DB round-trips).
-  poly_price_estimates: {
-    estimate_of_type: "string",
-    estimate_of_id: "integer",
-    price: "integer",
-  },
-  poly_treasures: { name: "string" },
-  poly_cars: { name: "string" },
-  // whor_* tables for has-one where-with-relation test (skip 8).
-  whor_authors: { name: "string", author_address_id: "integer" },
-  whor_addresses: { name: "string" },
-  // whmr_* tables for has-many where-with-relation test (skip 7).
-  whmr_authors: { name: "string" },
-  whmr_essays: { writer_id: "string", author_id: "integer" },
-  // wcpr_* tables for where-with-collection-polymorphic-relation test (skip 10).
-  wcpr_treasures: { name: "string" },
-  wcpr_price_estimates: { estimate_of_type: "string", estimate_of_id: "integer" },
-  // wsel_* tables for where-with-select-relation test (skip 9).
-  wsel_authors: { name: "string" },
-  wsel_essays: { writer_id: "string" },
-  // ponand_* tables for polymorphic WHERE NOT NAND tests (skips 2/3/4 — now un-skipped).
-  ponand_treasures: { name: "string" },
-  ponand_cars: { name: "string" },
-  ponand_price_estimates: {
-    estimate_of_type: "string",
-    estimate_of_id: "integer",
-    price: "integer",
-    currency: "string",
-  },
-  cpk_books: {
-    columns: {
-      author_id: "integer",
-      number: "integer",
-      title: "string",
-    },
-    primaryKey: ["author_id", "number"],
-  },
-  cpk_orders: {
-    columns: {
-      shop_id: "integer",
-      number: "integer",
-      status: "string",
-    },
-    primaryKey: ["shop_id", "number"],
-  },
-  cpk_posts: {
-    columns: { shop_id: "integer", number: "integer" },
-    primaryKey: ["shop_id", "number"],
-  },
-  cpk_items: {
-    columns: {
-      shop_id: "integer",
-      number: "integer",
-      status: "string",
-    },
-    primaryKey: ["shop_id", "number"],
-  },
-  cpk_entries: {
-    columns: {
-      shop_id: "integer",
-      number: "integer",
-      title: "string",
-    },
-    primaryKey: ["shop_id", "number"],
-  },
-  // "type casting nested joins" uses the canonical comments table (post_id only).
-  // posts + authors are already in this schema with author_id / name columns.
-  comments: { post_id: "integer" },
-  // "where with through association": canonical tables from TEST_SCHEMA.
-  categories: TEST_SCHEMA.categories,
-  categorizations: TEST_SCHEMA.categorizations,
-};
+const ids = (records: unknown[]): unknown[] => records.map((r) => (r as any).id);
+const sortedIds = (records: unknown[]): unknown[] => ids(records).slice().sort();
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema(SCHEMA);
-});
-
-// ==========================================================================
-// WhereTest — targets relation/where_test.rb
-// ==========================================================================
 describe("WhereTest", () => {
-  it("where copies bind params", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const rel1 = Post.where("title = ?", "hello");
-    const rel2 = rel1.where("title = ?", "world");
-    // Original relation should not be mutated
-    const sql1 = rel1.toSql();
-    const sql2 = rel2.toSql();
-    expect(sql1).toContain("hello");
-    expect(sql1).not.toContain("world");
-    expect(sql2).toContain("hello");
-    expect(sql2).toContain("world");
+  const { authors, posts, comments, categories, treasures, cars, priceEstimates, essays, topics } =
+    useHandlerFixtures(
+      [
+        "authors",
+        "authorAddresses",
+        "categories",
+        "categorizations",
+        "cars",
+        "treasures",
+        "priceEstimates",
+        "binaries",
+        "edges",
+        "vertices",
+        "essays",
+        "posts",
+        "comments",
+        "topics",
+      ],
+      { schema: canonicalSchema },
+    );
+
+  it("type casting nested joins", async () => {
+    const comment = comments("eager_other_comment1");
+    const result = await Comment.joins({ post: "author" })
+      .where({ authors: { id: "2-foo" } })
+      .toArray();
+    expect(ids(result)).toStrictEqual([(comment as any).id]);
   });
-  it("where on association with custom primary key", async () => {
-    class WoaAuthor extends Base {
-      static {
-        this._tableName = "woa_authors";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class WoaEssay extends Base {
-      static {
-        this._tableName = "woa_essays";
-        this.attribute("id", "integer");
-        this.attribute("writer_id", "string");
-        this.belongsTo("writer", {
-          className: "WoaAuthor",
-          foreignKey: "writer_id",
-          primaryKey: "name",
-        });
-      }
-    }
-    registerModel("WoaAuthor", WoaAuthor);
-    const author = await WoaAuthor.create({ name: "David" });
-    await WoaEssay.create({ writer_id: "David" });
-    const essay = await WoaEssay.where({ writer: author }).first();
-    expect(essay).not.toBeNull();
-    expect(essay!.writer_id).toBe("David");
+
+  it("where with through association", async () => {
+    const r1 = await Author.joins("comments")
+      .where({ comments: comments("greetings") })
+      .toArray();
+    expect(ids(r1)).toStrictEqual([(authors("david") as any).id]);
+
+    const r2 = await Author.joins("categories")
+      .where({ categories: categories("technology") })
+      .toArray();
+    expect(ids(r2)).toStrictEqual([(authors("bob") as any).id]);
   });
-  it("type cast is not evaluated at relation build time", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Building a relation should not execute any query
-    const rel = Post.where({ title: "hello" });
-    // Just building the relation should succeed without database access
-    expect(rel).toBeDefined();
-    expect(rel.toSql()).toContain("title");
+
+  it("type cast is not evaluated at relation build time", async () => {
+    const welcome = posts("welcome");
+    expect(ids(await Post.where({ id: "1-foo" }).toArray())).toStrictEqual([(welcome as any).id]);
+    expect(ids(await Post.where({ id: ["1-foo", "bar"] }).toArray())).toStrictEqual([
+      (welcome as any).id,
+    ]);
   });
-  it("where copies arel bind params", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+
+  it("where copies bind params", async () => {
+    const author = authors("david") as any;
+    const davidPosts = author.posts.where("posts.id != 1");
+    const joined = await Post.where({ id: davidPosts }).toArray();
+
+    expect(joined.length).toBeGreaterThan(0);
+    for (const post of joined) {
+      const a = await (post as any).loadBelongsTo("author");
+      expect(a.id).toBe(author.id);
+      expect((post as any).id).not.toBe(1);
     }
-    // Ensure where creates a new relation (immutability)
-    const rel1 = Post.where({ title: "a" });
-    const rel2 = rel1.where({ title: "b" });
-    expect(rel1.toSql()).not.toEqual(rel2.toSql());
   });
+
+  it("where copies bind params in the right order", async () => {
+    const author = authors("david") as any;
+    const davidPosts = author.posts.whereNot({ id: 1 });
+    const first = await davidPosts.first();
+    const joined = await Post.where({ id: davidPosts, title: first.title }).toArray();
+    expect(ids(joined)).toStrictEqual([first.id]);
+  });
+
+  it("where copies arel bind params", async () => {
+    const chef = await Chef.create({});
+    await CakeDesigner.create({ chef });
+
+    const cakeDesigners = CakeDesigner.joins("chef").where({ chefs: { id: (chef as any).id } });
+    const chefs = await Chef.where({ employable: cakeDesigners }).toArray();
+
+    expect(ids(chefs)).toStrictEqual([(chef as any).id]);
+  });
+
+  // SKIP: trails predicate-builder casts an un-castable query value (a non-numeric
+  // string for an integer column, etc.) to `null` and emits `IS NULL`, so the
+  // query matches NULL rows instead of nothing. Rails treats an un-boundable value
+  // as a contradiction (`QueryAttribute#boundable?` → `1=0`), so all five asserts
+  // are empty. Tracked-pending-convergence: RFC 0023
+  // `predicate-builder-blank-and-unboundable-contradiction`.
+  it.skip("where with invalid value", async () => {
+    const first = topics("first") as any;
+    await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
+    expect(await Topic.where({ parent_id: "not-a-number" }).toArray()).toHaveLength(0);
+    expect(await Topic.where({ written_on: "" }).toArray()).toHaveLength(0);
+    expect(await Topic.where({ bonus_time: "" }).toArray()).toHaveLength(0);
+    expect(await Topic.where({ last_read: "" }).toArray()).toHaveLength(0);
+  });
+
+  it("rewhere on root", async () => {
+    const welcome = posts("welcome");
+    const result = await Post.rewhere({ title: "Welcome to the weblog" }).first();
+    expect((result as any).id).toBe((welcome as any).id);
+  });
+
   it("where with tuple syntax", async () => {
-    class CpkBook extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("number", "integer");
-        this.attribute("title", "string");
-        this.primaryKey = ["author_id", "number"];
-      }
-    }
-    await CpkBook.create({ author_id: 1, number: 100, title: "First" });
-    await CpkBook.create({ author_id: 1, number: 200, title: "Second" });
-    await CpkBook.create({ author_id: 2, number: 100, title: "Other" });
-    const result = await CpkBook.where(["author_id", "number"], [[1, 100]]).toArray();
-    expect(result).toHaveLength(1);
-    const book = result[0];
-    expect(book.title).toBe("First");
+    const first = topics("first") as any;
+    const third = topics("third") as any;
+
+    const r1 = await Topic.where(["id"], [[first.id]]).toArray();
+    expect(ids(r1)).toStrictEqual([first.id]);
+
+    const key = ["title", "author_name"];
+    const conditions = [
+      [first.title, first.author_name],
+      [third.title, third.author_name],
+    ];
+    const r2 = await Topic.where(key, conditions).toArray();
+    expect(sortedIds(r2)).toStrictEqual([first.id, third.id].slice().sort());
   });
 
   it("where with tuple syntax on composite models", async () => {
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("number", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "number"];
-      }
-    }
-    await CpkOrder.create({ shop_id: 1, number: 10, status: "pending" });
-    await CpkOrder.create({ shop_id: 2, number: 20, status: "shipped" });
-    const result = await CpkOrder.where(
-      ["shop_id", "number"],
+    const bookOne = await CpkBook.create({ author_id: 1, id: 2 });
+    const bookTwo = await CpkBook.create({ author_id: 3, id: 4 });
+
+    const r1 = await CpkBook.where(["author_id", "id"], [[1, 2]]).toArray();
+    expect(ids(r1)).toStrictEqual([(bookOne as any).id]);
+
+    const r2 = await CpkBook.where(
+      ["author_id", "id"],
       [
-        [1, 10],
-        [2, 20],
+        [1, 2],
+        [3, 4],
       ],
     ).toArray();
-    expect(result).toHaveLength(2);
+    expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
+
+    const r3 = await CpkBook.where(
+      ["author_id", "id"],
+      [
+        [1, 4],
+        [3, 2],
+      ],
+    ).toArray();
+    expect(r3).toHaveLength(0);
   });
 
   it("where with tuple syntax with incorrect arity", () => {
-    class CpkPost extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("number", "integer");
-        this.primaryKey = ["shop_id", "number"];
-      }
-    }
-    // Tuple inner length (1) doesn't match column count (2) — must raise with the specific mismatch details
-    expect(() => CpkPost.where(["shop_id", "number"], [[1]])).toThrow(
-      "tuple arity 1 does not match column count 2",
-    );
+    expect(() => CpkBook.where(["one", "two", "three"], [1, 2, 3] as any)).toThrow();
+    expect(() => CpkBook.where(["one", "two"], 1 as any)).toThrow();
   });
 
   it("where with tuple syntax and regular syntax combined", async () => {
-    class CpkItem extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("number", "integer");
-        this.attribute("status", "string");
-        this.primaryKey = ["shop_id", "number"];
-      }
-    }
-    await CpkItem.create({ shop_id: 1, number: 1, status: "active" });
-    await CpkItem.create({ shop_id: 1, number: 2, status: "inactive" });
-    await CpkItem.create({ shop_id: 2, number: 1, status: "active" });
-    const result = await CpkItem.where(
-      ["shop_id", "number"],
-      [
-        [1, 1],
-        [1, 2],
-      ],
-    )
-      .where({ status: "active" })
+    const bookOne = await CpkBook.create({ author_id: 1, id: 2, title: "The Alchemist" });
+    const bookTwo = await CpkBook.create({ author_id: 3, id: 4, title: "The Alchemist" });
+
+    const r1 = await CpkBook.where({ title: "The Alchemist" }).toArray();
+    expect(sortedIds(r1)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
+
+    const r2 = await CpkBook.where({ title: "The Alchemist" })
+      .where(
+        ["author_id", "id"],
+        [
+          [1, 2],
+          [3, 4],
+        ],
+      )
       .toArray();
-    expect(result).toHaveLength(1);
-    const item = result[0];
-    expect(item.shop_id).toBe(1);
-    expect(item.number).toBe(1);
+    expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
+
+    const r3 = await CpkBook.where({ title: "The Alchemist" })
+      .where(["author_id", "id"], [[3, 4]])
+      .toArray();
+    expect(ids(r3)).toStrictEqual([(bookTwo as any).id]);
   });
 
-  it.skipIf(adapterType === "sqlite")("with tuple syntax and large values list", async () => {
-    class CpkEntry extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("number", "integer");
-        this.attribute("title", "string");
-        this.primaryKey = ["shop_id", "number"];
-      }
-    }
-    const tuples: [number, number][] = [];
-    for (let i = 1; i <= 20; i++) {
-      await CpkEntry.create({ shop_id: 1, number: i, title: `item${i}` });
-      if (i <= 10) tuples.push([1, i]);
-    }
-    const result = await CpkEntry.where(["shop_id", "number"], tuples).toArray();
-    expect(result).toHaveLength(10);
+  it.skipIf(adapterType === "sqlite")("with tuple syntax and large values list", () => {
+    const tupleIds: [number, number][] = [];
+    for (let i = 0; i < 1500; i++) tupleIds.push([1, 2]);
+    expect(() => CpkBook.where(["author_id", "id"], tupleIds).toSql()).not.toThrow();
   });
 
   it("where with nil cpk association", async () => {
-    class WnilOrder extends Base {
-      static {
-        this._tableName = "wnil_orders";
-        this._primaryKey = ["shop_id", "id"];
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.hasMany("books", { className: "WnilBook", foreignKey: ["shop_id", "order_id"] });
-      }
-    }
-    class WnilBook extends Base {
-      static {
-        this._tableName = "wnil_books";
-        this.attribute("shop_id", "integer");
-        this.attribute("order_id", "integer");
-        this.belongsTo("order", {
-          className: "WnilOrder",
-          foreignKey: ["shop_id", "order_id"],
-        });
-      }
-    }
-    registerModel("WnilOrder", WnilOrder);
-    registerModel("WnilBook", WnilBook);
-
-    const order = await WnilOrder.create({ shop_id: 1 });
-    const otherOrder = await WnilOrder.create({ shop_id: 2 });
-    // Use readAttribute to get the scalar auto-increment id, not the composite .id accessor
-    const book = await WnilBook.create({
-      shop_id: order.readAttribute("shop_id"),
-      order_id: order.readAttribute("id"),
+    const order = await CpkOrder.create({ shop_id: 1, id: 2 });
+    // Rails: order.books.create!(id: [3, 4]) — composite Book PK [author_id, id]
+    // plus the order FK [shop_id, order_id] inherited from the order.
+    const book = await CpkBook.create({
+      author_id: 3,
+      id: 4,
+      shop_id: (order as any).readAttribute("shop_id"),
+      order_id: (order as any).readAttribute("id"),
     });
-    const decoy = await WnilBook.create({
-      shop_id: otherOrder.readAttribute("shop_id"),
-      order_id: otherOrder.readAttribute("id"),
-    });
+    const hasBook = (recs: unknown[]): boolean =>
+      recs.some(
+        (r) => (r as any).readAttribute("author_id") === 3 && (r as any).readAttribute("id") === 4,
+      );
 
-    const found = (await WnilBook.where({ order }).toArray()).map((r: any) => r.id);
-    expect(found).toContain((book as any).id);
-    expect(found).not.toContain((decoy as any).id);
+    const found = await CpkBook.where({ order }).toArray();
+    expect(hasBook(found)).toBe(true);
 
-    await WnilBook.where({ id: (book as any).id }).updateAll({ shop_id: null, order_id: null });
-    const foundNil = (await WnilBook.where({ order: null }).toArray()).map((r: any) => r.id);
-    expect(foundNil).toContain((book as any).id);
-    expect(foundNil).not.toContain((decoy as any).id);
+    await book.update({ shop_id: null, order_id: null });
+    const foundNil = await CpkBook.where({ order: null }).toArray();
+    expect(hasBook(foundNil)).toBe(true);
   });
+
   it("belongs to shallow where", () => {
-    class BtsAuthor extends Base {
-      static {
-        this._tableName = "bts_authors";
-        this.attribute("id", "integer");
-      }
-    }
-    class BtsPost extends Base {
-      static {
-        this._tableName = "bts_posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", {
-          className: "BtsAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    registerModel("BtsAuthor", BtsAuthor);
-    const author = new BtsAuthor();
-    author.id = 1;
-    expect(BtsPost.where({ author_id: 1 }).toSql()).toEqual(
-      BtsPost.where({ author: author }).toSql(),
-    );
+    const author = new Author();
+    (author as any).id = 1;
+    expect(Post.where({ author_id: 1 }).toSql()).toEqual(Post.where({ author }).toSql());
   });
+
   it("belongs to nil where", () => {
-    class BtnAuthor extends Base {
-      static {
-        this._tableName = "btn_authors";
-        this.attribute("id", "integer");
-      }
-    }
-    class BtnPost extends Base {
-      static {
-        this._tableName = "btn_posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", {
-          className: "BtnAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    registerModel("BtnAuthor", BtnAuthor);
-    expect(BtnPost.where({ author_id: null }).toSql()).toEqual(
-      BtnPost.where({ author: null }).toSql(),
-    );
+    expect(Post.where({ author_id: null }).toSql()).toEqual(Post.where({ author: null }).toSql());
   });
+
   it("belongs to array value where", () => {
-    class BtavAuthor extends Base {
-      static {
-        this._tableName = "btav_authors";
-        this.attribute("id", "integer");
-      }
-    }
-    class BtavPost extends Base {
-      static {
-        this._tableName = "btav_posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", {
-          className: "BtavAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    registerModel("BtavAuthor", BtavAuthor);
-    expect(BtavPost.where({ author_id: [1, 2] }).toSql()).toEqual(
-      BtavPost.where({ author: [1, 2] }).toSql(),
+    expect(Post.where({ author_id: [1, 2] }).toSql()).toEqual(
+      Post.where({ author: [1, 2] }).toSql(),
     );
   });
+
   it("belongs to nested relation where", () => {
-    class BtnrAuthor extends Base {
-      static {
-        this._tableName = "btnr_authors";
-        this.attribute("id", "integer");
-      }
-    }
-    class BtnrPost extends Base {
-      static {
-        this._tableName = "btnr_posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", {
-          className: "BtnrAuthor",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    registerModel("BtnrAuthor", BtnrAuthor);
-    const expected = BtnrPost.where({ author_id: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
-    const actual = BtnrPost.where({ author: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
+    const expected = Post.where({ author_id: Author.where({ id: [1, 2] }) }).toSql();
+    const actual = Post.where({ author: Author.where({ id: [1, 2] }) }).toSql();
     expect(actual).toEqual(expected);
   });
+
   it("belongs to nested where", () => {
-    class BnwComment extends Base {
-      static {
-        this._tableName = "bnw_comments";
-        this.attribute("id", "integer");
-        this.attribute("parent_id", "integer");
-        this.attribute("post_id", "integer");
-        this.belongsTo("parent", {
-          className: "BnwComment",
-          foreignKey: "parent_id",
-        });
-      }
-    }
-    class BnwPost extends Base {
-      static {
-        this._tableName = "bnw_posts";
-        this.attribute("id", "integer");
-        this.hasMany("comments", {
-          className: "BnwComment",
-          foreignKey: "post_id",
-        });
-      }
-    }
-    registerModel("BnwComment", BnwComment);
-    registerModel("BnwPost", BnwPost);
-    const parent = new BnwComment();
+    const parent = new Comment();
     (parent as any).id = 1;
-    const expected = BnwPost.where({ comments: { parent_id: 1 } }).joins("comments");
-    const actual = BnwPost.where({ comments: { parent: parent } }).joins("comments");
+    const expected = Post.where({ comments: { parent_id: 1 } }).joins("comments");
+    const actual = Post.where({ comments: { parent } }).joins("comments");
     expect(actual.toSql()).toEqual(expected.toSql());
   });
+
   it("belongs to nested where with relation", async () => {
-    class BnwrAuthor extends Base {
-      static {
-        this._tableName = "bnwr_authors";
-        this.attribute("id", "integer");
-        this.hasMany("bnwr_posts", {
-          className: "BnwrPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class BnwrPost extends Base {
-      static {
-        this._tableName = "bnwr_posts";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-      }
-    }
-    registerModel("BnwrAuthor", BnwrAuthor);
-    registerModel("BnwrPost", BnwrPost);
-    // Use table name as association name so the WHERE predicate references the real table
-    // column (bnwr_posts.author_id) rather than an alias that the JOIN doesn't expose.
-
-    const author = await BnwrAuthor.create({});
-    const decoy = await BnwrAuthor.create({});
-    await BnwrPost.create({ author_id: author.id });
-    await BnwrPost.create({ author_id: decoy.id });
-    // decoy has a post, but its author_id does not match the subquery — without the
-    // nested relation predicate the JOIN alone would return both authors
-
-    // Rails: expected = Author.where(id: author).joins(:posts)
-    // Rails: actual   = Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
-    // Rails: assert_equal expected.to_a, actual.to_a
-    const expected = await BnwrAuthor.where({ id: author.id }).joins("bnwr_posts").toArray();
-    const actual = await BnwrAuthor.where({
-      bnwr_posts: { author_id: BnwrAuthor.where({ id: author.id }) },
+    const author = authors("david") as any;
+    const expected = await Author.where({ id: author }).joins("posts").toArray();
+    const actual = await Author.where({
+      posts: { author_id: Author.where({ id: author.id }) },
     })
-      .joins("bnwr_posts")
+      .joins("posts")
       .toArray();
-
-    const expectedIds = expected.map((r: any) => r.id);
-    const actualIds = actual.map((r: any) => r.id);
-    expect(actualIds).toEqual(expectedIds);
-    expect(actualIds).toContain(author.id);
-    expect(actualIds).not.toContain(decoy.id);
+    expect(sortedIds(actual)).toStrictEqual(sortedIds(expected));
   });
+
   it("polymorphic shallow where", () => {
-    class PolyTreasure extends Base {
-      static {
-        this._tableName = "poly_treasures";
-        this.attribute("name", "string");
-      }
-    }
-    class PolyPriceEstimate extends Base {
-      static {
-        this._tableName = "poly_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("price", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PolyTreasure", PolyTreasure);
-
-    const treasure = new PolyTreasure();
+    const treasure = new Treasure();
     (treasure as any).id = 1;
-
-    const expected = PolyPriceEstimate.where({
-      estimate_of_type: "PolyTreasure",
-      estimate_of_id: 1,
-    });
-    const actual = PolyPriceEstimate.where({ estimateOf: treasure });
-
+    const expected = PriceEstimate.where({ estimate_of_type: "Treasure", estimate_of_id: 1 });
+    const actual = PriceEstimate.where({ estimateOf: treasure });
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("where not polymorphic id and type as nand", async () => {
-    class PonandTreasure extends Base {
-      static {
-        this._tableName = "ponand_treasures";
-        this.attribute("name", "string");
-      }
-    }
-    class PonandCar extends Base {
-      static {
-        this._tableName = "ponand_cars";
-        this.attribute("name", "string");
-      }
-    }
-    class PonandPriceEstimate extends Base {
-      static {
-        this._tableName = "ponand_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("price", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PonandTreasure", PonandTreasure);
-    registerModel("PonandCar", PonandCar);
 
-    const diamond = (await PonandTreasure.create({ name: "diamond" })) as any;
-    const sapphire = (await PonandTreasure.create({ name: "sapphire" })) as any;
-    const honda = (await PonandCar.create({ name: "honda" })) as any;
+  it("where not polymorphic association", async () => {
+    const sapphire = treasures("sapphire") as any;
+    const actual = await PriceEstimate.whereNot({ estimateOf: sapphire }).toArray();
+    const only = await PriceEstimate.where({ estimateOf: sapphire }).toArray();
 
-    const diamondEst = (await PonandPriceEstimate.create({
-      estimate_of_type: "PonandTreasure",
-      estimate_of_id: diamond.id,
-      price: 10,
-    })) as any;
-    await PonandPriceEstimate.create({
-      estimate_of_type: "PonandTreasure",
-      estimate_of_id: sapphire.id,
-      price: 20,
-    });
-    await PonandPriceEstimate.create({
-      estimate_of_type: "PonandTreasure",
-      estimate_of_id: sapphire.id,
-      price: 25,
-    });
-    const hondaEst = (await PonandPriceEstimate.create({
-      estimate_of_type: "PonandCar",
-      estimate_of_id: honda.id,
-      price: 30,
-    })) as any;
-
-    // NAND: NOT (type='PonandTreasure' AND id=sapphire.id) → diamond + honda estimates
-    const actual = await PonandPriceEstimate.whereNot({
-      estimate_of_type: "PonandTreasure",
-      estimate_of_id: sapphire.id,
-    }).toArray();
-
-    const actualIds = actual.map((r: any) => r.id).sort();
-    const expectedIds = [diamondEst.id, hondaEst.id].sort();
-    expect(actualIds).toEqual(expectedIds);
-
-    // Positive: WHERE (type='PonandTreasure' AND id=sapphire.id) → only sapphire estimates
-    const only = await PonandPriceEstimate.where({
-      estimate_of_type: "PonandTreasure",
-      estimate_of_id: sapphire.id,
-    }).toArray();
-    expect(only).toHaveLength(2);
-    expect(only.every((r: any) => Number(r.estimate_of_id) === Number(sapphire.id))).toBe(true);
+    const sapphireEstimateIds = [
+      (priceEstimates("sapphire_1") as any).id,
+      (priceEstimates("sapphire_2") as any).id,
+    ];
+    const allIds = [
+      (priceEstimates("diamond") as any).id,
+      (priceEstimates("honda") as any).id,
+      ...sapphireEstimateIds,
+    ];
+    const expected = allIds.filter((id) => !sapphireEstimateIds.includes(id));
+    expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
+    expect(sortedIds(only)).toStrictEqual(sapphireEstimateIds.slice().sort());
   });
+
+  it("where not polymorphic id and type as nand", async () => {
+    const sapphire = treasures("sapphire") as any;
+    const actual = await PriceEstimate.whereNot({
+      estimate_of_type: "Treasure",
+      estimate_of_id: sapphire.id,
+    }).toArray();
+    const only = await PriceEstimate.where({
+      estimate_of_type: "Treasure",
+      estimate_of_id: sapphire.id,
+    }).toArray();
+
+    const sapphireEstimateIds = [
+      (priceEstimates("sapphire_1") as any).id,
+      (priceEstimates("sapphire_2") as any).id,
+    ];
+    const allIds = [
+      (priceEstimates("diamond") as any).id,
+      (priceEstimates("honda") as any).id,
+      ...sapphireEstimateIds,
+    ];
+    const expected = allIds.filter((id) => !sapphireEstimateIds.includes(id));
+    expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
+    expect(sortedIds(only)).toStrictEqual(sapphireEstimateIds.slice().sort());
+  });
+
   it("where not association as nand", async () => {
-    class PonandNandTreasure extends Base {
-      static {
-        this._tableName = "ponand_treasures";
-        this.attribute("name", "string");
-        this.hasMany("priceEstimates", {
-          className: "PonandNandPriceEstimate",
-          as: "estimateOf",
-        });
-      }
-    }
-    class PonandNandPriceEstimate extends Base {
-      static {
-        this._tableName = "ponand_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("price", "integer");
-        this.attribute("currency", "string");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PonandNandTreasure", PonandNandTreasure);
-    registerModel("PonandNandPriceEstimate", PonandNandPriceEstimate);
+    const treasure = await Treasure.create({ name: "my_treasure" });
+    await PriceEstimate.create({ estimateOf: treasure, price: 2, currency: "USD" });
 
-    const diamond = (await PonandNandTreasure.create({ name: "diamond" })) as any;
-    const sapphire = (await PonandNandTreasure.create({ name: "sapphire" })) as any;
-    const myTreasure = (await PonandNandTreasure.create({ name: "my_treasure" })) as any;
-
-    // diamond + sapphire (×2) get estimates with price != 2 or currency != "USD"
-    await PonandNandPriceEstimate.create({
-      estimate_of_type: "PonandNandTreasure",
-      estimate_of_id: diamond.id,
-      price: 5,
-      currency: "USD",
-    });
-    await PonandNandPriceEstimate.create({
-      estimate_of_type: "PonandNandTreasure",
-      estimate_of_id: sapphire.id,
-      price: 15,
-      currency: "USD",
-    });
-    await PonandNandPriceEstimate.create({
-      estimate_of_type: "PonandNandTreasure",
-      estimate_of_id: sapphire.id,
-      price: 15,
-      currency: "GBP",
-    });
-    // my_treasure: the one with (price=2, currency="USD") that should be excluded
-    await PonandNandPriceEstimate.create({
-      estimate_of_type: "PonandNandTreasure",
-      estimate_of_id: myTreasure.id,
-      price: 2,
-      currency: "USD",
-    });
-
-    // NAND: NOT (price=2 AND currency="USD") → diamond + sapphire(×2), NOT my_treasure
-    const actual = await PonandNandTreasure.joins("priceEstimates")
-      .whereNot({ ponand_price_estimates: { price: 2, currency: "USD" } })
+    const actual = await Treasure.joins("priceEstimates")
+      .whereNot({ price_estimates: { price: 2, currency: "USD" } })
       .toArray();
 
-    const actualIds = actual.map((r: any) => r.id).sort();
-    const expectedIds = [diamond.id, sapphire.id, sapphire.id].sort();
-    expect(actualIds).toEqual(expectedIds);
-    expect(actualIds).not.toContain(myTreasure.id);
+    const expected = [
+      (treasures("diamond") as any).id,
+      (treasures("sapphire") as any).id,
+      (treasures("sapphire") as any).id,
+    ];
+    expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
   });
+
+  it("polymorphic nested array where", () => {
+    const treasure = new Treasure();
+    (treasure as any).id = 1;
+    const hidden = new HiddenTreasure();
+    (hidden as any).id = 2;
+
+    const expected = PriceEstimate.where({
+      estimate_of_type: "Treasure",
+      estimate_of_id: [treasure, hidden],
+    });
+    const actual = PriceEstimate.where({ estimateOf: [treasure, hidden] });
+    expect(actual.toSql()).toEqual(expected.toSql());
+  });
+
   it("polymorphic nested array where not", async () => {
-    class PonandArrTreasure extends Base {
-      static {
-        this._tableName = "ponand_treasures";
-        this.attribute("name", "string");
-      }
-    }
-    class PonandArrCar extends Base {
-      static {
-        this._tableName = "ponand_cars";
-        this.attribute("name", "string");
-      }
-    }
-    class PonandArrPriceEstimate extends Base {
-      static {
-        this._tableName = "ponand_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("price", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PonandArrTreasure", PonandArrTreasure);
-    registerModel("PonandArrCar", PonandArrCar);
-
-    const diamond = (await PonandArrTreasure.create({ name: "diamond" })) as any;
-    const sapphire = (await PonandArrTreasure.create({ name: "sapphire" })) as any;
-    const honda = (await PonandArrCar.create({ name: "honda" })) as any;
-
-    await PonandArrPriceEstimate.create({
-      estimate_of_type: "PonandArrTreasure",
-      estimate_of_id: diamond.id,
-      price: 10,
-    });
-    const sapphireEst1 = (await PonandArrPriceEstimate.create({
-      estimate_of_type: "PonandArrTreasure",
-      estimate_of_id: sapphire.id,
-      price: 20,
-    })) as any;
-    const sapphireEst2 = (await PonandArrPriceEstimate.create({
-      estimate_of_type: "PonandArrTreasure",
-      estimate_of_id: sapphire.id,
-      price: 25,
-    })) as any;
-    await PonandArrPriceEstimate.create({
-      estimate_of_type: "PonandArrCar",
-      estimate_of_id: honda.id,
-      price: 30,
-    });
-
-    // WHERE NOT estimateOf IN [diamond, honda] → only sapphire estimates remain
-    const treasureInst = new PonandArrTreasure() as any;
-    treasureInst.id = diamond.id;
-    const carInst = new PonandArrCar() as any;
-    carInst.id = honda.id;
-
-    const actual = await PonandArrPriceEstimate.whereNot({
-      estimateOf: [treasureInst, carInst],
-    }).toArray();
-
-    const actualIds = actual.map((r: any) => r.id).sort();
-    const expectedIds = [sapphireEst1.id, sapphireEst2.id].sort();
-    expect(actualIds).toEqual(expectedIds);
+    const treasure = treasures("diamond") as any;
+    const car = cars("honda") as any;
+    const actual = await PriceEstimate.whereNot({ estimateOf: [treasure, car] }).toArray();
+    const expected = [
+      (priceEstimates("sapphire_1") as any).id,
+      (priceEstimates("sapphire_2") as any).id,
+    ];
+    expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
   });
+
   it("polymorphic array where multiple types", async () => {
-    class PolyMTreasure extends Base {
-      static {
-        this._tableName = "poly_treasures";
-        this.attribute("name", "string");
-      }
-    }
-    class PolyMCar extends Base {
-      static {
-        this._tableName = "poly_cars";
-        this.attribute("name", "string");
-      }
-    }
-    class PolyMPriceEstimate extends Base {
-      static {
-        this._tableName = "poly_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("price", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PolyMTreasure", PolyMTreasure);
-    registerModel("PolyMCar", PolyMCar);
+    const treasure1 = treasures("diamond") as any;
+    const treasure2 = treasures("sapphire") as any;
+    const car = cars("honda") as any;
 
-    const treasure1 = await PolyMTreasure.create({ name: "diamond" });
-    const treasure2 = await PolyMTreasure.create({ name: "sapphire" });
-    const car = await PolyMCar.create({ name: "honda" });
-    const pe1 = await PolyMPriceEstimate.create({
-      estimate_of_type: "PolyMTreasure",
-      estimate_of_id: (treasure1 as any).id,
-      price: 100,
-    });
-    const pe2 = await PolyMPriceEstimate.create({
-      estimate_of_type: "PolyMTreasure",
-      estimate_of_id: (treasure2 as any).id,
-      price: 200,
-    });
-    const pe3 = await PolyMPriceEstimate.create({
-      estimate_of_type: "PolyMCar",
-      estimate_of_id: (car as any).id,
-      price: 300,
-    });
-    // decoy: same type as treasure1 but a different id — must not appear in results
-    const decoy = await PolyMPriceEstimate.create({
-      estimate_of_type: "PolyMTreasure",
-      estimate_of_id: 99999,
-      price: 0,
-    });
-
-    const expected = [(pe1 as any).id, (pe2 as any).id, (pe3 as any).id].sort();
-    const actual = (
-      await PolyMPriceEstimate.where({ estimateOf: [treasure1, treasure2, car] }).toArray()
-    )
-      .map((r: any) => r.id)
-      .sort();
-    expect(actual).toEqual(expected);
-    expect(actual).not.toContain((decoy as any).id);
+    const expected = [
+      (priceEstimates("diamond") as any).id,
+      (priceEstimates("sapphire_1") as any).id,
+      (priceEstimates("sapphire_2") as any).id,
+      (priceEstimates("honda") as any).id,
+    ];
+    const actual = await PriceEstimate.where({ estimateOf: [treasure1, treasure2, car] }).toArray();
+    expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
   });
+
   it("polymorphic nested relation where", () => {
-    class PolyRTreasure extends Base {
-      static {
-        this._tableName = "poly_treasures";
-        this.attribute("name", "string");
-      }
-    }
-    class PolyRPriceEstimate extends Base {
-      static {
-        this._tableName = "poly_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PolyRTreasure", PolyRTreasure);
-
-    const expected = PolyRPriceEstimate.where({
-      estimate_of_type: "PolyRTreasure",
-      estimate_of_id: PolyRTreasure.where({ id: [1, 2] }),
+    const expected = PriceEstimate.where({
+      estimate_of_type: "Treasure",
+      estimate_of_id: Treasure.where({ id: [1, 2] }),
     });
-    const actual = PolyRPriceEstimate.where({ estimateOf: PolyRTreasure.where({ id: [1, 2] }) });
-
+    const actual = PriceEstimate.where({ estimateOf: Treasure.where({ id: [1, 2] }) });
     expect(actual.toSql()).toEqual(expected.toSql());
   });
+
   it("polymorphic sti shallow where", () => {
-    class PssTreasure extends Base {
-      static {
-        this._tableName = "pss_treasures";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class PssHiddenTreasure extends PssTreasure {}
-    class PssPriceEstimate extends Base {
-      static {
-        this._tableName = "pss_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PssTreasure", PssTreasure);
-
-    const treasure = new PssHiddenTreasure();
+    const treasure = new HiddenTreasure();
     (treasure as any).id = 1;
-
-    const expected = PssPriceEstimate.where({
-      estimate_of_type: "PssTreasure",
-      estimate_of_id: 1,
-    });
-    const actual = PssPriceEstimate.where({ estimateOf: treasure });
-
+    const expected = PriceEstimate.where({ estimate_of_type: "Treasure", estimate_of_id: 1 });
+    const actual = PriceEstimate.where({ estimateOf: treasure });
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("polymorphic nested where", () => {
-    class PnwPost extends Base {
-      static {
-        this._tableName = "pnw_posts";
-        this.attribute("id", "integer");
-      }
-    }
-    class PnwTreasure extends Base {
-      static {
-        this._tableName = "pnw_treasures";
-        this.attribute("name", "string");
-        this.hasMany("price_estimates", {
-          className: "PnwPriceEstimate",
-          as: "estimateOf",
-        });
-      }
-    }
-    class PnwPriceEstimate extends Base {
-      static {
-        this._tableName = "pnw_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.attribute("thing_type", "string");
-        this.attribute("thing_id", "integer");
-        this.belongsTo("thing", { polymorphic: true });
-      }
-    }
-    registerModel("PnwPost", PnwPost);
-    registerModel("PnwPriceEstimate", PnwPriceEstimate);
-    // Mirrors Rails `Treasure has_many :price_estimates, as: :estimate_of`.
 
-    const thing = new PnwPost();
-    (thing as any).id = 1;
-
-    const expected = PnwTreasure.where({
-      price_estimates: { thing_type: "PnwPost", thing_id: 1 },
-    }).joins("price_estimates");
-    const actual = PnwTreasure.where({ price_estimates: { thing: thing } }).joins(
-      "price_estimates",
-    );
-
-    expect(actual.toSql()).toEqual(expected.toSql());
-  });
   it("polymorphic sti nested where", () => {
-    class PsnTreasure extends Base {
-      static {
-        this._tableName = "psn_treasures";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("price_estimates", {
-          className: "PsnPriceEstimate",
-          as: "estimateOf",
-        });
-      }
-    }
-    class PsnHiddenTreasure extends PsnTreasure {}
-    class PsnPriceEstimate extends Base {
-      static {
-        this._tableName = "psn_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PsnTreasure", PsnTreasure);
-    registerModel("PsnPriceEstimate", PsnPriceEstimate);
-    // Mirrors Rails `Treasure has_many :price_estimates, as: :estimate_of`.
-
-    const treasure = new PsnHiddenTreasure();
+    const treasure = new HiddenTreasure();
     (treasure as any).id = 1;
-
-    const expected = PsnTreasure.where({
-      price_estimates: { estimate_of_type: "PsnTreasure", estimate_of_id: 1 },
-    }).joins("price_estimates");
-    const actual = PsnTreasure.where({
-      price_estimates: { estimateOf: treasure },
-    }).joins("price_estimates");
-
+    const expected = Treasure.where({
+      priceEstimates: { estimate_of_type: "Treasure", estimate_of_id: 1 },
+    }).joins("priceEstimates");
+    const actual = Treasure.where({ priceEstimates: { estimateOf: treasure } }).joins(
+      "priceEstimates",
+    );
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("decorated polymorphic where", () => {
-    class DpwTreasure extends Base {
-      static {
-        this._tableName = "dpw_treasures";
-        // Tableless model (no schema entry); declare id so the fake `.id = 1`
-        // below is writable under strict writeFromUser.
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class DpwPriceEstimate extends Base {
-      static {
-        this._tableName = "dpw_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("DpwTreasure", DpwTreasure);
 
-    const treasure = new DpwTreasure();
+  it("decorated polymorphic where", () => {
+    const treasure = new Treasure();
     (treasure as any).id = 1;
     // Rails decorates with a Struct that delegates class/id via method_missing.
-    // The JS analog is a prototype-delegating wrapper: `constructor` and `id`
-    // resolve through to the wrapped record, so polymorphic_name/id read the same.
+    // The JS analog is a prototype-delegating wrapper so polymorphic_name/id
+    // resolve through to the wrapped record.
     const decoratedTreasure = Object.create(treasure);
-
-    const expected = DpwPriceEstimate.where({
-      estimate_of_type: "DpwTreasure",
-      estimate_of_id: 1,
-    });
-    const actual = DpwPriceEstimate.where({ estimateOf: decoratedTreasure });
-
+    const expected = PriceEstimate.where({ estimate_of_type: "Treasure", estimate_of_id: 1 });
+    const actual = PriceEstimate.where({ estimateOf: decoratedTreasure });
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("where with empty hash and no foreign key", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({}).toSql();
-    expect(sql).toContain("FROM");
+
+  it("aliased attribute", () => {
+    const expected = Topic.where({ heading: "The First Topic" });
+    const actual = Topic.where({ title: "The First Topic" });
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("where with float for string column", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+
+  it("where error", async () => {
+    let raised = false;
+    try {
+      await Post.where({ id: { "posts.author_id": 10 } }).first();
+    } catch {
+      raised = true;
     }
-    // Float value should be converted to string representation
-    const sql = Post.where({ title: 1.5 }).toSql();
-    expect(sql).toContain("1.5");
+    expect(raised).toBe(false);
   });
-  it("where with decimal for string column", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+
+  it("where with table name", async () => {
+    const post = await Post.first();
+    const found = await Post.where({ posts: { id: (post as any).id } }).first();
+    expect((found as any).id).toBe((post as any).id);
+  });
+
+  // SKIP: Rails expand_from_hash returns `["1=0"]` for an empty (associated/nested)
+  // hash (predicate_builder.rb:85), so `where(posts: {})` matches nothing. trails'
+  // buildFromHashInternal expands the empty hash to zero predicate nodes, so the
+  // condition is dropped and all rows match. Tracked-pending-convergence: RFC 0023
+  // `predicate-builder-blank-and-unboundable-contradiction`.
+  it.skip("where with table name and empty hash", async () => {
+    expect(await Post.where({ posts: {} }).count()).toBe(0);
+  });
+
+  it("where with table name and empty array", async () => {
+    expect(await Post.where({ id: [] }).count()).toBe(0);
+  });
+
+  // SKIP: same empty-hash deviation as "where with table name and empty hash" —
+  // Rails expand_from_hash returns `["1=0"]` for the empty `sink: {}` hash, trails
+  // drops it. Tracked-pending-convergence: RFC 0023
+  // `predicate-builder-blank-and-unboundable-contradiction`.
+  it.skip("where with empty hash and no foreign key", async () => {
+    expect(await Edge.where({ sink: {} }).count()).toBe(0);
+  });
+
+  // SKIP: Rails treats an empty array `[]` as a blank condition (where_clause
+  // ignores it → all rows). trails' `where([])` routes the array into the
+  // composite-key tuple form and raises ArgumentError ("requires a tuples
+  // argument"). The `{}`, `null`, `""` blanks already behave Rails-faithfully.
+  // Tracked-pending-convergence: RFC 0023
+  // `predicate-builder-blank-and-unboundable-contradiction`.
+  it.skip("where with blank conditions", async () => {
+    for (const blank of [[], {}, null, ""]) {
+      const result = await Edge.where(blank as any)
+        .order("sink_id")
+        .toArray();
+      expect(result).toHaveLength(4);
     }
-    const sql = Post.where({ title: 123.456 }).toSql();
-    expect(sql).toContain("123.456");
   });
+
+  it("where with integer for string column", async () => {
+    expect(await Post.where({ title: 0 }).count()).toBe(0);
+  });
+
+  it("where with float for string column", async () => {
+    expect(await Post.where({ title: 0.0 }).count()).toBe(0);
+  });
+
+  it("where with boolean for string column", async () => {
+    expect(await Post.where({ title: false }).count()).toBe(0);
+  });
+
+  it("where with decimal for string column", async () => {
+    expect(await Post.where({ title: 0 }).count()).toBe(0);
+  });
+
   it.skip("where with rational for string column", () => {
     // PERMANENTLY BLOCKED: Ruby Rational has no JavaScript equivalent.
     // Rails: Post.where(title: Rational(0)).count == 0 (Rational cast to "0/1").
   });
+
   it("where with duration for string column", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Mirrors Rails: empty table → 0 matches (no post has title "0").
     expect(await Post.where({ title: seconds(0) }).count()).toBe(0);
-    // Positive: Duration.toString() → "0"; a post titled "0" must be found.
-    await Post.create({ title: "0" });
-    expect(await Post.where({ title: seconds(0) }).count()).toBe(1);
   });
-  it("where with integer for binary column", () => {
-    class Post extends Base {
-      static {
-        this.attribute("data", "string");
-      }
-    }
-    const sql = Post.where({ data: 42 }).toSql();
-    expect(sql).toContain("42");
+
+  it("where with integer for binary column", async () => {
+    expect(await Binary.where({ data: 0 }).count()).toBe(0);
   });
-  it("where with emoji for binary column", () => {
-    class Post extends Base {
-      static {
-        this.attribute("data", "string");
-      }
-    }
-    const sql = Post.where({ data: "hello" }).toSql();
-    expect(sql).toContain("hello");
+
+  it("where with emoji for binary column", async () => {
+    await Binary.create({ data: "🥦" });
+    const sql = Binary.where({ data: ["🥦", "🍦"] }).toSql();
+    expect(sql).toContain("f09fa5a6");
+    expect(sql).toContain("f09f8da6");
   });
-  function makeWoaModels(suffix: string) {
-    class Author extends Base {
-      static {
-        this._tableName = `woa_${suffix}_authors`;
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class Essay extends Base {
-      static {
-        this._tableName = `woa_${suffix}_essays`;
-        this.attribute("id", "integer");
-        this.attribute("writer_id", "string");
-      }
-    }
-    const aName = `Woa${suffix}Author`;
-    registerModel(aName, Author);
-    Associations.belongsTo.call(Essay, "writer", {
-      className: aName,
-      foreignKey: "writer_id",
-      primaryKey: "name",
-    });
-    return { Author, Essay };
-  }
+
+  it("where on association with custom primary key", async () => {
+    const author = authors("david") as any;
+    const essay = await Essay.where({ writer: author }).first();
+    expect((essay as any).id).toBe((essays("david_modest_proposal") as any).id);
+  });
+
   it("where on association with custom primary key with relation", async () => {
-    const { Author, Essay } = makeWoaModels("cr");
-    const author = await Author.create({ name: "David" });
-    await Essay.create({ writer_id: "David" });
+    const author = authors("david") as any;
     const essay = await Essay.where({ writer: Author.where({ id: author.id }) }).first();
-    expect(essay).not.toBeNull();
-    expect(essay!.writer_id).toBe("David");
+    expect((essay as any).id).toBe((essays("david_modest_proposal") as any).id);
   });
+
   it("where on association with relation performs subselect not two queries", async () => {
-    const { Author, Essay } = makeWoaModels("sp");
-    const author = await Author.create({ name: "Alice" });
-    await Essay.create({ writer_id: "Alice" });
-    const sql = Essay.where({ writer: Author.where({ name: "Alice" }) }).toSql();
+    const author = authors("david") as any;
+    const sql = Essay.where({ writer: Author.where({ id: author.id }) }).toSql();
     expect(sql).toContain("IN");
     expect(sql).toContain("SELECT");
     const result = await Essay.where({ writer: Author.where({ id: author.id }) }).toArray();
-    expect(result).toHaveLength(1);
+    expect(result.length).toBeGreaterThan(0);
   });
+
   it("where on association with custom primary key with array of base", async () => {
-    const { Author, Essay } = makeWoaModels("ab");
-    const author = await Author.create({ name: "David" });
-    await Essay.create({ writer_id: "David" });
-    expect(await Essay.where({ writer: [author] }).first()).not.toBeNull();
+    const author = authors("david") as any;
+    const essay = await Essay.where({ writer: [author] }).first();
+    expect((essay as any).id).toBe((essays("david_modest_proposal") as any).id);
   });
+
   it("where on association with custom primary key with array of ids", async () => {
-    const { Author, Essay } = makeWoaModels("ai");
-    await Author.create({ name: "David" });
-    await Essay.create({ writer_id: "David" });
     const essay = await Essay.where({ writer: ["David"] }).first();
-    expect(essay!.writer_id).toBe("David");
+    expect((essay as any).id).toBe((essays("david_modest_proposal") as any).id);
   });
+
   it("where with relation on has many association", async () => {
-    class WhmrAuthor extends Base {
-      static {
-        this._tableName = "whmr_authors";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("essays", {
-          className: "WhmrEssay",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class WhmrEssay extends Base {
-      static {
-        this._tableName = "whmr_essays";
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-        this.attribute("writer_id", "string");
-      }
-    }
-    registerModel("WhmrAuthor", WhmrAuthor);
-    registerModel("WhmrEssay", WhmrEssay);
-
-    const david = (await WhmrAuthor.create({ name: "David" })) as any;
-    await WhmrAuthor.create({ name: "Other" });
-    const essay = (await WhmrEssay.create({ author_id: david.id, writer_id: "David" })) as any;
-
-    const result = await WhmrAuthor.where({
-      essays: WhmrEssay.where({ id: essay.id }),
-    }).first();
-    expect(result).not.toBeNull();
-    expect((result as any).id).toBe(david.id);
+    const essay = essays("david_modest_proposal") as any;
+    const author = await Author.where({ essays: Essay.where({ id: essay.id }) }).first();
+    expect((author as any).id).toBe((authors("david") as any).id);
   });
+
   it("where with relation on has one association", async () => {
-    class WhorAddress extends Base {
-      static {
-        this._tableName = "whor_addresses";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.hasOne("author", {
-          className: "WhorAuthor",
-          foreignKey: "author_address_id",
-        });
-      }
-    }
-    class WhorAuthor extends Base {
-      static {
-        this._tableName = "whor_authors";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("author_address_id", "integer");
-      }
-    }
-    registerModel("WhorAddress", WhorAddress);
-    registerModel("WhorAuthor", WhorAuthor);
-    // AuthorAddress has_one :author — FK lives on the author side
-
-    const address = (await WhorAddress.create({ name: "addr1" })) as any;
-    await WhorAddress.create({ name: "addr2" });
-    const author = (await WhorAuthor.create({
-      name: "David",
-      author_address_id: address.id,
-    })) as any;
-
-    const result = await WhorAddress.where({
-      author: WhorAuthor.where({ id: author.id }),
+    const author = authors("david") as any;
+    const authorAddress = await AuthorAddress.where({
+      author: Author.where({ id: author.id }),
     }).first();
-    expect(result).not.toBeNull();
-    expect((result as any).id).toBe(address.id);
+    expect((authorAddress as any).id).toBe(author.author_address_id);
   });
+
   it("where on association with select relation", async () => {
-    class WselAuthor extends Base {
-      static {
-        this._tableName = "wsel_authors";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class WselEssay extends Base {
-      static {
-        this._tableName = "wsel_essays";
-        this.attribute("id", "integer");
-        this.attribute("writer_id", "string");
-        this.belongsTo("author", {
-          className: "WselAuthor",
-          foreignKey: "writer_id",
-          primaryKey: "name",
-        });
-      }
-    }
-    registerModel("WselAuthor", WselAuthor);
-
-    const david = await WselAuthor.create({ name: "David" });
-    const essay = await WselEssay.create({ writer_id: "David" });
-    await WselEssay.create({ writer_id: "Other" });
-
-    const result = await WselEssay.where({
-      author: WselAuthor.where({ name: "David" }).select("name"),
-    }).first();
-    expect(result).not.toBeNull();
-    expect((result as any).id).toBe((essay as any).id);
+    const essay = await Essay.where({
+      author: Author.where({ name: "David" }).select("name"),
+    }).take();
+    expect((essay as any).id).toBe((essays("david_modest_proposal") as any).id);
   });
+
   it("where on association with collection polymorphic relation", async () => {
-    class WcprTreasure extends Base {
-      static {
-        this._tableName = "wcpr_treasures";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.hasMany("priceEstimates", {
-          className: "WcprPriceEstimate",
-          as: "estimateOf",
-        });
-      }
-    }
-    class WcprPriceEstimate extends Base {
-      static {
-        this._tableName = "wcpr_price_estimates";
-        this.attribute("id", "integer");
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("WcprTreasure", WcprTreasure);
-    registerModel("WcprPriceEstimate", WcprPriceEstimate);
-
-    const diamond = (await WcprTreasure.create({ name: "diamond" })) as any;
-    const emerald = (await WcprTreasure.create({ name: "emerald" })) as any;
-    const ruby = (await WcprTreasure.create({ name: "ruby" })) as any;
-
-    // diamond and emerald have price estimates; ruby does not
-    await WcprPriceEstimate.create({
-      estimate_of_type: "WcprTreasure",
-      estimate_of_id: diamond.id,
-    });
-    await WcprPriceEstimate.create({
-      estimate_of_type: "WcprTreasure",
-      estimate_of_id: emerald.id,
-    });
-
-    // Rails: Treasure.where(name: ["diamond", "emerald"], price_estimates: PriceEstimate.all)
-    // Returns only treasures with matching name AND at least one price estimate
-    const result = await WcprTreasure.where({
+    const result = await Treasure.where({
       name: ["diamond", "emerald"],
-      priceEstimates: WcprPriceEstimate.all(),
+      priceEstimates: PriceEstimate.all(),
     }).toArray();
-
-    const names = result.map((r: any) => r.name).sort();
-    expect(names).toEqual(["diamond", "emerald"]);
-    expect(names).not.toContain("ruby");
-  });
-  it("where with unsupported arguments", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(() => Post.where(42 as any)).toThrow(/Unsupported argument type/);
-  });
-  it("invert where", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "hello" });
-    await Post.create({ title: "world" });
-    // invertWhere swaps where <-> whereNot
-    const result = await Post.where({ title: "hello" }).invertWhere().toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("world");
-  });
-  it("nested conditional on enum", async () => {
-    class Post extends Base {
-      static {
-        this._tableName = "enum_posts";
-        this.attribute("id", "integer");
-        this.attribute("status", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
-    await Post.create({ title: "A", status: 0 });
-    await Post.create({ title: "B", status: 1 });
-    await Post.create({ title: "C", status: 2 });
-    // Chain enum where with another condition
-    const result = await Post.where({ status: 1 }).where({ title: "B" }).toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("B");
-  });
-});
-
-describe("WhereTest", () => {
-  function makeAuthor() {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    return Author;
-  }
-
-  it("rewhere on root", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({ name: "Alice" }).rewhere({ name: "Bob" }).toSql();
-    expect(sql).toMatch(/Bob/);
-    expect(sql).not.toMatch(/Alice/);
-  });
-
-  it("where with invalid value", async () => {
-    const Author = makeAuthor();
-    // An invalid where value (e.g. undefined) should handle gracefully
-    const sql = Author.where({ name: "Valid" }).toSql();
-    expect(sql).toMatch(/Valid/);
-  });
-
-  it("aliased attribute", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "Test" });
-    const found = await Author.where({ name: "Test" }).first();
-    expect(found).not.toBeNull();
-  });
-
-  it("where error", async () => {
-    const Author = makeAuthor();
-    // No-op: where with empty should work
-    const sql = Author.where({}).toSql();
-    expect(typeof sql).toBe("string");
-  });
-
-  it("where with table name", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({ name: "Alice" }).toSql();
-    expect(sql).toMatch(/name/);
-  });
-
-  it("where with table name and empty hash", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({}).toSql();
-    expect(typeof sql).toBe("string");
-  });
-
-  it("where with table name and empty array", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({ name: [] }).toSql();
-    expect(typeof sql).toBe("string");
-  });
-
-  it("where with blank conditions", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "Blank" });
-    const all = await Author.where({}).toArray();
-    expect(all.length).toBe(1);
-  });
-
-  it("where with integer for string column", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "42" });
-    const found = await Author.where({ name: "42" }).first();
-    expect(found).not.toBeNull();
-  });
-
-  it("where with boolean for string column", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "true" });
-    const found = await Author.where({ name: "true" }).first();
-    expect(found).not.toBeNull();
+    expect(ids(result)).toStrictEqual([(treasures("diamond") as any).id]);
   });
 
   it("where with strong parameters", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "Strong" });
-    const found = await Author.where({ name: "Strong" }).first();
-    expect(found).not.toBeNull();
+    const author = authors("david") as any;
+    const found = await Author.where({ name: author.name }).first();
+    expect((found as any).id).toBe(author.id);
   });
 
   it("where with large number", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({ age: 9999999 }).toSql();
-    expect(sql).toMatch(/9999999/);
+    const bob = authors("bob") as any;
+    const r1 = await Author.where({ id: [3, 9223372036854775808n] }).toArray();
+    expect(ids(r1)).toStrictEqual([bob.id]);
   });
 
   it("to sql with large number", async () => {
-    const Author = makeAuthor();
-    const sql = Author.where({ age: 9999999 }).toSql();
-    expect(typeof sql).toBe("string");
+    const bob = authors("bob") as any;
+    const sql = Author.where({ id: [3, 9223372036854775808n] }).toSql();
+    const r1 = await Author.findBySql(sql);
+    expect(ids(r1)).toStrictEqual([bob.id]);
   });
 
-  it("where copies bind params in the right order", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "Alice", age: 30 });
-    await Author.create({ name: "Bob", age: 25 });
-    const found = await Author.where({ name: "Alice" }).where({ age: 30 }).first();
-    expect(found).not.toBeNull();
+  it("where with unsupported arguments", () => {
+    expect(() => Author.where(42 as any)).toThrow();
   });
 
-  it("where not polymorphic association", async () => {
-    const Author = makeAuthor();
-    await Author.create({ name: "Include" });
-    await Author.create({ name: "Exclude" });
-    const found = await Author.where({ name: "Include" }).toArray();
-    expect(found.length).toBe(1);
+  it("invert where", async () => {
+    const author = authors("david") as any;
+    const davidPosts = author.posts.whereNot({ id: 1 });
+    const result = await davidPosts.invertWhere().first();
+    expect(result.id).toBe(1);
   });
 
-  it("type casting nested joins", async () => {
-    class TcnjAuthor extends Base {
-      static {
-        this._tableName = "authors";
-      }
-    }
-    class TcnjPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.belongsTo("author", { className: "TcnjAuthor" });
-      }
-    }
-    class TcnjComment extends Base {
-      static {
-        this._tableName = "comments";
-        this.attribute("post_id", "integer");
-        this.belongsTo("post", { className: "TcnjPost" });
-      }
-    }
-    registerModel("TcnjAuthor", TcnjAuthor);
-    registerModel("TcnjPost", TcnjPost);
-    registerModel("TcnjComment", TcnjComment);
-
-    const author = await TcnjAuthor.create({});
-    const otherAuthor = await TcnjAuthor.create({});
-    const post = await TcnjPost.create({ author_id: author.id });
-    const otherPost = await TcnjPost.create({ author_id: otherAuthor.id });
-    const comment = await TcnjComment.create({ post_id: post.id });
-    await TcnjComment.create({ post_id: otherPost.id });
-
-    const found = await TcnjComment.joins({ post: "author" })
-      .where({ authors: { id: `${author.id}-foo` } })
+  it("nested conditional on enum", async () => {
+    const post = await Post.first();
+    await Comment.create({ label: "default", post, body: "Nice weather today" });
+    const result = await Post.joins("comments")
+      .where({ comments: { label: "default", body: "Nice weather today" } })
       .toArray();
-    expect(found.map((c) => c.id)).toStrictEqual([comment.id]);
-  });
-
-  it("where with through association", async () => {
-    class WtaAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("posts", { className: "WtaPost", foreignKey: "author_id" });
-        this.hasMany("comments", { className: "WtaComment", through: "posts" });
-        this.hasMany("categorizations", {
-          className: "WtaCategorization",
-          foreignKey: "author_id",
-        });
-        this.hasMany("categories", { className: "WtaCategory", through: "categorizations" });
-      }
-    }
-    class WtaPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.hasMany("comments", { className: "WtaComment", foreignKey: "post_id" });
-      }
-    }
-    class WtaComment extends Base {
-      static {
-        this._tableName = "comments";
-        this.attribute("post_id", "integer");
-      }
-    }
-    class WtaCategory extends Base {
-      static {
-        this._tableName = "categories";
-        this.attribute("name", "string");
-      }
-    }
-    class WtaCategorization extends Base {
-      static {
-        this._tableName = "categorizations";
-        this.attribute("author_id", "integer");
-        this.attribute("category_id", "integer");
-        this.belongsTo("category", { className: "WtaCategory", foreignKey: "category_id" });
-      }
-    }
-    registerModel("WtaAuthor", WtaAuthor);
-    registerModel("WtaPost", WtaPost);
-    registerModel("WtaComment", WtaComment);
-    registerModel("WtaCategory", WtaCategory);
-    registerModel("WtaCategorization", WtaCategorization);
-
-    // Mirror Rails fixture contrast: David has greetings on post 1; Bob has a
-    // different comment on his post. joins("comments") returns both authors so
-    // only the where({comments: greetings}) predicate can narrow to [david].
-    const david = await WtaAuthor.create({ name: "David" });
-    const bob = await WtaAuthor.create({ name: "Bob" });
-    const davidPost = await WtaPost.create({ author_id: david.id });
-    const bobPost = await WtaPost.create({ author_id: bob.id });
-    const greetings = await WtaComment.create({ post_id: davidPost.id });
-    await WtaComment.create({ post_id: bobPost.id }); // does_it_hurt analogue
-
-    const joined = await WtaAuthor.joins("comments").toArray();
-    expect(joined.length).toBe(2);
-
-    const result1 = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
-    expect(result1.map((a) => a.id)).toStrictEqual([david.id]);
-
-    // Mirror Rails fixture contrast: David→general, Bob→technology.
-    // joins("categories") returns both authors so only the where predicate narrows.
-    const general = await WtaCategory.create({ name: "general" });
-    const technology = await WtaCategory.create({ name: "technology" });
-    await WtaCategorization.create({ author_id: david.id, category_id: general.id });
-    await WtaCategorization.create({ author_id: bob.id, category_id: technology.id });
-
-    // Both authors are joined — joins alone does not narrow to bob.
-    const joinedCat = await WtaAuthor.joins("categories").toArray();
-    expect(joinedCat.length).toBe(2);
-
-    const result2 = await WtaAuthor.joins("categories").where({ categories: technology }).toArray();
-    expect(result2.map((a) => a.id)).toStrictEqual([bob.id]);
-  });
-
-  it("polymorphic nested array where", async () => {
-    class PnaTreasure extends Base {
-      static {
-        this._tableName = "pna_treasures";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    class PnaHiddenTreasure extends PnaTreasure {}
-    class PnaPriceEstimate extends Base {
-      static {
-        this._tableName = "pna_price_estimates";
-        this.attribute("estimate_of_type", "string");
-        this.attribute("estimate_of_id", "integer");
-        this.belongsTo("estimateOf", { polymorphic: true });
-      }
-    }
-    registerModel("PnaTreasure", PnaTreasure);
-
-    const treasure = new PnaTreasure();
-    (treasure as any).id = 1;
-    const hidden = new PnaHiddenTreasure();
-    (hidden as any).id = 2;
-
-    const expected = PnaPriceEstimate.where({
-      estimate_of_type: "PnaTreasure",
-      estimate_of_id: [treasure, hidden],
-    });
-    const actual = PnaPriceEstimate.where({ estimateOf: [treasure, hidden] });
-
-    expect(actual.toSql()).toEqual(expected.toSql());
+    expect(ids(result)).toStrictEqual([(post as any).id]);
   });
 });
-
-// ==========================================================================
-// Arel node support in Relation#where
-// ==========================================================================
-// ==========================================================================
-// WhereTest — targets relation/where_test.rb (continued)
-// ==========================================================================
-// ==========================================================================
-// Direct-assertion sweep of the `.joins` string resolver's foreign-key
-// derivation (mirrors Reflection#derive_foreign_key). Each branch — through,
-// HABTM, STI target — is asserted on the generated ON-clause SQL so a
-// regression in the shared deriveForeignKey helper surfaces here.
-// ==========================================================================
