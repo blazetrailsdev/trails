@@ -17,6 +17,7 @@ import {
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import { PredicateBuilder } from "./predicate-builder.js";
+import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
 import {
   ActiveRecordError,
   ConfigurationError,
@@ -1477,29 +1478,41 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
   return this;
 }
 
-function excludingBang(this: QueryMethodsHost, records: any[]): any {
+function excludingBang(this: QueryMethodsHost, records: any[], unloadedRelations: any[] = []): any {
   const primaryKey = this._modelClass.primaryKey;
   if (Array.isArray(primaryKey)) {
     throw new Error("excluding does not support models with composite primary keys");
   }
   const pk = primaryKey;
   // Rails `excluding!`: `predicate_builder[primary_key, records].invert`. The
-  // array handler dereferences AR records to their ids and routes Relation
-  // arguments through the subquery handler, so pass the mixed collection
-  // straight through rather than pre-mapping.
-  //
+  // array handler dereferences AR records to their ids, so pass the literal
+  // collection (scalars + any loaded relation's spread records) straight through
+  // rather than pre-mapping. Skip when empty so an all-unloaded-relations call
+  // doesn't append a spurious `id NOT IN ()` (always-true) predicate.
+  if (records.length > 0) {
+    this._whereClause.predicates.push(
+      ...this.predicateBuilder.buildNegatedFromHash({ [pk]: records }),
+    );
+  }
+
   // Rails materializes relation args eagerly (`relations.flat_map(&:ids)`,
-  // query_methods.rb:1583) because Ruby query execution is synchronous; trails'
-  // query builder is not, so a Relation arg flows through the same
-  // `PredicateBuilder::RelationHandler` path that `where(id: relation)` uses and
-  // emits `id NOT IN (SELECT <pk> FROM ...)` (relation-handler.ts). Same result
-  // set; the subquery's `SELECT posts.id FROM` still satisfies Rails'
-  // `assert_queries_match` shape check. Eager id-materialization would require
-  // an async `excluding`, breaking the chainable contract and diverging from
-  // every other relation-valued predicate.
-  this._whereClause.predicates.push(
-    ...this.predicateBuilder.buildNegatedFromHash({ [pk]: records }),
-  );
+  // query_methods.rb:1583): a separate `SELECT <pk>` query yielding a literal
+  // `id NOT IN (1, 2, 3)`. trails' query builder is synchronous and cannot run
+  // that id-select here, so record a `DeferredIdsNotIn` marker carrying the
+  // inner relation; the load pipeline substitutes the literal id list (via
+  // `Relation#ids`) before compile, matching Rails' SQL shape and 2-query count
+  // rather than emitting a `NOT IN (SELECT ...)` subquery. The marker carries
+  // that pk-select subquery only as a synchronous `toSql()` display fallback for
+  // the (rare) no-load path. Eager materialization here would require an async
+  // `excluding`, breaking the chainable contract.
+  if (unloadedRelations.length > 0) {
+    const attribute = (this._modelClass as any).arelTable.get(pk);
+    for (const rel of unloadedRelations) {
+      const inlineSubquery = (this.predicateBuilder.buildNegated(attribute, rel) as Nodes.NotIn)
+        .right as Nodes.Node;
+      this._whereClause.predicates.push(new DeferredIdsNotIn(attribute, inlineSubquery, rel));
+    }
+  }
   return this;
 }
 

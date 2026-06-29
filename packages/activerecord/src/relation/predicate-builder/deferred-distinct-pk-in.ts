@@ -41,3 +41,31 @@ export class DeferredDistinctPkNotIn extends Nodes.NotIn {
     super(attribute, inlineSubquery);
   }
 }
+
+/**
+ * Deferred id-materialization marker for an unloaded Relation argument to
+ * `excluding`/`without`.
+ *
+ * Mirrors Rails `QueryMethods#excluding` (query_methods.rb:1583), which
+ * materializes its Relation arguments eagerly via `relations.flat_map(&:ids)` —
+ * a separate `SELECT <pk>` query producing a literal id array — and feeds that
+ * into `excluding!` as a literal `id NOT IN (1, 2, 3)`. trails' query builder is
+ * synchronous and cannot run `Relation#ids` at `.excluding()`-build time, so we
+ * record this marker carrying the inner relation; the load pipeline
+ * (`_materializeDeferredDistinctPkPredicates`) awaits `innerRelation.ids()` and
+ * substitutes a literal `attribute.notIn([...ids])` before compile.
+ *
+ * Subclasses `NotIn` (carrying the pk-select subquery as the inline `right`) so
+ * the synchronous `toSql()` path — used only when SQL is requested without
+ * loading — still renders `id NOT IN (SELECT <pk> FROM ...)` as a display
+ * fallback, matching the pre-materialization behaviour.
+ */
+export class DeferredIdsNotIn extends Nodes.NotIn {
+  constructor(
+    attribute: Nodes.Attribute,
+    inlineSubquery: Nodes.Node,
+    readonly innerRelation: { ids(): Promise<unknown[]> },
+  ) {
+    super(attribute, inlineSubquery);
+  }
+}

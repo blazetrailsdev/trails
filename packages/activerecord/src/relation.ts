@@ -131,6 +131,7 @@ import { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredDistinctPkIn,
   DeferredDistinctPkNotIn,
+  DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
@@ -1165,9 +1166,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#excluding / #without
    */
   excluding(...records: unknown[]): Relation<T> {
-    const combined = this._excludingArgs(records, "excluding");
-    if (combined.length === 0) return this;
-    return this._clone().excludingBang(combined);
+    const { records: recs, relations } = this._excludingArgs(records, "excluding");
+    if (recs.length === 0 && relations.length === 0) return this;
+    return this._clone().excludingBang(recs, relations);
   }
 
   /**
@@ -1176,9 +1177,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#without
    */
   without(...records: unknown[]): Relation<T> {
-    const combined = this._excludingArgs(records, "without");
-    if (combined.length === 0) return this;
-    return this._clone().excludingBang(combined);
+    const { records: recs, relations } = this._excludingArgs(records, "without");
+    if (recs.length === 0 && relations.length === 0) return this;
+    return this._clone().excludingBang(recs, relations);
   }
 
   /**
@@ -1187,9 +1188,14 @@ export class Relation<T extends Base> {
    * arguments, flatten one level of array nesting, compact nils, then validate
    * that every remaining record and relation belongs to this model — raising
    * the same ArgumentError keyed on the public `__callee__`. Returns the
-   * `records + relations.flat_map(&:ids)` collection passed to `excluding!`.
+   * `records + relations.flat_map(&:ids)` collection split into already-known
+   * `records` (scalars + the spread of any loaded relation's cached records) and
+   * the still-`unloaded` relations whose ids the load pipeline materializes.
    */
-  private _excludingArgs(records: unknown[], callee: string): unknown[] {
+  private _excludingArgs(
+    records: unknown[],
+    callee: string,
+  ): { records: unknown[]; relations: Relation<T>[] } {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
     const recs = records
       .filter((r) => !(r instanceof Relation))
@@ -1208,15 +1214,18 @@ export class Relation<T extends Base> {
     // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
     // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
     // and re-queries otherwise. A loaded relation's records are already in
-    // memory, so spread them in to match Rails exactly; an unloaded relation
-    // flows through `excludingBang` as a `NOT IN (subquery)` since trails'
-    // synchronous builder cannot run its id-select here.
+    // memory, so spread them into the literal `records` collection to match
+    // Rails exactly (no extra query). An unloaded relation is deferred:
+    // `excludingBang` records a marker that the load pipeline materializes into a
+    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
+    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
     const combined: unknown[] = [...recs];
+    const unloaded: Relation<T>[] = [];
     for (const rel of relations) {
       if (rel.isLoaded) combined.push(...rel._records);
-      else combined.push(rel);
+      else unloaded.push(rel);
     }
-    return combined;
+    return { records: combined, relations: unloaded };
   }
 
   /**
@@ -5135,7 +5144,8 @@ export class Relation<T extends Base> {
   /**
    * Load-time hook for Rails' `distinct_relation_for_primary_key`
    * materialization. Before the where clause is compiled, replace each deferred
-   * marker (recorded synchronously by `RelationHandler`) with a literal
+   * marker (recorded synchronously by `RelationHandler`, or by `excludingBang`
+   * for an unloaded `excluding`/`without` relation arg) with a literal
    * `attribute IN (...ids)` / `NOT IN (...ids)`. An empty id set yields an empty
    * `IN`, which `WhereClause#isContradiction` short-circuits to a no-query empty
    * result (Rails' `none!` semantics). Idempotent: substituted nodes are plain
@@ -5155,13 +5165,20 @@ export class Relation<T extends Base> {
     const predicates = this._whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];
-      const deferred =
-        node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn;
-      if (!deferred) continue;
-      const ids = await node.innerRelation._materializeDistinctPkIds();
+      let ids: unknown[];
+      let negated: boolean;
+      if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
+        ids = await node.innerRelation._materializeDistinctPkIds();
+        negated = node instanceof DeferredDistinctPkNotIn;
+      } else if (node instanceof DeferredIdsNotIn) {
+        // Rails `excluding`/`without`: `relations.flat_map(&:ids)` (query_methods.rb:1583).
+        ids = await node.innerRelation.ids();
+        negated = true;
+      } else {
+        continue;
+      }
       const attribute = node.left as Nodes.Attribute;
-      predicates[i] =
-        node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
+      predicates[i] = negated ? attribute.notIn(ids) : attribute.in(ids);
     }
   }
 
