@@ -105,16 +105,15 @@ export class HasOne extends SingularAssociation {
       instance = typeof record[name] === "function" ? record[name]() : record[name];
     }
 
+    // Mirrors Rails `HasOne.touch_record`: `touch != true ? instance.touch(touch)
+    // : instance.touch`. The owner is touched immediately via `instance.touch`
+    // (unlike `BelongsTo.touch_record`, which defers with `touch_later`).
     if (instance && typeof instance.isPersisted === "function" && instance.isPersisted()) {
-      const touchFn = instance.touchLater ?? instance.touch;
-      if (typeof touchFn !== "function") return;
+      if (typeof instance.touch !== "function") return;
       if (touch === true) {
-        await touchFn.call(instance);
-      } else if (Array.isArray(touch)) {
-        if (touch.length === 0) return;
-        await touchFn.call(instance, ...touch);
+        await instance.touch();
       } else {
-        await touchFn.call(instance, touch);
+        await instance.touch(touch);
       }
     }
   }

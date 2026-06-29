@@ -1,6 +1,4 @@
 import type { Base } from "../base.js";
-import { RecordNotFound } from "../errors.js";
-import { star as arelStar } from "@blazetrails/arel";
 
 /**
  * Pessimistic locking support for ActiveRecord models.
@@ -10,45 +8,34 @@ import { star as arelStar } from "@blazetrails/arel";
  */
 
 /**
- * Reload a record with a pessimistic row-level lock.
+ * Obtain a row lock on this record. Reloads the record (with the requested
+ * lock) to acquire it. Pass an SQL locking clause to append to the SELECT, or
+ * `true` for the default exclusive `FOR UPDATE` lock. Returns the locked record.
  *
  * Mirrors: ActiveRecord::Locking::Pessimistic#lock!
  */
 export async function lockBang<T extends Base>(
   this: T,
-  lockClause: string = "FOR UPDATE",
+  lockClause: boolean | string = true,
 ): Promise<T> {
-  if (this.changed) {
-    const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
-    throw new Error(
-      `Locking a record with unpersisted changes is not supported. Changed attributes: ${dirtyAttrs}. Use save to persist the changes, or reload to discard them explicitly.`,
-    );
+  if (this.isPersisted()) {
+    if (this.changed) {
+      // Mirrors Rails' squished message order: the save/reload guidance first,
+      // then `Changed attributes: #{changed.map(&:inspect).join(', ')}.` last.
+      const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
+      throw new Error(
+        "Locking a record with unpersisted changes is not supported. Use " +
+          "`save` to persist the changes, or `reload` to discard them " +
+          `explicitly. Changed attributes: ${dirtyAttrs}.`,
+      );
+    }
+    // Mirrors Rails `reload(lock: lock)` — a primary-key `find_by!` that carries
+    // `LIMIT 1` ahead of the lock clause and resets in-memory + association
+    // state from the freshly locked row.
+    await (this as unknown as { reload(o: { lock: boolean | string }): Promise<unknown> }).reload({
+      lock: lockClause,
+    });
   }
-  const ctor = this.constructor as typeof Base;
-  // Mirrors Rails `lock!`, which reloads via `relation.lock(value).find(id)` —
-  // a primary-key lookup that always carries `LIMIT 1` ahead of the lock clause.
-  const sm = ctor.arelTable
-    .project(arelStar)
-    .where((ctor as any)._buildPkWhereNode(this.id))
-    .take(1)
-    .lock(lockClause);
-  const conn = ctor.connection;
-  const sql = conn.toSql(sm);
-  const rows = await conn.execute(sql);
-
-  if (rows.length === 0) {
-    throw new RecordNotFound(
-      `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-      ctor.name,
-      ctor.primaryKey as string,
-      this.id,
-    );
-  }
-
-  for (const [key, value] of Object.entries(rows[0])) {
-    (this as any)._attributes.set(key, value);
-  }
-  (this as any)._dirty.snapshot((this as any)._attributes);
   return this;
 }
 
@@ -67,7 +54,7 @@ export async function withLock<T extends Base>(
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockClause: string,
+  lockClause: boolean | string,
   fn: (record: T) => Promise<void> | void,
 ): Promise<void>;
 export async function withLock<T extends Base>(
@@ -77,23 +64,26 @@ export async function withLock<T extends Base>(
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockClause: string,
+  lockClause: boolean | string,
   options: TxOptions,
   fn: (record: T) => Promise<void> | void,
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockOrOptOrFn: string | TxOptions | ((record: T) => Promise<void> | void),
+  lockOrOptOrFn: boolean | string | TxOptions | ((record: T) => Promise<void> | void),
   optOrFn?: TxOptions | ((record: T) => Promise<void> | void),
   fn?: (record: T) => Promise<void> | void,
 ): Promise<void> {
-  let lockClause = "FOR UPDATE";
+  // Mirrors Rails `lock = args.present? ? args.first : true` — no lock argument
+  // defaults to `true` (resolved to `FOR UPDATE` by `lock!`/`reload`), and the
+  // first positional (`true`/`false`/a custom clause) is forwarded unchanged.
+  let lockClause: boolean | string = true;
   let txOptions: TxOptions = {};
   let callback: ((record: T) => Promise<void> | void) | undefined;
 
   if (typeof lockOrOptOrFn === "function") {
     callback = lockOrOptOrFn;
-  } else if (typeof lockOrOptOrFn === "string") {
+  } else if (typeof lockOrOptOrFn === "string" || typeof lockOrOptOrFn === "boolean") {
     lockClause = lockOrOptOrFn;
     if (typeof optOrFn === "function") {
       callback = optOrFn;
