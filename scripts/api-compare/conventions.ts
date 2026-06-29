@@ -315,17 +315,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Relation#reverse_order_value is a deferred boolean flag in Rails; trails " +
-      "has no such field — reverseOrderBang eagerly flips the stored order " +
-      "clauses (query_methods.rb reverse_sql_order semantics) at call time, so " +
-      "there is no value to expose. Tracked for convergence (store a deferred " +
-      "flag, expose the accessor) by story " +
-      "reverse-order-value-deferred-flag-convergence.",
-    names: ["reverse_order_value", "reverse_order_value="],
-    rubyFiles: ["relation.rb", "relation/query_methods.rb"],
-  },
-  {
-    reason:
       "Calculations#build_count_subquery is realized inline inside trails' " +
       "performCount (calculations.ts) — the limit/offset count path builds the " +
       "subquery there rather than as a separate named method.",
