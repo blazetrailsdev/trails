@@ -5171,8 +5171,13 @@ export class Relation<T extends Base> {
         // `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1588).
         // Concatenate the known literal ids with each relation's materialized
         // ids so the substitution stays a single `NOT IN`, not an `AND` of them.
-        const relationIds = (await Promise.all(node.innerRelations.map((rel) => rel.ids()))).flat();
-        ids = [...node.literalIds, ...relationIds];
+        // `flat_map(&:ids)` runs each `Relation#ids` select sequentially in
+        // argument order (calculations.rb:390-404), so await them in order
+        // rather than concurrently (also avoids contending the connection).
+        ids = [...node.literalIds];
+        for (const rel of node.innerRelations) {
+          ids.push(...(await rel.ids()));
+        }
         negated = true;
       } else {
         continue;
