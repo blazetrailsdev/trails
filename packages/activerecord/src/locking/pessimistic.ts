@@ -20,9 +20,13 @@ export async function lockBang<T extends Base>(
 ): Promise<T> {
   if (this.isPersisted()) {
     if (this.changed) {
+      // Mirrors Rails' squished message order: the save/reload guidance first,
+      // then `Changed attributes: #{changed.map(&:inspect).join(', ')}.` last.
       const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
       throw new Error(
-        `Locking a record with unpersisted changes is not supported. Changed attributes: ${dirtyAttrs}. Use save to persist the changes, or reload to discard them explicitly.`,
+        "Locking a record with unpersisted changes is not supported. Use " +
+          "`save` to persist the changes, or `reload` to discard them " +
+          `explicitly. Changed attributes: ${dirtyAttrs}.`,
       );
     }
     // Mirrors Rails `reload(lock: lock)` — a primary-key `find_by!` that carries
@@ -50,7 +54,7 @@ export async function withLock<T extends Base>(
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockClause: string,
+  lockClause: boolean | string,
   fn: (record: T) => Promise<void> | void,
 ): Promise<void>;
 export async function withLock<T extends Base>(
@@ -60,23 +64,26 @@ export async function withLock<T extends Base>(
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockClause: string,
+  lockClause: boolean | string,
   options: TxOptions,
   fn: (record: T) => Promise<void> | void,
 ): Promise<void>;
 export async function withLock<T extends Base>(
   this: T,
-  lockOrOptOrFn: string | TxOptions | ((record: T) => Promise<void> | void),
+  lockOrOptOrFn: boolean | string | TxOptions | ((record: T) => Promise<void> | void),
   optOrFn?: TxOptions | ((record: T) => Promise<void> | void),
   fn?: (record: T) => Promise<void> | void,
 ): Promise<void> {
-  let lockClause = "FOR UPDATE";
+  // Mirrors Rails `lock = args.present? ? args.first : true` — no lock argument
+  // defaults to `true` (resolved to `FOR UPDATE` by `lock!`/`reload`), and the
+  // first positional (`true`/`false`/a custom clause) is forwarded unchanged.
+  let lockClause: boolean | string = true;
   let txOptions: TxOptions = {};
   let callback: ((record: T) => Promise<void> | void) | undefined;
 
   if (typeof lockOrOptOrFn === "function") {
     callback = lockOrOptOrFn;
-  } else if (typeof lockOrOptOrFn === "string") {
+  } else if (typeof lockOrOptOrFn === "string" || typeof lockOrOptOrFn === "boolean") {
     lockClause = lockOrOptOrFn;
     if (typeof optOrFn === "function") {
       callback = optOrFn;
