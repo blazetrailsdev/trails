@@ -10,7 +10,6 @@ import {
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
 } from "../index.js";
-import { loadHasManyThrough } from "../associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -33,7 +32,7 @@ import {
   SpecialComment,
   SubSpecialComment,
 } from "../test-helpers/models/comment.js";
-import { Tag } from "../test-helpers/models/tag.js";
+import { Tag, OrderedTag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Reader, LazyReader } from "../test-helpers/models/reader.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -127,15 +126,6 @@ const TEST_SCHEMA: Schema = {
   eager_hmt_authors: { name: "string" },
   eager_hmt_authorships: { eager_hmt_author_id: "integer", eager_hmt_book_id: "integer" },
   eager_hmt_books: { title: "string" },
-  eager_hmt_mo_authors: { name: "string" },
-  eager_hmt_mo_authorships: { eager_hmt_mo_author_id: "integer", eager_hmt_mo_book_id: "integer" },
-  eager_hmt_mo_books: { title: "string" },
-  eager_hmt_ord_authors: { name: "string" },
-  eager_hmt_ord_authorships: {
-    eager_hmt_ord_author_id: "integer",
-    eager_hmt_ord_book_id: "integer",
-  },
-  eager_hmt_ord_books: { title: "string" },
   eager_ho_no_pk_children: {
     columns: { value: "string", eager_ho_no_pk_parent_id: "integer" },
     primaryKey: false,
@@ -728,119 +718,50 @@ describe("EagerAssociationTest", () => {
     expect(error.detailedMessage()).toContain("Did you mean?  tagging");
   });
   it("eager has many through with order", async () => {
-    class EagerHmtOrdAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtOrdAuthorships", {
-          className: "EagerHmtOrdAuthorship",
-          foreignKey: "eager_hmt_ord_author_id",
-        });
-        this.hasMany("eagerHmtOrdBooks", {
-          through: "eagerHmtOrdAuthorships",
-          source: "eagerHmtOrdBook",
-          className: "EagerHmtOrdBook",
-        });
-      }
-    }
-    class EagerHmtOrdAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_ord_author_id", "integer");
-        this.attribute("eager_hmt_ord_book_id", "integer");
-        this.belongsTo("eagerHmtOrdBook", {
-          className: "EagerHmtOrdBook",
-          foreignKey: "eager_hmt_ord_book_id",
-        });
-      }
-    }
-    class EagerHmtOrdBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
+    const tag = await OrderedTag.create({ name: "Foo" });
+    const post1 = await Post.create({ title: "Beaches", body: "I like beaches!" });
+    const post2 = await Post.create({ title: "Pools", body: "I like pools!" });
 
-    registerModel("EagerHmtOrdAuthor", EagerHmtOrdAuthor);
-    registerModel("EagerHmtOrdAuthorship", EagerHmtOrdAuthorship);
-    registerModel("EagerHmtOrdBook", EagerHmtOrdBook);
+    await Tagging.create({ taggable_type: "Post", taggable_id: post1.id, tag_id: tag.id });
+    await Tagging.create({ taggable_type: "Post", taggable_id: post2.id, tag_id: tag.id });
 
-    const author = await EagerHmtOrdAuthor.create({ name: "Writer" });
-    const b1 = await EagerHmtOrdBook.create({ title: "Zebra" });
-    const b2 = await EagerHmtOrdBook.create({ title: "Alpha" });
-    await EagerHmtOrdAuthorship.create({
-      eager_hmt_ord_author_id: author.id,
-      eager_hmt_ord_book_id: b1.id,
-    });
-    await EagerHmtOrdAuthorship.create({
-      eager_hmt_ord_author_id: author.id,
-      eager_hmt_ord_book_id: b2.id,
-    });
-
-    const books = await loadHasManyThrough(author, "eagerHmtOrdBooks", {
-      through: "eagerHmtOrdAuthorships",
-      source: "eagerHmtOrdBook",
-      className: "EagerHmtOrdBook",
-    });
-    expect(books).toHaveLength(2);
+    const tagWithIncludes = await OrderedTag.includes("taggedPosts").find(tag.id);
+    const taggings = await tagWithIncludes.orderedTaggings.toArray();
+    const taggableTitles: string[] = [];
+    for (const tagging of taggings) {
+      const taggable = (await tagging.loadBelongsTo("taggable")) as Post;
+      taggableTitles.push(taggable.title);
+    }
+    const taggedPostTitles = (await tagWithIncludes.taggedPosts.toArray()).map((p: any) => p.title);
+    expect(taggedPostTitles).toEqual(taggableTitles);
   });
   it("eager has many through multiple with order", async () => {
-    class EagerHmtMoAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.hasMany("eagerHmtMoAuthorships", {
-          className: "EagerHmtMoAuthorship",
-          foreignKey: "eager_hmt_mo_author_id",
-        });
-        this.hasMany("eagerHmtMoBooks", {
-          through: "eagerHmtMoAuthorships",
-          source: "eagerHmtMoBook",
-          className: "EagerHmtMoBook",
-        });
-      }
-    }
-    class EagerHmtMoAuthorship extends Base {
-      static {
-        this.attribute("eager_hmt_mo_author_id", "integer");
-        this.attribute("eager_hmt_mo_book_id", "integer");
-        this.belongsTo("eagerHmtMoBook", {
-          className: "EagerHmtMoBook",
-          foreignKey: "eager_hmt_mo_book_id",
-        });
-      }
-    }
-    class EagerHmtMoBook extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
+    const tag1 = await OrderedTag.create({ name: "Bar" });
+    const tag2 = await OrderedTag.create({ name: "Foo" });
 
-    registerModel("EagerHmtMoAuthor", EagerHmtMoAuthor);
-    registerModel("EagerHmtMoAuthorship", EagerHmtMoAuthorship);
-    registerModel("EagerHmtMoBook", EagerHmtMoBook);
+    const post1 = await Post.create({ title: "Beaches", body: "I like beaches!" });
+    const post2 = await Post.create({ title: "Pools", body: "I like pools!" });
 
-    const a1 = await EagerHmtMoAuthor.create({ name: "A1" });
-    const a2 = await EagerHmtMoAuthor.create({ name: "A2" });
-    const book = await EagerHmtMoBook.create({ title: "Shared" });
-    await EagerHmtMoAuthorship.create({
-      eager_hmt_mo_author_id: a1.id,
-      eager_hmt_mo_book_id: book.id,
-    });
-    await EagerHmtMoAuthorship.create({
-      eager_hmt_mo_author_id: a2.id,
-      eager_hmt_mo_book_id: book.id,
-    });
+    await Tagging.create({ taggable_type: "Post", taggable_id: post1.id, tag_id: tag1.id });
+    await Tagging.create({ taggable_type: "Post", taggable_id: post2.id, tag_id: tag1.id });
+    await Tagging.create({ taggable_type: "Post", taggable_id: post2.id, tag_id: tag2.id });
+    await Tagging.create({ taggable_type: "Post", taggable_id: post1.id, tag_id: tag2.id });
 
-    const books1 = await loadHasManyThrough(a1, "eagerHmtMoBooks", {
-      through: "eagerHmtMoAuthorships",
-      source: "eagerHmtMoBook",
-      className: "EagerHmtMoBook",
-    });
-    const books2 = await loadHasManyThrough(a2, "eagerHmtMoBooks", {
-      through: "eagerHmtMoAuthorships",
-      source: "eagerHmtMoBook",
-      className: "EagerHmtMoBook",
-    });
-    expect(books1).toHaveLength(1);
-    expect(books2).toHaveLength(1);
-    expect(books1[0].id).toBe(books2[0].id);
+    const tagsWithIncludes = await OrderedTag.where({ id: [tag1.id, tag2.id] })
+      .includes("taggedPosts")
+      .order("id")
+      .toArray();
+    const tag1WithIncludes = tagsWithIncludes[0];
+    const tag2WithIncludes = tagsWithIncludes[tagsWithIncludes.length - 1];
+
+    expect((await tag1WithIncludes.taggedPosts.toArray()).map((p: any) => p.title)).toEqual([
+      post2.title,
+      post1.title,
+    ]);
+    expect((await tag2WithIncludes.taggedPosts.toArray()).map((p: any) => p.title)).toEqual([
+      post1.title,
+      post2.title,
+    ]);
   });
   it("limited eager with order", async () => {
     class EagerLeoPost extends Base {
