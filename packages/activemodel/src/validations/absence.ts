@@ -11,16 +11,17 @@ import { isBlank } from "@blazetrails/activesupport";
  * are implemented on Model as static methods.
  */
 export interface HelperMethods {
-  validatesAbsenceOf(...attributes: string[]): void;
-  validatesAcceptanceOf(...attributes: string[]): void;
-  validatesConfirmationOf(...attributes: string[]): void;
-  validatesExclusionOf(attribute: string, options: Record<string, unknown>): void;
-  validatesFormatOf(attribute: string, options: Record<string, unknown>): void;
-  validatesInclusionOf(attribute: string, options: Record<string, unknown>): void;
-  validatesLengthOf(attribute: string, options: Record<string, unknown>): void;
-  validatesSizeOf(attribute: string, options: Record<string, unknown>): void;
-  validatesNumericalityOf(attribute: string, options?: Record<string, unknown> | boolean): void;
-  validatesPresenceOf(...attributes: string[]): void;
+  validatesAbsenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesAcceptanceOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesConfirmationOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesExclusionOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesFormatOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesInclusionOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesLengthOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesSizeOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesNumericalityOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesPresenceOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesComparisonOf(...attrNames: (string | Record<string, unknown>)[]): void;
 }
 
 export class AbsenceValidator extends EachValidator {

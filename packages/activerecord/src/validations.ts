@@ -363,6 +363,51 @@ export function _setSuperValidates(
 }
 
 /**
+ * Host shape for the `validates_*_of` helper overrides: the AR-specific
+ * `validatesWith` plus `_mergeAttributes` (inherited from Model).
+ */
+interface HelperMethodHost {
+  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+}
+
+// Each `validates_*_of` helper in AR re-opens
+// `ActiveRecord::Validations::ClassMethods` to delegate to `validates_with`
+// with the AR-specific validator constant (association/column-aware), shadowing
+// the ActiveModel helper that would otherwise wire the base validator. Mirrors
+// activerecord/lib/active_record/validations/{presence,absence,length,
+// numericality}.rb.
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_presence_of */
+export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_absence_of */
+export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_length_of */
+export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+/**
+ * Mirrors: ActiveRecord re-aliasing `validates_size_of` onto its own
+ * `validates_length_of` so the AR LengthValidator (marked-for-destruction
+ * aware) backs both spellings.
+ */
+export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+/** Mirrors: ActiveRecord::Validations::ClassMethods#validates_numericality_of */
+export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
+}
+
+/**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveRecord::Validations::ClassMethods` / `ActiveSupport::Concern#ClassMethods`.
  * `validatesAssociated` and `validatesUniqueness` live next to their
@@ -373,6 +418,11 @@ export const ClassMethods = {
   validates,
   validatesAssociated,
   validatesUniqueness,
+  validatesPresenceOf,
+  validatesAbsenceOf,
+  validatesLengthOf,
+  validatesSizeOf,
+  validatesNumericalityOf,
 };
 
 /**

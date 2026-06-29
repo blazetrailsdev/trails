@@ -41,27 +41,36 @@ describe("PresenceValidationTest", () => {
   });
 
   it("validates presence of with allow nil option", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validatesPresenceOf("title", { allowNil: true });
       }
     }
-    const p = new Person({});
-    p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
+    expect(new Topic({ title: "something" }).isValid()).toBe(true);
+
+    const blank = new Topic({ title: "" });
+    expect(blank.isValid()).toBe(false);
+    expect(blank.errors.get("title")).toContain("can't be blank");
+
+    const whitespace = new Topic({ title: "  " });
+    expect(whitespace.isValid()).toBe(false);
+    expect(whitespace.errors.get("title")).toContain("can't be blank");
+
+    expect(new Topic({ title: null }).isValid()).toBe(true);
   });
 
   it("validates presence of with allow blank option", () => {
-    class Person extends Model {
+    class Topic extends Model {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validatesPresenceOf("title", { allowBlank: true });
       }
     }
-    const p = new Person({ name: "" });
-    p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
+    expect(new Topic({ title: "something" }).isValid()).toBe(true);
+    expect(new Topic({ title: "" }).isValid()).toBe(true);
+    expect(new Topic({ title: "  " }).isValid()).toBe(true);
+    expect(new Topic({ title: null }).isValid()).toBe(true);
   });
 
   it("validate presences", () => {

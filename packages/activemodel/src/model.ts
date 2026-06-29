@@ -684,86 +684,112 @@ export class Model {
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_presence_of
+   *   validates_with PresenceValidator, _merge_attributes(attr_names)
    */
-  static validatesPresenceOf(...args: (string | Record<string, unknown>)[]): void {
-    const last = args[args.length - 1];
-    const opts =
-      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
-    const { message, ...rest } = opts;
-    const presenceValue = message != null ? { message } : true;
-    for (const attr of args as string[]) this.validates(attr, { presence: presenceValue, ...rest });
+  static validatesPresenceOf(...attrNames: unknown[]): void {
+    this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_absence_of
+   *   validates_with AbsenceValidator, _merge_attributes(attr_names)
    */
-  static validatesAbsenceOf(...args: (string | Record<string, unknown>)[]): void {
-    const last = args[args.length - 1];
-    const opts =
-      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
-    const { message, ...rest } = opts;
-    const absenceValue = message != null ? { message } : true;
-    for (const attr of args as string[]) this.validates(attr, { absence: absenceValue, ...rest });
+  static validatesAbsenceOf(...attrNames: unknown[]): void {
+    this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_length_of
+   *   validates_with LengthValidator, _merge_attributes(attr_names)
    */
-  static validatesLengthOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { length: options });
+  static validatesLengthOf(...attrNames: unknown[]): void {
+    this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_numericality_of
+   *   validates_with NumericalityValidator, _merge_attributes(attr_names)
    */
-  static validatesNumericalityOf(
-    attribute: string,
-    options: Record<string, unknown> | boolean = {},
-  ): void {
-    this.validates(attribute, { numericality: options === true ? {} : options });
+  static validatesNumericalityOf(...attrNames: unknown[]): void {
+    this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_inclusion_of
+   *   validates_with InclusionValidator, _merge_attributes(attr_names)
    */
-  static validatesInclusionOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { inclusion: options });
+  static validatesInclusionOf(...attrNames: unknown[]): void {
+    this.validatesWith(InclusionValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_exclusion_of
+   *   validates_with ExclusionValidator, _merge_attributes(attr_names)
    */
-  static validatesExclusionOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { exclusion: options });
+  static validatesExclusionOf(...attrNames: unknown[]): void {
+    this.validatesWith(ExclusionValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_format_of
+   *   validates_with FormatValidator, _merge_attributes(attr_names)
    */
-  static validatesFormatOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { format: options });
+  static validatesFormatOf(...attrNames: unknown[]): void {
+    this.validatesWith(FormatValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_acceptance_of
+   *   validates_with AcceptanceValidator, _merge_attributes(attr_names)
+   *
+   * Rails' AcceptanceValidator#initialize calls `setup!(options[:class])` to
+   * lazily materialize the virtual acceptance accessors. trails' constructor
+   * mass-assigns through `writeAttribute` (not prototype setters), so the
+   * accessor must be a real declared attribute — mirroring the `validates`
+   * DSL path (model.ts `if (rules.acceptance)`).
    */
-  static validatesAcceptanceOf(...attributes: string[]): void {
-    for (const attr of attributes) this.validates(attr, { acceptance: true });
+  static validatesAcceptanceOf(...attrNames: unknown[]): void {
+    const options = this._mergeAttributes(attrNames);
+    for (const attr of options.attributes as string[]) {
+      if (!this._attributeDefinitions.has(attr)) this.attribute(attr, "string", { virtual: true });
+    }
+    this.validatesWith(AcceptanceValidator, options);
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_confirmation_of
+   *   validates_with ConfirmationValidator, _merge_attributes(attr_names)
+   *
+   * As with acceptance, Rails' ConfirmationValidator#initialize → `setup!`
+   * defines the `${attr}_confirmation` accessors; trails declares them as
+   * real virtual attributes so the constructor's `writeAttribute` path
+   * accepts them (mirrors the `validates` DSL `if (rules.confirmation)`).
    */
-  static validatesConfirmationOf(...attributes: string[]): void {
-    for (const attr of attributes) this.validates(attr, { confirmation: true });
+  static validatesConfirmationOf(...attrNames: unknown[]): void {
+    const options = this._mergeAttributes(attrNames);
+    for (const attr of options.attributes as string[]) {
+      const confirmationAttr = `${attr}Confirmation`;
+      if (!this._attributeDefinitions.has(confirmationAttr)) {
+        this.attribute(confirmationAttr, "string", { virtual: true });
+      }
+    }
+    this.validatesWith(ConfirmationValidator, options);
   }
 
-  static validatesComparisonOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { comparison: options });
+  /**
+   * Mirrors: ActiveModel::Validations::HelperMethods.validates_comparison_of
+   *   validates_with ComparisonValidator, _merge_attributes(attr_names)
+   */
+  static validatesComparisonOf(...attrNames: unknown[]): void {
+    this.validatesWith(ComparisonValidator, this._mergeAttributes(attrNames));
   }
 
-  static validatesSizeOf(attribute: string, options: Record<string, unknown>): void {
-    this.validates(attribute, { length: options });
+  /**
+   * Mirrors: ActiveModel::Validations::HelperMethods `alias_method
+   * :validates_size_of, :validates_length_of` (length.rb:128).
+   */
+  static validatesSizeOf(...attrNames: unknown[]): void {
+    this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
   }
 
   // -- Callbacks (Phase 1200) --
