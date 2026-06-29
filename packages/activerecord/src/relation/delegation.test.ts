@@ -484,6 +484,28 @@ describe("DelegationTest", () => {
       expect(await Comment.all().toFs("db")).toBe(records.map((c) => c.id).join(","));
     });
 
+    it("to_fs default falls back to Array#to_s (bracketed inspect, not a bare join)", async () => {
+      const records = await Comment.all();
+      const fs = await Comment.all().toFs();
+      // Ruby Array#to_s == Array#inspect: `[<elem.inspect>, …]` — not `"a,b"`.
+      expect(fs).toBe(`[${records.map((c) => (c as any).inspect()).join(", ")}]`);
+      expect(fs.startsWith("[")).toBe(true);
+    });
+
+    it("on a loaded proxy each/index delegate to records synchronously", async () => {
+      const post = await Post.first();
+      const proxy = (post as any).comments;
+      await proxy.load();
+      expect(proxy.loaded).toBe(true);
+      // Rails delegates `each`/`index` to the loaded `records` synchronously; a
+      // loaded proxy must not resolve the inherited async Relation method.
+      const seen: number[] = [];
+      const ret = proxy.each((c: any) => seen.push(c.id));
+      expect(ret).not.toBeInstanceOf(Promise);
+      expect(seen).toEqual(proxy.target.map((c: any) => c.id));
+      expect(proxy.index(proxy.target[0])).toBe(0);
+    });
+
     it("delegates connection, primary_key and table_name to the model", () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);

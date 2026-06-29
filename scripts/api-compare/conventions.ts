@@ -280,10 +280,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "a bespoke collection XML serializer (root element derived from the model " +
       "name, per-record `<post>` wrapping, type attributes) distinct from a " +
       "record's own `toXml`, and ActiveSupport's `Array#to_xml` is itself not yet " +
-      "ported. Every other delegate name now resolves as a real method on Relation " +
-      "via DelegationMethods (relation/delegation.ts, mixed in with " +
-      "`include(Relation, DelegationMethods)`). Tracked for convergence (port " +
-      "`Array#to_xml`) by story array-to-xml-collection-serializer.",
+      "ported. The other `to: :records` value/Enumerable delegates this story " +
+      "covers now resolve as real methods on Relation via DelegationMethods " +
+      "(relation/delegation.ts, mixed in with `include(Relation, DelegationMethods)`); " +
+      "the remaining delegation.rb:101-104 entries are credited by other " +
+      "conventions, NOT by this story — operator delegates (`[]`, `&`, `|`, `+`, " +
+      "`-`) by the OPERATORS exclusion (conventions.ts), `encode_with` by the " +
+      "object-protocol skip group above, and `intersect?`/`length` by api:compare's " +
+      "existing predicate/method matching (`intersect?` → Relation#intersect). " +
+      "Tracked for convergence (port `Array#to_xml`) by story " +
+      "array-to-xml-collection-serializer.",
     names: ["to_xml"],
     rubyFiles: ["relation.rb", "relation/delegation.rb"],
   },
