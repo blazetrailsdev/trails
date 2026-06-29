@@ -1334,6 +1334,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       if (prepare) {
         const stmtName = this._preparedNameFor(client, sql);
         onPrepared?.(stmtName);
+        // `_preparedNameFor` may have evicted an LRU entry, queueing its
+        // DEALLOCATE on the maintenance tail. Drain it before issuing this
+        // query so the DEALLOCATE lands on an idle client rather than racing
+        // the query that triggered the eviction. Mirrors Rails, where
+        // StatementPool#[]= deallocs the evicted entry inline (under the
+        // connection lock) before the new query is sent
+        // (statement_pool.rb:31, postgresql_adapter.rb:307).
+        await this._maintenanceTail;
         return (await client.query({
           name: stmtName,
           text: sql,
@@ -4581,6 +4589,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // both prepares and executes in a single roundtrip).
     await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
     pool.set(key, { name });
+    // `set` may have evicted an LRU entry, queueing its DEALLOCATE on the
+    // maintenance tail. Drain it before returning so the caller's Bind+Execute
+    // lands on an idle client rather than racing the eviction's DEALLOCATE —
+    // matching Rails' inline dealloc-under-lock in StatementPool#[]=.
+    await this._maintenanceTail;
     return name;
   }
 
