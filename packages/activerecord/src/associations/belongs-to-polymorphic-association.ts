@@ -47,6 +47,13 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     );
   }
 
+  /**
+   * Mirrors Rails `BelongsToPolymorphicAssociation#raise_on_type_mismatch!`:
+   * "A polymorphic association cannot have a type mismatch, by definition."
+   * @internal
+   */
+  protected override raiseOnTypeMismatchBang(_record: Base): void {}
+
   protected override staleState(): unknown {
     const fkState = super.staleState();
     if (fkState != null) {

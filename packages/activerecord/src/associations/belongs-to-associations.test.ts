@@ -3,7 +3,14 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
-import { SubclassNotFound, Base, ReadOnlyRecord, RecordInvalid, registerModel } from "../index.js";
+import {
+  SubclassNotFound,
+  Base,
+  ReadOnlyRecord,
+  RecordInvalid,
+  registerModel,
+  AssociationTypeMismatch,
+} from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -40,6 +47,9 @@ import { Record } from "../test-helpers/models/record.js";
 import { Column } from "../test-helpers/models/column.js";
 import { Toy } from "../test-helpers/models/toy.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
+import { Project } from "../test-helpers/models/project.js";
+import { AdminUser } from "../test-helpers/models/admin/user.js";
+import { AdminAccount } from "../test-helpers/models/admin/account.js";
 import { LineItem } from "../test-helpers/models/line-item.js";
 import {
   CpkAuthor,
@@ -106,6 +116,9 @@ for (const m of [
   CpkOrder,
   CpkOrderWithSpecialPrimaryKey,
   CpkPost,
+  Project,
+  AdminUser,
+  AdminAccount,
 ]) {
   registerModel(m as any);
 }
@@ -395,8 +408,26 @@ describe("BelongsToAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  it.todo("type mismatch");
-  it.todo("raises type mismatch with namespaced class");
+  it("type mismatch", async () => {
+    const account = await Account.find(1);
+    expect(() => {
+      (account as any).firm = 1;
+    }).toThrow(AssociationTypeMismatch);
+    const project = await Project.find(1);
+    expect(() => {
+      (account as any).firm = project;
+    }).toThrow(AssociationTypeMismatch);
+  });
+
+  it("raises type mismatch with namespaced class", () => {
+    // The mismatch message names the resolved namespaced klass (AdminAccount),
+    // proving the wrong-type guard ran against the association's actual class —
+    // mirrors Rails' assertion shape `<Klass>(#...) expected, got "wrong value"
+    // which is an instance of String(#...)`.
+    expect(() => new AdminUser({ account: "wrong value" })).toThrow(
+      /^AdminAccount expected, got "wrong value" which is an instance of String$/,
+    );
+  });
 
   it("natural assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
