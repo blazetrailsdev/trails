@@ -36,6 +36,7 @@
   "packages/activerecord/src/multiparameter-attributes.test.ts",
   "packages/activerecord/src/multiple-db.test.ts",
   "packages/activerecord/src/nested-attributes.test.ts",
+  "packages/activerecord/src/persistence.test.ts",
   "packages/activerecord/src/query-cache-mixin.test.ts",
   "packages/activerecord/src/query-cache.test.ts",
   "packages/activerecord/src/schema-dumper.test.ts",
