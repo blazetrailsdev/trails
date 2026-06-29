@@ -74,62 +74,6 @@ import { Pirate } from "../test-helpers/models/pirate.js";
 import { Reference } from "../test-helpers/models/reference.js";
 import { CpkOrder, CpkBook, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 
-// All tables referenced by tests in this file. Tests declare ad-hoc
-// model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
-// be materialized up front rather than auto-derived by the test adapter.
-const TEST_SCHEMA: Schema = {
-  eager_cnt_ho_comments: { body: "string", eager_cnt_ho_post_id: "integer" },
-  eager_cnt_ho_posts: { title: "string" },
-  eager_comments: { body: "string", eager_post_id: "integer" },
-  eager_dup_authors: { name: "string" },
-  eager_dup_children: { label: "string", eager_dup_parent_id: "integer" },
-  eager_dup_parents: { name: "string" },
-  eager_dup_posts: { title: "string", eager_dup_author_id: "integer" },
-  eager_hm_cond_comments: { body: "string", eager_hm_cond_post_id: "integer" },
-  eager_hm_cond_posts: { title: "string" },
-  eager_hm_ho_comments: { body: "string", eager_hm_ho_post_id: "integer" },
-  eager_hm_ho_posts: { title: "string" },
-  eager_hm_hoac_comments: { body: "string", eager_hm_hoac_post_id: "integer" },
-  eager_hm_hoac_posts: { title: "string" },
-  eager_hm_hohc_comments: { body: "string", eager_hm_hohc_post_id: "integer" },
-  eager_hm_hohc_posts: { title: "string" },
-  eager_hm_lca_comments: { body: "string", eager_hm_lca_post_id: "integer" },
-  eager_hm_lca_posts: { title: "string" },
-  eager_hm_lce_comments: { body: "string", eager_hm_lce_post_id: "integer" },
-  eager_hm_lce_posts: { title: "string" },
-  eager_hm_limit_comments: { body: "string", eager_hm_limit_post_id: "integer" },
-  eager_hm_limit_posts: { title: "string" },
-  eager_hm_no_pk_children: {
-    columns: { value: "string", eager_hm_no_pk_parent_id: "integer" },
-    primaryKey: false,
-  },
-  eager_hm_no_pk_parents: { name: "string" },
-  eager_hmt_authors: { name: "string" },
-  eager_hmt_authorships: { eager_hmt_author_id: "integer", eager_hmt_book_id: "integer" },
-  eager_hmt_books: { title: "string" },
-  eager_ho_no_pk_children: {
-    columns: { value: "string", eager_ho_no_pk_parent_id: "integer" },
-    primaryKey: false,
-  },
-  eager_ho_no_pk_parents: { name: "string" },
-  eager_ho_ref_children: { value: "string", eager_ho_ref_parent_id: "integer" },
-  eager_ho_ref_parents: { name: "string" },
-  eager_no_res_comments: { body: "string", eager_no_res_post_id: "integer" },
-  eager_no_res_posts: { title: "string" },
-  eager_or_comments: { body: "string", eager_or_post_id: "integer" },
-  eager_or_posts: { title: "string" },
-  eager_posts: { title: "string" },
-  eager_tl_widgets: { name: "string" },
-  eager_nl_authors: { name: "string" },
-  eager_nl_posts: { title: "string", eager_nl_author_id: "integer" },
-  eager_tl_authors: { name: "string" },
-  eager_tl_posts: { title: "string" },
-  eager_tl_comments: {
-    body: "string",
-    eager_tl_post_id: "integer",
-    eager_tl_author_id: "integer",
-  },
-};
 // Mirrors eager_test.rb's `find_all_ordered` helper.
 async function findAllOrdered(klass: any, include: unknown = null): Promise<any[]> {
   let relation = klass.order(`${klass.tableName}.${klass.primaryKey}`);
@@ -188,7 +132,6 @@ describe("EagerAssociationTest", () => {
     { schema: canonicalSchema },
   );
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
     registerModel(Matey);
     registerModel(Subscriber);
     registerModel(Subscription);
