@@ -9,6 +9,7 @@ import type { Treasure } from "./treasure.js";
 // vendor/rails/activerecord/test/models/ship.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
+import { registerModel } from "../../associations.js";
 
 export class Ship extends Base {
   declare pirate: Pirate | null;
@@ -103,3 +104,5 @@ export class FamousShip extends Base {
     this.validates("name", { presence: true, on: "conference" });
   }
 }
+
+registerModel(Ship);

@@ -1,6 +1,7 @@
 // vendor/rails/activerecord/test/models/price_estimate.rb
 import { NumberHelper } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class PriceEstimate extends Base {
   declare estimateOf: Base | null;
@@ -22,3 +23,5 @@ export class PriceEstimate extends Base {
     return NumberHelper.numberToCurrency(this.readAttribute("price"));
   }
 }
+
+registerModel(PriceEstimate);

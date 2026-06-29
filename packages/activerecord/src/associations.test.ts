@@ -36,6 +36,10 @@ import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { buildHasManyRelation, loadBelongsTo, loadHasMany, loadHasOne } from "./associations.js";
+import "./test-helpers/models/ship.js";
+import "./test-helpers/models/bird.js";
+import "./test-helpers/models/treasure.js";
+import "./test-helpers/models/price-estimate.js";
 
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
@@ -1579,6 +1583,11 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
+  // Tests are synchronous reflection checks — no DB queries. setupHandlerSuite +
+  // useHandlerTransactionalFixtures keep _skipGlobalResetDepth > 0 so the global
+  // beforeEach does not call resetTestAdapterState() (dropAllTables) between tests,
+  // which would silently drop canonical tables (cpk_order_agreements, cpk_cars, etc.)
+  // needed by the later AssociationsTest describe block.
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1694,80 +1703,140 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    class Post extends Base {
+    // Rails: `include MyModule` (def comments; :none end) BEFORE `has_many :comments`;
+    // the module is inserted above GeneratedAssociationMethods in the ancestor chain so
+    // the module method wins. JS equivalent: define as non-configurable before hasMany —
+    // defineReaders' guard (`if (existing && !existing.configurable) return`) skips it,
+    // matching Ruby's outcome that a pre-included method is not replaced by the association.
+    class MyArticle extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("tag_id", "integer");
-        this.belongsTo("tag", {});
+        Object.defineProperty(this.prototype, "comments", {
+          get() {
+            return "none" as const;
+          },
+          configurable: false,
+        });
+        this._tableName = "articles";
+        this.hasMany("comments", { inverseOf: false });
       }
     }
-    const ref = reflectOnAssociation(Post, "tag");
-    expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("tag");
+    expect(new (MyArticle as any)().comments).toBe("none");
   });
 });
 
 describe("WithAnnotationsTest", () => {
+  // Mirrors Rails pirate.rb:SpacePirate (table "pirates") with annotated association scopes.
+  // vendor/rails/activerecord/test/models/pirate.rb:108-118
+  class SpacePirateAnnotated extends Base {
+    static {
+      this.tableName = "pirates";
+      this.belongsTo("parrot", { className: "Parrot", foreignKey: "parrot_id" });
+      this.belongsTo("parrotWithAnnotation", {
+        scope: (q: any) => q.annotate("that tells jokes"),
+        className: "Parrot",
+        foreignKey: "parrot_id",
+      });
+      this.hasAndBelongsToMany("parrots", { className: "Parrot", foreignKey: "pirate_id" });
+      this.hasAndBelongsToMany("parrotsWithAnnotation", {
+        scope: (q: any) => q.annotate("that are very colorful"),
+        className: "Parrot",
+        foreignKey: "pirate_id",
+      });
+      this.hasOne("ship", { className: "Ship", foreignKey: "pirate_id" });
+      this.hasOne("shipWithAnnotation", {
+        scope: (q: any) => q.annotate("that is a rocket"),
+        className: "Ship",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("birds", { className: "Bird", foreignKey: "pirate_id" });
+      this.hasMany("birdsWithAnnotation", {
+        scope: (q: any) => q.annotate("that are also parrots"),
+        className: "Bird",
+        foreignKey: "pirate_id",
+      });
+      this.hasMany("treasures", { as: "looter" });
+      this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
+      this.hasMany("treasureEstimatesWithAnnotation", {
+        scope: (q: any) => q.annotate("yarrr"),
+        through: "treasures",
+        source: "priceEstimates",
+      });
+    }
+  }
+
   setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  it("belongs to with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("belongs-to-hint").toSql();
-    expect(sql).toContain("belongs-to-hint");
+  const { pirates } = useHandlerFixtures(
+    ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
+    { schema: canonicalSchema },
+  );
+
+  it("belongs to with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(() => (pirate as any).loadBelongsTo("parrot"));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(() => (pirate as any).loadBelongsTo("parrotWithAnnotation"));
+    expect(sqls.some((s) => s.includes("that tells jokes"))).toBe(true);
   });
 
-  it("has and belongs to many with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("habtm-hint").toSql();
-    expect(sql).toContain("habtm-hint");
+  it("has and belongs to many with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).parrots.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).parrotsWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("that are very colorful"))).toBe(true);
   });
 
-  it("has one with annotation includes a query comment", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("has-one-hint").toSql();
-    expect(sql).toContain("has-one-hint");
+  it("has one with annotation includes a query comment", async () => {
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(() => (pirate as any).loadHasOne("ship"));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(() => (pirate as any).loadHasOne("shipWithAnnotation"));
+    expect(sqls.some((s) => s.includes("that is a rocket"))).toBe(true);
   });
 
   it("has many with annotation includes a query comment", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("has-many-hint").toSql();
-    expect(sql).toContain("has-many-hint");
+    const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).birds.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).birdsWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("that are also parrots"))).toBe(true);
   });
 
   it("has many through with annotation includes a query comment", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("hmt-hint").toSql();
-    expect(sql).toContain("hmt-hint");
+    const pirate = await SpacePirateAnnotated.find(pirates("redbeard").id);
+    const plain = await captureSql(async () => {
+      await (pirate as any).treasureEstimates.first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(async () => {
+      await (pirate as any).treasureEstimatesWithAnnotation.first();
+    });
+    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
 
   it("has many through with annotation includes a query comment when eager loading", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.all().annotate("eager-hmt-hint").toSql();
-    expect(sql).toContain("eager-hmt-hint");
+    const plain = await captureSql(async () => {
+      await SpacePirateAnnotated.includes("treasureEstimates").first();
+    });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((s) => !s.includes("/*"))).toBe(true);
+    const sqls = await captureSql(async () => {
+      await SpacePirateAnnotated.includes("treasureEstimatesWithAnnotation").first();
+    });
+    expect(sqls.some((s) => s.includes("yarrr"))).toBe(true);
   });
 });
 
