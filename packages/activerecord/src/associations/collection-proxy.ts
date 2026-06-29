@@ -2602,6 +2602,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         await record.destroy();
         if (record.isDestroyed()) destroyed.push(record);
       }
+      // For has_many :through, Rails' HasManyThroughAssociation#delete_records
+      // destroys the join rows inside the same `transaction { remove_records }`
+      // (has_many_through_association.rb:148-163), so a failure leaves neither
+      // the targets destroyed nor the join rows orphaned. Run _deleteThrough
+      // inside `run` so it shares the transaction below.
+      if (destroyed.length > 0 && this._isThrough) {
+        await this._deleteThrough(destroyed);
+      }
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
     // there are persisted records, so a mid-batch raise rolls back the batch.
@@ -2610,13 +2618,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await run();
     }
-    // Remove join/through rows only for successfully destroyed records
-    if (destroyed.length > 0) {
-      if (this._isThrough) {
-        await this._deleteThrough(destroyed);
-      } else {
-        this._removeFromTarget(destroyed);
-      }
+    // Non-through join/target pruning happens after the destroy batch (it is
+    // pure in-memory bookkeeping, not a DB write that needs the transaction).
+    if (destroyed.length > 0 && !this._isThrough) {
+      this._removeFromTarget(destroyed);
     }
   }
 
