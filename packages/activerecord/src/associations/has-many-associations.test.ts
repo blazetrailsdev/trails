@@ -67,7 +67,10 @@ import { Car as HmCar } from "../test-helpers/models/car.js";
 import { Engine as HmEngine } from "../test-helpers/models/engine.js";
 import { Bulb as HmBulb, FunkyBulb as HmFunkyBulb } from "../test-helpers/models/bulb.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
-import { Topic as HmTopic } from "../test-helpers/models/topic.js";
+import {
+  Topic as HmTopic,
+  DefaultRejectedTopic as HmDefaultRejectedTopic,
+} from "../test-helpers/models/topic.js";
 import {
   Reply as HmReply,
   SillyReply as HmSillyReply,
@@ -82,6 +85,7 @@ import { Image as HmImage } from "../test-helpers/models/image.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Category } from "../test-helpers/models/category.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 import {
   CpkBook,
   CpkOrder,
@@ -2826,346 +2830,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Updated");
   });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache updates in memory after concat", async () => {
-    class CcConcatAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcConcatPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcConcatAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcConcatAuthor);
-    registerModel(CcConcatPost);
-    const author = await CcConcatAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcConcatPost.create({ author_id: author.id, title: "A", body: "body" });
-    // create() automatically calls updateCounterCaches
-    const reloaded = await CcConcatAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache updates in memory after create with array", async () => {
-    class CcArrAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcArrPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcArrAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcArrAuthor);
-    registerModel(CcArrPost);
-    const author = await CcArrAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcArrPost.create({ author_id: author.id, title: "A", body: "body" });
-    await CcArrPost.create({ author_id: author.id, title: "B", body: "body" });
-    const reloaded = await CcArrAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(2);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache updates in memory after update with inverse of disabled", async () => {
-    class CcUpdDisAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcUpdDisPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcUpdDisAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcUpdDisAuthor);
-    registerModel(CcUpdDisPost);
-    const author = await CcUpdDisAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcUpdDisPost.create({ author_id: author.id, title: "A", body: "body" });
-    const reloaded = await CcUpdDisAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache updates in memory after create with overlapping counter cache columns", async () => {
-    class CcOverlapAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcOverlapPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcOverlapAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcOverlapAuthor);
-    registerModel(CcOverlapPost);
-    const author = await CcOverlapAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcOverlapPost.create({ author_id: author.id, title: "A", body: "body" });
-    const reloaded = await CcOverlapAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache updates in memory after update with inverse of enabled", async () => {
-    class CcUpdEnAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcUpdEnPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcUpdEnAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcUpdEnAuthor);
-    registerModel(CcUpdEnPost);
-    const author = await CcUpdEnAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcUpdEnPost.create({ author_id: author.id, title: "A", body: "body" });
-    const reloaded = await CcUpdEnAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("deleting updates counter cache without dependent option", async () => {
-    class CcDelNdAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcDelNdPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcDelNdAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcDelNdAuthor);
-    registerModel(CcDelNdPost);
-    const author = await CcDelNdAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcDelNdPost.create({ author_id: author.id, title: "A", body: "body" });
-    await post.destroy();
-    const reloaded = await CcDelNdAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("calling update on id changes the counter cache", async () => {
-    class CcUpdIdAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcUpdIdPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcUpdIdAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcUpdIdAuthor);
-    registerModel(CcUpdIdPost);
-    const author1 = await CcUpdIdAuthor.create({ name: "Alice", posts_count: 0 });
-    const author2 = await CcUpdIdAuthor.create({ name: "Bob", posts_count: 0 });
-    const post = await CcUpdIdPost.create({ author_id: author1.id, title: "A", body: "body" });
-    // Move post to author2
-    post.author_id = author2.id;
-    await post.save();
-    const reloaded1 = await CcUpdIdAuthor.find(author1.id!);
-    const reloaded2 = await CcUpdIdAuthor.find(author2.id!);
-    expect((reloaded1 as any).posts_count).toBe(0);
-    expect((reloaded2 as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("calling update changing ids changes the counter cache", async () => {
-    class CcChgAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcChgPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcChgAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcChgAuthor);
-    registerModel(CcChgPost);
-    const author1 = await CcChgAuthor.create({ name: "Alice", posts_count: 0 });
-    const author2 = await CcChgAuthor.create({ name: "Bob", posts_count: 0 });
-    const post = await CcChgPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id;
-    await post.save();
-    const reloaded1 = await CcChgAuthor.find(author1.id!);
-    const reloaded2 = await CcChgAuthor.find(author2.id!);
-    expect((reloaded1 as any).posts_count).toBe(0);
-    expect((reloaded2 as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("calling update changing ids of inversed association changes the counter cache", async () => {
-    class CcInvAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcInvPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcInvAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcInvAuthor);
-    registerModel(CcInvPost);
-    const author1 = await CcInvAuthor.create({ name: "Alice", posts_count: 0 });
-    const author2 = await CcInvAuthor.create({ name: "Bob", posts_count: 0 });
-    const post = await CcInvPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id;
-    await post.save();
-    const reloaded2 = await CcInvAuthor.find(author2.id!);
-    expect((reloaded2 as any).posts_count).toBe(1);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("clearing updates counter cache", async () => {
-    class CcClrAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("posts", {
-          className: "CcClrPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class CcClrPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcClrAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcClrAuthor);
-    registerModel(CcClrPost);
-    const author = await CcClrAuthor.create({ name: "Alice", posts_count: 0 });
-    const p1 = await CcClrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const p2 = await CcClrPost.create({ author_id: author.id, title: "B", body: "body" });
-    // Now clear (destroy auto-decrements)
-    await p1.destroy();
-    await p2.destroy();
-    const reloaded = await CcClrAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
-    class CcClrSymAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("posts", {
-          className: "CcClrSymPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class CcClrSymPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcClrSymAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcClrSymAuthor);
-    registerModel(CcClrSymPost);
-    const author = await CcClrSymAuthor.create({ name: "Alice", posts_count: 0 });
-    const post = await CcClrSymPost.create({ author_id: author.id, title: "A", body: "body" });
-    await post.destroy();
-    const reloaded = await CcClrSymAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(0);
-  });
   it("clearing an exclusively dependent association collection", async () => {
     class ExclDepAuthor extends Base {
       static {
@@ -3426,41 +3090,6 @@ describe("HasManyAssociationsTest", () => {
     await author.destroy();
     const remaining = await loadHasMany(author, "destroy_all_scope_posts", {
       className: "DestroyAllScopePost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
-
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("destroy all on desynced counter cache association", async () => {
-    class DccAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.hasMany("dcc_posts", {
-          className: "DccPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class DccPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DccAuthor);
-    registerModel(DccPost);
-    const author = await DccAuthor.create({ name: "Alice", posts_count: 0 });
-    await DccPost.create({ author_id: author.id, title: "A", body: "body" });
-    await DccPost.create({ author_id: author.id, title: "B", body: "body" });
-    // Destroy all dependents
-    await author.destroy();
-    const remaining = await loadHasMany(author, "dcc_posts", {
-      className: "DccPost",
       foreignKey: "author_id",
     });
     expect(remaining.length).toBe(0);
@@ -3805,31 +3434,6 @@ describe("HasManyAssociationsTest", () => {
     expect(ids.length).toBe(2);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
-  });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("counter cache on unloaded association", async () => {
-    class CcUlAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcUlPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CcUlAuthor);
-    registerModel(CcUlPost);
-    const author = await CcUlAuthor.create({ name: "Writer", posts_count: 0 });
-    await CcUlPost.create({ author_id: author.id, title: "P1", body: "body" });
-    await CcUlPost.create({ author_id: author.id, title: "P2", body: "body" });
-    // Count via query
-    const count = await CcUlPost.where({ author_id: author.id }).count();
-    expect(count).toBe(2);
   });
   it("ids reader cache not used for size when association is dirty", async () => {
     class DirtyIdAuthor extends Base {
@@ -5377,34 +4981,6 @@ describe("HasManyAssociationsTest", () => {
     await post.destroy();
     expect(post.isDestroyed()).toBe(true);
   });
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("updates counter cache when default scope is given", async () => {
-    class CcDsAuthor extends Base {
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcDsPost extends Base {
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcDsAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcDsAuthor);
-    registerModel(CcDsPost);
-    const author = await CcDsAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcDsPost.create({ author_id: author.id, title: "A", body: "body" });
-    const reloaded = await CcDsAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
   it("passes custom context validation to validate children", async () => {
     class CtxValAuthor extends Base {
       static {
@@ -5947,7 +5523,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  useHandlerFixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
+  const { posts } = useHandlerFixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -5965,6 +5541,13 @@ describe("HasManyAssociationsTest", () => {
       .limit(10)
       .size();
     expect(len).toBeGreaterThan(0);
+  });
+
+  it("deleting updates counter cache without dependent option", async () => {
+    const post = posts("welcome") as any;
+    const before = ((await HmPost.find(post.id)) as any).tags_count as number;
+    await post.taggings.delete(await post.taggings.first());
+    expect(((await HmPost.find(post.id)) as any).tags_count).toBe(before - 1);
   });
 });
 
@@ -6579,8 +6162,10 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(RestrictedWithExceptionFirm);
     registerModel(HmTopic);
     registerModel(HmReply);
+    registerModel(HmDefaultRejectedTopic);
     enableSti(HmTopic);
     registerSubclass(HmReply);
+    registerSubclass(HmDefaultRejectedTopic);
   });
 
   it("custom named counter cache", async () => {
@@ -6588,6 +6173,67 @@ describe("HasManyAssociationsTest", () => {
     const before = topic.replies_count as number;
     await topic.approvedReplies.clear();
     expect((await HmTopic.find(topic.id)).replies_count).toBe(before - 1);
+  });
+
+  it("clearing updates counter cache", async () => {
+    const topic = (await HmTopic.first()) as any;
+    const before = topic.replies_count as number;
+    await topic.replies.clear();
+    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(before - 1);
+  });
+
+  it("updates counter cache when default scope is given", async () => {
+    const topic = (await HmDefaultRejectedTopic.create({ approved: true })) as any;
+    await topic.approvedReplies.create({});
+    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(1);
+  });
+
+  it("calling update on id changes the counter cache", async () => {
+    const topic = (await HmTopic.order("id ASC").first()) as any;
+    const originalCount = (await topic.replies.toArray()).length;
+    expect(topic.replies_count).toBe(originalCount);
+
+    const firstReply = await topic.replies.first();
+    await firstReply.update({ parent_id: null });
+    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(originalCount - 1);
+
+    await firstReply.update({ parent_id: topic.id });
+    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(originalCount);
+  });
+
+  it("calling update changing ids changes the counter cache", async () => {
+    const topic1 = (await HmTopic.find(1)) as any;
+    const topic2 = (await HmTopic.find(3)) as any;
+    const originalCount1 = (await topic1.replies.toArray()).length;
+    const originalCount2 = (await topic2.replies.toArray()).length;
+
+    const reply1 = await topic1.replies.first();
+    const reply2 = await topic2.replies.first();
+
+    await reply1.update({ parent_id: topic2.id });
+    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1 - 1);
+    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2 + 1);
+
+    await reply2.update({ parent_id: topic1.id });
+    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1);
+    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2);
+  });
+
+  it("calling update changing ids of inversed association changes the counter cache", async () => {
+    const topic1 = (await HmTopic.find(1)) as any;
+    const topic2 = (await HmTopic.find(3)) as any;
+    const originalCount1 = (await topic1.replies.toArray()).length;
+    const originalCount2 = (await topic2.replies.toArray()).length;
+
+    const reply1 = await topic1.replies.first();
+    await reply1.update({ parent_id: topic2.id });
+    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1 - 1);
+    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2 + 1);
+
+    const reply2 = await topic2.replies.first();
+    await reply2.update({ parent_id: topic1.id });
+    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1);
+    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2);
   });
 
   it("restrict with exception", async () => {
@@ -6638,6 +6284,51 @@ describe("HasManyAssociationsTest", () => {
     expect(topic.readAttribute("replies_count")).toBe(1);
     expect(await topic.replies.size()).toBe(1);
     expect(((await HmTopic.find(topic.id)) as any).readAttribute("replies_count")).toBe(1);
+  });
+
+  it("counter cache updates in memory after concat", async () => {
+    const topic = (await HmTopic.create({ title: "Zoom-zoom-zoom" })) as any;
+    await topic.replies.push(await HmReply.create({ title: "re: zoom", content: "speedy quick!" }));
+    expect(topic.replies_count).toBe(1);
+    expect(await topic.replies.size()).toBe(1);
+    expect(await ((await HmTopic.find(topic.id)) as any).replies.size()).toBe(1);
+  });
+
+  it("counter cache updates in memory after create with array", async () => {
+    const topic = (await HmTopic.create({ title: "Zoom-zoom-zoom" })) as any;
+    await topic.replies.create([
+      { title: "re: zoom", content: "speedy quick!" },
+      { title: "re: zoom 2", content: "OMG lol!" },
+    ]);
+    expect(topic.replies_count).toBe(2);
+    expect(await topic.replies.size()).toBe(2);
+    expect(await ((await HmTopic.find(topic.id)) as any).replies.size()).toBe(2);
+  });
+
+  it("counter cache updates in memory after update with inverse of disabled", async () => {
+    const topic = (await HmTopic.create({ title: "Zoom-zoom-zoom" })) as any;
+    expect(topic.replies_count).toBe(0);
+
+    const reply1 = await HmReply.create({ title: "re: zoom", content: "speedy quick!" });
+    const reply2 = await HmReply.create({ title: "re: zoom 2", content: "OMG lol!" });
+
+    await topic.replies.push(reply1, reply2);
+
+    expect(topic.replies_count).toBe(2);
+    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(2);
+  });
+
+  it("counter cache on unloaded association", async () => {
+    const car = (await HmCar.create({ name: "My AppliCar" })) as any;
+    expect(await car.engines.size()).toBe(0);
+  });
+
+  it("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
+    const car = (await HmCar.first()) as any;
+    await car.engines.create({});
+    const before = ((await HmCar.find(car.id)) as any).engines_count as number;
+    await car.engines.clear();
+    expect(((await HmCar.find(car.id)) as any).engines_count).toBe(before - 1);
   });
 
   it("pushing association updates counter cache", async () => {
@@ -6778,4 +6469,41 @@ describe("HasManyAssociationsTest", () => {
 
     expect(await blogPost.comments.size()).toBe(1);
   });
+});
+
+describe("HasManyAssociationsTest", () => {
+  const { categories } = useHandlerFixtures(["categories", "categorizations"], {
+    schema: TEST_SCHEMA,
+  });
+
+  beforeAll(() => {
+    registerModel(Category);
+    registerModel(Categorization);
+  });
+
+  it("counter cache updates in memory after update with inverse of enabled", async () => {
+    const category = (await Category.create({ name: "Counter Cache" })) as any;
+    expect(category.categorizations_count).toBeNull();
+
+    const categorization1 = await Categorization.create({});
+    const categorization2 = await Categorization.create({});
+
+    await category.categorizations.push(categorization1, categorization2);
+
+    expect(category.categorizations_count).toBe(2);
+    expect(((await Category.find(category.id)) as any).categorizations_count).toBe(2);
+  });
+
+  it("destroy all on desynced counter cache association", async () => {
+    const category = categories("general") as any;
+    expect(await category.categorizations.count()).toBeGreaterThan(0);
+
+    await category.categorizations.destroyAll();
+    expect(await category.categorizations.count()).toBe(0);
+  });
+
+  // BLOCKED: Rails' test_counter_cache_updates_in_memory_after_create_with_overlapping_counter_cache_columns
+  // uses the bespoke UserCommentsCount / PostCommentsCount / CommentOverlappingCounterCache
+  // models, which are not part of the canonical schema. Keep skipped until those models land.
+  it.skip("counter cache updates in memory after create with overlapping counter cache columns", async () => {});
 });
