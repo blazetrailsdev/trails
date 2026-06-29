@@ -685,10 +685,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // loaded, otherwise queries and caches. Mutated proxies (_cpMutated, e.g.
     // from whereBang) always re-query and must NOT hydrate the association
     // cache — the mutated scope is not the canonical association scope.
-    if (!this._cpMutated && this._targetLoaded) return this._target;
+    // Through-associations are also excluded from caching: their scope is
+    // derived from mutable owner FKs (e.g. post.author_id), so caching would
+    // return stale rows when the base FK changes between calls.
+    const canCache = !this._cpMutated && !this._isThrough;
+    if (canCache && this._targetLoaded) return this._target;
     const results = await this._execLoad();
     const merged = this._mergeTargetLists(results);
-    if (!this._cpMutated) {
+    if (canCache) {
       this._target = merged;
       this._targetLoaded = true;
     }
@@ -1421,12 +1425,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Count associated records.
    */
   async count(): Promise<number> {
-    // Rails' CollectionAssociation#count: if the target is already
-    // loaded, count the loaded array (no query). Otherwise issue a
-    // real `COUNT(*)` on the scoped relation. Previously the non-
-    // diverged branch loaded every row just to read `.length`, which
-    // is a significant perf regression on large collections.
-    if (this._targetLoaded) return this._target.length;
+    // Rails' CollectionProxy#count delegates to scope/relation which always
+    // issues a SQL COUNT — it does NOT use the loaded-target cache (that is
+    // `size`'s job). Remove any _targetLoaded fast-path here to stay faithful.
     // Strict loading only blocks paths that actually hit the DB —
     // a loaded target above returns without querying, matching
     // `size()`'s loaded-target fast path.
