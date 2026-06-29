@@ -3268,17 +3268,19 @@ export async function updateCounterCaches(
     const fkValues = fkCols.map((col) => record._readAttribute(col));
     if (fkValues.some((v) => v === null || v === undefined)) continue;
 
-    // For polymorphic, resolve model from _type column
-    let className: string;
+    // For polymorphic, resolve model from _type column via the owner's
+    // polymorphic_class_for hook (which a model may override to map a custom
+    // polymorphic_name back to its class).
+    let targetModel: typeof Base;
     if (assoc.options.polymorphic) {
       const typeCol = assoc.options.foreignType ?? `${underscore(assoc.name)}_type`;
       const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
-      className = typeName;
+      targetModel = ctor.polymorphicClassFor(typeName);
     } else {
-      className = assoc.options.className ?? camelize(assoc.name);
+      const className = assoc.options.className ?? camelize(assoc.name);
+      targetModel = resolveAssocClass(record, assoc.name, className);
     }
-    const targetModel = resolveAssocClass(record, assoc.name, className);
 
     // Counter column name. Mirrors Rails' BelongsToAssociation#update_counters,
     // which reads the column off the belongs_to reflection's
@@ -3484,7 +3486,12 @@ export function setBelongsTo(
     }
     if (options.polymorphic) {
       const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-      record._writeAttribute(typeCol, targetCtor!.name);
+      // Rails writes `record.class.polymorphic_name`; honor a model override
+      // of that static, else preserve the existing flattened-name behavior.
+      const polyName = Object.prototype.hasOwnProperty.call(targetCtor, "polymorphicName")
+        ? (targetCtor as any).polymorphicName()
+        : targetCtor!.name;
+      record._writeAttribute(typeCol, polyName);
     }
   } else {
     if (Array.isArray(foreignKey)) {
@@ -3614,16 +3621,16 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     const fkValue = record._readAttribute(foreignKey as string);
     if (fkValue === null || fkValue === undefined) continue;
 
-    let className: string;
+    let targetModel: typeof Base;
     if (assoc.options.polymorphic) {
       const typeCol = assoc.options.foreignType ?? `${underscore(assoc.name)}_type`;
       const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
-      className = typeName;
+      targetModel = ctor.polymorphicClassFor(typeName);
     } else {
-      className = assoc.options.className ?? camelize(assoc.name);
+      const className = assoc.options.className ?? camelize(assoc.name);
+      targetModel = resolveAssocClass(record, assoc.name, className);
     }
-    const targetModel = resolveAssocClass(record, assoc.name, className);
 
     const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;

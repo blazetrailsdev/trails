@@ -115,8 +115,16 @@ export class BelongsToAssociation extends SingularAssociation {
           ? this.owner.attributeBeforeLastSave(foreignType)
           : undefined;
       if (modelTypeWas) {
+        // Resolve via the owner's polymorphic_class_for hook (a model may
+        // override it to map a custom polymorphic_name back to its class).
+        const ownerCtor = this.owner.constructor as typeof Base & {
+          polymorphicClassFor?: (name: string) => typeof Base;
+        };
         try {
-          modelWas = resolveModel(modelTypeWas as string);
+          modelWas =
+            typeof ownerCtor.polymorphicClassFor === "function"
+              ? ownerCtor.polymorphicClassFor(modelTypeWas as string)
+              : resolveModel(modelTypeWas as string);
         } catch {
           return;
         }

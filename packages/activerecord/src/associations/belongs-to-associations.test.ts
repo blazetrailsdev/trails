@@ -59,6 +59,39 @@ import {
   belongsToRequiredValidatesForeignKey,
 } from "../ar-config.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { travelTo, travelBack } from "@blazetrails/activesupport";
+
+// Mirrors the inline classes in Rails'
+// belongs_to_associations_test.rb (test_polymorphic_with_custom_name_*).
+class CarPolymorphicName extends Base {
+  declare wheels_count: number;
+  declare wheels_owned_at: Temporal.Instant | Temporal.PlainDateTime;
+  static {
+    this.tableName = "cars";
+    this.hasMany("wheels", { as: "wheelable" });
+  }
+  static polymorphicName(): string {
+    return "polymorphic_car";
+  }
+}
+
+class WheelPolymorphicName extends Base {
+  declare wheelable: Base | null;
+  declare wheelable_id: number;
+  declare wheelable_type: string;
+  static {
+    this.tableName = "wheels";
+    this.belongsTo("wheelable", {
+      polymorphic: true,
+      counterCache: "wheels_count",
+      touch: "wheels_owned_at",
+    });
+  }
+  static polymorphicClassFor(name: string): typeof Base {
+    if (name !== "polymorphic_car") throw new Error(`Unexpected name: ${name}`);
+    return CarPolymorphicName;
+  }
+}
 
 for (const m of [
   Author,
@@ -96,6 +129,8 @@ for (const m of [
   LineItem,
   Car,
   Wheel,
+  CarPolymorphicName,
+  WheelPolymorphicName,
   CpkAuthor,
   CpkBook,
   CpkBrokenBook,
@@ -1382,9 +1417,44 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (sponsor as any).loadBelongsTo("thing"))!.id).toBe(groucho.id);
   });
 
-  it.todo("polymorphic with custom name counter cache");
+  it("polymorphic with custom name counter cache", async () => {
+    const car = await CarPolymorphicName.create({});
+    const wheel = await WheelPolymorphicName.create({
+      wheelable_type: "polymorphic_car",
+      wheelable_id: car.id,
+    });
+    expect((await CarPolymorphicName.find(car.id)).wheels_count).toBe(1);
 
-  it.todo("polymorphic with custom name touch old belongs to model");
+    (wheel as any).wheelable = null;
+    await wheel.save();
+
+    expect((await CarPolymorphicName.find(car.id)).wheels_count).toBe(0);
+  });
+
+  it("polymorphic with custom name touch old belongs to model", async () => {
+    const car = await CarPolymorphicName.create({});
+    const wheel = (await WheelPolymorphicName.create({
+      wheelable: car,
+    } as any)) as unknown as WheelPolymorphicName;
+
+    // Rails: `touch_time = 1.day.ago.round` — second-precision past timestamp.
+    const touchTime = new Date(Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000) * 1000);
+
+    travelTo(touchTime);
+    try {
+      (wheel as any).wheelable = null;
+      await wheel.save();
+    } finally {
+      travelBack();
+    }
+
+    // The touch on the old belongs_to (CarPolymorphicName) writes
+    // wheels_owned_at = touch_time.
+    const reloaded = await CarPolymorphicName.find(car.id);
+    expect((reloaded.wheels_owned_at as Temporal.Instant).epochMilliseconds).toBe(
+      touchTime.getTime(),
+    );
+  });
 
   it("build with conditions", async () => {
     const client = companies("second_client");

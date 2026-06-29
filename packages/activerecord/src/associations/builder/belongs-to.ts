@@ -192,7 +192,18 @@ export class BelongsTo extends SingularAssociation {
               ? record._readAttribute(foreignType)
               : record[foreignType]);
           try {
-            klass = typeName ? resolveModel(typeName) : null;
+            // Resolve via the owner's polymorphic_class_for hook (a model may
+            // override it to map a custom polymorphic_name back to its class).
+            const ownerCtor = record.constructor as {
+              polymorphicClassFor?: (name: string) => any;
+            };
+            if (!typeName) {
+              klass = null;
+            } else if (typeof ownerCtor.polymorphicClassFor === "function") {
+              klass = ownerCtor.polymorphicClassFor(typeName);
+            } else {
+              klass = resolveModel(typeName);
+            }
           } catch {
             klass = null;
           }

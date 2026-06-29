@@ -24,6 +24,16 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   override get klass(): typeof Base {
     const type = this.readForeignType();
     if (!type) return undefined as any;
+    // Rails resolves a polymorphic target via the owner class's
+    // `polymorphic_class_for`, which a model may override to map a custom
+    // `polymorphic_name` type string back to its class. Fall back to a bare
+    // registry lookup when the owner has no such hook.
+    const ownerCtor = this.owner.constructor as typeof Base & {
+      polymorphicClassFor?: (name: string) => typeof Base;
+    };
+    if (typeof ownerCtor.polymorphicClassFor === "function") {
+      return ownerCtor.polymorphicClassFor(type);
+    }
     return resolveModel(type);
   }
 
@@ -174,6 +184,15 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * registry key, falling back to constructor.name.
    */
   private polymorphicTypeName(record: Base): string {
+    // Rails writes `record.class.polymorphic_name`. When the record's class
+    // overrides that static (e.g. returning a custom type string), honor it
+    // verbatim — the registry-key reconstruction below exists only to recover
+    // `::`-namespaced names that JS class names flatten, which does not apply
+    // to an explicit override.
+    const recordCtor = record.constructor as typeof Base;
+    if (Object.prototype.hasOwnProperty.call(recordCtor, "polymorphicName")) {
+      return recordCtor.polymorphicName();
+    }
     // Rails: `record.class.polymorphic_name` resolves to the STI base class
     // name (`base_class.name`), so subclass records store their base type.
     const ctor = baseClass.call(record.constructor as typeof Base) as typeof Base & {
