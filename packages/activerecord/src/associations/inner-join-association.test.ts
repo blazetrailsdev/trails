@@ -159,16 +159,23 @@ describe("InnerJoinAssociationTest", () => {
 
   it("construct finder sql ignores empty joins hash", () => {
     const { Post } = makeModels();
-    const sql = Post.joins().toSql();
+    const rel = Post.joins({});
+    const sql = rel.toSql();
     expect(sql).toContain("SELECT");
     expect(sql).not.toContain("JOIN");
+    // Rails compact_blank!s the {} away before joins!; it must not linger in
+    // relation state (where it would skew structural comparisons).
+    expect((rel as any)._namedInnerJoins).toEqual([]);
   });
 
   it("construct finder sql ignores empty joins array", () => {
     const { Post } = makeModels();
-    const sql = Post.joins().toSql();
+    const rel = Post.joins([]);
+    const sql = rel.toSql();
     expect(sql).toContain("SELECT");
     expect(sql).not.toContain("JOIN");
+    expect((rel as any)._namedInnerJoins).toEqual([]);
+    expect((rel as any)._joinValues).toEqual([]);
   });
 
   it("join conditions added to join clause", () => {

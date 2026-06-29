@@ -1225,6 +1225,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: OrderArg[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { orderArgs: true });
     return this._clone().orderBang(...args);
   }
 
@@ -1259,15 +1260,16 @@ export class Relation<T extends Base> {
   select(fn: (record: T) => boolean): Promise<T[]>;
   select(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
   select(...args: any[]): Relation<T> | Promise<T[]> {
-    if (args.length === 0) {
-      throw new ArgumentError("Call `select' with at least one field.");
-    }
-    if (args.length > 1 && typeof args[args.length - 1] === "function") {
-      throw new ArgumentError("`select' with block doesn't take arguments.");
-    }
-    if (args.length === 1 && typeof args[0] === "function") {
+    // Block form first — mirrors Rails' `if block_given?` guard before
+    // check_if_method_has_arguments!. A trailing function argument is the TS
+    // equivalent of a Ruby block.
+    if (args.length >= 1 && typeof args[args.length - 1] === "function") {
+      if (args.length > 1) {
+        throw new ArgumentError("`select' with block doesn't take arguments.");
+      }
       return this.toArray().then((records) => records.filter(args[0]));
     }
+    this.checkIfMethodHasArgumentsBang("select", args, "Call `select' with at least one field.");
     const fields = this.processSelectArgs(args);
     return this._clone()._selectBang(...fields);
   }
@@ -1278,6 +1280,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reselect
    */
   reselect(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("reselect", columns as unknown[]);
     const fields = this.processSelectArgs(columns as unknown[]);
     return this._clone().reselectBang(...fields);
   }
@@ -1309,6 +1312,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#group
    */
   group(...columns: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("group", columns as unknown[]);
     return this._clone().groupBang(...(columns as string[]));
   }
 
@@ -1334,6 +1338,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#regroup
    */
   regroup(...columns: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("regroup", columns);
     return this._clone().regroupBang(...columns);
   }
 
@@ -1343,6 +1348,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: OrderArg[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, {
+      orderArgs: true,
+    });
     return this._clone().reorderBang(...args);
   }
 
@@ -1571,6 +1579,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#annotate
    */
   annotate(...comments: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("annotate", comments);
     return this._clone().annotateBang(...comments);
   }
 
@@ -1580,6 +1589,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#optimizer_hints
    */
   optimizerHints(...hints: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("optimizer_hints", hints);
     return this._clone().optimizerHintsBang(...hints);
   }
 
@@ -1619,6 +1629,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#unscope
    */
   unscope(...types: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("unscope", types as unknown[]);
     return this._clone().unscopeBang(...types);
   }
 
@@ -1781,6 +1792,7 @@ export class Relation<T extends Base> {
       | undefined
     >
   ): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("joins", args as unknown[], undefined, { normalize: false });
     const rel = this._clone();
     // Two-string-argument form: joins(table, onClause) — a trails-only
     // extension preserved for back-compat. Rails has no such form: it
@@ -1801,12 +1813,16 @@ export class Relation<T extends Base> {
       rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
       return rel;
     }
-    // Flatten string arrays: joins(["str1", "str2"]) mirrors Rails array form.
-    // Plain objects are kept as-is (not array-flattened) so { post: "author" }
-    // survives the flatMap step.
-    const flatArgs = args.flatMap((a) => (Array.isArray(a) ? a : [a]));
+    // Rails' `check_if_method_has_arguments!` runs `args.flatten!` +
+    // `args.compact_blank!` before `spawn.joins!` (query_methods.rb:868-871).
+    // We apply it here rather than in the guard because the trails-only
+    // `joins(table, on)` form above must be disambiguated on the raw arg shape
+    // first — flattening would collapse a single `joins(["a","b"])` array into
+    // two args and trip that heuristic. flattenedArgs recurses into arrays only
+    // (plain objects like `{ post: "author" }` pass through); isBlankArgument
+    // drops `{}` / `[]` / `null` / `""` so blank specs never reach join state.
+    const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     for (const arg of flatArgs) {
-      if (!arg) continue;
       // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
       // Rails joins! uses |= (array union), deduplicating by object identity for
       // nodes and string equality for strings. JS === matches both behaviours.
@@ -1832,7 +1848,8 @@ export class Relation<T extends Base> {
         if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
         continue;
       }
-      if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
+      const joinValue = arg as string | Nodes.Join;
+      if (!rel._joinValues.includes(joinValue)) rel._joinValues.push(joinValue);
     }
     return rel;
   }
@@ -1849,6 +1866,8 @@ export class Relation<T extends Base> {
   leftJoins(table: string, on: string): Relation<T>;
   leftJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
   leftJoins(table: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
+    const callArgs = on !== undefined ? [table, on] : table === undefined ? [] : [table];
+    this.checkIfMethodHasArgumentsBang("left_joins", callArgs, undefined, { normalize: false });
     const rel = this._clone();
     if (on !== undefined) {
       // Explicit SQL form: LEFT OUTER JOIN table ON condition — only valid for strings.
@@ -1867,9 +1886,16 @@ export class Relation<T extends Base> {
           "only associations and hashes are supported as arguments to leftOuterJoins",
         );
       }
-      const specs = Array.isArray(table) ? table : [table];
+      // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
+      // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
+      // `leftJoins([])` drop their blank specs instead of polluting join state.
+      const specs = _qm
+        .flattenedArgs(Array.isArray(table) ? table : [table])
+        .filter((s) => !_qm.isBlankArgument(s));
       for (const spec of specs) {
-        if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
+        if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
+          rel._leftOuterJoinsValues.push(spec as AssociationSpec);
+        }
       }
     }
     return rel;
@@ -1880,11 +1906,13 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
-  leftOuterJoins(): Relation<T>;
   leftOuterJoins(table: string, on: string): Relation<T>;
   leftOuterJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
   leftOuterJoins(table?: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
-    if (table === undefined) return this._clone();
+    const callArgs = on !== undefined ? [table, on] : table === undefined ? [] : [table];
+    this.checkIfMethodHasArgumentsBang("left_outer_joins", callArgs, undefined, {
+      normalize: false,
+    });
     if (on !== undefined) {
       if (typeof table !== "string")
         throw argumentError("leftOuterJoins(table, on) requires a string table name");
@@ -2280,6 +2308,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#includes
    */
   includes(...associations: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("includes", associations);
     return this._clone().includesBang(...associations);
   }
 
@@ -2289,6 +2318,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#preload
    */
   preload(...associations: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("preload", associations);
     return this._clone().preloadBang(...associations);
   }
 
@@ -2298,6 +2328,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#eager_load
    */
   eagerLoad(...associations: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("eager_load", associations);
     return this._clone().eagerLoadBang(...associations);
   }
 
@@ -5846,6 +5877,7 @@ export class Relation<T extends Base> {
     methodName: string | symbol,
     args: unknown[],
     message?: string,
+    options?: { normalize?: boolean; orderArgs?: boolean },
   ): void {
     // Rails passes a Symbol via __callee__; we collapse it to its
     // description so the error message reads `.select()` rather than
@@ -5853,6 +5885,33 @@ export class Relation<T extends Base> {
     // description) fall through to "<anonymous>".
     const name =
       typeof methodName === "symbol" ? (methodName.description ?? "<anonymous>") : methodName;
+    const raiseIfBlank = () => {
+      // Rails raises on `args.blank?` — the *outer* varargs array being empty —
+      // BEFORE any flatten/compact, so `joins([])` / `reorder(nil)` (a single
+      // blank element) do not raise.
+      if (!args || args.length === 0) {
+        throw argumentError(message ?? `The method .${name}() must contain arguments.`);
+      }
+    };
+    // `normalize: false` performs only the blank raise, skipping the shared
+    // `flatten!`/`compact_blank!` mutation. Used by the joins family, whose bang
+    // variants do their own array flattening and blank-skipping.
+    if (options?.normalize === false) {
+      raiseIfBlank();
+      return;
+    }
+    // `orderArgs` runs Rails' order/reorder normalization: raise-on-blank, then
+    // `flatten!` + `compact_blank!` (query_methods.rb:656-660/752-756) — except a
+    // trails bind-array `[Arel.sql("x = ?"), ...binds]` is preserved so orderBang
+    // can interpolate it. So `order([nil])` / `reorder([{}])` flatten then compact
+    // to empty (no-op), matching Rails, instead of reaching orderBang as arrays.
+    if (options?.orderArgs) {
+      raiseIfBlank();
+      const flat = _qm.flattenedOrderArgs(args).filter((a) => !_qm.isBlankArgument(a));
+      args.length = 0;
+      args.push(...flat);
+      return;
+    }
     return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message);
   }
 
@@ -6106,6 +6165,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references
    */
   references(...tables: Array<string | Nodes.SqlLiteral>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("references", tables);
     // Tag bare-string references as manual so they don't act as eager-load join
     // aliases — mirrors Rails seeding @references only from SqlLiteral
     // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so

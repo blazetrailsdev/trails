@@ -714,9 +714,30 @@ describe("RelationTest", () => {
     expect(() => (Topic as any).reorder([])).not.toThrow();
     expect(() => (Topic as any).order([])).not.toThrow();
     expect(() => (Topic as any).eagerLoad([])).not.toThrow();
+    expect(() => (Topic as any).reselect([])).not.toThrow();
     expect(() => (Topic as any).unscope([])).not.toThrow();
     expect(() => (Topic as any).joins([])).not.toThrow();
     expect(() => (Topic as any).leftJoins([])).not.toThrow();
+    expect(() => (Topic as any).optimizerHints([])).not.toThrow();
+    expect(() => (Topic as any).annotate([])).not.toThrow();
+  });
+
+  // order/reorder mirror Rails' `args.flatten!` + `args.compact_blank!`
+  // (query_methods.rb:656-660/752-756): a nested blank argument flattens then
+  // compacts away rather than reaching the bang variant as an array and raising.
+  it("order and reorder flatten and compact blank nested arguments", () => {
+    expect(() => (Topic as any).order([null])).not.toThrow();
+    expect(() => (Topic as any).reorder([{}])).not.toThrow();
+    expect((Topic.order("title") as any).order([null]).toSql()).toContain("ORDER BY");
+    expect((Topic.order("title") as any).reorder([{}]).toSql()).not.toContain("ORDER BY");
+  });
+
+  // Rails compact_blank!s blank join specs before joins!/left_outer_joins!, so a
+  // blank hash/array must not linger in relation state (query_methods.rb:868-890).
+  it("blank join arguments are not retained in relation state", () => {
+    expect((Topic as any).joins({})._namedInnerJoins).toEqual([]);
+    expect((Topic as any).leftJoins({})._leftOuterJoinsValues).toEqual([]);
+    expect((Topic as any).leftJoins([])._leftOuterJoinsValues).toEqual([]);
   });
 
   it("respond to dynamic finders", () => {
@@ -1869,12 +1890,12 @@ describe("RelationTest", () => {
   });
 
   it("order with reorder nil removes the order", () => {
-    const sql = Topic.order("title").reorder().toSql();
+    const sql = Topic.order("title").reorder(null).toSql();
     expect(sql).not.toContain("ORDER BY");
   });
 
   it("reverse order with reorder nil removes the order", () => {
-    const sql = Topic.order("title").reorder().reverseOrder().toSql();
+    const sql = Topic.order("title").reorder(null).reverseOrder().toSql();
     expect(sql).not.toContain("ORDER BY");
   });
 
@@ -2319,6 +2340,34 @@ describe("RelationTest", () => {
   it(" with blank value", () => {
     expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
+
+  // Mirrors the parametrized `test_no_arguments_to_#{method}_raise_errors`
+  // block in relations_test.rb: every query method guarded by
+  // check_if_method_has_arguments! raises ArgumentError when called with no
+  // arguments. The display name is the Rails method (so test:compare matches),
+  // while the invoker uses the trails camelCase port.
+  const noArgGuardedMethods: Array<[string, (rel: any) => unknown]> = [
+    ["references", (rel) => rel.references()],
+    ["includes", (rel) => rel.includes()],
+    ["preload", (rel) => rel.preload()],
+    ["eager_load", (rel) => rel.eagerLoad()],
+    ["group", (rel) => rel.group()],
+    ["order", (rel) => rel.order()],
+    ["reorder", (rel) => rel.reorder()],
+    ["reselect", (rel) => rel.reselect()],
+    ["unscope", (rel) => rel.unscope()],
+    ["joins", (rel) => rel.joins()],
+    ["left_joins", (rel) => rel.leftJoins()],
+    ["left_outer_joins", (rel) => rel.leftOuterJoins()],
+    ["optimizer_hints", (rel) => rel.optimizerHints()],
+    ["annotate", (rel) => rel.annotate()],
+    ["regroup", (rel) => rel.regroup()],
+  ];
+  for (const [method, invoke] of noArgGuardedMethods) {
+    it(`no arguments to ${method} raise errors`, () => {
+      expect(() => invoke(Topic.all())).toThrow(`The method .${method}() must contain arguments.`);
+    });
+  }
 
   // Rails gates CreateOrFindByWithinTransactions `unless current_adapter?(:SQLite3Adapter)`
   describe.skipIf(adapterType === "sqlite")("CreateOrFindByWithinTransactions", () => {
