@@ -910,12 +910,12 @@ describe("EagerAssociationTest", () => {
   });
   it("preload has many using primary key", async () => {
     const expected = (await (await Firm.first())!.clientsUsingPrimaryKey.toArray()).sort(
-      (a: any, b: any) => a.id - b.id,
+      (a: any, b: any) => Number(a.id) - Number(b.id),
     );
     const firm = await Firm.includes("clientsUsingPrimaryKey").first();
     await assertNoQueries(false, async () => {
       const actual = (await firm!.clientsUsingPrimaryKey.toArray()).sort(
-        (a: any, b: any) => a.id - b.id,
+        (a: any, b: any) => Number(a.id) - Number(b.id),
       );
       expect(actual.map((c: any) => c.id)).toEqual(expected.map((c: any) => c.id));
     });
@@ -935,7 +935,7 @@ describe("EagerAssociationTest", () => {
     });
   });
   it("preloading through empty belongs to", async () => {
-    const maxId = (await Company.maximum("id")) as number;
+    const maxId = Number(await Company.maximum("id"));
     const c = await Client.create({ name: "Foo", client_of: maxId + 1 });
 
     let client!: InstanceType<typeof Client>;
