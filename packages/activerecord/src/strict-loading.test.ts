@@ -169,21 +169,17 @@ describe("StrictLoadingTest", () => {
   it("strict loading n plus one only mode does not eager load child associations", async () => {
     const developer = await Developer.first();
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
-    await association(developer!, "projects").first();
+    await developer!.projects.first();
 
     // Rails checks `developer.projects.loaded?` via the OO association proxy.
     // We check the CollectionProxy's `loaded` flag — same semantics in our stack.
-    expect(association(developer!, "projects").loaded).toBe(false);
+    expect(developer!.projects.loaded).toBe(false);
 
-    // Does not raise for a single-record access (first doesn't load the full set).
-    // Rails further asserts `developer.projects.first.firm` doesn't raise, verifying
-    // that the returned project has no strict loading cascaded. In TS,
-    // CollectionProxy.first() routes through toArray() which does cascade
-    // strictLoadingBang() onto the returned records (tracked divergence from Rails
-    // where `first` runs LIMIT 1 without cascading). The assert_nothing_raised
-    // for `first.firm` is therefore not portable to TS without fixing the
-    // CollectionProxy.first cascade path.
-    await association(developer!, "projects").first();
+    // Rails asserts `developer.projects.first.firm` does not raise: `first` runs a
+    // bounded LIMIT query and does NOT cascade strict loading onto the returned
+    // record, so `project.firm` (a child association) loads freely.
+    const project = await developer!.projects.first();
+    await project!.firm;
   });
 
   // Rails: test_default_mode_is_all
