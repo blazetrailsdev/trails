@@ -1969,7 +1969,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return {
       idCol,
       idValue: this._record._readAttribute(polyPk),
-      typeCol: `${underscore(asName)}_type`,
+      // Rails derives the type column as reflection.type =
+      // options[:foreign_type] || "#{options[:as]}_type" (reflection.rb:519).
+      typeCol: throughAssoc.options.foreignType ?? `${underscore(asName)}_type`,
       typeValue: ctor.name,
     };
   }
@@ -2156,7 +2158,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // Polymorphic through: ownerJoinAttrs already has the polymorphic
           // _id column from _throughOwnerPolymorphic; just add the _type.
           if (throughAssoc.options.as) {
-            joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = polymorphicName(ctor);
+            // reflection.type = options[:foreign_type] || "#{options[:as]}_type".
+            const typeCol =
+              throughAssoc.options.foreignType ?? `${underscore(throughAssoc.options.as)}_type`;
+            joinAttrs[typeCol] = polymorphicName(ctor);
           }
           // Mirrors Rails' save_through_record: skip insert if the through record
           // was already persisted (e.g. via autosave triggered by record.save in
