@@ -2,7 +2,7 @@ import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeSave, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { resolveModel, modelRegistry } from "../../associations.js";
+import { modelRegistry } from "../../associations.js";
 import {
   flushPendingCounterCacheColumns,
   registerCounterCachedAssociation,
@@ -192,7 +192,14 @@ export class BelongsTo extends SingularAssociation {
               ? record._readAttribute(foreignType)
               : record[foreignType]);
           try {
-            klass = typeName ? resolveModel(typeName) : null;
+            // Rails: `o.class.polymorphic_class_for(klass)` — a model may
+            // override the hook to map a custom polymorphic_name back to its
+            // class (builder/belongs_to.rb:53).
+            klass = typeName
+              ? (
+                  record.constructor as { polymorphicClassFor(name: string): any }
+                ).polymorphicClassFor(typeName)
+              : null;
           } catch {
             klass = null;
           }
