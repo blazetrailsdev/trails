@@ -335,6 +335,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
   private set _rawConnection(value: pg.Client | null) {
     this._connection = value as unknown as AbstractAdapter | null;
+    if (value) {
+      // Register this client's DEALLOCATE serializer so a StatementPool built
+      // for it (via buildStatementPool) deallocates through the adapter-owned
+      // maintenance queue rather than fire-and-forget — without the pool
+      // constructor needing a non-Rails-shaped extra argument. Mirrors Rails,
+      // where StatementPool#dealloc reaches @connection.@raw_connection to issue
+      // the DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
+      pgDeallocSerializers.set(value, (deallocSql) =>
+        this._enqueueMaintenance(() => value.query(deallocSql)),
+      );
+    }
   }
   private _pgClientOptions: pg.ClientConfig | null = null;
   // Non-null when a transaction is open on _rawConnection. Always equals
@@ -1252,15 +1263,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private _poolFor(client: pg.Client): StatementPool {
     if (!this._statementPool) {
-      const pool = this.buildStatementPool(client);
-      // Wire DEALLOCATE through the adapter's maintenance serializer so eviction
-      // cleanup chains behind the in-flight query / prior maintenance op on the
-      // pinned client rather than fire-and-forgetting onto a busy one. Done here
-      // (not in buildStatementPool) to keep that method's `new StatementPool`
-      // call arity-faithful to Rails' build_statement_pool.
-      pool.serializeDealloc = (deallocSql) =>
-        this._enqueueMaintenance(() => client.query(deallocSql));
-      this._statementPool = pool;
+      this._statementPool = this.buildStatementPool(client);
     }
     return this._statementPool;
   }
@@ -4720,6 +4723,17 @@ export interface PreparedStatement {
 }
 
 /**
+ * Maps a pinned `pg.Client` to its owning adapter's DEALLOCATE serializer
+ * (populated by the adapter's `_rawConnection` setter). A `StatementPool`'s
+ * `dealloc` looks the client up here so eviction cleanup chains behind the
+ * in-flight query on the adapter-owned maintenance queue rather than racing it,
+ * without the pool constructor needing a non-Rails-shaped extra argument. A
+ * `WeakMap` so entries vanish when the client is GC'd. Clients no adapter owns
+ * (standalone pools) are absent → the prior best-effort fire-and-forget path.
+ */
+const pgDeallocSerializers = new WeakMap<pg.Client, (deallocSql: string) => void>();
+
+/**
  * PG-flavored StatementPool. Backs the per-connection statement cache;
  * `dealloc` sends `DEALLOCATE` for the evicted name. PG prepared
  * statements are session-scoped, and after the dual-pool collapse the
@@ -4735,13 +4749,6 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   // session-scoped nature of PG prepared statements and lets the
   // adapter own zero state about naming.
   private _counter = 0;
-  // Routes DEALLOCATE through the owning adapter's maintenance serializer so
-  // eviction cleanup chains behind the in-flight query rather than racing it.
-  // Set by the adapter right after construction — the constructor stays
-  // arity-faithful to Rails' `StatementPool.new(connection, statement_limit)`.
-  // Undefined for standalone pools (no owning adapter); those keep the prior
-  // best-effort fire-and-forget behavior.
-  serializeDealloc?: (deallocSql: string) => void;
 
   constructor(client: pg.Client, maxSize = 1000) {
     super(maxSize);
@@ -4773,15 +4780,16 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     // of raising, so a leaked caller-supplied name can't produce a synchronous
     // throw at the call site.
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
-    if (this.serializeDealloc) {
-      // Route through the adapter's maintenance serializer so the DEALLOCATE
-      // chains behind the in-flight query / prior eviction on the pinned client
-      // rather than fire-and-forgetting onto a busy client (node-pg's "already
-      // executing a query" deprecation). The serializer swallows the rejection.
-      this.serializeDealloc(deallocSql);
+    const serialize = pgDeallocSerializers.get(client);
+    if (serialize) {
+      // Adapter-owned client: route through its maintenance serializer so the
+      // DEALLOCATE chains behind the in-flight query / prior eviction on the
+      // pinned client rather than fire-and-forgetting onto a busy client
+      // (node-pg's "already executing a query" deprecation). It swallows errors.
+      serialize(deallocSql);
       return;
     }
-    // Standalone pool with no owning adapter: keep the prior best-effort
+    // Standalone pool whose client no adapter owns: keep the prior best-effort
     // fire-and-forget. The empty `.catch` keeps node from treating a post-close
     // DEALLOCATE as an unhandled rejection.
     client.query(deallocSql).catch(() => {});
