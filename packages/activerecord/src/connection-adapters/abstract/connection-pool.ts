@@ -865,8 +865,8 @@ export class ConnectionPool implements ReapablePool {
     this.disconnect(false);
   }
 
-  discardBang(): void {
-    this._discardBang();
+  discardBang(): Array<Promise<void>> {
+    return this._discardBang();
   }
 
   /**
@@ -876,8 +876,9 @@ export class ConnectionPool implements ReapablePool {
    * on a still-pooled conn). Rails' `discard!` abandons the raw handle without
    * closing it, so SQLite's `discardBang()` fires no new close; but dropping our
    * `_connections` reference here would orphan any in-flight close, leaking the
-   * handle past teardown and racing a re-open. `discardBang` ignores the drains
-   * (Rails-synchronous); `discardBangAsync` awaits them.
+   * handle past teardown and racing a re-open. `discardBang` returns the drains
+   * for the caller to ignore (Rails-synchronous) or await; `discardBangAsync`
+   * awaits them.
    */
   private _discardBang(): Array<Promise<void>> {
     if (this.isDiscarded()) return [];
@@ -911,7 +912,7 @@ export class ConnectionPool implements ReapablePool {
    * immediately for sync drivers (or when nothing is in flight).
    */
   async discardBangAsync(): Promise<void> {
-    await Promise.all(this._discardBang());
+    await Promise.all(this.discardBang());
   }
 
   clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): void {

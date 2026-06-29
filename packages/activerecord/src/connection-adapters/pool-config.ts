@@ -200,12 +200,15 @@ export class PoolConfig {
   async discardPoolBang(): Promise<void> {
     const pool = this._pool;
     if (!pool) return;
-    // Mirror Rails' synchronous critical section: `@pool.discard!; @pool = nil`.
-    // `discardBangAsync` fires the synchronous discard (nulling the pool's
-    // connections) before its first await, and we null `_pool` here before
-    // awaiting, so a caller that does not await still observes the pool gone.
+    // Mirror Rails' synchronous critical section: `@pool.discard!; @pool = nil`
+    // assigns nil only after `discard!` returns. `discardBang()` runs the
+    // synchronous discard (throwing synchronously on failure, before `_pool` is
+    // cleared) and returns the in-flight async-close drains; we null `_pool`
+    // only once it succeeds, then await the drains (a trails-only step for
+    // async-only drivers, with no Rails equivalent).
+    const drains = pool.discardBang();
     this._pool = null;
-    await pool.discardBangAsync();
+    await Promise.all(drains);
   }
 
   static async discardPoolsBang(): Promise<void> {
