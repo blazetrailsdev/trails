@@ -191,46 +191,47 @@ export class PoolConfig {
     }
   }
 
-  discardPoolBang(): void {
-    if (!this._pool) return;
-    this._pool.disconnectBang();
+  /**
+   * Run Rails' synchronous `discard_pool!` critical section: `@pool.discard!;
+   * @pool = nil`. `discardBangDraining()` performs the synchronous discard
+   * (throwing synchronously on failure, before `_pool` is cleared) and returns
+   * the in-flight async-close drains; we null `_pool` only once it succeeds and
+   * hand the drains back so the caller can await them after every config in a
+   * sweep has been discarded (the drain is a trails-only step for async-only
+   * drivers, with no Rails equivalent). No-ops when the pool is uninitialized.
+   */
+  private _discardPoolBangSync(): Array<Promise<void>> {
+    const pool = this._pool;
+    if (!pool) return [];
+    const drains = pool.discardBangDraining();
     this._pool = null;
+    return drains;
   }
 
   /**
-   * Async-draining variant of `discardPoolBang`: awaits each adapter's pending
-   * async `driver.close()` (via the pool's `disconnectAsync`) before dropping
-   * the pool, so an async-only driver's handle is fully closed before the caller
-   * re-opens the DB. No-ops when the pool is uninitialized or all drivers close
-   * synchronously.
+   * Discards the pool: drains each adapter's pending async `driver.close()`
+   * before dropping the pool, so an async-only driver's handle is fully closed
+   * before the caller re-opens the DB. No-ops when the pool is uninitialized.
    */
-  async discardPoolBangAsync(): Promise<void> {
-    if (!this._pool) return;
-    await this._pool.disconnectAsync();
-    this._pool = null;
+  async discardPoolBang(): Promise<void> {
+    await Promise.all(this._discardPoolBangSync());
   }
 
-  static discardPoolsBang(): void {
+  static async discardPoolsBang(): Promise<void> {
+    // Match Rails' `INSTANCES.each_key(&:discard_pool!)`: discard (and null)
+    // every registered pool synchronously up front, with no inter-pool waiting,
+    // so a slow trails-only drain on one pool can't delay discarding the rest.
+    // The async drains are awaited only after the whole sweep has run.
+    const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
       const config = ref.deref();
       if (!config) {
         INSTANCES.delete(ref);
         continue;
       }
-      config.discardPoolBang();
+      drains.push(...config._discardPoolBangSync());
     }
-  }
-
-  /** Async-draining variant of `discardPoolsBang`. */
-  static async discardPoolsBangAsync(): Promise<void> {
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      await config.discardPoolBangAsync();
-    }
+    await Promise.all(drains);
   }
 
   static disconnectAllBang(): void {

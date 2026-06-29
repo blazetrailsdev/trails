@@ -167,7 +167,21 @@ function _establishPooledTestPool(): Promise<
 
 // Boot: initialize the pool eagerly so factory calls below are synchronous.
 // newRawTestAdapter is also set during this await.
-const _pool = await _establishPooledTestPool();
+let _pool = await _establishPooledTestPool();
+
+/**
+ * Re-establish the shared pooled test adapter after it has been torn down
+ * terminally (e.g. a test that exercises `PoolConfig.discardPoolsBang()`, whose
+ * real `discard!` semantics null the pool's connections so it can never be
+ * re-checked-out). Drops the memoized handler/pool and rebuilds a fresh pool so
+ * the next `resetTestAdapterState` has a live connection again.
+ *
+ * @internal — for pool-lifecycle tests only.
+ */
+export async function _reestablishPooledTestPoolForTests(): Promise<void> {
+  _resetPooledTestAdapterForTests();
+  _pool = await _establishPooledTestPool();
+}
 
 /** Type alias for pool-leased adapters returned by test factories. */
 export type TestDatabaseAdapter = DatabaseAdapter;
