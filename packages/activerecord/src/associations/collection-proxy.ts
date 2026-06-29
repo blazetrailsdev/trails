@@ -21,6 +21,8 @@ import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
   performLast as basePerformLast,
+  findTake as baseFindTake,
+  findTakeWithLimit as baseFindTakeWithLimit,
   normalizeFindArgs,
   raiseNotFoundAll,
   raiseNotFoundSingle,
@@ -2853,11 +2855,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return records.slice(0, n);
     }
     // Rails' `take(n)` runs `find_take_with_limit` (`limit(n).to_a`,
-    // finder_methods.rb:603); no-arg `take` is `find_take` (`limit(1).records.first`,
-    // finder_methods.rb:582), memoized via @take. Both are bounded queries.
-    if (n !== undefined) return this.findNthWithLimit(0, n);
+    // finder_methods.rb:590); no-arg `take` is `find_take` (`limit(1).records.first`,
+    // finder_methods.rb:582), memoized via @take. Both are bounded queries that
+    // deliberately SKIP `ordered_relation` — unlike `first`, `take` is an
+    // arbitrary-order fetch, so we use the plain `findTake*` helpers rather than
+    // `findNthWithLimit` (which would add an implicit `ORDER BY pk`). The proxy
+    // keeps loaded state in `_target`/`_targetLoaded`, not Relation's `_loaded`,
+    // so the loaded branch is handled here.
+    if (n !== undefined) {
+      if (this._targetLoaded) return this._target.slice(0, n);
+      return baseFindTakeWithLimit(this as any, n);
+    }
     if (this._offsetMemo.has("take")) return this._offsetMemo.get("take")!;
-    const record = (await this.findNthWithLimit(0, 1))[0] ?? null;
+    const record = this._targetLoaded ? (this._target[0] ?? null) : await baseFindTake(this as any);
     this._offsetMemo.set("take", record);
     return record;
   }
