@@ -58,7 +58,7 @@ import {
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import { getFs, getPath, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 import {
   returningColumnValues as sqliteReturningColumnValues,
@@ -332,9 +332,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } else {
       filename = filenameOrConfig;
     }
+    this._memoryDatabase = AbstractSQLite3Adapter._isMemoryFilename(filename);
+    // Mirrors the non-`:memory:`/non-`file:` branch of Rails'
+    // `SQLite3Adapter#initialize`: expand the path and create its parent
+    // directory before the driver opens the handle below.
+    if (!this._memoryDatabase && !filename.startsWith("file:")) {
+      filename = this.prepareDatabasePath(filename);
+    }
     this._config = { ...options };
     this._filename = filename;
-    this._memoryDatabase = AbstractSQLite3Adapter._isMemoryFilename(filename);
     this._readonly = options.readonly ?? false;
     this._strict = options.strict ?? AbstractSQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
@@ -350,6 +356,39 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // connect() flags them for the async path instead. See completeAsyncConnect.
     if (!this._asyncConnectPending) this.configureConnection();
     this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
+  }
+
+  /**
+   * Expand the database path and ensure its parent directory exists, mirroring
+   * the non-`:memory:`/non-`file:` branch of Rails' `SQLite3Adapter#initialize`
+   * (`File.expand_path(db, Rails.root)` + `FileUtils.mkdir_p(File.dirname(db))`).
+   *
+   * Deviation: Rails expands relative to `Rails.root`; trails has no
+   * `Rails.root`, so we resolve relative to the working directory
+   * (`getFs().cwd()`) — the closest app-relative equivalent. An absolute path
+   * passes through `resolve` unchanged, matching Rails.
+   *
+   * The directory is created through the fs adapter rather than `node:fs`, and
+   * synchronously: like Rails' `initialize`, this constructor is synchronous
+   * and pre-warms the driver handle (version/encoding caches) before returning,
+   * so the directory must already exist by the time the driver opens — deferring
+   * the mkdir to the async connect path would race that open. A failed mkdir
+   * raises `NoDatabaseError`, mirroring Rails' `rescue SystemCallError`.
+   * @internal
+   */
+  private prepareDatabasePath(filename: string): string {
+    const fs = getFs();
+    const path = getPath();
+    const expanded = path.resolve(fs.cwd(), filename);
+    const dirname = path.dirname(expanded);
+    try {
+      if (!fs.existsSync(dirname)) {
+        fs.mkdirSync(dirname, { recursive: true });
+      }
+    } catch (e) {
+      throw new NoDatabaseError(`Could not create database directory '${dirname}'`, { cause: e });
+    }
+    return expanded;
   }
 
   /**
