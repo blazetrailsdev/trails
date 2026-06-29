@@ -1225,7 +1225,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { flatten: false });
+    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { orderArgs: true });
     return this._clone().orderBang(...args);
   }
 
@@ -1348,7 +1348,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, { flatten: false });
+    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, {
+      orderArgs: true,
+    });
     return this._clone().reorderBang(...args);
   }
 
@@ -5863,7 +5865,7 @@ export class Relation<T extends Base> {
     methodName: string | symbol,
     args: unknown[],
     message?: string,
-    options?: { normalize?: boolean; flatten?: boolean },
+    options?: { normalize?: boolean; orderArgs?: boolean },
   ): void {
     // Rails passes a Symbol via __callee__; we collapse it to its
     // description so the error message reads `.select()` rather than
@@ -5886,15 +5888,16 @@ export class Relation<T extends Base> {
       raiseIfBlank();
       return;
     }
-    // `flatten: false` keeps Rails' `compact_blank!` (so `reorder(nil)` drops the
-    // blank and clears the order) but skips `flatten!`. Used by order/reorder,
-    // whose bang variants treat an array argument structurally — e.g. the
-    // bind-array form `[Arel.sql("x = ?"), bind]` that flattening would split.
-    if (options?.flatten === false) {
+    // `orderArgs` runs Rails' order/reorder normalization: raise-on-blank, then
+    // `flatten!` + `compact_blank!` (query_methods.rb:656-660/752-756) — except a
+    // trails bind-array `[Arel.sql("x = ?"), ...binds]` is preserved so orderBang
+    // can interpolate it. So `order([nil])` / `reorder([{}])` flatten then compact
+    // to empty (no-op), matching Rails, instead of reaching orderBang as arrays.
+    if (options?.orderArgs) {
       raiseIfBlank();
-      const kept = args.filter((a) => !_qm.isBlankArgument(a));
+      const flat = _qm.flattenedOrderArgs(args).filter((a) => !_qm.isBlankArgument(a));
       args.length = 0;
-      args.push(...kept);
+      args.push(...flat);
       return;
     }
     return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message);

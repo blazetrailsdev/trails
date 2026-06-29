@@ -1694,6 +1694,26 @@ export function flattenedArgs(args: unknown[]): unknown[] {
   return args.flatMap((e) => (Array.isArray(e) ? flattenedArgs(e) : e));
 }
 
+/** @internal */
+export function flattenedOrderArgs(args: unknown[]): unknown[] {
+  // order/reorder mirror Rails' `args.flatten!` (query_methods.rb:659/755) so a
+  // nested blank array like `order([nil])` collapses and compact_blanks away.
+  // The one exception is trails' bind-array form `[Arel.sql("x = ?"), ...binds]`
+  // — an array led by an Arel node — which orderBang consumes structurally to
+  // interpolate the binds; flattening it would split the SQL from its binds.
+  const out: unknown[] = [];
+  for (const e of args) {
+    if (Array.isArray(e) && !(e[0] instanceof Nodes.Node)) {
+      out.push(...flattenedOrderArgs(e));
+    } else {
+      // A bind-array (Arel-node-led) or scalar is pushed as one element; using a
+      // loop (not flatMap) keeps the preserved bind-array from being spread.
+      out.push(e);
+    }
+  }
+  return out;
+}
+
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 
 /** @internal */

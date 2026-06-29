@@ -722,6 +722,16 @@ describe("RelationTest", () => {
     expect(() => (Topic as any).annotate([])).not.toThrow();
   });
 
+  // order/reorder mirror Rails' `args.flatten!` + `args.compact_blank!`
+  // (query_methods.rb:656-660/752-756): a nested blank argument flattens then
+  // compacts away rather than reaching the bang variant as an array and raising.
+  it("order and reorder flatten and compact blank nested arguments", () => {
+    expect(() => (Topic as any).order([null])).not.toThrow();
+    expect(() => (Topic as any).reorder([{}])).not.toThrow();
+    expect((Topic.order("title") as any).order([null]).toSql()).toContain("ORDER BY");
+    expect((Topic.order("title") as any).reorder([{}]).toSql()).not.toContain("ORDER BY");
+  });
+
   it("respond to dynamic finders", () => {
     expect(typeof Post.findBy).toBe("function");
     expect(typeof Post.findByBang).toBe("function");
