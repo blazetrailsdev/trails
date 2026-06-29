@@ -32,6 +32,7 @@ import {
   type Type,
   typeRegistry,
   pushPendingDecorator,
+  type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
@@ -1041,13 +1042,11 @@ export class Base extends Model {
    */
   static attribute(
     name: string,
-    typeName: string | Type,
-    options?: {
-      default?: unknown;
-      virtual?: boolean;
-      userProvidedDefault?: boolean;
-      limit?: number | null;
-    },
+    // Type is optional, mirroring Rails' `attribute(name, type = nil, **options)`.
+    // When omitted (`attribute("col", { default: "x" })`) the attribute keeps its
+    // existing schema-reflected / declared type and only the default is applied.
+    typeName?: string | Type | AttributeOptions,
+    options?: AttributeOptions,
   ): void {
     // STI subclasses share the base's `_attributeDefinitions` — matching
     // Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
