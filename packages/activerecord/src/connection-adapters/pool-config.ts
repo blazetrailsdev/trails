@@ -198,9 +198,14 @@ export class PoolConfig {
    * DB. No-ops when the pool is uninitialized.
    */
   async discardPoolBang(): Promise<void> {
-    if (!this._pool) return;
-    await this._pool.discardBangAsync();
+    const pool = this._pool;
+    if (!pool) return;
+    // Mirror Rails' synchronous critical section: `@pool.discard!; @pool = nil`.
+    // `discardBangAsync` fires the synchronous discard (nulling the pool's
+    // connections) before its first await, and we null `_pool` here before
+    // awaiting, so a caller that does not await still observes the pool gone.
     this._pool = null;
+    await pool.discardBangAsync();
   }
 
   static async discardPoolsBang(): Promise<void> {

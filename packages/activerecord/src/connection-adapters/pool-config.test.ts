@@ -101,7 +101,11 @@ describe("PoolConfig", () => {
       const pool = config.pool;
       expect(config.poolInitialized).toBe(true);
       const spy = vi.spyOn(pool, "discardBangAsync");
-      await config.discardPoolBang();
+      const promise = config.discardPoolBang();
+      // Rails nils @pool inside the synchronous discard! critical section, so
+      // the pool is gone before the async drain resolves.
+      expect(config.poolInitialized).toBe(false);
+      await promise;
       expect(spy).toHaveBeenCalled();
       expect(config.poolInitialized).toBe(false);
     });
