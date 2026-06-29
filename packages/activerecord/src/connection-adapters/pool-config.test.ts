@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PoolConfig } from "./pool-config.js";
+import { _reestablishPooledTestPoolForTests } from "../test-adapter.js";
 import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { SchemaReflection } from "./schema-cache.js";
@@ -91,23 +92,23 @@ describe("PoolConfig", () => {
   });
 
   describe("discardPoolBang", () => {
-    it("is a no-op when pool is not initialized", () => {
-      expect(() => config.discardPoolBang()).not.toThrow();
+    it("is a no-op when pool is not initialized", async () => {
+      await expect(config.discardPoolBang()).resolves.toBeUndefined();
       expect(config.poolInitialized).toBe(false);
     });
 
-    it("disconnects and nulls the pool", () => {
+    it("discards and nulls the pool", async () => {
       const pool = config.pool;
       expect(config.poolInitialized).toBe(true);
-      const spy = vi.spyOn(pool, "disconnect");
-      config.discardPoolBang();
+      const spy = vi.spyOn(pool, "discardBangAsync");
+      await config.discardPoolBang();
       expect(spy).toHaveBeenCalled();
       expect(config.poolInitialized).toBe(false);
     });
 
-    it("creates a new pool after discard", () => {
+    it("creates a new pool after discard", async () => {
       const pool1 = config.pool;
-      config.discardPoolBang();
+      await config.discardPoolBang();
       const pool2 = config.pool;
       expect(pool2).not.toBe(pool1);
     });
@@ -147,14 +148,21 @@ describe("PoolConfig", () => {
   });
 
   describe("static discardPoolsBang", () => {
-    it("discards pools on all tracked instances", () => {
+    // discardPoolsBang iterates the global PoolConfig registry, which includes
+    // the shared pooled test adapter; real `discard!` nulls its connections
+    // terminally, so rebuild it before the next test's reset hook runs.
+    afterEach(async () => {
+      await _reestablishPooledTestPoolForTests();
+    });
+
+    it("discards pools on all tracked instances", async () => {
       const c1 = new PoolConfig(makeDescriptor("a"), makeDbConfig("a"));
       const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));
       void c1.pool;
       void c2.pool;
       expect(c1.poolInitialized).toBe(true);
       expect(c2.poolInitialized).toBe(true);
-      PoolConfig.discardPoolsBang();
+      await PoolConfig.discardPoolsBang();
       expect(c1.poolInitialized).toBe(false);
       expect(c2.poolInitialized).toBe(false);
     });
