@@ -1252,21 +1252,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private _poolFor(client: pg.Client): StatementPool {
     if (!this._statementPool) {
-      this._statementPool = this._makeStatementPool(client);
+      const pool = this.buildStatementPool(client);
+      // Wire DEALLOCATE through the adapter's maintenance serializer so eviction
+      // cleanup chains behind the in-flight query / prior maintenance op on the
+      // pinned client rather than fire-and-forgetting onto a busy one. Done here
+      // (not in buildStatementPool) to keep that method's `new StatementPool`
+      // call arity-faithful to Rails' build_statement_pool.
+      pool.serializeDealloc = (deallocSql) =>
+        this._enqueueMaintenance(() => client.query(deallocSql));
+      this._statementPool = pool;
     }
     return this._statementPool;
-  }
-
-  /**
-   * Build a StatementPool wired to drain DEALLOCATE through the adapter's
-   * maintenance serializer (`_enqueueMaintenance`) instead of fire-and-forget,
-   * so an evicted statement's DEALLOCATE chains behind the in-flight query /
-   * prior maintenance op on the pinned client rather than racing it.
-   */
-  private _makeStatementPool(client: pg.Client): StatementPool {
-    return new StatementPool(client, this._statementLimit, (deallocSql) =>
-      this._enqueueMaintenance(() => client.query(deallocSql)),
-    );
   }
 
   /**
@@ -4656,7 +4652,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   buildStatementPool(client: pg.Client): StatementPool {
-    return this._makeStatementPool(client);
+    return new StatementPool(client, this._statementLimit);
   }
 
   /**
@@ -4741,14 +4737,15 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   private _counter = 0;
   // Routes DEALLOCATE through the owning adapter's maintenance serializer so
   // eviction cleanup chains behind the in-flight query rather than racing it.
+  // Set by the adapter right after construction — the constructor stays
+  // arity-faithful to Rails' `StatementPool.new(connection, statement_limit)`.
   // Undefined for standalone pools (no owning adapter); those keep the prior
   // best-effort fire-and-forget behavior.
-  private readonly _serializeDealloc?: (deallocSql: string) => void;
+  serializeDealloc?: (deallocSql: string) => void;
 
-  constructor(client: pg.Client, maxSize = 1000, serializeDealloc?: (deallocSql: string) => void) {
+  constructor(client: pg.Client, maxSize = 1000) {
     super(maxSize);
     this._client = client;
-    this._serializeDealloc = serializeDealloc;
   }
 
   /**
@@ -4776,12 +4773,12 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     // of raising, so a leaked caller-supplied name can't produce a synchronous
     // throw at the call site.
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
-    if (this._serializeDealloc) {
+    if (this.serializeDealloc) {
       // Route through the adapter's maintenance serializer so the DEALLOCATE
       // chains behind the in-flight query / prior eviction on the pinned client
       // rather than fire-and-forgetting onto a busy client (node-pg's "already
       // executing a query" deprecation). The serializer swallows the rejection.
-      this._serializeDealloc(deallocSql);
+      this.serializeDealloc(deallocSql);
       return;
     }
     // Standalone pool with no owning adapter: keep the prior best-effort
