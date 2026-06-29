@@ -624,7 +624,7 @@ describe("AssociationScope", () => {
     // emit `WHERE memberships.active = TRUE` on the JOINed-in table.
     class CcAuthor extends Base {
       declare cc_memberships: AssociationProxy<CcMembership>;
-      declare cc_tags: AssociationProxy<Base>;
+      declare cc_tags: AssociationProxy<CcTag>;
 
       static {
         this.attribute("id", "integer");
@@ -835,9 +835,9 @@ describe("AssociationScope", () => {
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
     class HotUser extends Base {
       declare hot_account: HotAccount | null;
-      declare hot_settings: Base | null;
+      declare hot_settings: HotSettings | null;
       declare loadHasOne: ((name: "hot_account") => Promise<HotAccount | null>) &
-        ((name: "hot_settings") => Promise<Base | null>);
+        ((name: "hot_settings") => Promise<HotSettings | null>);
 
       static {
         this.attribute("id", "integer");
@@ -908,7 +908,7 @@ describe("AssociationScope", () => {
     //   WHERE through_memberships.through_author_id = 1
     class ThroughAuthor extends Base {
       declare through_memberships: AssociationProxy<ThroughMembership>;
-      declare through_posts: AssociationProxy<Base>;
+      declare through_posts: AssociationProxy<ThroughPost>;
 
       static {
         this.attribute("id", "integer");
