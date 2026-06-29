@@ -914,8 +914,10 @@ describe("EagerAssociationTest", () => {
     await assertQueriesCount(2, false, async () => {
       tagging = await Tagging.preload("taggable").find(t.id);
     });
+    // Rails: assert_no_queries { assert_nil tagging.taggable } — exercise the
+    // reader so a preloaded-but-re-querying bug would be caught.
     await assertNoQueries(false, async () => {
-      expect((tagging as any).association("taggable").target ?? null).toBeNull();
+      expect(await (tagging as any).taggable).toBeNull();
     });
     expect(Number(tagging.taggable_id)).toBe(maxId + 1);
   });
@@ -931,7 +933,6 @@ describe("EagerAssociationTest", () => {
         });
       }
     }
-    registerModel("TempAuthor", TempAuthor);
 
     const author = await TempAuthor.first();
     // PRECONDITION: make sure ordering results in different results
