@@ -1,3 +1,5 @@
+import type { AssociationProxy } from "./collection-proxy.js";
+import type { Category } from "../test-helpers/models/category.js";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -74,6 +76,8 @@ import { travelTo, travelBack } from "@blazetrails/activesupport";
 // Mirrors the inline classes in Rails'
 // belongs_to_associations_test.rb (test_polymorphic_with_custom_name_*).
 class CarPolymorphicName extends Base {
+  declare wheels: AssociationProxy<Wheel>;
+
   declare wheels_count: number;
   declare wheels_owned_at: Temporal.Instant | Temporal.PlainDateTime;
   static {
@@ -86,6 +90,8 @@ class CarPolymorphicName extends Base {
 }
 
 class WheelPolymorphicName extends Base {
+  declare loadBelongsTo: (name: "wheelable") => Promise<Base | null>;
+
   declare wheelable: Base | null;
   declare wheelable_id: number;
   declare wheelable_type: string;
@@ -306,6 +312,9 @@ describe("BelongsToAssociationsTest", () => {
 
   it("optional relation can be set per model", async () => {
     class FirstModel extends Base {
+      declare company: Company | null;
+      declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
       static _tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = false;
@@ -313,6 +322,9 @@ describe("BelongsToAssociationsTest", () => {
       }
     }
     class SecondModel extends Base {
+      declare company: Company | null;
+      declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
       static _tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = true;
@@ -331,6 +343,9 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
+        declare company: Company | null;
+        declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: true, inverseOf: false });
@@ -348,6 +363,9 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
+        declare company: Company | null;
+        declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { optional: false, inverseOf: false });
@@ -366,6 +384,9 @@ describe("BelongsToAssociationsTest", () => {
     (Base as any).belongsToRequiredByDefault = true;
     try {
       class TempModel extends Base {
+        declare company: Company | null;
+        declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
         static _tableName = "accounts";
         static {
           this.belongsTo("company", { inverseOf: false });
@@ -384,6 +405,9 @@ describe("BelongsToAssociationsTest", () => {
     const jamis = await Developer.find(developers("jamis").id);
 
     class TempDefault extends Base {
+      declare developer: Developer | null;
+      declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { default: () => david, inverseOf: false });
@@ -402,6 +426,9 @@ describe("BelongsToAssociationsTest", () => {
 
   it("default with lambda", async () => {
     class TempDefault extends Base {
+      declare developer: Developer | null;
+      declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
       static _tableName = "ships";
       static {
         this.belongsTo("developer", {
@@ -1679,6 +1706,9 @@ describe("BelongsToAssociationsTest", () => {
   it("polymorphic with false", async () => {
     expect(() => {
       class TempPost extends Base {
+        declare category: Category | null;
+        declare loadBelongsTo: (name: "category") => Promise<Category | null>;
+
         static _tableName = "posts";
         static {
           this.belongsTo("category", { polymorphic: false } as any);
@@ -1835,6 +1865,9 @@ describe("BelongsToAssociationsTest", () => {
 
   it("runs parent presence check if parent changed or nil", async () => {
     class ShipRequired extends Base {
+      declare developer: Developer | null;
+      declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
@@ -1858,6 +1891,9 @@ describe("BelongsToAssociationsTest", () => {
 
   it("skips parent presence check if parent has not changed", async () => {
     class ShipRequired extends Base {
+      declare developer: Developer | null;
+      declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
       static _tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
@@ -1878,6 +1914,9 @@ describe("BelongsToAssociationsTest", () => {
 
     try {
       class TempShip extends Base {
+        declare developer: Developer | null;
+        declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
         static _tableName = "ships";
         static {
           this.belongsTo("developer", { required: true, inverseOf: false });
