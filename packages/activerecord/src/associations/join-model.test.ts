@@ -461,8 +461,7 @@ describe("AssociationsJoinModelTest", () => {
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).authors.toArray()) as Base[]).length;
       await assertNoQueries(false, async () => {
-        const assoc = (postsWithAuthors[i] as any).association("authors");
-        expect((assoc.target as Base[]).length).toBe(expected);
+        expect(await (postsWithAuthors[i] as any).authors.length()).toBe(expected);
       });
     }
   });
@@ -492,8 +491,7 @@ describe("AssociationsJoinModelTest", () => {
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
       await assertNoQueries(false, async () => {
-        const assoc = (postsWithTags[i] as any).association("tags");
-        expect((assoc.target as Base[]).length).toBe(expected);
+        expect(await (postsWithTags[i] as any).tags.length()).toBe(expected);
       });
     }
   });
@@ -508,8 +506,7 @@ describe("AssociationsJoinModelTest", () => {
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
       await assertNoQueries(false, async () => {
-        const assoc = (postsWithTaggings[i] as any).association("taggings");
-        expect((assoc.target as Base[]).length).toBe(expected);
+        expect(await (postsWithTaggings[i] as any).taggings.length()).toBe(expected);
       });
     }
   });
@@ -1014,8 +1011,7 @@ describe("AssociationsJoinModelTest", () => {
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
       await assertNoQueries(false, async () => {
-        const assoc = (postsWithTaggings[i] as any).association("taggings");
-        expect((assoc.target as Base[]).length).toBe(expected);
+        expect(await (postsWithTaggings[i] as any).taggings.length()).toBe(expected);
       });
     }
   });
@@ -1284,8 +1280,7 @@ describe("AssociationsJoinModelTest", () => {
     for (let i = 0; i < allPosts.length; i++) {
       const expectedLen = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
       await assertNoQueries(false, async () => {
-        const len = ((postsWithTags[i] as any).tags.target as Base[]).length;
-        expect(len).toBe(expectedLen);
+        expect(await (postsWithTags[i] as any).tags.length()).toBe(expectedLen);
       });
     }
   });

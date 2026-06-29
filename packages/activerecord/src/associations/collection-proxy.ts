@@ -294,12 +294,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // first.
   // ──────────────────────────────────────────────────────────────────
 
-  // `length` is intentionally NOT redeclared — `CollectionProxy extends
-  // Relation`, and `Relation#length()` is `async`. Previously CP shadowed
-  // it with a sync getter over `_target`; keeping that alongside
-  // inheritance would require overriding an async method with a getter,
-  // which TS rejects. Callers that need the sync count should reach for
-  // `proxy.target.length` or `Array.from(proxy).length`.
+  /**
+   * Return the number of records in the collection.
+   *
+   * Mirrors ActiveRecord::Associations::CollectionProxy#length
+   * (collection_proxy.rb): `records.length`. `records` resolves through
+   * `load_target`, which returns the cached `@target` when the association is
+   * already loaded — so a loaded proxy counts in memory with NO query and only
+   * an unloaded one re-queries. The inherited `Relation#length` always
+   * re-queries via `toArray`/`_execLoad`, which is why we override here: the
+   * proxy keeps loaded state in `_target`/`_targetLoaded`, not Relation's
+   * `_records`/`_loaded`, so `loadTarget()` (which short-circuits on
+   * `_targetLoaded`) is the faithful path.
+   */
+  override async length(): Promise<number> {
+    return (await this.loadTarget()).length;
+  }
 
   [Symbol.iterator](): IterableIterator<T> {
     return this._target[Symbol.iterator]();
