@@ -6,6 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { isAbortSignal } from "@blazetrails/activesupport";
 import {
   sanitizeForMassAssignment,
   SerializeCastValue,
@@ -488,6 +489,16 @@ export async function incrementBang<T extends CounterBangRecord>(
   // otherwise a later write would still diff against the pre-increment
   // original.
   this.clearAttributeChange(attribute);
+  // Mirrors Rails Callbacks#increment! (callbacks.rb:435-437):
+  //   `touch ? _run_touch_callbacks { super } : super`
+  // — when a `touch:` is requested, the counter UPDATE timestamps the row and
+  // the after_touch callbacks must fire on this in-memory instance (e.g. a
+  // belongs_to `counter_cache` + `touch:` bumps the parent's `after_touch`
+  // counter). The class-level `updateCounters` above only emits SQL.
+  if (options.touch != null) {
+    const ctor = this.constructor as unknown as { prototype: object };
+    await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+  }
   return this;
 }
 
@@ -766,8 +777,14 @@ export async function save<T extends SaveRecord>(
   // live. So validations run *before* the guards: a record that is both
   // destroyed and invalid raises RecordInvalid (validations first), not
   // RecordNotSaved.
-  if (!performValidations.call(this, options)) return false;
   const self = this as any;
+  // A `before_validation` that needs async DB work (Rails runs it inside the
+  // save transaction — transactions_test.rb:714) can't await on trails' strict-
+  // sync validation chain, so such a callback defers its thunk here instead of
+  // running inline. Reset the queue before the chain populates it so a prior
+  // save that bailed at validation doesn't leak a stale thunk into this one.
+  self._beforeValidationSideEffects = [];
+  if (!performValidations.call(this, options)) return false;
   if (options?.validate !== false) {
     if (!(await self._runAsyncValidations())) return false;
   }
@@ -795,9 +812,36 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return (await withTransactionReturningStatus.call(self, () => self.createOrUpdate())) as
-      | boolean
-      | undefined;
+    return (await withTransactionReturningStatus.call(self, async () => {
+      // Drain deferred `before_validation` side effects inside the transaction
+      // so a cancelling filter's DB write (`Book.create`) rolls back with it.
+      // A drained thunk that `throw :abort`s halts the save (status false →
+      // Rollback), matching Rails' halted validation callback.
+      //
+      // ORDERING DEVIATION: Rails layers save as `Transactions#save {
+      // Validations#save { perform_validations; Persistence#save } }`
+      // (transactions.rb:360, validations.rb:47), so `before_validation` runs
+      // *inside* the transaction and *before* `valid?`. trails runs
+      // `performValidations` above (outside the transaction, line 778), so the
+      // deferred thunk's async body runs here — after the validators, not
+      // before. Observable only when a record has BOTH a failing validation and
+      // an aborting async `before_validation`: trails reports `errors.any`
+      // (validators already ran) where Rails reports none (abort halts first).
+      // The four cancellation tests don't hit this (validations pass); the
+      // governing constraint is the strict-sync validation chain — see the
+      // Topic wiring and `validations.ts#isValid`. Tracked for convergence:
+      // RFC 0023 story `save-runs-validations-inside-transaction`.
+      const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
+      for (const thunk of sideEffects) {
+        try {
+          await thunk();
+        } catch (e) {
+          if (isAbortSignal(e)) return false;
+          throw e;
+        }
+      }
+      return self.createOrUpdate();
+    })) as boolean | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
     // callbacks raise RecordInvalid when a child fails to save. The transaction

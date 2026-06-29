@@ -3,7 +3,14 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
-import { SubclassNotFound, Base, ReadOnlyRecord, RecordInvalid, registerModel } from "../index.js";
+import {
+  SubclassNotFound,
+  Base,
+  ReadOnlyRecord,
+  RecordInvalid,
+  registerModel,
+  AssociationTypeMismatch,
+} from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
@@ -40,6 +47,9 @@ import { Record } from "../test-helpers/models/record.js";
 import { Column } from "../test-helpers/models/column.js";
 import { Toy } from "../test-helpers/models/toy.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
+import { Project } from "../test-helpers/models/project.js";
+import { AdminUser } from "../test-helpers/models/admin/user.js";
+import { AdminAccount } from "../test-helpers/models/admin/account.js";
 import { LineItem } from "../test-helpers/models/line-item.js";
 import {
   CpkAuthor,
@@ -141,6 +151,9 @@ for (const m of [
   CpkOrder,
   CpkOrderWithSpecialPrimaryKey,
   CpkPost,
+  Project,
+  AdminUser,
+  AdminAccount,
 ]) {
   registerModel(m as any);
 }
@@ -366,8 +379,50 @@ describe("BelongsToAssociationsTest", () => {
     }
   });
 
-  it.todo("default");
-  it.todo("default with lambda");
+  it("default", async () => {
+    const david = await Developer.find(developers("david").id);
+    const jamis = await Developer.find(developers("jamis").id);
+
+    class TempDefault extends Base {
+      static _tableName = "ships";
+      static {
+        this.belongsTo("developer", { default: () => david, inverseOf: false });
+      }
+    }
+
+    let ship = await TempDefault.create({});
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+
+    ship = await TempDefault.create({ developer: jamis });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
+
+    await ship.update({ developer: null });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+  });
+
+  it("default with lambda", async () => {
+    class TempDefault extends Base {
+      static _tableName = "ships";
+      static {
+        this.belongsTo("developer", {
+          default: (owner) => (owner as any).defaultDeveloper(),
+          inverseOf: false,
+        });
+      }
+      defaultDeveloper(): Promise<any> {
+        return Developer.first();
+      }
+    }
+
+    const david = await Developer.find(developers("david").id);
+    const jamis = await Developer.find(developers("jamis").id);
+
+    let ship = await TempDefault.create({});
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+
+    ship = await TempDefault.create({ developer: jamis });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
+  });
 
   it("default scope on relations is not cached", async () => {
     const counter = 0;
@@ -388,8 +443,26 @@ describe("BelongsToAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  it.todo("type mismatch");
-  it.todo("raises type mismatch with namespaced class");
+  it("type mismatch", async () => {
+    const account = await Account.find(1);
+    expect(() => {
+      (account as any).firm = 1;
+    }).toThrow(AssociationTypeMismatch);
+    const project = await Project.find(1);
+    expect(() => {
+      (account as any).firm = project;
+    }).toThrow(AssociationTypeMismatch);
+  });
+
+  it("raises type mismatch with namespaced class", () => {
+    // The mismatch message names the resolved namespaced klass (AdminAccount),
+    // proving the wrong-type guard ran against the association's actual class —
+    // mirrors Rails' assertion shape `<Klass>(#...) expected, got "wrong value"
+    // which is an instance of String(#...)`.
+    expect(() => new AdminUser({ account: "wrong value" })).toThrow(
+      /^AdminAccount expected, got "wrong value" which is an instance of String$/,
+    );
+  });
 
   it("natural assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
@@ -812,7 +885,26 @@ describe("BelongsToAssociationsTest", () => {
     expect((await Topic.find(topic.id!)).readAttribute("replies_count")).toBe(1);
   });
 
-  it.todo("belongs to counter after touch");
+  it("belongs to counter after touch", async () => {
+    const topic = await Topic.create({ title: "topic" });
+
+    expect(topic.readAttribute("replies_count")).toBe(0);
+    expect((topic as any).afterTouchCalled).toBe(0);
+
+    const reply = await Reply.create({
+      title: "blah!",
+      content: "world around!",
+      topicWithPrimaryKey: topic,
+    });
+
+    expect(topic.readAttribute("replies_count")).toBe(1);
+    expect((topic as any).afterTouchCalled).toBe(1);
+
+    await reply.destroyBang();
+
+    expect(topic.readAttribute("replies_count")).toBe(0);
+    expect((topic as any).afterTouchCalled).toBe(2);
+  });
 
   it("belongs to touch with reassigning", async () => {
     const debate = await Topic.create({ title: "debate" });
@@ -1537,7 +1629,20 @@ describe("BelongsToAssociationsTest", () => {
     expect((await parent.reload()).children_count).toBe(1);
   });
 
-  it.todo("belongs to with out of range value assigning");
+  it("belongs to with out of range value assigning", async () => {
+    class Temp extends Author {
+      static {
+        this.validates("authorAddress", { presence: true });
+      }
+    }
+
+    const author = Temp.new();
+    author.writeAttribute("author_address_id", 9223372036854775808n); // out of range in the bigint
+
+    expect(await (author as any).loadBelongsTo("authorAddress")).toBeNull();
+    expect(await author.isValid()).toBe(false);
+    expect(author.errors.details.get("authorAddress")).toEqual([{ error: "blank" }]);
+  });
 
   it("polymorphic with custom primary key", async () => {
     const toy = await Toy.create({});

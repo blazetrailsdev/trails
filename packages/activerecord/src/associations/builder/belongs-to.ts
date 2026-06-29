@@ -1,7 +1,7 @@
 import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { beforeSave, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { modelRegistry } from "../../associations.js";
 import {
   flushPendingCounterCacheColumns,
@@ -296,7 +296,14 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {
-    beforeValidation(model, async (record: any) => {
+    // Rails registers this on before_validation
+    // (builder/belongs_to.rb#add_default_callbacks) so the defaulted target
+    // also satisfies a presence validation on a required association. Trails'
+    // validation chain is strictly synchronous, but the default block may run
+    // an async finder (e.g. `() => Developer.first()`), so we defer to
+    // before_save — the next async-capable lifecycle phase that still runs
+    // before the FK is written.
+    beforeSave(model, async (record: any) => {
       if (typeof record.association === "function") {
         const assoc = record.association(reflection.name);
         if (typeof assoc.default === "function") {

@@ -39,7 +39,7 @@ export {
   registerWithSuperclass,
 } from "./attribute-registration.js";
 export { Attributes } from "./attributes.js";
-export type { AttributeDefinition } from "./attributes.js";
+export type { AttributeDefinition, AttributeOptions } from "./attributes.js";
 export {
   Attribute,
   FromDatabase,

@@ -88,6 +88,20 @@ export function _writeAttribute(
  *
  * @internal
  */
+export interface AttributeOptions {
+  default?: unknown;
+  virtual?: boolean;
+  /**
+   * Mirrors Rails' `user_provided_default:` keyword. Defaults to true —
+   * any call to `attribute(...)` is treated as user-authored. Internal
+   * schema-reflection paths pass `false` so user-declared attributes win
+   * on re-registration.
+   */
+  userProvidedDefault?: boolean;
+  limit?: number | null;
+}
+
+/** @internal */
 export function attribute(
   this: {
     _attributeDefinitions: Map<string, AttributeDefinition>;
@@ -95,36 +109,45 @@ export function attribute(
     _cachedDefaultAttributes?: AttributeSet | null;
   },
   name: string,
-  typeName: string | Type,
-  options?: {
-    default?: unknown;
-    virtual?: boolean;
-    /**
-     * Mirrors Rails' `user_provided_default:` keyword. Defaults to true —
-     * any call to `attribute(...)` is treated as user-authored. Internal
-     * schema-reflection paths pass `false` so user-declared attributes win
-     * on re-registration.
-     */
-    userProvidedDefault?: boolean;
-    limit?: number | null;
-  },
+  // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
+  // optional. When omitted, the attribute keeps its existing (schema-reflected
+  // or previously-declared) type and only the default/decorator is applied —
+  // backing the `attribute :col, default: "x"` idiom. See
+  // activemodel/lib/active_model/attribute_registration.rb:18,55-63.
+  typeName?: string | Type | AttributeOptions,
+  options?: AttributeOptions,
 ): void {
-  const type = typeName instanceof Type ? typeName : typeRegistry.lookup(typeName);
+  // Type-optional form: `attribute(name, options)`. The second positional is
+  // the options hash rather than a type when it isn't a string or Type.
+  if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {
+    options = typeName;
+    typeName = undefined;
+  }
+  const typeProvided = typeName !== undefined;
   const userProvided = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
   const existing = this._attributeDefinitions.get(name);
+  // When the type is omitted, preserve the existing attribute's type (Rails'
+  // PendingType `with_type` inheritance path); fall back to the value type only
+  // when nothing is known about the attribute yet.
+  const type = typeProvided
+    ? typeName instanceof Type
+      ? typeName
+      : typeRegistry.lookup(typeName as string)
+    : (existing?.type ?? typeRegistry.lookup("value"));
   // Preserve the existing defaultValue when no default is explicitly provided,
   // matching Rails' PendingType behavior: with_type only changes the type and
   // leaves the current default/value untouched.
   const defaultValue =
     options?.default !== undefined ? options.default : (existing?.defaultValue ?? null);
   this._attributeDefinitions.set(name, {
+    ...existing,
     name,
     type,
     defaultValue,
-    virtual: options?.virtual,
+    virtual: options?.virtual ?? existing?.virtual,
     userProvided,
     source: userProvided ? "user" : "schema",
     ...(options?.limit != null ? { limit: options.limit } : {}),
@@ -133,9 +156,17 @@ export function attribute(
   // Push to pending-modification queue so _defaultAttributes() replays in
   // the correct order relative to schema-reflected columns (AR) or other
   // pending modifications (AM inheritance).
-  // Mirrors: ActiveModel::AttributeRegistration#attribute
-  pushPendingType(this, name, type);
-  if (options?.default !== undefined) {
+  // Mirrors: ActiveModel::AttributeRegistration#attribute —
+  //   pending << PendingType.new(name, type) if type || no_default
+  //   pending << PendingDefault.new(name, default) unless no_default
+  // A bare re-declaration (no type, no default) still pushes a PendingType with
+  // a nil type so it re-anchors to the attribute's current type at replay; a
+  // default-only call pushes only PendingDefault, preserving the existing type.
+  const noDefault = options?.default === undefined;
+  if (typeProvided || noDefault) {
+    pushPendingType(this, name, typeProvided ? type : null);
+  }
+  if (!noDefault) {
     pushPendingDefault(this, name, defaultValue);
   }
 

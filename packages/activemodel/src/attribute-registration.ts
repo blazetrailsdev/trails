@@ -3,6 +3,7 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
+import type { AttributeOptions } from "./attributes.js";
 
 /**
  * AttributeRegistration mixin — provides the static attribute() method
@@ -16,8 +17,8 @@ import { AttributeSet } from "./attribute-set.js";
 export interface AttributeRegistrationClassMethods {
   attribute(
     name: string,
-    typeName: string | Type,
-    options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
+    typeName?: string | Type | AttributeOptions,
+    options?: AttributeOptions,
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: (name: string, type: Type) => Type): void;
@@ -53,13 +54,16 @@ export interface PendingModification {
 export class PendingType implements PendingModification {
   constructor(
     readonly name: string,
-    readonly type: Type,
+    // Nullable, mirroring Rails' `PendingType` whose `type` is nil for a bare
+    // `attribute(:col)` re-declaration. apply_to falls back to the attribute's
+    // current type (`type || attribute.type`), keeping the existing type.
+    readonly type: Type | null,
   ) {}
 
   /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
-    attributeSet.set(this.name, existing.withType(this.type));
+    attributeSet.set(this.name, existing.withType(this.type ?? existing.type));
   }
 }
 
@@ -183,7 +187,12 @@ export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
  * ValueType — same effect as Rails setting `hash.default = Type.default_value`.
  */
 export function attributeTypes(this: AttributeHostInternals): Record<string, Type> {
-  const cast = _defaultAttributes.call(this).castTypes();
+  // Dispatch through `this._defaultAttributes()` (not the bare AM function) so a
+  // subclass override — notably ActiveRecord's column-inclusive
+  // `_defaultAttributes`, which reflects schema columns into the set — is
+  // honored. Mirrors Rails calling the polymorphic `_default_attributes`.
+  const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
+  const cast = host._defaultAttributes().castTypes();
   return new Proxy(cast, {
     get(target, prop, receiver) {
       if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
@@ -345,7 +354,11 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
  *
  * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
  */
-export function pushPendingType(cls: AttributeHostInternals, name: string, type: Type): void {
+export function pushPendingType(
+  cls: AttributeHostInternals,
+  name: string,
+  type: Type | null,
+): void {
   pendingAttributeModifications.call(cls).push(new PendingType(name, type));
 }
 

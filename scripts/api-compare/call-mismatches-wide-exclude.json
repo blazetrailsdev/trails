@@ -15178,6 +15178,20 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
+    "rubyName": "raise_on_type_mismatch!",
+    "call": "klass",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association.ts",
+    "rubyName": "raise_on_type_mismatch!",
+    "call": "reflection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association.ts",
     "rubyName": "async_load_target",
     "call": "find_target",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -15845,13 +15859,6 @@
     "tsFile": "associations/belongs-to-association.ts",
     "rubyName": "invertible_for?",
     "call": "klass",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/belongs-to-association.ts",
-    "rubyName": "replace",
-    "call": "raise_on_type_mismatch!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -60289,5 +60296,12 @@
     "rubyName": "stale_state",
     "call": "through_reflection",
     "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasManyThroughAssociation#staleState delegates to."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/belongs-to.ts",
+    "rubyName": "add_default_callbacks",
+    "call": "before_validation",
+    "reason": "Intentional deviation: Rails registers the default on before_validation, but trails' validation chain is strictly synchronous and the default block may be async (e.g. () => Developer.first()), so addDefaultCallbacks registers it on beforeSave instead. Documented in belongs-to.ts and AssociationOptions.default."
   }
 ]
