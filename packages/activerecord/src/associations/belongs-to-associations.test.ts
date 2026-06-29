@@ -1467,7 +1467,20 @@ describe("BelongsToAssociationsTest", () => {
     expect((await parent.reload()).children_count).toBe(1);
   });
 
-  it.todo("belongs to with out of range value assigning");
+  it("belongs to with out of range value assigning", async () => {
+    class Temp extends Author {
+      static {
+        this.validates("authorAddress", { presence: true });
+      }
+    }
+
+    const author = Temp.new();
+    (author as any).author_address_id = 9223372036854775808n; // out of range in the bigint
+
+    expect(await (author as any).loadBelongsTo("authorAddress")).toBeNull();
+    expect(await author.isValid()).toBe(false);
+    expect(author.errors.details.get("authorAddress")).toEqual([{ error: "blank" }]);
+  });
 
   it("polymorphic with custom primary key", async () => {
     const toy = await Toy.create({});
