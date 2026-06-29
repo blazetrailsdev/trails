@@ -92,8 +92,14 @@ export function hasSecureToken(
   Object.defineProperty(modelClass.prototype, methodName, {
     value: async function (this: Base): Promise<string> {
       const newToken = generateToken(tokenLength);
-      this._attributes.set(attribute, newToken);
-      await this.updateColumn(attribute, newToken);
+      // Mirrors Rails: `update! attribute => generate_unique_secure_token(...)`
+      // (secure_token.rb:53) — a full validated save with callbacks and a
+      // timestamp bump, not a direct-SQL `update_column` that bypasses them.
+      await (
+        this as unknown as {
+          updateBang(attrs: Record<string, unknown>): Promise<unknown>;
+        }
+      ).updateBang({ [attribute]: newToken });
       return newToken;
     },
     writable: true,
