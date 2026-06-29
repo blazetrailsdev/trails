@@ -5167,8 +5167,12 @@ export class Relation<T extends Base> {
         ids = await node.innerRelation._materializeDistinctPkIds();
         negated = node instanceof DeferredDistinctPkNotIn;
       } else if (node instanceof DeferredIdsNotIn) {
-        // Rails `excluding`/`without`: `relations.flat_map(&:ids)` (query_methods.rb:1583).
-        ids = await node.innerRelation.ids();
+        // Rails `excluding`/`without`: one predicate over
+        // `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1588).
+        // Concatenate the known literal ids with each relation's materialized
+        // ids so the substitution stays a single `NOT IN`, not an `AND` of them.
+        const relationIds = (await Promise.all(node.innerRelations.map((rel) => rel.ids()))).flat();
+        ids = [...node.literalIds, ...relationIds];
         negated = true;
       } else {
         continue;

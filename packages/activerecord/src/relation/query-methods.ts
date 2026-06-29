@@ -18,6 +18,7 @@ import {
 } from "@blazetrails/activemodel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
+import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 import {
   ActiveRecordError,
   ConfigurationError,
@@ -1487,41 +1488,42 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
 
   // Rails `excluding!`: `predicate_builder[primary_key, records].invert`, where
   // `records` is `records + relations.flat_map(&:ids)` — scalar AR records plus
-  // every relation arg's eagerly-materialized ids. Ruby materializes those ids
-  // before this call (synchronous query execution); trails' builder is
-  // synchronous-and-lazy, so `_excludingArgs` leaves any UNLOADED relation in
-  // `records` for us to defer here. Partition: literal records go through the
-  // array handler unchanged; each unloaded relation becomes a `DeferredIdsNotIn`.
+  // every relation arg's eagerly-materialized ids — built into ONE predicate.
+  // Ruby materializes those ids before this call (synchronous query execution);
+  // trails' builder is synchronous-and-lazy, so `_excludingArgs` leaves any
+  // UNLOADED relation in `records` for us to defer here.
   const unloadedRelations = records.filter((r) => isRelationLike(r));
   const literalRecords = records.filter((r) => !isRelationLike(r));
 
-  // The array handler dereferences AR records to their ids. Skip when empty so
-  // an all-unloaded-relations call doesn't append a spurious `id NOT IN ()`
-  // (always-true) predicate.
-  if (literalRecords.length > 0) {
+  // No unloaded relations: every value's id is known now, so build the literal
+  // predicate exactly as Rails does (array handler dereferences AR records to
+  // their ids).
+  if (unloadedRelations.length === 0) {
     this._whereClause.predicates.push(
       ...this.predicateBuilder.buildNegatedFromHash({ [pk]: literalRecords }),
     );
+    return this;
   }
 
-  // Rails materializes relation args eagerly (`relations.flat_map(&:ids)`,
-  // query_methods.rb:1583): a separate `SELECT <pk>` query yielding a literal
-  // `id NOT IN (1, 2, 3)`. trails cannot run that id-select synchronously here,
-  // so record a `DeferredIdsNotIn` marker carrying the
-  // inner relation; the load pipeline substitutes the literal id list (via
-  // `Relation#ids`) before compile, matching Rails' SQL shape and 2-query count
-  // rather than emitting a `NOT IN (SELECT ...)` subquery. The marker carries
-  // that pk-select subquery only as a synchronous `toSql()` display fallback for
-  // the (rare) no-load path. Eager materialization here would require an async
+  // Otherwise record a single `DeferredIdsNotIn` carrying both the known literal
+  // record ids and the unloaded relations. trails cannot run their id-select
+  // synchronously, so the load pipeline materializes `relations.flat_map(&:ids)`
+  // and substitutes one literal `id NOT IN (records + relIds)` before compile —
+  // matching Rails' single predicate and its extra-query-per-relation semantics
+  // rather than emitting a `NOT IN (SELECT ...)` subquery. Folding the literals
+  // into the same marker keeps it ONE predicate, not an `AND` of `NOT IN`s. The
+  // marker carries a pk-select subquery only as a `toSql()` display fallback for
+  // the (rare) no-load path; eager materialization here would require an async
   // `excluding`, breaking the chainable contract.
-  if (unloadedRelations.length > 0) {
-    const attribute = (this._modelClass as any).arelTable.get(pk);
-    for (const rel of unloadedRelations) {
-      const inlineSubquery = (this.predicateBuilder.buildNegated(attribute, rel) as Nodes.NotIn)
-        .right as Nodes.Node;
-      this._whereClause.predicates.push(new DeferredIdsNotIn(attribute, inlineSubquery, rel));
-    }
-  }
+  const attribute = (this._modelClass as any).arelTable.get(pk);
+  // Mirror the array handler's `x.is_a?(Base) ? x.id : x` deref.
+  const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
+  const inlineSubquery = (
+    this.predicateBuilder.buildNegated(attribute, unloadedRelations[0]) as Nodes.NotIn
+  ).right as Nodes.Node;
+  this._whereClause.predicates.push(
+    new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, unloadedRelations),
+  );
   return this;
 }
 
