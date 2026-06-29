@@ -414,6 +414,88 @@ describe("DelegationTest", () => {
       expect(ids).toEqual([...ids].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0)));
     });
   }); // DelegationRelationTest
+
+  // The `delegate ... to: :records` / `to: :model` set exposed under their exact
+  // Rails names (delegation.rb:101-106) via DelegationMethods. Each `to: :records`
+  // method is async + self-loading in trails (Rails reads the loaded `records`
+  // synchronously). Rails generates `test_delegates_<method>_to_Array` per
+  // ARRAY_DELEGATES entry as an `assert_respond_to`.
+  describe("DelegationNamedMethods", () => {
+    // ruby name → trails camelCase property
+    const RECORD_DELEGATES: ReadonlyArray<readonly [string, string]> = [
+      ["each", "each"],
+      ["join", "join"],
+      ["reverse", "reverse"],
+      ["compact", "compact"],
+      ["shuffle", "shuffle"],
+      ["rotate", "rotate"],
+      ["sample", "sample"],
+      ["index", "index"],
+      ["rindex", "rindex"],
+      ["in_groups", "inGroups"],
+      ["in_groups_of", "inGroupsOf"],
+      ["to_sentence", "toSentence"],
+      ["to_formatted_s", "toFormattedS"],
+      ["to_fs", "toFs"],
+      ["as_json", "asJson"],
+    ];
+
+    for (const [rubyName, jsName] of RECORD_DELEGATES) {
+      it(`test_delegates_${rubyName}_to_Array`, () => {
+        // assert_respond_to: present as a real named method on an unloaded relation.
+        expect(typeof (Comment.all() as any)[jsName]).toBe("function");
+      });
+    }
+
+    it("each yields every record and returns them", async () => {
+      const seen: number[] = [];
+      const returned = await Comment.all().each((c) => seen.push(c.id as number));
+      expect(seen.length).toBeGreaterThan(0);
+      expect(returned.map((c) => c.id)).toEqual(seen);
+    });
+
+    it("reverse returns a reversed copy of the records", async () => {
+      const forward = await Comment.all();
+      const reversed = await Comment.all().reverse();
+      expect(reversed.map((c) => c.id)).toEqual([...forward].reverse().map((c) => c.id));
+    });
+
+    it("index and rindex locate records by value", async () => {
+      // Same loaded relation, so index()/rindex() see the cached instances and
+      // identity comparison matches.
+      const relation = Comment.all();
+      const records = await relation.toArray();
+      const mid = records[Math.floor(records.length / 2)];
+      expect(await relation.index(mid)).toBe(records.findIndex((c) => c.id === mid.id));
+      expect(await relation.rindex((c: any) => c.id === mid.id)).toBe(
+        records.map((c) => c.id).lastIndexOf(mid.id),
+      );
+    });
+
+    it("inGroupsOf splits the records into fixed-size groups", async () => {
+      const records = await Comment.all();
+      const groups = await Comment.all().inGroupsOf(2);
+      expect(groups.length).toBe(Math.ceil(records.length / 2));
+      expect(groups[0].length).toBe(2);
+    });
+
+    it("to_fs(:db) joins the record ids", async () => {
+      const records = await Comment.all();
+      expect(await Comment.all().toFs("db")).toBe(records.map((c) => c.id).join(","));
+    });
+
+    it("delegates connection, primary_key and table_name to the model", () => {
+      const relation = Comment.all();
+      expect(relation.tableName).toBe(Comment.tableName);
+      expect(relation.primaryKey).toBe(Comment.primaryKey);
+      expect(relation.connection).toBe(Comment.connection);
+    });
+
+    it("delegates transaction to the model", async () => {
+      const result = await Comment.all().transaction(async () => 42);
+      expect(result).toBe(42);
+    });
+  }); // DelegationNamedMethods
 });
 
 describe("DelegationCachingTest", () => {

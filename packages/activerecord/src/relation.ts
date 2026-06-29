@@ -19,6 +19,7 @@ import {
   RecordNotUnique,
 } from "./errors.js";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
@@ -79,7 +80,7 @@ import {
   compareValuesForOrder as _compareValuesForOrder,
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
-import { wrapWithScopeProxy } from "./relation/delegation.js";
+import { wrapWithScopeProxy, DelegationMethods } from "./relation/delegation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
@@ -7781,10 +7782,49 @@ export interface Relation<T extends Base>
   mergeBang(other: any): Relation<T>;
 }
 
+// DelegationMethods carries getters (connection/primaryKey/tableName/name) and
+// generic/T-returning methods, so its surface is declared explicitly here rather
+// than via Included<> (which drops accessors and erases the generics).
+export interface Relation<T extends Base> {
+  each(fn: (record: T, index: number) => void): Promise<T[]>;
+  join(separator?: string): Promise<string>;
+  reverse(): Promise<T[]>;
+  compact(): Promise<T[]>;
+  index(valueOrFn: T | ((record: T) => unknown)): Promise<number | null>;
+  rindex(valueOrFn: T | ((record: T) => unknown)): Promise<number | null>;
+  sample(n?: number): Promise<T | T[] | null>;
+  rotate(count?: number): Promise<T[]>;
+  shuffle(): Promise<T[]>;
+  split(valueOrFn: T | ((record: T) => boolean)): Promise<T[][]>;
+  inGroups(number: number, fillWith?: T | null | false): Promise<(T | null | false)[][]>;
+  inGroupsOf(number: number, fillWith?: T | null | false): Promise<(T | null | false)[][]>;
+  toSentence(options?: {
+    wordsConnector?: string;
+    twoWordsConnector?: string;
+    lastWordConnector?: string;
+  }): Promise<string>;
+  asJson(options?: SerializeOptions): Promise<unknown[]>;
+  toFs(format?: string): Promise<string>;
+  toFormattedS(format?: string): Promise<string>;
+  get connection(): DatabaseAdapter;
+  get primaryKey(): string | string[];
+  get tableName(): string;
+  withConnection<R>(
+    fn: (conn: DatabaseAdapter) => R | Promise<R>,
+    options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
+  ): Promise<R>;
+  transaction<R>(
+    fn: (tx: any) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined>;
+  sanitizeSqlLike(value: string, escapeChar?: string): string;
+}
+
 include(Relation, QueryMethodBangs);
 include(Relation, FinderMethods);
 include(Relation, Calculations);
 include(Relation, SpawnMethods);
+include(Relation, DelegationMethods);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);

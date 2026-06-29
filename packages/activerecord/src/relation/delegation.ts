@@ -10,7 +10,15 @@
  */
 
 import type { Base } from "../base.js";
-import { Delegation as ASDelegation } from "@blazetrails/activesupport";
+import type { DatabaseAdapter } from "../adapter.js";
+import type { SerializeOptions } from "@blazetrails/activemodel";
+import {
+  Delegation as ASDelegation,
+  inGroups,
+  inGroupsOf,
+  splitArray,
+  toSentence,
+} from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
 import { NotImplementedError } from "../errors.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
@@ -602,4 +610,243 @@ function includeRelationMethods(target: object, methods: GeneratedRelationMethod
  */
 function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
   return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
+}
+
+/**
+ * The host surface `DelegationMethods` operates against once mixed into
+ * `Relation` — the `model` accessor (Rails' delegation target `:model`) and the
+ * loaded `records` (`:records`), reached through `toArray()` since trails loads
+ * asynchronously.
+ */
+export interface DelegationHost {
+  readonly model: typeof Base;
+  toArray(): Promise<Base[]>;
+}
+
+/**
+ * DelegationMethods — the curated `delegate ... to: :records` and
+ * `delegate ... to: :model` surface (delegation.rb:101-106) realized as real
+ * named methods on `Relation` (mixed in via `include(Relation, DelegationMethods)`),
+ * so `relation.each`, `relation.connection`, `relation.toSentence`, … resolve
+ * exactly as in Rails rather than only through the runtime delegation Proxy.
+ *
+ * The `to: :records` methods are async + self-loading: Rails reads the loaded
+ * `records` array synchronously, but trails loads asynchronously, so each forces
+ * `toArray()` first and then applies the corresponding `Array`/`Enumerable`
+ * helper to a copy (preserving Ruby's non-mutating semantics).
+ *
+ * Mirrors: ActiveRecord::Delegation
+ */
+export class DelegationMethods {
+  // ---- to: :records (Array / Enumerable) ----
+
+  /** `Array#each` — yields each loaded record, returning the records. */
+  async each(this: DelegationHost, fn: (record: Base, index: number) => void): Promise<Base[]> {
+    const records = await this.toArray();
+    records.forEach(fn);
+    return records;
+  }
+
+  /** `Array#join`. */
+  async join(this: DelegationHost, separator?: string): Promise<string> {
+    return (await this.toArray()).join(separator);
+  }
+
+  /** `Array#reverse` (non-mutating). */
+  async reverse(this: DelegationHost): Promise<Base[]> {
+    return [...(await this.toArray())].reverse();
+  }
+
+  /** `Array#compact` — drop nil records. */
+  async compact(this: DelegationHost): Promise<Base[]> {
+    return (await this.toArray()).filter((record) => record != null);
+  }
+
+  /**
+   * `Array#index` — the index of the first matching record (by predicate or
+   * value), or `null` (Ruby's `nil`) when none matches.
+   */
+  async index(
+    this: DelegationHost,
+    valueOrFn: Base | ((record: Base) => unknown),
+  ): Promise<number | null> {
+    const records = await this.toArray();
+    const found =
+      typeof valueOrFn === "function"
+        ? records.findIndex(valueOrFn as (record: Base) => unknown)
+        : records.indexOf(valueOrFn);
+    return found === -1 ? null : found;
+  }
+
+  /**
+   * `Array#rindex` — the index of the last matching record, or `null` when none
+   * matches.
+   */
+  async rindex(
+    this: DelegationHost,
+    valueOrFn: Base | ((record: Base) => unknown),
+  ): Promise<number | null> {
+    const records = await this.toArray();
+    if (typeof valueOrFn !== "function") {
+      const found = records.lastIndexOf(valueOrFn);
+      return found === -1 ? null : found;
+    }
+    const predicate = valueOrFn as (record: Base) => unknown;
+    for (let i = records.length - 1; i >= 0; i--) {
+      if (predicate(records[i])) return i;
+    }
+    return null;
+  }
+
+  /**
+   * `Array#sample` — a random record, or (with `n`) up to `n` distinct random
+   * records. Returns `null` (Ruby's `nil`) when sampling a single record from an
+   * empty collection.
+   */
+  async sample(this: DelegationHost, n?: number): Promise<Base | Base[] | null> {
+    const records = [...(await this.toArray())];
+    const shuffled = shuffleInPlace(records);
+    if (n === undefined) return shuffled.length === 0 ? null : shuffled[0];
+    return shuffled.slice(0, Math.max(0, n));
+  }
+
+  /** `Array#rotate` — rotate left by `count` (negative rotates right). */
+  async rotate(this: DelegationHost, count = 1): Promise<Base[]> {
+    const records = await this.toArray();
+    if (records.length === 0) return [];
+    const shift = ((count % records.length) + records.length) % records.length;
+    return records.slice(shift).concat(records.slice(0, shift));
+  }
+
+  /** `Array#shuffle` (non-mutating). */
+  async shuffle(this: DelegationHost): Promise<Base[]> {
+    return shuffleInPlace([...(await this.toArray())]);
+  }
+
+  /** `Array#split` — split records on a value or predicate (ActiveSupport). */
+  async split(
+    this: DelegationHost,
+    valueOrFn: Base | ((record: Base) => boolean),
+  ): Promise<Base[][]> {
+    return splitArray(await this.toArray(), valueOrFn);
+  }
+
+  /** `Array#in_groups` — split records into `number` groups (ActiveSupport). */
+  async inGroups(
+    this: DelegationHost,
+    number: number,
+    fillWith: Base | null | false = null,
+  ): Promise<(Base | null | false)[][]> {
+    return inGroups(await this.toArray(), number, fillWith);
+  }
+
+  /** `Array#in_groups_of` — split records into groups of `number` (ActiveSupport). */
+  async inGroupsOf(
+    this: DelegationHost,
+    number: number,
+    fillWith: Base | null | false = null,
+  ): Promise<(Base | null | false)[][]> {
+    return inGroupsOf(await this.toArray(), number, fillWith);
+  }
+
+  /** `Array#to_sentence` — comma/`and`-joined record strings (ActiveSupport). */
+  async toSentence(
+    this: DelegationHost,
+    options?: {
+      wordsConnector?: string;
+      twoWordsConnector?: string;
+      lastWordConnector?: string;
+    },
+  ): Promise<string> {
+    return toSentence(
+      (await this.toArray()).map((record) => String(record)),
+      options,
+    );
+  }
+
+  /** `Array#as_json` — each record's `as_json`. */
+  async asJson(this: DelegationHost, options?: SerializeOptions): Promise<unknown[]> {
+    return (await this.toArray()).map((record) =>
+      (record as unknown as { asJson(o?: SerializeOptions): unknown }).asJson(options),
+    );
+  }
+
+  /**
+   * `Array#to_fs` / `Array#to_formatted_s` (conversions.rb): the `:db` format
+   * yields `"null"` for an empty collection else the records' ids joined by
+   * `","`; any other format falls back to the default string form.
+   */
+  async toFs(this: DelegationHost, format?: string): Promise<string> {
+    const records = await this.toArray();
+    if (format === "db") {
+      if (records.length === 0) return "null";
+      return records.map((record) => (record as unknown as { id: unknown }).id).join(",");
+    }
+    return String(records);
+  }
+
+  /** Alias of {@link toFs} — `alias_method :to_formatted_s, :to_fs`. */
+  async toFormattedS(this: DelegationHost & DelegationMethods, format?: string): Promise<string> {
+    return this.toFs(format);
+  }
+
+  // ---- to: :model ----
+
+  /** `delegate :connection, to: :model`. */
+  get connection(): DatabaseAdapter {
+    return (this as unknown as DelegationHost).model.connection;
+  }
+
+  /** `delegate :primary_key, to: :model`. */
+  get primaryKey(): string | string[] {
+    return (this as unknown as DelegationHost).model.primaryKey;
+  }
+
+  /** `delegate :table_name, to: :model`. */
+  get tableName(): string {
+    return (this as unknown as DelegationHost).model.tableName;
+  }
+
+  /** `delegate :with_connection, to: :model`. */
+  withConnection<R>(
+    this: DelegationHost,
+    fn: (conn: DatabaseAdapter) => R | Promise<R>,
+    options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
+  ): Promise<R> {
+    return this.model.withConnection(fn, options);
+  }
+
+  /** `delegate :transaction, to: :model`. */
+  transaction<R>(
+    this: DelegationHost,
+    fn: (tx: any) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined> {
+    return this.model.transaction(fn, options);
+  }
+
+  /** `delegate :sanitize_sql_like, to: :model`. */
+  sanitizeSqlLike(this: DelegationHost, value: string, escapeChar?: string): string {
+    return this.model.sanitizeSqlLike(value, escapeChar);
+  }
+}
+
+/**
+ * The named methods `DelegationMethods` installs on `Relation` (its `to: :records`
+ * and `to: :model` surface). `wrapCollectionProxy` consults this so a *loaded*
+ * proxy keeps the synchronous already-loaded Array semantics for the curated
+ * record delegations (`join`, `reverse`, …) instead of resolving to the
+ * inherited async method.
+ */
+export const DELEGATION_METHOD_NAMES: ReadonlySet<string> = new Set(
+  Object.getOwnPropertyNames(DelegationMethods.prototype).filter((n) => n !== "constructor"),
+);
+
+/** Fisher–Yates in-place shuffle (Ruby `Array#shuffle`/`#sample` semantics). */
+function shuffleInPlace<T>(array: T[]): T[] {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }

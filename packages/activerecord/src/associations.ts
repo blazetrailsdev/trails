@@ -12,6 +12,7 @@ import {
   generateRelationMethod,
   lookupGeneratedRelationMethod,
   uncacheableMethods,
+  DELEGATION_METHOD_NAMES,
 } from "./relation/delegation.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { qualifiedName } from "./inheritance.js";
@@ -3122,8 +3123,20 @@ function wrapCollectionProxy<T extends Base = Base>(
   return new Proxy(proxy, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
-      if (value !== undefined) return value;
-      if (prop in target) return value;
+      // Curated `to: :records` Array methods (`join`, `reverse`, …) are now real
+      // async methods on the Relation base (DelegationMethods). On a *loaded*
+      // proxy they must keep their synchronous already-loaded semantics (Rails
+      // reads `records` synchronously), so for curated names CollectionProxy
+      // itself does NOT specialize, fall through to the sync array delegate
+      // below rather than resolving to the inherited async method. Names
+      // CollectionProxy specializes (slice/reduce/indexOf/…) keep winning here.
+      const preferSyncArrayDelegate =
+        typeof prop === "string" &&
+        target.loaded &&
+        DELEGATION_METHOD_NAMES.has(prop) &&
+        delegateArrayMethod(prop, () => target.target) !== undefined;
+      if (value !== undefined && !preferSyncArrayDelegate) return value;
+      if (prop in target && !preferSyncArrayDelegate) return value;
       if (typeof prop === "symbol") return value;
 
       // Numeric indexing — `proxy[0]`, `proxy[1]` read the loaded target
