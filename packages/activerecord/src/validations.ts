@@ -83,12 +83,16 @@ export interface Validations {
  */
 export interface ValidationsClassMethods {
   validatesAbsenceOf(...attrNames: AttrNameArg[]): void;
-  validatesAssociated(...args: AttrNameArg[]): void;
   validatesLengthOf(...attrNames: AttrNameArg[]): void;
   validatesSizeOf(...attrNames: AttrNameArg[]): void;
   validatesNumericalityOf(...attrNames: AttrNameArg[]): void;
   validatesPresenceOf(...attrNames: AttrNameArg[]): void;
-  validatesUniquenessOf(...attrNames: AttrNameArg[]): void;
+  // validatesAssociated / validatesUniquenessOf are out of this story's scope:
+  // their implementations don't yet delegate through `_merge_attributes`
+  // (no array flattening / multi-attr support), so keep the narrow typing
+  // until they're converged. See associated.ts / uniqueness.ts.
+  validatesAssociated(...args: (string | Record<string, unknown>)[]): void;
+  validatesUniquenessOf(...attrNames: (string | Record<string, unknown>)[]): void;
 }
 
 /** Minimal instance-side surface used by Validations instance helpers. */
