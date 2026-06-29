@@ -730,7 +730,9 @@ export class Association {
         (this.reflection as any).className ??
         this.reflection.name;
       const actualType =
-        record == null ? String(record) : (record.constructor as { name?: string }).name;
+        record == null
+          ? String(record)
+          : ((record.constructor as { name?: string }).name ?? "Object");
       // Mirrors Rails' message shape: `<Expected> expected, got <record.inspect>
       // which is an instance of <record.class>`. The `(#<object_id>)` segments
       // Rails appends are unreplicable in JS and omitted.
