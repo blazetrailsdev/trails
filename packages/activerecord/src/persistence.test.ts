@@ -13,7 +13,7 @@ function isTemporalDatetime(v: unknown): boolean {
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
 import {
   Base,
@@ -105,25 +105,13 @@ describe("PersistenceTest", () => {
     { schema: canonicalSchema },
   );
 
-  afterAll(async () => {
-    // `becomes default sti subclass` and `reset column information resets
-    // children` run reverted DDL on the shared canonical `topics` table
-    // (`change_column_default :topics, :type` / `add_column :topics, :foo`).
-    // Each reverts in its own `finally`, but a `dropExisting` canonical rebuild
-    // here is the belt-and-suspenders shield (mirrors locking/dirty.test.ts):
-    // it guarantees no `type`-default or `foo`-column drift escapes this file
-    // into a sibling reading `topics` on the same per-worker DB, even if a
-    // revert is interrupted. `repairWorkerSchema` only restores *missing*
-    // canonical columns, so it would not undo a leftover extra `foo`.
-    await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
-  });
-
-  // Rails has no `auto_id_tests` fixture file, so the table is created from the
-  // canonical schema directly (mirroring the `boolean.test.ts` pattern) rather
-  // than via a fixture set. `loadSchema` warms the cache so the synchronous
-  // `columns()` reflection resolves (Rails loads columns lazily).
+  // The `auto_id_tests` table is prebuilt on the per-worker DB from the
+  // canonical schema (`template-global-setup.ts`); `loadSchema` warms the cache
+  // so the synchronous `columns()` reflection resolves (Rails loads columns
+  // lazily). `becomes default sti subclass` / `reset column information resets
+  // children` mutate the shared `topics` table's DDL but each reverts in its
+  // own `finally`, so no rebuild shield is needed here.
   beforeAll(async () => {
-    await defineSchema({ auto_id_tests: canonicalSchema.auto_id_tests });
     await AutoId.loadSchema();
   });
 
@@ -1090,13 +1078,10 @@ describe("PersistenceTest", () => {
 
   const Topic = CanonicalTopic;
 
-  beforeAll(async () => {
-    await defineSchema({
-      topics: canonicalSchema.topics,
-      minimalistics: canonicalSchema.minimalistics,
-      cpk_orders: canonicalSchema.cpk_orders,
-    });
-  });
+  // `topics` / `minimalistics` / `cpk_orders` are prebuilt on the per-worker DB
+  // from the canonical schema (`template-global-setup.ts`); transactional
+  // fixtures roll back row mutations per test, so no per-file schema setup is
+  // needed.
 
   it("update columns changing id", async () => {
     const t = await Topic.create({ title: "test" });

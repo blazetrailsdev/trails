@@ -85,12 +85,12 @@ describe("generateSchemaFile", () => {
     expect(content).not.toContain('force: "cascade"');
   });
 
-  it("emits a single-column integer custom PK via the string primaryKey (serial) form", () => {
-    // String `primaryKey` + an explicit integer-width id makes createTable
-    // generate an INT-width serial PK column (default adapter → "integer").
-    expect(content).toContain('"gadgets", { primaryKey: "gadget_id", id: { type: "integer" } }');
-    // ...and the PK column is NOT re-emitted as a plain integer column.
-    expect(content).not.toContain('"gadget_id", "integer"');
+  it("emits a single-column integer custom PK inline at its declared offset (serial)", () => {
+    // `id: false` suppresses the auto id; the serial PK column is emitted inline
+    // at its declared offset with an INT-width serial type (default → "integer")
+    // so its reflected position matches Rails (mirrors define-schema.ts).
+    expect(content).toContain('"gadgets", { id: false }');
+    expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
     // The non-PK column is still emitted.
     expect(content).toContain('"name", "string"');
   });
@@ -174,7 +174,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
     const filePath = await generateSchemaFile(SCHEMA, "postgres");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain('primaryKey: "gadget_id", id: { type: "serial" }');
+    expect(content).toContain('"gadget_id", "serial", { primaryKey: true }');
     fs.unlinkSync(filePath);
   });
 
@@ -182,7 +182,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
     const filePath = await generateSchemaFile(SCHEMA, "mysql");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain('primaryKey: "gadget_id", id: { type: "integer" }');
+    expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
     fs.unlinkSync(filePath);
   });
 });
@@ -196,7 +196,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
     const filePath = await generateSchemaFile(SCHEMA, "postgres");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain('primaryKey: "widget_id", id: { type: "bigserial" }');
+    expect(content).toContain('"widget_id", "bigserial", { primaryKey: true }');
     fs.unlinkSync(filePath);
   });
 
@@ -204,7 +204,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
     const filePath = await generateSchemaFile(SCHEMA, "mysql");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain('primaryKey: "widget_id", id: { type: "bigint" }');
+    expect(content).toContain('"widget_id", "bigint", { primaryKey: true }');
     fs.unlinkSync(filePath);
   });
 
@@ -212,7 +212,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
     const filePath = await generateSchemaFile(SCHEMA, "sqlite");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
-    expect(content).toContain('primaryKey: "widget_id", id: { type: "integer" }');
+    expect(content).toContain('"widget_id", "integer", { primaryKey: true }');
     fs.unlinkSync(filePath);
   });
 });
