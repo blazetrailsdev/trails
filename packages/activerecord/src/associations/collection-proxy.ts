@@ -164,10 +164,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _assocDef: AssociationDefinition;
   private _target: T[] = [];
   private _targetLoaded = false;
-  // Mirrors Rails' Association#@stale_state — snapshot of the through FK(s) at
-  // the time the target was last cached. Used by _staleTarget? to detect when
-  // a belongs_to-through FK changes and the cache must be discarded.
-  private _staleStateSnapshot: string | undefined = undefined;
   // Mirrors Rails' `CollectionAssociation#@replaced_or_added_targets` (a
   // `Set.new.compare_by_identity`): records that have been added to or
   // replaced on the in-memory target. `replace_on_target` consults it to
@@ -685,25 +681,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Load and return all associated records.
    */
   async toArray(): Promise<T[]> {
-    // Rails `to_a` / `load_target`: re-uses the cached target when already
-    // loaded (and not stale), otherwise queries and caches.
-    //   - Mutated proxies (_cpMutated) always re-query without caching.
-    //   - Nested-through associations (through-assoc is itself a through) are
-    //     excluded from caching: Rails explicitly notes stale detection for
-    //     nested-throughs is impractical (through_association.rb:80).
-    //   - Single-level belongs_to-through caches with a stale-state snapshot
-    //     of the owner FK, matching ThroughAssociation#stale_state (rails:82).
-    if (!this._cpMutated && !this._isNestedThrough) {
-      if (this._targetLoaded && !this._staleTarget()) return this._target;
-    }
+    // Rails `to_a` → CollectionProxy#records → load_target. For caching
+    // semantics see load() and first()/last() which call loadTarget() and set
+    // _targetLoaded. toArray() itself stays a fresh-query path: it calls
+    // _execLoad every time so callers that need a re-query (e.g. after an
+    // external delete or a through-FK change) always get fresh data.
     const results = await this._execLoad();
-    const merged = this._mergeTargetLists(results);
-    if (!this._cpMutated && !this._isNestedThrough) {
-      this._target = merged;
-      this._targetLoaded = true;
-      this._staleStateSnapshot = this._computeStaleState();
-    }
-    return merged;
+    return this._mergeTargetLists(results);
   }
 
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
@@ -799,44 +783,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private get _isThrough(): boolean {
     return !!this._assocDef.options.through;
-  }
-
-  // True when the immediate through-association is itself a through-association
-  // (nested-through). Rails explicitly notes stale detection for nested-throughs
-  // is impractical (through_association.rb:80); we skip caching for them.
-  private get _isNestedThrough(): boolean {
-    if (!this._isThrough) return false;
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    return !!throughAssoc?.options?.through;
-  }
-
-  // Mirrors ThroughAssociation#stale_state (through_association.rb:82):
-  // for a single-level belongs_to-through, returns a string snapshot of the
-  // owner's through FK value(s); undefined for non-through or non-belongs_to.
-  private _computeStaleState(): string | undefined {
-    if (!this._isThrough) return undefined;
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc || throughAssoc.type !== "belongsTo") return undefined;
-    const fkCols: string[] = Array.isArray(throughAssoc.options.foreignKey)
-      ? throughAssoc.options.foreignKey
-      : throughAssoc.options.foreignKey
-        ? [throughAssoc.options.foreignKey]
-        : [`${underscore(singularize(throughAssoc.name))}_id`];
-    const vals = fkCols.map((col) => (this._record as any)._readAttribute?.(col) ?? null);
-    return vals.some((v) => v != null) ? JSON.stringify(vals) : undefined;
-  }
-
-  // Mirrors Association#stale_target? (association.rb:97): true when the
-  // cached target is no longer valid because the through FK(s) changed.
-  private _staleTarget(): boolean {
-    if (!this._targetLoaded) return false;
-    const current = this._computeStaleState();
-    if (current === undefined && this._staleStateSnapshot === undefined) return false;
-    return current !== this._staleStateSnapshot;
   }
 
   /**
@@ -2798,8 +2744,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override first(n: number): Promise<T[]>;
   override async first(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
+    // Rails: CollectionProxy#first calls load_target when find_from_target? —
+    // this hydrates and caches @target so repeated first() calls return the
+    // same object reference (no re-query). isFindFromTarget() mirrors that.
+    const records = await this.loadTarget();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
   }
@@ -2824,8 +2772,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
+    const records = await this.loadTarget();
     if (n === undefined) return records[records.length - 1] ?? null;
     return records.slice(Math.max(0, records.length - n));
   }
@@ -2850,8 +2797,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
+    const records = await this.loadTarget();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
   }
