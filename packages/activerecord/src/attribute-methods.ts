@@ -550,16 +550,30 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 }
 
 interface AttributeNamesHost {
-  _attributeDefinitions: { keys(): Iterable<string> };
+  _attributeDefinitions: { keys(): Iterable<string>; has(name: string): boolean };
+  columnNames?(): string[];
 }
 
 /**
  * Returns the list of attribute names for the model class.
  *
  * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#attribute_names
+ *
+ * Rails returns schema column order first, then any declared/virtual
+ * attributes that aren't columns (attributes_test.rb "overloading properties
+ * does not attribute method order"). A user `attribute :col` override keeps the
+ * column's schema position rather than jumping to its declaration slot, so we
+ * walk `column_names` first and append the non-column declarations in
+ * declaration order.
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
-  return [...this._attributeDefinitions.keys()];
+  const declared = [...this._attributeDefinitions.keys()];
+  const columnNames = this.columnNames?.() ?? [];
+  if (columnNames.length === 0) return declared;
+  const columnSet = new Set(columnNames);
+  const orderedColumns = columnNames.filter((name) => this._attributeDefinitions.has(name));
+  const virtuals = declared.filter((name) => !columnSet.has(name));
+  return [...orderedColumns, ...virtuals];
 }
 
 // ---------------------------------------------------------------------------
