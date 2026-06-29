@@ -187,12 +187,8 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
   // subclass override — notably ActiveRecord's column-inclusive
   // `_defaultAttributes`, which reflects schema columns into the set — is
   // honored. Mirrors Rails calling the polymorphic `_default_attributes`.
-  const host = this as AttributeHostInternals & { _defaultAttributes?: () => AttributeSet };
-  const defaults =
-    typeof host._defaultAttributes === "function"
-      ? host._defaultAttributes()
-      : _defaultAttributes.call(this);
-  const cast = defaults.castTypes();
+  const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
+  const cast = host._defaultAttributes().castTypes();
   return new Proxy(cast, {
     get(target, prop, receiver) {
       if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
