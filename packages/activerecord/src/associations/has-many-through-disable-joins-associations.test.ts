@@ -190,13 +190,13 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it("preloading has many through disable joins", async () => {
     const expectedIds = [rating1.id, rating2.id].sort(sortIds);
 
-    const authorsList = await Author.all().preload("goodRatings").toArray();
+    const authorsList = await Author.all().preload("goodRatings");
     const preloadedAuthor = authorsList.find((a: any) => a.id === author.id) as any;
     expect(preloadedAuthor).toBeDefined();
     const goodRatings = preloadedAuthor.association("goodRatings").target as any[];
     expect(goodRatings.map((r: any) => r.id).sort(sortIds)).toEqual(expectedIds);
 
-    const authorsList2 = await Author.all().preload("noJoinsGoodRatings").toArray();
+    const authorsList2 = await Author.all().preload("noJoinsGoodRatings");
     const preloadedAuthor2 = authorsList2.find((a: any) => a.id === author.id) as any;
     expect(preloadedAuthor2).toBeDefined();
     const noJoinsGoodRatings = preloadedAuthor2.association("noJoinsGoodRatings").target as any[];

@@ -130,7 +130,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     // Warm the books table once before any test runs so the first create
     // doesn't race with the test-adapter's regex-recovery schema path on
     // MariaDB. Subsequent tests reuse the warmed schema cache.
-    await books.EncryptedBook.where("1=1").toArray();
+    await books.EncryptedBook.where("1=1");
   });
 
   useHandlerTransactionalFixtures();

@@ -57,7 +57,7 @@ describe("bound SQL literal with Relation bind value", () => {
   });
 
   it("extracts id_for_database from an AR object positional bind", async () => {
-    const [first] = sortedIds(await Topic.where({ approved: true }).toArray());
+    const [first] = sortedIds(await Topic.where({ approved: true }));
     const topic = await Topic.find(first);
     const relation = Topic.where("id = ?", topic);
 
@@ -69,8 +69,8 @@ describe("bound SQL literal with Relation bind value", () => {
   });
 
   it("maps id_for_database over an array positional bind", async () => {
-    const ids = sortedIds(await Topic.where({ approved: true }).toArray());
-    const topics = await Topic.where({ approved: true }).toArray();
+    const ids = sortedIds(await Topic.where({ approved: true }));
+    const topics = await Topic.where({ approved: true });
     const relation = Topic.where("id IN (?)", topics);
 
     expect(sortedIds(await relation.toArray())).toEqual(ids);

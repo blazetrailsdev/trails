@@ -370,7 +370,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await association<Project>(dev, "projects").push(activeRecord);
     await association<Project>(dev, "projects").push(activeRecord);
     expect(await association<Project>(dev, "projects").size()).toBe(3);
-    expect((await association<Project>(dev, "projects").distinct().toArray()).length).toBe(1);
+    expect((await association<Project>(dev, "projects").distinct()).length).toBe(1);
   });
 
   it("distinct before the fact", async () => {
@@ -423,7 +423,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("deleting array", async () => {
     const david = await Developer.find(1);
     await association<Project>(david, "projects").reload();
-    await association<Project>(david, "projects").delete(...(await Project.all().toArray()));
+    await association<Project>(david, "projects").delete(...(await Project.all()));
     expect(await association<Project>(david, "projects").size()).toBe(0);
   });
 
@@ -505,11 +505,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await association<Pirate>(george, "pirates").toArray()).length).toBeGreaterThan(0);
     expect((await association<Treasure>(george, "treasures").toArray()).length).toBeGreaterThan(0);
 
-    const pirateBefore = (await Pirate.all().toArray()).length;
-    const treasureBefore = (await Treasure.all().toArray()).length;
+    const pirateBefore = (await Pirate.all()).length;
+    const treasureBefore = (await Treasure.all()).length;
     await (george as any).destroyAssociations();
-    expect((await Pirate.all().toArray()).length).toBe(pirateBefore);
-    expect((await Treasure.all().toArray()).length).toBe(treasureBefore);
+    expect((await Pirate.all()).length).toBe(pirateBefore);
+    expect((await Treasure.all()).length).toBe(treasureBefore);
 
     expect(
       (
@@ -714,7 +714,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("consider type", async () => {
-    const developer = (await Developer.all().toArray())[0];
+    const developer = (await Developer.all())[0];
     const specialProject = await SpecialProject.create({ name: "Special Project" });
 
     const otherProject = (await association<Project>(developer, "projects").toArray())[0];
@@ -729,7 +729,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("symbol join table", async () => {
-    const developer = (await Developer.all().toArray())[0];
+    const developer = (await Developer.all())[0];
     const sp = await association<SpecialProject>(developer, "symSpecialProjects").create({
       name: "omg",
     });
@@ -807,13 +807,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("find grouped", async () => {
-    const allPosts = await Post.all().where("category_id = 1").joins("categories").toArray();
+    const allPosts = await Post.all().where("category_id = 1").joins("categories");
     const grouped = await Post.all()
       .where("category_id = 1")
       .group("author_id")
       .select("count(posts.id) as posts_count")
-      .joins("categories")
-      .toArray();
+      .joins("categories");
     expect(allPosts.length).toBe(5);
     expect(grouped.length).toBe(2);
   });
@@ -1000,7 +999,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await association<Pirate>(george, "pirates").count()).toBe(2);
     await (await Pirate.find(redbeard.id)).destroy();
     expect(await association<Pirate>(george, "pirates").count()).toBe(1);
-    expect((await Pirate.where({ id: redbeard.id }).toArray()).length).toBe(0);
+    expect((await Pirate.where({ id: redbeard.id })).length).toBe(0);
   });
 
   it("has and belongs to many associations on new records use null relations", async () => {

@@ -113,33 +113,33 @@ describe("ReadOnlyTest", () => {
   });
 
   it("find with readonly option", async () => {
-    for (const d of await Developer.all().toArray()) {
+    for (const d of await Developer.all()) {
       expect(d.isReadonly()).toBe(false);
     }
     expect(Developer.all().isReadonly).toBe(false);
-    for (const d of await Developer.all().readonly(false).toArray()) {
+    for (const d of await Developer.all().readonly(false)) {
       expect(d.isReadonly()).toBe(false);
     }
-    for (const d of await Developer.all().readonly(true).toArray()) {
+    for (const d of await Developer.all().readonly(true)) {
       expect(d.isReadonly()).toBe(true);
     }
-    for (const d of await Developer.all().readonly().toArray()) {
+    for (const d of await Developer.all().readonly()) {
       expect(d.isReadonly()).toBe(true);
     }
     expect(Developer.all().readonly().isReadonly).toBe(true);
   });
 
   it("find with joins option does not imply readonly", async () => {
-    for (const d of await Developer.joins("  ").toArray()) {
+    for (const d of await Developer.joins("  ")) {
       expect(d.isReadonly()).toBe(false);
     }
-    for (const d of await Developer.joins("  ").readonly(true).toArray()) {
+    for (const d of await Developer.joins("  ").readonly(true)) {
       expect(d.isReadonly()).toBe(true);
     }
-    for (const d of await Developer.joins(", projects").toArray()) {
+    for (const d of await Developer.joins(", projects")) {
       expect(d.isReadonly()).toBe(false);
     }
-    for (const d of await Developer.joins(", projects").readonly(true).toArray()) {
+    for (const d of await Developer.joins(", projects").readonly(true)) {
       expect(d.isReadonly()).toBe(true);
     }
   });

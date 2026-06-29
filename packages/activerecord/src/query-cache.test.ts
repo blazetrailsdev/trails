@@ -234,7 +234,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     cached.enableQueryCacheBang();
     await Task.create({ title: "first" });
-    await Task.all().toArray();
+    await Task.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
     await Task.create({ title: "second" });
     expect(cached.queryCache.empty).toBe(true);
@@ -244,7 +244,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     cached.enableQueryCacheBang();
     await Task.create({ title: "first" });
-    await Task.all().toArray();
+    await Task.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
     const t = await Task.first();
     (t as any).title = "updated";
@@ -256,7 +256,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     cached.disableQueryCacheBang();
     await Task.create({ title: "first" });
-    await Task.all().toArray();
+    await Task.all();
     expect(cached.queryCache.empty).toBe(true);
   });
 
@@ -265,8 +265,8 @@ describe("QueryCacheTest", () => {
     expect(cached.queryCache.enabled).toBe(false);
     const mw = makeMiddleware(async () => {
       await Task.create({ title: "row" });
-      await Task.all().toArray();
-      await Task.all().toArray();
+      await Task.all();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       throw new Error("lol borked");
     }, [cached]);
@@ -339,8 +339,8 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "row" });
     const mw = makeMiddleware(async () => {
-      await Task.all().toArray();
-      await Task.all().toArray();
+      await Task.all();
+      await Task.all();
       expect(cached.queryCache.size).toBe(1);
     }, [cached]);
     await mw();
@@ -359,8 +359,8 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "cached" });
     await cached.cache(async () => {
-      const r1 = await Task.all().toArray();
-      const r2 = await Task.all().toArray();
+      const r1 = await Task.all();
+      const r2 = await Task.all();
       expect(r1).toHaveLength(1);
       expect(r2).toHaveLength(1);
     });
@@ -411,8 +411,8 @@ describe("QueryCacheTest", () => {
     await Task.create({ title: "a" });
     await Task.create({ title: "b" });
     await cached.cache(async () => {
-      const r1 = await Task.all().toArray();
-      const r2 = await Task.all().toArray();
+      const r1 = await Task.all();
+      const r2 = await Task.all();
       expect(r1).toHaveLength(2);
       expect(r2).toHaveLength(2);
     });
@@ -456,9 +456,9 @@ describe("QueryCacheTest", () => {
     await Task.create({ title: "all" });
     await cached.cache(async () => {
       hits.reset();
-      await Task.all().toArray();
+      await Task.all();
       const hitsAfterFirst = hits.count;
-      await Task.all().toArray();
+      await Task.all();
       expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
@@ -592,7 +592,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "flat" });
     await cached.cache(async () => {
-      const results = await Task.all().toArray();
+      const results = await Task.all();
       expect(Array.isArray(results)).toBe(true);
       expect(results[0]).not.toBeInstanceOf(Array);
     });
@@ -602,7 +602,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "nowrap" });
     await cached.cache(async () => {
-      const results = await Task.all().toArray();
+      const results = await Task.all();
       expect(Array.isArray(results)).toBe(true);
     });
   });
@@ -698,10 +698,10 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
     await cached.cache(async () => {
-      const r1 = await Task.all().toArray();
+      const r1 = await Task.all();
       expect(r1).toHaveLength(1);
       await Task.create({ title: "b" });
-      const r2 = await Task.all().toArray();
+      const r2 = await Task.all();
       expect(r2).toHaveLength(2);
     });
   });
@@ -713,7 +713,7 @@ describe("QueryCacheTest", () => {
     await cached.beginTransaction();
     await Task.create({ title: "during" });
     await cached.rollback();
-    const results = await Task.all().toArray();
+    const results = await Task.all();
     expect(results).toHaveLength(1);
     expect(results[0].title).toBe("before");
   });
@@ -819,7 +819,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
     cached.enableQueryCacheBang();
-    await Task.all().toArray();
+    await Task.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
     await cached.uncached(async () => {
       expect(cached.queryCache.enabled).toBe(false);
@@ -904,11 +904,11 @@ describe("QuerySerializedParamTest", () => {
     const t = await Task.create({ title: "serialized_ar" });
     await cached.cache(async () => {
       hits.reset();
-      const r1 = await Task.where({ id: t.id }).toArray();
+      const r1 = await Task.where({ id: t.id });
       expect(r1).toHaveLength(1);
       expect(r1[0]?.id).toBe(t.id);
       const hitsAfterFirst = hits.count;
-      const r2 = await Task.where({ id: t.id }).toArray();
+      const r2 = await Task.where({ id: t.id });
       expect(r2).toHaveLength(1);
       expect(r2[0]?.id).toBe(t.id);
       expect(hits.count).toBeGreaterThan(hitsAfterFirst); // cache hit
@@ -984,7 +984,7 @@ describe("QueryCacheExpiryTest", () => {
     const { cached, Task } = await setup();
     const task = await Task.create({ title: "a" });
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       (task as any).title = "b";
       await (task as any).save();
@@ -995,7 +995,7 @@ describe("QueryCacheExpiryTest", () => {
     const { cached, Task } = await setup();
     const task = await Task.create({ title: "a" });
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await (task as any).destroy();
       expect(cached.queryCache.empty).toBe(true);
@@ -1004,7 +1004,7 @@ describe("QueryCacheExpiryTest", () => {
   it("insert", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.create({ title: "a" });
       expect(cached.queryCache.empty).toBe(true);
@@ -1013,12 +1013,12 @@ describe("QueryCacheExpiryTest", () => {
   itIfSupports("insert_on_duplicate_skip", "insert all", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.insert({ title: "a" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.insertAll([{ title: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
@@ -1027,12 +1027,12 @@ describe("QueryCacheExpiryTest", () => {
   it("insert all bang", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.insertBang({ title: "a" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.insertAllBang([{ title: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
@@ -1041,12 +1041,12 @@ describe("QueryCacheExpiryTest", () => {
   itIfSupports("insert_on_duplicate_update", "upsert all", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.upsert({ title: "a" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all().toArray();
+      await Task.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await Task.upsertAll([{ title: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
@@ -1057,7 +1057,7 @@ describe("QueryCacheExpiryTest", () => {
     const p = await Post.create({ title: "p", body: "b" });
     const c = await Category.create({ name: "c" });
     await cached.cache(async () => {
-      await Post.all().toArray();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await association(p as any, "categories").push(c as any);
       expect(cached.queryCache.empty).toBe(true);
@@ -1069,7 +1069,7 @@ describe("QueryCacheExpiryTest", () => {
     const c = await Category.create({ name: "c" });
     await association(p as any, "categories").push(c as any);
     await cached.cache(async () => {
-      await Post.all().toArray();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await association(p as any, "categories").deleteAll();
       expect(cached.queryCache.empty).toBe(true);

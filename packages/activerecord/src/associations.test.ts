@@ -667,8 +667,8 @@ describe("PreloaderTest", () => {
     const author = await Author.create({ name: "David" });
     const book = await Book.create({ author_id: author.id, name: "A Book" });
     const post = await Post.create({ title: "Welcome", body: "body", author_id: author.id });
-    const bookLoaded = (await Book.where({ id: book.id }).includes("author").toArray())[0];
-    const postFresh = (await Post.where({ id: post.id }).toArray())[0];
+    const bookLoaded = (await Book.where({ id: book.id }).includes("author"))[0];
+    const postFresh = (await Post.where({ id: post.id }))[0];
     // book's author already loaded; post shares the same author_id →
     // the Preloader finds the key in alreadyLoadedByKey and issues 0 DB queries
     const sqls = await captureSql(async () => {
@@ -710,9 +710,7 @@ describe("PreloaderTest", () => {
     // same scope and are coalesced — 3 batch calls total (taggings, tags, and the
     // tag→tagging preload from Tagging#tag's `includes(:tagging)` scope), not 5.
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    const posts = await Post.where({ id: [post1.id, post2.id] })
-      .includes("tags")
-      .toArray();
+    const posts = await Post.where({ id: [post1.id, post2.id] }).includes("tags");
     expect(spy).toHaveBeenCalledTimes(3);
     const p1tags = (posts.find((p: any) => p.title === "P1") as any).association("tags").target;
     const p2tags = (posts.find((p: any) => p.title === "P2") as any).association("tags").target;
@@ -727,8 +725,8 @@ describe("PreloaderTest", () => {
     await Tagging.create({ taggable_id: post1.id, taggable_type: "Post", tag_id: tag1.id });
     await Tagging.create({ taggable_id: post2.id, taggable_type: "Post", tag_id: tag2.id });
     // Pre-load middle records (taggings) for post1 only
-    const p1 = (await Post.where({ title: "P1" }).includes("taggings").toArray())[0];
-    const p2 = (await Post.where({ title: "P2" }).toArray())[0];
+    const p1 = (await Post.where({ title: "P1" }).includes("taggings"))[0];
+    const p2 = (await Post.where({ title: "P2" }))[0];
     // Preload tags for both posts. The through-preloader's tagging loader finds p1's key
     // already loaded (LoaderRecords merge path) and only queries DB for p2's taggings
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
@@ -854,7 +852,7 @@ describe("PreloaderTest", () => {
 
     // First preload: nothing loaded, so all five levels query —
     // line_items, shipping_lines, both discount_applications, and discounts.
-    const fresh = (await Invoice.where({ id: invoice.id }).toArray())[0];
+    const fresh = (await Invoice.where({ id: invoice.id }))[0];
     const firstSqls = await captureSql(async () => {
       await new Preloader({ records: [fresh], associations: nested }).call();
     });
@@ -865,7 +863,7 @@ describe("PreloaderTest", () => {
     // Reload, then force-load the line_items branch (line_items +
     // line_item_discount_applications). The second preload must skip that branch
     // and issue only the three shipping/discount queries.
-    const reloaded = (await Invoice.where({ id: invoice.id }).toArray())[0];
+    const reloaded = (await Invoice.where({ id: invoice.id }))[0];
     const lineItems = await loadHasMany(reloaded, "lineItems", {});
     for (const li of lineItems) await loadHasMany(li, "discountApplications", {});
     const secondSqls = await captureSql(async () => {
@@ -883,7 +881,7 @@ describe("PreloaderTest", () => {
     await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag1.id });
     await Tagging.create({ taggable_id: post.id, taggable_type: "Post", tag_id: tag2.id });
 
-    const posts = await Post.where({ id: post.id }).includes("taggings").toArray();
+    const posts = await Post.where({ id: post.id }).includes("taggings");
     expect(posts).toHaveLength(1);
     const preloaded = (posts[0] as any).association("taggings").target;
     expect(preloaded).toHaveLength(2);
@@ -922,7 +920,7 @@ describe("PreloaderTest", () => {
     const mary = await Author.create({ name: "Mary" });
     const bob = await Author.create({ name: "Bob" });
     await AuthorFavorite.create({ author_id: mary.id, favorite_author_id: bob.id });
-    const favorites = await AuthorFavorite.all().toArray();
+    const favorites = await AuthorFavorite.all();
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
     await new Preloader({
       records: favorites,
@@ -1176,8 +1174,8 @@ describe("PreloaderTest", () => {
       await Post.create({ title: "misc by mary", body: "body", author_id: mary.id })
     ).id;
     // Fresh instances so association load state mirrors Rails' fixtures.
-    const bobPost = (await Post.where({ id: bobPostId }).toArray())[0];
-    const maryPost = (await Post.where({ id: maryPostId }).toArray())[0];
+    const bobPost = (await Post.where({ id: bobPostId }))[0];
+    const maryPost = (await Post.where({ id: maryPostId }))[0];
 
     // Force-load bob's author; mary's stays unloaded.
     const loadedBob = await loadBelongsTo(bobPost, "author", {});
@@ -1206,7 +1204,7 @@ describe("PreloaderTest", () => {
       writer_id: "David",
       category_id: "General",
     });
-    const categories = await Category.all().toArray();
+    const categories = await Category.all();
 
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
     // One query to get the middle records (i.e. essays); categories come from availableRecords
@@ -1393,7 +1391,7 @@ describe("PreloaderTest", () => {
       body: "Great!",
     });
 
-    const blogPosts = await ShardedBlogPostPL.all().includes("comments").toArray();
+    const blogPosts = await ShardedBlogPostPL.all().includes("comments");
     expect(blogPosts).toHaveLength(2);
     const byTitle = new Map(blogPosts.map((bp) => [(bp as any).title, bp]));
     expect(byTitle.get("Post1")!.association("comments").isLoaded()).toBe(true);
@@ -1409,7 +1407,7 @@ describe("PreloaderTest", () => {
     await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp1.id, body: "C1" });
     await ShardedCommentPL.create({ blog_id: blog.id, blog_post_id: bp2.id, body: "C2" });
 
-    const comments = await ShardedCommentPL.all().includes("blogPost").toArray();
+    const comments = await ShardedCommentPL.all().includes("blogPost");
     expect(comments).toHaveLength(2);
     const byBody = new Map(comments.map((c) => [(c as any).body, c]));
     expect(byBody.get("C1")!.association("blogPost").isLoaded()).toBe(true);
@@ -1446,7 +1444,7 @@ describe("PreloaderTest", () => {
     const tag2 = await ShardedTagPL.create({ blog_id: blog2.id, name: "Tag2" });
     await ShardedBlogPostTagPL.create({ blog_id: blog.id, blog_post_id: bp1.id, tag_id: tag.id });
 
-    const tags = await ShardedTagPL.all().includes("blogPosts").toArray();
+    const tags = await ShardedTagPL.all().includes("blogPosts");
     expect(tags).toHaveLength(2);
     expect(tags.every((t) => t.association("blogPosts").isLoaded())).toBe(true);
 
@@ -1471,7 +1469,7 @@ describe("PreloaderTest", () => {
 
     let orders: any[];
     const sqls = await captureSql(async () => {
-      orders = await CpkOrderPL.where("id = ?", orderId).includes("orderAgreements").toArray();
+      orders = await CpkOrderPL.where("id = ?", orderId).includes("orderAgreements");
     });
     expect(sqls).toHaveLength(2);
     const preloadSql = sqls[1];
@@ -1488,7 +1486,7 @@ describe("PreloaderTest", () => {
 
     let agreements: any[];
     const sqls = await captureSql(async () => {
-      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes("order").toArray();
+      agreements = await CpkOrderAgreementPL.where("id = ?", ag.id).includes("order");
     });
     expect(sqls).toHaveLength(2);
     const preloadSql = sqls[1];
@@ -1518,7 +1516,7 @@ describe("PreloaderTest", () => {
     // Persisted post with one built (unsaved) comment — preloader queries for
     // persisted comments but must also preserve the built comment in the result.
     const persistedPost = await Post.create({ title: "Welcome", body: "body" });
-    const post = (await Post.where({ id: persistedPost.id }).toArray())[0];
+    const post = (await Post.where({ id: persistedPost.id }))[0];
     const comment = (post as any).association("comments").build({ body: "built" });
 
     const sqls = await captureSql(async () => {
@@ -1547,7 +1545,7 @@ describe("PreloaderTest", () => {
     // Persisted post with a built (unsaved) author — preloader must issue no
     // queries (author already built in memory) and preserve the same instance.
     const persistedPost = await Post.create({ title: "Welcome", body: "body" });
-    const post = (await Post.where({ id: persistedPost.id }).toArray())[0];
+    const post = (await Post.where({ id: persistedPost.id }))[0];
     const author = (post as any).association("author").build({ name: "Built" });
 
     const sqls = await captureSql(async () => {
@@ -1561,7 +1559,7 @@ describe("PreloaderTest", () => {
     const a = await Author.create({ name: "A" });
     await Post.create({ title: "P", body: "body", author_id: a.id });
 
-    const posts = await Post.all().includes("author").toArray();
+    const posts = await Post.all().includes("author");
     expect(posts).toHaveLength(1);
     const assoc = (posts[0] as any).association("author");
     expect(assoc.isLoaded()).toBe(true);
@@ -1573,7 +1571,7 @@ describe("PreloaderTest", () => {
     await Post.create({ title: "P1", body: "body", author_id: a.id });
     await Post.create({ title: "P2", body: "body", author_id: a.id });
 
-    const authors = await Author.all().includes("posts").toArray();
+    const authors = await Author.all().includes("posts");
     const owner = authors.find((x) => x.id === a.id)!;
     const assoc = (owner as any).association("posts");
     expect(assoc.isLoaded()).toBe(true);
@@ -1989,8 +1987,7 @@ describe("AssociationsTest", () => {
 
     const liquids = await Liquid.includes({ molecules: "electrons" })
       .references("molecules")
-      .where("molecules.id is not null")
-      .toArray();
+      .where("molecules.id is not null");
     expect((await (liquids[0] as any).molecules.toArray()).length).toBe(1);
   });
 
@@ -2008,9 +2005,9 @@ describe("AssociationsTest", () => {
   it("subselect", async () => {
     const author = authors("david");
     const favs = await association(author, "authorFavorites").toArray();
-    const fav2 = await association(author, "authorFavorites")
-      .where({ author: Author.where({ id: author.id }) })
-      .toArray();
+    const fav2 = await association(author, "authorFavorites").where({
+      author: Author.where({ id: author.id }),
+    });
     // Rails: `assert_equal favs, fav2` compares arrays element-wise with AR
     // record `==` (class + id), not mapped ids. Mirror that with `equals`.
     expect(fav2.length).toEqual(favs.length);

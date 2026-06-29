@@ -50,8 +50,8 @@ describe("HMT Slot E — nested-through advanced", () => {
     const david = authors("david");
     const bob = authors("bob");
     // Load each author's tags in separate preload queries.
-    const [davidRow] = await Author.where({ id: david.id }).preload("tags").toArray();
-    const [bobRow] = await Author.where({ id: bob.id }).preload("tags").toArray();
+    const [davidRow] = await Author.where({ id: david.id }).preload("tags");
+    const [bobRow] = await Author.where({ id: bob.id }).preload("tags");
     const davidTags = (davidRow.association("tags").target ?? []) as any[];
     const bobTags = (bobRow.association("tags").target ?? []) as any[];
     // david: welcome+thinking both tagged "general"
@@ -64,8 +64,8 @@ describe("HMT Slot E — nested-through advanced", () => {
     // Author → posts → taggings: two separate preloads of the same chain
     // must produce stable results (no alias collision between invocations).
     const david = authors("david");
-    const [r1] = await Author.where({ id: david.id }).preload("taggings").toArray();
-    const [r2] = await Author.where({ id: david.id }).preload("taggings").toArray();
+    const [r1] = await Author.where({ id: david.id }).preload("taggings");
+    const [r2] = await Author.where({ id: david.id }).preload("taggings");
     const t1 = ((r1.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
     const t2 = ((r2.association("taggings").target ?? []) as any[]).map((r: any) => r.id).sort();
     expect(t1).toEqual(t2);
@@ -101,9 +101,7 @@ describe("HMT Slot E — nested-through advanced", () => {
     // Preload all authors' tags in one query — each owner must get only their own tags.
     const david = authors("david");
     const bob = authors("bob");
-    const preloaded = await Author.where({ id: [david.id, bob.id] })
-      .preload("tags")
-      .toArray();
+    const preloaded = await Author.where({ id: [david.id, bob.id] }).preload("tags");
     const byId = new Map(preloaded.map((row) => [row.id, row]));
     const davidTags = ((byId.get(david.id)!.association("tags").target ?? []) as any[]).map(
       (t) => t.name,

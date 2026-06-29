@@ -85,21 +85,15 @@ describe("WhereTest", () => {
 
   it("type casting nested joins", async () => {
     const comment = comments("eager_other_comment1");
-    const result = await Comment.joins({ post: "author" })
-      .where({ authors: { id: "2-foo" } })
-      .toArray();
+    const result = await Comment.joins({ post: "author" }).where({ authors: { id: "2-foo" } });
     expect(ids(result)).toStrictEqual([(comment as any).id]);
   });
 
   it("where with through association", async () => {
-    const r1 = await Author.joins("comments")
-      .where({ comments: comments("greetings") })
-      .toArray();
+    const r1 = await Author.joins("comments").where({ comments: comments("greetings") });
     expect(ids(r1)).toStrictEqual([(authors("david") as any).id]);
 
-    const r2 = await Author.joins("categories")
-      .where({ categories: categories("technology") })
-      .toArray();
+    const r2 = await Author.joins("categories").where({ categories: categories("technology") });
     expect(ids(r2)).toStrictEqual([(authors("bob") as any).id]);
   });
 
@@ -109,16 +103,14 @@ describe("WhereTest", () => {
     // no TS equivalent of that mock without a spy, so only the result equality is
     // ported — the lazy-cast timing invariant is NOT covered here.
     const welcome = posts("welcome");
-    expect(ids(await Post.where({ id: "1-foo" }).toArray())).toStrictEqual([(welcome as any).id]);
-    expect(ids(await Post.where({ id: ["1-foo", "bar"] }).toArray())).toStrictEqual([
-      (welcome as any).id,
-    ]);
+    expect(ids(await Post.where({ id: "1-foo" }))).toStrictEqual([(welcome as any).id]);
+    expect(ids(await Post.where({ id: ["1-foo", "bar"] }))).toStrictEqual([(welcome as any).id]);
   });
 
   it("where copies bind params", async () => {
     const author = authors("david") as any;
     const davidPosts = author.posts.where("posts.id != 1");
-    const joined = await Post.where({ id: davidPosts }).toArray();
+    const joined = await Post.where({ id: davidPosts });
 
     expect(joined.length).toBeGreaterThan(0);
     for (const post of joined) {
@@ -132,7 +124,7 @@ describe("WhereTest", () => {
     const author = authors("david") as any;
     const davidPosts = author.posts.whereNot({ id: 1 });
     const first = await davidPosts.first();
-    const joined = await Post.where({ id: davidPosts, title: first.title }).toArray();
+    const joined = await Post.where({ id: davidPosts, title: first.title });
     expect(ids(joined)).toStrictEqual([first.id]);
   });
 
@@ -141,7 +133,7 @@ describe("WhereTest", () => {
     await CakeDesigner.create({ chef });
 
     const cakeDesigners = CakeDesigner.joins("chef").where({ chefs: { id: (chef as any).id } });
-    const chefs = await Chef.where({ employable: cakeDesigners }).toArray();
+    const chefs = await Chef.where({ employable: cakeDesigners });
 
     expect(ids(chefs)).toStrictEqual([(chef as any).id]);
   });
@@ -156,10 +148,10 @@ describe("WhereTest", () => {
     // predicate-builder-blank-and-unboundable-contradiction.
     const first = topics("first") as any;
     await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
-    expect(await Topic.where({ parent_id: "not-a-number" }).toArray()).toHaveLength(0);
-    expect(await Topic.where({ written_on: "" }).toArray()).toHaveLength(0);
-    expect(await Topic.where({ bonus_time: "" }).toArray()).toHaveLength(0);
-    expect(await Topic.where({ last_read: "" }).toArray()).toHaveLength(0);
+    expect(await Topic.where({ parent_id: "not-a-number" })).toHaveLength(0);
+    expect(await Topic.where({ written_on: "" })).toHaveLength(0);
+    expect(await Topic.where({ bonus_time: "" })).toHaveLength(0);
+    expect(await Topic.where({ last_read: "" })).toHaveLength(0);
   });
 
   it("rewhere on root", async () => {
@@ -172,7 +164,7 @@ describe("WhereTest", () => {
     const first = topics("first") as any;
     const third = topics("third") as any;
 
-    const r1 = await Topic.where(["id"], [[first.id]]).toArray();
+    const r1 = await Topic.where(["id"], [[first.id]]);
     expect(ids(r1)).toStrictEqual([first.id]);
 
     const key = ["title", "author_name"];
@@ -180,7 +172,7 @@ describe("WhereTest", () => {
       [first.title, first.author_name],
       [third.title, third.author_name],
     ];
-    const r2 = await Topic.where(key, conditions).toArray();
+    const r2 = await Topic.where(key, conditions);
     expect(sortedIds(r2)).toStrictEqual([first.id, third.id].slice().sort());
   });
 
@@ -188,7 +180,7 @@ describe("WhereTest", () => {
     const bookOne = await CpkBook.create({ author_id: 1, id: 2 });
     const bookTwo = await CpkBook.create({ author_id: 3, id: 4 });
 
-    const r1 = await CpkBook.where(["author_id", "id"], [[1, 2]]).toArray();
+    const r1 = await CpkBook.where(["author_id", "id"], [[1, 2]]);
     expect(ids(r1)).toStrictEqual([(bookOne as any).id]);
 
     const r2 = await CpkBook.where(
@@ -197,7 +189,7 @@ describe("WhereTest", () => {
         [1, 2],
         [3, 4],
       ],
-    ).toArray();
+    );
     expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
     const r3 = await CpkBook.where(
@@ -206,7 +198,7 @@ describe("WhereTest", () => {
         [1, 4],
         [3, 2],
       ],
-    ).toArray();
+    );
     expect(r3).toHaveLength(0);
   });
 
@@ -219,23 +211,19 @@ describe("WhereTest", () => {
     const bookOne = await CpkBook.create({ author_id: 1, id: 2, title: "The Alchemist" });
     const bookTwo = await CpkBook.create({ author_id: 3, id: 4, title: "The Alchemist" });
 
-    const r1 = await CpkBook.where({ title: "The Alchemist" }).toArray();
+    const r1 = await CpkBook.where({ title: "The Alchemist" });
     expect(sortedIds(r1)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
-    const r2 = await CpkBook.where({ title: "The Alchemist" })
-      .where(
-        ["author_id", "id"],
-        [
-          [1, 2],
-          [3, 4],
-        ],
-      )
-      .toArray();
+    const r2 = await CpkBook.where({ title: "The Alchemist" }).where(
+      ["author_id", "id"],
+      [
+        [1, 2],
+        [3, 4],
+      ],
+    );
     expect(sortedIds(r2)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
 
-    const r3 = await CpkBook.where({ title: "The Alchemist" })
-      .where(["author_id", "id"], [[3, 4]])
-      .toArray();
+    const r3 = await CpkBook.where({ title: "The Alchemist" }).where(["author_id", "id"], [[3, 4]]);
     expect(ids(r3)).toStrictEqual([(bookTwo as any).id]);
   });
 
@@ -260,11 +248,11 @@ describe("WhereTest", () => {
         (r) => (r as any).readAttribute("author_id") === 3 && (r as any).readAttribute("id") === 4,
       );
 
-    const found = await CpkBook.where({ order }).toArray();
+    const found = await CpkBook.where({ order });
     expect(hasBook(found)).toBe(true);
 
     await book.update({ shop_id: null, order_id: null });
-    const foundNil = await CpkBook.where({ order: null }).toArray();
+    const foundNil = await CpkBook.where({ order: null });
     expect(hasBook(foundNil)).toBe(true);
   });
 
@@ -300,12 +288,10 @@ describe("WhereTest", () => {
 
   it("belongs to nested where with relation", async () => {
     const author = authors("david") as any;
-    const expected = await Author.where({ id: author }).joins("posts").toArray();
+    const expected = await Author.where({ id: author }).joins("posts");
     const actual = await Author.where({
       posts: { author_id: Author.where({ id: author.id }) },
-    })
-      .joins("posts")
-      .toArray();
+    }).joins("posts");
     expect(sortedIds(actual)).toStrictEqual(sortedIds(expected));
   });
 
@@ -319,8 +305,8 @@ describe("WhereTest", () => {
 
   it("where not polymorphic association", async () => {
     const sapphire = treasures("sapphire") as any;
-    const actual = await PriceEstimate.whereNot({ estimateOf: sapphire }).toArray();
-    const only = await PriceEstimate.where({ estimateOf: sapphire }).toArray();
+    const actual = await PriceEstimate.whereNot({ estimateOf: sapphire });
+    const only = await PriceEstimate.where({ estimateOf: sapphire });
 
     const sapphireEstimateIds = [
       (priceEstimates("sapphire_1") as any).id,
@@ -341,11 +327,11 @@ describe("WhereTest", () => {
     const actual = await PriceEstimate.whereNot({
       estimate_of_type: "Treasure",
       estimate_of_id: sapphire.id,
-    }).toArray();
+    });
     const only = await PriceEstimate.where({
       estimate_of_type: "Treasure",
       estimate_of_id: sapphire.id,
-    }).toArray();
+    });
 
     const sapphireEstimateIds = [
       (priceEstimates("sapphire_1") as any).id,
@@ -365,10 +351,9 @@ describe("WhereTest", () => {
     const treasure = await Treasure.create({ name: "my_treasure" });
     await PriceEstimate.create({ estimateOf: treasure, price: 2, currency: "USD" });
 
-    const actual = await Treasure.joins("priceEstimates")
-      .whereNot({ price_estimates: { price: 2, currency: "USD" } })
-      .toArray();
-
+    const actual = await Treasure.joins("priceEstimates").whereNot({
+      price_estimates: { price: 2, currency: "USD" },
+    });
     const expected = [
       (treasures("diamond") as any).id,
       (treasures("sapphire") as any).id,
@@ -394,7 +379,7 @@ describe("WhereTest", () => {
   it("polymorphic nested array where not", async () => {
     const treasure = treasures("diamond") as any;
     const car = cars("honda") as any;
-    const actual = await PriceEstimate.whereNot({ estimateOf: [treasure, car] }).toArray();
+    const actual = await PriceEstimate.whereNot({ estimateOf: [treasure, car] });
     const expected = [
       (priceEstimates("sapphire_1") as any).id,
       (priceEstimates("sapphire_2") as any).id,
@@ -413,7 +398,7 @@ describe("WhereTest", () => {
       (priceEstimates("sapphire_2") as any).id,
       (priceEstimates("honda") as any).id,
     ];
-    const actual = await PriceEstimate.where({ estimateOf: [treasure1, treasure2, car] }).toArray();
+    const actual = await PriceEstimate.where({ estimateOf: [treasure1, treasure2, car] });
     expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
   });
 
@@ -523,9 +508,7 @@ describe("WhereTest", () => {
     // SCOPE: convergence tracked by RFC 0023
     // predicate-builder-blank-and-unboundable-contradiction.
     for (const blank of [[], {}, null, ""]) {
-      const result = await Edge.where(blank as any)
-        .order("sink_id")
-        .toArray();
+      const result = await Edge.where(blank as any).order("sink_id");
       expect(result).toHaveLength(4);
     }
   });
@@ -587,7 +570,7 @@ describe("WhereTest", () => {
     const sql = Essay.where({ writer: Author.where({ id: author.id }) }).toSql();
     expect(sql).toContain("IN");
     expect(sql).toContain("SELECT");
-    const result = await Essay.where({ writer: Author.where({ id: author.id }) }).toArray();
+    const result = await Essay.where({ writer: Author.where({ id: author.id }) });
     expect(result.length).toBeGreaterThan(0);
   });
 
@@ -631,7 +614,7 @@ describe("WhereTest", () => {
     const result = await Treasure.where({
       name: ["diamond", "emerald"],
       priceEstimates: PriceEstimate.all(),
-    }).toArray();
+    });
     expect(ids(result)).toStrictEqual([(treasures("diamond") as any).id]);
   });
 
@@ -654,9 +637,9 @@ describe("WhereTest", () => {
     // SCOPE: convergence tracked by RFC 0023
     // predicate-builder-blank-and-unboundable-contradiction.
     const bob = authors("bob") as any;
-    const r1 = await Author.where({ id: [3, 9223372036854775808n] }).toArray();
+    const r1 = await Author.where({ id: [3, 9223372036854775808n] });
     expect(ids(r1)).toStrictEqual([bob.id]);
-    const r2 = await Author.where({ id: new Range(3, 9223372036854775808n) }).toArray();
+    const r2 = await Author.where({ id: new Range(3, 9223372036854775808n) });
     expect(ids(r2)).toStrictEqual([bob.id]);
   });
 
@@ -687,9 +670,9 @@ describe("WhereTest", () => {
   it("nested conditional on enum", async () => {
     const post = await Post.first();
     await Comment.create({ label: "default", post, body: "Nice weather today" });
-    const result = await Post.joins("comments")
-      .where({ comments: { label: "default", body: "Nice weather today" } })
-      .toArray();
+    const result = await Post.joins("comments").where({
+      comments: { label: "default", body: "Nice weather today" },
+    });
     expect(ids(result)).toStrictEqual([(post as any).id]);
   });
 });

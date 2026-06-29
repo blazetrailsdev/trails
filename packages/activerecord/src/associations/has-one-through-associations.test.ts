@@ -262,7 +262,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(club.isPersisted()).toBe(true);
     expect(club.name).toBe("Rails Club");
     // Verify the membership was created
-    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    const memberships = await Membership.all().where({ member_id: member.id });
     expect(memberships.length).toBe(1);
     expect(memberships[0].readAttribute("club_id")).toBe(Number(club.id));
   });
@@ -271,7 +271,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = await Member.create({ name: "DHH" });
     const club = await createThroughAssociation(member, "club", { name: "New Club" });
     expect(club.isPersisted()).toBe(true);
-    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    const memberships = await Membership.all().where({ member_id: member.id });
     expect(memberships.length).toBe(1);
   });
 
@@ -384,14 +384,14 @@ describe("HasOneThroughAssociationsTest", () => {
     const club2 = await createThroughAssociation(member2, "club", { name: "Club2" });
     expect(club1.isPersisted()).toBe(true);
     expect(club2.isPersisted()).toBe(true);
-    const allMemberships = await Membership.all().toArray();
+    const allMemberships = await Membership.all();
     expect(allMemberships.length).toBe(2);
   });
 
   it("creating association sets both parent ids for new", async () => {
     const member = await Member.create({ name: "DHH" });
     const club = await createThroughAssociation(member, "club", { name: "FK Test" });
-    const membership = (await Membership.all().where({ member_id: member.id }).toArray())[0];
+    const membership = (await Membership.all().where({ member_id: member.id }))[0];
     expect(membership.readAttribute("member_id")).toBe(Number(member.id));
     expect(membership.readAttribute("club_id")).toBe(Number(club.id));
   });
@@ -502,7 +502,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const club = await Club.create({ name: "Eager Club" });
     const member = await Member.create({ name: "Eager Member" });
     await Membership.create({ member_id: member.id, club_id: club.id });
-    const members = await Member.all().includes("club").toArray();
+    const members = await Member.all().includes("club");
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any).association("club").target;
     expect(preloaded).not.toBeNull();
@@ -552,7 +552,7 @@ describe("HasOneThroughAssociationsTest", () => {
       sponsorable_type: "HotepMember",
       club_id: club.id,
     });
-    const members = await HotepMember.all().includes("sponsorClub").toArray();
+    const members = await HotepMember.all().includes("sponsorClub");
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any).association("sponsorClub").target;
     expect(preloaded).not.toBeNull();
@@ -615,21 +615,21 @@ describe("HasOneThroughAssociationsTest", () => {
     // conditions on the through table — includes-only preload (no references).
     // The through-table WHERE is copied onto the through query; Rails:
     // `Member.all.merge!(includes: :favorite_club)`.
-    let loaded = await CeMember.all().includes("favoriteClub").toArray();
+    let loaded = await CeMember.all().includes("favoriteClub");
     expect((loaded[0] as any).association("favoriteClub").target?.name).toBe(
       "Moustache and Eyebrow Fancier Club",
     );
     await membership.update({ favorite: false });
-    loaded = await CeMember.all().includes("favoriteClub").toArray();
+    loaded = await CeMember.all().includes("favoriteClub");
     expect((loaded[0] as any).association("favoriteClub").target).toBeNull();
 
     // conditions on the source table
-    loaded = await CeMember.all().includes("hairyClub").toArray();
+    loaded = await CeMember.all().includes("hairyClub");
     expect((loaded[0] as any).association("hairyClub").target?.name).toBe(
       "Moustache and Eyebrow Fancier Club",
     );
     await club.update({ name: "Association of Clean-Shaven Persons" });
-    loaded = await CeMember.all().includes("hairyClub").toArray();
+    loaded = await CeMember.all().includes("hairyClub");
     expect((loaded[0] as any).association("hairyClub").target).toBeNull();
   });
 
@@ -803,7 +803,7 @@ describe("HasOneThroughAssociationsTest", () => {
       sponsorable_type: "EsOrg",
     });
 
-    const clubs = await EsClub.all().includes("sponsoredMember").toArray();
+    const clubs = await EsClub.all().includes("sponsoredMember");
     expect(clubs).toHaveLength(2);
 
     const byId = new Map(clubs.map((c: any) => [c.id, c]));
@@ -841,8 +841,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes("club")
         .references("clubs")
         .where({ name: "Groucho Marx" })
-        .order("clubs.name")
-        .toArray();
+        .order("clubs.name");
     });
     expect(members).toHaveLength(1);
     await assertNoQueries(false, async () => {
@@ -896,8 +895,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes("sponsorClub")
         .references("np_clubs")
         .where({ name: "Groucho Marx" })
-        .order("np_clubs.name")
-        .toArray();
+        .order("np_clubs.name");
     });
     expect(members).toHaveLength(1);
     await assertNoQueries(false, async () => {
@@ -957,8 +955,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .includes("sponsorClub")
         .references("npm_clubs")
         .where({ name: "Groucho Marx" })
-        .order("npm_clubs.name DESC")
-        .toArray();
+        .order("npm_clubs.name DESC");
     });
     expect(members).toHaveLength(1);
     await assertNoQueries(false, async () => {
@@ -1097,7 +1094,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const club = await Club.create({ name: "Preload Club" });
     const member = await Member.create({ name: "Preload Member" });
     await Membership.create({ member_id: member.id, club_id: club.id });
-    const members = await Member.all().includes("club").toArray();
+    const members = await Member.all().includes("club");
     expect(members).toHaveLength(1);
     const preloaded = (members[0] as any).association("club").target;
     expect(preloaded).not.toBeNull();
@@ -1256,15 +1253,13 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(((await david.association("essayCategory").loadTarget()) as any)?.name).toBe("General");
     const authorsViaCategory = await PkAuthor.all()
       .joins("essayCategory")
-      .where({ "pk_categories.id": general.id })
-      .toArray();
+      .where({ "pk_categories.id": general.id });
     expect(authorsViaCategory[0]?.readAttribute("name")).toBe("David");
 
     expect(((await david.association("essayOwner").loadTarget()) as any)?.name).toBe("blackbeard");
     const authorsViaOwner = await PkAuthor.all()
       .joins("essayOwner")
-      .where({ "pk_owners.name": "blackbeard" })
-      .toArray();
+      .where({ "pk_owners.name": "blackbeard" });
     expect(authorsViaOwner[0]?.readAttribute("name")).toBe("David");
   });
 
@@ -1316,8 +1311,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(((await david.association("essayCategory2").loadTarget()) as any)?.name).toBe("General");
     const authors = await PkAuthor.all()
       .joins("essayCategory2")
-      .where({ "pk_categories.id": general.id })
-      .toArray();
+      .where({ "pk_categories.id": general.id });
     expect(authors[0]?.readAttribute("name")).toBe("David");
   });
 
@@ -1471,7 +1465,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(member.association("club").target).toBe(club);
     await member.save();
     // After save, membership should be created linking member to club
-    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    const memberships = await Membership.all().where({ member_id: member.id });
     expect(memberships.length).toBe(1);
     expect(memberships[0].readAttribute("club_id")).toBe(Number(club.id));
   });
@@ -1618,7 +1612,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(newClub.isPersisted()).toBe(true);
     expect(newClub.name).toBe("New Club");
     // A fresh membership should exist in the DB
-    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    const memberships = await Membership.all().where({ member_id: member.id });
     expect(memberships.length).toBe(1);
     expect(memberships[0].club_id).toBe(Number(newClub.id));
   });

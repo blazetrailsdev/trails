@@ -29,14 +29,14 @@ describe("NullRelationTest", () => {
 
   it("none", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Developer.none().toArray()).toEqual([]);
-      expect(await Developer.all().none().toArray()).toEqual([]);
+      expect(await Developer.none()).toEqual([]);
+      expect(await Developer.all().none()).toEqual([]);
     });
   });
 
   it("none chainable", async () => {
     await assertQueriesCount(0, false, async () => {
-      expect(await Developer.none().where({ name: "David" }).toArray()).toEqual([]);
+      expect(await Developer.none().where({ name: "David" })).toEqual([]);
     });
   });
 

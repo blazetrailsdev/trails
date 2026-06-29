@@ -29,17 +29,17 @@ describe("ExcludingTest", () => {
   it("result set does not include single excluded record", async () => {
     const post = posts("welcome");
 
-    expect(ids(await Post.excluding(post).toArray())).not.toContain(post.id);
-    expect(ids(await Post.excluding(post).toArray())).not.toContain(post.id);
+    expect(ids(await Post.excluding(post))).not.toContain(post.id);
+    expect(ids(await Post.excluding(post))).not.toContain(post.id);
 
-    expect(ids(await Post.without(post).toArray())).not.toContain(post.id);
+    expect(ids(await Post.without(post))).not.toContain(post.id);
   });
 
   it("result set does not include collection of excluded records", async () => {
     const post = posts("welcome");
     const thinking = posts("thinking");
 
-    const relationIds = ids(await Post.excluding(post, thinking).toArray());
+    const relationIds = ids(await Post.excluding(post, thinking));
     expect(relationIds).not.toContain(post.id);
     expect(relationIds).not.toContain(thinking.id);
   });
@@ -48,7 +48,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const query = Post.where({ id: post });
 
-    const records = await Post.excluding(query).toArray();
+    const records = await Post.excluding(query);
     expect(ids(records)).not.toContain(post.id);
   });
 
@@ -56,7 +56,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const query = await Post.where({ id: post }).load();
 
-    const records = await Post.excluding(query).toArray();
+    const records = await Post.excluding(query);
     expect(ids(records)).not.toContain(post.id);
   });
 
@@ -64,7 +64,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const thinking = posts("thinking");
 
-    const records = await Post.excluding(post, Post.where({ id: thinking })).toArray();
+    const records = await Post.excluding(post, Post.where({ id: thinking }));
     expect(ids(records)).not.toContain(post.id);
     expect(ids(records)).not.toContain(thinking.id);
   });
@@ -74,7 +74,7 @@ describe("ExcludingTest", () => {
     const commentGreetings = comments("greetings");
     const commentMoreGreetings = comments("more_greetings");
 
-    const relationIds = ids(await post.comments.excluding(commentGreetings).toArray());
+    const relationIds = ids(await post.comments.excluding(commentGreetings));
     expect(relationIds).not.toContain(commentGreetings.id);
     expect(relationIds).toContain(commentMoreGreetings.id);
   });
@@ -85,7 +85,7 @@ describe("ExcludingTest", () => {
     const commentMoreGreetings = comments("more_greetings");
 
     const relationIds = ids(
-      await post.comments.excluding([commentGreetings, commentMoreGreetings]).toArray(),
+      await post.comments.excluding([commentGreetings, commentMoreGreetings]),
     );
     expect(relationIds).not.toContain(commentGreetings.id);
     expect(relationIds).not.toContain(commentMoreGreetings.id);
@@ -95,7 +95,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const relation = post.comments;
 
-    const records = await Comment.excluding(relation).toArray();
+    const records = await Comment.excluding(relation);
     const postComments = await post.comments.toArray();
 
     expect(records.length).toBeGreaterThan(0);
@@ -108,7 +108,7 @@ describe("ExcludingTest", () => {
     const post = posts("welcome");
     const relation = await post.comments.load();
 
-    const records = await Comment.excluding(relation).toArray();
+    const records = await Comment.excluding(relation);
     const postComments = await post.comments.toArray();
 
     expect(records.length).toBeGreaterThan(0);

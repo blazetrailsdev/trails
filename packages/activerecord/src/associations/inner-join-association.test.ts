@@ -296,7 +296,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("SpecialComment");
 
     // Query should find the post (it has special comments)
-    const results = await Post.joins("specialComments").where({ id: post.id }).toArray();
+    const results = await Post.joins("specialComments").where({ id: post.id });
     expect(results.length).toBeGreaterThan(0);
   });
 
@@ -304,7 +304,7 @@ describe("InnerJoinAssociationTest", () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Bob" });
     await Post.create({ title: "P1", author_id: a.id });
-    const results = await Post.where({ author_id: a.id }).toArray();
+    const results = await Post.where({ author_id: a.id });
     expect(results.length).toBe(1);
     expect(results[0].title).toBe("P1");
   });
@@ -381,7 +381,7 @@ describe("InnerJoinAssociationTest", () => {
     const tag = await ThrTag.create({ name: "ruby" });
     await ThrTagging.create({ thr_post_id: post.id, thr_tag_id: tag.id });
 
-    const results = await ThrPost.joins("thrTags").where({ id: post.id }).toArray();
+    const results = await ThrPost.joins("thrTags").where({ id: post.id });
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].title).toBe("P1");
   });
@@ -406,7 +406,7 @@ describe("InnerJoinAssociationTest", () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Alice" });
     await Post.create({ title: "hello", author_id: a.id });
-    const posts = await Post.where({ author_id: a.id }).toArray();
+    const posts = await Post.where({ author_id: a.id });
     expect(posts.length).toBe(1);
     expect(posts[0].title).toBe("hello");
   });

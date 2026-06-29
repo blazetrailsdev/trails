@@ -363,28 +363,28 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("all() returns all records", async () => {
-      const products = await Product.all().toArray();
+      const products = await Product.all();
       expect(products).toHaveLength(5);
     });
 
     it("where filters correctly", async () => {
-      const fruits = await Product.where({ category: "fruit" }).toArray();
+      const fruits = await Product.where({ category: "fruit" });
       expect(fruits).toHaveLength(3);
     });
 
     it("chained where conditions", async () => {
-      const items = await Product.where({ category: "fruit" }).where({ name: "Apple" }).toArray();
+      const items = await Product.where({ category: "fruit" }).where({ name: "Apple" });
       expect(items).toHaveLength(1);
     });
 
     it("order sorts correctly", async () => {
-      const items = await Product.all().order({ price: "desc" }).toArray();
+      const items = await Product.all().order({ price: "desc" });
       expect(items[0].name).toBe("Eggplant");
       expect(items[4].name).toBe("Apple");
     });
 
     it("limit and offset", async () => {
-      const items = await Product.all().order("name").limit(2).offset(1).toArray();
+      const items = await Product.all().order("name").limit(2).offset(1);
       expect(items).toHaveLength(2);
     });
 
@@ -424,7 +424,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("none returns empty", async () => {
-      expect(await Product.all().none().toArray()).toEqual([]);
+      expect(await Product.all().none()).toEqual([]);
       expect(await Product.all().none().count()).toBe(0);
     });
   });

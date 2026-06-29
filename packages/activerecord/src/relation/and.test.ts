@@ -22,7 +22,7 @@ describe("AndTest", () => {
     const davidAndMary = Author.where({ id: [david, mary] }).order("id");
     const maryAndBob = Author.where({ id: [mary, bob] }).order("id");
 
-    expect((await davidAndMary.and(maryAndBob).toArray()).map((a: any) => a.id)).toEqual([mary.id]);
+    expect((await davidAndMary.and(maryAndBob)).map((a: any) => a.id)).toEqual([mary.id]);
   });
 
   it("and with non relation attribute", async () => {

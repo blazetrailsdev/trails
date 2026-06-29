@@ -179,8 +179,8 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with recursive", async () => {
-    const topCompanies = await Company.where({ firm_id: null }).toArray();
-    const childCompanies = await Company.where({ firm_id: topCompanies }).toArray();
+    const topCompanies = await Company.where({ firm_id: null });
+    const childCompanies = await Company.where({ firm_id: topCompanies });
     const topCompaniesAndChildren = [
       ...topCompanies.map((c: any) => Number(c.id)),
       ...childCompanies.map((c: any) => Number(c.id)),
@@ -216,7 +216,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
       .joins("LEFT OUTER JOIN commented_posts ON commented_posts.post_id = posts.id")
       .select("posts.*, commented_posts.post_id as has_comments");
 
-    const records = await relation.order("id").toArray();
+    const records = await relation.order("id");
 
     // Make sure we load all records (thus, left outer join is used)
     expect(records.length).toEqual(await Post.count());

@@ -281,8 +281,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const maryId = authors("mary").id;
     const postList = await Post.where({ id: [davidId, maryId] })
       .preload("author", "authorFavoritesWithScope")
-      .order("id")
-      .toArray();
+      .order("id");
     // With preloading, author_favorites_with_scope should be cached
     for (const p of postList) {
       // association already loaded — should not issue a new query
@@ -292,7 +291,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("preload sti rhs class", async () => {
-    const devs = await Developer.includes("firms").all().toArray();
+    const devs = await Developer.includes("firms").all();
     expect(devs.length).toBeGreaterThan(0);
     for (const dev of devs) {
       expect((dev as any).firms).toBeDefined();
@@ -325,7 +324,7 @@ describe("HasManyThroughAssociationsTest", () => {
       member_id: (await Member.create({ name: "Bob" })).id,
     });
 
-    const preloadedClubs = await Club.joins("memberships").preload("membership").toArray();
+    const preloadedClubs = await Club.joins("memberships").preload("membership");
     expect(preloadedClubs.length).toBeGreaterThan(0);
     for (const c of preloadedClubs) {
       expect((c as any).membership).toBeDefined();
@@ -447,7 +446,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await (sicp as any).students.reload();
     const studentCountBefore = await NoPkDelStudent.count();
     const lessonStudentCountBefore = await NoPkDelLessonStudent.count();
-    const allStudents = await NoPkDelStudent.all().toArray();
+    const allStudents = await NoPkDelStudent.all();
     await (sicp as any).students.destroy(...allStudents);
     expect(await NoPkDelStudent.count()).toBe(studentCountBefore);
     expect(await NoPkDelLessonStudent.count()).toBeLessThan(lessonStudentCountBefore as number);
@@ -493,7 +492,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await sicp.save();
 
     await (sicp as any).students.reload();
-    const allStudents = await NoPkCbStudent.all().toArray();
+    const allStudents = await NoPkCbStudent.all();
     await (sicp as any).students.destroy(...allStudents);
     expect(afterDestroyCalled).toBe(true);
   });
@@ -1626,18 +1625,16 @@ describe("HasManyThroughAssociationsTest", () => {
     const essayCats = await (david as any).essayCategories.toArray();
     expect(essayCats.map((c: any) => c.id)).toEqual([general.id]);
 
-    const joinedAuthors = await Author.joins("essayCategories")
-      .where({ "categories.id": general.id })
-      .toArray();
+    const joinedAuthors = await Author.joins("essayCategories").where({
+      "categories.id": general.id,
+    });
     expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
 
     const blackbeard = await Owner.find(owners("blackbeard").id);
     const essayOwners = await (david as any).essayOwners.toArray();
     expect(essayOwners.map((o: any) => o.id)).toEqual([blackbeard.id]);
 
-    const ownersAuthors = await Author.joins("essayOwners")
-      .where({ "owners.name": "blackbeard" })
-      .toArray();
+    const ownersAuthors = await Author.joins("essayOwners").where({ "owners.name": "blackbeard" });
     expect(ownersAuthors.map((a: any) => a.id)).toContain(david.id);
   });
 
@@ -1647,9 +1644,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const essayCats2 = await (david as any).essayCategories_2.toArray();
     expect(essayCats2.map((c: any) => c.id)).toEqual([general.id]);
 
-    const joinedAuthors = await Author.joins("essayCategories_2")
-      .where({ "categories.id": general.id })
-      .toArray();
+    const joinedAuthors = await Author.joins("essayCategories_2").where({
+      "categories.id": general.id,
+    });
     expect(joinedAuthors.map((a: any) => a.id)).toContain(david.id);
   });
 
@@ -1687,9 +1684,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const maryCatId = categorizations("mary_thinking_sti").id;
     const postList = await Post.joins("authorCategorizations")
       .order("posts.id")
-      .where({ "categorizations.id": maryCatId })
-      .toArray();
-
+      .where({ "categorizations.id": maryCatId });
     expect(postList.map((p: any) => p.id)).toEqual([
       posts("eager_other").id,
       posts("misc_by_mary").id,
@@ -1841,8 +1836,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const loaded = await Person.where({ id: person.id })
       .where(`readers.id = ${readerId} or 1=1`)
       .references("readers")
-      .includes("posts")
-      .toArray();
+      .includes("posts");
     const p = loaded[0];
     expect((p as any).posts.loaded).toBe(true);
     expect(await (p as any).posts.toArray()).toEqual([]);
@@ -1925,9 +1919,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const activePersons = await Person.joins("readers")
       .joins("posts")
       .distinct()
-      .where({ "posts.title": "active" })
-      .toArray();
-
+      .where({ "posts.title": "active" });
     const sum = activePersons.reduce((acc: number, p: any) => acc + p.followers_count, 0);
     expect(sum).toBe(10);
     expect(
@@ -2270,7 +2262,7 @@ describe("HasManyThroughAssociationsTest", () => {
       await ShardedBlogPostTag.where({
         blog_post_id: (blogPost as any).id,
         blog_id: (blogPost as any).blog_id,
-      }).toArray()
+      })
     ).map((t: any) => t.tag_id);
 
     const tagIds: any[] = [];
@@ -2297,7 +2289,7 @@ describe("HasManyThroughAssociationsTest", () => {
       await ShardedBlogPostTag.where({
         tag_id: (tag as any).id,
         blog_id: (tag as any).blog_id,
-      }).toArray()
+      })
     ).map((t: any) => t.blog_post_id);
 
     const blogPosts2 = await (tag as any).blogPosts.toArray();
@@ -2403,7 +2395,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(tagsBefore.length).toBeGreaterThan(0);
 
     const tag = tagsBefore[0];
-    const postTags2 = await Post.joins("tags").where({ id: post.id }).toArray();
+    const postTags2 = await Post.joins("tags").where({ id: post.id });
     expect(postTags2.length).toBeGreaterThan(0);
     expect(postTags2.map((p: any) => p.id)).toContain(post.id);
   });

@@ -125,7 +125,7 @@ describe("ForbiddenAttributesProtectionTest", () => {
     const params = new ProtectedParams({ first_name: "Guille" }).permit();
     await Person.createBang(params);
 
-    const remaining = (await Person.whereNot(params).toArray()).filter(
+    const remaining = (await Person.whereNot(params)).filter(
       (p) => p.readAttribute("first_name") === "Guille",
     );
     expect(remaining).toHaveLength(0);

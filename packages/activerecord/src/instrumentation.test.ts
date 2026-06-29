@@ -238,7 +238,7 @@ describe("InstrumentationTest", () => {
         capturedRowCount = event.payload.row_count;
       }
     });
-    await Book.where({ name: "row count book 1" }).toArray();
+    await Book.where({ name: "row count book 1" });
     expect(capturedRowCount).toBe(10);
   });
 
@@ -342,7 +342,7 @@ describe("InstrumentationTest", () => {
     Notifications.subscribe("instantiation.active_record", () => {
       called = true;
     });
-    await Author.where({ id: 0 }).toArray();
+    await Author.where({ id: 0 });
     expect(called).toBe(false);
   });
 });

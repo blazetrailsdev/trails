@@ -46,13 +46,13 @@ describe("BooleanTest", () => {
   });
 
   it("find by boolean string", async () => {
-    const results = await Topic.where({ approved: true }).toArray();
+    const results = await Topic.where({ approved: true });
     expect(results.length).toBe(1);
     expect(results[0].id).toBe(topics("approved_topic").id);
   });
 
   it("find by falsy boolean symbol", async () => {
-    const results = await Topic.where({ approved: false }).toArray();
+    const results = await Topic.where({ approved: false });
     expect(results.length).toBe(1);
     expect(results[0].id).toBe(topics("unapproved_topic").id);
   });

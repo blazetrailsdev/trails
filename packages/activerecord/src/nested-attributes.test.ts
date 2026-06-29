@@ -164,7 +164,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -176,7 +176,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "Great post!" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect((birds[0] as any).name).toBe("Great post!");
   });
@@ -189,7 +189,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "ruby" }, { name: "rails" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(2);
     const names = birds.map((b: any) => b.name).sort();
     expect(names).toEqual(["rails", "ruby"]);
@@ -211,7 +211,7 @@ describe("NestedAttributesTest", () => {
     const updatedBird = await CanonicalBird.find(bird.id);
     expect((updatedBird as any).name).toBe("ruby-updated");
 
-    const allBirds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const allBirds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(allBirds.length).toBe(2);
   });
 
@@ -251,7 +251,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "ruby", _destroy: true }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -265,7 +265,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -277,7 +277,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(2);
   });
 
@@ -289,7 +289,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(2);
   });
 
@@ -301,7 +301,7 @@ describe("NestedAttributesTest", () => {
     expect(() =>
       assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }, { name: "c" }]),
     ).toThrow(TooManyRecords);
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -313,7 +313,7 @@ describe("NestedAttributesTest", () => {
     assignNestedAttributes(pirate, "birds", { "0": { name: "ruby" }, "1": { name: "rails" } });
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(2);
     const names = birds.map((b: any) => b.name).sort();
     expect(names).toEqual(["rails", "ruby"]);
@@ -386,7 +386,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", [{ name: "Black Pearl" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(1);
     expect(ships[0].name).toBe("Black Pearl");
   });
@@ -396,7 +396,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", [{ name: "Doomed", _destroy: true }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(0);
   });
 
@@ -405,7 +405,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", [{ name: "Rejected" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(0);
   });
 
@@ -415,7 +415,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await Ship.create({ name: "Old Ship", pirate_id: pirate.id });
     assignNestedAttributes(pirate, "ship", [{ name: "New Ship" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.some((s: any) => s.name === "New Ship")).toBe(true);
   });
 
@@ -425,7 +425,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await Ship.create({ name: "Old Ship", pirate_id: pirate.id });
     assignNestedAttributes(pirate, "ship", [{ name: "Phantom", _destroy: true }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(1);
     expect(ships[0].name).toBe("Old Ship");
   });
@@ -476,7 +476,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const ship = await Ship.create({ name: "Doomed", pirate_id: pirate.id });
     assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(0);
   });
 
@@ -505,7 +505,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", { "0": { name: "IndifferentShip" } });
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(1);
     expect(ships[0].name).toBe("IndifferentShip");
   });
@@ -527,7 +527,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     assignNestedAttributes(pirate, "ship", [{ name: "Deferred" }]);
     await pirate.save();
     expect(pirate.catchphrase).toBe("Yarr");
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(1);
   });
 
@@ -540,7 +540,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const beforeSave = await Ship.find(ship.id!);
     expect(beforeSave).toBeDefined();
     await pirate.save();
-    const afterSave = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const afterSave = await Ship.where({ pirate_id: pirate.id });
     expect(afterSave.length).toBe(0);
   });
 
@@ -568,7 +568,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "Brand New" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(1);
   });
 
@@ -580,7 +580,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     // With updateOnly and no id, it should still create a new record (since our impl doesn't have updateOnly logic yet)
     assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "UpdatedNoId" }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -602,7 +602,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const ship = await Ship.create({ name: "ToDestroy", pirate_id: pirate.id });
     assignNestedAttributes(pirate, "updateOnlyShip", [{ id: ship.id, _destroy: true }]);
     await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id }).toArray();
+    const ships = await Ship.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(0);
   });
 
@@ -646,7 +646,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl" });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "Arrr" }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(1);
     expect(pirates[0].catchphrase).toBe("Arrr");
   });
@@ -694,7 +694,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl" });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "Doomed", _destroy: true }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(0);
   });
 
@@ -703,7 +703,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl" });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "Rejected" }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(0);
   });
 
@@ -713,7 +713,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "New" }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.some((p: any) => p.catchphrase === "New")).toBe(true);
   });
 
@@ -773,7 +773,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(0);
   });
 
@@ -783,7 +783,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(0);
   });
 
@@ -825,7 +825,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const beforeSave = await Pirate.find(pirate.id!);
     expect(beforeSave).toBeDefined();
     await ship.save();
-    const afterSave = await Pirate.all().toArray();
+    const afterSave = await Pirate.all();
     expect(afterSave.length).toBe(0);
   });
 
@@ -840,7 +840,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl" });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "New" }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(1);
   });
 
@@ -850,7 +850,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
     assignNestedAttributes(ship, "pirate", [{ catchphrase: "NoIdUpdate" }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -870,7 +870,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
     assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
     await ship.save();
-    const pirates = await Pirate.all().toArray();
+    const pirates = await Pirate.all();
     expect(pirates.length).toBe(0);
   });
 
@@ -918,7 +918,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "", _destroy: false }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -931,7 +931,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -964,7 +964,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -977,7 +977,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "spam" }, { name: "legit" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("legit");
   });
@@ -991,7 +991,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", { "0": { name: "reject" }, "1": { name: "keep" } });
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("keep");
   });
@@ -1003,7 +1003,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "ship", [{ name: "Rejected" }]);
     await pirate.save();
-    const ships = await CanonicalShip.where({ pirate_id: pirate.id }).toArray();
+    const ships = await CanonicalShip.where({ pirate_id: pirate.id });
     expect(ships.length).toBe(0);
   });
 
@@ -1035,7 +1035,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(0);
   });
 
@@ -1046,7 +1046,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly", id: undefined }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
   });
 
@@ -1072,7 +1072,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const modifiedAttrs = [{ name: "Overridden Bird" }];
     assignNestedAttributes(pirate, "birds", modifiedAttrs);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("Overridden Bird");
   });
@@ -1085,7 +1085,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const parentPirate = await CanonicalPirate.create({ catchphrase: "Parent" });
     assignNestedAttributes(parentPirate, "birds", [{ name: "Rejected" }]);
     await parentPirate.save();
-    const parentBirds = await CanonicalBird.where({ pirate_id: parentPirate.id }).toArray();
+    const parentBirds = await CanonicalBird.where({ pirate_id: parentPirate.id });
     expect(parentBirds.length).toBe(0);
 
     // Subclass inherits the `birds` reflection from CanonicalPirate. The FK is
@@ -1100,7 +1100,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await SubPirate.create({ catchphrase: "Yo" });
     assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
   });
   it("should not create duplicates with create with", async () => {
@@ -1147,7 +1147,7 @@ describe("TestNestedAttributesInGeneral", () => {
     assignNestedAttributes(car, "carReviews", [{ comment: "zippy", rating: 5 }]);
     await car.save();
 
-    const reviews = await CpkCarReview.where({ car_make: "Honda", car_model: "Civic" }).toArray();
+    const reviews = await CpkCarReview.where({ car_make: "Honda", car_model: "Civic" });
     expect(reviews.length).toBe(1);
     expect((reviews[0] as any).comment).toBe("zippy");
     expect((reviews[0] as any).car_make).toBe("Honda");
@@ -1165,7 +1165,7 @@ describe("TestNestedAttributesInGeneral", () => {
     assignNestedAttributes(pirate, "birds", [{ name: "Tweetie" }]);
     await pirate.save();
 
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect((birds[0] as any).name).toBe("Tweetie");
   });
@@ -1329,7 +1329,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     const article = await IERArticle.create({ title: "test" });
     assignNestedAttributes(article, "ierTags", [{ name: "skip" }, { name: "valid" }]);
     await article.save();
-    const tags = await IERTag.where({ ier_article_id: article.id }).toArray();
+    const tags = await IERTag.where({ ier_article_id: article.id });
     expect(tags.length).toBe(1);
   });
 });
@@ -1372,7 +1372,7 @@ describe("TestNestedAttributesWithExtend", () => {
     const article = await ExtArticleSub.create({ title: "extended" });
     assignNestedAttributes(article, "extTags", [{ name: "extended-tag" }]);
     await article.save();
-    const tags = await ExtTag.where({ ext_article_id: article.id }).toArray();
+    const tags = await ExtTag.where({ ext_article_id: article.id });
     expect(tags.length).toBe(1);
     expect(tags[0].name).toBe("extended-tag");
   });
@@ -1444,7 +1444,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
     const entry = await DTEntry2.create({ title: "delegated" });
     assignNestedAttributes(entry, "dtComment2", [{ body: "via delegated type" }]);
     await entry.save();
-    const comments = await DTComment2.where({ dt_entry2_id: entry.id }).toArray();
+    const comments = await DTComment2.where({ dt_entry2_id: entry.id });
     expect(comments.length).toBe(1);
     expect(comments[0].body).toBe("via delegated type");
   });
@@ -1463,7 +1463,7 @@ describe("assigning nested attributes target", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "target test" });
     assignNestedAttributes(pirate, "birds", [{ name: "assigned" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("assigned");
   });
@@ -1484,7 +1484,7 @@ describe("assigning nested attributes target with nil placeholder for rejected i
     const pirate = await CanonicalPirate.create({ catchphrase: "test" });
     assignNestedAttributes(pirate, "birds", [{ name: "keep" }, { name: "" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("keep");
   });
@@ -1508,7 +1508,7 @@ describe("can use symbols as object identifier", () => {
       bar: { name: "Blown Away" },
     });
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(2);
   });
 });
@@ -1593,7 +1593,7 @@ describe("should not assign destroy key to a record", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "no destroy key" });
     assignNestedAttributes(pirate, "birds", [{ name: "keep" }]);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     // The _destroy key should not be assigned as an attribute
     expect(birds[0].readAttribute("_destroy" as any)).toBeFalsy();
@@ -1617,7 +1617,7 @@ describe("should not destroy the associated model until the parent is saved", ()
     const beforeSave = await CanonicalBird.find(bird.id);
     expect(beforeSave).toBeDefined();
     await pirate.save();
-    const afterSave = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const afterSave = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(afterSave.length).toBe(0);
   });
 });
@@ -1768,7 +1768,7 @@ describe("should save only one association on create", () => {
     const pirate = await CanonicalPirate.create({ catchphrase: "one assoc" });
     assignNestedAttributes(pirate, "birds", { foo: { name: "Grace OMalley" } });
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id }).toArray();
+    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
     expect(birds[0].name).toBe("Grace OMalley");
   });
@@ -1938,7 +1938,7 @@ describe("acceptsNestedAttributesFor", () => {
     ]);
     await post.save();
 
-    const comments = await Comment.all().toArray();
+    const comments = await Comment.all();
     expect(comments.length).toBe(2);
     expect(comments[0].post_id).toBe(post.id);
   });
@@ -1967,7 +1967,7 @@ describe("acceptsNestedAttributesFor", () => {
     assignNestedAttributes(article, "tags", [{ id: tag.id, _destroy: true }]);
     await article.save();
 
-    const remaining = await Tag.all().toArray();
+    const remaining = await Tag.all();
     expect(remaining.length).toBe(0);
   });
 });
@@ -2013,7 +2013,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     ]);
     await post.save();
 
-    const comments = await Comment.all().toArray();
+    const comments = await Comment.all();
     expect(comments.length).toBe(2);
     expect(comments[0].post_id).toBe(post.id);
     expect(comments[1].post_id).toBe(post.id);
@@ -2092,7 +2092,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     assignNestedAttributes(post, "comments", [{ id: c2.id, _destroy: true }]);
     await post.save();
 
-    const remaining = await Comment.all().toArray();
+    const remaining = await Comment.all();
     expect(remaining.length).toBe(1);
     expect(remaining[0].body).toBe("Keep me");
   });
@@ -2135,7 +2135,7 @@ describe("Nested Attributes (Rails-guided)", () => {
     ]);
     await post.save();
 
-    const comments = await Comment.all().toArray();
+    const comments = await Comment.all();
     expect(comments.length).toBe(2);
   });
   it("should automatically enable autosave on the association", async () => {
@@ -2212,7 +2212,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const remaining = await Treasure.where({
       looter_id: part.id,
       looter_type: "ShipPart",
-    }).toArray();
+    });
     expect(remaining.length).toBe(0);
   });
 
@@ -2226,7 +2226,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const trinkets = await Treasure.where({
       looter_id: part.id,
       looter_type: "ShipPart",
-    }).toArray();
+    });
     expect(trinkets.length).toBe(2);
   });
 
@@ -2320,7 +2320,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const remaining = await Treasure.where({
       looter_id: part.id,
       looter_type: "ShipPart",
-    }).toArray();
+    });
     expect(remaining.length).toBe(0);
   });
 
@@ -2331,7 +2331,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const trinkets = await Treasure.where({
       looter_id: part.id,
       looter_type: "ShipPart",
-    }).toArray();
+    });
     expect(trinkets.length).toBe(2);
   });
 

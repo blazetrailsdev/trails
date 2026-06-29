@@ -49,7 +49,7 @@ describe("Base static query delegations", () => {
     await Topic.create({ title: "Bob" });
     await Topic.create({ title: "Alice" });
 
-    const results = await Topic.order("title").toArray();
+    const results = await Topic.order("title");
     expect(results[0].title).toBe("Alice");
   });
 
@@ -58,7 +58,7 @@ describe("Base static query delegations", () => {
     await Topic.create({ title: "Bob" });
     await Topic.create({ title: "Charlie" });
 
-    const results = await Topic.limit(2).toArray();
+    const results = await Topic.limit(2);
     expect(results.length).toBe(2);
   });
 
@@ -73,7 +73,7 @@ describe("Base static query delegations", () => {
   it("Base.none() returns empty relation", async () => {
     await Topic.create({ title: "Alice" });
 
-    const results = await Topic.none().toArray();
+    const results = await Topic.none();
     expect(results.length).toBe(0);
   });
 

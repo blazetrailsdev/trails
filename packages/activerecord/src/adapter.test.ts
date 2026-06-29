@@ -1029,12 +1029,12 @@ describe("AdapterConnectionTest", () => {
     PostForRetryTest.adapter = adapter as any;
 
     adapter.failOnce = true;
-    await PostForRetryTest.where({ id: 1 }).limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
     expect(adapter.active).toBe(true);
 
     adapter.failOnce = true;
-    await PostForRetryTest.where({ title: "Welcome to the weblog" }).limit(1).toArray();
+    await PostForRetryTest.where({ title: "Welcome to the weblog" }).limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
     expect(adapter.active).toBe(true);
   });
@@ -1080,24 +1080,24 @@ describe("AdapterConnectionTest", () => {
     // through the shared visitor — that compile must not clobber the
     // already-captured classification (regression: collector reset).
     const fromNode = new Nodes.SqlLiteral("posts", { retryable: true });
-    await PostForRetryTest.where("1 = 1").from(fromNode).limit(1).toArray();
+    await PostForRetryTest.where("1 = 1").from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
 
     // A fully retryable query with a from(Arel node) stays retryable.
-    await PostForRetryTest.where({ id: 1 }).from(fromNode).limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
 
     // A non-retryable FROM node lowers the classification even when the rest
     // of the SELECT is retryable — Rails compiles the whole arel through one
     // collector, so the raw FROM fragment makes allow_retry false.
     const rawFromNode = new Nodes.SqlLiteral("posts");
-    await PostForRetryTest.where({ id: 1 }).from(rawFromNode).limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).from(rawFromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
 
     // from(Relation) compiles its subquery separately too — a non-retryable
     // fragment inside the subquery must lower the outer classification.
     const rawSubquery = PostForRetryTest.where("1 = 1");
-    await PostForRetryTest.where({ id: 1 }).from(rawSubquery, "sub").limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).from(rawSubquery, "sub").limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
 
     // A set-operation subquery now compiles as a live compound node through the
@@ -1107,13 +1107,13 @@ describe("AdapterConnectionTest", () => {
     const retryableSetOp = PostForRetryTest.where({ id: 1 }).union(
       PostForRetryTest.where({ id: 2 }),
     );
-    await PostForRetryTest.where({ id: 1 }).from(retryableSetOp, "sub").limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).from(retryableSetOp, "sub").limit(1);
     expect(adapter.capturedAllowRetry).toBe(true);
 
     // A non-retryable operand (raw SQL) lowers the outer classification through
     // that same single collector.
     const mixedSetOp = PostForRetryTest.where("1 = 1").union(PostForRetryTest.where({ id: 2 }));
-    await PostForRetryTest.where({ id: 1 }).from(mixedSetOp, "sub").limit(1).toArray();
+    await PostForRetryTest.where({ id: 1 }).from(mixedSetOp, "sub").limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
   });
   it("findBySql tolerates a null opts argument without throwing", async () => {

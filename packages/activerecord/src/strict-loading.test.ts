@@ -202,18 +202,18 @@ describe("StrictLoadingTest", () => {
 
   // Rails: test_strict_loading
   it("strict loading", async () => {
-    const allDevs = await Developer.all().toArray();
+    const allDevs = await Developer.all();
     expect(allDevs.every((d) => !d.isStrictLoading())).toBe(true);
-    const strictDevs = await Developer.all().strictLoading().toArray();
+    const strictDevs = await Developer.all().strictLoading();
     expect(strictDevs.every((d) => d.isStrictLoading())).toBe(true);
   });
 
   // Rails: test_strict_loading_by_default
   it("strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
-      const allDevs = await Developer.all().toArray();
+      const allDevs = await Developer.all();
       expect(allDevs.every((d) => d.isStrictLoading())).toBe(true);
-      const nonStrictDevs = await Developer.all().strictLoading(false).toArray();
+      const nonStrictDevs = await Developer.all().strictLoading(false);
       expect(nonStrictDevs.every((d) => !d.isStrictLoading())).toBe(true);
     });
   });
@@ -386,7 +386,7 @@ describe("StrictLoadingTest", () => {
       const dev = await Developer.first();
       await AuditLog.create({ developer_id: dev!.id, message: "M" });
 
-      const devs = await Developer.all().includes("auditLogs").toArray();
+      const devs = await Developer.all().includes("auditLogs");
 
       for (const d of devs) {
         await association(d, "auditLogs").toArray();

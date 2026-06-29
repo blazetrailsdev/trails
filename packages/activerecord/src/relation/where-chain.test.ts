@@ -41,7 +41,7 @@ describe("WhereChainTest", () => {
     (await ((await Author.find(1)) as any).posts.toArray()).length;
 
   it("associated with association", async () => {
-    const relation = await Post.all().where().associated("author").toArray();
+    const relation = await Post.all().where().associated("author");
     expect(includesRecord(relation, posts("welcome"))).toBe(true);
     expect(includesRecord(relation, posts("sti_habtm"))).toBe(true);
     expect(includesRecord(relation, posts("authorless"))).toBe(false);
@@ -68,13 +68,13 @@ describe("WhereChainTest", () => {
   // rows, so the predicate must land on the aliased child column to filter them,
   // which the flat path can't do.
   it.skip("associated with child association", async () => {
-    const relation = await Comment.all().where().associated("children").toArray();
+    const relation = await Comment.all().where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
 
   it("associated with multiple associations", async () => {
-    const relation = await Post.all().where().associated("author", "comments").toArray();
+    const relation = await Post.all().where().associated("author", "comments");
     expect(includesRecord(relation, posts("welcome"))).toBe(true);
     expect(includesRecord(relation, posts("sti_habtm"))).toBe(false);
     expect(includesRecord(relation, posts("authorless"))).toBe(false);
@@ -209,24 +209,21 @@ describe("WhereChainTest", () => {
   // self-join (aliased `children_comments`) that does the filtering. See the
   // skip-boundary note above.
   it("associated with add joins before", async () => {
-    const relation = await Comment.joins("children").where().associated("children").toArray();
+    const relation = await Comment.joins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
 
   // Self-join `children` — see skip note above (RFC 0027 convergence story).
   it.skip("associated with add left joins before", async () => {
-    const relation = await Comment.leftJoins("children").where().associated("children").toArray();
+    const relation = await Comment.leftJoins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
 
   // Self-join `children` — see skip note above (RFC 0027 convergence story).
   it.skip("associated with add left outer joins before", async () => {
-    const relation = await Comment.leftOuterJoins("children")
-      .where()
-      .associated("children")
-      .toArray();
+    const relation = await Comment.leftOuterJoins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
@@ -238,13 +235,13 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with association", async () => {
-    const relation = await Post.all().where().missing("author").toArray();
+    const relation = await Post.all().where().missing("author");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 
   // Self-join `children` — see skip note above (RFC 0027 convergence story).
   it.skip("missing with child association", async () => {
-    const relation = await Comment.all().where().missing("children").toArray();
+    const relation = await Comment.all().where().missing("children");
     expect(includesRecord(relation, comments("more_greetings"))).toBe(true);
     expect(includesRecord(relation, comments("greetings"))).toBe(false);
   });
@@ -256,7 +253,7 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with multiple association", async () => {
-    const relation = await Post.all().where().missing("author", "comments").toArray();
+    const relation = await Post.all().where().missing("author", "comments");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 

@@ -79,7 +79,7 @@ describe("EachTest", () => {
     }
     expect(count).toBe(total);
 
-    const posts7 = await Post.order("id asc").where("id >= ?", 7).toArray();
+    const posts7 = await Post.order("id asc").where("id >= ?", 7);
     let count7 = 0;
     for await (const _post of Post.findEach({ batchSize: 2, start: 7 })) {
       count7++;
@@ -307,7 +307,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not ignore the default scope if it is other then order", async () => {
-    const defaultScope = await SpecialPostWithDefaultScope.all().toArray();
+    const defaultScope = await SpecialPostWithDefaultScope.all();
     const batchPosts: any[] = [];
     for await (const batch of SpecialPostWithDefaultScope.findInBatches({})) {
       batchPosts.push(...batch);
@@ -320,7 +320,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should use any column as primary key", async () => {
-    const nickOrderSubscribers = await Subscriber.order("nick asc").toArray();
+    const nickOrderSubscribers = await Subscriber.order("nick asc");
     const startNick = nickOrderSubscribers[1].readAttribute("nick") as string;
     const collected: any[] = [];
     for await (const batch of Subscriber.findInBatches({ batchSize: 1, start: startNick })) {
@@ -429,7 +429,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should be ordered by id", async () => {
-    const ids = (await Post.order("id ASC").toArray()).map((p: any) => p.id);
+    const ids = (await Post.order("id ASC")).map((p: any) => p.id);
     let i = 0;
     for await (const post of Post.inBatches({ batchSize: 2 }).eachRecord()) {
       expect(post.id).toBe(ids[i]);
@@ -441,7 +441,7 @@ describe("EachTest", () => {
     await assertQueriesCount(6 + 6, false, async () => {
       await Post.inBatches({ batchSize: 2 }).updateAll({ title: "updated-title" });
     });
-    const all = await Post.all().toArray();
+    const all = await Post.all();
     expect(all.every((p: any) => p.readAttribute("title") === "updated-title")).toBe(true);
   });
 
@@ -617,7 +617,7 @@ describe("EachTest", () => {
   it("in batches when loaded runs no queries when batching over cpk model", async () => {
     const incorrectlySorted = CpkOrder.order({ shop_id: "asc", id: "desc" });
     await incorrectlySorted.toArray(); // load
-    const correctlySorted = await CpkOrder.order({ shop_id: "desc", id: "asc" }).toArray();
+    const correctlySorted = await CpkOrder.order({ shop_id: "desc", id: "asc" });
     const expected = correctlySorted.slice(1, correctlySorted.length - 1);
     const startId = (expected[0] as any).id;
     const finishId = (expected[expected.length - 1] as any).id;
@@ -645,7 +645,7 @@ describe("EachTest", () => {
     try {
       const orderedPosts = Post.order("id desc");
       await orderedPosts.toArray(); // load
-      const expected = await Post.order("id desc").toArray();
+      const expected = await Post.order("id desc");
       const collected: any[] = [];
       for await (const post of orderedPosts
         .inBatches({ batchSize: 1, cursor: "id", order: "desc" })
@@ -848,7 +848,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should not ignore default scope without order statements", async () => {
-    const defaultScope = await SpecialPostWithDefaultScope.all().toArray();
+    const defaultScope = await SpecialPostWithDefaultScope.all();
     const batchPosts: any[] = [];
     for await (const relation of SpecialPostWithDefaultScope.inBatches({})) {
       const records = await relation.toArray();
@@ -862,7 +862,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should use any column as primary key", async () => {
-    const nickOrderSubscribers = await Subscriber.order("nick asc").toArray();
+    const nickOrderSubscribers = await Subscriber.order("nick asc");
     const startNick = nickOrderSubscribers[1].readAttribute("nick") as string;
     const collected: any[] = [];
     for await (const relation of Subscriber.inBatches({ batchSize: 1, start: startNick })) {
@@ -909,10 +909,10 @@ describe("EachTest", () => {
 
   it("in batches relations with condition should not overlap with each other", async () => {
     const authorId = (await Post.first())?.readAttribute("author_id");
-    const postsByAuthor = await Post.where({ author_id: authorId }).toArray();
+    const postsByAuthor = await Post.where({ author_id: authorId });
     const seenPosts: any[] = [];
     for await (const batch of Post.inBatches({ batchSize: 2 })) {
-      const records = await batch.where({ author_id: authorId }).toArray();
+      const records = await batch.where({ author_id: authorId });
       seenPosts.push(...records);
     }
     const expectedIds = postsByAuthor
@@ -976,7 +976,7 @@ describe("EachTest", () => {
       });
     });
     try {
-      const expected = await Post.order("id desc").toArray();
+      const expected = await Post.order("id desc");
       const collected: any[] = [];
       for await (const post of Post.inBatches({
         batchSize: 1,
@@ -1134,7 +1134,7 @@ describe("EachTest", () => {
   });
 
   it(".find_each iterates over composite primary key", async () => {
-    const orders = await CpkOrder.order(...(CpkOrder.primaryKey as string[])).toArray();
+    const orders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const orderIds = orders.map((o: any) => String(o.id));
     let index = 0;
     for await (const order of CpkOrder.findEach({ batchSize: 1 })) {
@@ -1151,7 +1151,7 @@ describe("EachTest", () => {
     await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
     await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
     await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[])).toArray();
+    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const order = allOrders[1]; // second
     let firstRelation: any = null;
     for await (const rel of CpkOrder.inBatches({ batchSize: 1, start: (order as any).id })) {
@@ -1167,7 +1167,7 @@ describe("EachTest", () => {
     await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
     await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
     await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[])).toArray();
+    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const order = allOrders[allOrders.length - 2]; // second_to_last
     const batches: any[] = [];
     for await (const rel of CpkOrder.inBatches({ batchSize: 1, finish: (order as any).id })) {
@@ -1184,7 +1184,7 @@ describe("EachTest", () => {
     await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
     await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
     await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
-    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[])).toArray();
+    const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const [order1, order2] = allOrders;
     const [shopId, id] = (order1 as any).id as [number, number];
     let firstRelation: any = null;
@@ -1206,7 +1206,7 @@ describe("EachTest", () => {
     await CpkBook.create({ author_id: 1, id: 1 });
     await CpkBook.create({ author_id: 2, id: 1 });
     await CpkBook.create({ author_id: 2, id: 2 });
-    const books = await CpkBook.order({ author_id: "asc", id: "desc" }).toArray();
+    const books = await CpkBook.order({ author_id: "asc", id: "desc" });
     const bookIds = books.map((b: any) => JSON.stringify(b.id));
     let index = 0;
     for await (const book of CpkBook.findEach({ batchSize: 1, order: ["asc", "desc"] as any })) {
@@ -1256,7 +1256,7 @@ describe("EachTest", () => {
     await CpkBook.create({ author_id: 1, id: 1 });
     await CpkBook.create({ author_id: 1, id: 2 });
     await CpkBook.create({ author_id: 1, id: 3 });
-    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).limit(2).toArray();
+    const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).limit(2);
     const [authorId, id] = (book1 as any).id as [number, number];
     let firstRelation: any = null;
     for await (const rel of CpkBook.where("author_id >= ? AND id < ?", authorId, id).inBatches({

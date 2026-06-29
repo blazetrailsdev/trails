@@ -61,7 +61,7 @@ describe("CoreTest", () => {
   it("inspect limited select instance", async () => {
     const { Topic } = makeModel();
     await Topic.create({ title: "limited", author: "bob" });
-    const results = await Topic.select("title").toArray();
+    const results = await Topic.select("title");
     expect(results.length).toBe(1);
     expect(results[0].title).toBe("limited");
   });
@@ -87,7 +87,7 @@ describe("CoreTest", () => {
   it("inspect relation with virtual field", async () => {
     const { Topic } = makeModel();
     await Topic.create({ title: "vf", author: "dave" });
-    const results = await Topic.all().toArray();
+    const results = await Topic.all();
     expect(results.length).toBe(1);
   });
 
@@ -150,7 +150,7 @@ describe("CoreTest", () => {
     const { Topic } = makeModel();
     await Topic.create({ title: "dup1" });
     await Topic.create({ title: "dup2" });
-    const results = await Topic.all().toArray();
+    const results = await Topic.all();
     expect(results.length).toBe(2);
   });
 

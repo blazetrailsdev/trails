@@ -95,53 +95,45 @@ describe("RelationScopingTest", () => {
   });
 
   it("reverse order", async () => {
-    const forward = await Developer.order("id DESC").toArray();
-    const reversed = await Developer.order("id DESC").reverseOrder().toArray();
+    const forward = await Developer.order("id DESC");
+    const reversed = await Developer.order("id DESC").reverseOrder();
     expect(reversed.map((d: any) => d.id)).toEqual(forward.map((d: any) => d.id).reverse());
   });
 
   it("reverse order with arel attribute", async () => {
-    const expected = await Developer.order("id DESC").toArray();
-    const actual = await Developer.order(Developer.arelTable.get("id").desc())
-      .reverseOrder()
-      .toArray();
+    const expected = await Developer.order("id DESC");
+    const actual = await Developer.order(Developer.arelTable.get("id").desc()).reverseOrder();
     expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
   it("reverse order with arel attribute as hash", async () => {
-    const expected = await Developer.order("id DESC").toArray();
+    const expected = await Developer.order("id DESC");
     const actual = await Developer.order(
       new Map([[Developer.arelTable.get("id"), "desc" as const]]),
-    )
-      .reverseOrder()
-      .toArray();
+    ).reverseOrder();
     expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
   it("reverse order with arel node as hash", async () => {
     const node = Developer.arelTable.get("id").add(0);
-    const expected = await Developer.order("id DESC").toArray();
-    const actual = await Developer.order(new Map([[node, "desc" as const]]))
-      .reverseOrder()
-      .toArray();
+    const expected = await Developer.order("id DESC");
+    const actual = await Developer.order(new Map([[node, "desc" as const]])).reverseOrder();
     expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
   it("reverse order with multiple arel attributes", async () => {
-    const expected = await Developer.order("id DESC").order("name DESC").toArray();
+    const expected = await Developer.order("id DESC").order("name DESC");
     const actual = await Developer.order(Developer.arelTable.get("id").desc())
       .order(Developer.arelTable.get("name").desc())
-      .reverseOrder()
-      .toArray();
+      .reverseOrder();
     expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
   it("reverse order with arel attributes and strings", async () => {
-    const expected = await Developer.order("id DESC").order("name DESC").toArray();
+    const expected = await Developer.order("id DESC").order("name DESC");
     const actual = await Developer.order("id DESC")
       .order(Developer.arelTable.get("name").desc())
-      .reverseOrder()
-      .toArray();
+      .reverseOrder();
     expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
   });
 
@@ -204,7 +196,7 @@ describe("RelationScopingTest", () => {
 
   it("scoped find all", async () => {
     await Developer.where("name = 'David'").scoping(async () => {
-      const all = await Developer.all().toArray();
+      const all = await Developer.all();
       expect(all.length).toBe(1);
       expect(all[0].id).toBe(developers("david").id);
     });
@@ -374,27 +366,27 @@ describe("RelationScopingTest", () => {
   });
 
   it("delete all default scope filters on joins", async () => {
-    expect(await DeveloperFilteredOnJoins.all().toArray()).not.toEqual([]);
+    expect(await DeveloperFilteredOnJoins.all()).not.toEqual([]);
     await DeveloperFilteredOnJoins.deleteAll();
-    expect(await DeveloperFilteredOnJoins.all().toArray()).toEqual([]);
-    expect(await Developer.all().toArray()).not.toEqual([]);
+    expect(await DeveloperFilteredOnJoins.all()).toEqual([]);
+    expect(await Developer.all()).not.toEqual([]);
   });
 
   it("current scope does not pollute sibling subclasses", async () => {
     await Comment.none().scoping(async () => {
-      expect((await SpecialComment.all().toArray()).length).toBe(0);
-      expect((await VerySpecialComment.all().toArray()).length).toBe(0);
-      expect((await SubSpecialComment.all().toArray()).length).toBe(0);
+      expect((await SpecialComment.all()).length).toBe(0);
+      expect((await VerySpecialComment.all()).length).toBe(0);
+      expect((await SubSpecialComment.all()).length).toBe(0);
     });
     await SpecialComment.none().scoping(async () => {
-      expect((await Comment.all().toArray()).length).toBeGreaterThan(0);
-      expect((await VerySpecialComment.all().toArray()).length).toBeGreaterThan(0);
-      expect((await SubSpecialComment.all().toArray()).length).toBe(0);
+      expect((await Comment.all()).length).toBeGreaterThan(0);
+      expect((await VerySpecialComment.all()).length).toBeGreaterThan(0);
+      expect((await SubSpecialComment.all()).length).toBe(0);
     });
     await SubSpecialComment.none().scoping(async () => {
-      expect((await Comment.all().toArray()).length).toBeGreaterThan(0);
-      expect((await VerySpecialComment.all().toArray()).length).toBeGreaterThan(0);
-      expect((await SpecialComment.all().toArray()).length).toBeGreaterThan(0);
+      expect((await Comment.all()).length).toBeGreaterThan(0);
+      expect((await VerySpecialComment.all()).length).toBeGreaterThan(0);
+      expect((await SpecialComment.all()).length).toBeGreaterThan(0);
     });
   });
 
@@ -424,13 +416,13 @@ describe("RelationScopingTest", () => {
   });
 
   it("scoping with klass method works in the scope block", async () => {
-    const expected = await SpecialPostWithDefaultScope.unscoped().toArray();
+    const expected = await SpecialPostWithDefaultScope.unscoped();
     const actual = (await SpecialPostWithDefaultScope.unscopedAll()) as Base[];
     expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
 
   it("scoping with query method works in the scope block", async () => {
-    const expected = await SpecialPostWithDefaultScope.unscoped().where({ author_id: 0 }).toArray();
+    const expected = await SpecialPostWithDefaultScope.unscoped().where({ author_id: 0 });
     const actual = (await SpecialPostWithDefaultScope.authorless()) as Base[];
     expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
   });
@@ -537,7 +529,7 @@ describe("NestedRelationScopingTest", () => {
   it("merge inner scope has priority", async () => {
     await Developer.limit(5).scoping(async () => {
       await Developer.limit(10).scoping(async () => {
-        expect((await Developer.all().toArray()).length).toBe(10);
+        expect((await Developer.all()).length).toBe(10);
       });
     });
   });

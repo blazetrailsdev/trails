@@ -438,13 +438,13 @@ describe("UpdateAllTest", () => {
   it("klass level update all", async () => {
     const now = instant("2015-01-01T12:00:00Z");
 
-    for (const person of await Person.all().toArray()) {
+    for (const person of await Person.all()) {
       expect(epochMs((person as any).updated_at)).not.toBe(now.epochMilliseconds);
     }
 
     await Person.updateAll({ updated_at: now });
 
-    for (const person of await Person.all().toArray()) {
+    for (const person of await Person.all()) {
       expect(epochMs((person as any).updated_at)).toBe(now.epochMilliseconds);
     }
   });
@@ -452,7 +452,7 @@ describe("UpdateAllTest", () => {
   it("klass level touch all", async () => {
     const now = instant("2015-01-01T12:00:00Z");
 
-    for (const person of await Person.all().toArray()) {
+    for (const person of await Person.all()) {
       expect(epochMs((person as any).updated_at)).not.toBe(now.epochMilliseconds);
     }
 
@@ -460,7 +460,7 @@ describe("UpdateAllTest", () => {
     await Person.touchAll();
     vi.useRealTimers();
 
-    for (const person of await Person.all().toArray()) {
+    for (const person of await Person.all()) {
       expect(epochMs((person as any).updated_at)).toBe(now.epochMilliseconds);
     }
   });

@@ -556,7 +556,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.where("title = ?", "hello").toArray();
+    const results = await Topic.where("title = ?", "hello");
     expect(results.length).toBe(1);
   });
 
@@ -567,7 +567,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.where("title = :title", { title: "hello" }).toArray();
+    const results = await Topic.where("title = :title", { title: "hello" });
     expect(results.length).toBe(1);
   });
 
@@ -580,7 +580,7 @@ describe("FinderTest", () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
     await Topic.create({ title: "c" });
-    const results = await Topic.where({ title: ["a", "b"] }).toArray();
+    const results = await Topic.where({ title: ["a", "b"] });
     expect(results.length).toBe(2);
   });
 
@@ -601,7 +601,7 @@ describe("FinderTest", () => {
       }
     }
     await Topic.create({ title: "hello" });
-    const results = await Topic.where("title = ?", "hello").toArray();
+    const results = await Topic.where("title = ?", "hello");
     expect(results.length).toBe(1);
   });
 
@@ -689,7 +689,7 @@ describe("FinderTest", () => {
       }
     }
     for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const results = await Topic.all().limit(2).offset(1).toArray();
+    const results = await Topic.all().limit(2).offset(1);
     expect(results.length).toBeLessThanOrEqual(2);
   });
 
@@ -1159,7 +1159,7 @@ describe("FinderTest", () => {
       }
     }
     const p = await Post.create({ title: "test" });
-    const arr = await Post.all().toArray();
+    const arr = await Post.all();
     const found = arr.find((r: any) => r.id === p.id);
     expect(found).toBeTruthy();
   });
@@ -1171,7 +1171,7 @@ describe("FinderTest", () => {
       }
     }
     await Post.create({ title: "existing" });
-    const arr = await Post.all().toArray();
+    const arr = await Post.all();
     const notFound = arr.find((r: any) => r.id === 99999);
     expect(notFound).toBeUndefined();
   });
@@ -1183,7 +1183,7 @@ describe("FinderTest", () => {
       }
     }
     await Post.create({ title: "hello" });
-    const results = await Post.where({ title: ["hello", null] }).toArray();
+    const results = await Post.where({ title: ["hello", null] });
     expect(results.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -1324,7 +1324,7 @@ describe("FinderTest", () => {
   it("include on loaded relation with composite primary key", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "cpk_loaded" });
-    const posts = await Post.all().toArray();
+    const posts = await Post.all();
     expect(posts.length).toBe(1);
   });
   it("member on unloaded relation with mismatched class", async () => {
@@ -1342,7 +1342,7 @@ describe("FinderTest", () => {
   it("member on loaded relation with composite primary key", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "mem_cpk_loaded" });
-    const posts = await Post.all().toArray();
+    const posts = await Post.all();
     expect(posts.length).toBe(1);
   });
   it("implicit order column is configurable", async () => {
@@ -1391,7 +1391,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "range1" });
     await Post.create({ title: "range2" });
-    const results = await Post.where({ title: ["range1", "range2"] }).toArray();
+    const results = await Post.where({ title: ["range1", "range2"] });
     expect(results.length).toBe(2);
   });
   it("find on hash conditions with open ended range", async () => {
@@ -1460,7 +1460,7 @@ describe("FinderTest", () => {
   });
   it("hash condition find empty array with aggregate having multiple mappings", async () => {
     const { Post } = makeModel();
-    const results = await Post.where({ title: [] }).toArray();
+    const results = await Post.where({ title: [] });
     expect(results.length).toBe(0);
   });
   it("condition utc time interpolation with default timezone local", async () => {
@@ -1515,19 +1515,19 @@ describe("FinderTest", () => {
   it("with limiting with custom select", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "lim_sel" });
-    const results = await Post.select("title").limit(1).toArray();
+    const results = await Post.select("title").limit(1);
     expect(results.length).toBe(1);
   });
   it("eager load for no has many with limit and joins for has many", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "el_hm" });
-    const results = await Post.limit(1).toArray();
+    const results = await Post.limit(1);
     expect(results.length).toBe(1);
   });
   it("eager load for no has many with limit and left joins for has many", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "el_lj" });
-    const results = await Post.limit(1).toArray();
+    const results = await Post.limit(1);
     expect(results.length).toBe(1);
   });
   it("find one message with custom primary key", async () => {
@@ -1540,7 +1540,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "cpk_a" });
     const p2 = await Post.create({ title: "cpk_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] });
     expect(results.length).toBe(2);
   });
   it("#skip_query_cache! for #exists?", async () => {
@@ -1576,29 +1576,27 @@ describe("FinderTest", () => {
   it("find with a single composite primary key wrapped in an array", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "cpk_arr" });
-    const results = await Post.where({ id: [p.id] }).toArray();
+    const results = await Post.where({ id: [p.id] });
     expect(results.length).toBe(1);
   });
   it("find with a multiple sets of composite primary key", async () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "mcpk_a" });
     const p2 = await Post.create({ title: "mcpk_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] });
     expect(results.length).toBe(2);
   });
   it("find with a multiple sets of composite primary key wrapped in an array", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "mcpk_wrap" });
-    const results = await Post.where({ id: [p.id] }).toArray();
+    const results = await Post.where({ id: [p.id] });
     expect(results.length).toBe(1);
   });
   it("find with a multiple sets of composite primary key wrapped in an array ordered", async () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "mcpk_ord_a" });
     const p2 = await Post.create({ title: "mcpk_ord_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] })
-      .order("title")
-      .toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] }).order("title");
     expect(results.length).toBe(2);
   });
   it("#find_by with composite primary key and query caching", async () => {
@@ -1626,7 +1624,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "ord_a" });
     const p2 = await Post.create({ title: "ord_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] });
     expect(results.length).toBe(2);
   });
 
@@ -1634,9 +1632,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     const p1 = await Post.create({ title: "b" });
     const p2 = await Post.create({ title: "a" });
-    const results = await Post.where({ id: [p1.id, p2.id] })
-      .order("title")
-      .toArray();
+    const results = await Post.where({ id: [p1.id, p2.id] }).order("title");
     expect(results.length).toBe(2);
   });
 
@@ -1647,31 +1643,28 @@ describe("FinderTest", () => {
     await Post.create({ title: "a" });
     const results = await Post.where({ id: [p1.id, p2.id] })
       .order("title")
-      .limit(1)
-      .toArray();
+      .limit(1);
     expect(results.length).toBe(1);
   });
 
   it("find with ids and limit", async () => {
     const { Post } = makeModel();
     for (let i = 0; i < 5; i++) await Post.create({ title: String(i) });
-    const results = await Post.limit(2).toArray();
+    const results = await Post.limit(2);
     expect(results.length).toBe(2);
   });
 
   it("find with ids where and limit", async () => {
     const { Post } = makeModel();
     for (let i = 0; i < 5; i++) await Post.create({ title: String(i) });
-    const results = await Post.where({ title: ["0", "1", "2"] })
-      .limit(2)
-      .toArray();
+    const results = await Post.where({ title: ["0", "1", "2"] }).limit(2);
     expect(results.length).toBe(2);
   });
 
   it("find with ids and offset", async () => {
     const { Post } = makeModel();
     for (let i = 0; i < 5; i++) await Post.create({ title: String(i) });
-    const results = await Post.all().offset(2).toArray();
+    const results = await Post.all().offset(2);
     expect(results.length).toBe(3);
   });
 
@@ -1761,7 +1754,7 @@ describe("FinderTest", () => {
   it("member when non AR object passed on loaded relation", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "mem_non_ar_l" });
-    const records = await Post.all().toArray();
+    const records = await Post.all();
     const found = records.find((r: any) => r.id === 99999);
     expect(found).toBeUndefined();
   });
@@ -1796,7 +1789,7 @@ describe("FinderTest", () => {
   it("member on unloaded relation with limit", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "mem_lim" });
-    const results = await Post.limit(10).toArray();
+    const results = await Post.limit(10);
     const found = results.find((r: any) => r.id === p.id);
     expect(found).toBeTruthy();
   });
@@ -1853,7 +1846,7 @@ describe("FinderTest", () => {
   it("find with hash conditions on joined table and with range", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "joined_range" });
-    const results = await Post.where({ title: ["joined_range"] }).toArray();
+    const results = await Post.where({ title: ["joined_range"] });
     expect(results.length).toBe(1);
   });
 
@@ -1874,14 +1867,14 @@ describe("FinderTest", () => {
   it("find on hash conditions with multiple ranges", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "multi_range" });
-    const results = await Post.where({ title: ["multi_range"] }).toArray();
+    const results = await Post.where({ title: ["multi_range"] });
     expect(results.length).toBe(1);
   });
 
   it("hash condition find malformed", async () => {
     const { Post } = makeModel();
     // Empty conditions should return all or handle gracefully
-    const results = await Post.where({}).toArray();
+    const results = await Post.where({});
     expect(Array.isArray(results)).toBe(true);
   });
 
@@ -1895,7 +1888,7 @@ describe("FinderTest", () => {
   it("bind variables with quotes", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" }).toArray();
+    const results = await Post.where({ title: "it's quoted" });
     expect(results.length).toBe(1);
   });
 
@@ -1930,7 +1923,7 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "a" });
     await Post.create({ title: "b" });
-    const results = await Post.where({ title: ["a", "b"] }).toArray();
+    const results = await Post.where({ title: ["a", "b"] });
     expect(results.length).toBe(2);
   });
 
@@ -2006,7 +1999,7 @@ describe("FinderTest", () => {
   it("find on array conditions", async () => {
     const Topic = makeTopic();
     await Topic.create({ title: "Match" });
-    const found = await Topic.where({ title: ["Match", "Other"] }).toArray();
+    const found = await Topic.where({ title: ["Match", "Other"] });
     expect(found.length).toBe(1);
   });
 
@@ -2032,7 +2025,7 @@ describe("FinderTest", () => {
     const Topic = makeTopic();
     const t1 = await Topic.create({ title: "T1" });
     const t2 = await Topic.create({ title: "T2" });
-    const found = await Topic.where({ id: [t1, t2].map((t) => t.id) }).toArray();
+    const found = await Topic.where({ id: [t1, t2].map((t) => t.id) });
     expect(found.length).toBe(2);
   });
 
@@ -2128,13 +2121,13 @@ describe("FinderTest", () => {
 
   it("find by empty in condition", async () => {
     await Post.create({ title: "a" });
-    const results = await Post.where({ title: [] }).toArray();
+    const results = await Post.where({ title: [] });
     expect(results.length).toBe(0);
   });
 
   it("find with nil inside set passed for one attribute", async () => {
     await Post.create({ title: "a" });
-    const results = await Post.where({ title: ["a", null] }).toArray();
+    const results = await Post.where({ title: ["a", null] });
     expect(Array.isArray(results)).toBe(true);
   });
 
@@ -2225,7 +2218,7 @@ describe("FinderTest", () => {
 
     const results = await Post.where({
       id: [new Range(id(0), id(1)), id(2), id(4), new Range(id(5), id(7)), id(8)],
-    }).toArray();
+    });
 
     const got = results.map((p: any) => p.id).sort((a, b) => Number(a) - Number(b));
     const expected = [0, 1, 2, 4, 5, 6, 7, 8].map(id);
@@ -2251,7 +2244,7 @@ describe("FinderTest", () => {
 
   it("named bind variables with quotes", async () => {
     await Post.create({ title: "it's quoted" });
-    const results = await Post.where({ title: "it's quoted" }).toArray();
+    const results = await Post.where({ title: "it's quoted" });
     expect(results.length).toBe(1);
   });
 
@@ -2261,13 +2254,13 @@ describe("FinderTest", () => {
 
   it("find by nil and not nil attributes", async () => {
     await Post.create({ title: "has-title" });
-    const results = await Post.where({ title: "has-title" }).toArray();
+    const results = await Post.where({ title: "has-title" });
     expect(results.length).toBe(1);
   });
 
   it("select rows", async () => {
     await Post.create({ title: "row1" });
-    const results = await Post.all().toArray();
+    const results = await Post.all();
     expect(results.length).toBe(1);
   });
 
