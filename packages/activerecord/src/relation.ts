@@ -7277,6 +7277,7 @@ export class Relation<T extends Base> {
     this._orderClauses = [...source._orderClauses];
     this._rawOrderClauses = [...source._rawOrderClauses];
     this._reordering = source._reordering;
+    this._reverseOrderValue = source._reverseOrderValue;
     this._limitValue = source._limitValue;
     this._offsetValue = source._offsetValue;
     this._selectColumns = source._selectColumns ? [...source._selectColumns] : null;
