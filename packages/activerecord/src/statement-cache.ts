@@ -10,8 +10,9 @@
  *   const results = await cache.execute(["my book"], connection);
  */
 
-import { Attribute } from "@blazetrails/activemodel";
+import { Attribute, ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
+import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
 
 /**
@@ -240,21 +241,32 @@ export class StatementCache {
     connection: unknown,
     opts: { allowRetry?: boolean } = {},
   ): Promise<InstanceType<typeof Base>[]> {
-    const bindValues = this._bindMap.bind(params);
-    const sql = this._queryBuilder.sqlFor(bindValues, connection);
-    const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
-    // PartialQuery inlines values into the SQL string — pass empty binds
-    // to avoid findBySql trying to re-substitute them. This matches Rails:
-    // PartialQuery#sql_for drains the bind_values array in place via
-    // `binds.shift` (statement_cache.rb:51-61), so by the time it reaches
-    // find_by_sql the array is empty and the unprepared query log carries no
-    // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
-    if (this._queryBuilder instanceof PartialQuery) {
-      return this._model.findBySql(sql, [], { allowRetry, preparable: true });
+    try {
+      const bindValues = this._bindMap.bind(params);
+      const sql = this._queryBuilder.sqlFor(bindValues, connection);
+      const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
+      // PartialQuery inlines values into the SQL string — pass empty binds
+      // to avoid findBySql trying to re-substitute them. This matches Rails:
+      // PartialQuery#sql_for drains the bind_values array in place via
+      // `binds.shift` (statement_cache.rb:51-61), so by the time it reaches
+      // find_by_sql the array is empty and the unprepared query log carries no
+      // bind payload. (Our sqlFor copies the array, so we drop it explicitly.)
+      if (this._queryBuilder instanceof PartialQuery) {
+        return await this._model.findBySql(sql, [], { allowRetry, preparable: true });
+      }
+      // Type-cast bind objects to primitives for the adapter
+      const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
+      return await this._model.findBySql(sql, castedBinds, { allowRetry, preparable: true });
+    } catch (e) {
+      // Mirrors statement_cache.rb:154 — `rescue ::RangeError` → `[]`. An
+      // out-of-range bind (e.g. a belongs_to FK beyond the column's integer
+      // range) raises while serializing `valueForDatabase` *before* the query
+      // reaches `selectAll`'s own RangeError rescue, so it must be caught here
+      // too. Ruby's bare `::RangeError` covers both ActiveModel::RangeError
+      // (type-level) and ActiveRecord::RangeError (adapter-level wire rejection).
+      if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
+      throw e;
     }
-    // Type-cast bind objects to primitives for the adapter
-    const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
-    return this._model.findBySql(sql, castedBinds, { allowRetry, preparable: true });
   }
 
   /**
