@@ -6485,13 +6485,40 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Check if the given record is present in the loaded records.
+   * Check if the given record is present in the relation.
    *
-   * Mirrors: ActiveRecord::Relation#include?
+   * Mirrors: ActiveRecord::Relation#include? (finder_methods.rb:389-407).
+   * A non-model argument short-circuits to `false` without querying. A loaded
+   * relation — or one carrying offset/limit/having — compares in memory; an
+   * unloaded relation without those issues a cheap `exists?(id)` rather than
+   * materializing every row.
    */
   async include(record: T): Promise<boolean> {
-    const records = await this.toArray();
-    return records.some((r) => r.isEqual(record));
+    if (!(record instanceof this._modelClass)) return false;
+    if (
+      this.isLoaded ||
+      this._offsetValue !== null ||
+      this._limitValue !== null ||
+      !this._havingClause.isEmpty()
+    ) {
+      const records = await this.toArray();
+      return records.some((r) => r.isEqual(record));
+    }
+    // Unloaded fast path: probe existence by primary key. Composite-PK models
+    // (Rails `record.class.composite_primary_key?`) carry a tuple id, which
+    // exists()'s array branch reads as `[sql, ...binds]`; route those through a
+    // PK-column hash instead so each component is bound to its column.
+    const recordClass = record.constructor as typeof Base;
+    if (recordClass.compositePrimaryKey) {
+      const pk = recordClass.primaryKey as string[];
+      const id = record.id as unknown[];
+      const conditions: Record<string, unknown> = {};
+      pk.forEach((col, i) => {
+        conditions[col] = id[i];
+      });
+      return this.exists(conditions);
+    }
+    return this.exists(record.id);
   }
 
   /**

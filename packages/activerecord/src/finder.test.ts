@@ -8,6 +8,7 @@ import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 
 const TEST_SCHEMA = {
@@ -2325,6 +2326,24 @@ describe("FinderTest", () => {
     const item = await Item.findBy({ name: "Apple" });
     expect(item).not.toBeNull();
     expect(item!.name).toBe("Apple");
+  });
+});
+
+describe("FinderTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  it("include on unloaded relation with composite primary key match", async () => {
+    const book = await CpkBook.create({ author_id: 1, id: 1, title: "cpk-hit" });
+    const included = await CpkBook.all().include(book);
+    expect(included).toBe(true);
+  });
+
+  it("include on unloaded relation with composite primary key without match", async () => {
+    const book = await CpkBook.create({ author_id: 2, id: 2, title: "cpk-miss" });
+    await book.destroy();
+    const included = await CpkBook.all().include(book);
+    expect(included).toBe(false);
   });
 });
 
