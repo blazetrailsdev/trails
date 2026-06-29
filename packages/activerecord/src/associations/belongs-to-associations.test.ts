@@ -1475,7 +1475,7 @@ describe("BelongsToAssociationsTest", () => {
     }
 
     const author = Temp.new();
-    (author as any).author_address_id = 9223372036854775808n; // out of range in the bigint
+    author.writeAttribute("author_address_id", 9223372036854775808n); // out of range in the bigint
 
     expect(await (author as any).loadBelongsTo("authorAddress")).toBeNull();
     expect(await author.isValid()).toBe(false);
