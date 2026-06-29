@@ -47,7 +47,6 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   let post: Post;
   let post2: Post;
   let comment: Comment;
-  let comment2: Comment;
   let member: Member;
   let member2: Member;
   let memberType: MemberType;
@@ -66,14 +65,13 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     })) as Comment;
     post2 = (await (author as any).posts.create({ title: "title", body: "body" })) as Post;
     member2 = await Member.create({ member_type_id: memberType.id });
-    comment2 = (await (post2 as any).comments.create({
+    await (post2 as any).comments.create({
       body: "text",
       origin_id: member2.id,
       origin_type: "Member",
-    })) as Comment;
+    });
     rating1 = (await (comment as any).ratings.create({ value: 8 })) as Rating;
     rating2 = (await (comment as any).ratings.create({ value: 9 })) as Rating;
-    void comment2;
   });
 
   const sortIds = (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0);
