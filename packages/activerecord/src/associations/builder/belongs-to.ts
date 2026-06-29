@@ -1,4 +1,4 @@
-import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
+import { underscore, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeSave, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
@@ -337,49 +337,55 @@ export class BelongsTo extends SingularAssociation {
 
     super.defineValidations(model, reflection);
 
-    if (required) {
-      // Rails validates the association name (reflection.name) which
-      // checks whether the associated record can be loaded. Our codebase
-      // validates the foreign key directly since association-aware presence
-      // validation is not yet wired. The effect is the same: reject nil FK.
+    if (required && typeof model.validatesPresenceOf === "function") {
+      // Mirrors Rails BelongsToBuilder.define_validations: presence is
+      // validated on the association NAME (reflection.name), not the foreign
+      // key column, so `read_attribute_for_validation` reads the loaded
+      // in-memory target. Assigning an unsaved `record.parent = Parent.new`
+      // satisfies presence, and autosave persists the new parent before the
+      // owner (see autosave-association saveBelongsTo).
+      const name = reflection.name;
+      const polymorphic = !!reflection.options?.polymorphic;
       const rawFk =
         reflection.foreignKey ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
       const foreignKeys = Array.isArray(rawFk) ? rawFk : [rawFk];
+      const foreignTypes = polymorphic
+        ? Array.isArray(reflection.foreignType)
+          ? (reflection.foreignType as string[])
+          : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
+        : [];
 
-      if (belongsToRequiredValidatesForeignKey) {
-        if (typeof model.validatesPresenceOf === "function") {
-          for (const key of foreignKeys) {
-            model.validatesPresenceOf(key, { message: "required" });
-          }
-        } else if (typeof model.validates === "function") {
-          for (const key of foreignKeys) {
-            model.validates(key, { presence: true });
-          }
-        }
-      } else {
-        const foreignTypes = reflection.options?.polymorphic
-          ? Array.isArray(reflection.foreignType)
-            ? (reflection.foreignType as string[])
-            : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
-          : [];
+      // trails validations are synchronous (see CLAUDE.md) and cannot load an
+      // unloaded target, so we suppress the presence check when the FK is
+      // already populated — keeping `create({ parentId: id })` valid and
+      // matching Rails' observable behavior (where reading the association
+      // loads the record from the FK).
+      const foreignKeyPresent = (record: any): boolean => {
+        if (foreignKeys.length === 0) return false;
+        if (!foreignKeys.every((key) => !isBlank(record._readAttribute(key)))) return false;
+        if (!polymorphic) return true;
+        return foreignTypes.every((type) => !isBlank(record._readAttribute(type)));
+      };
 
+      let condition: (record: any) => boolean = (record) => !foreignKeyPresent(record);
+
+      if (!belongsToRequiredValidatesForeignKey) {
+        // Rails' conditional branch only runs the presence check when the FK
+        // (or polymorphic type) is nil or changed, so an already-persisted,
+        // untouched FK doesn't re-validate the (possibly unloaded) target.
         const needsValidation = (record: any, attrs: string[]) =>
           attrs.some(
             (attr) =>
               record._readAttribute(attr) == null ||
               (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
           );
-
-        const condition = (record: any) =>
+        const railsCondition = (record: any) =>
           needsValidation(record, foreignKeys) ||
-          (reflection.options?.polymorphic && needsValidation(record, foreignTypes));
-
-        if (typeof model.validates === "function") {
-          for (const key of foreignKeys) {
-            model.validates(key, { presence: true, if: condition });
-          }
-        }
+          (polymorphic && needsValidation(record, foreignTypes));
+        condition = (record) => railsCondition(record) && !foreignKeyPresent(record);
       }
+
+      model.validatesPresenceOf(name, { message: "required", if: condition });
     }
   }
 
