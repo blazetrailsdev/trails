@@ -5161,29 +5161,31 @@ export class Relation<T extends Base> {
     const predicates = this._whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];
-      let ids: unknown[];
-      let negated: boolean;
       if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
-        ids = await node.innerRelation._materializeDistinctPkIds();
-        negated = node instanceof DeferredDistinctPkNotIn;
+        const attribute = node.left as Nodes.Attribute;
+        const ids = await node.innerRelation._materializeDistinctPkIds();
+        predicates[i] =
+          node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
       } else if (node instanceof DeferredIdsNotIn) {
+        const attribute = node.left as Nodes.Attribute;
         // Rails `excluding`/`without`: one predicate over
         // `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1588).
         // Concatenate the known literal ids with each relation's materialized
-        // ids so the substitution stays a single `NOT IN`, not an `AND` of them.
+        // ids so the substitution stays a single predicate, not an `AND` of them.
         // `flat_map(&:ids)` runs each `Relation#ids` select sequentially in
         // argument order (calculations.rb:390-404), so await them in order
         // rather than concurrently (also avoids contending the connection).
-        ids = [...node.literalIds];
+        const ids = [...node.literalIds];
         for (const rel of node.innerRelations) {
           ids.push(...(await rel.ids()));
         }
-        negated = true;
-      } else {
-        continue;
+        // Route through the negated predicate builder — trails' equivalent of
+        // Rails `predicate_builder[primary_key, records].invert`
+        // (query_methods.rb:1587) — instead of hardcoding `NOT IN`, so the
+        // materialized array shares the loaded/`where.not` array-negation logic
+        // (e.g. an eventual single-id `!=` collapse) rather than diverging.
+        predicates[i] = this.predicateBuilder.buildNegated(attribute, ids);
       }
-      const attribute = node.left as Nodes.Attribute;
-      predicates[i] = negated ? attribute.notIn(ids) : attribute.in(ids);
     }
   }
 
