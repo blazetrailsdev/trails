@@ -6,6 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { isAbortSignal } from "@blazetrails/activesupport";
 import {
   sanitizeForMassAssignment,
   SerializeCastValue,
@@ -766,8 +767,14 @@ export async function save<T extends SaveRecord>(
   // live. So validations run *before* the guards: a record that is both
   // destroyed and invalid raises RecordInvalid (validations first), not
   // RecordNotSaved.
-  if (!performValidations.call(this, options)) return false;
   const self = this as any;
+  // A `before_validation` that needs async DB work (Rails runs it inside the
+  // save transaction — transactions_test.rb:714) can't await on trails' strict-
+  // sync validation chain, so such a callback defers its thunk here instead of
+  // running inline. Reset the queue before the chain populates it so a prior
+  // save that bailed at validation doesn't leak a stale thunk into this one.
+  self._beforeValidationSideEffects = [];
+  if (!performValidations.call(this, options)) return false;
   if (options?.validate !== false) {
     if (!(await self._runAsyncValidations())) return false;
   }
@@ -795,9 +802,22 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return (await withTransactionReturningStatus.call(self, () => self.createOrUpdate())) as
-      | boolean
-      | undefined;
+    return (await withTransactionReturningStatus.call(self, async () => {
+      // Drain deferred `before_validation` side effects inside the transaction
+      // so a cancelling filter's DB write (`Book.create`) rolls back with it.
+      // A drained thunk that `throw :abort`s halts the save (status false →
+      // Rollback), matching Rails' halted validation callback.
+      const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
+      for (const thunk of sideEffects) {
+        try {
+          await thunk();
+        } catch (e) {
+          if (isAbortSignal(e)) return false;
+          throw e;
+        }
+      }
+      return self.createOrUpdate();
+    })) as boolean | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
     // callbacks raise RecordInvalid when a child fails to save. The transaction

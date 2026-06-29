@@ -622,19 +622,19 @@ describe("TransactionTest", () => {
   // and asserts BOTH that the dirtied `author_name` reverts AND that the
   // `Book.count` DB side effect is rolled back.
   //
-  // CONVERGENCE-PENDING: the DB side effect needs async work (`Book.create`)
-  // inside the cancelling before-filter, but trails' `before_validation` runs on
-  // the strict-sync validation chain (no awaiting) and the canonical Topic's
-  // `before_save_for_transaction` / `before_validation_for_transaction` hook
-  // dispatch is invoked synchronously without `await`, so a `Book.create` there
-  // cannot be awaited or transactionally rolled back. Faithful Rails bodies are
-  // retained for the un-skip; tracked alongside
-  // [[transactions-test-rollback-restores-record-state]].
+  // The DB side effect needs async work (`Book.create`) inside the cancelling
+  // before-filter. The canonical Topic `before_save_for_transaction` runs on the
+  // async save-callback chain (the wrapper returns the hook's Promise so it is
+  // awaited inside the save transaction). `before_validation_for_transaction`
+  // can't await on trails' strict-sync validation chain, so the Topic wrapper
+  // defers its thunk into `_beforeValidationSideEffects`, which `save` drains
+  // inside the transaction (persistence.ts). In both paths the `throw :abort`
+  // halts the save (status false → Rollback), rolling back `Book.create`.
   for (const filter of ["validation", "save"] as const) {
     const hook =
       filter === "validation" ? "beforeValidationForTransaction" : "beforeSaveForTransaction";
 
-    it.skip(`cancellation from before filters rollbacks in ${filter}`, async () => {
+    it(`cancellation from before filters rollbacks in ${filter}`, async () => {
       first[hook] = async () => {
         await Book.create({});
         throwAbort();
@@ -648,7 +648,7 @@ describe("TransactionTest", () => {
       expect(await Book.count()).toBe(nbooksBeforeSave);
     });
 
-    it.skip(`cancellation from before filters rollbacks in ${filter}!`, async () => {
+    it(`cancellation from before filters rollbacks in ${filter}!`, async () => {
       first[hook] = async () => {
         await Book.create({});
         throwAbort();
