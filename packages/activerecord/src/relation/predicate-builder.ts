@@ -276,7 +276,16 @@ export class PredicateBuilder {
 
     const parts: Nodes.Node[] = [];
 
-    if (scalarValues.length > 0) {
+    // Mirror Rails `ArrayHandler#call` (array_handler.rb:18-23) followed by
+    // `.invert`: a length-1 value array builds the scalar predicate
+    // (`build(attribute, values.first)` → Equality) and inverts to `!=`, only
+    // multi-value arrays use `IN` (→ `NOT IN` here). The positive
+    // `ArrayHandler.call` already collapses the single-value case via
+    // `predicateBuilder.build`; mirror its inverse here with `buildNegated` so
+    // both paths agree (`where.not`, `excluding`).
+    if (scalarValues.length === 1) {
+      parts.push(this.buildNegated(attribute, scalarValues[0]));
+    } else if (scalarValues.length > 1) {
       parts.push(attribute.notIn(scalarValues));
     }
 
