@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { Rollback } from "../errors.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
@@ -1837,26 +1838,49 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
       return record.save();
     };
-    for (const record of records) {
-      // Route through replace_on_target (via _addToTarget) so set_inverse_instance
-      // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
-      // Rails' concat_records → add_to_target(record) { insert_record }. A record
-      // already wired into the loaded target by inverse-of setting is replaced in
-      // place rather than appended twice.
-      // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
-      // so a `distinct` association scope dedups in place on append rather than appending twice.
-      //
-      // Rails' `concat_records` runs `insert_record` inside the per-record
-      // `add_to_target` block, guarded by `unless owner.new_record?`
-      // (collection_association.rb:444). For a new-record owner the child is
-      // added to the in-memory target and saved later via autosave; skipping
-      // the insert also avoids writing a child row with a null owner FK. The
-      // check is evaluated per record at save time (after `before_add` fires),
-      // so a callback that persists the owner mid-loop flips the remaining
-      // records onto the insert path — matching Rails' control flow.
-      await this._addToTarget(record, { replace: this.distinctValue }, () =>
-        this._record.isNewRecord() ? Promise.resolve(true) : insertRecord(record),
-      );
+    // Rails' `concat_records` accumulates `result &&= insert_record(...)` and
+    // `raise ActiveRecord::Rollback unless result` (collection_association.rb:438-452),
+    // so a record whose `save` merely *returns false* (a validation/callback abort
+    // that doesn't raise) still rolls back the records already inserted in this
+    // batch. Mirror that here rather than relying on a thrown error.
+    let result = true;
+    const insertAll = async (): Promise<void> => {
+      for (const record of records) {
+        // Route through replace_on_target (via _addToTarget) so set_inverse_instance
+        // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
+        // Rails' concat_records → add_to_target(record) { insert_record }. A record
+        // already wired into the loaded target by inverse-of setting is replaced in
+        // place rather than appended twice.
+        // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`
+        // so a `distinct` association scope dedups in place on append rather than appending twice.
+        //
+        // Rails' `concat_records` runs `insert_record` inside the per-record
+        // `add_to_target` block, guarded by `unless owner.new_record?`
+        // (collection_association.rb:444). For a new-record owner the child is
+        // added to the in-memory target and saved later via autosave; skipping
+        // the insert also avoids writing a child row with a null owner FK. The
+        // check is evaluated per record at save time (after `before_add` fires),
+        // so a callback that persists the owner mid-loop flips the remaining
+        // records onto the insert path — matching Rails' control flow.
+        await this._addToTarget(record, { replace: this.distinctValue }, async () => {
+          if (this._record.isNewRecord()) return true;
+          const saved = await insertRecord(record);
+          if (!saved) result = false;
+          return saved;
+        });
+      }
+      if (!result) throw new Rollback();
+    };
+    // Rails' `CollectionAssociation#concat` wraps the inserts in a transaction
+    // for a persisted owner (`transaction { concat_records(records) }`,
+    // collection_association.rb:133) so a mid-batch save failure rolls back the
+    // records already inserted. A new-record owner skips the transaction — the
+    // inserts are deferred to autosave, so no DB write happens here (and a
+    // BEGIN would violate the "push does not query" invariant).
+    if (this._record.isNewRecord()) {
+      await insertAll();
+    } else {
+      await this.transaction(insertAll);
     }
     return stripThenable(this._proxySelf ?? this) as this;
   }
