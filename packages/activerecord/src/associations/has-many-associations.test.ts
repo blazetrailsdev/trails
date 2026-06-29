@@ -6387,11 +6387,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await car.funkyBulbs.count()).toBe(0);
   });
 
-  // BLOCKED: CollectionProxy#first does not cache _target on load (toArray is
-  // deliberately cache-bypassing per collection-proxy.ts:686-692). Each call to
-  // first() fetches a new object; the toBe identity check fails. Story:
-  // assoc-has-many-collection-first-caching (RFC 0019).
-  it.skip("find first after reset", async () => {
+  it("find first after reset", async () => {
     const firm = (await HmFirm.first()) as any;
     const collection = firm.clients;
     const original = await collection.first();

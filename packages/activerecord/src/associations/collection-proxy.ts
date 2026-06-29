@@ -164,6 +164,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _assocDef: AssociationDefinition;
   private _target: T[] = [];
   private _targetLoaded = false;
+  // Rails' Relation#@offsets memo: find_nth(index) caches the single record at a
+  // given offset so repeated `first`/`last`/`take` (no-arg) return the SAME object
+  // without re-querying, until `reset`/`reload`/mutation clears it (finder_methods.rb,
+  // collection_proxy.rb#reset). Keyed "first"/"last"/"take".
+  private _offsetMemo = new Map<string, T | null>();
   // Mirrors Rails' `CollectionAssociation#@replaced_or_added_targets` (a
   // `Set.new.compare_by_identity`): records that have been added to or
   // replaced on the in-memory target. `replace_on_target` consults it to
@@ -606,6 +611,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       Object.defineProperty(this, name, {
         value: function (this: CollectionProxy<T>, ...args: unknown[]) {
           (this as unknown as { _cpMutated: boolean })._cpMutated = true;
+          // Rails Relation#reset clears @offsets alongside loaded state
+          // (relation.rb:1194). The Relation.prototype.reset below doesn't see
+          // our subclass field, so drop the find_nth memo here too — otherwise a
+          // memoized first()/last()/take() row would survive the scope mutation.
+          (this as unknown as { _offsetMemo: Map<string, unknown> })._offsetMemo.clear();
           // Use Relation#reset so all inherited load-state — including
           // `_loadToken` — is invalidated atomically. Bumping the token
           // lets in-flight super.toArray() completions detect that
@@ -1423,12 +1433,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Count associated records.
    */
   async count(): Promise<number> {
-    // Rails' CollectionAssociation#count: if the target is already
-    // loaded, count the loaded array (no query). Otherwise issue a
-    // real `COUNT(*)` on the scoped relation. Previously the non-
-    // diverged branch loaded every row just to read `.length`, which
-    // is a significant perf regression on large collections.
-    if (this._targetLoaded) return this._target.length;
+    // Rails' CollectionProxy#count delegates to scope/relation which always
+    // issues a SQL COUNT — it does NOT use the loaded-target cache (that is
+    // `size`'s job). Remove any _targetLoaded fast-path here to stay faithful.
     // Strict loading only blocks paths that actually hit the DB —
     // a loaded target above returns without querying, matching
     // `size()`'s loaded-target fast path.
@@ -2177,6 +2184,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
+    this._offsetMemo.clear();
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
       assocInstance._associationIds = null;
@@ -2457,6 +2465,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
     }
     this._removeFromTarget(removed);
+    // If any records were not pruned (e.g. composite-PK target whose join row
+    // the scalar findBy couldn't locate), invalidate the cache so the next
+    // toArray re-queries rather than returning a stale target.
+    if (removed.length !== records.length && this._targetLoaded) {
+      this._targetLoaded = false;
+    }
   }
 
   private async _deleteThroughAllSql(): Promise<number> {
@@ -2748,10 +2762,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override first(n: number): Promise<T[]>;
   override async first(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
-    if (n === undefined) return records[0] ?? null;
-    return records.slice(0, n);
+    // Rails CollectionProxy#first: `load_target if find_from_target?; super`
+    // (collection_proxy.rb:259). When find_from_target? the loaded @target is
+    // used; otherwise super runs a bounded finder query WITHOUT marking the
+    // association loaded (so n_plus_one_only `loaded?` stays false). The no-arg
+    // case mirrors Relation#find_nth's @offsets memo (finder_methods.rb) so
+    // repeated `first` returns the same object until reset/reload clears it.
+    if (this.isFindFromTarget()) {
+      const records = await this.loadTarget();
+      if (n === undefined) return records[0] ?? null;
+      return records.slice(0, n);
+    }
+    if (n !== undefined) return (await this.toArray()).slice(0, n);
+    if (this._offsetMemo.has("first")) return this._offsetMemo.get("first")!;
+    const record = (await this.toArray())[0] ?? null;
+    this._offsetMemo.set("first", record);
+    return record;
   }
 
   /**
@@ -2774,10 +2800,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
-    if (n === undefined) return records[records.length - 1] ?? null;
-    return records.slice(Math.max(0, records.length - n));
+    // Rails CollectionProxy#last: `load_target if find_from_target?; super`
+    // (collection_proxy.rb:289). Unlike first/take, Relation#last is NOT memoized
+    // — it builds a temporary `reverse_order` relation and reads `.first` off it
+    // (finder_methods.rb:202), so there is no @offsets/@take cache here. We
+    // deliberately do NOT consult/populate _offsetMemo for last().
+    if (this.isFindFromTarget()) {
+      const records = await this.loadTarget();
+      if (n === undefined) return records[records.length - 1] ?? null;
+      return records.slice(Math.max(0, records.length - n));
+    }
+    const arr = await this.toArray();
+    if (n === undefined) return arr[arr.length - 1] ?? null;
+    return arr.slice(Math.max(0, arr.length - n));
   }
 
   /**
@@ -2800,10 +2835,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    if (this.isFindFromTarget()) await this.loadTarget();
-    const records = this._targetLoaded ? this._target : await this.toArray();
-    if (n === undefined) return records[0] ?? null;
-    return records.slice(0, n);
+    // Mirrors first()'s find_from_target?/memo split.
+    if (this.isFindFromTarget()) {
+      const records = await this.loadTarget();
+      if (n === undefined) return records[0] ?? null;
+      return records.slice(0, n);
+    }
+    if (n !== undefined) return (await this.toArray()).slice(0, n);
+    if (this._offsetMemo.has("take")) return this._offsetMemo.get("take")!;
+    const record = (await this.toArray())[0] ?? null;
+    this._offsetMemo.set("take", record);
+    return record;
   }
 
   /**
@@ -2860,6 +2902,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       return false;
     }
+    // Rails Relation#many? uses records.many? when loaded (no query),
+    // otherwise limited_count > 1.
+    if (this._targetLoaded) return this._target.length > 1;
     return (await this.count()) > 1;
   }
 
@@ -3158,6 +3203,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
+    this._offsetMemo.clear();
     await this.load();
     return stripThenable(this);
   }
@@ -3172,6 +3218,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
+    this._offsetMemo.clear();
     // Drop the OO association's memoized named-scope relations (Rails'
     // `reset_scope`) so the next `things.someScope()` rebuilds. Only an
     // already-built instance can hold a cache, so don't construct one here.
