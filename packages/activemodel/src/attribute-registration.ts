@@ -3,6 +3,7 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
+import type { AttributeOptions } from "./attributes.js";
 
 /**
  * AttributeRegistration mixin — provides the static attribute() method
@@ -16,8 +17,8 @@ import { AttributeSet } from "./attribute-set.js";
 export interface AttributeRegistrationClassMethods {
   attribute(
     name: string,
-    typeName: string | Type,
-    options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
+    typeName?: string | Type | AttributeOptions,
+    options?: AttributeOptions,
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: (name: string, type: Type) => Type): void;
