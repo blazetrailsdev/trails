@@ -60303,5 +60303,12 @@
     "rubyName": "stale_state",
     "call": "through_reflection",
     "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasManyThroughAssociation#staleState delegates to."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/belongs-to.ts",
+    "rubyName": "add_default_callbacks",
+    "call": "before_validation",
+    "reason": "Intentional deviation: Rails registers the default on before_validation, but trails' validation chain is strictly synchronous and the default block may be async (e.g. () => Developer.first()), so addDefaultCallbacks registers it on beforeSave instead. Documented in belongs-to.ts and AssociationOptions.default."
   }
 ]
