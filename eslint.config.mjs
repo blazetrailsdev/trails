@@ -14,6 +14,7 @@ import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
+import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-order.mjs";
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
@@ -145,6 +146,7 @@ export default defineConfig(
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
           "sqlite-driver-await": sqliteDriverAwait,
+          "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
           "expected-fixtures": expectedFixtures,
@@ -444,6 +446,24 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/sqlite-driver-await": "error",
+    },
+  },
+
+  // ── prefer-await-relation: await relations directly, don't call .toArray() ──
+  // Applies to both app code and test files across the ported packages.
+  {
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+    ],
+    rules: {
+      // `warn`, not `error`: `.toArray()` is the established relation
+      // materializer across ~1700 call sites. Surfacing it advisory-only
+      // (autofixable via `--fix`) lets the codebase converge to direct awaits
+      // without breaking lint or forcing a mass rewrite in one PR.
+      "blazetrails/prefer-await-relation": "warn",
     },
   },
 
