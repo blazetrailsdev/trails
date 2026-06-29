@@ -23,11 +23,19 @@ tester.run("prefer-await-relation", rule, {
     { code: "const a = rel.toArray(1);" },
     // computed member access is not matched
     { code: "const a = rel['toArray']();" },
-    // synchronous non-relation .toArray() — not in a Promise-consuming
-    // position, so excluded (ActiveModel Errors, OrderedHash, view paths).
+    // Not directly awaited — excluded so non-relation `.toArray()` accessors
+    // (raw query Result, ActiveModel Errors, OrderedHash, view-path/streaming
+    // wrappers) are never mis-flagged or mis-rewritten:
+    // synchronous, plain expression
     { code: "const arr = e.toArray();" },
     { code: "const all = [...this._viewPaths.toArray(), ...paths];" },
     { code: "ship.parts.toArray();" },
+    // returned but not awaited — `result` here is a raw Result, not a relation
+    { code: "function f(result: any) { return result.toArray(); }" },
+    // arrow body, not awaited
+    { code: "const f = (result: any) => result.toArray();" },
+    // .then chain, not awaited
+    { code: "ship.parts.toArray().then((p: any) => p);" },
   ],
   invalid: [
     // awaited relation.toArray()
@@ -42,25 +50,25 @@ tester.run("prefer-await-relation", rule, {
       errors: [{ messageId: "preferAwait" }],
       output: "async function f(rel: any) { const a = await rel.where({ x: 1 }); }",
     },
-    // returned (thenable) — relation, consumed as a Promise
-    {
-      code: "function f(rel: any) { return rel.toArray(); }",
-      errors: [{ messageId: "preferAwait" }],
-      output: "function f(rel: any) { return rel; }",
-    },
-    // .then chain
-    {
-      code: "ship.parts.toArray().then((p: any) => p);",
-      errors: [{ messageId: "preferAwait" }],
-      output: "ship.parts.then((p: any) => p);",
-    },
-    // chained off a method call
+    // awaited, chained off a method call
     {
       code: "async function f(Post: any) { return await Post.all().toArray(); }",
       errors: [{ messageId: "preferAwait" }],
       output: "async function f(Post: any) { return await Post.all(); }",
     },
-    // optional-chained call
+    // awaited through parentheses
+    {
+      code: "async function f(rel: any) { const a = await (rel.toArray()); }",
+      errors: [{ messageId: "preferAwait" }],
+      output: "async function f(rel: any) { const a = await (rel); }",
+    },
+    // awaited through a TS assertion wrapper
+    {
+      code: "async function f(rel: any) { await (rel.toArray() as any[]); }",
+      errors: [{ messageId: "preferAwait" }],
+      output: "async function f(rel: any) { await (rel as any[]); }",
+    },
+    // optional-chained call, awaited
     {
       code: "async function f(rel: any) { await rel?.toArray(); }",
       errors: [{ messageId: "preferAwait" }],
