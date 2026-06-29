@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
+import { loadBelongsTo, modelRegistry } from "../associations.js";
 import { baseClass, demodulize } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
@@ -24,17 +24,10 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   override get klass(): typeof Base {
     const type = this.readForeignType();
     if (!type) return undefined as any;
-    // Rails resolves a polymorphic target via the owner class's
-    // `polymorphic_class_for`, which a model may override to map a custom
-    // `polymorphic_name` type string back to its class. Fall back to a bare
-    // registry lookup when the owner has no such hook.
-    const ownerCtor = this.owner.constructor as typeof Base & {
-      polymorphicClassFor?: (name: string) => typeof Base;
-    };
-    if (typeof ownerCtor.polymorphicClassFor === "function") {
-      return ownerCtor.polymorphicClassFor(type);
-    }
-    return resolveModel(type);
+    // Rails: `owner.class.polymorphic_class_for(type)` — a model may override
+    // the hook to map a custom `polymorphic_name` type string back to its
+    // class (belongs_to_polymorphic_association.rb:9).
+    return (this.owner.constructor as typeof Base).polymorphicClassFor(type);
   }
 
   /**

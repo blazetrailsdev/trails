@@ -3486,12 +3486,10 @@ export function setBelongsTo(
     }
     if (options.polymorphic) {
       const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-      // Rails writes `record.class.polymorphic_name`; honor a model override
-      // of that static, else preserve the existing flattened-name behavior.
-      const polyName = Object.prototype.hasOwnProperty.call(targetCtor, "polymorphicName")
-        ? (targetCtor as any).polymorphicName()
-        : targetCtor!.name;
-      record._writeAttribute(typeCol, polyName);
+      // Rails: `record.class.polymorphic_name` (belongs_to_polymorphic_association.rb:28).
+      // The default honors `store_full_class_name`/demodulization; a model may
+      // override it to store a custom type string.
+      record._writeAttribute(typeCol, targetCtor!.polymorphicName());
     }
   } else {
     if (Array.isArray(foreignKey)) {

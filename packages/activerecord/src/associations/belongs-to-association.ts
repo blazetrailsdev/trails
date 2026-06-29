@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadBelongsTo, resolveModel, reflectLockVersionBump } from "../associations.js";
+import { loadBelongsTo, reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
@@ -115,16 +115,13 @@ export class BelongsToAssociation extends SingularAssociation {
           ? this.owner.attributeBeforeLastSave(foreignType)
           : undefined;
       if (modelTypeWas) {
-        // Resolve via the owner's polymorphic_class_for hook (a model may
-        // override it to map a custom polymorphic_name back to its class).
-        const ownerCtor = this.owner.constructor as typeof Base & {
-          polymorphicClassFor?: (name: string) => typeof Base;
-        };
+        // Rails: `owner.class.polymorphic_class_for(model_type_was)` — a model
+        // may override the hook to map a custom polymorphic_name back to its
+        // class (belongs_to_association.rb:70).
         try {
-          modelWas =
-            typeof ownerCtor.polymorphicClassFor === "function"
-              ? ownerCtor.polymorphicClassFor(modelTypeWas as string)
-              : resolveModel(modelTypeWas as string);
+          modelWas = (this.owner.constructor as typeof Base).polymorphicClassFor(
+            modelTypeWas as string,
+          );
         } catch {
           return;
         }
