@@ -15178,6 +15178,20 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
+    "rubyName": "raise_on_type_mismatch!",
+    "call": "klass",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association.ts",
+    "rubyName": "raise_on_type_mismatch!",
+    "call": "reflection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/association.ts",
     "rubyName": "async_load_target",
     "call": "find_target",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -15852,13 +15866,6 @@
     "tsFile": "associations/belongs-to-association.ts",
     "rubyName": "invertible_for?",
     "call": "klass",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/belongs-to-association.ts",
-    "rubyName": "replace",
-    "call": "raise_on_type_mismatch!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
