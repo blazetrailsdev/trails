@@ -1813,12 +1813,16 @@ export class Relation<T extends Base> {
       rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
       return rel;
     }
-    // Flatten string arrays: joins(["str1", "str2"]) mirrors Rails array form.
-    // Plain objects are kept as-is (not array-flattened) so { post: "author" }
-    // survives the flatMap step.
-    const flatArgs = args.flatMap((a) => (Array.isArray(a) ? a : [a]));
+    // Rails' `check_if_method_has_arguments!` runs `args.flatten!` +
+    // `args.compact_blank!` before `spawn.joins!` (query_methods.rb:868-871).
+    // We apply it here rather than in the guard because the trails-only
+    // `joins(table, on)` form above must be disambiguated on the raw arg shape
+    // first — flattening would collapse a single `joins(["a","b"])` array into
+    // two args and trip that heuristic. flattenedArgs recurses into arrays only
+    // (plain objects like `{ post: "author" }` pass through); isBlankArgument
+    // drops `{}` / `[]` / `null` / `""` so blank specs never reach join state.
+    const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     for (const arg of flatArgs) {
-      if (!arg) continue;
       // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
       // Rails joins! uses |= (array union), deduplicating by object identity for
       // nodes and string equality for strings. JS === matches both behaviours.
@@ -1844,7 +1848,8 @@ export class Relation<T extends Base> {
         if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
         continue;
       }
-      if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
+      const joinValue = arg as string | Nodes.Join;
+      if (!rel._joinValues.includes(joinValue)) rel._joinValues.push(joinValue);
     }
     return rel;
   }
@@ -1881,9 +1886,16 @@ export class Relation<T extends Base> {
           "only associations and hashes are supported as arguments to leftOuterJoins",
         );
       }
-      const specs = Array.isArray(table) ? table : [table];
+      // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
+      // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
+      // `leftJoins([])` drop their blank specs instead of polluting join state.
+      const specs = _qm
+        .flattenedArgs(Array.isArray(table) ? table : [table])
+        .filter((s) => !_qm.isBlankArgument(s));
       for (const spec of specs) {
-        if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
+        if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
+          rel._leftOuterJoinsValues.push(spec as AssociationSpec);
+        }
       }
     }
     return rel;
