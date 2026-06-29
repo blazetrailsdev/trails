@@ -266,16 +266,7 @@ describe("CustomPropertiesTest", () => {
 
   it("overloading properties does not attribute method order", () => {
     const attributeNames = OverloadedType.attributeNames();
-    const expected = [...OverloadedType.columnNames(), "non_existent_decimal"];
-    // Rails asserts exact order (column_names + the virtual attr). trails keeps
-    // declared overrides in declaration order rather than column order, so the
-    // sequence differs; assert the same membership and that the virtual
-    // `non_existent_decimal` is excluded from column_names but present in
-    // attribute_names. Exact-order convergence tracked by RFC 0023
-    // attribute-names-column-order.
-    expect(new Set(attributeNames)).toEqual(new Set(expected));
-    expect(OverloadedType.columnNames()).not.toContain("non_existent_decimal");
-    expect(attributeNames).toContain("non_existent_decimal");
+    expect(attributeNames).toEqual([...OverloadedType.columnNames(), "non_existent_decimal"]);
   });
 
   it("caches are cleared", async () => {
