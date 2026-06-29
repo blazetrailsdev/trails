@@ -1177,12 +1177,7 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preloading readonly association", async () => {
-    // BLOCKED: preloader does not propagate a readonly() reflection scope to
-    // has_many :through / HABTM source records — only the has-one path
-    // (readonly_account) marks records readonly. eager_load (the sibling test
-    // below) does propagate it. Un-skip story:
-    // assoc-eager-preload-readonly-through-habtm-propagation.
+  it("preloading readonly association", async () => {
     // has-one
     const firm = await (Firm as any).where({ id: 1 }).preload("readonlyAccount").firstBang();
     expect((await firm.readonlyAccount).isReadonly()).toBe(true);
