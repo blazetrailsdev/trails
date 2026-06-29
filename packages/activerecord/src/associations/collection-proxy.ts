@@ -2800,21 +2800,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    // Mirrors first()'s find_from_target?/memo split (collection_proxy.rb:289).
+    // Rails CollectionProxy#last: `load_target if find_from_target?; super`
+    // (collection_proxy.rb:289). Unlike first/take, Relation#last is NOT memoized
+    // — it builds a temporary `reverse_order` relation and reads `.first` off it
+    // (finder_methods.rb:202), so there is no @offsets/@take cache here. We
+    // deliberately do NOT consult/populate _offsetMemo for last().
     if (this.isFindFromTarget()) {
       const records = await this.loadTarget();
       if (n === undefined) return records[records.length - 1] ?? null;
       return records.slice(Math.max(0, records.length - n));
     }
-    if (n !== undefined) {
-      const arr = await this.toArray();
-      return arr.slice(Math.max(0, arr.length - n));
-    }
-    if (this._offsetMemo.has("last")) return this._offsetMemo.get("last")!;
     const arr = await this.toArray();
-    const record = arr[arr.length - 1] ?? null;
-    this._offsetMemo.set("last", record);
-    return record;
+    if (n === undefined) return arr[arr.length - 1] ?? null;
+    return arr.slice(Math.max(0, arr.length - n));
   }
 
   /**
