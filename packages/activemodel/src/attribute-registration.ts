@@ -53,13 +53,16 @@ export interface PendingModification {
 export class PendingType implements PendingModification {
   constructor(
     readonly name: string,
-    readonly type: Type,
+    // Nullable, mirroring Rails' `PendingType` whose `type` is nil for a bare
+    // `attribute(:col)` re-declaration. apply_to falls back to the attribute's
+    // current type (`type || attribute.type`), keeping the existing type.
+    readonly type: Type | null,
   ) {}
 
   /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
-    attributeSet.set(this.name, existing.withType(this.type));
+    attributeSet.set(this.name, existing.withType(this.type ?? existing.type));
   }
 }
 
@@ -345,7 +348,11 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
  *
  * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
  */
-export function pushPendingType(cls: AttributeHostInternals, name: string, type: Type): void {
+export function pushPendingType(
+  cls: AttributeHostInternals,
+  name: string,
+  type: Type | null,
+): void {
   pendingAttributeModifications.call(cls).push(new PendingType(name, type));
 }
 

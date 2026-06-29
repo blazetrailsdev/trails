@@ -101,6 +101,7 @@ export interface AttributeOptions {
   limit?: number | null;
 }
 
+/** @internal */
 export function attribute(
   this: {
     _attributeDefinitions: Map<string, AttributeDefinition>;
@@ -155,12 +156,17 @@ export function attribute(
   // Push to pending-modification queue so _defaultAttributes() replays in
   // the correct order relative to schema-reflected columns (AR) or other
   // pending modifications (AM inheritance).
-  // Mirrors: ActiveModel::AttributeRegistration#attribute — a PendingType is
-  // pushed only when a type was supplied; otherwise the existing type is kept.
-  if (typeProvided) {
-    pushPendingType(this, name, type);
+  // Mirrors: ActiveModel::AttributeRegistration#attribute —
+  //   pending << PendingType.new(name, type) if type || no_default
+  //   pending << PendingDefault.new(name, default) unless no_default
+  // A bare re-declaration (no type, no default) still pushes a PendingType with
+  // a nil type so it re-anchors to the attribute's current type at replay; a
+  // default-only call pushes only PendingDefault, preserving the existing type.
+  const noDefault = options?.default === undefined;
+  if (typeProvided || noDefault) {
+    pushPendingType(this, name, typeProvided ? type : null);
   }
-  if (options?.default !== undefined) {
+  if (!noDefault) {
     pushPendingDefault(this, name, defaultValue);
   }
 
