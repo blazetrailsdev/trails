@@ -383,6 +383,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // this before proceeding so no query can interleave between the two
   // SQL commands that resetBang fires asynchronously.
   private _inFlightReset: Promise<void> | null = null;
+  // Serializes out-of-band maintenance SQL on the pinned client — DEALLOCATE
+  // (statement-pool eviction) and resetBang's ROLLBACK + DISCARD ALL — so these
+  // never fire-and-forget onto a client that's already executing a query
+  // (node-pg's "already executing a query" deprecation, the wire-protocol-desync
+  // seam). Each op chains onto the previous; query-acquisition paths drain this
+  // (alongside _inFlightReset) before yielding the socket so a pending DEALLOCATE
+  // can't race the next user query. This is the narrow maintenance-op serializer;
+  // the full per-query mutex is the sibling pg-pinned-client-query-serializer-mutex.
+  private _maintenanceTail: Promise<void> = Promise.resolve();
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -1100,6 +1109,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
     // query can interleave between the two commands resetBang fires.
     while (this._inFlightReset) await this._inFlightReset;
+    // Drain any pending maintenance op (DEALLOCATE) so it can't race the query
+    // we're about to hand the caller on the pinned client.
+    await this._maintenanceTail;
     // Re-check after the yield: a concurrent close/disconnect/discard
     // may have run while we were waiting for the reset to complete.
     if (this._closed || this._pgClientOptions == null) {
@@ -1214,6 +1226,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   protected override async awaitRawConnectionReady(): Promise<void> {
     while (this._inFlightReset) await this._inFlightReset;
+    // Drain any pending maintenance op (DEALLOCATE) so it can't race the query
+    // the withRawConnection loop is about to issue on the pinned client.
+    await this._maintenanceTail;
     // If the reset's reconfigure step failed it tore down the socket; re-open
     // a fresh, configured connection so the loop never yields an unconfigured
     // (or null) one. connect() throws here only if the server is truly down —
@@ -1237,9 +1252,40 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private _poolFor(client: pg.Client): StatementPool {
     if (!this._statementPool) {
-      this._statementPool = new StatementPool(client, this._statementLimit);
+      this._statementPool = this._makeStatementPool(client);
     }
     return this._statementPool;
+  }
+
+  /**
+   * Build a StatementPool wired to drain DEALLOCATE through the adapter's
+   * maintenance serializer (`_enqueueMaintenance`) instead of fire-and-forget,
+   * so an evicted statement's DEALLOCATE chains behind the in-flight query /
+   * prior maintenance op on the pinned client rather than racing it.
+   */
+  private _makeStatementPool(client: pg.Client): StatementPool {
+    return new StatementPool(client, this._statementLimit, (deallocSql) =>
+      this._enqueueMaintenance(() => client.query(deallocSql)),
+    );
+  }
+
+  /**
+   * Chain `fn` onto the pinned client's maintenance tail so DEALLOCATE /
+   * ROLLBACK / DISCARD ALL serialize against each other (and, via the drain in
+   * `_acquireFreshClient` / `awaitRawConnectionReady`, against the next user
+   * query). Errors are swallowed — these are best-effort, session-scoped cleanup
+   * commands (Rails' StatementPool#dealloc / reset! likewise rescue), and an
+   * unhandled rejection on a post-close socket must not crash the process.
+   *
+   * @internal
+   */
+  private _enqueueMaintenance(fn: () => Promise<unknown>): Promise<void> {
+    const next = this._maintenanceTail.then(fn).then(
+      () => {},
+      () => {},
+    );
+    this._maintenanceTail = next;
+    return next;
   }
 
   /**
@@ -2482,10 +2528,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // only AFTER ROLLBACK's response is processed (matching the
     // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
     const live = this._rawConnection;
-    let work: Promise<unknown> = Promise.resolve();
+    // Chain off the maintenance tail so ROLLBACK (and the DISCARD ALL below)
+    // serialize behind any pending DEALLOCATE on the pinned client rather than
+    // firing onto a client that's still executing one.
+    let work: Promise<unknown> = this._maintenanceTail;
     if (this._client) {
       this._cancelAnyRunningQuery();
-      work = live.query("ROLLBACK").catch(() => {});
+      work = this._maintenanceTail.then(() => live.query("ROLLBACK")).catch(() => {});
       this._client = null;
       this._inTransaction = false;
     }
@@ -2535,6 +2584,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         if (this._inFlightReset === reset) this._inFlightReset = null;
       });
     this._inFlightReset = reset;
+    // Make subsequent maintenance ops (DEALLOCATE) queue behind the full
+    // ROLLBACK → DISCARD ALL → reconfigure chain on this socket.
+    this._maintenanceTail = reset;
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();
@@ -4591,7 +4643,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   buildStatementPool(client: pg.Client): StatementPool {
-    return new StatementPool(client, this._statementLimit);
+    return this._makeStatementPool(client);
   }
 
   /**
@@ -4674,10 +4726,16 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   // session-scoped nature of PG prepared statements and lets the
   // adapter own zero state about naming.
   private _counter = 0;
+  // Routes DEALLOCATE through the owning adapter's maintenance serializer so
+  // eviction cleanup chains behind the in-flight query rather than racing it.
+  // Undefined for standalone pools (no owning adapter); those keep the prior
+  // best-effort fire-and-forget behavior.
+  private readonly _serializeDealloc?: (deallocSql: string) => void;
 
-  constructor(client: pg.Client, maxSize = 1000) {
+  constructor(client: pg.Client, maxSize = 1000, serializeDealloc?: (deallocSql: string) => void) {
     super(maxSize);
     this._client = client;
+    this._serializeDealloc = serializeDealloc;
   }
 
   /**
@@ -4698,20 +4756,25 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   protected override dealloc(stmt: PreparedStatement): void {
     const client = this._client;
     if (!client) return;
-    // Best-effort async cleanup: we don't await DEALLOCATE, but pg
-    // still queues it on this client and it runs before later queries
-    // on the same connection — eviction doesn't block the caller
-    // that triggered it (pg.write path) but it isn't free either.
-    // The server also drops prepared statements on session close, so
-    // a swallowed failure here is safe. Errors are intentionally
-    // ignored — Rails' PG::StatementPool#dealloc likewise rescues
-    // PG::InvalidSqlStatementName / connection errors — and the
-    // empty `.catch` keeps node from treating a post-close
+    // Best-effort async cleanup. The server drops prepared statements on
+    // session close, so a swallowed failure here is safe — Rails' PG::
+    // StatementPool#dealloc likewise rescues PG::InvalidSqlStatementName /
+    // connection errors. `pgQuoteColumnName` escapes any embedded `"` instead
+    // of raising, so a leaked caller-supplied name can't produce a synchronous
+    // throw at the call site.
+    const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
+    if (this._serializeDealloc) {
+      // Route through the adapter's maintenance serializer so the DEALLOCATE
+      // chains behind the in-flight query / prior eviction on the pinned client
+      // rather than fire-and-forgetting onto a busy client (node-pg's "already
+      // executing a query" deprecation). The serializer swallows the rejection.
+      this._serializeDealloc(deallocSql);
+      return;
+    }
+    // Standalone pool with no owning adapter: keep the prior best-effort
+    // fire-and-forget. The empty `.catch` keeps node from treating a post-close
     // DEALLOCATE as an unhandled rejection.
-    // `pgQuoteColumnName` escapes any embedded `"` instead of
-    // raising, so a leaked caller-supplied name can't produce a
-    // synchronous throw that would escape the `.catch(() => {})`.
-    client.query(`DEALLOCATE ${pgQuoteColumnName(stmt.name)}`).catch(() => {});
+    client.query(deallocSql).catch(() => {});
   }
 
   /**
