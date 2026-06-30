@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
@@ -70,6 +71,8 @@ afterAll(async () => {
   const { ctx } = freshContext();
   const o = { ifExists: true } as const;
   await ctx.dropTable("articles", o);
+  await ctx.dropTable("big_numbers", o);
+  await ctx.dropTable("binary_testings", o);
   await ctx.dropTable("bk1", o);
   await ctx.dropTable("bk2", o);
   await ctx.dropTable("bk3", o);
@@ -217,27 +220,106 @@ describe("MigrationTest", () => {
     }
   });
 
-  it("add column with if not exists set to true", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const cols = Post.columnsHash();
-    expect(cols["body"]).toBeDefined();
-    expect(cols["title"]).toBeDefined();
+  it("add column with if not exists set to true", async () => {
+    // Rails: migration_a adds `last_name`; migration_b re-adds it with
+    // if_not_exists: true and asserts it does not raise. We exercise the same
+    // live add_column path on a scratch table (the sibling tests' isolation
+    // idiom) instead of mutating the shared canonical `people` table.
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.addColumn("users", "last_name", "string");
+    expect(ctx.columnExists("users", "last_name")).toBe(true);
+    // if_not_exists: true must not raise even though the column already exists.
+    await ctx.addColumn("users", "last_name", "string", { ifNotExists: true });
+    expect(ctx.columnExists("users", "last_name")).toBe(true);
   });
 
-  it("add table with decimals", () => {
-    class Product extends Base {
-      static {
-        this.attribute("price", "decimal");
+  it("add table with decimals", async () => {
+    // Mirrors test_add_table_with_decimals: GiveMeBigNumbers.up creates
+    // `big_numbers` with decimal columns carrying explicit precision/scale, then
+    // a BigNumber row is persisted and read back to assert the per-adapter
+    // value/type semantics (the part the old columnsHash() stub dropped).
+    const { adapter, ctx } = freshContext();
+    await ctx.dropTable("big_numbers", { ifExists: true });
+    // GiveMeBigNumbers.up
+    await ctx.createTable("big_numbers", {}, (t) => {
+      t.column("bank_balance", "decimal", { precision: 10, scale: 2 });
+      t.column("big_bank_balance", "decimal", { precision: 15, scale: 2 });
+      t.column("world_population", "decimal", { precision: 20 });
+      t.column("my_house_population", "decimal", { precision: 2 });
+      t.column("value_of_e", "decimal");
+    });
+
+    // The persisted column precision/scale survive the create_table path.
+    const cols = ctx.columns("big_numbers");
+    const byName = (n: string) => cols.find((c) => c.name === n)!;
+    expect(byName("bank_balance").precision).toBe(10);
+    expect(byName("bank_balance").scale).toBe(2);
+    expect(byName("big_bank_balance").precision).toBe(15);
+    expect(byName("big_bank_balance").scale).toBe(2);
+    expect(byName("world_population").precision).toBe(20);
+    expect(byName("my_house_population").precision).toBe(2);
+
+    try {
+      // Mirrors models/big_number.rb: my_house_population is :integer. Rails
+      // also reads the scale-0 `world_population` column back as an exact
+      // Integer; in trails a scale-0/unscaled decimal read without an explicit
+      // attribute override comes back as a lossy JS number (e.g. 2**62 rounds to
+      // 4611686018427388000), so — exactly as models/numeric_data.rb does for
+      // the same column — declare it :big_integer to get the exact round-trip.
+      // value_of_e (DECIMAL, no precision/scale) is left to the raw column type;
+      // its per-adapter cast (PG exact / SQLite float / others Integer) diverges
+      // in trails (see below) and is asserted only for non-nil here.
+      class BigNumber extends Base {
+        static _tableName = "big_numbers";
+        static {
+          this.attribute("world_population", "big_integer");
+          this.attribute("my_house_population", "integer");
+          this.adapter = adapter;
+        }
       }
+      await BigNumber.loadSchema();
+
+      expect(
+        await BigNumber.create({
+          bank_balance: 1586.43,
+          big_bank_balance: new BigDecimal("1000234000567.95"),
+          world_population: 2n ** 62n,
+          my_house_population: 3,
+          value_of_e: new BigDecimal("2.7182818284590452353602875"),
+        }),
+      ).toBeTruthy();
+
+      const b = (await BigNumber.first())!;
+      expect(b).not.toBeNull();
+      expect((b as any).bank_balance).not.toBeNull();
+      expect((b as any).big_bank_balance).not.toBeNull();
+      expect((b as any).world_population).not.toBeNull();
+      expect((b as any).my_house_population).not.toBeNull();
+      expect((b as any).value_of_e).not.toBeNull();
+
+      // world_population round-trips exactly (no precision loss) as Rails' 2**62.
+      expect(typeof (b as any).world_population).toBe("bigint");
+      expect((b as any).world_population).toBe(2n ** 62n);
+      expect((b as any).my_house_population).toBe(3);
+      // The scaled decimals round-trip exactly through the BigDecimal type —
+      // this is the decimal-serialization coverage the columnsHash() stub lacked.
+      expect((b as any).bank_balance).toBeInstanceOf(BigDecimal);
+      expect(((b as any).bank_balance as BigDecimal).toString("F")).toBe("1586.43");
+      expect((b as any).big_bank_balance).toBeInstanceOf(BigDecimal);
+      expect(((b as any).big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
+
+      // Rails additionally asserts value_of_e's exact per-adapter type/value (PG:
+      // BigDecimal 2.71828…; SQLite: BigDecimal float; others: Integer 2). trails'
+      // read of an unscaled decimal column diverges (SQLite returns the truncated
+      // JS number 2, not a float BigDecimal), so the detailed per-adapter value
+      // assertion is omitted pending the decimal-read fidelity story
+      // (0023-surfaced-deviations/unscaled-decimal-read-fidelity).
+    } finally {
+      await ctx.dropTable("big_numbers", { ifExists: true });
     }
-    const cols = Product.columnsHash();
-    expect(cols["price"]).toBeDefined();
-    expect(cols["price"].type).toBe("decimal");
   });
 
   it("instance based migration up", async () => {
@@ -313,34 +395,91 @@ describe("MigrationTest", () => {
     await ctx.dropTable("test_integer_limits", { ifExists: true });
   });
 
-  it("create table with binary column", () => {
-    class Document extends Base {
-      static {
-        this.attribute("content", "string");
-      }
-    }
-    const cols = Document.columnsHash();
-    expect(cols["content"]).toBeDefined();
+  it("create table with binary column", async () => {
+    // Rails creates `binary_testings` with a `t.column "data", :binary,
+    // null: false` and asserts the persisted column's default is nil. Drive the
+    // live create_table path and introspect the column.
+    const { ctx } = freshContext();
+    await ctx.dropTable("binary_testings", { ifExists: true });
+    await ctx.createTable("binary_testings", {}, (t) => {
+      t.column("data", "binary", { null: false });
+    });
+    const cols = ctx.columns("binary_testings");
+    const dataColumn = cols.find((c) => c.name === "data");
+    expect(dataColumn).toBeDefined();
+    expect(dataColumn!.type).toBe("binary");
+    expect(dataColumn!.default ?? null).toBeNull();
+    await ctx.dropTable("binary_testings", { ifExists: true });
   });
 
   it("proper table name on migration", () => {
-    class UserProfile extends Base {
-      static {
-        this.attribute("bio", "string");
-      }
+    // Rails exercises Migration#proper_table_name with string/symbol names and a
+    // model, honoring the model's own table_name_prefix/suffix and falling back
+    // to ActiveRecord::Base's prefix/suffix (via table_name_options) otherwise.
+    class Reminder extends Base {}
+    const savedPrefix = Base.tableNamePrefix;
+    const savedSuffix = Base.tableNameSuffix;
+    try {
+      // A bare string/symbol with no options keeps its name unchanged.
+      expect(Migration.properTableName("table")).toBe("table");
+      // Given a model, the model's own table_name wins.
+      expect(Migration.properTableName(Reminder)).toBe("reminders");
+      Reminder.resetTableName();
+      expect(Migration.properTableName(Reminder)).toBe(Reminder.tableName);
+
+      // Use the model's own prefix/suffix when a model is given.
+      Base.tableNamePrefix = "ARprefix_";
+      Base.tableNameSuffix = "_ARsuffix";
+      Reminder.tableNamePrefix = "prefix_";
+      Reminder.tableNameSuffix = "_suffix";
+      Reminder.resetTableName();
+      expect(Migration.properTableName(Reminder)).toBe("prefix_reminders_suffix");
+      Reminder.tableNamePrefix = "";
+      Reminder.tableNameSuffix = "";
+      Reminder.resetTableName();
+
+      // Use AR::Base's prefix/suffix when a string/symbol is given with options.
+      Base.tableNamePrefix = "prefix_";
+      Base.tableNameSuffix = "_suffix";
+      Reminder.resetTableName();
+      expect(Migration.properTableName("table", Migration.tableNameOptions())).toBe(
+        "prefix_table_suffix",
+      );
+    } finally {
+      Base.tableNamePrefix = savedPrefix;
+      Base.tableNameSuffix = savedSuffix;
     }
-    expect(typeof UserProfile.tableName).toBe("string");
-    expect(UserProfile.tableName.length).toBeGreaterThan(0);
   });
 
-  it("remove column with if not exists not set", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const cols = Post.columnsHash();
-    expect(cols["title"]).toBeDefined();
+  it("remove column with if not exists not set", async () => {
+    // Rails adds `last_name`, removes it, then removes it again with
+    // if_not_exists unset: SQLite tolerates the missing column, other adapters
+    // raise. Exercise the live remove_column path on a scratch table.
+    const { ctx } = freshContext();
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+      t.string("last_name");
+    });
+    expect(ctx.columnExists("users", "last_name")).toBe(true);
+    await ctx.removeColumn("users", "last_name");
+    expect(ctx.columnExists("users", "last_name")).toBe(false);
+
+    // Removing a missing column with if_not_exists unset raises on every
+    // adapter in trails. Rails matches this on PG (`column ... does not exist`)
+    // and MySQL (`check that ... exists`), but on SQLite Rails removes columns
+    // via a table rebuild — copying every column except the dropped one — so a
+    // missing column is a no-op and `assert_nothing_raised` holds. trails'
+    // SchemaStatements emits a native `ALTER TABLE ... DROP COLUMN`, which
+    // SQLite 3.35+ rejects with "no such column" (same class of base-vs-adapter
+    // write-method divergence as the changeColumn rebuild path). Tracked-pending
+    // -convergence under 0023-surfaced-deviations story
+    // sqlite-remove-column-tolerate-missing; assert the current trails raise
+    // until the rebuild path lands.
+    const error = await ctx.removeColumn("users", "last_name").catch((e) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toMatch(
+      /no such column.*last_name|column "last_name" of relation "users" does not exist|check that.*exists/i,
+    );
   });
 
   it("migration context with default schema migration", async () => {
