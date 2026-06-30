@@ -438,6 +438,7 @@ describe("DelegationTest", () => {
       ["to_formatted_s", "toFormattedS"],
       ["to_fs", "toFs"],
       ["as_json", "asJson"],
+      ["to_xml", "toXml"],
     ];
 
     for (const [rubyName, jsName] of RECORD_DELEGATES) {
@@ -483,6 +484,34 @@ describe("DelegationTest", () => {
       expect(ret).not.toBeInstanceOf(Promise);
       expect(seen).toEqual(proxy.target.map((c: any) => c.id));
       expect(proxy.index(proxy.target[0])).toBe(0);
+    });
+
+    it("to_xml serializes the collection with a plural root and singular children", async () => {
+      // Array#to_xml: root reflects the pluralized class name, each record under
+      // root.singularize, and the collection carries `type="array"`.
+      const xml = await Comment.all().toXml({ only: ["id"] });
+      expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+      expect(xml).toContain('<comments type="array">');
+      expect(xml).toContain("</comments>");
+      expect(xml).toContain("<comment>");
+      const records = await Comment.all();
+      expect(xml).toContain(`<id type="integer">${records[0].id}</id>`);
+    });
+
+    it("to_xml(skip_types: true) drops the type attributes and skip_instruct omits the prolog", async () => {
+      const xml = await Comment.all().toXml({ skipTypes: true, skipInstruct: true, only: ["id"] });
+      expect(xml.startsWith("<comments>")).toBe(true);
+      expect(xml).not.toContain("type=");
+      const records = await Comment.all();
+      expect(xml).toContain(`<id>${records[0].id}</id>`);
+    });
+
+    it("to_xml on an empty collection self-closes under nil-classes (or :root)", async () => {
+      const empty = Comment.where({ id: -1 });
+      expect(await empty.toXml({ skipInstruct: true })).toBe('<nil-classes type="array"/>');
+      expect(await Comment.where({ id: -1 }).toXml({ skipInstruct: true, root: "comments" })).toBe(
+        '<comments type="array"/>',
+      );
     });
 
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {

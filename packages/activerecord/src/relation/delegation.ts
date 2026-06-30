@@ -14,8 +14,10 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   Delegation as ASDelegation,
+  dasherize,
   inGroups,
   inGroupsOf,
+  singularize,
   splitArray,
   toSentence,
 } from "@blazetrails/activesupport";
@@ -646,6 +648,20 @@ export type ToSentenceOptions = {
   lastWordConnector?: string;
 };
 
+/** Options for the collection {@link DelegationMethods.toXml} serializer. */
+export type ToXmlOptions = SerializeOptions & {
+  root?: string;
+  children?: string;
+  skipTypes?: boolean;
+  skipInstruct?: boolean;
+};
+
+/** A record that knows how to serialize itself to XML (ActiveModel#to_xml). */
+interface XmlSerializable {
+  constructor: unknown;
+  toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string;
+}
+
 /**
  * The `delegate ... to: :records` operations (delegation.rb:101) as pure sync
  * functions over an already-loaded `records` array, reused by `DelegationMethods`
@@ -841,6 +857,50 @@ export class DelegationMethods {
   /** Alias of {@link toFs} — `alias_method :to_formatted_s, :to_fs`. */
   async toFormattedS(this: DelegationHost, format?: string): Promise<string> {
     return RECORD_DELEGATES.toFormattedS(await this.toArray(), format) as string;
+  }
+
+  /**
+   * `Array#to_xml` (active_support/core_ext/array/conversions.rb): serialize the
+   * loaded records as an XML collection by invoking `to_xml` on each element.
+   *
+   * The root element reflects the (pluralized, underscored) class name of the
+   * first record — `<posts type="array">` — with each child rendered under
+   * `root.singularize` (`<post>`). Empty collections use `nil-classes` (or the
+   * supplied `:root`) and self-close. `skipTypes` drops every `type=` attribute
+   * (including `type="array"`); `skipInstruct` omits the XML declaration;
+   * `:only`/`:except` thread down into each record's serialization.
+   */
+  async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
+    const records = (await this.toArray()) as unknown as XmlSerializable[];
+    const { skipTypes = false, skipInstruct = false } = options;
+
+    const root =
+      options.root ??
+      (records.length === 0
+        ? "nil-classes"
+        : (records[0].constructor as { modelName: { plural: string } }).modelName.plural);
+    const children = options.children ?? singularize(root);
+    const rootTag = dasherize(root);
+    const childTag = dasherize(children);
+    const arrayAttr = skipTypes ? "" : ' type="array"';
+
+    const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
+    const childOpts = { only: options.only, except: options.except, skipTypes, root: childTag };
+
+    if (records.length === 0) {
+      return `${instruct}<${rootTag}${arrayAttr}/>`;
+    }
+
+    const body = records
+      .map((record) =>
+        record
+          .toXml(childOpts)
+          .split("\n")
+          .map((line) => (line === "" ? line : `  ${line}`))
+          .join("\n"),
+      )
+      .join("\n");
+    return `${instruct}<${rootTag}${arrayAttr}>\n${body}\n</${rootTag}>`;
   }
 
   // ---- to: :model ----

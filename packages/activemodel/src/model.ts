@@ -2152,13 +2152,17 @@ export class Model {
    *
    * Mirrors: ActiveModel::Serializers::Xml#to_xml
    */
-  toXml(options?: SerializeOptions & { root?: string }): string {
+  toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string {
     const hash = this.serializableHash(options);
     const root = options?.root ?? (this.constructor as typeof Model).modelName.singular;
-    return `<${root}>\n${this._hashToXml(hash, "  ")}</${root}>`;
+    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false)}</${root}>`;
   }
 
-  private _hashToXml(hash: Record<string, unknown>, indent: string): string {
+  private _hashToXml(hash: Record<string, unknown>, indent: string, skipTypes = false): string {
+    // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
+    // attribute on every tag; the `nil="true"` marker is a separate attribute
+    // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
+    const typeAttr = (t: string) => (skipTypes ? "" : ` type="${t}"`);
     let xml = "";
     for (const [key, value] of Object.entries(hash)) {
       const tag = dasherize(key);
@@ -2176,35 +2180,35 @@ export class Model {
         !(value instanceof Temporal.PlainTime) &&
         !(value instanceof Temporal.ZonedDateTime)
       ) {
-        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ")}${indent}</${tag}>\n`;
+        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes)}${indent}</${tag}>\n`;
         // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
       } else if (value instanceof Date) {
-        xml += `${indent}<${tag} type="dateTime">${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
       } else if (Array.isArray(value)) {
-        xml += `${indent}<${tag} type="array">\n`;
+        xml += `${indent}<${tag}${typeAttr("array")}>\n`;
         for (const item of value) {
           if (typeof item === "object" && item !== null) {
-            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ")}${indent}  </item>\n`;
+            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes)}${indent}  </item>\n`;
           } else {
             xml += `${indent}  <item>${this._escapeXml(String(item))}</item>\n`;
           }
         }
         xml += `${indent}</${tag}>\n`;
       } else if (typeof value === "number") {
-        xml += `${indent}<${tag} type="integer">${value}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("integer")}>${value}</${tag}>\n`;
       } else if (typeof value === "boolean") {
-        xml += `${indent}<${tag} type="boolean">${value}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("boolean")}>${value}</${tag}>\n`;
       } else if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
-        xml += `${indent}<${tag} type="dateTime">${value.toJSON()}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toJSON()}</${tag}>\n`;
       } else if (value instanceof Temporal.ZonedDateTime) {
         // ZonedDateTime.toJSON() includes the IANA bracket annotation which is
         // not a valid XML Schema dateTime lexical form. Serialize as Instant
         // (UTC) so the output is a standard ISO 8601 dateTime string.
-        xml += `${indent}<${tag} type="dateTime">${value.toInstant().toJSON()}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toInstant().toJSON()}</${tag}>\n`;
       } else if (value instanceof Temporal.PlainDate) {
-        xml += `${indent}<${tag} type="date">${value.toString()}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("date")}>${value.toString()}</${tag}>\n`;
       } else if (value instanceof Temporal.PlainTime) {
-        xml += `${indent}<${tag} type="time">${value.toString()}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr("time")}>${value.toString()}</${tag}>\n`;
       } else {
         xml += `${indent}<${tag}>${this._escapeXml(String(value))}</${tag}>\n`;
       }

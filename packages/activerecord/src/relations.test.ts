@@ -175,10 +175,15 @@ describe("RelationTest", () => {
   });
 
   it("to xml", async () => {
-    const birds = await Bird.all();
-    expect(birds).toBeDefined();
-    const arr = await Bird.all();
-    expect(arr).toBeDefined();
+    // assert_nothing_raised { Bird.all.to_xml } / { Bird.all.to_a.to_xml }
+    let relationXml: string | undefined;
+    try {
+      relationXml = await Bird.all().toXml();
+    } catch {
+      expect.unreachable("to_xml raised");
+    }
+    expect(typeof relationXml).toBe("string");
+    expect(relationXml).toContain('type="array"');
   });
 
   it("scoped all", async () => {
