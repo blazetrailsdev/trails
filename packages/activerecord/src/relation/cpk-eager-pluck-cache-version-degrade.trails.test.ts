@@ -77,6 +77,17 @@ describe("CpkBook eager pluck / cache_version preload-degrade", () => {
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
   });
 
+  it("pluck of an unjoinable association's own column surfaces the explicit capability-gap error", async () => {
+    await seedBooks();
+    // The column references the degraded (unjoinable) table directly. trails
+    // cannot JOIN cpk_chapters (composite key), so rather than silently emitting
+    // SQL against an unjoined table, it surfaces the explicit error Rails' join
+    // path would raise.
+    await expect(CpkBook.eagerLoad("chapters").pluck("cpk_chapters.title")).rejects.toThrow(
+      /chapters/,
+    );
+  });
+
   it("cache_version over eagerLoad('chapters') degrades to preload instead of crashing", async () => {
     await withCollectionCacheVersioning(async () => {
       await seedBooks();

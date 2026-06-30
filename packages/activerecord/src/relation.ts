@@ -3965,6 +3965,23 @@ export class Relation<T extends Base> {
       // nothing and are simply omitted (no preload needed).
       const joinableSpecs = eagerSpecs.filter((s) => !fallbackAssocs.includes(s));
 
+      // A pluck column may reference a degraded (unjoinable) association's own
+      // table (e.g. `pluck("cpk_chapters.title")`). Rails JOINs that table;
+      // trails cannot (composite-key capability gap), and silently preloading it
+      // would emit SQL against an unjoined table. Route those columns back
+      // through the full-spec join, which raises the explicit capability-gap
+      // error rather than degrade into broken SQL.
+      if (fallbackAssocs.length > 0) {
+        const fallbackTables = new Set(this._resolveAssocTables(fallbackAssocs));
+        const referencesFallbackTable = columns.some((c) => {
+          const text = typeof c === "string" ? c : c instanceof Nodes.SqlLiteral ? c.value : "";
+          return this.tablesInString(text).some((t) => fallbackTables.has(t));
+        });
+        if (referencesFallbackTable) {
+          return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
+        }
+      }
+
       // No spec is joinable: degrade entirely to the base relation (limit/offset
       // preserved), mirroring _executeEagerLoad's jd.nodes.length === 0 fallback.
       if (jd.nodes.length === 0) {
