@@ -4712,7 +4712,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   buildStatementPool(client: pg.Client): StatementPool {
-    return new StatementPool(client, this._statementLimit);
+    return new StatementPool(
+      client,
+      PostgreSQLAdapter.typeCastConfigToInteger(this._statementLimit) as number,
+    );
   }
 
   /**

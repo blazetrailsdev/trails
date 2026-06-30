@@ -2051,7 +2051,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   buildStatementPool(): StatementPool {
-    return new StatementPool(this.statementLimit);
+    return new StatementPool(
+      AbstractMysqlAdapter.typeCastConfigToInteger(this.statementLimit) as number,
+    );
   }
 
   /** @internal */

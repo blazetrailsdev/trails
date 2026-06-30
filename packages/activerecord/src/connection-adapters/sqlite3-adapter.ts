@@ -2624,7 +2624,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   override buildStatementPool(): GenericStatementPool<SqliteStatement> {
-    return new GenericStatementPool<SqliteStatement>(this._statementLimit);
+    return new GenericStatementPool<SqliteStatement>(
+      AbstractSQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
+    );
   }
 
   /**
