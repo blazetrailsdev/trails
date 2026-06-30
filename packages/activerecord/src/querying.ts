@@ -10,7 +10,7 @@ import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import { argumentError } from "./relation/query-methods.js";
-import type { AssociationSpec } from "./relation/query-methods.js";
+import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 
 /**
  * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
@@ -215,16 +215,11 @@ export function distinct<T extends typeof Base>(this: T): Relation<InstanceType<
 /** Mirrors: ActiveRecord::Querying#joins */
 export function joins<T extends typeof Base>(
   this: T,
-  tableOrSql?: string,
-  on?: string,
-): Relation<InstanceType<T>>;
-export function joins<T extends typeof Base>(
-  this: T,
   ...nodes: import("@blazetrails/arel").Nodes.Join[]
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  stringArray: string[],
+  specArray: JoinSpec[],
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
@@ -232,30 +227,16 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<
-    | string
-    | import("@blazetrails/arel").Nodes.Join
-    | Record<string, AssociationSpec | AssociationSpec[]>
-  >
+  ...args: Array<JoinSpec>
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<
-    | string
-    | string[]
-    | import("@blazetrails/arel").Nodes.Join
-    | Record<string, AssociationSpec | AssociationSpec[]>
-    | undefined
-  >
+  ...args: Array<JoinSpec>
 ): Relation<InstanceType<T>> {
   const relation = this.all();
-  // Flatten string array passed as single argument: joins(["a", "b"])
-  // Gate on all-string to avoid misrouting mixed or non-string arrays.
-  if (
-    args.length === 1 &&
-    Array.isArray(args[0]) &&
-    (args[0] as unknown[]).every((x) => typeof x === "string")
-  ) {
+  // A single array arg (joins(["a", "b"]) or joins([{ post: "author" }]))
+  // forwards as-is; Relation#joins flattens it like Rails' args.flatten!.
+  if (args.length === 1 && Array.isArray(args[0])) {
     return relation.joins(args[0]);
   }
   if (args.length === 1 && _isPlainObject(args[0])) {
@@ -264,8 +245,7 @@ export function joins<T extends typeof Base>(
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
     // Forward all string args so the variadic association-list form
     // (`joins("a", "b")`, mirroring Rails `joins(:a, :b)`) is preserved.
-    // Relation#joins disambiguates the two-arg `(table, onClause)` shape.
-    return relation.joins(...(args as Array<string | undefined>));
+    return relation.joins(...(args as Array<string>));
   }
   return relation.joins(...(args as import("@blazetrails/arel").Nodes.Join[]));
 }

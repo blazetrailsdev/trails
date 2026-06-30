@@ -63,6 +63,7 @@ import {
   type UnscopeType,
   type ExceptKey,
   type AssociationSpec,
+  type JoinSpec,
   type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
@@ -1799,63 +1800,33 @@ export class Relation<T extends Base> {
   /**
    * Add one or more INNER JOINs. Accepts:
    * - An association name (resolved to a JOIN via reflection)
-   * - A raw SQL string
-   * - Two strings: (table, onClause) — explicit JOIN/ON pair
+   * - A raw SQL join string, e.g. `joins("INNER JOIN authors ON posts.author_id = authors.id")`
    * - Arel `Nodes.Join` instances (e.g. from `SelectManager#joinSources`)
    * - Any mix of the above as variadic args
    *
    * Mirrors: ActiveRecord::Relation#joins — Rails' `joins(*args)` is variadic
    * and accepts strings, symbol association names, Arel join nodes, or a nested
    * association hash like `joins({ post: "author" })` (mirrors Rails
-   * `joins(post: :author)`).
+   * `joins(post: :author)`). For an explicit JOIN/ON pair, pass the full raw
+   * SQL fragment as a single string (Rails' verbatim-fragment path) rather than
+   * a `(table, on)` pair — trails collapses Ruby symbols to strings, so there is
+   * no type-based way to tell a `(table, on)` pair from `joins(:a, :b)`.
    */
-  joins(tableOrSql?: string, on?: string): Relation<T>;
   joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(stringArray: string[]): Relation<T>;
+  joins(specArray: JoinSpec[]): Relation<T>;
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
-  joins(
-    ...args: Array<
-      string | string[] | Nodes.Join | Record<string, AssociationSpec | AssociationSpec[]>
-    >
-  ): Relation<T>;
-  joins(
-    ...args: Array<
-      | string
-      | string[]
-      | Nodes.Join
-      | Record<string, AssociationSpec | AssociationSpec[]>
-      | undefined
-    >
-  ): Relation<T> {
+  joins(...args: Array<JoinSpec>): Relation<T>;
+  joins(...args: Array<JoinSpec>): Relation<T> {
     this.checkIfMethodHasArgumentsBang("joins", args as unknown[], undefined, { normalize: false });
     const rel = this._clone();
-    // Two-string-argument form: joins(table, onClause) — a trails-only
-    // extension preserved for back-compat. Rails has no such form: it
-    // disambiguates by type — `joins(:a, :b)` (symbols → JoinDependency) vs
-    // `joins("raw sql")` (strings → verbatim fragment). trails collapses both
-    // to strings, so a heuristic is unavoidable here. We assume an ON clause is
-    // a SQL predicate (contains whitespace or `=`) while an association/table
-    // name is a bare identifier; a bare second arg routes to the variadic path
-    // below (Rails' `joins(:a, :b)`). LIMITATION: a space-free operator-only ON
-    // clause (`"a.x<b.y"`) would be misrouted — no current call site does this,
-    // but pass such predicates with surrounding whitespace.
-    if (
-      args.length === 2 &&
-      typeof args[0] === "string" &&
-      typeof args[1] === "string" &&
-      /[\s=]/.test(args[1])
-    ) {
-      rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
-      return rel;
-    }
     // Rails' `check_if_method_has_arguments!` runs `args.flatten!` +
     // `args.compact_blank!` before `spawn.joins!` (query_methods.rb:868-871).
-    // We apply it here rather than in the guard because the trails-only
-    // `joins(table, on)` form above must be disambiguated on the raw arg shape
-    // first — flattening would collapse a single `joins(["a","b"])` array into
-    // two args and trip that heuristic. flattenedArgs recurses into arrays only
-    // (plain objects like `{ post: "author" }` pass through); isBlankArgument
-    // drops `{}` / `[]` / `null` / `""` so blank specs never reach join state.
+    // flattenedArgs recurses into arrays only (plain objects like
+    // `{ post: "author" }` pass through); isBlankArgument drops `{}` / `[]` /
+    // `null` / `""` so blank specs never reach join state. A `joins(["a","b"])`
+    // array flattens to two association names here, matching Rails — there is no
+    // longer a `(table, on)` heuristic to disambiguate against, so the flatten
+    // is uniform.
     const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     for (const arg of flatArgs) {
       // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
@@ -4705,8 +4676,9 @@ export class Relation<T extends Base> {
    * `_namedInnerJoins`. A value assigned then read back is preserved by
    * category, but — matching the reader's concat order — named joins always
    * precede raw joins regardless of their original interleaving. The
-   * SQL-emitted `_joinClauses` (trails-only `joins(table, on)` form) are not
-   * part of `joins_values` and are left untouched.
+   * SQL-emitted `_joinClauses` (the explicit-ON `leftJoins(table, on)` form and
+   * where-association joins) are not part of `joins_values` and are left
+   * untouched.
    */
   set joinsValues(value: (AssociationSpec | string | Nodes.Join)[]) {
     this.assertModifiableBang();
