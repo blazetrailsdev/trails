@@ -79,23 +79,6 @@ export class BelongsToAssociation extends SingularAssociation {
     }
   }
 
-  /**
-   * Synchronous counterpart of {@link default} for the before_validation chain,
-   * which is strictly synchronous. Writes the default only when the reader
-   * resolves synchronously to nil (FK absent) and the block returns a
-   * non-Promise. A present FK (object or async reader) is left untouched —
-   * mirroring Rails' `writer(...) if reader.nil?`. The async-block path is
-   * handled by Base#_runBelongsToDefaults before validation runs.
-   */
-  applyDefaultSync(block: (owner: Base) => Base | null | Promise<Base | null>): void {
-    const current = this.reader;
-    if (current != null) return;
-    const value = block(this.owner);
-    if (value != null && typeof (value as { then?: unknown }).then !== "function") {
-      this.writer(value as Base);
-    }
-  }
-
   override reset(): void {
     super.reset();
     this._updated = false;

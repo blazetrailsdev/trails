@@ -301,15 +301,16 @@ export class BelongsTo extends SingularAssociation {
     // so the defaulted target satisfies a presence validation on a required
     // association. trails' validation chain is strictly synchronous while the
     // default block may run an async finder (e.g. `() => Developer.first()`), so
-    // the async resolution runs in Base#_runBelongsToDefaults — an async
-    // pre-validation phase invoked from `save` before the chain. This sync
-    // callback applies a synchronous default block (and no-ops once the FK is
-    // already populated), covering the standalone `valid?` path.
+    // the awaited resolution actually runs in Base#_runBelongsToDefaults — an
+    // async pre-validation phase invoked from `save` before the chain. This
+    // before_validation callback fires `default` too (no-op once the FK is
+    // populated by that phase) for fidelity and the standalone `valid?` path;
+    // it's fire-and-forget because the sync chain cannot await it.
     beforeValidation(model, (record: any) => {
       if (typeof record.association !== "function") return;
       const assoc = record.association(reflection.name);
-      if (typeof assoc.applyDefaultSync === "function") {
-        assoc.applyDefaultSync(reflection.options?.default);
+      if (typeof assoc.default === "function") {
+        void assoc.default(reflection.options?.default);
       }
     });
   }
