@@ -30754,6 +30754,13 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "rubyName": "compute_type",
+    "call": "new",
+    "reason": "Equivalent (different path): Rails' compute_type constructs NameError.new on an unresolved constant; #4311 dropped the redundant inline `throw new SubclassNotFound` subclass check (that constraint lives in stiClassFor/find_sti_class), so computeType now delegates the NameError construction to resolveComputedType. Pre-existing flag surfaced post-#4311."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "rubyName": "compute_type",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
