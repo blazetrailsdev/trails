@@ -293,10 +293,36 @@ export abstract class Migration {
   /**
    * Run the migration in the given direction (class method).
    *
-   * Mirrors: ActiveRecord::Migration.migrate
+   * Mirrors: ActiveRecord::Migration.migrate — dispatches to the class-level
+   * `up`/`down`, which by default lease a fresh instance and run it, but a
+   * legacy migration can override `self.up`/`self.down` with the migration body
+   * directly (see `invertible_migration_test.rb`'s `LegacyMigration`).
    */
   static async migrate(direction: "up" | "down"): Promise<void> {
-    // Subclasses should override; this is a no-op base
+    if (direction === "up") {
+      await this.up();
+    } else {
+      await this.down();
+    }
+  }
+
+  /**
+   * Class-level forward run. Defaults to running a fresh instance forward;
+   * override on a legacy migration to define the migration body directly.
+   *
+   * Mirrors: ActiveRecord::Migration.up
+   */
+  static async up(): Promise<void> {
+    await new (this as unknown as new () => Migration)().up();
+  }
+
+  /**
+   * Class-level rollback run.
+   *
+   * Mirrors: ActiveRecord::Migration.down
+   */
+  static async down(): Promise<void> {
+    await new (this as unknown as new () => Migration)().down();
   }
 
   /**

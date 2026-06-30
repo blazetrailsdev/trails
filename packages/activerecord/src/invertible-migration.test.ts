@@ -54,10 +54,6 @@ class InvertibleChangeTableMigration extends SilentMigration {
 
 class InvertibleTransactionMigration extends InvertibleMigration {
   async change(): Promise<void> {
-    if (this.isReverting()) {
-      await super.change();
-      return;
-    }
     await this.connection.transaction(async () => {
       await super.change();
     });
@@ -193,14 +189,16 @@ class DropTableMigration extends SilentMigration {
 }
 
 class LegacyMigration extends Migration {
-  async up(): Promise<void> {
-    await this.createTable("horses", (t) => {
+  static async up(): Promise<void> {
+    const m = new LegacyMigration();
+    await m.createTable("horses", (t) => {
       t.column("content", "text");
       t.column("remind_at", "datetime");
     });
   }
-  async down(): Promise<void> {
-    await this.dropTable("horses");
+  static async down(): Promise<void> {
+    const m = new LegacyMigration();
+    await m.dropTable("horses");
   }
 }
 
@@ -537,28 +535,24 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it("legacy up", async () => {
-    const migration = new LegacyMigration();
-    await migration.up();
+    await LegacyMigration.migrate("up");
     expect(await Base.leaseConnection().tableExists("horses")).toBe(true);
   });
 
   it("legacy down", async () => {
-    const migration = new LegacyMigration();
-    await migration.up();
-    await migration.down();
+    await LegacyMigration.migrate("up");
+    await LegacyMigration.migrate("down");
     expect(await Base.leaseConnection().tableExists("horses")).toBe(false);
   });
 
   it("up", async () => {
-    const migration = new LegacyMigration();
-    await migration.up();
+    await LegacyMigration.up();
     expect(await Base.leaseConnection().tableExists("horses")).toBe(true);
   });
 
   it("down", async () => {
-    const migration = new LegacyMigration();
-    await migration.up();
-    await migration.down();
+    await LegacyMigration.up();
+    await LegacyMigration.down();
     expect(await Base.leaseConnection().tableExists("horses")).toBe(false);
   });
 
