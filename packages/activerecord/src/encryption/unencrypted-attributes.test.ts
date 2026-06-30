@@ -52,7 +52,8 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
 
     // It will encrypt on saving
     await post.update({ title: "Other title" });
-    await assertEncryptedAttribute(await EncryptedPost.find(post.id), "title", "Other title");
+    await post.reload();
+    await assertEncryptedAttribute(post, "title", "Other title");
   });
 
   it("when :support_unencrypted_data is on, it won't work with unencrypted attributes", async () => {
