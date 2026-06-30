@@ -75,6 +75,41 @@ describe("RequiredAssociationsTest", () => {
     expect(await record.save()).toBe(true);
   });
 
+  it("required belongs_to validates target exists, not just the foreign key", async () => {
+    class Parent extends Base {}
+    class Child extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+      }
+    }
+    Associations.belongsTo.call(Child, "parent", {
+      required: true,
+      inverseOf: false,
+      className: "Parent",
+    });
+    registerModel("Parent", Parent);
+    registerModel("Child", Child);
+
+    // A FK that points at a row that does not exist must fail "must exist",
+    // matching Rails reading the association (loading nil) during validation.
+    const orphan = new Child();
+    (orphan as any).parent_id = 999999;
+    expect(await orphan.save()).toBe(false);
+    expect(orphan.errors.fullMessages).toEqual(["Parent must exist"]);
+
+    // A FK that points at a row that does exist still saves.
+    const parent = new Parent();
+    expect(await parent.save()).toBe(true);
+    const child = new Child();
+    (child as any).parent_id = (parent as any).id;
+    expect(await child.save()).toBe(true);
+
+    // save(validate: false) bypasses the existence check, like Rails' valid?.
+    const skip = new Child();
+    (skip as any).parent_id = 999999;
+    expect(await skip.save({ validate: false })).toBe(true);
+  });
+
   it("belongs_to associations can be required by default", async () => {
     const prev = (Base as any).belongsToRequiredByDefault;
     try {

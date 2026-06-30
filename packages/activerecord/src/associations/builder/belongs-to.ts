@@ -386,6 +386,27 @@ export class BelongsTo extends SingularAssociation {
       }
 
       model.validatesPresenceOf(name, { message: "required", if: condition });
+
+      // The sync presence check above only fires when the FK is blank (Rails'
+      // observable "must exist" for an unset association). When the FK IS
+      // populated, Rails still reads the association — loading the target — and
+      // fails "must exist" if the row no longer exists. trails validations are
+      // synchronous and cannot load, so that case is deferred to the async
+      // validation pass (Base#_runAsyncValidations), which runs after the sync
+      // chain and is skipped on `save(validate: false)` just like Rails' valid?.
+      const klass = model as { _asyncValidations?: Array<unknown> };
+      if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
+        klass._asyncValidations = [...(klass._asyncValidations ?? [])];
+      }
+      (klass._asyncValidations as Array<unknown>).push({
+        attribute: name,
+        options: {
+          belongsToExistence: true,
+          message: "required",
+          if: (record: any) => foreignKeyPresent(record),
+        },
+        declaringClass: model,
+      });
     }
   }
 

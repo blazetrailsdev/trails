@@ -3143,6 +3143,22 @@ export class Base extends Model {
     for (const { attribute, options, declaringClass } of asyncValidators) {
       if (!asyncValidationContextMatches(context, options.on)) continue;
       if (!shouldValidate(this, options)) continue;
+      if (options.belongsToExistence) {
+        // Rails validates a required belongs_to on the association NAME, which
+        // reads the association — loading the target from the FK. A FK pointing
+        // at a deleted/nonexistent row loads nil and fails "must exist". trails'
+        // sync validator can't load an unloaded target, so the FK-present case
+        // is deferred here (the async pass, gated by validate:false exactly like
+        // Rails' valid?) where the target can be loaded and checked.
+        let target: unknown = null;
+        if (typeof this.association === "function") {
+          target = await (this.association(attribute) as any).loadTarget();
+        }
+        if (target == null) {
+          this.errors.add(attribute, "blank", { message: options.message ?? "required" });
+        }
+        continue;
+      }
       // For an association attribute (`validates :event, uniqueness: true`), the
       // presence check reads the underlying foreign key (Rails reads the
       // association object; the FK carries the same value and avoids a lazy
