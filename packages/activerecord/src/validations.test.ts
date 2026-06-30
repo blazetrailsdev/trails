@@ -2,41 +2,27 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
-const TEST_SCHEMA = {
-  topics: { title: "string", score: "integer" },
-  users: { name: "string", email: "string", invite_code: "string", reason: "string" },
-  items: { price: "integer" },
-  emails: { address: "string" },
-  permissions: { user_id: "integer", resource_id: "integer" },
-} as const;
-
-// -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+// These synthetic coverage models ride the canonical `topics` table. Rails'
+// ValidationsTest drives almost everything through the Topic model, so the
+// canonical columns map cleanly: `title` (string presence), `replies_count`
+// (integer numericality), `group`/`content` (string/text presence on
+// create/update contexts), and `parent_id`/`replies_count` for scoped
+// uniqueness.
 
 describe("ValidationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
 
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("score", "integer");
+        this.attribute("replies_count", "integer");
         this.validates("title", { presence: true });
       }
     }
@@ -142,51 +128,51 @@ describe("ValidationsTest", () => {
 
   it("numericality validation with mutation", async () => {
     const { Topic } = makeModel();
-    const t = await Topic.create({ title: "num", score: 42 });
-    expect(t.score).toBe(42);
+    const t = await Topic.create({ title: "num", replies_count: 42 });
+    expect(t.replies_count).toBe(42);
   });
 
   it("numericality validation checks against raw value", async () => {
     const { Topic } = makeModel();
-    const t = new Topic({ title: "raw", score: 5 });
-    expect(t.score).toBe(5);
+    const t = new Topic({ title: "raw", replies_count: 5 });
+    expect(t.replies_count).toBe(5);
   });
 
   it("numericality validates cast value when record loaded from database (cameFromUser false)", async () => {
     // When an AR record is loaded via writeFromDatabase, cameFromUser returns
     // false and the validator uses readAttribute (cast value), not the raw
     // string column. A numeric column loaded as the integer 42 must pass.
-    class Item extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("price", "integer");
-        this.validates("price", { numericality: { greaterThan: 0 } });
+        this.attribute("replies_count", "integer");
+        this.validates("replies_count", { numericality: { greaterThan: 0 } });
       }
     }
-    const item = Item.new({}) as any;
-    item._attributes.writeFromDatabase("price", 42);
-    expect(item.cameFromUser("price")).toBe(false);
-    expect(await item.isValid()).toBe(true);
+    const topic = Topic.new({}) as any;
+    topic._attributes.writeFromDatabase("replies_count", 42);
+    expect(topic.cameFromUser("replies_count")).toBe(false);
+    expect(await topic.isValid()).toBe(true);
   });
 
   it("numericality validates raw input when attribute came from user (cameFromUser true)", async () => {
     // User-assigned string "abc" on an integer column casts to null but the
     // validator must see the raw "abc" via readAttributeBeforeTypeCast and
     // reject it — not silently pass because the cast value is null.
-    class Item extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("price", "integer");
-        this.validates("price", { numericality: true });
+        this.attribute("replies_count", "integer");
+        this.validates("replies_count", { numericality: true });
       }
     }
-    const item = Item.new({ price: "abc" }) as any;
-    expect(item.cameFromUser("price")).toBe(true);
-    expect(await item.isValid()).toBe(false);
-    expect(item.errors.get("price")).toContain("is not a number");
+    const topic = Topic.new({ replies_count: "abc" }) as any;
+    expect(topic.cameFromUser("replies_count")).toBe(true);
+    expect(await topic.isValid()).toBe(false);
+    expect(topic.errors.get("replies_count")).toContain("is not a number");
   });
 
   it("numericality validator wont be affected by custom getter", async () => {
     const { Topic } = makeModel();
-    const t = new Topic({ title: "getter", score: 10 });
+    const t = new Topic({ title: "getter", replies_count: 10 });
     const result = await t.isValid();
     expect(result).toBe(true);
   });
@@ -209,180 +195,174 @@ describe("ValidationsTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  it("valid uses create context when new", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("invite_code", "string");
-    User.adapter = await freshAdapter();
-    User.validates("invite_code", { presence: true, on: "create" });
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
 
-    // Can't create without invite_code
-    const user = new User({ name: "Alice" });
+  it("valid uses create context when new", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("group", "string");
+        this.validates("group", { presence: true, on: "create" });
+      }
+    }
+
+    // Can't create without group
+    const user = new Topic({ title: "Alice" });
     const saved = await user.save();
     expect(saved).toBe(false);
 
-    // Can create with invite_code
-    const user2 = new User({ name: "Alice", invite_code: "ABC123" });
+    // Can create with group
+    const user2 = new Topic({ title: "Alice", group: "ABC123" });
     const saved2 = await user2.save();
     expect(saved2).toBe(true);
 
-    // Can update without invite_code (validation skipped for update context)
-    user2.invite_code = null;
-    user2.name = "Bob";
+    // Can update without group (validation skipped for update context)
+    user2.group = null;
+    user2.title = "Bob";
     const saved3 = await user2.save();
     expect(saved3).toBe(true);
   });
 
   it("valid uses update context when persisted", async () => {
-    class User extends Base {
-      static _tableName = "users";
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.validates("content", { presence: true, on: "update" });
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("reason", "string");
-    User.adapter = await freshAdapter();
-    User.validates("reason", { presence: true, on: "update" });
 
-    // Can create without reason
-    const user = await User.create({ name: "Alice" });
+    // Can create without content
+    const user = await Topic.create({ title: "Alice" });
     expect(user.isPersisted()).toBe(true);
 
-    // Can't update without reason
-    user.name = "Bob";
+    // Can't update without content
+    user.title = "Bob";
     const saved = await user.save();
     expect(saved).toBe(false);
 
-    // Can update with reason
-    user.reason = "Name change";
+    // Can update with content
+    user.content = "Name change";
     const saved2 = await user.save();
     expect(saved2).toBe(true);
   });
 });
 
 describe("ValidationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
   it("validates before save", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = new User();
+    const u = new Topic();
     expect(await u.save()).toBe(false);
-    expect(u.errors.get("name")).toContain("can't be blank");
+    expect(u.errors.get("title")).toContain("can't be blank");
   });
 
   it("create with invalid data returns unpersisted record", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = await User.create({});
+    const u = await Topic.create({});
     expect(u.isNewRecord()).toBe(true);
     expect(u.errors.size).toBeGreaterThan(0);
   });
 
   it("create! throws RecordInvalid", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    await expect(User.createBang({})).rejects.toThrow("Validation failed");
+    await expect(Topic.createBang({})).rejects.toThrow("Validation failed");
   });
 
   it("update with invalid data returns false", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = await User.create({ name: "Alice" });
-    const result = await u.update({ name: "" });
+    const u = await Topic.create({ title: "Alice" });
+    const result = await u.update({ title: "" });
     expect(result).toBe(false);
   });
 
   it("isValid returns true for valid record", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = new User({ name: "Alice" });
+    const u = new Topic({ title: "Alice" });
     expect(u.isValid()).toBe(true);
   });
 
   it("isValid returns false for invalid record", () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = new User();
+    const u = new Topic();
     expect(u.isValid()).toBe(false);
   });
 
   it("errors are cleared on valid save", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
       }
     }
-    const u = new User();
+    const u = new Topic();
     await u.save(); // fails
     expect(u.errors.size).toBeGreaterThan(0);
-    u.name = "Alice";
+    u.title = "Alice";
     await u.save(); // succeeds
     expect(u.errors.size).toBe(0);
   });
 });
 
 describe("ValidationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
   it("validate uniqueness", async () => {
-    class Email extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("address", "string");
-        this.validatesUniqueness("address");
+        this.attribute("title", "string");
+        this.validatesUniqueness("title");
       }
     }
-    await Email.create({ address: "a@b.com" });
-    const dup = new Email({ address: "a@b.com" });
+    await Topic.create({ title: "uniq-a@b.com" });
+    const dup = new Topic({ title: "uniq-a@b.com" });
     expect(await dup.save()).toBe(false);
-    expect(dup.errors.get("address")).toContain("has already been taken");
+    expect(dup.errors.get("title")).toContain("has already been taken");
   });
 
   it("validate uniqueness with scope", async () => {
-    class Permission extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("user_id", "integer");
-        this.attribute("resource_id", "integer");
-        this.validatesUniqueness("user_id", { scope: "resource_id" });
+        this.attribute("parent_id", "integer");
+        this.attribute("replies_count", "integer");
+        this.validatesUniqueness("parent_id", { scope: "replies_count" });
       }
     }
-    await Permission.create({ user_id: 1, resource_id: 1 });
-    const p2 = await Permission.create({ user_id: 1, resource_id: 2 });
+    await Topic.create({ parent_id: 901, replies_count: 1 });
+    const p2 = await Topic.create({ parent_id: 901, replies_count: 2 });
     expect(p2.isPersisted()).toBe(true);
-    const p3 = new Permission({ user_id: 1, resource_id: 1 });
+    const p3 = new Topic({ parent_id: 901, replies_count: 1 });
     expect(await p3.save()).toBe(false);
   });
 });
