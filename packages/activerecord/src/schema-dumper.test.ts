@@ -81,21 +81,21 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("name");
       t.integer("age");
     });
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("createTable");
-    expect(output).toContain("users");
+    expect(output).toContain("sd_users");
   });
 
   it("schema dump uses force cascade on create table", async () => {
-    await ctx.createTable("authors", {}, (t) => {
+    await ctx.createTable("sd_authors", {}, (t) => {
       t.string("name");
     });
     const output = SchemaDumper.dump(ctx) as string;
-    expect(output).toMatch(/createTable\("authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
+    expect(output).toMatch(/createTable\("sd_authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
   });
 
   it("schema dump excludes sqlite sequence", async () => {
@@ -118,7 +118,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("types no line up", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("name");
       t.integer("age");
       t.boolean("active");
@@ -131,7 +131,7 @@ describe("SchemaDumperTest", () => {
     }
   });
   it("arguments no line up", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("name", { null: false });
       t.integer("age", { default: 0 });
       t.string("code", { limit: 10, null: false });
@@ -173,20 +173,20 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with string ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
+    await ctx.createTable("sd_users", {}, (t) => t.string("name"));
     await ctx.createTable("ignored_table", {}, (t) => t.string("val"));
     SchemaDumper.ignoreTables = ["ignored_table"];
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("users");
+    expect(output).toContain("sd_users");
     expect(output).not.toContain("ignored_table");
   });
 
   it("schema dump with regexp ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
+    await ctx.createTable("sd_users", {}, (t) => t.string("name"));
     await ctx.createTable("temp_cache", {}, (t) => t.string("val"));
     SchemaDumper.ignoreTables = [/^temp_/];
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("users");
+    expect(output).toContain("sd_users");
     expect(output).not.toContain("temp_cache");
   });
 
@@ -205,17 +205,15 @@ describe("SchemaDumperTest", () => {
   // partial-index support (MySQL) the DDL drops the `where` clause, so the dump
   // emits a plain index.
   it("schema dumps partial indices", async () => {
-    // Mirrors Rails' dump_table_schema("companies") on the canonical
-    // `company_partial_index` (firm_id, type) WHERE (rating > 10).
-    // force: true mirrors Rails' `create_table :companies` and drops any
-    // canonical `companies` left on the shared file-backed worker DB so the
-    // dump reflects only this test's lone partial index.
-    await ctx.createTable("companies", { force: true }, (t) => {
+    // Mirrors Rails' dump_table_schema for a `company_partial_index`
+    // (firm_id, type) WHERE (rating > 10), on a scratch table off the
+    // canonical `companies` name so it never clobbers it under one-schema.
+    await ctx.createTable("sd_companies", {}, (t) => {
       t.string("type");
       t.integer("firm_id");
       t.integer("rating");
     });
-    await ctx.addIndex("companies", ["firm_id", "type"], {
+    await ctx.addIndex("sd_companies", ["firm_id", "type"], {
       name: "company_partial_index",
       where: "(rating > 10)",
     });
@@ -223,17 +221,17 @@ describe("SchemaDumperTest", () => {
     // Rails branches the full expected index line on supports_partial_index?;
     // unsupported backends (MySQL) emit the plain index with no `where:`.
     const expected = adapterSupports("partial_index")
-      ? '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
-      : '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index" });';
+      ? '  await ctx.addIndex("sd_companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
+      : '  await ctx.addIndex("sd_companies", ["firm_id", "type"], { name: "company_partial_index" });';
     expect(output).toContain(expected);
   });
   // Rails runs this unconditionally and branches on `supports_nulls_not_distinct?`
   // (PostgreSQL ≥ 15 only). Backends without support emit a plain unique index.
   it("schema dumps nulls not distinct", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("email");
     });
-    await ctx.addIndex("users", "email", {
+    await ctx.addIndex("sd_users", "email", {
       name: "idx_users_email_unique",
       unique: true,
       nullsNotDistinct: true,
@@ -242,15 +240,15 @@ describe("SchemaDumperTest", () => {
     // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
     // unsupported backends emit a plain unique index with no `nullsNotDistinct:`.
     const expected = adapterSupports("nulls_not_distinct")
-      ? '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true, nullsNotDistinct: true });'
-      : '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true });';
+      ? '  await ctx.addIndex("sd_users", "email", { name: "idx_users_email_unique", unique: true, nullsNotDistinct: true });'
+      : '  await ctx.addIndex("sd_users", "email", { name: "idx_users_email_unique", unique: true });';
     expect(output).toContain(expected);
   });
   it("schema dumps index sort order", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("name");
     });
-    await ctx.addIndex("users", "name", {
+    await ctx.addIndex("sd_users", "name", {
       name: "idx_users_name_desc",
       order: { name: "desc" },
     });
@@ -261,11 +259,11 @@ describe("SchemaDumperTest", () => {
   });
   it("schema dumps index length", async () => {
     const { adapter: lenAdapter, ctx: lenCtx } = freshCtx();
-    await lenCtx.createTable("companies", {}, (t) => {
+    await lenCtx.createTable("sd_companies", {}, (t) => {
       t.string("name");
       t.string("description");
     });
-    await lenCtx.addIndex("companies", ["name", "description"], {
+    await lenCtx.addIndex("sd_companies", ["name", "description"], {
       name: "index_companies_on_name_and_description",
       length: 10,
     });
@@ -278,12 +276,12 @@ describe("SchemaDumperTest", () => {
     const { SchemaStatements } =
       await import("./connection-adapters/abstract/schema-statements.js");
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
-    await testCtx.createTable("products", {}, (t) => {
+    await testCtx.createTable("sd_products", {}, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
     });
     const ss = new SchemaStatements(testAdapter as any);
-    await ss.addCheckConstraint("products", "price > discounted_price", {
+    await ss.addCheckConstraint("sd_products", "price > discounted_price", {
       name: "products_price_check",
     });
     const output = await SchemaDumper.dump(testAdapter);
@@ -350,7 +348,7 @@ describe("SchemaDumperTest", () => {
   );
 
   it("schema dump does not emit id false for normal tables", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("name");
     });
     const output = SchemaDumper.dump(ctx);
@@ -367,7 +365,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump should use false as default", async () => {
-    await ctx.createTable("booleans", {}, (t) => {
+    await ctx.createTable("sd_booleans", {}, (t) => {
       t.boolean("has_fun", { default: false });
     });
     const output = SchemaDumper.dump(ctx);
@@ -375,7 +373,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump does not include limit for text field", async () => {
-    await ctx.createTable("posts", {}, (t) => {
+    await ctx.createTable("sd_posts", {}, (t) => {
       t.text("params");
     });
     const output = SchemaDumper.dump(ctx);
@@ -384,7 +382,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump does not include limit for binary field", async () => {
-    await ctx.createTable("binaries", {}, (t) => {
+    await ctx.createTable("sd_binaries", {}, (t) => {
       t.binary("data");
     });
     const output = SchemaDumper.dump(ctx);
@@ -393,7 +391,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump does not include limit for float field", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
+    await ctx.createTable("sd_numeric_data", {}, (t) => {
       t.float("temperature");
     });
     const output = SchemaDumper.dump(ctx);
@@ -417,10 +415,10 @@ describe("SchemaDumperTest", () => {
     }
   });
   itIfSupports("expression_index", "schema dump expression indices", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("email");
     });
-    await ctx.addIndex("users", "lower(email)", { name: "idx_users_lower_email" });
+    await ctx.addIndex("sd_users", "lower(email)", { name: "idx_users_lower_email" });
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain('"lower(email)"');
     expect(output).toContain("idx_users_lower_email");
@@ -430,11 +428,11 @@ describe("SchemaDumperTest", () => {
   // backtick output), not by supports_expression_index?. Our body is a PG/SQLite
   // port (`lower(a || b)`), so it's a pre-existing divergence — left as-is.
   it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("sd_users", {}, (t) => {
       t.string("first_name");
       t.string("last_name");
     });
-    await ctx.addIndex("users", "lower(first_name || ' ' || last_name)", {
+    await ctx.addIndex("sd_users", "lower(first_name || ' ' || last_name)", {
       name: "idx_users_full_name",
     });
     const output = SchemaDumper.dump(ctx);
@@ -483,7 +481,7 @@ describe("SchemaDumperTest", () => {
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
       const { adapter, ctx: testCtx } = freshSidecarCtx();
-      await testCtx.createTable("booleans", {}, (t) => {
+      await testCtx.createTable("sd_booleans", {}, (t) => {
         t.boolean("has_fun", { default: false });
       });
       const output = await SchemaDumper.dump(adapter);
@@ -514,7 +512,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump includes decimal options", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
+    await ctx.createTable("sd_numeric_data", {}, (t) => {
       t.decimal("bank_balance", { precision: 10, scale: 2 });
     });
     const output = SchemaDumper.dump(ctx);
@@ -757,7 +755,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
     const { adapter, ctx: testCtx } = freshSidecarCtx();
-    await testCtx.createTable("numeric_data", {}, (t) => {
+    await testCtx.createTable("sd_numeric_data", {}, (t) => {
       t.float("temperature_with_limit", { limit: 24 });
     });
     const output = await SchemaDumper.dump(adapter);
@@ -779,7 +777,7 @@ describe("SchemaDumperTest", () => {
     },
   );
   it("schema dump keeps large precision integer columns as decimal", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
+    await ctx.createTable("sd_numeric_data", {}, (t) => {
       t.decimal("atoms_in_universe", { precision: 55 });
     });
     const output = SchemaDumper.dump(ctx);
@@ -787,7 +785,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump keeps id column when id is false and id column added", async () => {
-    await ctx.createTable("goofy_string_id", { id: false }, (t) => {
+    await ctx.createTable("sd_goofy_string_id", { id: false }, (t) => {
       t.string("id", { null: false });
     });
     const output = SchemaDumper.dump(ctx);
@@ -796,12 +794,12 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await ctx.createTable("string_key_objects", { id: false }, (t) => {
+    await ctx.createTable("sd_string_key_objects", { id: false }, (t) => {
       t.string("key", { null: false });
     });
-    await ctx.addIndex("string_key_objects", "key", { unique: true });
+    await ctx.addIndex("sd_string_key_objects", "key", { unique: true });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
+    expect(output).toMatch(/createTable\("sd_string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
   itIfSupports(
@@ -940,7 +938,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("sd_posts", {}, (t) => {
         t.string("title");
         t.timestamps();
       });
@@ -1024,10 +1022,10 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("sd_posts", {}, (t) => {
         t.string("title");
       });
-      await ctx.addColumn("posts", "created_at", "datetime");
+      await ctx.addColumn("sd_posts", "created_at", "datetime");
       const output = SchemaDumper.dump(ctx);
       expect(output).toContain("datetime");
       expect(output).toContain("created_at");
@@ -1054,10 +1052,10 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("sd_posts", {}, (t) => {
         t.string("title");
       });
-      await ctx.addColumn("posts", "posted_at", "datetime");
+      await ctx.addColumn("sd_posts", "posted_at", "datetime");
       const output = SchemaDumper.dump(ctx);
       expect(output).toContain("datetime");
       expect(output).toContain("posted_at");
@@ -1128,22 +1126,22 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("dumps schema from adapter introspection", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("articles", {}, (t) => {
+    await ctx.createTable("sd_articles", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
     });
     const result = await TopLevelDumper.dump(adapter);
-    expect(result).toContain("articles");
+    expect(result).toContain("sd_articles");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
   });
 
   it("dumps schema with indexes from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("comments", {}, (t) => {
+    await ctx.createTable("sd_comments", {}, (t) => {
       t.integer("post_id");
     });
-    await ctx.addIndex("comments", "post_id", { name: "index_comments_on_post_id" });
+    await ctx.addIndex("sd_comments", "post_id", { name: "index_comments_on_post_id" });
     const result = await TopLevelDumper.dump(adapter);
     expect(result).toContain("addIndex");
     expect(result).toContain("index_comments_on_post_id");
@@ -1151,7 +1149,7 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("events", {}, (t) => {
+    await ctx.createTable("sd_events", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
     const result = await TopLevelDumper.dump(adapter);
@@ -1177,11 +1175,11 @@ describe("SchemaDumperAdapterTest", () => {
     const { InternalMetadata } = await import("./internal-metadata.js");
     await new SchemaMigration(adapter).createTable();
     await new InternalMetadata(adapter).createTable();
-    await ctx.createTable("products", {}, (t) => {
+    await ctx.createTable("sd_products", {}, (t) => {
       t.string("name");
     });
     const result = await TopLevelDumper.dump(adapter);
-    expect(result).toContain("products");
+    expect(result).toContain("sd_products");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");
   });
@@ -1356,22 +1354,22 @@ describe("cleanDefault", () => {
 afterAll(async () => {
   const { ctx } = freshCtx();
   const o = { ifExists: true } as const;
-  await ctx.dropTable("articles", o);
-  await ctx.dropTable("authors", o);
+  await ctx.dropTable("sd_articles", o);
+  await ctx.dropTable("sd_authors", o);
   await ctx.dropTable("auto_inc", o);
   await ctx.dropTable("bigint_array", o);
-  await ctx.dropTable("binaries", o);
+  await ctx.dropTable("sd_binaries", o);
   await ctx.dropTable("binary_fields", o);
-  await ctx.dropTable("booleans", o);
+  await ctx.dropTable("sd_booleans", o);
   await ctx.dropTable("CamelTable", o);
   await ctx.dropTable("codes", o);
-  await ctx.dropTable("comments", o);
-  await ctx.dropTable("companies", o);
+  await ctx.dropTable("sd_comments", o);
+  await ctx.dropTable("sd_companies", o);
   await ctx.dropTable("custom_pk", o);
   await ctx.dropTable("defaults", o);
   await ctx.dropTable("dump_defaults", o);
-  await ctx.dropTable("events", o);
-  await ctx.dropTable("goofy_string_id", o);
+  await ctx.dropTable("sd_events", o);
+  await ctx.dropTable("sd_goofy_string_id", o);
   await ctx.dropTable("ignored_table", o);
   await ctx.dropTable("indexed", o);
   await ctx.dropTable("infinity_defaults", o);
@@ -1380,20 +1378,20 @@ afterAll(async () => {
   await ctx.dropTable("myapp_posts", o);
   await ctx.dropTable("myapp_users", o);
   await ctx.dropTable("myapp_users_v1", o);
-  await ctx.dropTable("numeric_data", o);
+  await ctx.dropTable("sd_numeric_data", o);
   await ctx.dropTable("postgresql_oids", o);
   await ctx.dropTable("postgresql_times", o);
-  await ctx.dropTable("posts", o);
-  await ctx.dropTable("products", o);
+  await ctx.dropTable("sd_posts", o);
+  await ctx.dropTable("sd_products", o);
   await ctx.dropTable("safe", o);
   await ctx.dropTable("strict", o);
-  await ctx.dropTable("string_key_objects", o);
+  await ctx.dropTable("sd_string_key_objects", o);
   await ctx.dropTable("temp_cache", o);
   await ctx.dropTable("test_schema_exclusion", o);
   await ctx.dropTable("test_schema_unique", o);
   await ctx.dropTable("test_uc_no_idx", o);
   await ctx.dropTable("timestamps", o);
-  await ctx.dropTable("users", o);
+  await ctx.dropTable("sd_users", o);
 });
 
 describe("formatColspecRaw", () => {
