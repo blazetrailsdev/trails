@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, trailsRoot } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
@@ -965,7 +965,10 @@ async function loadConfigFile(modelClass: typeof Base): Promise<RawConfiguration
 
   const pathAdapter = await getPathAsync();
   const fsAdapter = await getFsAsync();
-  const cwd = process.cwd();
+  // Mirrors Rails' optional `Rails.root` seam: resolve `config/database.*`
+  // against `Trails.root` when trailties' boot has set it, else the working
+  // directory.
+  const cwd = trailsRoot() ?? fsAdapter.cwd();
   const tsCandidates = [
     pathAdapter.resolve(cwd, "config", "database.ts"),
     pathAdapter.resolve(cwd, "config", "database.js"),

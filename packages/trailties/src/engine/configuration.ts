@@ -10,6 +10,7 @@
  * - `routeSetClass` is held as an opaque constructor; the real
  *   `ActionDispatch::Routing::RouteSet` wiring lands with PR 2.5.
  */
+import { getFs, getPath } from "@blazetrails/activesupport";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 
@@ -41,11 +42,14 @@ export class EngineConfiguration extends RailtieConfiguration {
     return this._root;
   }
 
-  /** Mirrors Rails `root=`. Re-expands `paths.path` so downstream lookups
-   * resolve against the new root. */
+  /** Mirrors Rails `root=` (`@root = paths.path = Pathname.new(value).expand_path`):
+   * the override is expanded against the working directory before it is stored,
+   * so a relative value resolves to an absolute root. `null` (clear) is left
+   * as-is. Re-points `paths.path` so downstream lookups resolve against it. */
   setRoot(value: string | null): void {
-    this._root = value;
-    if (this._paths) this._paths.path = value;
+    const expanded = value === null ? null : getPath().resolve(getFs().cwd(), value);
+    this._root = expanded;
+    if (this._paths) this._paths.path = expanded;
   }
 
   paths(): Root {

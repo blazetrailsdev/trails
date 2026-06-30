@@ -8,6 +8,7 @@ import {
   getFsAsync,
   getPathAsync,
   runLoadHooks,
+  setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
@@ -106,6 +107,14 @@ export class Application extends Engine {
    */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
+    // Publish a live view of the app root so ActiveRecord's path-resolution
+    // sites (SQLite DB path, config/database.* lookup) expand against it —
+    // mirrors Rails' `Rails.root` being a live read of `application.config.root`
+    // (rails.rb:65-67). The getter prefers `config.root` so a later
+    // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
+    // is the discovered/cwd fallback for before any explicit override.
+    const bootRoot = await this.requireRoot();
+    setTrailsRoot(() => this.config.root ?? bootRoot);
     this.runInitializers(group, this);
     this._initialized = true;
     runLoadHooks("after_initialize", this);
@@ -172,7 +181,9 @@ export class Application extends Engine {
   }
 
   private async requireRoot(): Promise<string> {
-    return (await this.root()) ?? (await getFsAsync()).cwd();
+    // Mirrors Rails' `Rails.root` (`application.config.root`): an explicit
+    // `config.root=` override wins, then the discovered source root, then cwd.
+    return this.config.root ?? (await this.root()) ?? (await getFsAsync()).cwd();
   }
 }
 
