@@ -177,7 +177,9 @@ export class Application extends Engine {
   }
 
   private async requireRoot(): Promise<string> {
-    return (await this.root()) ?? (await getFsAsync()).cwd();
+    // Mirrors Rails' `Rails.root` (`application.config.root`): an explicit
+    // `config.root=` override wins, then the discovered source root, then cwd.
+    return this.config.root ?? (await this.root()) ?? (await getFsAsync()).cwd();
   }
 }
 

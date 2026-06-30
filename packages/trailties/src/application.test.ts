@@ -9,6 +9,8 @@ import {
   onLoad,
   registerFsAdapter,
   resetLoadHooks,
+  setTrailsRoot,
+  trailsRoot,
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
@@ -186,6 +188,40 @@ describe("Application", () => {
       const app = IApp3.instance();
       await app.initialize();
       expect(seen).toEqual([app]);
+    });
+
+    it("publishes the discovered root to the ActiveRecord seam (trailsRoot)", async () => {
+      installFs(new Set(["/", "/app", "/app/src"]), new Set(["/app/config.ts"]), "/cwd");
+      setTrailsRoot(null);
+      class RootPubApp extends Application {}
+      RootPubApp.calledFrom("/app/src");
+      Application.register(RootPubApp);
+      try {
+        await RootPubApp.instance().initialize();
+        expect(trailsRoot()).toBe("/app");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
+    it("publishes config.root override (not the discovered root) to trailsRoot", async () => {
+      installFs(
+        new Set(["/", "/app", "/app/src", "/override"]),
+        new Set(["/app/config.ts"]),
+        "/cwd",
+      );
+      setTrailsRoot(null);
+      class RootOverrideApp extends Application {}
+      RootOverrideApp.calledFrom("/app/src");
+      Application.register(RootOverrideApp);
+      const app = RootOverrideApp.instance();
+      app.config.setRoot("/override");
+      try {
+        await app.initialize();
+        expect(trailsRoot()).toBe("/override");
+      } finally {
+        setTrailsRoot(null);
+      }
     });
 
     it("raises when called twice", async () => {
