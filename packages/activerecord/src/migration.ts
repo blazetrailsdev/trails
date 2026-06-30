@@ -291,29 +291,31 @@ export abstract class Migration {
   }
 
   /**
+   * The migration instance currently executing a legacy class-level
+   * `self.up`/`self.down` body, so that body's schema operations route through
+   * it. Mirrors Rails' `Migration.delegate` (`active_record/migration.rb:951`).
+   */
+  static _delegate?: Migration;
+
+  /**
    * Run the migration in the given direction (class method).
    *
-   * Mirrors: ActiveRecord::Migration.migrate — dispatches to the class-level
-   * `up`/`down`, which by default lease a fresh instance and run it, but a
-   * legacy migration can override `self.up`/`self.down` with the migration body
-   * directly (see `invertible_migration_test.rb`'s `LegacyMigration`).
+   * Mirrors: ActiveRecord::Migration.migrate — `new.migrate(direction)`, so the
+   * class-level entry point runs through the instance announce/timing/write +
+   * exec_migration path (`active_record/migration.rb:727`).
    */
   static async migrate(direction: "up" | "down"): Promise<void> {
-    if (direction === "up") {
-      await this.up();
-    } else {
-      await this.down();
-    }
+    await new (this as unknown as new () => Migration)().migrate(direction);
   }
 
   /**
-   * Class-level forward run. Defaults to running a fresh instance forward;
-   * override on a legacy migration to define the migration body directly.
+   * Class-level forward run. Defaults to running a fresh instance through the
+   * full `migrate` path; a legacy migration overrides `self.up` with the body.
    *
    * Mirrors: ActiveRecord::Migration.up
    */
   static async up(): Promise<void> {
-    await new (this as unknown as new () => Migration)().up();
+    await new (this as unknown as new () => Migration)().migrate("up");
   }
 
   /**
@@ -322,7 +324,7 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration.down
    */
   static async down(): Promise<void> {
-    await new (this as unknown as new () => Migration)().down();
+    await new (this as unknown as new () => Migration)().migrate("down");
   }
 
   /**
@@ -331,6 +333,8 @@ export abstract class Migration {
    * @internal
    */
   async up(): Promise<void> {
+    const legacy = this._legacyClassDirection("up");
+    if (legacy) return legacy();
     // Default: run change() in forward direction
     await this._runChange("up");
   }
@@ -342,7 +346,30 @@ export abstract class Migration {
    * @internal
    */
   async down(): Promise<void> {
+    const legacy = this._legacyClassDirection("down");
+    if (legacy) return legacy();
     await this._runChange("down");
+  }
+
+  /**
+   * Rails delegate shape (`active_record/migration.rb:951`): a legacy migration
+   * defines its own class-level `self.up`/`self.down`; the instance runs that
+   * body with itself as the delegate so its schema ops route back through this
+   * instance. Returns null for the normal `change`-based path.
+   */
+  private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
+    const ctor = this.constructor as typeof Migration;
+    if (!Object.prototype.hasOwnProperty.call(ctor, direction)) return null;
+    const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
+    return async (): Promise<void> => {
+      const prev = Migration._delegate;
+      Migration._delegate = this;
+      try {
+        await fn.call(ctor);
+      } finally {
+        Migration._delegate = prev;
+      }
+    };
   }
 
   /**
