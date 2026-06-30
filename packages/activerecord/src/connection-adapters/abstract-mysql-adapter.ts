@@ -20,6 +20,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
+  AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -1688,7 +1689,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   translateException(exception: unknown, opts: { sql: string; binds: unknown[] }): Error {
-    return this._translateException(exception, opts.sql, opts.binds);
+    const translated = this._translateException(exception, opts.sql, opts.binds);
+    // Mirrors Rails' AbstractAdapter#translate_exception, which attaches the
+    // originating pool (`connection_pool`) to every exception it builds.
+    if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
+    return translated;
   }
 
   /** @internal */

@@ -60,6 +60,19 @@ export class AdapterError extends ActiveRecordError {
     this.name = "AdapterError";
     this._connectionPool = options?.connectionPool;
   }
+
+  /**
+   * Attach the originating pool to a translated exception, mirroring Rails'
+   * `AbstractAdapter#translate_exception`, which assigns `connection_pool` to
+   * every exception it builds. Idempotent: an explicitly-constructed pool is
+   * never overwritten.
+   */
+  setConnectionPool(connectionPool: unknown): this {
+    if (this._connectionPool === undefined) {
+      this._connectionPool = connectionPool;
+    }
+    return this;
+  }
 }
 
 export class ConnectionNotEstablished extends AdapterError {
