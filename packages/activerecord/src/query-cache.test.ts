@@ -15,7 +15,8 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { LogSubscriber } from "./log-subscriber.js";
+import { Notifications, Logger, type NotificationEvent } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
@@ -323,12 +324,41 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache does not raise exceptions", async () => {
-    await Base.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
-        await Task.find(1);
-        await Task.find(1);
+    // Rails subscribes a ShouldNotHaveExceptionsLogger (a LogSubscriber that
+    // rescues into `@exception` while handling the event) and asserts it did
+    // not raise while processing the cached sql.active_record event.
+    class ShouldNotHaveExceptionsLogger extends LogSubscriber {
+      events: NotificationEvent[] = [];
+      exception = false;
+      override sql(event: NotificationEvent): void {
+        this.events.push(event);
+        try {
+          super.sql(event);
+        } catch {
+          this.exception = true;
+        }
+      }
+    }
+
+    const savedLogger = Base.logger;
+    // A sink logger (Rails' `Logger.new(File::NULL)`) so `sql` runs its full
+    // formatting path instead of short-circuiting on a null logger.
+    Base.logger = new Logger({ write: () => {} }) as never;
+    const logger = new ShouldNotHaveExceptionsLogger();
+    const sub = Notifications.subscribe("sql.active_record", (e) => logger.sql(e));
+    try {
+      await Base.cache(async () => {
+        await assertQueriesCount(1, false, async () => {
+          await Task.find(1);
+          await Task.find(1);
+        });
       });
-    });
+    } finally {
+      Notifications.unsubscribe(sub);
+      Base.logger = savedLogger;
+    }
+
+    expect(logger.exception).toBe(false);
   });
 
   it.skip("query cache does not allow sql key mutation", () => {
