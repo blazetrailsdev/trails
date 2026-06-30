@@ -822,7 +822,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       case "binary":
         if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
           throw new ArgumentError(
-            `No binary type has byte size ${limit}. The limit on binary can be at most 1GB - 1 byte.`,
+            `No binary type has byte size ${limit}. The limit on binary can be at most 1GB - 1byte.`,
           );
         }
         sql = "bytea";
@@ -830,7 +830,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       case "text":
         if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
           throw new ArgumentError(
-            `No text type has byte size ${limit}. The limit on text can be at most 1GB - 1 byte.`,
+            `No text type has byte size ${limit}. The limit on text can be at most 1GB - 1byte.`,
           );
         }
         sql = "text";
