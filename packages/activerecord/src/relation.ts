@@ -1812,17 +1812,20 @@ export class Relation<T extends Base> {
    * no type-based way to tell a `(table, on)` pair from `joins(:a, :b)`.
    */
   joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(specArray: AssociationSpec[]): Relation<T>;
+  joins(specArray: Array<AssociationSpec | Nodes.Join>): Relation<T>;
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
   joins(
     ...args: Array<
-      string | AssociationSpec[] | Nodes.Join | Record<string, AssociationSpec | AssociationSpec[]>
+      | string
+      | Array<AssociationSpec | Nodes.Join>
+      | Nodes.Join
+      | Record<string, AssociationSpec | AssociationSpec[]>
     >
   ): Relation<T>;
   joins(
     ...args: Array<
       | string
-      | AssociationSpec[]
+      | Array<AssociationSpec | Nodes.Join>
       | Nodes.Join
       | Record<string, AssociationSpec | AssociationSpec[]>
       | undefined
