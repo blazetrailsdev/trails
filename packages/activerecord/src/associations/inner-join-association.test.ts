@@ -3,34 +3,17 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import type { AssociationProxy } from "./collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { Table } from "@blazetrails/arel";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-const TEST_SCHEMA = {
-  authors: { name: "string" },
-  posts: { title: "string", author_id: "integer" },
-  comments: { body: "string", type: "string", post_id: "integer" },
-  thr_authors: { name: "string" },
-  thr_posts: { title: "string", thr_author_id: "integer" },
-  thr_taggings: { thr_post_id: "integer", thr_tag_id: "integer" },
-  thr_tags: { name: "string" },
-  habtm_posts: { title: "string" },
-  habtm_tags: { name: "string" },
-  habtm_posts_habtm_tags: { habtm_post_id: "integer", habtm_tag_id: "integer" },
-} as const;
 
 describe("InnerJoinAssociationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   function makeModels() {
     class Author extends Base {
@@ -44,10 +27,12 @@ describe("InnerJoinAssociationTest", () => {
     }
     class Post extends Base {
       declare title: string;
+      declare body: string;
       declare author_id: number;
 
       static {
         this.attribute("title", "string");
+        this.attribute("body", "text");
         this.attribute("author_id", "integer");
       }
     }
@@ -139,7 +124,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("eager load with arel joins", async () => {
     const { Post, Comment } = makeModels();
-    const post = await Post.create({ title: "with-two-comments" });
+    const post = await Post.create({ title: "with-two-comments", body: "b" });
     await Comment.create({ body: "C1", post_id: post.id });
     await Comment.create({ body: "C2", post_id: post.id });
     const postTable = new Table("posts");
@@ -196,7 +181,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("join conditions allow nil associations", async () => {
     const { Post } = makeModels();
-    await Post.create({ title: "orphan" });
+    await Post.create({ title: "orphan", body: "b" });
     const sql = Post.joins("authors", "posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
@@ -231,7 +216,7 @@ describe("InnerJoinAssociationTest", () => {
   it("find with implicit inner joins does not set associations", async () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Alice" });
-    const post = await Post.create({ title: "P1", author_id: a.id });
+    const post = await Post.create({ title: "P1", body: "b", author_id: a.id });
     const reloaded = await Post.find(post.id);
     expect((reloaded as any)._loadedAssociations?.author).toBeUndefined();
   });
@@ -239,8 +224,8 @@ describe("InnerJoinAssociationTest", () => {
   it("count honors implicit inner joins", async () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "P1", author_id: a.id });
-    await Post.create({ title: "P2", author_id: a.id });
+    await Post.create({ title: "P1", body: "b", author_id: a.id });
+    await Post.create({ title: "P2", body: "b", author_id: a.id });
     const count = await Post.all().count();
     expect(count).toBe(2);
   });
@@ -248,7 +233,7 @@ describe("InnerJoinAssociationTest", () => {
   it("calculate honors implicit inner joins", async () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "P1", author_id: a.id });
+    await Post.create({ title: "P1", body: "b", author_id: a.id });
     const count = await Post.all().count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
@@ -292,7 +277,7 @@ describe("InnerJoinAssociationTest", () => {
     registerModel(SubSpecialComment);
     registerModel(Post);
 
-    const post = await Post.create({ title: "STI Post" });
+    const post = await Post.create({ title: "STI Post", body: "b" });
     await Comment.create({ body: "regular", type: "Comment", post_id: post.id });
     await SpecialComment.create({ body: "special", post_id: post.id });
     await SubSpecialComment.create({ body: "sub-special", post_id: post.id });
@@ -310,7 +295,7 @@ describe("InnerJoinAssociationTest", () => {
   it("find with conditions on reflection", async () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Bob" });
-    await Post.create({ title: "P1", author_id: a.id });
+    await Post.create({ title: "P1", body: "b", author_id: a.id });
     const results = await Post.where({ author_id: a.id });
     expect(results.length).toBe(1);
     expect(results[0].title).toBe("P1");
@@ -323,8 +308,9 @@ describe("InnerJoinAssociationTest", () => {
       declare thrTags: AssociationProxy<ThrTag>;
 
       static {
+        this._tableName = "authors";
         this.attribute("name", "string");
-        this.hasMany("thrPosts", { foreignKey: "thr_author_id" });
+        this.hasMany("thrPosts", { className: "ThrPost", foreignKey: "author_id" });
         this.hasMany("thrTags", {
           through: "thrPosts",
           source: "thrTag",
@@ -334,14 +320,17 @@ describe("InnerJoinAssociationTest", () => {
     }
     class ThrPost extends Base {
       declare title: string;
-      declare thr_author_id: number;
+      declare body: string;
+      declare author_id: number;
       declare thrTaggings: AssociationProxy<ThrTagging>;
       declare thrTags: AssociationProxy<ThrTag>;
 
       static {
+        this._tableName = "posts";
         this.attribute("title", "string");
-        this.attribute("thr_author_id", "integer");
-        this.hasMany("thrTaggings", { foreignKey: "thr_post_id" });
+        this.attribute("body", "text");
+        this.attribute("author_id", "integer");
+        this.hasMany("thrTaggings", { className: "ThrTagging", as: "taggable" });
         this.hasMany("thrTags", {
           through: "thrTaggings",
           source: "thrTag",
@@ -350,16 +339,19 @@ describe("InnerJoinAssociationTest", () => {
       }
     }
     class ThrTagging extends Base {
-      declare thr_post_id: number;
-      declare thr_tag_id: number;
+      declare tag_id: number;
+      declare taggable_id: number;
+      declare taggable_type: string;
       declare thrTag: ThrTag | null;
       declare loadBelongsTo: (name: "thrTag") => Promise<ThrTag | null>;
 
       static {
-        this.attribute("thr_post_id", "integer");
-        this.attribute("thr_tag_id", "integer");
+        this._tableName = "taggings";
+        this.attribute("tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
         this.belongsTo("thrTag", {
-          foreignKey: "thr_tag_id",
+          foreignKey: "tag_id",
           className: "ThrTag",
         });
       }
@@ -368,6 +360,7 @@ describe("InnerJoinAssociationTest", () => {
       declare name: string;
 
       static {
+        this._tableName = "tags";
         this.attribute("name", "string");
       }
     }
@@ -379,14 +372,18 @@ describe("InnerJoinAssociationTest", () => {
     // Verify the through join generates correct SQL
     const sql = ThrPost.joins("thrTags").toSql();
     expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("thr_taggings");
-    expect(sql).toContain("thr_tags");
+    expect(sql).toContain("taggings");
+    expect(sql).toContain("tags");
 
     // Verify it works end-to-end
     const author = await ThrAuthor.create({ name: "Alice" });
-    const post = await ThrPost.create({ title: "P1", thr_author_id: author.id });
+    const post = await ThrPost.create({ title: "P1", body: "b", author_id: author.id });
     const tag = await ThrTag.create({ name: "ruby" });
-    await ThrTagging.create({ thr_post_id: post.id, thr_tag_id: tag.id });
+    await ThrTagging.create({
+      tag_id: tag.id,
+      taggable_id: post.id,
+      taggable_type: "ThrPost",
+    });
 
     const results = await ThrPost.joins("thrTags").where({ id: post.id });
     expect(results.length).toBeGreaterThan(0);
@@ -412,7 +409,7 @@ describe("InnerJoinAssociationTest", () => {
   it("the correct records are loaded when including an aliased association", async () => {
     const { Post, Author } = makeModels();
     const a = await Author.create({ name: "Alice" });
-    await Post.create({ title: "hello", author_id: a.id });
+    await Post.create({ title: "hello", body: "b", author_id: a.id });
     const posts = await Post.where({ author_id: a.id });
     expect(posts.length).toBe(1);
     expect(posts[0].title).toBe("hello");
@@ -443,7 +440,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("eager load with string joins", async () => {
     const { Post, Comment } = makeModels();
-    const post = await Post.create({ title: "with-two-comments" });
+    const post = await Post.create({ title: "with-two-comments", body: "b" });
     await Comment.create({ body: "C1", post_id: post.id });
     await Comment.create({ body: "C2", post_id: post.id });
     // Mirrors Rails: Person.eager_load(:agents).joins(string_join).count == 3
@@ -459,29 +456,33 @@ describe("InnerJoinAssociationTest", () => {
   it("joins a has_and_belongs_to_many association", async () => {
     class HabtmPost extends Base {
       declare title: string;
-      declare habtmTags: AssociationProxy<HabtmTag>;
+      declare habtmCategories: AssociationProxy<HabtmCategory>;
 
       static {
+        this._tableName = "posts";
         this.attribute("title", "string");
-        this.hasAndBelongsToMany("habtmTags", {
-          className: "HabtmTag",
-          joinTable: "habtm_posts_habtm_tags",
+        this.hasAndBelongsToMany("habtmCategories", {
+          className: "HabtmCategory",
+          joinTable: "categories_posts",
+          foreignKey: "post_id",
+          associationForeignKey: "category_id",
         });
       }
     }
-    class HabtmTag extends Base {
+    class HabtmCategory extends Base {
       declare name: string;
 
       static {
+        this._tableName = "categories";
         this.attribute("name", "string");
       }
     }
     registerModel(HabtmPost);
-    registerModel(HabtmTag);
+    registerModel(HabtmCategory);
 
-    const sql = HabtmPost.joins("habtmTags").toSql();
+    const sql = HabtmPost.joins("habtmCategories").toSql();
     expect(sql).toContain("INNER JOIN");
-    expect(sql).toContain("habtm_posts_habtm_tags");
-    expect(sql).toContain("habtm_tags");
+    expect(sql).toContain("categories_posts");
+    expect(sql).toContain("categories");
   });
 });
