@@ -3948,6 +3948,20 @@ export class Relation<T extends Base> {
       rel._eagerLoadAssociations = [];
       rel._includesAssociations = [];
 
+      const basePk = (this._modelClass as any).primaryKey ?? "id";
+      const jd = new JoinDependency(this._modelClass);
+      this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+
+      // If no eager association is joinable (composite-key collection or other
+      // capability-gap reflection), Rails JOINs but trails preloads. pluck reads
+      // only the requested columns from the base query, so degrade to the base
+      // relation (limit/offset preserved) instead of `leftOuterJoins`, which
+      // throws for the unjoinable spec. Mirrors _executeEagerLoad's
+      // jd.nodes.length === 0 preload fallback.
+      if (jd.nodes.length === 0) {
+        return rel.pluck(...columns);
+      }
+
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
       if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
         // Rails apply_join_dependency, for a limit/offset over a collection
@@ -3956,18 +3970,13 @@ export class Relation<T extends Base> {
         // DISTINCT primary keys, rewrite as `WHERE pk IN (ids)`, and clear
         // limit/offset. Limiting the joined rows directly would be wrong under
         // fan-out (it limits associated rows, not parents).
-        const basePk = (this._modelClass as any).primaryKey ?? "id";
-        const jd = new JoinDependency(this._modelClass);
-        this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
-        if (jd.nodes.length > 0) {
-          const limitedIds = await this._materializeLimitedIds(jd, basePk);
-          const limited = rel.leftOuterJoins(eagerSpecs).where({
-            [basePk]: limitedIds,
-          });
-          limited._limitValue = null;
-          limited._offsetValue = null;
-          return limited.pluck(...columns);
-        }
+        const limitedIds = await this._materializeLimitedIds(jd, basePk);
+        const limited = rel.leftOuterJoins(eagerSpecs).where({
+          [basePk]: limitedIds,
+        });
+        limited._limitValue = null;
+        limited._offsetValue = null;
+        return limited.pluck(...columns);
       }
       return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
     }
@@ -7160,7 +7169,17 @@ export class Relation<T extends Base> {
         rel._includesAssociations = [];
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
-        if (
+        const jd = new JoinDependency(this._modelClass);
+        this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+        if (jd.nodes.length === 0) {
+          // No eager association is joinable (composite-key collection or other
+          // capability-gap reflection): trails preloads rather than JOINs.
+          // cache_version reads size/timestamp from the base query, so degrade to
+          // the base relation (limit/offset preserved) instead of `leftOuterJoins`,
+          // which throws for the unjoinable spec. Mirrors _executeEagerLoad's
+          // jd.nodes.length === 0 preload fallback.
+          collection = rel;
+        } else if (
           hasLimitOrOffset &&
           !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
           !Array.isArray(pk)
@@ -7174,16 +7193,10 @@ export class Relation<T extends Base> {
           // synchronous applyJoinDependencyForArel below, which surfaces the
           // unsupported combination as an explicit NotImplementedError rather
           // than emitting a wrong single-column `"col1,col2"` predicate.
-          const jd = new JoinDependency(this._modelClass);
-          this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
-          if (jd.nodes.length > 0) {
-            const limitedIds = await this._materializeLimitedIds(jd, pk);
-            collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
-            collection._limitValue = null;
-            collection._offsetValue = null;
-          } else {
-            collection = rel.leftOuterJoins(eagerSpecs);
-          }
+          const limitedIds = await this._materializeLimitedIds(jd, pk);
+          collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
+          collection._limitValue = null;
+          collection._offsetValue = null;
         } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
