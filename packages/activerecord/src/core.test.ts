@@ -69,18 +69,9 @@ describe("CoreTest", () => {
     });
   });
 
-  // Rails stubs Time::DATE_FORMATS[:inspect] to a lambda and asserts inspect
-  // renders the custom format. trails has no Time::DATE_FORMATS registry; the
-  // inspect formatter is not pluggable, so there is no faithful counterpart.
-  it.skip("inspect instance with lambda date formatter", () => {});
-
   it("inspect new instance", () => {
     expect(new Topic({}).inspect()).toMatch(/Topic id: nil/);
   });
-
-  // Rails asserts the Ruby singleton_class inspect (`#<Class:#<Topic:..>>`).
-  // No JS/trails counterpart for singleton classes.
-  it.skip("inspect singleton instance", () => {});
 
   it("inspect limited select instance", async () => {
     await withAttributesForInspect(["id", "title"], async () => {
@@ -130,36 +121,14 @@ describe("CoreTest", () => {
     });
   });
 
-  // Rails pretty_print_* exercise Ruby's `PP` pretty-printer rendering of a
-  // record (multi-line `#<Topic:0x..` output). trails has no `PP` integration,
-  // so these have no faithful counterpart here.
-  it.skip("pretty print new", () => {});
-  it.skip("pretty print persisted", () => {});
-  it.skip("pretty print full", () => {});
-  it.skip("pretty print uninitialized", () => {});
-  it.skip("pretty print overridden by inspect", () => {});
-  it.skip("pretty print with non primary key id attribute", () => {});
-  it.skip("pretty print with overridden attribute for inspect", () => {});
-
   // Rails introspects `@find_by_statement_cache` size via
   // initialize_find_by_cache. trails exposes no equivalent statement-cache
   // surface to assert against.
   // Tracked: 0023-surfaced-deviations/find-by-statement-cache-introspection.
   it.skip("find by cache does not duplicate entries", () => {});
 
-  // Rails adds Cpk::Book instances to a Ruby Set (dedup via hash/eql?). JS Set
-  // dedups by reference, and trails CpkBook `==` does not yet compare equal for
-  // equal composite ids — see the equality story below.
-  // Tracked: 0023-surfaced-deviations/cpk-equality-new-record-composite-id.
-  it.skip("composite pk models added to a set", () => {});
-
   // Rails: Cpk::Book.new(id: [1, 2]) == Cpk::Book.new(id: [1, 2]) is true.
   // trails returns false for equal composite ids on new records.
   // Tracked: 0023-surfaced-deviations/cpk-equality-new-record-composite-id.
   it.skip("composite pk models equality", () => {});
-
-  // Rails asserts Ruby `.hash` equality for equal composite ids. No JS hash
-  // counterpart, and it hinges on the same `==` gap as above.
-  // Tracked: 0023-surfaced-deviations/cpk-equality-new-record-composite-id.
-  it.skip("composite pk models hash", () => {});
 });
