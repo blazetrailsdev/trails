@@ -85,19 +85,19 @@ describe("InnerJoinAssociationTest", () => {
     registerModel("ShardedComment", sharded.ShardedComment);
   });
 
-  it("test_construct_finder_sql_applies_aliases_tables_on_association_conditions", async () => {
+  it("construct finder sql applies aliases tables on association conditions", async () => {
     const result = await Author.joins(["thinkingPosts", "welcomePosts"]).first();
     expect((result as any)?.id).toBe((authors("david") as any).id);
   });
 
-  it("test_construct_finder_sql_does_not_table_name_collide_on_duplicate_associations", async () => {
+  it("construct finder sql does not table name collide on duplicate associations", async () => {
     const sql = Person.joins({ agents: { agents: "agents" } })
       .joins({ agents: { agents: { primaryContact: "agents" } } })
       .toSql();
     expect(/agents_people_4/i.test(sql)).toBe(true);
   });
 
-  it("test_construct_finder_sql_does_not_table_name_collide_on_duplicate_associations_with_left_outer_joins", () => {
+  it("construct finder sql does not table name collide on duplicate associations with left outer joins", () => {
     const sql = Person.joins({ agents: "agents" }).leftOuterJoins({ agents: "agents" }).toSql();
     expect(/agents_people_2/i.test(sql)).toBe(true);
     expect(/INNER JOIN/i.test(sql)).toBe(true);
@@ -105,7 +105,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(/LEFT OUTER JOIN/i.test(sql)).toBe(false);
   });
 
-  it("test_construct_finder_sql_does_not_table_name_collide_with_string_joins", async () => {
+  it("construct finder sql does not table name collide with string joins", async () => {
     const stringJoin =
       "JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
@@ -117,7 +117,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(queries.some((sql) => /agents_people_2/i.test(sql))).toBe(true);
   });
 
-  it("test_construct_finder_sql_does_not_table_name_collide_with_aliased_joins", async () => {
+  it("construct finder sql does not table name collide with aliased joins", async () => {
     const agents = Person.arelTable.alias("agents_people");
     const agents2 = Person.arelTable.alias("agents_people_2");
     const constraint = agents
@@ -135,7 +135,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(queries.some((sql) => /agents_people_2/i.test(sql))).toBe(true);
   });
 
-  it("test_user_supplied_joins_order_should_be_preserved", async () => {
+  it("user supplied joins order should be preserved", async () => {
     const stringJoin =
       "JOIN people agents_people_2 ON agents_people_2.primary_contact_id = people.id";
     const agents = Person.arelTable.alias("agents_people");
@@ -156,7 +156,7 @@ describe("InnerJoinAssociationTest", () => {
   // Arel join nodes when merging a relation into itself, so the `posts` self-join
   // is emitted twice and `posts.type` becomes ambiguous. Rails dedupes the join.
   // Deviation: inner-join-association-surfaced-deviations (RFC 0023).
-  it.skip("test_deduplicate_joins", async () => {
+  it.skip("deduplicate joins", async () => {
     const postsTable = new Table("posts");
     const constraint = postsTable.get("author_id").eq(Author.arelTable.get("id"));
 
@@ -176,7 +176,7 @@ describe("InnerJoinAssociationTest", () => {
   // Rails (which seeds the alias_tracker so the user-supplied string/arel join
   // resolves `agents_people_2`). trails emits a non-matching alias → "no such
   // column: agents_people_2.id". Deviation: inner-join-association-surfaced-deviations.
-  it.skip("test_eager_load_with_string_joins", async () => {
+  it.skip("eager load with string joins", async () => {
     const stringJoin =
       "LEFT JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
@@ -187,7 +187,7 @@ describe("InnerJoinAssociationTest", () => {
   // aliasing gap as test_eager_load_with_string_joins — the user-supplied Arel
   // join references `agents_people` while the eager_load join collides on
   // `primary_contact_id`. Deviation: inner-join-association-surfaced-deviations.
-  it.skip("test_eager_load_with_arel_joins", async () => {
+  it.skip("eager load with arel joins", async () => {
     const agents = Person.arelTable.alias("agents_people");
     const agents2 = Person.arelTable.alias("agents_people_2");
     const constraint = agents
@@ -199,33 +199,33 @@ describe("InnerJoinAssociationTest", () => {
     expect(await Person.eagerLoad("agents").joins(arelJoin).count()).toBe(3);
   });
 
-  it("test_construct_finder_sql_ignores_empty_joins_hash", () => {
+  it("construct finder sql ignores empty joins hash", () => {
     const sql = Author.joins({}).toSql();
     expect(/JOIN/i.test(sql)).toBe(false);
   });
 
-  it("test_construct_finder_sql_ignores_empty_joins_array", () => {
+  it("construct finder sql ignores empty joins array", () => {
     const sql = Author.joins([]).toSql();
     expect(/JOIN/i.test(sql)).toBe(false);
   });
 
-  it("test_join_conditions_added_to_join_clause", () => {
+  it("join conditions added to join clause", () => {
     const sql = Author.joins("essays").toSql();
     expect(/writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql)).toBe(true);
     expect(/WHERE/i.test(sql)).toBe(false);
   });
 
-  it("test_join_association_conditions_support_string_and_arel_expressions", async () => {
+  it("join association conditions support string and arel expressions", async () => {
     expect(await Author.joins("welcomePostsWithOneComment").count()).toBe(0);
     expect(await Author.joins("welcomePostsWithComments").count()).toBe(1);
   });
 
-  it("test_join_conditions_allow_nil_associations", async () => {
+  it("join conditions allow nil associations", async () => {
     const authorsRel = Author.includes("essays").where({ essays: { id: null } });
     expect(await authorsRel.count()).toBe(1);
   });
 
-  it("test_join_with_reserved_word", async () => {
+  it("join with reserved word", async () => {
     const result = await CategoryPost.joins("group").where({
       "group.id": (categories("technology") as any).id,
     });
@@ -237,45 +237,45 @@ describe("InnerJoinAssociationTest", () => {
     ]);
   });
 
-  it("test_find_with_implicit_inner_joins_without_select_does_not_imply_readonly", async () => {
+  it("find with implicit inner joins without select does not imply readonly", async () => {
     const authorsRel = await Author.joins("posts");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
-  it("test_find_with_implicit_inner_joins_honors_readonly_with_select", async () => {
+  it("find with implicit inner joins honors readonly with select", async () => {
     const authorsRel = await Author.joins("posts").select("authors.*");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
-  it("test_find_with_implicit_inner_joins_honors_readonly_false", async () => {
+  it("find with implicit inner joins honors readonly false", async () => {
     const authorsRel = await Author.joins("posts").readonly(false);
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => !a.isReadonly())).toBe(true);
   });
 
-  it("test_find_with_implicit_inner_joins_does_not_set_associations", async () => {
+  it("find with implicit inner joins does not set associations", async () => {
     const authorsRel = await Author.joins("posts").select("authors.*");
     expect(authorsRel.length).toBeGreaterThan(0);
     expect(authorsRel.every((a) => (a as any)._loadedAssociations?.posts === undefined)).toBe(true);
   });
 
-  it("test_count_honors_implicit_inner_joins", async () => {
+  it("count honors implicit inner joins", async () => {
     const allAuthors = await Author.all();
     let realCount = 0;
     for (const a of allAuthors) realCount += await (a as any).posts.count();
     expect(await Author.joins("posts").count()).toBe(realCount);
   });
 
-  it("test_calculate_honors_implicit_inner_joins", async () => {
+  it("calculate honors implicit inner joins", async () => {
     const allAuthors = await Author.all();
     let realCount = 0;
     for (const a of allAuthors) realCount += await (a as any).posts.count();
     expect(await Author.joins("posts").count("authors.id")).toBe(realCount);
   });
 
-  it("test_calculate_honors_implicit_inner_joins_and_distinct_and_conditions", async () => {
+  it("calculate honors implicit inner joins and distinct and conditions", async () => {
     const allAuthors = await Author.all();
     let realCount = 0;
     for (const a of allAuthors) {
@@ -289,7 +289,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(authorsWithWelcomingPostTitles).toBe(realCount);
   });
 
-  it("test_find_with_sti_join", async () => {
+  it("find with sti join", async () => {
     const scope = Post.joins("specialComments").where({ id: (posts("sti_comments") as any).id });
 
     expect(await scope.where({ "comments.type": "Comment" })).toHaveLength(0);
@@ -297,14 +297,14 @@ describe("InnerJoinAssociationTest", () => {
     expect((await scope.where({ "comments.type": "SubSpecialComment" })).length).toBeGreaterThan(0);
   });
 
-  it("test_find_with_conditions_on_reflection", async () => {
+  it("find with conditions on reflection", async () => {
     expect((await (posts("welcome") as any).comments).length).toBeGreaterThan(0);
     expect(
       await Post.joins("nonexistentComments").where({ id: (posts("welcome") as any).id }),
     ).toHaveLength(0);
   });
 
-  it("test_find_with_conditions_on_through_reflection", async () => {
+  it("find with conditions on through reflection", async () => {
     expect((await (posts("welcome") as any).tags).length).toBeGreaterThan(0);
     expect(await Post.joins("miscTags").where({ id: (posts("welcome") as any).id })).toHaveLength(
       0,
@@ -375,7 +375,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(itsBlogPost.id).toEqual((blogPosts[0] as any).id);
   });
 
-  it("test_inner_joins_includes_all_nested_associations", async () => {
+  it("inner joins includes all nested associations", async () => {
     const queries = await captureSql(async () => {
       await Friendship.joins(["friendFavoriteReferenceJob", "followerFavoriteReferenceJob"]);
     });
