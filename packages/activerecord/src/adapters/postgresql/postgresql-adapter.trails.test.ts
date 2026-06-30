@@ -81,7 +81,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     // Clean up test tables
     try {
-      await adapter.exec(`DROP TABLE IF EXISTS "ExItems" CASCADE`);
       // Explicit teardown for every table this file creates via raw CREATE TABLE
       // (the dynamic `LIKE 'ex_%'` sweep below also drops them, but the static
       // list is what require-table-teardown balances against). IF EXISTS keeps

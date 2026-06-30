@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     // Clean up test tables
     try {
-      await adapter.exec(`DROP TABLE IF EXISTS "ExItems" CASCADE`);
+      await adapter.exec(`DROP TABLE IF EXISTS "CamelCase" CASCADE`);
       // Explicit teardown for every table this file creates via raw CREATE TABLE
       // (the dynamic `LIKE 'ex_%'` sweep below also drops them, but the static
       // list is what require-table-teardown balances against). IF EXISTS keeps
@@ -228,8 +228,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("primary key works tables containing capital letters", async () => {
-      await adapter.exec(`CREATE TABLE "ExItems" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      const pk = await adapter.primaryKey('"ExItems"');
+      await adapter.exec(`CREATE TABLE "CamelCase" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      const pk = await adapter.primaryKey('"CamelCase"');
       expect(pk).toBe("id");
     });
 
