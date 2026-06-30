@@ -116,15 +116,34 @@ describe("EnumTest", () => {
     expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
   });
 
-  // Rails: `Book.covers[:soft]` — `cover` string enum not on canonical Book.
+  // Surfaced gap: every assertion uses `Book.statuses[...].to_s` (a numeric
+  // string like "2"), and `where({ status: "2" })` doesn't serialize the
+  // numeric string through EnumType in the predicate builder (it matches
+  // `IS NULL` instead). Plus the `cover` tail. Pending under
+  // 0023-surfaced-deviations/enum-canonical-book-gaps.
   it.skip("find via where with values.to_s", () => {});
 
-  // Rails: `Book.where(last_read: :forgotten)` and `cover` symbol coercion —
-  // neither expressible on canonical Book.
-  it.skip("find via where with symbols", () => {});
+  // Ruby symbols map to trails' label strings.
+  it("find via where with symbols", async () => {
+    book = books("awdr");
+    expect((await Book.where({ status: "published" }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
+    // Pending: array-of-label `where({ status: ["published", ...] })` (the
+    // predicate builder doesn't map enum labels per array element),
+    // `last_read: forgotten`, `status: prohibited` (nil), and `cover` matches.
+  });
 
-  // Rails: `Book.where(last_read: "forgotten")` — `forgotten: nil` not on Book.
-  it.skip("find via where with strings", () => {});
+  it("find via where with strings", async () => {
+    book = books("awdr");
+    expect((await Book.where({ status: "published" }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
+    // Pending: array-of-label `where`, `last_read: "forgotten"`, and
+    // `status: "prohibited"` (nil).
+  });
 
   // Rails uses 64-bit out-of-range labels and beginless/endless ranges.
   it.skip("find via where with large number", () => {});
