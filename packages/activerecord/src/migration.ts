@@ -1,4 +1,12 @@
-import { getFs, getPath, Logger, getEnv, camelize, underscore } from "@blazetrails/activesupport";
+import {
+  getFs,
+  getPath,
+  Logger,
+  getEnv,
+  camelize,
+  underscore,
+  humanize,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -115,14 +123,14 @@ export class IrreversibleMigration extends MigrationError {
 
 export class DuplicateMigrationVersionError extends MigrationError {
   constructor(version: string | number) {
-    super(`Duplicate migration version: ${version}`);
+    super(`Multiple migrations have the version number ${version}.`);
     this.name = "DuplicateMigrationVersionError";
   }
 }
 
 export class DuplicateMigrationNameError extends MigrationError {
   constructor(name: string) {
-    super(`Duplicate migration name: ${name}`);
+    super(`Multiple migrations have the name ${name}.`);
     this.name = "DuplicateMigrationNameError";
   }
 }
@@ -2744,6 +2752,9 @@ export class Migrator {
       await this._ensureSchemaTable();
 
       if (targetVersion !== undefined && targetVersion !== null) {
+        if (this._invalidTarget(targetVersion)) {
+          throw new UnknownMigrationVersionError(targetVersion);
+        }
         this._validateTargetVersion(targetVersion);
         const target = BigInt(targetVersion);
         const current = BigInt(await this.currentVersion());
@@ -2783,7 +2794,7 @@ export class Migrator {
   async down(targetVersion?: number | string | null): Promise<void> {
     await this._withAdvisoryLock(async () => {
       await this._ensureSchemaTable();
-      await this._migrateDown(targetVersion ?? 0);
+      await this._migrateDown(targetVersion ?? null);
     });
   }
 
@@ -2792,10 +2803,11 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator#rollback
    */
-  async rollback(steps: number = 1): Promise<void> {
+  async rollback(steps: number = 1): Promise<MigrationProxy[]> {
     if (!Number.isInteger(steps) || steps < 0) {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
+    let rolledBack: MigrationProxy[] = [];
     await this._withAdvisoryLock(async () => {
       await this._ensureSchemaTable();
       const applied = await this._appliedVersions();
@@ -2805,7 +2817,9 @@ export class Migrator {
       for (const proxy of toRollback) {
         await this._runMigration(proxy, "down");
       }
+      rolledBack = toRollback;
     });
+    return rolledBack;
   }
 
   /**
@@ -2839,16 +2853,24 @@ export class Migrator {
    * `migrated.include?(migration.version)` before running. Our `_runMigration`
    * doesn't carry that check, so the guard lives here instead.
    */
-  async runWithoutLock(direction: "up" | "down", targetVersion: string | number): Promise<void> {
-    this._validateTargetVersion(targetVersion);
+  async runWithoutLock(
+    direction: "up" | "down",
+    targetVersion: string | number,
+  ): Promise<string | undefined> {
     await this._ensureSchemaTable();
-    const key = String(BigInt(targetVersion));
+    let key: string;
+    try {
+      key = String(BigInt(targetVersion));
+    } catch {
+      throw new UnknownMigrationVersionError(targetVersion);
+    }
     const proxy = this._migrations.find((m) => m.version === key);
-    if (!proxy) throw new UnknownMigrationVersionError(key);
+    if (!proxy) throw new UnknownMigrationVersionError(targetVersion);
     const applied = await this._appliedVersions();
-    if (direction === "up" && applied.has(key)) return;
-    if (direction === "down" && !applied.has(key)) return;
+    if (direction === "up" && applied.has(key)) return undefined;
+    if (direction === "down" && !applied.has(key)) return undefined;
     await this._runMigration(proxy, direction);
+    return proxy.version;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
@@ -3056,7 +3078,10 @@ export class Migrator {
       return {
         status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
         version: normV,
-        name: m.name,
+        // Mirrors Rails: `(name + scope).humanize` — the snake-case filename
+        // part, humanized (migration.rb:1331). Our proxy carries the camelized
+        // class name, so underscore it back before humanizing.
+        name: humanize(underscore(m.name)),
       };
     });
 
@@ -3245,6 +3270,21 @@ export class Migrator {
     );
   }
 
+  /**
+   * Mirrors Rails' `Migrator#invalid_target?`: a target version is invalid when
+   * it is given, is not 0, and does not correspond to any known migration.
+   */
+  private _invalidTarget(targetVersion: number | string): boolean {
+    let key: string;
+    try {
+      key = String(BigInt(targetVersion));
+    } catch {
+      return true;
+    }
+    if (key === "0") return false;
+    return !this._migrations.some((m) => m.version === key);
+  }
+
   private _validateTargetVersion(v: number | string): void {
     if (typeof v === "string") {
       if (!/^\d+$/.test(v)) {
@@ -3267,8 +3307,8 @@ export class Migrator {
    * Mirrors: ActiveRecord::MigrationContext#run (which builds a Migrator
    * scoped to `target_version` and calls `#run`).
    */
-  async run(direction: "up" | "down", targetVersion: number | string): Promise<void> {
-    await this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
+  async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
+    return this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
   }
 
   private async _migrateUp(
@@ -3291,14 +3331,17 @@ export class Migrator {
   }
 
   private async _migrateDown(
-    targetVersion: number | string,
+    targetVersion: number | string | null,
     filter?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
-    this._validateTargetVersion(targetVersion);
-    const target = BigInt(targetVersion);
+    // A null target means "revert everything" (Rails: a `:down` Migrator with no
+    // target_version), which — unlike `down(0)` — also reverts a version-0
+    // migration.
+    if (targetVersion !== null) this._validateTargetVersion(targetVersion);
+    const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
-      .filter((m) => applied.has(m.version) && BigInt(m.version) > target)
+      .filter((m) => applied.has(m.version) && (target === null || BigInt(m.version) > target))
       .filter((m) => !filter || filter(m))
       .reverse();
 
