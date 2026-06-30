@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
-import { ConfigurationError, UnknownPrimaryKey } from "./errors.js";
+import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
 import { cachedFindByStatement } from "./core.js";
 import {
   underscore,
@@ -1264,7 +1264,10 @@ export class AssociationReflection extends MacroReflection {
 
     const resolved = modelRegistry.get(simpleName);
     if (!resolved) {
-      throw new Error(
+      // Rails' compute_class raises NameError for a missing constant (the only
+      // error check_validity! callers rescue); the subclass guard below raises
+      // ArgumentError, which must propagate. reflection.rb:495-508.
+      throw new NameError(
         `Model '${simpleName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
       );
     }

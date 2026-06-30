@@ -7,8 +7,7 @@ import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
-import { AssociationTypeMismatch } from "../errors.js";
+import { AssociationTypeMismatch, NameError } from "../errors.js";
 
 /**
  * Base class for all association proxies. An Association wraps a single
@@ -110,12 +109,13 @@ export class Association {
     try {
       if (ctor._reflectOnAssociation?.(name)?.klass) return;
     } catch (e) {
-      // Rails' compute_class rescues only NameError (missing constant) and lets
-      // ArgumentError — the "resolved constant is not an ActiveRecord::Base
-      // subclass" guard — propagate (reflection.rb:495-508). Mirror that: a
-      // missing-class failure falls through to the resolveModel NameError below;
-      // a config ArgumentError must surface.
-      if (e instanceof ArgumentError) throw e;
+      // Rails rescues only the missing-constant NameError from compute_class and
+      // re-raises anything else — notably the ArgumentError "resolved constant is
+      // not an ActiveRecord::Base subclass" guard (reflection.rb:495-508). Mirror
+      // that: a missing-class NameError falls through to the resolveModel lookup
+      // below (which re-raises the same faithful NameError); every other error
+      // — config/reflection failures — propagates unchanged.
+      if (!(e instanceof NameError)) throw e;
     }
     const className =
       opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
