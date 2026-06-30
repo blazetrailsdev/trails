@@ -126,10 +126,16 @@ describeIfMysql("Mysql2AdapterTest", () => {
   });
 
   it("columns for distinct with arel order", () => {
-    const order = new Arel.Nodes.Descending(Arel.sql("posts.created_at"));
-    expect(adapter.columnsForDistinct("posts.id", [order])).toBe(
-      "posts.created_at AS alias_0, posts.id",
-    );
+    const prevEngine = Arel.Table.engine;
+    Arel.Table.engine = null; // should not rely on the global Arel::Table.engine
+    try {
+      const order = new Arel.Nodes.Descending(Arel.sql("posts.created_at"));
+      expect(adapter.columnsForDistinct("posts.id", [order])).toBe(
+        "posts.created_at AS alias_0, posts.id",
+      );
+    } finally {
+      Arel.Table.engine = prevEngine;
+    }
   });
 
   // FK type-mismatch fixture tables — created/dropped around each test so the
@@ -183,6 +189,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
     );
     expect(error.cause).toBeInstanceOf(Error);
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
   // Rails: `skip "MariaDB does not return mismatched foreign key in error message" if @conn.mariadb?`
@@ -208,6 +215,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       );
       expect(error.message).toMatch(/which has type `int/i);
       expect(error.cause).toBeInstanceOf(Error);
+      expect(error.connectionPool).toBe(adapter.pool);
     },
   );
 
@@ -236,6 +244,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer/,
     );
     expect(error.cause).toBeInstanceOf(Error);
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
   it("errors for integer fks on bigint pk table in create table", async () => {
@@ -263,6 +272,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint/,
     );
     expect(error.cause).toBeInstanceOf(Error);
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
   it("errors for bigint fks on string pk table in create table", async () => {
@@ -290,6 +300,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       /To resolve this issue, change the type of the `subscriber_id` column on `foos` to be :string/,
     );
     expect(error.cause).toBeInstanceOf(Error);
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
   it("read timeout exception", () => {
@@ -307,6 +318,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
     expect(translated).toBeInstanceOf(AdapterTimeout);
     expect(translated).toBeInstanceOf(QueryAborted);
     expect((translated as AdapterTimeout).cause).toBe(driverErr);
+    expect((translated as AdapterTimeout).connectionPool).toBe(adapter.pool);
   });
 
   it("statement timeout error codes", () => {
@@ -319,6 +331,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
       const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
       expect(translated).toBeInstanceOf(StatementTimeout);
       expect((translated as StatementTimeout).cause).toBe(driverErr);
+      expect((translated as StatementTimeout).connectionPool).toBe(adapter.pool);
     }
   });
 
@@ -339,7 +352,11 @@ describeIfMysql("Mysql2AdapterTest", () => {
   it("warnings do not change returned value of exec update", async () => {
     // Pin a single pool connection via beginTransaction so SET SESSION
     // sql_mode='' carries over to the warning-producing UPDATE (DDL on MySQL
-    // auto-commits, so the table persists even on rollback).
+    // auto-commits, so the table persists even on rollback). Capture sql_mode
+    // up front and restore it in `finally` (mirrors Rails' ensure): session
+    // variables are NOT transactional, so rollback() would otherwise leak the
+    // weakened sql_mode onto the pooled connection.
+    const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction();
     try {
@@ -359,12 +376,17 @@ describeIfMysql("Mysql2AdapterTest", () => {
         expect(affected).toBe(1);
       });
     } finally {
+      // Restore on the still-pinned connection before rollback releases it.
+      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
     }
   });
 
   it("warnings do not change returned value of exec delete", async () => {
+    // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
+    // not transactional, so rollback() does not revert SET SESSION.
+    const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
     await adapter.beginTransaction();
     try {
@@ -381,6 +403,7 @@ describeIfMysql("Mysql2AdapterTest", () => {
         expect(affected).toBe(1);
       });
     } finally {
+      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
     }

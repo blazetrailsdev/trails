@@ -186,6 +186,9 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
       // pool connection via beginTransaction so all three statements
       // run on the same session. (DDL in MySQL auto-commits, so the
       // table persists even though we roll back the transaction.)
+      // Session variables aren't transactional, so rollback() won't revert the
+      // SET SESSION below — capture and restore sql_mode explicitly.
+      const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
       await adapter.beginTransaction();
       try {
         await adapter.executeMutation(
@@ -198,7 +201,8 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
           adapter.executeMutation(`INSERT INTO ex_long (name) VALUES ('toolongvalue')`),
         ).rejects.toBeInstanceOf(ValueTooLong);
       } finally {
-        await adapter.rollback();
+        await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
+        await adapter.rollback().catch(() => {});
       }
     });
   });
@@ -271,6 +275,9 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
     // Guards that the warning handler is wired into executeMutation — the
     // Rails mirror only asserts the returned row count is unaffected; this
     // extension asserts the warning was actually surfaced (regression catch).
+    // Capture/restore sql_mode (mirrors Rails' ensure) — session variables are
+    // not transactional, so rollback() does not revert SET SESSION.
+    const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
     await adapter.beginTransaction();
     try {
@@ -287,6 +294,7 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
       });
       expect(warnSpy).toHaveBeenCalled();
     } finally {
+      await adapter.executeMutation(`SET SESSION sql_mode='${oldSqlMode}'`).catch(() => {});
       await adapter.rollback().catch(() => {});
       await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
     }

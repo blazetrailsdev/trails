@@ -18,6 +18,7 @@ import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
+  AdapterError,
   AdapterTimeout,
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -699,6 +700,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (translated instanceof MismatchedForeignKey) {
       translated = await this._enrichMismatchedForeignKey(translated);
     }
+    // Mirrors Rails' AbstractAdapter#translate_exception, which attaches the
+    // originating pool to every translated exception. Done after enrichment so
+    // the rebuilt MismatchedForeignKey carries it too.
+    if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
     return translated;
   }
 
