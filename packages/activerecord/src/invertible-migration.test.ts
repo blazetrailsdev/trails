@@ -432,17 +432,17 @@ describe("InvertibleMigrationTest", () => {
   itIfSupports("comments", "migrate revert change column comment", async () => {
     const migration1 = new ChangeColumnComment1();
     await migration1.migrate("up");
-    Horse.resetColumnInformation();
-    expect((await Horse.columnsHash())["name"].comment).toBe("Sekitoba");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Sekitoba");
 
     const migration2 = new ChangeColumnComment2();
     await migration2.migrate("up");
-    Horse.resetColumnInformation();
-    expect((await Horse.columnsHash())["name"].comment).toBe("Diomed");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Diomed");
 
     await migration2.migrate("down");
-    Horse.resetColumnInformation();
-    expect((await Horse.columnsHash())["name"].comment).toBe("Sekitoba");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Sekitoba");
   });
 
   itIfSupports("comments", "migrate revert change table comment", async () => {
