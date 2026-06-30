@@ -711,7 +711,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (welcomePost2 as any).people.size()).toBe(0);
   });
 
-  it.skip("destroy association", async () => {
+  it("destroy association", async () => {
     const personCountBefore = await Person.count();
     const readerCountBefore = await Reader.count();
     const post = await Post.find(posts("welcome").id);
@@ -726,7 +726,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (reloaded as any).people.size()).toBe(0);
   });
 
-  it.skip("destroy all", async () => {
+  it("destroy all", async () => {
     const personCountBefore = await Person.count();
     const readerCountBefore = await Reader.count();
     const post = await Post.find(posts("welcome").id);

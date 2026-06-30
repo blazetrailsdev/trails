@@ -709,14 +709,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // fresh DB rows); we apply the same merge here. We deliberately do NOT yet
     // hydrate/cache `_target` or mark the association loaded the way Rails'
     // `load_target` does — `toArray` stays the cache-bypassing re-query path
-    // because two existing gaps surface as stale-cache reads once it caches:
-    //   (1) bang mutations (`whereBang`/etc.) must re-query with the mutated
-    //       scope without hydrating the association cache;
-    //   (2) `_deleteThrough` looks up join rows with a scalar-PK read, so for
-    //       composite-PK target models it can't prune the destroyed records
-    //       from a cached `_target` (re-querying masks this today).
-    // Converging `toArray` onto full `load_target` hydration is tracked
-    // separately and is gated on fixing (2).
+    // because bang mutations (`whereBang`/etc.) must re-query with the mutated
+    // scope without hydrating the association cache. Converging `toArray` onto
+    // full `load_target` hydration is tracked separately.
     const results = await this._execLoad();
     return this._mergeTargetLists(results);
   }
@@ -2451,72 +2446,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._invalidateAssociationIds();
   }
 
-  private async _deleteThrough(records: Base[]): Promise<void> {
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) return;
-
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
-    // Polymorphic through goes through _throughOwnerPolymorphic (same lookup
-    // shape as _pushThrough / _buildThroughScope); composite owners go
-    // through the column-paired helper.
-    const throughAs = throughAssoc.options.as;
-    const poly = throughAs ? this._throughOwnerPolymorphic(throughAssoc, ctor, throughAs) : null;
-    const ownerConditions: Record<string, unknown> = poly
-      ? { [poly.idCol]: poly.idValue, [poly.typeCol]: poly.typeValue }
-      : this._throughOwnerAttrs(throughAssoc, ctor);
-    // Guard against unsaved owners / missing composite components — otherwise
-    // findBy({fk: null}) would translate to IS NULL and could destroy an
-    // orphan join row. Mirrors the short-circuits in _buildThroughScope and
-    // _deleteThroughAllSql.
-    if (poly ? poly.idValue == null : Object.values(ownerConditions).some((v) => v == null)) {
-      return;
-    }
-    // Apply the polymorphic-source discriminator the same way _deleteThroughAllSql
-    // and _buildThroughScope do, so we don't destroy a join row belonging to a
-    // different source type that happens to share the id.
-    if (this._assocDef.options.sourceType) {
-      const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-      ownerConditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
-    }
-    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-    const sourceFk = `${underscore(sourceName)}_id`;
-
-    // All-or-nothing before_remove (see remove_records in collection_association.rb):
-    // one record halting aborts the whole removal — no join rows are destroyed.
-    for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true))
-        return;
-    }
-    const removed: Base[] = [];
-    for (const record of records) {
-      const targetPk = record._readAttribute(
-        (record.constructor as typeof Base).primaryKey as string,
-      );
-      const joinRecord = await throughModel.findBy({
-        ...ownerConditions,
-        [sourceFk]: targetPk,
-      });
-      if (joinRecord) {
-        await joinRecord.destroy();
-        if (joinRecord.isDestroyed()) {
-          removed.push(record);
-          fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
-        }
-      }
-    }
-    this._removeFromTarget(removed);
-    // If any records were not pruned (e.g. composite-PK target whose join row
-    // the scalar findBy couldn't locate), invalidate the cache so the next
-    // toArray re-queries rather than returning a stale target.
-    if (removed.length !== records.length && this._targetLoaded) {
-      this._targetLoaded = false;
-    }
-  }
-
   private async _deleteThroughAllSql(): Promise<number> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
@@ -2632,19 +2561,29 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: T[]): Promise<void> {
+    // Through (incl. HABTM): delegate to the association-layer destroy, exactly
+    // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
+    // has_many :through that runs HasManyThroughAssociation#delete_records
+    // (has_many_through_association.rb:148-163): `scope.destroy_all` on the
+    // THROUGH (join) scope only — built via `construct_join_attributes(*records)`
+    // so duplicate join rows for the same target are all destroyed — then
+    // `remove_records` prunes the in-memory target and fires after_remove (in
+    // that order), wrapped in a transaction when any record is persisted. The
+    // source records themselves are never destroyed. Mirror `delete`'s through
+    // branch and sync the proxy's own target from the returned removed records.
+    if (this._isThrough) {
+      const assoc = this._record.association(this._assocName) as unknown as {
+        destroy: (...r: Array<Base | number | string | bigint>) => Promise<Base[]>;
+      };
+      const removed = await assoc.destroy(...(records as Base[]));
+      this._removeFromTarget(removed);
+      return;
+    }
     const destroyed: Base[] = [];
     const run = async () => {
       for (const record of records) {
         await record.destroy();
         if (record.isDestroyed()) destroyed.push(record);
-      }
-      // For has_many :through, Rails' HasManyThroughAssociation#delete_records
-      // destroys the join rows inside the same `transaction { remove_records }`
-      // (has_many_through_association.rb:148-163), so a failure leaves neither
-      // the targets destroyed nor the join rows orphaned. Run _deleteThrough
-      // inside `run` so it shares the transaction below.
-      if (destroyed.length > 0 && this._isThrough) {
-        await this._deleteThrough(destroyed);
       }
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
@@ -2656,7 +2595,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     // Non-through join/target pruning happens after the destroy batch (it is
     // pure in-memory bookkeeping, not a DB write that needs the transaction).
-    if (destroyed.length > 0 && !this._isThrough) {
+    if (destroyed.length > 0) {
       this._removeFromTarget(destroyed);
     }
   }
