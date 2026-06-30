@@ -33,6 +33,7 @@
   "packages/activerecord/src/query-cache-mixin.test.ts",
   "packages/activerecord/src/query-cache.test.ts",
   "packages/activerecord/src/schema-dumper.test.ts",
+  "packages/activerecord/src/schema-introspection.trails.test.ts",
   "packages/activerecord/src/test-databases.test.ts",
   "packages/activerecord/src/test-helpers/define-schema.test.ts",
   "packages/activerecord/src/test-helpers/handler-resolved-adapter.test.ts",
