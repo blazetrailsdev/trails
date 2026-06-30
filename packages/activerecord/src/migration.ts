@@ -291,12 +291,21 @@ export abstract class Migration {
   }
 
   /**
+   * The migration instance currently executing a legacy class-level
+   * `self.up`/`self.down` body, so that body's schema operations route through
+   * it. Mirrors Rails' `Migration.delegate` (`active_record/migration.rb:951`).
+   */
+  static _delegate?: Migration;
+
+  /**
    * Run the migration in the given direction (class method).
    *
-   * Mirrors: ActiveRecord::Migration.migrate
+   * Mirrors: ActiveRecord::Migration.migrate — `new.migrate(direction)`, so the
+   * class-level entry point runs through the instance announce/timing/write +
+   * exec_migration path (`active_record/migration.rb:727`).
    */
   static async migrate(direction: "up" | "down"): Promise<void> {
-    // Subclasses should override; this is a no-op base
+    await new (this as unknown as new () => Migration)().migrate(direction);
   }
 
   /**
@@ -305,6 +314,8 @@ export abstract class Migration {
    * @internal
    */
   async up(): Promise<void> {
+    const legacy = this._legacyClassDirection("up");
+    if (legacy) return legacy();
     // Default: run change() in forward direction
     await this._runChange("up");
   }
@@ -316,7 +327,34 @@ export abstract class Migration {
    * @internal
    */
   async down(): Promise<void> {
+    const legacy = this._legacyClassDirection("down");
+    if (legacy) return legacy();
     await this._runChange("down");
+  }
+
+  /**
+   * Rails legacy delegate shape (`active_record/migration.rb:951-960`): a legacy
+   * migration defines its own class-level `self.up`/`self.down`; the instance
+   * `up`/`down` run that body with itself as the delegate (so its schema ops
+   * route back through this instance), and no-op for a direction the legacy
+   * class doesn't define (`return unless self.class.respond_to?(direction)`).
+   * Returns null for the normal `change`-based path (no class-level up/down).
+   */
+  private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
+    const ctor = this.constructor as typeof Migration;
+    const owns = (d: "up" | "down"): boolean => Object.prototype.hasOwnProperty.call(ctor, d);
+    if (!owns("up") && !owns("down")) return null; // change-based, not legacy
+    if (!owns(direction)) return async (): Promise<void> => {}; // Rails: return unless respond_to?
+    const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
+    return async (): Promise<void> => {
+      const prev = Migration._delegate;
+      Migration._delegate = this;
+      try {
+        await fn.call(ctor);
+      } finally {
+        Migration._delegate = prev;
+      }
+    };
   }
 
   /**
