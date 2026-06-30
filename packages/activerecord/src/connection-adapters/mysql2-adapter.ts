@@ -48,6 +48,7 @@ import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
+import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
   columns as mysqlColumns,
   foreignKeys as mysqlForeignKeys,
@@ -281,6 +282,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   _statementPoolForTest(): Mysql2StatementPool | undefined {
     return this._stmtPool ?? undefined;
+  }
+
+  /**
+   * Test-only accessor for the persistent raw connection. Mirrors the PG
+   * adapter's `_rawConnectionForTest`.
+   * @internal
+   */
+  _clientForTest(): mysql.Connection | null {
+    return this._client;
   }
 
   /**
@@ -1303,6 +1313,30 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
       this._client = null;
     }
+  }
+
+  /**
+   * Mirrors Rails' `Mysql2Adapter#discard!`. Used just before a forked
+   * process sheds a connection inherited from its parent. Rails sets
+   * `@raw_connection&.automatic_close = false` then nulls the handle so the
+   * abandoned connection won't close its fd on GC, keeping the parent's live
+   * socket intact. node-mysql2 has no `automatic_close`; we mirror the
+   * contract by dropping the reference and neutralizing the abandoned socket
+   * (`abandonRawSocket`: unref + strip listeners) WITHOUT calling
+   * `client.end()`, which would actively close it.
+   */
+  override discardBang(): void {
+    this._activeState = false;
+    // Advance generation so any in-flight connect attempt is bypassed by
+    // _ensureClient() rather than adopted onto a discarded adapter.
+    this._connectGeneration++;
+    super.discardBang();
+    this._inTransaction = false;
+    this._stmtPool?.detach();
+    this._stmtPool = null;
+    const conn = this._client;
+    this._client = null;
+    abandonRawSocket(conn);
   }
 
   /**

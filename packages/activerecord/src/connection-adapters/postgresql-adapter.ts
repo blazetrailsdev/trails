@@ -132,6 +132,7 @@ import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
+import { abandonRawSocket } from "./abandon-raw-socket.js";
 
 const OID_JSON = 114;
 const OID_JSONB = 3802;
@@ -2644,10 +2645,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails' `PostgreSQLAdapter#discard!`. Used when the process
-   * is about to fork or the connection is unrecoverably broken. We
-   * fire a non-blocking `client.end()` and immediately null all
-   * references so no further queries can start.
+   * Mirrors Rails' `PostgreSQLAdapter#discard!`. Used when the process is
+   * about to fork or the connection is unrecoverably broken. Rails does
+   * `@raw_connection&.socket_io&.reopen(IO::NULL)` then nulls the handle — it
+   * ABANDONS the fd WITHOUT closing it, so a forked child tearing down its
+   * inherited copy can't disturb the parent's live server socket. We mirror
+   * that: drop every reference and neutralize the abandoned socket via
+   * `abandonRawSocket` (unref + strip listeners) but never call `client.end()`,
+   * which would actively close it.
    */
   override discardBang(): void {
     const conn = this._rawConnection;
@@ -2660,7 +2665,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
-    conn?.end().catch(() => {});
+    abandonRawSocket(conn);
     // Rails' discard! calls reset_transaction; super.discardBang() does not.
     this.resetTransaction();
     super.discardBang();

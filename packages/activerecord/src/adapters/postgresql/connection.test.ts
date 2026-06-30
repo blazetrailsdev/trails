@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/connection_test.rb
  */
-import { it, expect, describe, beforeEach, afterEach } from "vitest";
+import { it, expect, describe, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value } from "../../type.js";
@@ -275,15 +275,20 @@ describeIfPg("PostgresqlConnectionTest", () => {
     }
   });
 
-  it("discardBang fires async connection cleanup", async () => {
+  it("discardBang abandons the connection without closing the socket", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
+    const endSpy = conn ? vi.spyOn(conn, "end") : null;
     try {
       expect(a.active).toBe(true);
       a.discardBang();
       expect(a.active).toBe(false);
       expect(a.isConnected()).toBe(false);
+      // Rails' discard! abandons the fd WITHOUT closing it (socket_io.reopen
+      // (IO::NULL)); it must never communicate with the server. end() would
+      // actively close the socket, violating that fork-safety contract.
+      expect(endSpy).not.toHaveBeenCalled();
     } finally {
       await conn?.end().catch(() => {});
     }

@@ -103,6 +103,25 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.active).toBe(false);
     });
 
+    it("active after discard", async () => {
+      await adapter.execute("SELECT 1");
+      expect(adapter.active).toBe(true);
+      adapter.discardBang();
+      expect(adapter.active).toBe(false);
+    });
+
+    it("discard abandons the raw connection without closing it", async () => {
+      await adapter.execute("SELECT 1");
+      const raw = adapter._clientForTest();
+      expect(raw).not.toBeNull();
+      const endSpy = vi.spyOn(raw as { end: () => Promise<void> }, "end");
+      adapter.discardBang();
+      // Rails' discard! must not communicate with the server: the abandoned
+      // handle is dropped without an end()/close() that would shut the socket.
+      expect(endSpy).not.toHaveBeenCalled();
+      expect(adapter.active).toBe(false);
+    });
+
     it("wait timeout as string", async () => {
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
       try {
