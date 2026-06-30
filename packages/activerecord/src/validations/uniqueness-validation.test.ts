@@ -410,6 +410,30 @@ describe("UniquenessValidationTest", () => {
     expect(await t2.save()).toBe(true);
   });
 
+  it("validate uniqueness of with multiple attributes and array forms", async () => {
+    // Rails' `validates_uniqueness_of(*attr_names)` arity: `_merge_attributes`
+    // flattens nested arrays and registers a deferred check per attribute, so a
+    // single call can guard several columns. (Mirrors the multi-attr form used by
+    // Rails' test_validate_case_insensitive_uniqueness without the integer
+    // case-insensitive scope column, which hits a separate SQLite LOWER(bind)
+    // quirk tracked by story uniqueness-case-insensitive-integer-column-sqlite.)
+    Topic.validatesUniquenessOf(["title"], "author_name");
+
+    // Fixture topics(:first): title "The First Topic", author_name "David".
+    const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
+    expect(await collideTitle.save()).toBe(false);
+    expect(collideTitle.errors.get("title")).toEqual(["has already been taken"]);
+    expect(collideTitle.errors.get("author_name")).toEqual([]);
+
+    const collideAuthor = new Topic({ title: "A Brand New Title", author_name: "David" });
+    expect(await collideAuthor.save()).toBe(false);
+    expect(collideAuthor.errors.get("author_name")).toEqual(["has already been taken"]);
+    expect(collideAuthor.errors.get("title")).toEqual([]);
+
+    const unique = new Topic({ title: "A Brand New Title", author_name: "Nobody In Fixtures" });
+    expect(await unique.save()).toBe(true);
+  });
+
   it("validate case sensitive uniqueness with special sql like chars", async () => {
     Topic.validatesUniqueness("title", { caseSensitive: true });
 

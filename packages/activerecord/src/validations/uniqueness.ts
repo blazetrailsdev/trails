@@ -67,6 +67,42 @@ export function validatesUniqueness(
   (klass._asyncValidations as Array<unknown>).push({ attribute, options, declaringClass: this });
 }
 
+/**
+ * Register deferred uniqueness validations for one or more attributes,
+ * delegating through `_mergeAttributes` so multiple / nested-array attr lists
+ * (Rails' `*attr_names` arity) and the trailing options hash are normalized the
+ * same way as the other `validates_*_of` helpers.
+ *
+ * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
+ * (activerecord/lib/active_record/validations/uniqueness.rb:291-292).
+ *
+ * TRACKED DEVIATION (structural, behavior-preserving) — Rails registers a single
+ * `validates_with UniquenessValidator, _merge_attributes(attr_names)`: one
+ * validator instance owns the flattened `attributes` list, and
+ * `EachValidator#validate` loops `attributes.each { |a| validate_each(record, a, value) }`
+ * (activemodel/lib/active_model/validations/with.rb:88-104 →
+ * each_validator.rb#validate). trails keeps uniqueness OFF the synchronous
+ * validator chain in the `_asyncValidations` registry (the ratified sync-only
+ * deviation documented on `isValid` in validations.ts), and that registry is
+ * keyed by a single `attribute` per entry — `Base#_runAsyncValidations`
+ * constructs one `UniquenessValidator` per entry and calls `validateEach` once,
+ * never iterating a multi-attribute `attributes` array. So fanning the merged
+ * names into one deferred entry each is the faithful equivalent: it produces the
+ * same per-attribute `validateEach` calls (same count, same options, same
+ * errors) as Rails' single-validator/`attributes.each` loop. Carrying them in
+ * one entry would require teaching the deferred runner to loop `attributes`,
+ * duplicating Rails' EachValidator loop in a different layer — out of scope here.
+ */
+export function validatesUniquenessOf(
+  this: { _mergeAttributes(attrNames: unknown[]): Record<string, unknown> },
+  ...attrNames: unknown[]
+): void {
+  const { attributes, ...options } = this._mergeAttributes(attrNames);
+  for (const attribute of attributes as string[]) {
+    validatesUniqueness.call(this, attribute, options);
+  }
+}
+
 export class UniquenessValidator extends EachValidator {
   private _klass: any;
 

@@ -20,7 +20,11 @@ import { AssociatedValidator, validatesAssociated } from "./validations/associat
 import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
-import { UniquenessValidator, validatesUniqueness } from "./validations/uniqueness.js";
+import {
+  UniquenessValidator,
+  validatesUniqueness,
+  validatesUniquenessOf,
+} from "./validations/uniqueness.js";
 import { _preloadedHolderTarget } from "./associations.js";
 import type { Base } from "./base.js";
 
@@ -36,6 +40,7 @@ export {
   UniquenessValidator,
   validatesAssociated,
   validatesUniqueness,
+  validatesUniquenessOf,
 };
 
 /**
@@ -87,12 +92,8 @@ export interface ValidationsClassMethods {
   validatesSizeOf(...attrNames: AttrNameArg[]): void;
   validatesNumericalityOf(...attrNames: AttrNameArg[]): void;
   validatesPresenceOf(...attrNames: AttrNameArg[]): void;
-  // validatesAssociated / validatesUniquenessOf are out of this story's scope:
-  // their implementations don't yet delegate through `_merge_attributes`
-  // (no array flattening / multi-attr support), so keep the narrow typing
-  // until they're converged. See associated.ts / uniqueness.ts.
-  validatesAssociated(...args: (string | Record<string, unknown>)[]): void;
-  validatesUniquenessOf(...attrNames: (string | Record<string, unknown>)[]): void;
+  validatesAssociated(...attrNames: AttrNameArg[]): void;
+  validatesUniquenessOf(...attrNames: AttrNameArg[]): void;
 }
 
 /** Minimal instance-side surface used by Validations instance helpers. */
@@ -422,6 +423,7 @@ export const ClassMethods = {
   validates,
   validatesAssociated,
   validatesUniqueness,
+  validatesUniquenessOf,
   validatesPresenceOf,
   validatesAbsenceOf,
   validatesLengthOf,
