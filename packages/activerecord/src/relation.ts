@@ -1868,7 +1868,37 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#left_joins
    */
   leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("left_joins", args, undefined, { normalize: false });
+    return this._leftOuterJoins("left_joins", args);
+  }
+
+  /**
+   * Alias for leftJoins.
+   *
+   * Mirrors: ActiveRecord::Relation#left_outer_joins (`left_joins` is Rails'
+   * alias of the same method).
+   */
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
+    return this._leftOuterJoins("left_outer_joins", args);
+  }
+
+  /**
+   * Shared body for `leftJoins` / `leftOuterJoins`, mirroring Rails'
+   * `left_outer_joins(*args)` → `spawn.left_outer_joins!(*args)`
+   * (query_methods.rb:883-890). The `callee` name threads through to the
+   * ArgumentError so the message matches whichever alias was called
+   * (Rails' `__callee__`). Validation runs exactly once: re-delegating between
+   * the two public methods would re-run the no-argument guard after
+   * `checkIfMethodHasArgumentsBang` compacts a blank-only `args` (e.g.
+   * `leftOuterJoins({})`) down to `[]`, which Rails treats as a no-op, not a
+   * raise.
+   *
+   * @internal
+   */
+  private _leftOuterJoins(
+    callee: string,
+    args: Array<AssociationSpec | AssociationSpec[]>,
+  ): Relation<T> {
+    this.checkIfMethodHasArgumentsBang(callee, args, undefined, { normalize: false });
     const rel = this._clone();
     // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
     // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
@@ -1887,18 +1917,6 @@ export class Relation<T extends Base> {
       }
     }
     return rel;
-  }
-
-  /**
-   * Alias for leftJoins.
-   *
-   * Mirrors: ActiveRecord::Relation#left_outer_joins
-   */
-  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("left_outer_joins", args, undefined, {
-      normalize: false,
-    });
-    return this.leftJoins(...args);
   }
 
   /**
