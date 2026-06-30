@@ -41,7 +41,8 @@ export function _destroy(this: Base): boolean {
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
   rejectIf?: (attrs: Record<string, unknown>) => boolean;
-  limit?: number | ((...args: unknown[]) => number);
+  // A string limit names a method/attribute on the owner (Rails `limit: :symbol`).
+  limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
 
@@ -192,8 +193,7 @@ export function assignNestedAttributes(
   const ctor = record.constructor as typeof Base;
   const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
   const config = configs.find((c) => c.associationName === associationName);
-  const rawLimit = config?.options.limit;
-  const resolvedLimit = typeof rawLimit === "function" ? rawLimit() : rawLimit;
+  const resolvedLimit = resolveNestedLimit(config?.options.limit, record);
   if (resolvedLimit !== undefined && attrs.length > resolvedLimit) {
     throw new TooManyRecords(
       `Maximum ${resolvedLimit} records are allowed. ` + `Got ${attrs.length} records instead.`,
@@ -509,6 +509,22 @@ export function raiseNestedAttributesRecordNotFoundBang(
 }
 
 /** @internal */
+// Resolve a `limit:` option to a number. A string names a method/attribute on
+// the owner (Rails `limit: :parrots_limit`); a function is invoked.
+function resolveNestedLimit(
+  limit: number | string | ((...args: unknown[]) => number) | undefined,
+  record: Base,
+): number | undefined {
+  if (limit === undefined) return undefined;
+  if (typeof limit === "function") return limit();
+  if (typeof limit === "string") {
+    const value = (record as unknown as Record<string, unknown>)[limit];
+    return typeof value === "function" ? (value as () => number).call(record) : Number(value);
+  }
+  return limit;
+}
+
+/** @internal */
 export function checkRecordLimitBang(
   limit: number | ((...args: unknown[]) => number) | undefined,
   attributesCollection: unknown[],
@@ -605,6 +621,14 @@ function storePendingNestedAttributes(
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
 
+// Rails reports the offending value's class name (e.g. `got String`); mirror
+// that with the JS constructor name rather than the lowercase `typeof`.
+function nestedTypeName(value: unknown): string {
+  if (value === null) return "NilClass";
+  if (value === undefined) return "undefined";
+  return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
+}
+
 /** @internal */
 export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
@@ -613,7 +637,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 ): void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
     throw new Error(
-      `Hash expected for \`${associationName}\` attributes, got ${typeof attributes}`,
+      `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
     );
   }
 
@@ -685,7 +709,7 @@ export function assignNestedAttributesForCollectionAssociation(
 ): void {
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
     throw new Error(
-      `Hash or Array expected for \`${associationName}\` attributes, got ${typeof attributesCollection}`,
+      `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
     );
   }
   const ctor = record.constructor as typeof Base;
@@ -707,7 +731,7 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  checkRecordLimitBang(config?.options.limit, attrs);
+  checkRecordLimitBang(resolveNestedLimit(config?.options.limit, record), attrs);
 
   // Rails `assign_nested_attributes_for_collection_association` marks matching
   // records for destruction *in memory* at assign time, so validations run
