@@ -583,8 +583,12 @@ describe("QueryCacheMutableParamTest", () => {
   registerModel(JsonObj);
 
   beforeEach(async () => {
+    // Rails: `t.jsonb` on PostgreSQL (the `json` type has no `=` operator), else
+    // `t.json`. Mirror that so the `WHERE payload = $1` equality the test issues
+    // is valid on every adapter.
+    const columnType = Base.connection.adapterName === "postgres" ? "jsonb" : "json";
     await Base.connection.createTable("json_objs", { force: true }, (t) => {
-      (t as unknown as { json(name: string): void }).json("payload");
+      (t as unknown as { column(name: string, type: string): void }).column("payload", columnType);
     });
     Base.leaseConnection().enableQueryCacheBang();
   });
