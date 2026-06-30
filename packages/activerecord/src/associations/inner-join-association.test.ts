@@ -55,15 +55,15 @@ describe("InnerJoinAssociationTest", () => {
 
   it("construct finder sql applies aliases tables on association conditions", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors");
   });
 
   it("construct finder sql does not table name collide on duplicate associations", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id")
-      .joins("comments", "comments.post_id = posts.id")
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
+      .joins("INNER JOIN comments ON comments.post_id = posts.id")
       .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors");
@@ -72,7 +72,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("construct finder sql does not table name collide on duplicate associations with left outer joins", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id")
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
       .leftOuterJoins("comments", "comments.post_id = posts.id")
       .toSql();
     expect(sql).toContain("INNER JOIN");
@@ -106,8 +106,8 @@ describe("InnerJoinAssociationTest", () => {
 
   it("user supplied joins order should be preserved", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id")
-      .joins("comments", "comments.post_id = posts.id")
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
+      .joins("INNER JOIN comments ON comments.post_id = posts.id")
       .toSql();
     const authorsIdx = sql.indexOf("authors");
     const commentsIdx = sql.indexOf("comments");
@@ -166,8 +166,7 @@ describe("InnerJoinAssociationTest", () => {
   it("join conditions added to join clause", () => {
     const { Post } = makeModels();
     const sql = Post.joins(
-      "authors",
-      "posts.author_id = authors.id AND authors.name = 'test'",
+      "INNER JOIN authors ON posts.author_id = authors.id AND authors.name = 'test'",
     ).toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors.name");
@@ -175,33 +174,33 @@ describe("InnerJoinAssociationTest", () => {
 
   it("join association conditions support string and arel expressions", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
 
   it("join conditions allow nil associations", async () => {
     const { Post } = makeModels();
     await Post.create({ title: "orphan", body: "b" });
-    const sql = Post.joins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
 
   it("join with reserved word", () => {
     const { Post } = makeModels();
-    const sql = Post.joins('"order"', 'posts.id = "order".post_id').toSql();
+    const sql = Post.joins('INNER JOIN "order" ON posts.id = "order".post_id').toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("order");
   });
 
   it("find with implicit inner joins without select does not imply readonly", () => {
     const { Post } = makeModels();
-    const rel = Post.joins("authors", "posts.author_id = authors.id");
+    const rel = Post.joins("INNER JOIN authors ON posts.author_id = authors.id");
     expect(rel.isReadonly).toBeFalsy();
   });
 
   it("find with implicit inner joins honors readonly with select", () => {
     const { Post } = makeModels();
-    const rel = Post.joins("authors", "posts.author_id = authors.id")
+    const rel = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
       .select("posts.title")
       .readonly();
     expect(rel.isReadonly).toBe(true);
@@ -209,7 +208,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("find with implicit inner joins honors readonly false", () => {
     const { Post } = makeModels();
-    const rel = Post.joins("authors", "posts.author_id = authors.id").readonly(false);
+    const rel = Post.joins("INNER JOIN authors ON posts.author_id = authors.id").readonly(false);
     expect(rel.isReadonly).toBe(false);
   });
 
@@ -405,7 +404,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("the default scope of the target is applied when joining associations", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id")
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id")
       .where({ title: "test" })
       .toSql();
     expect(sql).toContain("INNER JOIN");
@@ -414,7 +413,7 @@ describe("InnerJoinAssociationTest", () => {
 
   it("the default scope of the target is correctly aliased when joining associations", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors AS a", "posts.author_id = a.id").toSql();
+    const sql = Post.joins("INNER JOIN authors AS a ON posts.author_id = a.id").toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("authors AS a");
   });
@@ -430,21 +429,21 @@ describe("InnerJoinAssociationTest", () => {
 
   it("joins a belongs_to association with a composite foreign key", () => {
     const { Post } = makeModels();
-    const sql = Post.joins("authors", "posts.author_id = authors.id").toSql();
+    const sql = Post.joins("INNER JOIN authors ON posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
 
   it("joins a has_many association with a composite foreign key", () => {
     const { Author } = makeModels();
-    const sql = Author.joins("posts", "posts.author_id = authors.id").toSql();
+    const sql = Author.joins("INNER JOIN posts ON posts.author_id = authors.id").toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("posts");
   });
 
   it("inner joins includes all nested associations", () => {
     const { Author } = makeModels();
-    const sql = Author.joins("posts", "posts.author_id = authors.id")
-      .joins("comments", "comments.post_id = posts.id")
+    const sql = Author.joins("INNER JOIN posts ON posts.author_id = authors.id")
+      .joins("INNER JOIN comments ON comments.post_id = posts.id")
       .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("posts");

@@ -264,8 +264,7 @@ export function joins<T extends typeof Base>(
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
     // Forward all string args so the variadic association-list form
     // (`joins("a", "b")`, mirroring Rails `joins(:a, :b)`) is preserved.
-    // Relation#joins disambiguates the two-arg `(table, onClause)` shape.
-    return relation.joins(...(args as Array<string | undefined>));
+    return relation.joins(...(args as Array<string>));
   }
   return relation.joins(...(args as import("@blazetrails/arel").Nodes.Join[]));
 }
