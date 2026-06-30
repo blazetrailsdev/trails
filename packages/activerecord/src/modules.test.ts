@@ -146,10 +146,7 @@ describe("ModulesTest", () => {
     }
   });
 
-  it.skip("compute type can infer class name of sibling inside module", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint
-    // that Rails does not — sibling lookup (Firm from Client.computeType("Firm"))
-    // throws SubclassNotFound in trails. Convergence needed in inheritance.ts.
+  it("compute type can infer class name of sibling inside module", () => {
     // Rails modules_test.rb:146-147 sets store_full_sti_class = true for this test;
     // the outer beforeEach leaves it false, so restore it here for future un-skippers.
     const prev = Base.storeFullStiClass;
