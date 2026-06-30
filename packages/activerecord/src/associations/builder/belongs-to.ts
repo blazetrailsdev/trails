@@ -367,23 +367,25 @@ export class BelongsTo extends SingularAssociation {
         return foreignTypes.every((type) => !isBlank(record._readAttribute(type)));
       };
 
-      let condition: (record: any) => boolean = (record) => !foreignKeyPresent(record);
+      // Rails' false-config branch only runs the presence check (which reads —
+      // and thus existence-checks — the association) when the FK or polymorphic
+      // type is nil or changed; the true-config branch runs it unconditionally
+      // (builder/belongs_to.rb:127-139). `railsRuns` captures that gate so both
+      // the sync presence check and the async existence check honor it.
+      const needsValidation = (record: any, attrs: string[]) =>
+        attrs.some(
+          (attr) =>
+            record._readAttribute(attr) == null ||
+            (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
+        );
+      const railsRuns = belongsToRequiredValidatesForeignKey
+        ? () => true
+        : (record: any) =>
+            needsValidation(record, foreignKeys) ||
+            (polymorphic && needsValidation(record, foreignTypes));
 
-      if (!belongsToRequiredValidatesForeignKey) {
-        // Rails' conditional branch only runs the presence check when the FK
-        // (or polymorphic type) is nil or changed, so an already-persisted,
-        // untouched FK doesn't re-validate the (possibly unloaded) target.
-        const needsValidation = (record: any, attrs: string[]) =>
-          attrs.some(
-            (attr) =>
-              record._readAttribute(attr) == null ||
-              (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
-          );
-        const railsCondition = (record: any) =>
-          needsValidation(record, foreignKeys) ||
-          (polymorphic && needsValidation(record, foreignTypes));
-        condition = (record) => railsCondition(record) && !foreignKeyPresent(record);
-      }
+      const condition: (record: any) => boolean = (record) =>
+        railsRuns(record) && !foreignKeyPresent(record);
 
       model.validatesPresenceOf(name, { message: "required", if: condition });
 
@@ -394,6 +396,9 @@ export class BelongsTo extends SingularAssociation {
       // synchronous and cannot load, so that case is deferred to the async
       // validation pass (Base#_runAsyncValidations), which runs after the sync
       // chain and is skipped on `save(validate: false)` just like Rails' valid?.
+      // It is gated by the same `railsRuns` condition so the false-config branch
+      // doesn't reload an already-persisted, unchanged FK (belongs_to_associations_test.rb
+      // "skips parent presence check if parent has not changed").
       const klass = model as { _asyncValidations?: Array<unknown> };
       if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
         klass._asyncValidations = [...(klass._asyncValidations ?? [])];
@@ -403,7 +408,7 @@ export class BelongsTo extends SingularAssociation {
         options: {
           belongsToExistence: true,
           message: "required",
-          if: (record: any) => foreignKeyPresent(record),
+          if: (record: any) => railsRuns(record) && foreignKeyPresent(record),
         },
         declaringClass: model,
       });
