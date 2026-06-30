@@ -1852,37 +1852,36 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add a LEFT OUTER JOIN. Accepts:
-   * - A string association name: `leftJoins("posts")`
+   * Add a LEFT OUTER JOIN. Variadic, mirroring Rails'
+   * `left_outer_joins(*args)` (query_methods.rb:883-895), which does
+   * `left_outer_joins_values |= args`. Accepts:
+   * - String association names: `leftJoins("posts")`,
+   *   `leftJoins("thinkingPosts", "welcomePosts")`
    * - A hash spec for nested associations: `leftJoins({ posts: "comments" })`
-   * - An array of the above: `leftJoins(["posts", "comments"])`
+   * - Arrays of the above: `leftJoins(["posts", "comments"])`
    *
-   * Mirrors Rails' variadic `left_outer_joins(*args)`
-   * (query_methods.rb:883-895): args are stored in left_outer_joins_values and
-   * resolved via JoinDependency. Rails raises ArgumentError on a raw SQL string
-   * fragment ("only Hash, Symbol and Array are allowed"); a raw LEFT OUTER JOIN
-   * fragment goes through `joins("LEFT OUTER JOIN …")` instead.
+   * Args are stored in left_outer_joins_values and resolved via JoinDependency.
+   * Rails raises ArgumentError on a raw SQL string fragment ("only Hash, Symbol
+   * and Array are allowed"); a raw LEFT OUTER JOIN fragment goes through
+   * `joins("LEFT OUTER JOIN …")` instead.
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
-  leftJoins(table: AssociationSpec | AssociationSpec[]): Relation<T> {
-    const callArgs = table === undefined ? [] : [table];
-    this.checkIfMethodHasArgumentsBang("left_joins", callArgs, undefined, { normalize: false });
+  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("left_joins", args, undefined, { normalize: false });
     const rel = this._clone();
-    // Rails raises ArgumentError when a raw SQL string (containing spaces) is
-    // passed; association names are always single-word identifiers.
-    if (typeof table === "string" && /\s/.test(table)) {
-      throw argumentError(
-        "only associations and hashes are supported as arguments to leftOuterJoins",
-      );
-    }
     // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
     // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
     // `leftJoins([])` drop their blank specs instead of polluting join state.
-    const specs = _qm
-      .flattenedArgs(Array.isArray(table) ? table : [table])
-      .filter((s) => !_qm.isBlankArgument(s));
+    const specs = _qm.flattenedArgs(args).filter((s) => !_qm.isBlankArgument(s));
     for (const spec of specs) {
+      // Rails raises ArgumentError when a raw SQL string (containing spaces) is
+      // passed; association names are always single-word identifiers.
+      if (typeof spec === "string" && /\s/.test(spec)) {
+        throw argumentError(
+          "only associations and hashes are supported as arguments to leftOuterJoins",
+        );
+      }
       if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
         rel._leftOuterJoinsValues.push(spec as AssociationSpec);
       }
@@ -1895,12 +1894,11 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
-  leftOuterJoins(table?: AssociationSpec | AssociationSpec[]): Relation<T> {
-    const callArgs = table === undefined ? [] : [table];
-    this.checkIfMethodHasArgumentsBang("left_outer_joins", callArgs, undefined, {
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("left_outer_joins", args, undefined, {
       normalize: false,
     });
-    return this.leftJoins(table);
+    return this.leftJoins(...args);
   }
 
   /**
