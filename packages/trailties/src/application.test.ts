@@ -224,6 +224,23 @@ describe("Application", () => {
       }
     });
 
+    it("expands a relative config.root override before publishing to trailsRoot", async () => {
+      installFs(new Set(["/", "/cwd", "/cwd/rel", "/app", "/app/src"]), new Set([]), "/cwd");
+      setTrailsRoot(null);
+      class RelRootApp extends Application {}
+      RelRootApp.calledFrom("/app/src");
+      Application.register(RelRootApp);
+      const app = RelRootApp.instance();
+      app.config.setRoot("rel");
+      try {
+        await app.initialize();
+        // Rails: `root= -> Pathname.new(value).expand_path` against cwd (/cwd).
+        expect(trailsRoot()).toBe("/cwd/rel");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
     it("raises when called twice", async () => {
       class IApp4 extends Application {}
       Application.register(IApp4);
