@@ -62,6 +62,10 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
     null,
     binds,
   );
+  // Rails asserts `assert_equal 1, id` unconditionally; the mysql2 driver reports
+  // insertId 0 for an explicit-id INSERT (the value isn't auto-generated), so skip
+  // only the insert-return check there. The bound SELECT below still asserts the
+  // row round-trips as `{ id: 1, ... }` on every adapter.
   if (adapterType !== "mysql") expect(Number(id)).toBe(1);
 
   const updated = await conn.update(
