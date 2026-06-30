@@ -7807,7 +7807,7 @@ export interface Relation<T extends Base>
   find(...ids: unknown[]): Promise<T | T[]>;
   findBy(conditions: Record<string, unknown>): Promise<T | null>;
   findByBang(conditions: Record<string, unknown>): Promise<T>;
-  findSoleBy(conditions: Record<string, unknown>): Promise<T>;
+  findSoleBy(...conditions: unknown[]): Promise<T>;
   first(): Promise<T | null>;
   first(n: number): Promise<T[]>;
   firstBang(): Promise<T>;

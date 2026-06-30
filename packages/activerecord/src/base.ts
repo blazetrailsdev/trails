@@ -2141,9 +2141,9 @@ export class Base extends Model {
    */
   static async findSoleBy<T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown>,
+    ...conditions: unknown[]
   ): Promise<InstanceType<T>> {
-    return this.all().where(conditions).sole();
+    return (this.all().where as any)(...conditions).sole();
   }
 
   /**
