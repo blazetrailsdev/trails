@@ -10,7 +10,7 @@ import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import { argumentError } from "./relation/query-methods.js";
-import type { AssociationSpec } from "./relation/query-methods.js";
+import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 
 /**
  * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
@@ -219,7 +219,7 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  specArray: Array<AssociationSpec | import("@blazetrails/arel").Nodes.Join>,
+  specArray: JoinSpec[],
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
@@ -227,21 +227,11 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<
-    | string
-    | import("@blazetrails/arel").Nodes.Join
-    | Record<string, AssociationSpec | AssociationSpec[]>
-  >
+  ...args: Array<JoinSpec>
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<
-    | string
-    | Array<AssociationSpec | import("@blazetrails/arel").Nodes.Join>
-    | import("@blazetrails/arel").Nodes.Join
-    | Record<string, AssociationSpec | AssociationSpec[]>
-    | undefined
-  >
+  ...args: Array<JoinSpec>
 ): Relation<InstanceType<T>> {
   const relation = this.all();
   // A single array arg (joins(["a", "b"]) or joins([{ post: "author" }]))

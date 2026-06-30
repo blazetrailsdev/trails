@@ -63,6 +63,7 @@ import {
   type UnscopeType,
   type ExceptKey,
   type AssociationSpec,
+  type JoinSpec,
   type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
@@ -1812,25 +1813,10 @@ export class Relation<T extends Base> {
    * no type-based way to tell a `(table, on)` pair from `joins(:a, :b)`.
    */
   joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(specArray: Array<AssociationSpec | Nodes.Join>): Relation<T>;
+  joins(specArray: JoinSpec[]): Relation<T>;
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
-  joins(
-    ...args: Array<
-      | string
-      | Array<AssociationSpec | Nodes.Join>
-      | Nodes.Join
-      | Record<string, AssociationSpec | AssociationSpec[]>
-    >
-  ): Relation<T>;
-  joins(
-    ...args: Array<
-      | string
-      | Array<AssociationSpec | Nodes.Join>
-      | Nodes.Join
-      | Record<string, AssociationSpec | AssociationSpec[]>
-      | undefined
-    >
-  ): Relation<T> {
+  joins(...args: Array<JoinSpec>): Relation<T>;
+  joins(...args: Array<JoinSpec>): Relation<T> {
     this.checkIfMethodHasArgumentsBang("joins", args as unknown[], undefined, { normalize: false });
     const rel = this._clone();
     // Rails' `check_if_method_has_arguments!` runs `args.flatten!` +

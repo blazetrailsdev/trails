@@ -119,6 +119,13 @@ export type AssociationSpec =
   | AssociationSpec[]
   | { [assoc: string]: AssociationSpec | AssociationSpec[] };
 
+/**
+ * A single `joins` argument. Like {@link AssociationSpec} but also admits Arel
+ * `Nodes.Join` at any array depth, mirroring Rails' `args.flatten!` over
+ * arbitrary join args before `joins_values |= args` (query_methods.rb:868-875).
+ */
+export type JoinSpec = AssociationSpec | Nodes.Join | JoinSpec[];
+
 type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
 
 /**
