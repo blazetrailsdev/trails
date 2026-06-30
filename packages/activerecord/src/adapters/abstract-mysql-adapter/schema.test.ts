@@ -214,11 +214,12 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("foreign keys method with ansi quotes", async () => {
     const a = ansi!;
-    // Scratch tables `ca_lessons_students` (id:false, student_id) referencing
-    // `ca_students`(id), mirroring Rails' lessons_students/students shape but on
+    // Scratch tables mirroring Rails' lessons_students join table (id:false with
+    // lesson_id + student_id references, schema.rb:715) and students(id), but on
     // non-canonical names so the one-schema harness never sees a canonical drop.
     await a.createTable("ca_students", { force: true });
     await a.createTable("ca_lessons_students", { id: false, force: true }, (t: any) => {
+      t.integer("lesson_id");
       t.integer("student_id");
     });
     try {
