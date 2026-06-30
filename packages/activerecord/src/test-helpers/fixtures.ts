@@ -1,4 +1,5 @@
 import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { TEST_SCHEMA } from "./test-schema.js";
 import { useHandlerFixtures } from "./use-handler-fixtures.js";
 import { type WithTransactionalFixturesOptions } from "./with-transactional-fixtures.js";
 import {
@@ -14,11 +15,16 @@ import {
 /**
  * Rails-faithful public surface for declaring fixtures in a test file.
  *
- * Thin, non-breaking alias for {@link useHandlerFixtures} — same overloads
- * (map / names / tableless), same runtime path. Mirrors Rails'
- * `fixtures :authors, :posts` declaration, which carries no "handler"
- * qualifier. New and newly-ported tests should prefer this name; existing
- * `useHandlerFixtures` call sites stay as-is and migrate mechanically later.
+ * Thin alias for {@link useHandlerFixtures} — same overloads (map / names /
+ * tableless), same runtime path. Mirrors Rails' `fixtures :authors, :posts`
+ * declaration, which carries no "handler" qualifier. New and newly-ported
+ * tests should prefer this name; existing `useHandlerFixtures` call sites stay
+ * as-is and migrate mechanically later.
+ *
+ * Calling `fixtures()` IS the opt-in to the canonical schema: it defaults
+ * `schema` to `TEST_SCHEMA`, so converted tests never pass `schema` and the
+ * minimal sub-schema for the requested sets is derived automatically. An
+ * explicit `schema` still overrides for sets the canonical schema lacks.
  *
  * @example  // primary documented form
  *   const { authors, posts } = fixtures({
@@ -47,9 +53,17 @@ export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: (WithTransactionalFixturesOptions & UseFixturesOpts) | undefined = undefined,
 ): Record<string, unknown> {
+  // Opting into `fixtures()` IS the opt-in to the canonical schema: converted
+  // tests get `TEST_SCHEMA` slice-derivation by default and never pass `schema`
+  // themselves. An explicit `schema` still wins for the few sets the canonical
+  // schema doesn't yet cover.
+  const withSchema: WithTransactionalFixturesOptions & UseFixturesOpts = {
+    schema: TEST_SCHEMA,
+    ...options,
+  };
   return (useHandlerFixtures as (...args: unknown[]) => Record<string, unknown>)(
     fixturesOrNames,
-    options,
+    withSchema,
   );
 }
 
