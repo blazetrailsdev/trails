@@ -7,8 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Base, association, registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -31,7 +30,7 @@ registerModel(Toy);
 registerModel(Owner);
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
-  useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
+  fixtures(["authors", "posts"]);
 
   // A fresh author owns only the posts we create here, so the loaded `posts`
   // collection is the deterministic ["a", "b", "c"] set the assertions expect.
@@ -423,7 +422,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 // transaction case (test_transaction_when_deleting_persisted/_new_record cover
 // `destroy`), so these use descriptive trails-only names.
 describe("CollectionProxy#delete — nullify transaction rollback", () => {
-  useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
+  fixtures(["authors", "posts"]);
 
   // Author subclass on the canonical `authors` table whose has_many :posts
   // carries an after_remove that raises — the only deviation from the default
@@ -495,7 +494,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
 // for the composite case, and `Pet has_many :toys` (Toy PK `toy_id`) for the
 // custom single-column case. No bespoke tables.
 describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () => {
-  useHandlerFixtures(["cpkAuthors", "cpkBooks", "pets", "toys"], { schema: canonicalSchema });
+  fixtures(["cpkAuthors", "cpkBooks", "pets", "toys"]);
 
   it("keys loaded targets by their composite primary key", async () => {
     const owner = await CpkAuthor.create({ name: "o" });
