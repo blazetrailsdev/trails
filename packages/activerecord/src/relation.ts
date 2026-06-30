@@ -3063,12 +3063,24 @@ export class Relation<T extends Base> {
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
+    const joinedTables = this._joinedTableNames();
+    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+  }
+
+  /**
+   * Table names reachable from the relation's manual joins plus the base table:
+   * Rails `build_joins([])`'s joined-table extraction (relation.rb:1474-1488).
+   * `_leftOuterJoinsValues` / `_namedInnerJoins` hold association names resolved
+   * to tables; `_joinClauses` / `_joinValues` carry already-built or raw joins.
+   * @internal
+   */
+  private _joinedTableNames(): Set<string> {
     const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
     // JoinDependency with InnerJoin). Resolve to table names so references to
     // those tables don't spuriously promote includes to eager_load.
     const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
-    const joinedTables = new Set<string>([
+    return new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
       ...namedInnerTables,
@@ -3088,8 +3100,6 @@ export class Relation<T extends Base> {
       }),
       String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
-
-    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
   }
 
   /**
@@ -3969,17 +3979,16 @@ export class Relation<T extends Base> {
       // table (e.g. `pluck("cpk_chapters.title")`). Rails JOINs that table;
       // trails cannot (composite-key capability gap), and silently preloading it
       // would emit SQL against an unjoined table. The degraded query can only
-      // project the base table plus the joinable specs' tables, so treat a
-      // column referencing any OTHER table as reaching for an unjoinable
-      // fallback — covering nested hash/array fallback shapes that
-      // `_resolveAssocTables` (string-spec only) can't resolve directly. Route
-      // those back through the full-spec join, which raises the explicit
-      // capability-gap error rather than degrade into broken SQL.
+      // project the base table, the relation's manual joins, and the joinable
+      // eager specs' tables, so treat a column referencing any OTHER table as
+      // reaching for an unjoinable fallback — covering nested hash/array
+      // fallback shapes that `_resolveAssocTables` (string-spec only) can't
+      // resolve directly. Route those back through the full-spec join, which
+      // raises the explicit capability-gap error rather than degrade into
+      // broken SQL.
       if (fallbackAssocs.length > 0) {
-        const baseTable = String(
-          (this._modelClass as unknown as { tableName?: string }).tableName ?? "",
-        ).toLowerCase();
-        const safeTables = new Set<string>([baseTable, ...this._resolveAssocTables(joinableSpecs)]);
+        const safeTables = this._joinedTableNames();
+        for (const t of this._resolveAssocTables(joinableSpecs)) safeTables.add(t);
         const referencesUnservableTable = columns.some((c) => {
           const text = typeof c === "string" ? c : c instanceof Nodes.SqlLiteral ? c.value : "";
           return this.tablesInString(text).some((t) => !safeTables.has(t));

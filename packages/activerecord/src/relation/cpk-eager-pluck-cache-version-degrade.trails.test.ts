@@ -66,11 +66,11 @@ describe("CpkBook eager pluck / cache_version preload-degrade", () => {
     expect(titles).toEqual(["Alpha", "Beta"]);
   });
 
-  it("pluck over a mixed joinable + unjoinable eager spec joins the joinable and degrades the rest", async () => {
+  it("pluck over multiple unjoinable eager specs degrades to preload", async () => {
     await seedBooks();
-    // `author` (single-PK belongs_to) is joinable; `chapters` (composite-PK
-    // collection) is not. The joinable spec must still be JOINed and the
-    // unjoinable one degraded to preload, rather than the whole list throwing.
+    // A composite source PK makes JoinDependency bail for EVERY association on
+    // CpkBook (belongs_to author included), so both specs are fallbacks and the
+    // relation degrades entirely to the base query rather than throwing.
     const titles = await CpkBook.eagerLoad("author", "chapters")
       .order("author_id", "id")
       .pluck("title");
