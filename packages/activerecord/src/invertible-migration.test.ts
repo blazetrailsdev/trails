@@ -11,10 +11,12 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { Migration, IrreversibleMigration } from "./migration.js";
+import { CommandRecorder } from "./migration/command-recorder.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
+import { loadSchemaFromAdapter } from "./model-schema.js";
 
 class Horse extends Base {
   static {
@@ -179,6 +181,17 @@ class DisableExtension2 extends SilentMigration {
   }
 }
 
+class DropTableMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await (this.dropTable as (name: string, fn: (t: any) => void) => Promise<void>)(
+      "horses",
+      (t) => {
+        t.string("name");
+      },
+    );
+  }
+}
+
 class LegacyMigration extends Migration {
   async up(): Promise<void> {
     await this.createTable("horses", (t) => {
@@ -232,6 +245,14 @@ class RevertNonNamedExpressionIndexMigration extends SilentMigration {
   }
 }
 
+class RevertCustomForeignKeyTable extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeTable("horses", async (t) => {
+      await t.references("owner", { foreignKey: { toTable: "developers" } } as any);
+    });
+  }
+}
+
 class UpOnlyMigration extends SilentMigration {
   async change(): Promise<void> {
     await this.addColumn("horses", "oldie", "integer", { default: 0 });
@@ -247,10 +268,23 @@ class RevertForeignKeyWithInvalidOption extends SilentMigration {
   }
 }
 
+class RevertUniqueConstraintWithInvalidOption extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addUniqueConstraint("horses", "place_id", { invalid: "option" });
+  }
+}
+
 class RevertCheckConstraintWithInvalidOption extends SilentMigration {
   async change(): Promise<void> {
     await this.addCheckConstraint("horses", "place_id > 0", { invalid: "option" });
   }
+}
+
+// Mirrors Rails' `Horse.reset_column_information` followed by the lazy schema
+// reload its next attribute access triggers.
+async function resetHorse(): Promise<void> {
+  Horse.resetColumnInformation();
+  await loadSchemaFromAdapter.call(Horse);
 }
 
 describe("InvertibleMigrationTest", () => {
@@ -379,19 +413,19 @@ describe("InvertibleMigrationTest", () => {
     expect(await migration.connection.tableExists("horses")).toBe(false);
   });
 
-  it.skip("migrate revert change column default", async () => {
+  it("migrate revert change column default", async () => {
     const migration1 = new ChangeColumnDefault1();
     await migration1.migrate("up");
-    Horse.resetColumnInformation();
+    await resetHorse();
     expect(new Horse().readAttribute("name")).toBe("Sekitoba");
 
     const migration2 = new ChangeColumnDefault2();
     await migration2.migrate("up");
-    Horse.resetColumnInformation();
+    await resetHorse();
     expect(new Horse().readAttribute("name")).toBe("Diomed");
 
     await migration2.migrate("down");
-    Horse.resetColumnInformation();
+    await resetHorse();
     expect(new Horse().readAttribute("name")).toBe("Sekitoba");
   });
 
@@ -453,13 +487,50 @@ describe("InvertibleMigrationTest", () => {
   // path can recreate the table on reversal; trails' Migration#dropTable takes
   // no block and _reverseOperation throws IrreversibleMigration for dropTable.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("migrate revert drop table", () => {});
+  it.skip("migrate revert drop table", async () => {
+    const connection = Base.leaseConnection();
+    const migration1 = new InvertibleMigration();
+    await migration1.migrate("up");
+    expect(await connection.tableExists("horses")).toBe(true);
+
+    const migration2 = new DropTableMigration();
+    await migration2.migrate("up");
+    expect(await connection.tableExists("horses")).toBe(false);
+
+    await migration2.migrate("down");
+    expect(await connection.tableExists("horses")).toBe(true);
+  });
 
   // Rails asserts the exact CommandRecorder#commands triples
   // ([sym, args, block]); the trails recorder records {cmd, args} without the
   // block, so a verbatim port needs block-tracking in CommandRecorder.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("revert order", () => {});
+  it.skip("revert order", async () => {
+    const block = (t: any) => t.string("name");
+    const recorder = new CommandRecorder(Base.leaseConnection());
+    recorder.record("createTable", ["apples", block]);
+    await recorder.revert(async () => {
+      recorder.record("createTable", ["bananas", block]);
+      await recorder.revert(async () => {
+        recorder.record("createTable", ["clementines"]);
+        recorder.record("createTable", ["dates"]);
+      });
+      recorder.record("createTable", ["elderberries"]);
+    });
+    await recorder.revert(async () => {
+      recorder.record("createTable", ["figs"]);
+      recorder.record("createTable", ["grapes"]);
+    });
+    expect(recorder.commands).toEqual([
+      { cmd: "createTable", args: ["apples", block] },
+      { cmd: "dropTable", args: ["elderberries"] },
+      { cmd: "createTable", args: ["clementines"] },
+      { cmd: "createTable", args: ["dates"] },
+      { cmd: "dropTable", args: ["bananas", block] },
+      { cmd: "dropTable", args: ["grapes"] },
+      { cmd: "dropTable", args: ["figs"] },
+    ]);
+  });
 
   it("legacy up", async () => {
     const migration = new LegacyMigration();
@@ -499,6 +570,19 @@ describe("InvertibleMigrationTest", () => {
       Base.tableNamePrefix = "";
       Base.tableNameSuffix = "";
     }
+  });
+
+  // Reverting `change_table { t.references }` records addReference, but trails'
+  // CommandRecorder change_table proxy has no `references`, and SQLite's
+  // removeColumn rebuild can't drop a column an index still references.
+  // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
+  it.skip("migrations can handle foreign keys to specific tables", async () => {
+    const migration = new RevertCustomForeignKeyTable();
+    await new InvertibleMigration().migrate("up");
+    await migration.migrate("up");
+    expect(await Base.leaseConnection().columnExists("horses", "owner_id")).toBe(true);
+    await migration.migrate("down");
+    expect(await Base.leaseConnection().columnExists("horses", "owner_id")).toBe(false);
   });
 
   it("migrate revert add index without name on expression", async () => {
@@ -544,14 +628,10 @@ describe("InvertibleMigrationTest", () => {
     Horse.resetColumnInformation();
   });
 
-  describeIfSupports("unique_constraints", "unique constraints", () => {
-    class RevertUniqueConstraintWithInvalidOption extends SilentMigration {
-      async change(): Promise<void> {
-        await this.addUniqueConstraint("horses", "place_id", { invalid: "option" });
-      }
-    }
-
-    it("migrate revert add unique constraint with invalid option", async () => {
+  itIfSupports(
+    "unique_constraints",
+    "migrate revert add unique constraint with invalid option",
+    async () => {
       await new InvertibleMigration().migrate("up");
       await new RevertUniqueConstraintWithInvalidOption().migrate("up");
 
@@ -560,26 +640,24 @@ describe("InvertibleMigrationTest", () => {
 
       await new RevertUniqueConstraintWithInvalidOption().migrate("down");
       expect((await (connection as any).uniqueConstraints("horses")).length).toBe(0);
-    });
-  });
-
-  // trails' SQLite adapter emits `ALTER TABLE ... ADD CONSTRAINT` for
-  // addForeignKey, which SQLite rejects (it needs table recreation); PG/MySQL
-  // run it. SQLite case tracked-pending-convergence under
-  // RFC 0023-surfaced-deviations.
-  it.skipIf(adapterType === "sqlite")(
-    "migrate revert add foreign key with invalid option",
-    async () => {
-      await new InvertibleMigration().migrate("up");
-      await new RevertForeignKeyWithInvalidOption().migrate("up");
-
-      const connection = Base.leaseConnection();
-      expect((await connection.foreignKeys("horses")).length).toBe(1);
-
-      await new RevertForeignKeyWithInvalidOption().migrate("down");
-      expect((await connection.foreignKeys("horses")).length).toBe(0);
     },
   );
+
+  // trails diverges on every adapter: SQLite emits `ALTER TABLE ... ADD
+  // CONSTRAINT` (rejected; needs table recreation), and on PG/MariaDB the
+  // reverse names the constraint `fk_horses_parent_id`, which doesn't match the
+  // hashed name addForeignKey created. Tracked-pending-convergence under
+  // RFC 0023-surfaced-deviations.
+  it.skip("migrate revert add foreign key with invalid option", async () => {
+    await new InvertibleMigration().migrate("up");
+    await new RevertForeignKeyWithInvalidOption().migrate("up");
+
+    const connection = Base.leaseConnection();
+    expect((await connection.foreignKeys("horses")).length).toBe(1);
+
+    await new RevertForeignKeyWithInvalidOption().migrate("down");
+    expect((await connection.foreignKeys("horses")).length).toBe(0);
+  });
 
   itIfSupports(
     "check_constraints",
