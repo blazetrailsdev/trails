@@ -30782,6 +30782,13 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "rubyName": "compute_type",
+    "call": "new",
+    "reason": "Equivalent (b): Rails compute_type's `new` is NameError.new on the no-constant path (inheritance.rb:266); trails delegates constant resolution to resolveComputedType, which raises that `new NameError(...)` (inheritance.ts:93,101)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "rubyName": "compute_type",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
