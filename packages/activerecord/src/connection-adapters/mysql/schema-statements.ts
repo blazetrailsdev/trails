@@ -835,6 +835,7 @@ export async function indexes(
   tableName: string,
 ): Promise<
   Array<{
+    table: string;
     name: string;
     columns: string[];
     unique: boolean;
@@ -924,6 +925,7 @@ export async function indexes(
   }
   return Array.from(byIndex.entries()).map(
     ([name, { columns, unique, using, type, comment, lengths, orders }]) => ({
+      table: tableName,
       name,
       columns,
       unique,

@@ -513,7 +513,7 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
 // `id` column — only the legacy shape gets one; define-schema.ts sets
 // `createOpts.id = false` for BOTH `primaryKey: false` and `primaryKey:
 // string[]`, so any wrapped form has no implicit `id`.
-const WRAPPER_KEYS = new Set(["columns", "primaryKey"]);
+const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes"]);
 function tableShape(table: TableSchema): {
   columns: Record<string, unknown>;
   hasImplicitId: boolean;

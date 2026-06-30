@@ -345,6 +345,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
    * counting every match.
    */
   private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {
+    // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
+    // identifier to parse, so short-circuit before parseSchemaQualifiedName.
+    if (!name) return false;
     const { schema, table } = this.pg.parseSchemaQualifiedName(name);
     if (schema) {
       // $1=schema, $2=table, $3..=relkinds

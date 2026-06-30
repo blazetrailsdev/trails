@@ -1176,6 +1176,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string,
     type: "BASE TABLE" | "VIEW" | null,
   ): Promise<boolean> {
+    // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
+    // schema to parse, so short-circuit before parseMysqlName (which trims).
+    if (!name) return false;
     const { schema, table } = this.parseMysqlName(name);
     const schemaBind = schema ?? null;
     // Use `schema_placeholder OR database()` via COALESCE so the same
@@ -1224,6 +1227,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** Delegates to {@link mysqlIndexes} in `mysql/schema-statements.ts`. */
   async indexes(tableName: string): Promise<
     Array<{
+      table: string;
       name: string;
       columns: string[];
       unique: boolean;
