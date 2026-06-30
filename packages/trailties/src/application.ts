@@ -107,10 +107,14 @@ export class Application extends Engine {
    */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
-    // Publish the resolved app root so ActiveRecord's path-resolution sites
-    // (SQLite DB path, config/database.* lookup) expand against it — mirrors
-    // Rails wiring `Rails.root` for the framework to read.
-    setTrailsRoot(await this.requireRoot());
+    // Publish a live view of the app root so ActiveRecord's path-resolution
+    // sites (SQLite DB path, config/database.* lookup) expand against it —
+    // mirrors Rails' `Rails.root` being a live read of `application.config.root`
+    // (rails.rb:65-67). The getter prefers `config.root` so a later
+    // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
+    // is the discovered/cwd fallback for before any explicit override.
+    const bootRoot = await this.requireRoot();
+    setTrailsRoot(() => this.config.root ?? bootRoot);
     this.runInitializers(group, this);
     this._initialized = true;
     runLoadHooks("after_initialize", this);

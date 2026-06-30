@@ -241,6 +241,24 @@ describe("Application", () => {
       }
     });
 
+    it("keeps trailsRoot in sync with a config.setRoot after boot (live read)", async () => {
+      installFs(new Set(["/", "/app", "/app/src", "/later"]), new Set(["/app/config.ts"]), "/cwd");
+      setTrailsRoot(null);
+      class LiveRootApp extends Application {}
+      LiveRootApp.calledFrom("/app/src");
+      Application.register(LiveRootApp);
+      const app = LiveRootApp.instance();
+      try {
+        await app.initialize();
+        expect(trailsRoot()).toBe("/app");
+        // Rails reads Rails.root live from application.config.root.
+        app.config.setRoot("/later");
+        expect(trailsRoot()).toBe("/later");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
     it("raises when called twice", async () => {
       class IApp4 extends Application {}
       Application.register(IApp4);
