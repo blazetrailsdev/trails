@@ -2691,8 +2691,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._closed = true;
     this._discarded = true;
     abandonRawSocket(conn);
-    // Rails' discard! calls reset_transaction; super.discardBang() does not.
-    this.resetTransaction();
+    // Rails' discard! (unlike disconnect!) does NOT reset the transaction
+    // manager — it only forgets the connection (super is the empty base
+    // discard!). So we drop the references above and call the no-op super
+    // without running the disconnect/reset-transaction lifecycle.
     super.discardBang();
   }
 
