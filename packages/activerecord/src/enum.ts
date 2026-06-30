@@ -323,6 +323,9 @@ export function _enum(
     prefix?: boolean | string;
     suffix?: boolean | string;
     scopes?: boolean;
+    // Rails' public keyword is `instance_methods:`; the camelCase alias is
+    // accepted too so both Rails-faithful and trails-idiomatic callers work.
+    instance_methods?: boolean;
     instanceMethods?: boolean;
     validate?: boolean;
     default?: string | number;
@@ -340,7 +343,8 @@ export function _enum(
   // Rails: `scopes:` / `instance_methods:` default to true; `false` opts out of
   // the generated class scopes / instance predicate+bang methods respectively.
   const scopesEnabled = options?.scopes !== false;
-  const instanceMethodsEnabled = options?.instanceMethods !== false;
+  const instanceMethodsEnabled =
+    options?.instance_methods !== false && options?.instanceMethods !== false;
 
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
@@ -414,34 +418,50 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
-    if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
-    if (definedNames.has(fullName))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (definedNames.has(notScopeName))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
-    definedNames.add(predicateName);
-    definedNames.add(bangName);
-    definedNames.add(fullName);
-    definedNames.add(notScopeName);
+    // Rails only runs the instance conflict checks inside `if instance_methods`
+    // and the scope conflict checks inside `if scopes` (enum.rb detect_enum_conflict!
+    // call sites), so an enum that opts out must not raise on an opted-out name.
+    if (instanceMethodsEnabled) {
+      if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
+      if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      definedNames.add(predicateName);
+      definedNames.add(bangName);
+    }
+    if (scopesEnabled) {
+      if (definedNames.has(fullName))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      if (definedNames.has(notScopeName))
+        raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+      definedNames.add(fullName);
+      definedNames.add(notScopeName);
+    }
 
-    if (predicateName in (this.prototype as object))
-      raiseConflictError.call(this, attribute, predicateName);
-    if (bangName in (this.prototype as object)) raiseConflictError.call(this, attribute, bangName);
-    if (fullName in (this as object))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (notScopeName in (this as object))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    if (instanceMethodsEnabled) {
+      if (predicateName in (this.prototype as object))
+        raiseConflictError.call(this, attribute, predicateName);
+      if (bangName in (this.prototype as object))
+        raiseConflictError.call(this, attribute, bangName);
+    }
+    if (scopesEnabled) {
+      if (fullName in (this as object))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      if (notScopeName in (this as object))
+        raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    }
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (fp in (this.prototype as object)) raiseConflictError.call(this, attribute, fp);
-      if (`${friendlyName}Bang` in (this.prototype as object))
-        raiseConflictError.call(this, attribute, `${friendlyName}Bang`);
-      if (friendlyName in (this as object))
-        raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (notFriendlyName in (this as object))
-        raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      if (instanceMethodsEnabled) {
+        if (fp in (this.prototype as object)) raiseConflictError.call(this, attribute, fp);
+        if (`${friendlyName}Bang` in (this.prototype as object))
+          raiseConflictError.call(this, attribute, `${friendlyName}Bang`);
+      }
+      if (scopesEnabled) {
+        if (friendlyName in (this as object))
+          raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
+        if (notFriendlyName in (this as object))
+          raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      }
     }
   }
 

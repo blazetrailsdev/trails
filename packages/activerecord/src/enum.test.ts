@@ -703,7 +703,7 @@ describe("EnumTest", () => {
       static _tableName = "books";
     }
     K.attribute("status", "integer");
-    defineEnum(K, "status", ["proposed", "written"], { instanceMethods: false } as any);
+    defineEnum(K, "status", ["proposed", "written"], { instance_methods: false } as any);
     expect((new K() as any).isProposed).toBeUndefined();
   });
 
