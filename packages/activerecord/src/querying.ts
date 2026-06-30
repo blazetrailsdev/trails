@@ -9,7 +9,6 @@ import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/act
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
-import { argumentError } from "./relation/query-methods.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 
 /**
@@ -261,34 +260,13 @@ export function optimizerHints<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#left_joins */
 export function leftJoins<T extends typeof Base>(
   this: T,
-  table: string,
-  on: string,
-): Relation<InstanceType<T>>;
-export function leftJoins<T extends typeof Base>(
-  this: T,
   table: AssociationSpec | AssociationSpec[],
-): Relation<InstanceType<T>>;
-export function leftJoins<T extends typeof Base>(
-  this: T,
-  table: AssociationSpec | AssociationSpec[],
-  on?: string,
 ): Relation<InstanceType<T>> {
-  const rel = this.all();
-  if (on !== undefined) {
-    if (typeof table !== "string")
-      throw argumentError("leftJoins(table, on) requires a string table name");
-    return rel.leftJoins(table, on);
-  }
-  return rel.leftJoins(table);
+  return this.all().leftJoins(table);
 }
 
 /** Mirrors: ActiveRecord::Querying#left_outer_joins */
 export function leftOuterJoins<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
-export function leftOuterJoins<T extends typeof Base>(
-  this: T,
-  table: string,
-  on: string,
-): Relation<InstanceType<T>>;
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
   table: AssociationSpec | AssociationSpec[],
@@ -296,18 +274,12 @@ export function leftOuterJoins<T extends typeof Base>(
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
   table?: AssociationSpec | AssociationSpec[],
-  on?: string,
 ): Relation<InstanceType<T>> {
   const rel = this.all();
   // Rails' Querying#left_outer_joins delegates to Relation, whose guard raises
   // ArgumentError on no arguments; surface that same raise here.
   if (table === undefined) {
     return (rel.leftOuterJoins as (...a: unknown[]) => Relation<InstanceType<T>>)();
-  }
-  if (on !== undefined) {
-    if (typeof table !== "string")
-      throw argumentError("leftOuterJoins(table, on) requires a string table name");
-    return rel.leftOuterJoins(table, on);
   }
   return rel.leftOuterJoins(table);
 }
