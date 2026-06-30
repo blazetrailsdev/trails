@@ -653,6 +653,9 @@ export class AbstractAdapter implements Quoting {
   pool: unknown = null;
   logger: unknown = null;
   lock: unknown = null;
+  /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
+  private _inspectId?: number;
+  private static _inspectSeq?: number;
 
   /**
    * Default header prefix for `Relation#explain` output. Concrete adapters
@@ -1187,6 +1190,28 @@ export class AbstractAdapter implements Quoting {
 
   get shard(): string {
     return (this.pool as any)?.shard ?? "default";
+  }
+
+  /**
+   * Mirrors Rails' AbstractAdapter#inspect: surfaces the pool's
+   * env_name/name/role/shard but never secrets (password, host). No Ruby
+   * object_id, so the `:0x…` slot uses a stable per-instance hex; role/shard
+   * render as quoted strings, not symbols.
+   */
+  inspect(): string {
+    const q = (v: string): string => JSON.stringify(String(v));
+    const pool = this.pool as { dbConfig?: { envName?: string; name?: string } } | null;
+    const envName = pool?.dbConfig?.envName ?? "test";
+    const configName = pool?.dbConfig?.name;
+    const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
+    const shardField = this.shard !== "default" ? ` shard=${q(this.shard)}` : "";
+    this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
+    const hex = `0x${this._inspectId.toString(16).padStart(12, "0")}`;
+    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=${q(this.role)}${shardField}>`;
+  }
+
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return this.inspect();
   }
 
   // --- Capability introspection ---

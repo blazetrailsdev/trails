@@ -1378,6 +1378,10 @@ export const TEST_SCHEMA: Schema = {
       update_count: { type: "integer", null: false, default: 0 },
     },
     primaryKey: false,
+    // Rails schema.rb: `t.index :nick, unique: true`. Load-bearing — the
+    // adapter_test uniqueness-violation probe inserts the same nick twice and
+    // expects RecordNotUnique.
+    indexes: [{ columns: "nick", unique: true }],
   },
 
   subscriptions: {

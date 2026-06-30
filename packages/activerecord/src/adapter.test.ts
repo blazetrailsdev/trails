@@ -49,9 +49,11 @@ import {
 // .to_sql` collects the `?` marker — rather than hard-coding a literal `?`.
 const qm = new Nodes.BindParam(null).toSql();
 
-// Drives the same insert/update/select/delete bind round-trip as Rails'
-// AdapterTest casted/non-casted bind probes.
-async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): Promise<void> {
+// Drives Rails' AdapterTest casted/non-casted bind probes against the leased
+// connection and the canonical `events` table. The insert return value is
+// normalized (`Number(...)`) and skipped on MySQL, whose driver reports `0` for
+// an explicit-id INSERT rather than the inserted key.
+async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<void> {
   const id = await conn.insert(
     `INSERT INTO events(id) VALUES (${qm})`,
     null,
@@ -60,7 +62,7 @@ async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): P
     null,
     binds,
   );
-  expect(id).toBe(1);
+  if (adapterType !== "mysql") expect(Number(id)).toBe(1);
 
   const updated = await conn.update(
     `UPDATE events SET title = 'foo' WHERE id = ${qm}`,
@@ -70,31 +72,14 @@ async function roundTripBinds(conn: AbstractSQLite3Adapter, binds: unknown[]): P
   expect(updated).toBe(1);
 
   const found = await conn.selectAll(`SELECT * FROM events WHERE id = ${qm}`, null, binds);
-  expect(found.first()).toEqual({ id: 1, title: "foo" });
+  const foundRow = found.first() as { id: unknown; title: string };
+  expect({ ...foundRow, id: Number(foundRow.id) }).toEqual({ id: 1, title: "foo" });
 
   const deleted = await conn.delete(`DELETE FROM events WHERE id = ${qm}`, null, binds);
   expect(deleted).toBe(1);
 
   const empty = await conn.selectAll(`SELECT * FROM events WHERE id = ${qm}`, null, binds);
   expect(empty.first()).toBeUndefined();
-}
-
-// Spin up a fresh in-memory adapter with the given DDL applied, run the body,
-// then close. Mirrors AdapterTest's per-test `@connection` against the schema
-// the corresponding Rails fixtures (accounts/authors/tasks/topics/subscribers/
-// posts) materialize — created inline here so the suite stays self-contained
-// rather than leaning on a shared handler DB.
-async function withSchema(
-  ddl: string[],
-  body: (conn: AbstractSQLite3Adapter) => Promise<void>,
-): Promise<void> {
-  const conn = new BetterSQLite3Adapter(":memory:");
-  try {
-    for (const stmt of ddl) await conn.executeMutation(stmt);
-    await body(conn);
-  } finally {
-    await conn.close();
-  }
 }
 
 // Open a fresh in-memory adapter (no schema), run the body, then close.
@@ -234,139 +219,183 @@ class PostForRetryTest extends Base {
   }
 }
 
+// Faithful port of Rails' AdapterTest (adapter_test.rb). Rides the canonical
+// schema + official Book/Post/Author/Event models and real fixtures; the leased
+// `Base.connection` stands in for Rails' `@connection = ...lease_connection`.
 describe("AdapterTest", () => {
-  it("valid column", async () => {
-    const conn = new BetterSQLite3Adapter(":memory:");
-    try {
-      for (const type of Object.keys(conn.nativeDatabaseTypes())) {
-        expect(conn.isValidType(type)).toBe(true);
-      }
-    } finally {
-      await conn.close();
+  registerModel("Author", Author);
+  registerModel("Post", Post);
+  registerModel("Book", Book);
+  registerModel("Event", Event);
+  useHandlerFixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
+    schema: canonicalSchema,
+    usesTransaction: [
+      // Raise a DB error mid-statement (aborts an open PG transaction, poisoning
+      // transactional teardown) — run un-wrapped; they persist nothing. The
+      // index tests' add_index/remove_index commit (DDL auto-commits on MySQL),
+      // so they too run outside the shared transaction (cleanup in a finally).
+      "value limit violations are translated to specific exception",
+      "numeric value out of ranges are translated to specific exception",
+      "uniqueness violations are translated to specific exception",
+      "not null violations are translated to specific exception",
+      "indexes",
+      "remove index when name and wrong column name specified",
+      "remove index when name and wrong column name specified positional argument",
+    ],
+  });
+
+  // The Event-backed `events` table is not among the fixtures wired above, so
+  // ensure it exists (mirrors schema.rb `t.string :title, limit: 5`). The
+  // sqlite worker DB is seeded with the full canonical schema, so events
+  // already exists there; only the server adapters need the explicit create.
+  beforeAll(async () => {
+    if (adapterType !== "sqlite") await defineSchema({ events: canonicalSchema.events });
+  });
+
+  // Rails runs this `unless current_adapter?(:PostgreSQLAdapter) ||
+  // (current_adapter?(:SQLite3Adapter) && !prepared_statements)` (adapter_test.rb:19) —
+  // i.e. on MySQL and SQLite (SQLite defaults prepared_statements: true), excluding
+  // only PostgreSQL.
+  it.skipIf(adapterType === "postgres")("update prepared statement", async () => {
+    const b = await Book.create({ name: "my \x00 book" });
+    await b.reload();
+    expect(b.name).toBe("my \x00 book");
+
+    await b.update({ name: "my other \x00 book" });
+    await b.reload();
+    expect(b.name).toBe("my other \x00 book");
+  });
+
+  it.skip("create record with pk as zero", () => {
+    // BLOCKED: schema-gen. defineSchema emits the canonical `books` PK as an
+    // auto-increment/identity column (PG GENERATED AS IDENTITY, MySQL AUTO_INCREMENT
+    // treats inserted 0 as "next value"), so explicit `id: 0` is overridden and
+    // `Book.find(0)` misses. Rails declares `books` with `id: :integer` (plain integer
+    // PK that honours 0). Skipped until defineSchema can mirror that.
+  });
+
+  it("valid column", () => {
+    const conn = Base.connection;
+    for (const type of Object.keys(conn.nativeDatabaseTypes())) {
+      expect(conn.isValidType(type)).toBe(true);
     }
   });
-  it("invalid column", async () => {
-    const conn = new BetterSQLite3Adapter(":memory:");
-    try {
-      expect(conn.isValidType("foobar")).toBe(false);
-    } finally {
-      await conn.close();
-    }
+
+  it("invalid column", () => {
+    expect(Base.connection.isValidType("foobar")).toBe(false);
   });
+
+  it("tables", async () => {
+    const tables = await Base.connection.tables();
+    expect(tables).toContain("accounts");
+    expect(tables).toContain("authors");
+    expect(tables).toContain("tasks");
+    expect(tables).toContain("topics");
+  });
+
   it("table exists?", async () => {
-    await withSchema(
-      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
-      async (conn) => {
-        expect(await conn.tableExists("accounts")).toBe(true);
-        expect(await conn.tableExists("nonexistingtable")).toBe(false);
-        expect(await conn.tableExists("'")).toBe(false);
-        expect(await conn.tableExists(null as unknown as string)).toBe(false);
-      },
-    );
+    const conn = Base.connection;
+    // Rails passes both "accounts" and :accounts; symbols collapse to strings here.
+    expect(await conn.tableExists("accounts")).toBe(true);
+    expect(await conn.tableExists("nonexistingtable")).toBe(false);
+    expect(await conn.tableExists("'")).toBe(false);
+    expect(await conn.tableExists(null as unknown as string)).toBe(false);
   });
+
   it("data sources", async () => {
-    await withSchema(
-      [
-        "CREATE TABLE accounts (id integer PRIMARY KEY)",
-        "CREATE TABLE authors (id integer PRIMARY KEY)",
-        "CREATE TABLE tasks (id integer PRIMARY KEY)",
-        "CREATE TABLE topics (id integer PRIMARY KEY)",
-      ],
-      async (conn) => {
-        const dataSources = await conn.dataSources();
-        expect(dataSources).toContain("accounts");
-        expect(dataSources).toContain("authors");
-        expect(dataSources).toContain("tasks");
-        expect(dataSources).toContain("topics");
-      },
-    );
+    const dataSources = await Base.connection.dataSources();
+    expect(dataSources).toContain("accounts");
+    expect(dataSources).toContain("authors");
+    expect(dataSources).toContain("tasks");
+    expect(dataSources).toContain("topics");
   });
+
+  it("data source exists?", async () => {
+    const conn = Base.connection;
+    expect(await conn.isDataSourceExists("accounts")).toBe(true);
+    expect(await conn.isDataSourceExists("nonexistingtable")).toBe(false);
+    expect(await conn.isDataSourceExists("'")).toBe(false);
+    expect(await conn.isDataSourceExists(null as unknown as string)).toBe(false);
+  });
+
   it("indexes", async () => {
     const idxName = "accounts_idx";
-    await withSchema(
-      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
-      async (conn) => {
-        expect(await conn.indexes("accounts")).toEqual([]);
-
-        await conn.addIndex("accounts", "firm_id", { name: idxName });
-        const indexes = (await conn.indexes("accounts")) as Array<{
-          table: string;
-          name: string;
-          unique: boolean;
-          columns: string[];
-        }>;
-        expect(indexes[0].table).toBe("accounts");
-        expect(indexes[0].name).toBe(idxName);
-        expect(indexes[0].unique).toBe(false);
-        expect(indexes[0].columns).toEqual(["firm_id"]);
-      },
-    );
-  });
-  it("returns empty indexes for non existing table", async () => {
-    const conn = new BetterSQLite3Adapter(":memory:");
+    const conn = Base.connection;
     try {
-      expect(await conn.indexes("nonexistingtable")).toEqual([]);
+      expect(await conn.indexes("accounts")).toEqual([]);
+
+      await conn.addIndex("accounts", "firm_id", { name: idxName });
+      const indexes = (await conn.indexes("accounts")) as Array<{
+        table: string;
+        name: string;
+        unique: boolean;
+        columns: string[];
+      }>;
+      expect(indexes[0].table).toBe("accounts");
+      expect(indexes[0].name).toBe(idxName);
+      expect(indexes[0].unique).toBe(false);
+      expect(indexes[0].columns).toEqual(["firm_id"]);
     } finally {
-      await conn.close();
+      await conn.removeIndex("accounts", { name: idxName }).catch(() => {});
     }
   });
+
+  it("returns empty indexes for non existing table", async () => {
+    expect(await Base.connection.indexes("nonexistingtable")).toEqual([]);
+  });
+
   it("remove index when name and wrong column name specified", async () => {
-    await withSchema(
-      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
-      async (conn) => {
-        await conn.addIndex("accounts", "firm_id", { name: "accounts_idx" });
-        await expect(
-          conn.removeIndex("accounts", { name: "accounts_idx", column: "wrong_column_name" }),
-        ).rejects.toBeInstanceOf(ArgumentError);
-        // ensure: the real index is still removable by name
-        await conn.removeIndex("accounts", { name: "accounts_idx" });
-      },
-    );
+    const conn = Base.connection;
+    const indexName = "accounts_idx";
+    try {
+      await conn.addIndex("accounts", "firm_id", { name: indexName });
+      await expect(
+        conn.removeIndex("accounts", { name: indexName, column: "wrong_column_name" }),
+      ).rejects.toBeInstanceOf(ArgumentError);
+    } finally {
+      await conn.removeIndex("accounts", { name: indexName });
+    }
   });
+
   it("remove index when name and wrong column name specified positional argument", async () => {
-    await withSchema(
-      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
-      async (conn) => {
-        await conn.addIndex("accounts", "firm_id", { name: "accounts_idx" });
-        await expect(
-          conn.removeIndex("accounts", "wrong_column_name", { name: "accounts_idx" }),
-        ).rejects.toBeInstanceOf(ArgumentError);
-        await conn.removeIndex("accounts", { name: "accounts_idx" });
-      },
-    );
+    const conn = Base.connection;
+    const indexName = "accounts_idx";
+    try {
+      await conn.addIndex("accounts", "firm_id", { name: indexName });
+      await expect(
+        conn.removeIndex("accounts", "wrong_column_name", { name: indexName }),
+      ).rejects.toBeInstanceOf(ArgumentError);
+    } finally {
+      await conn.removeIndex("accounts", { name: indexName });
+    }
   });
+
+  // current database (gated by respond_to?(:current_database)) lives in the
+  // describeIfMysql AdapterTest block below (MySQL) and adapters/postgresql/
+  // adapter.test.ts (PG).
+
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
-    await withSchema(
-      ["CREATE TABLE subscribers (nick varchar PRIMARY KEY, name varchar)"],
-      async (conn) => {
-        const result = await conn.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
-        expect(result).toBeInstanceOf(Result);
-        expect(result.rows).toEqual([]);
-        expect(result.columns).toEqual([]);
-      },
-    );
+    const result = await Base.connection.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
+    expect(result).toBeInstanceOf(Result);
+    expect(result.rows).toEqual([]);
+    expect(result.columns).toEqual([]);
   });
+
   it("#exec_query queries with an empty result set still return the columns", async () => {
-    await withSchema(
-      ["CREATE TABLE subscribers (nick varchar PRIMARY KEY, name varchar)"],
-      async (conn) => {
-        const result = await conn.execQuery("SELECT * FROM subscribers WHERE 1=0");
-        expect(result).toBeInstanceOf(Result);
-        expect(result.rows).toEqual([]);
-        expect(result.columns.length).toBeGreaterThan(0);
-      },
-    );
+    const result = await Base.connection.execQuery("SELECT * FROM subscribers WHERE 1=0");
+    expect(result).toBeInstanceOf(Result);
+    expect(result.rows).toEqual([]);
+    expect(result.columns.length).toBeGreaterThan(0);
   });
-  // charset / show nonexistent variable returns nil / not specifying database
-  // name for cross database selects (MySQL-only) live in the describeIfMysql
-  // AdapterTest block at the bottom of this file.
+
+  // charset / collation / show-variable / cross-database-selects (MySQL-only)
+  // live in the describeIfMysql AdapterTest block below.
+
   it("disable prepared statements", async () => {
-    // Rails establishes a connection with `prepared_statements: true` and
-    // asserts `lease_connection.prepared_statements?` flips false once the
-    // global `ActiveRecord.disable_prepared_statements` toggle is set. Rails
-    // gates this `unless in_memory_db?`; our default test DB is sqlite
-    // `:memory:`, so we exercise the same setter chokepoint by constructing
-    // the adapter with `preparedStatements: true` on each side of the toggle.
+    // Rails asserts `prepared_statements?` flips false once the global
+    // `ActiveRecord.disable_prepared_statements` toggle is set. Rails gates this
+    // `unless in_memory_db?`; our default DB is sqlite `:memory:`, so we hit the
+    // same setter chokepoint by constructing adapters on each side of the toggle.
     const original = disablePreparedStatements;
     try {
       const enabled = new BetterSQLite3Adapter(":memory:", { preparedStatements: true });
@@ -381,6 +410,7 @@ describe("AdapterTest", () => {
       setDisablePreparedStatements(original);
     }
   });
+
   it("table alias", () => {
     // Rails redefines `table_alias_length` on the connection's singleton class
     // to return 10; TS has no per-instance method override, so a subclass that
@@ -395,115 +425,21 @@ describe("AdapterTest", () => {
     expect(conn.tableAliasFor("posts_comments")).toBe("posts_comm");
     expect(conn.tableAliasFor("dbo.posts")).toBe("dbo_posts");
   });
+
   it("uniqueness violations are translated to specific exception", async () => {
-    await withSchema(
-      ["CREATE TABLE subscribers (nick varchar PRIMARY KEY, name varchar)"],
-      async (conn) => {
-        await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')");
-        const error = await conn
-          .executeMutation("INSERT INTO subscribers(nick) VALUES('me')")
-          .catch((e) => e);
-        expect(error).toBeInstanceOf(RecordNotUnique);
-        expect(error.cause).toBeTruthy();
-      },
-    );
+    const conn = Base.connection;
+    await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')");
+    const error = await conn
+      .executeMutation("INSERT INTO subscribers(nick) VALUES('me')")
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(RecordNotUnique);
+    expect(error.cause).toBeTruthy();
   });
+
   it("not null violations are translated to specific exception", async () => {
-    await withSchema(
-      ["CREATE TABLE posts (id integer PRIMARY KEY, title varchar NOT NULL)"],
-      async (conn) => {
-        const error = await conn.executeMutation("INSERT INTO posts(id) VALUES(1)").catch((e) => e);
-        expect(error).toBeInstanceOf(NotNullViolation);
-        expect(error.cause).toBeTruthy();
-      },
-    );
-  });
-  // `value limit violations` and `numeric value out of ranges` are translated
-  // only on non-SQLite backends (Rails gates them `unless
-  // current_adapter?(:SQLite3Adapter)`), so they live in the model-backed
-  // `AdapterTest` block below where Base.connection resolves to the
-  // ARCONN-configured adapter.
-  it.skip("exceptions from notifications are not translated", () => {
-    // BLOCKED: notifications
-    // ROOT-CAUSE: activesupport Notifications._notify swallows subscriber errors on the
-    // instrument()/instrumentAsync() path (only the publish() propagate=true path re-raises),
-    // so a subscriber raising inside sql.active_record never bubbles to the caller the way
-    // Rails' instrumenter lets it. Reproducing the test needs Notifications to re-raise
-    // subscriber errors from instrumented blocks — a cross-cutting change out of scope here.
-    // SCOPE: ~5 LOC test once Notifications propagates; affects ~1 test
-  });
-  it("database related exceptions are translated to statement invalid", async () => {
-    await withSchema([], async (conn) => {
-      const error = await conn.execute("This is a syntax error").catch((e) => e);
-      expect(error).toBeInstanceOf(StatementInvalid);
-      expect(error.cause).toBeInstanceOf(Error);
-    });
-  });
-  it("select all always return activerecord result", async () => {
-    await withSchema(
-      ["CREATE TABLE posts (id integer PRIMARY KEY, title varchar)"],
-      async (conn) => {
-        const result = await conn.selectAll("SELECT * FROM posts");
-        expect(result).toBeInstanceOf(Result);
-      },
-    );
-  });
-  it("select all insert update delete with casted binds", async () => {
-    await withSchema(
-      ["CREATE TABLE events (id integer PRIMARY KEY, title varchar(5))"],
-      async (conn) => {
-        const binds = [Event.typeForAttribute("id").serialize(1)];
-        await roundTripBinds(conn, binds);
-      },
-    );
-  });
-  it("select all insert update delete with binds", async () => {
-    await withSchema(
-      ["CREATE TABLE events (id integer PRIMARY KEY, title varchar(5))"],
-      async (conn) => {
-        const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
-        await roundTripBinds(conn, binds);
-      },
-    );
-  });
-  it("type_to_sql returns a String for unmapped types", () => {
-    expect(new SchemaCreation("sqlite").typeToSql("special_db_type" as any)).toBe(
-      "special_db_type",
-    );
-  });
-  // current database (MySQL/PG, gated by respond_to?(:current_database)) lives
-  // in the describeIfMysql AdapterTest block at the bottom of this file (MySQL)
-  // and the adapters/postgresql/adapter.test.ts suite (PG) behind
-  // describeIfMysql/describeIfPg.
-});
-
-// Model-backed AdapterTest cases. Same Rails class (AdapterTest) as the
-// inline-DDL block above, kept in a second describe so it can wire the handler
-// suite + canonical Book/Post/Author models + fixtures (Rails'
-// `@connection = ActiveRecord::Base.lease_connection`), since these exercise
-// create/reload/update/find and relation-typed select methods.
-describe("AdapterTest", () => {
-  registerModel("Author", Author);
-  registerModel("Post", Post);
-  registerModel("Book", Book);
-  registerModel("Event", Event);
-  useHandlerFixtures(["posts", "authors", "books"], {
-    schema: canonicalSchema,
-    // These two intentionally raise a DB error mid-INSERT, which aborts an open
-    // PG transaction and would poison transactional-fixtures teardown. Run them
-    // outside the shared transaction; the failed INSERT persists nothing, so no
-    // manual cleanup is needed.
-    usesTransaction: [
-      "value limit violations are translated to specific exception",
-      "numeric value out of ranges are translated to specific exception",
-    ],
-  });
-
-  // The Event-backed `events` table is not among the fixtures wired above, so
-  // ensure it exists (mirrors schema.rb `t.string :title, limit: 5`).
-  beforeAll(async () => {
-    if (adapterType === "sqlite") return;
-    await defineSchema({ events: canonicalSchema.events });
+    const error = await Post.create().catch((e) => e);
+    expect(error).toBeInstanceOf(NotNullViolation);
+    expect(error.cause).toBeTruthy();
   });
 
   it.skipIf(adapterType === "sqlite")(
@@ -526,31 +462,34 @@ describe("AdapterTest", () => {
     },
   );
 
-  // Rails runs this `unless current_adapter?(:PostgreSQLAdapter) ||
-  // (current_adapter?(:SQLite3Adapter) && !prepared_statements)` (adapter_test.rb:19) —
-  // i.e. on MySQL and SQLite (SQLite defaults prepared_statements: true), excluding
-  // only PostgreSQL. The extractor cannot evaluate the runtime `!prepared_statements`,
-  // so its railsGate over-excludes SQLite; gate to Rails' real condition regardless.
-  it.skipIf(adapterType === "postgres")("update prepared statement", async () => {
-    const b = await Book.create({ name: "my \x00 book" });
-    await b.reload();
-    expect(b.name).toBe("my \x00 book");
-
-    await b.update({ name: "my other \x00 book" });
-    await b.reload();
-    expect(b.name).toBe("my other \x00 book");
+  it.skip("exceptions from notifications are not translated", () => {
+    // BLOCKED: notifications. activesupport Notifications._notify swallows subscriber
+    // errors on the instrument()/instrumentAsync() path (only publish() with
+    // propagate=true re-raises), so a subscriber raising inside sql.active_record never
+    // bubbles to the caller. Needs Notifications to re-raise from instrumented blocks.
   });
 
-  it.skip("create record with pk as zero", () => {
-    // BLOCKED: schema-gen
-    // ROOT-CAUSE: trails' defineSchema emits the canonical `books` primary key as the
-    // adapter-default auto-increment/identity column. On PostgreSQL that is GENERATED
-    // ... AS IDENTITY (and on MySQL AUTO_INCREMENT treats an inserted 0 as "next value"),
-    // so an explicit `id: 0` is overridden and `Book.find(0)` misses. Rails' schema
-    // declares `books` with `id: :integer` (a plain integer PK that honours explicit 0).
-    // Passes on SQLite (INTEGER PRIMARY KEY accepts 0) but not cross-adapter, so it stays
-    // skipped until defineSchema can mirror Rails' integer-PK declaration.
-    // SCOPE: ~4 LOC test once the books PK mirrors Rails' `id: :integer`; affects ~1 test
+  it("database related exceptions are translated to statement invalid", async () => {
+    const error = await Base.connection.execute("This is a syntax error").catch((e) => e);
+    expect(error).toBeInstanceOf(StatementInvalid);
+    expect(error.cause).toBeInstanceOf(Error);
+  });
+
+  it("select all always return activerecord result", async () => {
+    const result = await Base.connection.selectAll("SELECT * FROM posts");
+    expect(result).toBeInstanceOf(Result);
+  });
+
+  // Rails gates these `if prepared_statements`; every adapter in our matrix
+  // (sqlite/mysql/postgres) defaults it on, so the gate is always satisfied.
+  it("select all insert update delete with casted binds", async () => {
+    const binds = [Event.typeForAttribute("id").serialize(1)];
+    await roundTripBinds(Base.connection, binds);
+  });
+
+  it("select all insert update delete with binds", async () => {
+    const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
+    await roundTripBinds(Base.connection, binds);
   });
 
   it("select methods passing a association relation", async () => {
@@ -576,33 +515,17 @@ describe("AdapterTest", () => {
     expect(await conn.selectValues(sql)).toEqual(["foo"]);
   });
 
-  // QueryAttribute bind round-trip against the ARCONN-configured connection,
-  // scoped to the driver write path. The inline-DDL block above drives the same
-  // Rails probe (`test_select_all_insert_update_delete_with_binds`) against
-  // SQLite; here the `Relation::QueryAttribute` bind must be unwrapped to
-  // `valueForDatabase` by the adapter's driver-bind path before reaching the
-  // driver (matching Rails' `type_casted_binds`). On MySQL the explicit-id INSERT
-  // yields driver insertId 0, and on PostgreSQL the bound INSERT flows through
-  // `executeMutation`, so the round-trip is asserted via the bound SELECT rather
-  // than the insert return value.
-  it.skipIf(adapterType === "sqlite")("select all insert update delete with binds", async () => {
-    const conn = Base.connection;
-    const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
+  it("type_to_sql returns a String for unmapped types", () => {
+    expect(new SchemaCreation("sqlite").typeToSql("special_db_type" as any)).toBe(
+      "special_db_type",
+    );
+  });
 
-    await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
-
-    const updated = await conn.update("UPDATE events SET title = 'foo' WHERE id = ?", null, binds);
-    expect(updated).toBe(1);
-
-    const found = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
-    const foundRow = found.first() as { id: unknown; title: string };
-    expect({ ...foundRow, id: Number(foundRow.id) }).toEqual({ id: 1, title: "foo" });
-
-    const deleted = await conn.delete("DELETE FROM events WHERE id = ?", null, binds);
-    expect(deleted).toBe(1);
-
-    const empty = await conn.selectAll("SELECT * FROM events WHERE id = ?", null, binds);
-    expect(empty.first()).toBeUndefined();
+  it("inspect does not show secrets", () => {
+    const output = Base.connection.inspect();
+    // Rails: `/...::FooAdapter:0x[\da-f]+ env_name="\w+" role=:writing>/`. trails
+    // has no Ruby namespace and renders role as a quoted string, not a :symbol.
+    expect(output).toMatch(/\w*Adapter:0x[\da-f]+ env_name="\w+" role="writing">/);
   });
 });
 
@@ -661,6 +584,17 @@ describe("AdapterForeignKeyTest", () => {
   });
   beforeEach(cleanup);
   afterEach(cleanup);
+
+  // Rails' sqlite test connection always runs with `PRAGMA foreign_keys = ON`.
+  // The shared worker connection's pragma can drift OFF after a sibling
+  // describe's non-transactional fixture reloads (disableReferentialIntegrity
+  // toggles it around the load), so re-assert it here before the FK-violation
+  // probes — otherwise the INSERTs silently succeed and no error is raised.
+  beforeEach(async () => {
+    if (adapterType === "sqlite") {
+      await Base.connection.executeMutation("PRAGMA foreign_keys = ON");
+    }
+  });
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
     Base.connection.insert(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
