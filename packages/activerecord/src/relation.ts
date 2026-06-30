@@ -1853,8 +1853,8 @@ export class Relation<T extends Base> {
 
   /**
    * Add a LEFT OUTER JOIN. Variadic, mirroring Rails'
-   * `left_outer_joins(*args)` (query_methods.rb:883-895), which does
-   * `left_outer_joins_values |= args`. Accepts:
+   * `left_outer_joins(*args)` (query_methods.rb:883-887), whose `!` writer does
+   * `left_outer_joins_values |= args` (query_methods.rb:889-891). Accepts:
    * - String association names: `leftJoins("posts")`,
    *   `leftJoins("thinkingPosts", "welcomePosts")`
    * - A hash spec for nested associations: `leftJoins({ posts: "comments" })`
@@ -1883,8 +1883,9 @@ export class Relation<T extends Base> {
 
   /**
    * Shared body for `leftJoins` / `leftOuterJoins`, mirroring Rails'
-   * `left_outer_joins(*args)` → `spawn.left_outer_joins!(*args)`
-   * (query_methods.rb:883-890). The `callee` name threads through to the
+   * `left_outer_joins(*args)` (query_methods.rb:883-887) →
+   * `spawn.left_outer_joins!(*args)` (query_methods.rb:889-891). The `callee`
+   * name threads through to the
    * ArgumentError so the message matches whichever alias was called
    * (Rails' `__callee__`). Validation runs exactly once: re-delegating between
    * the two public methods would re-run the no-argument guard after
