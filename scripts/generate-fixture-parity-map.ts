@@ -97,13 +97,18 @@ function findBodyEnd(lines: string[], startIdx: number, indent: number): number 
 /**
  * Build a regex that matches bare `fixtureSetName(:` accessor calls.
  * Uses word-boundary so `categories(` doesn't match inside `categories_posts(`.
+ * The `(?<!\.)` lookbehind excludes member calls (`.references(:post)`): a
+ * fixture-set name like `references` collides with the ActiveRecord query method
+ * `.references(...)`, and a fixture row accessor is ALWAYS a bare call
+ * (`references(:label)`), never `.references(...)` — so dropping the dotted form
+ * removes that false positive without losing any genuine accessor reference.
  */
 function buildAccessorRe(fixtureNames: string[]): RegExp | null {
   const escaped = fixtureNames
     .filter((n) => /^[a-zA-Z_]/.test(n))
     .map((n) => n.replace(/[-]/g, "\\-"));
   if (escaped.length === 0) return null;
-  return new RegExp(`\\b(${escaped.join("|")})\\s*\\(`);
+  return new RegExp(`(?<!\\.)\\b(${escaped.join("|")})\\s*\\(`);
 }
 
 function collectFixtureNames(src: string): string[] {

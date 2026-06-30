@@ -11,27 +11,14 @@ import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { SerializedPost } from "./test-helpers/models/post.js";
 import { bookFixtureData } from "./test-helpers/fixtures/books.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    books: TEST_SCHEMA.books,
-    authors: TEST_SCHEMA.authors,
-    serialized_posts: TEST_SCHEMA.serialized_posts,
-    topics: TEST_SCHEMA.topics,
-  });
+beforeAll(() => {
   registerModel(Author);
   registerModel(SerializedPost);
 });
 
-const { books } = useFixtures({ books: [Book, bookFixtureData] }, () => Base.connection);
+const { books } = fixtures({ books: [Book, bookFixtureData] });
 
 const FORMATS = ["json"] as const;
 

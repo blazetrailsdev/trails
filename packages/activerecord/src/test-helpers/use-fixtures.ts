@@ -306,6 +306,16 @@ function useTablelessFixtures(
 /**
  * Vitest helper that inserts fixture rows in a `beforeEach` and cleans them up in `afterEach`.
  *
+ * **Prefer {@link fixtures} (or {@link useHandlerFixtures}) in test files.** This
+ * lower-level entry point — which takes an explicit `getAdapter` thunk and runs a
+ * per-test delete/reseed without a pinned transaction — is retained only as a
+ * documented escape hatch for the handful of suites that genuinely cannot use the
+ * handler-resolved, transactional path: non-transactional suites that must commit
+ * across connections (Rails `use_transactional_tests = false`, e.g. the view DML
+ * tests), multi-database suites that seed through model-specific connections, and
+ * suites that build their own adapter. The direct-adapter call sites that only
+ * needed canonical tables have been converged onto `fixtures()`.
+ *
  * Returns an object of typed accessor functions — one per fixture set. Each accessor is callable
  * by label (`topics("first")`) and has an `.all()` method.
  *

@@ -1,36 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Rails: `fixtures :"admin/users", :"admin/accounts"` + `Admin::User`, `Admin::Account`,
 // `User`. With the YAML store coder implemented, `Admin::User` (which declares
 // `store("params", { coder: "YAML" })`) now loads and the `admin/users` fixture set is
 // registry-resident, so the Admin::User-backed assertions run on the real model.
-setupFixtures();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    admin_accounts: canonicalSchema.admin_accounts,
-    admin_users: canonicalSchema.admin_users,
-    users: canonicalSchema.users,
-  });
-  await AdminAccount.loadSchema();
-  await AdminUser.loadSchema();
-  await User.loadSchema();
-});
 
 // admin/accounts listed first: admin/users rows ref() admin_accounts ids.
-const { "admin/users": adminUsers } = useFixtures(
-  ["admin/accounts", "admin/users"],
-  () => Base.connection,
-);
+const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
   let previousFilterAttributes: (string | RegExp | ((k: string, v: unknown) => unknown))[];

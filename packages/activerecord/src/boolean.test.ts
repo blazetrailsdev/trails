@@ -2,34 +2,19 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "./index.js";
+import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ topics: TEST_SCHEMA.topics });
-  await Topic.loadSchema();
+const { topics } = fixtures({
+  topics: [
+    Topic,
+    {
+      approved_topic: { title: "Approved", approved: true },
+      unapproved_topic: { title: "Unapproved", approved: false },
+    },
+  ],
 });
-
-const { topics } = useFixtures(
-  {
-    topics: [
-      Topic,
-      {
-        approved_topic: { title: "Approved", approved: true },
-        unapproved_topic: { title: "Unapproved", approved: false },
-      },
-    ],
-  },
-  () => Base.connection,
-);
 
 describe("BooleanTest", () => {
   it("boolean", async () => {

@@ -15,8 +15,6 @@ import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
@@ -84,8 +82,6 @@ async function findAllOrdered(klass: any, include: unknown = null): Promise<any[
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
   const {
     authors,
     posts,
@@ -99,42 +95,37 @@ describe("EagerAssociationTest", () => {
     tags,
     people,
     categories,
-  } = useFixtures(
-    [
-      "authors",
-      "authorFavorites",
-      "authorAddresses",
-      "posts",
-      "comments",
-      "essays",
-      "people",
-      "readers",
-      "categories",
-      "companies",
-      "accounts",
-      "developers",
-      "projects",
-      "developersProjects",
-      "parrots",
-      "pirates",
-      "mateys",
-      "clubs",
-      "members",
-      "memberships",
-      "sponsors",
-      "subscribers",
-      "subscriptions",
-      "books",
-      "tags",
-    ],
-    () => Base.connection,
-    { schema: canonicalSchema },
-  );
+  } = fixtures([
+    "authors",
+    "authorFavorites",
+    "authorAddresses",
+    "posts",
+    "comments",
+    "essays",
+    "people",
+    "readers",
+    "categories",
+    "companies",
+    "accounts",
+    "developers",
+    "projects",
+    "developersProjects",
+    "parrots",
+    "pirates",
+    "mateys",
+    "clubs",
+    "members",
+    "memberships",
+    "sponsors",
+    "subscribers",
+    "subscriptions",
+    "books",
+    "tags",
+  ]);
   beforeAll(async () => {
-    registerModel(Matey);
-    registerModel(Subscriber);
-    registerModel(Subscription);
-    registerModel(Book);
+    // Matey, Subscriber, Subscription, and Book auto-register on resolution of
+    // their requested fixture sets (#4348); only models without a requested
+    // fixture set need explicit registration here.
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -273,10 +264,8 @@ describe("EagerAssociationTest", () => {
   it("including duplicate objects from belongs to", async () => {
     const popularPost = await Post.create({ title: "foo", body: "I like cars!" });
     const comment = await popularPost.comments.create({ body: "lol" });
-    const michael = await Person.create({ first_name: "Michael" });
-    const david = await Person.create({ first_name: "David" });
-    await Reader.create({ post_id: popularPost.id, person_id: michael.id });
-    await Reader.create({ post_id: popularPost.id, person_id: david.id });
+    await Reader.create({ post_id: popularPost.id, person_id: people("michael").id });
+    await Reader.create({ post_id: popularPost.id, person_id: people("david").id });
 
     const readerArr = await Reader.where({ post_id: popularPost.id }).includes({
       post: "comments",
