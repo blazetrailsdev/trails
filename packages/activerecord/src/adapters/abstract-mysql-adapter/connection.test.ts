@@ -103,6 +103,44 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.active).toBe(false);
     });
 
+    it("active after discard", async () => {
+      await adapter.execute("SELECT 1");
+      const socket = (
+        adapter._clientForTest() as unknown as {
+          connection?: { stream?: { destroy?: () => void } };
+        }
+      )?.connection?.stream;
+      expect(adapter.active).toBe(true);
+      adapter.discardBang();
+      expect(adapter.active).toBe(false);
+      // discardBang abandons the socket without closing it; free the fd.
+      socket?.destroy?.();
+    });
+
+    it("discard abandons the raw connection without closing it", async () => {
+      await adapter.execute("SELECT 1");
+      const raw = adapter._clientForTest();
+      expect(raw).not.toBeNull();
+      const endSpy = vi.spyOn(raw as { end: () => Promise<void> }, "end");
+      // Capture the socket: discardBang abandons it (unref'd, listeners
+      // stripped) without end()ing, so destroy it directly to free the fd.
+      const socket = (
+        raw as unknown as {
+          stream?: { destroy?: () => void };
+          connection?: { stream?: { destroy?: () => void } };
+        }
+      )?.connection?.stream;
+      try {
+        adapter.discardBang();
+        // Rails' discard! must not communicate with the server: the abandoned
+        // handle is dropped without an end()/close() that would shut the socket.
+        expect(endSpy).not.toHaveBeenCalled();
+        expect(adapter.active).toBe(false);
+      } finally {
+        socket?.destroy?.();
+      }
+    });
+
     it("wait timeout as string", async () => {
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
       try {
