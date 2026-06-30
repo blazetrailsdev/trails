@@ -386,12 +386,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Backs the `active` getter so a torn-down adapter reports inactive
   // even before the next lazy acquire would notice the missing connection.
   private _closed = false;
-  // True only when the most recent teardown was `discardBang()` (Rails'
-  // `discard!`), which must NOT communicate with the server. A connect that
-  // races the discard and resolves afterward sees this and abandons its raw
-  // socket (`abandonRawSocket`) instead of `end()`ing it. Reset to false by
-  // disconnect/close/reconnect, whose contract is to actively close.
-  private _discarded = false;
+  // Per-acquire generation. Each _doAcquire captures the current value; a
+  // teardown that must invalidate the in-flight acquire bumps it. `discardBang`
+  // (Rails' `discard!`) is the only teardown that bumps it AND records the
+  // captured generation in `_discardedAcquireGenerations`. A connect that
+  // races the discard then (a) is no longer reused by `_acquireFreshClient`
+  // (generation mismatch, like mysql2's `_connectingPromiseGen` check) and
+  // (b) abandons its raw socket instead of `end()`ing or adopting it when it
+  // resolves — surviving a later reconnect that would reset a mutable flag.
+  private _acquireGeneration = 0;
+  // Generation stamped on the currently-stored `_acquiring` promise.
+  private _acquiringGen = -1;
+  private _discardedAcquireGenerations = new Set<number>();
   // In-flight connect/configure promise. Concurrent _acquireFreshClient
   // callers converge on this so we never open two pg.Clients in
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
@@ -1139,15 +1145,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
       return this._rawConnection;
     }
-    if (!this._acquiring) {
-      this._acquiring = this._doAcquire().finally(() => {
-        this._acquiring = null;
+    // Reuse the in-flight acquire only if it belongs to the current
+    // generation. A discardBang() bumps the generation, so its orphaned
+    // acquire is bypassed here (a fresh one is opened) rather than adopted
+    // — mirrors mysql2's `_connectingPromiseGen === _connectGeneration`.
+    if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
+      const acquireGen = this._acquireGeneration;
+      const acquiring = this._doAcquire(acquireGen).finally(() => {
+        this._discardedAcquireGenerations.delete(acquireGen);
+        // Only clear if we still own the slot — a newer-generation acquire
+        // may have replaced us while this one was in flight.
+        if (this._acquiring === acquiring) this._acquiring = null;
       });
+      this._acquiring = acquiring;
+      this._acquiringGen = acquireGen;
     }
     return this._acquiring;
   }
 
-  private async _doAcquire(): Promise<pg.Client> {
+  private async _doAcquire(acquireGen: number): Promise<pg.Client> {
     // Snapshot the connection into a local so a concurrent
     // disconnectBang / discardBang / reconnect that nulls
     // _rawConnection between awaits can't smuggle null into the
@@ -1164,9 +1180,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // torn down between the await above and this point, do NOT
       // publish `newClient` — tear it down instead so we don't leak
       // a live socket onto a closed adapter.
-      if (this._closed || this._pgClientOptions == null || this._rawConnection != null) {
-        this._teardownRacedClient(newClient);
-        if (this._closed || this._pgClientOptions == null) {
+      const racedDiscard = this._discardedAcquireGenerations.has(acquireGen);
+      if (
+        this._closed ||
+        this._pgClientOptions == null ||
+        this._rawConnection != null ||
+        racedDiscard
+      ) {
+        this._teardownRacedClient(newClient, acquireGen);
+        if (this._closed || this._pgClientOptions == null || racedDiscard) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }
         // Another caller raced ahead and already published a
@@ -1213,7 +1235,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         this._statementPool?.detach();
         this._statementPool = null;
       }
-      this._teardownRacedClient(client);
+      this._teardownRacedClient(client, acquireGen);
       throw error;
     }
     return client;
@@ -1221,13 +1243,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /**
    * Dispose of a raw client that a concurrent teardown orphaned mid-acquire.
-   * When the teardown was `discardBang()` (`_discarded`), Rails' `discard!`
-   * contract forbids talking to the server, so we abandon the fd without
-   * closing it (`abandonRawSocket`); otherwise (disconnect/close/configure
-   * failure) we actively `end()` the socket as before.
+   * When this acquire's generation was orphaned by `discardBang()` (Rails'
+   * `discard!`), whose contract forbids talking to the server, we abandon the
+   * fd without closing it (`abandonRawSocket`); otherwise (disconnect/close/
+   * configure failure) we actively `end()` the socket as before. Keying on the
+   * captured generation — not a mutable flag — keeps the decision correct even
+   * when a later reconnect runs before this acquire resolves.
    */
-  private _teardownRacedClient(client: pg.Client): void {
-    if (this._discarded) {
+  private _teardownRacedClient(client: pg.Client, acquireGen: number): void {
+    if (this._discardedAcquireGenerations.has(acquireGen)) {
       abandonRawSocket(client);
     } else {
       client.end().catch(() => {});
@@ -2405,7 +2429,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._closed = true;
-    this._discarded = false;
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._pgClientOptions = null;
@@ -2461,7 +2484,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = false;
-    this._discarded = false;
     conn?.end().catch(() => {});
   }
 
@@ -2661,7 +2683,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
-    this._discarded = false;
     conn?.end().catch(() => {});
     // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
     this.resetTransaction();
@@ -2689,7 +2710,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
-    this._discarded = true;
+    // If a connect is in flight, record its generation so it abandons (not
+    // ends/adopts) its socket when it resolves, then bump so a later
+    // reconnect opens a fresh acquire instead of reusing the orphaned one.
+    if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
+    this._acquireGeneration++;
     abandonRawSocket(conn);
     // Rails' discard! (unlike disconnect!) does NOT reset the transaction
     // manager — it only forgets the connection (super is the empty base
