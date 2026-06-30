@@ -416,7 +416,7 @@ describe("UniquenessValidationTest", () => {
     // single call can guard several columns. (Mirrors the multi-attr form used by
     // Rails' test_validate_case_insensitive_uniqueness without the integer
     // case-insensitive scope column, which hits a separate SQLite LOWER(bind)
-    // quirk tracked outside this story.)
+    // quirk tracked by story uniqueness-case-insensitive-integer-column-sqlite.)
     Topic.validatesUniquenessOf(["title"], "author_name");
 
     // Fixture topics(:first): title "The First Topic", author_name "David".
