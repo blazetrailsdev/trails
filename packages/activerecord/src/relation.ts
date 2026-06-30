@@ -84,6 +84,7 @@ import {
   wrapWithScopeProxy,
   DelegationMethods,
   type ToSentenceOptions,
+  type ToXmlOptions,
 } from "./relation/delegation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
@@ -8049,6 +8050,7 @@ export interface Relation<T extends Base> {
   asJson(options?: SerializeOptions): Promise<unknown[]>;
   toFs(format?: string): Promise<string>;
   toFormattedS(format?: string): Promise<string>;
+  toXml(options?: ToXmlOptions): Promise<string>;
   get connection(): DatabaseAdapter;
   get primaryKey(): string | string[];
   get tableName(): string;

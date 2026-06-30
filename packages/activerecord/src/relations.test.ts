@@ -175,10 +175,31 @@ describe("RelationTest", () => {
   });
 
   it("to xml", async () => {
-    const birds = await Bird.all();
-    expect(birds).toBeDefined();
-    const arr = await Bird.all();
-    expect(arr).toBeDefined();
+    // assert_nothing_raised { Bird.all.to_xml } / { Bird.all.to_a.to_xml }
+    let relationXml: string | undefined;
+    try {
+      relationXml = await Bird.all().toXml();
+    } catch {
+      expect.unreachable("to_xml raised");
+    }
+    expect(typeof relationXml).toBe("string");
+    expect(relationXml).toContain('type="array"');
+  });
+
+  it("to xml threads :methods down to each record", async () => {
+    // Rails passes the shared options hash to XmlMini.to_tag, so `:methods`
+    // (topic.rb's `topic_id`) reaches every record's serialization. Filtered to
+    // base Topics (the `topics` fixtures mix Topic/Reply, which Rails would root
+    // under <objects>) so the collection is homogeneous.
+    const baseTopics = Topic.where({ type: null });
+    const xml = await baseTopics.toXml({ only: ["id"], methods: ["topicId"] });
+    const topics = await Topic.where({ type: null });
+    expect(xml).toContain('<topics type="array">');
+    // trails method names are camelCase, so the serialized tag is `topicId`
+    // (Rails' snake_case `topic_id` would dasherize to `topic-id`). The
+    // `type="integer"` attribute is adapter-dependent (PG/MariaDB return the id
+    // as BigInt/string, not JS number), so match the tag agnostically.
+    expect(xml).toMatch(new RegExp(`<topicId[^>]*>${topics[0].id}</topicId>`));
   });
 
   it("scoped all", async () => {

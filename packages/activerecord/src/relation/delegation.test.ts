@@ -438,6 +438,7 @@ describe("DelegationTest", () => {
       ["to_formatted_s", "toFormattedS"],
       ["to_fs", "toFs"],
       ["as_json", "asJson"],
+      ["to_xml", "toXml"],
     ];
 
     for (const [rubyName, jsName] of RECORD_DELEGATES) {
@@ -483,6 +484,68 @@ describe("DelegationTest", () => {
       expect(ret).not.toBeInstanceOf(Promise);
       expect(seen).toEqual(proxy.target.map((c: any) => c.id));
       expect(proxy.index(proxy.target[0])).toBe(0);
+    });
+
+    it("to_xml serializes the collection with a plural root and singular children", async () => {
+      // Array#to_xml: root reflects the pluralized class name, each record under
+      // root.singularize, and the collection carries `type="array"`. Filtered to a
+      // single STI type so the collection is homogeneous (the `comments` fixtures
+      // mix Comment/SpecialComment, which Rails would root under <objects>).
+      const base = Comment.where({ type: "Comment" });
+      const xml = await base.toXml({ only: ["id"] });
+      expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+      expect(xml).toContain('<comments type="array">');
+      expect(xml).toContain("</comments>");
+      expect(xml).toContain("<comment>");
+      const records = await Comment.where({ type: "Comment" });
+      // The `type="integer"` attribute is adapter-dependent (PG/MariaDB return
+      // ids as BigInt/string, not JS number), so match the id tag agnostically.
+      expect(xml).toMatch(new RegExp(`<id[^>]*>${records[0].id}</id>`));
+    });
+
+    it("to_xml(skip_types: true) drops the type attributes and skip_instruct omits the prolog", async () => {
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["id"],
+      });
+      expect(xml.startsWith("<comments>")).toBe(true);
+      expect(xml).not.toContain("type=");
+      const records = await Comment.where({ type: "Comment" });
+      expect(xml).toContain(`<id>${records[0].id}</id>`);
+    });
+
+    it("to_xml roots a heterogeneous collection under <objects> (Rails all?(first.class))", async () => {
+      // conversions.rb:189-195: the default root reflects the first element's
+      // class only when every element shares it; a mixed collection (e.g. STI
+      // subclasses) falls back to "objects". Drive toXml over a host whose
+      // records are two different classes to exercise that branch.
+      class Sparrow {
+        toXml() {
+          return "<bird>\n</bird>";
+        }
+      }
+      class Hawk {
+        toXml() {
+          return "<bird>\n</bird>";
+        }
+      }
+      const host = {
+        async toArray() {
+          return [new Sparrow(), new Hawk()];
+        },
+      };
+      const xml = await (Relation.prototype as any).toXml.call(host, { skipInstruct: true });
+      expect(xml.startsWith('<objects type="array">')).toBe(true);
+      expect(xml.endsWith("</objects>")).toBe(true);
+    });
+
+    it("to_xml on an empty collection self-closes under nil-classes (or :root)", async () => {
+      const empty = Comment.where({ id: -1 });
+      expect(await empty.toXml({ skipInstruct: true })).toBe('<nil-classes type="array"/>');
+      expect(await Comment.where({ id: -1 }).toXml({ skipInstruct: true, root: "comments" })).toBe(
+        '<comments type="array"/>',
+      );
     });
 
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {
