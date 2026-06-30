@@ -154,6 +154,9 @@ describe("EnumTest", () => {
   it("build from scope", () => {
     expect((Book as any).written().build().isWritten()).toBe(true);
     expect((Book as any).written().build().isProposed()).toBe(false);
+    // Rails also asserts `PublishedBook.hard.build.hard?` /  `.soft?` — canonical
+    // PublishedBook omits the `cover` enum (`enum :cover, { hard: "0", soft: "1" }`),
+    // so that half is pending (0023-surfaced-deviations/enum-canonical-book-gaps).
   });
 
   it("build from where", () => {
