@@ -31,6 +31,12 @@ import { Notifications } from "@blazetrails/activesupport";
 export interface StubbableAdapter {
   execute: (sql: string, binds?: unknown[], name?: string) => Promise<unknown>;
   executeMutation: (sql: string, binds?: unknown[], name?: string) => Promise<number>;
+  // PostgreSQL routes DDL (CREATE DATABASE / CREATE INDEX / DROP INDEX) through
+  // the bare-driver `exec`, which bypasses execute/executeMutation. Stub it too
+  // so those statements are instrumented-and-returned rather than run, mirroring
+  // Rails' PostgresqlActiveSchemaTest where `execute` is monkey-patched to a
+  // no-op that returns the SQL.
+  exec?: (sql: string) => Promise<void>;
 }
 
 /**
@@ -42,6 +48,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
   const original = {
     execute: adapter.execute,
     executeMutation: adapter.executeMutation,
+    exec: adapter.exec,
   };
   adapter.execute = (sql: string, _binds?: unknown[], name: string = "SQL") => {
     Notifications.instrument("sql.active_record", { sql, name });
@@ -51,9 +58,16 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
     Notifications.instrument("sql.active_record", { sql, name });
     return Promise.resolve(0);
   };
+  if (original.exec) {
+    adapter.exec = (sql: string) => {
+      Notifications.instrument("sql.active_record", { sql, name: "SQL" });
+      return Promise.resolve();
+    };
+  }
   return () => {
     adapter.execute = original.execute;
     adapter.executeMutation = original.executeMutation;
+    adapter.exec = original.exec;
   };
 }
 

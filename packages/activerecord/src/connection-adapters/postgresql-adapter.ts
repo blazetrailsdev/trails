@@ -3695,7 +3695,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const quotedTable = this.quoteTableName(tableName);
 
     if (options.algorithm && options.algorithm !== "concurrently") {
-      throw new Error(`Unknown algorithm: ${options.algorithm}. Only 'concurrently' is supported.`);
+      // Rails raises ArgumentError "Algorithm must be one of the following: :concurrently".
+      throw new ArgumentError(`Algorithm must be one of the following: :concurrently`);
     }
     if (options.algorithm === "concurrently" && this._inTransaction) {
       throw new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction");
@@ -3783,7 +3784,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
 
     if (opts.algorithm && opts.algorithm !== "concurrently") {
-      throw new Error(`Unknown algorithm: ${opts.algorithm}. Only 'concurrently' is supported.`);
+      // Rails raises ArgumentError "Algorithm must be one of the following: :concurrently".
+      throw new ArgumentError(`Algorithm must be one of the following: :concurrently`);
     }
     if (opts.algorithm === "concurrently" && this._inTransaction) {
       throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
