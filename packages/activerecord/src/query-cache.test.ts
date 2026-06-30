@@ -2,8 +2,9 @@
 // Rides the canonical TEST_SCHEMA + official test-helpers/models + real
 // fixtures (tasks, topics, categories, posts, categories_posts), mirroring the
 // Rails test names and assertions as closely as TypeScript allows.
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -71,13 +72,13 @@ describe("QueryCacheTest", () => {
 
   it.skip("execute clear cache", () => {
     // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-on-execute-exec-query): Rails clears the query cache
+    // query-cache-dirties-wiring-incomplete): Rails clears the query cache
     // on any `execute`, trails only dirties on `executeMutation` (write path).
   });
 
   it.skip("exec query clear cache", () => {
     // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-on-execute-exec-query): Rails clears the query cache
+    // query-cache-dirties-wiring-incomplete): Rails clears the query cache
     // on any `exec_query`, trails only dirties on `executeMutation`.
   });
 
@@ -529,6 +530,56 @@ describe("QueryCacheTest", () => {
       expect(Base.connectionPool().queryCache.size).toBe(0);
     });
     await mw();
+  });
+});
+
+describe("QueryCacheMutableParamTest", () => {
+  setupHandlerSuite();
+
+  // Mirrors Rails' `class JsonObj; self.table_name = "json_objs"; attribute
+  // :payload, :json; end` — a scratch table Rails creates in `setup` (not a
+  // canonical table), so naming it `json_objs` matches Rails, not a hack.
+  class JsonObj extends Base {
+    static {
+      this._tableName = "json_objs";
+      this.attribute("payload", "json");
+    }
+  }
+  registerModel(JsonObj);
+
+  beforeEach(async () => {
+    await Base.connection.createTable("json_objs", { force: true }, (t) => {
+      (t as unknown as { json(name: string): void }).json("payload");
+    });
+    Base.leaseConnection().enableQueryCacheBang();
+  });
+
+  afterEach(async () => {
+    Base.leaseConnection().disableQueryCacheBang();
+    await Base.connection.dropTable("json_objs", { ifExists: true });
+  });
+
+  it("query cache handles mutated binds", async () => {
+    await JsonObj.create({ payload: { a: 1 } });
+
+    const search: { a: number; b?: number } = { a: 1 };
+    await JsonObj.where({ payload: search }).first(); // populate the cache
+
+    search.b = 2;
+    expect(await JsonObj.where({ payload: search }).first()).toBeNull();
+  });
+});
+
+describe("QuerySerializedParamTest", () => {
+  it.skip("query serialized active record", () => {
+    // BLOCKED: serializes a hash containing an ActiveRecord instance through a
+    // YAML coder and round-trips it via `use_yaml_unsafe_load`; trails has no
+    // YAML AR-record (un)safe-load equivalent.
+  });
+
+  it.skip("query serialized string", () => {
+    // BLOCKED: depends on the Ruby YAML `serialize` coder round-trip used by the
+    // sibling AR-record case above; not portable without YAML serialization.
   });
 });
 
