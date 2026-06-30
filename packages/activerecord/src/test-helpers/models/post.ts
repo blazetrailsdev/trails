@@ -186,6 +186,8 @@ export class Post extends Base {
   static {
     this.aliasAttribute("text", "body");
     this.aliasAttribute("commentsCount", "legacy_comments_count");
+    // Rails: `alias_attribute :comments_count, :legacy_comments_count` (post.rb).
+    this.aliasAttribute("comments_count", "legacy_comments_count");
 
     this.scope("containingTheLetterA", (q: any) => q.where("body LIKE '%a%'"));
     this.scope("titledWithAnApostrophe", (q: any) => q.where("title LIKE '%''%'"));
