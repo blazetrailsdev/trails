@@ -20330,6 +20330,20 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "translate_exception",
+    "call": "mismatched_foreign_key",
+    "reason": "Satisfied by the delegated path: translateException calls _translateException, which builds the MismatchedForeignKey (mismatchedForeignKey); the public method only attaches the connection pool."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "translate_exception",
+    "call": "new",
+    "reason": "Satisfied by the delegated path: translateException calls _translateException, which constructs the translated error classes; the public method only attaches the connection pool."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "add_index_for_alter",
     "call": "accept",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
