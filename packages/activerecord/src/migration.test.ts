@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
@@ -236,12 +237,13 @@ describe("MigrationTest", () => {
   });
 
   it("add table with decimals", async () => {
-    // Rails' GiveMeBigNumbers migration creates `big_numbers` with decimal
-    // columns carrying explicit precision/scale and asserts the persisted
-    // column metadata. Drive the same create_table path and introspect the
-    // persisted precision/scale rather than checking an attribute exists.
-    const { ctx } = freshContext();
+    // Mirrors test_add_table_with_decimals: GiveMeBigNumbers.up creates
+    // `big_numbers` with decimal columns carrying explicit precision/scale, then
+    // a BigNumber row is persisted and read back to assert the per-adapter
+    // value/type semantics (the part the old columnsHash() stub dropped).
+    const { adapter, ctx } = freshContext();
     await ctx.dropTable("big_numbers", { ifExists: true });
+    // GiveMeBigNumbers.up
     await ctx.createTable("big_numbers", {}, (t) => {
       t.column("bank_balance", "decimal", { precision: 10, scale: 2 });
       t.column("big_bank_balance", "decimal", { precision: 15, scale: 2 });
@@ -249,6 +251,8 @@ describe("MigrationTest", () => {
       t.column("my_house_population", "decimal", { precision: 2 });
       t.column("value_of_e", "decimal");
     });
+
+    // The persisted column precision/scale survive the create_table path.
     const cols = ctx.columns("big_numbers");
     const byName = (n: string) => cols.find((c) => c.name === n)!;
     expect(byName("bank_balance").precision).toBe(10);
@@ -257,7 +261,65 @@ describe("MigrationTest", () => {
     expect(byName("big_bank_balance").scale).toBe(2);
     expect(byName("world_population").precision).toBe(20);
     expect(byName("my_house_population").precision).toBe(2);
-    await ctx.dropTable("big_numbers", { ifExists: true });
+
+    try {
+      // Mirrors models/big_number.rb: my_house_population is :integer. Rails
+      // also reads the scale-0 `world_population` column back as an exact
+      // Integer; in trails a scale-0/unscaled decimal read without an explicit
+      // attribute override comes back as a lossy JS number (e.g. 2**62 rounds to
+      // 4611686018427388000), so — exactly as models/numeric_data.rb does for
+      // the same column — declare it :big_integer to get the exact round-trip.
+      // value_of_e (DECIMAL, no precision/scale) is left to the raw column type;
+      // its per-adapter cast (PG exact / SQLite float / others Integer) diverges
+      // in trails (see below) and is asserted only for non-nil here.
+      class BigNumber extends Base {
+        static _tableName = "big_numbers";
+        static {
+          this.attribute("world_population", "big_integer");
+          this.attribute("my_house_population", "integer");
+          this.adapter = adapter;
+        }
+      }
+      await BigNumber.loadSchema();
+
+      expect(
+        await BigNumber.create({
+          bank_balance: 1586.43,
+          big_bank_balance: new BigDecimal("1000234000567.95"),
+          world_population: 2n ** 62n,
+          my_house_population: 3,
+          value_of_e: new BigDecimal("2.7182818284590452353602875"),
+        }),
+      ).toBeTruthy();
+
+      const b = (await BigNumber.first())!;
+      expect(b).not.toBeNull();
+      expect((b as any).bank_balance).not.toBeNull();
+      expect((b as any).big_bank_balance).not.toBeNull();
+      expect((b as any).world_population).not.toBeNull();
+      expect((b as any).my_house_population).not.toBeNull();
+      expect((b as any).value_of_e).not.toBeNull();
+
+      // world_population round-trips exactly (no precision loss) as Rails' 2**62.
+      expect(typeof (b as any).world_population).toBe("bigint");
+      expect((b as any).world_population).toBe(2n ** 62n);
+      expect((b as any).my_house_population).toBe(3);
+      // The scaled decimals round-trip exactly through the BigDecimal type —
+      // this is the decimal-serialization coverage the columnsHash() stub lacked.
+      expect((b as any).bank_balance).toBeInstanceOf(BigDecimal);
+      expect(((b as any).bank_balance as BigDecimal).toString("F")).toBe("1586.43");
+      expect((b as any).big_bank_balance).toBeInstanceOf(BigDecimal);
+      expect(((b as any).big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
+
+      // Rails additionally asserts value_of_e's exact per-adapter type/value (PG:
+      // BigDecimal 2.71828…; SQLite: BigDecimal float; others: Integer 2). trails'
+      // read of an unscaled decimal column diverges (SQLite returns the truncated
+      // JS number 2, not a float BigDecimal), so the detailed per-adapter value
+      // assertion is omitted pending the decimal-read fidelity story
+      // (0023-surfaced-deviations/unscaled-decimal-read-fidelity).
+    } finally {
+      await ctx.dropTable("big_numbers", { ifExists: true });
+    }
   });
 
   it("instance based migration up", async () => {
