@@ -3,20 +3,14 @@
  * These guard documented trails implementation behavior that has no
  * Rails counterpart test, so they live in a `.trails.test.ts` sibling.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("frozen / isFrozen", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
-  });
+  useHandlerFixtures(["topics"], { schema: canonicalSchema });
 
   it("deleting an unpersisted record still marks it destroyed and frozen", async () => {
     // Matches Rails' `delete` which only issues the DELETE when persisted?
