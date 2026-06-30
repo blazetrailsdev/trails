@@ -198,6 +198,28 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("resolves delegation ONE level only (no transitive chasing)", () => {
+    // build → mid → leaf. `build` inherits `mid`'s DIRECT calls (`leaf`), but
+    // NOT `leaf`'s body calls (`constructor`) — that would be a second level.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.mid(); }
+        private mid() { return this.leaf(); }
+        private leaf() { return new Pool(); }
+      }`,
+    );
+    const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.calls]));
+    expect(byName["build"]).toEqual(["leaf", "mid"]);
+    expect(byName["mid"]).toEqual(["constructor", "leaf"]);
+  });
+
+  it("does not credit delegation to an unknown / inherited helper", () => {
+    // `inheritedHook` is not a method of this class — nothing to union, and the
+    // delegating method keeps only the literal call name.
+    const cls = extractFromSource(`class Foo { build() { return this.inheritedHook(); } }`);
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(["inheritedHook"]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
