@@ -1,14 +1,6 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
+import { describe, it, expect } from "vitest";
 import { Author } from "../test-helpers/models/author.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "../test-helpers/use-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-
-setupFixtures();
-useHandlerTransactionalFixtures();
+import { fixtures } from "../test-helpers/fixtures.js";
 
 // Rails' Class.new(Base) { self.table_name = "authors" } generates
 // name_changed? via attribute_method_suffix. Schema-reflected attributes
@@ -21,22 +13,14 @@ class StringTestAuthor extends Author {
   }
 }
 
-beforeAll(async () => {
-  await defineSchema({ authors: TEST_SCHEMA.authors });
-  await StringTestAuthor.loadSchema();
+const { authors } = fixtures({
+  authors: [
+    StringTestAuthor,
+    {
+      sean: { name: "Sean" },
+    },
+  ],
 });
-
-const { authors } = useFixtures(
-  {
-    authors: [
-      StringTestAuthor,
-      {
-        sean: { name: "Sean" },
-      },
-    ],
-  },
-  () => Base.connection,
-);
 
 describe("StringTypeTest", () => {
   it("string mutations are detected", async () => {

@@ -1,17 +1,9 @@
 // activerecord/test/cases/encryption/encrypted_fixtures_test.rb
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Base } from "../base.js";
 import "../relation.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "../test-helpers/use-fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
@@ -19,15 +11,12 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     const snapshot = snapshotEncryptionConfig();
     configureEncryption();
     restoreEncryption = () => restoreEncryptionConfig(snapshot);
-    await defineSchema(TEST_SCHEMA);
   });
   afterAll(() => {
     restoreEncryption?.();
   });
 
-  const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter, {
-    schema: TEST_SCHEMA,
-  });
+  const { encryptedBooks } = fixtures(["encryptedBooks"]);
 
   it("fixtures get encrypted automatically", async () => {
     const { EncryptableRecord } = await import("./encryptable-record.js");
@@ -40,9 +29,6 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
 // set. A second EncryptableFixtureTest describe (its own handler suite) isolates
 // the seeders while keeping the Rails-matching describe path flat.
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
@@ -50,17 +36,12 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     const snapshot = snapshotEncryptionConfig();
     configureEncryption();
     restoreEncryption = () => restoreEncryptionConfig(snapshot);
-    await defineSchema(TEST_SCHEMA);
   });
   afterAll(() => {
     restoreEncryption?.();
   });
 
-  const { encryptedBookThatIgnoresCases } = useFixtures(
-    ["encryptedBookThatIgnoresCases"],
-    () => Base.adapter,
-    { schema: TEST_SCHEMA },
-  );
+  const { encryptedBookThatIgnoresCases } = fixtures(["encryptedBookThatIgnoresCases"]);
 
   it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
     const book = encryptedBookThatIgnoresCases("rfr");

@@ -1,15 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "../test-helpers/use-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import {
   Developer,
   DeveloperFilteredOnJoins,
   DeveloperOrderedBySalary,
 } from "../test-helpers/models/developer.js";
-import { Project } from "../test-helpers/models/project.js";
 import { Post, FirstPost, SpecialPostWithDefaultScope } from "../test-helpers/models/post.js";
 import {
   Comment,
@@ -21,45 +17,34 @@ import { Category } from "../test-helpers/models/category.js";
 import { Author } from "../test-helpers/models/author.js";
 import { association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
-import { Reference, BadReference } from "../test-helpers/models/reference.js";
+import { BadReference } from "../test-helpers/models/reference.js";
 
-registerModel(Developer);
+// The fixture-set base models (Developer, Project, Post, Comment, Category,
+// Person, Reference, Author) auto-register on fixture resolution (#4348). Only
+// the test-specific subclasses the fixture thunks don't return need explicit
+// registration here.
 registerModel(DeveloperOrderedBySalary);
 registerModel(DeveloperFilteredOnJoins);
-registerModel(Project);
-registerModel(Post);
-registerModel(Comment);
 registerModel(SpecialComment);
 registerModel(SubSpecialComment);
 registerModel(VerySpecialComment);
-registerModel(Category);
-registerModel(Person);
-registerModel(Reference);
 registerModel(BadReference);
-registerModel(Author);
 registerModel(FirstPost);
 registerModel(SpecialPostWithDefaultScope);
 
-setupFixtures();
-useHandlerTransactionalFixtures();
-
-const { developers, people, references, authors } = useFixtures(
-  [
-    "developers",
-    "projects",
-    "developersProjects",
-    "authors",
-    "authorAddresses",
-    "posts",
-    "comments",
-    "people",
-    "references",
-    "categories",
-    "categoriesPosts",
-  ],
-  () => Base.connection as any,
-  { schema: canonicalSchema },
-);
+const { developers, people, references, authors, comments } = fixtures([
+  "developers",
+  "projects",
+  "developersProjects",
+  "authors",
+  "authorAddresses",
+  "posts",
+  "comments",
+  "people",
+  "references",
+  "categories",
+  "categoriesPosts",
+]);
 
 describe("RelationScopingTest", () => {
   it("unscoped breaks caching", async () => {
@@ -410,7 +395,7 @@ describe("RelationScopingTest", () => {
   it("scoping respects sti constraint", async () => {
     await Comment.unscoped(async () => {
       const comment = (await Comment.find(1)) as Base;
-      expect(Number(comment.id)).toBe(1);
+      expect(Number(comment.id)).toBe(Number(comments("greetings").id));
       await expect(SpecialComment.find(1)).rejects.toThrow(RecordNotFound);
     });
   });
