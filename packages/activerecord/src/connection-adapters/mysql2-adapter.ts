@@ -165,6 +165,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // reference so close() can await it.
   private _connectGeneration = 0;
   private _connectingPromiseGen = -1;
+  // Generations orphaned by discardBang() (Rails' discard!). A connect at one
+  // of these generations that resolves after the discard must abandon its raw
+  // socket without end()ing it — discard! is forbidden from talking to the
+  // server. disconnectBang()/close() bump the generation too but are NOT
+  // recorded here, so their stale connects still end() the socket as before.
+  private _discardedConnectGenerations = new Set<number>();
   // Tracks the in-flight _client.end() from disconnectBang() so close() can
   // await full socket teardown even though _client was already nulled.
   private _endingClient: Promise<void> | null = null;
@@ -602,6 +608,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const discardErr = new ConnectionNotEstablished(
             "Mysql2Adapter: connection was closed during connect",
           );
+          if (this._discardedConnectGenerations.delete(gen)) {
+            // discardBang() orphaned this connect: abandon the fd without
+            // end()ing it, matching Rails mysql2 discard! (no server I/O).
+            abandonRawSocket(conn);
+            throw discardErr;
+          }
           return conn.end().then(
             () => {
               throw discardErr;
@@ -1327,6 +1339,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override discardBang(): void {
     this._activeState = false;
+    // If a connect is in flight, record its generation so that when it
+    // resolves into the gen-mismatch branch it abandons the socket instead
+    // of end()ing it (Rails discard! must not communicate with the server).
+    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
+      this._discardedConnectGenerations.add(this._connectGeneration);
+    }
     // Advance generation so any in-flight connect attempt is bypassed by
     // _ensureClient() rather than adopted onto a discarded adapter.
     this._connectGeneration++;

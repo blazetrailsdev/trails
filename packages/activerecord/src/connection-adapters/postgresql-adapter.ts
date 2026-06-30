@@ -386,6 +386,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Backs the `active` getter so a torn-down adapter reports inactive
   // even before the next lazy acquire would notice the missing connection.
   private _closed = false;
+  // True only when the most recent teardown was `discardBang()` (Rails'
+  // `discard!`), which must NOT communicate with the server. A connect that
+  // races the discard and resolves afterward sees this and abandons its raw
+  // socket (`abandonRawSocket`) instead of `end()`ing it. Reset to false by
+  // disconnect/close/reconnect, whose contract is to actively close.
+  private _discarded = false;
   // In-flight connect/configure promise. Concurrent _acquireFreshClient
   // callers converge on this so we never open two pg.Clients in
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
@@ -1159,7 +1165,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // publish `newClient` — tear it down instead so we don't leak
       // a live socket onto a closed adapter.
       if (this._closed || this._pgClientOptions == null || this._rawConnection != null) {
-        newClient.end().catch(() => {});
+        this._teardownRacedClient(newClient);
         if (this._closed || this._pgClientOptions == null) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }
@@ -1207,10 +1213,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         this._statementPool?.detach();
         this._statementPool = null;
       }
-      client.end().catch(() => {});
+      this._teardownRacedClient(client);
       throw error;
     }
     return client;
+  }
+
+  /**
+   * Dispose of a raw client that a concurrent teardown orphaned mid-acquire.
+   * When the teardown was `discardBang()` (`_discarded`), Rails' `discard!`
+   * contract forbids talking to the server, so we abandon the fd without
+   * closing it (`abandonRawSocket`); otherwise (disconnect/close/configure
+   * failure) we actively `end()` the socket as before.
+   */
+  private _teardownRacedClient(client: pg.Client): void {
+    if (this._discarded) {
+      abandonRawSocket(client);
+    } else {
+      client.end().catch(() => {});
+    }
   }
 
   /**
@@ -2384,6 +2405,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._closed = true;
+    this._discarded = false;
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._pgClientOptions = null;
@@ -2439,6 +2461,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = false;
+    this._discarded = false;
     conn?.end().catch(() => {});
   }
 
@@ -2638,6 +2661,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
+    this._discarded = false;
     conn?.end().catch(() => {});
     // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
     this.resetTransaction();
@@ -2665,6 +2689,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
+    this._discarded = true;
     abandonRawSocket(conn);
     // Rails' discard! calls reset_transaction; super.discardBang() does not.
     this.resetTransaction();
