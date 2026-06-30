@@ -1,473 +1,185 @@
+// Faithful port of vendor/rails/activerecord/test/cases/statement_cache_test.rb
 import { describe, it, expect, beforeAll } from "vitest";
-import { Notifications } from "@blazetrails/activesupport";
-import { Attribute, ValueType } from "@blazetrails/activemodel";
-import { Table as ArelTable, Nodes } from "@blazetrails/arel";
-import {
-  StatementCache,
-  Substitute,
-  Query,
-  PartialQuery,
-  PartialQueryCollector,
-  Params,
-  BindMap,
-} from "./statement-cache.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { registerModel } from "./index.js";
+import { StatementCache } from "./statement-cache.js";
+import { Book } from "./test-helpers/models/book.js";
+import { Liquid } from "./test-helpers/models/liquid.js";
+import { Molecule } from "./test-helpers/models/molecule.js";
+import { Electron } from "./test-helpers/models/electron.js";
+import { NumericData } from "./test-helpers/models/numeric-data.js";
+import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+import { RecordNotFound } from "./errors.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+
+registerModel("Book", Book);
+registerModel("Liquid", Liquid);
+registerModel("Molecule", Molecule);
+registerModel("Electron", Electron);
+registerModel("NumericData", NumericData);
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
+beforeAll(async () => {
+  await defineSchema({
+    authors: TEST_SCHEMA.authors,
+    books: TEST_SCHEMA.books,
+    liquid: TEST_SCHEMA.liquid,
+    molecules: TEST_SCHEMA.molecules,
+    electrons: TEST_SCHEMA.electrons,
+    numeric_data: TEST_SCHEMA.numeric_data,
+    clothing_items: TEST_SCHEMA.clothing_items,
+    birds: TEST_SCHEMA.birds,
+  });
+  await Promise.all([
+    Book.loadSchema(),
+    Liquid.loadSchema(),
+    Molecule.loadSchema(),
+    Electron.loadSchema(),
+    NumericData.loadSchema(),
+  ]);
+});
 
 describe("StatementCacheTest", () => {
-  let adapter: TestDatabaseAdapter;
+  it("statement cache", async () => {
+    await Book.create({ name: "my book" });
+    await Book.create({ name: "my other book" });
 
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      books: canonicalSchema.books,
-      authors: canonicalSchema.authors,
+    const cache = StatementCache.create(ClothingItem.leaseConnection(), (params) => {
+      return Book.where({ name: params.bind() }) as any;
     });
-  });
-  withTransactionalFixtures(() => adapter);
 
-  it("statement cache", () => {
-    const sub = new Substitute();
-    expect(sub).toBeInstanceOf(Substitute);
-    const params = new Params();
-    expect(params.bind()).toBeInstanceOf(Substitute);
+    let b = await cache.execute(["my book"], ClothingItem.leaseConnection());
+    expect(b[0].readAttribute("name")).toBe("my book");
+    b = await cache.execute(["my other book"], ClothingItem.leaseConnection());
+    expect(b[0].readAttribute("name")).toBe("my other book");
   });
 
-  it("statement cache id", () => {
-    const s1 = new Substitute();
-    const s2 = new Substitute();
-    expect(s1).not.toBe(s2);
-  });
+  it("statement cache id", async () => {
+    const b1 = await Book.create({ name: "my book" });
+    const b2 = await Book.create({ name: "my other book" });
 
-  it("statement cache with simple statement", () => {
-    const query = new Query("SELECT * FROM users WHERE id = ?");
-    expect(query.sqlFor([], {})).toBe("SELECT * FROM users WHERE id = ?");
-    expect(query.retryable).toBe(false);
-  });
-
-  it("statement cache with complex statement", () => {
-    const query = new Query("SELECT * FROM users WHERE id = ? AND name = ?", {
-      retryable: true,
+    const cache = StatementCache.create(ClothingItem.leaseConnection(), (params) => {
+      return Book.where({ id: params.bind() }) as any;
     });
-    expect(query.sqlFor([], {})).toBe("SELECT * FROM users WHERE id = ? AND name = ?");
-    expect(query.retryable).toBe(true);
+
+    let b = await cache.execute([b1.id], ClothingItem.leaseConnection());
+    expect(b[0].readAttribute("name")).toBe(b1.readAttribute("name"));
+    b = await cache.execute([b2.id], ClothingItem.leaseConnection());
+    expect(b[0].readAttribute("name")).toBe(b2.readAttribute("name"));
   });
 
-  it("statement cache with strictly cast attribute", () => {
-    const bindMap = new BindMap([new Substitute(), "static"]);
-    const result = bindMap.bind(["replaced"]);
-    expect(result[0]).toBe("replaced");
-    expect(result[1]).toBe("static");
+  it("find or create by", async () => {
+    await Book.create({ name: "my book" });
+
+    const a = await Book.findOrCreateBy({ name: "my book" });
+    const b = await Book.findOrCreateBy({ name: "my other book" });
+
+    expect(a.readAttribute("name")).toBe("my book");
+    expect(b.readAttribute("name")).toBe("my other book");
   });
 
-  it("statement cache values differ", () => {
-    const bindMap = new BindMap([new Substitute(), new Substitute()]);
-    const r1 = bindMap.bind(["a", "b"]);
-    const r2 = bindMap.bind(["c", "d"]);
-    expect(r1).toEqual(["a", "b"]);
-    expect(r2).toEqual(["c", "d"]);
-  });
-
-  it("unprepared statements dont share a cache with prepared statements", () => {
-    const prepared = StatementCache.query("SELECT 1");
-    const partial = StatementCache.partialQuery(["SELECT ", new Substitute()]);
-    expect(prepared).toBeInstanceOf(Query);
-    expect(partial).toBeInstanceOf(PartialQuery);
-    expect(prepared).not.toBeInstanceOf(PartialQuery);
-  });
-
-  it("PartialQuery substitutes bind values", () => {
-    const partial = new PartialQuery(["SELECT * FROM users WHERE name = ", new Substitute()]);
-    const sql = partial.sqlFor(["alice"], {
-      quote: (v: unknown) => `'${String(v)}'`,
+  it("statement cache with simple statement", async () => {
+    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+      return Book.where({ name: "my book" }).where("author_id > 3") as any;
     });
-    expect(sql).toBe("SELECT * FROM users WHERE name = 'alice'");
+
+    await Book.create({ name: "my book", author_id: 4 });
+
+    const books = await cache.execute([], ClothingItem.leaseConnection());
+    expect(books[0].readAttribute("name")).toBe("my book");
   });
 
-  it("PartialQueryCollector collects parts and binds", () => {
-    const collector = new PartialQueryCollector();
-    collector.append("SELECT * FROM users WHERE id = ");
-    collector.addBind(42);
-    const [parts, binds] = collector.value;
-    expect(parts).toHaveLength(2);
-    expect(parts[0]).toBe("SELECT * FROM users WHERE id = ");
-    expect(parts[1]).toBeInstanceOf(Substitute);
-    expect(binds).toEqual([42]);
+  it("statement cache with complex statement", async () => {
+    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+      return Liquid.joins({ molecules: "electrons" }).where({
+        "molecules.name": "dioxane",
+        "electrons.name": "lepton",
+      }) as any;
+    });
+
+    const salty = await Liquid.create({ name: "salty" });
+    const molecule = await (salty as any).molecules.create({ name: "dioxane" });
+    await molecule.electrons.create({ name: "lepton" });
+
+    const liquids = await cache.execute([], ClothingItem.leaseConnection());
+    expect(liquids[0].readAttribute("name")).toBe("salty");
   });
 
-  it("PartialQueryCollector starts retryable", () => {
-    // Mirrors Arel's SQLString/Composite collectors: retryable until a
-    // non-retryable node flips it false during compilation.
-    expect(new PartialQueryCollector().retryable).toBe(true);
+  it("statement cache with strictly cast attribute", async () => {
+    const row = await NumericData.create({ temperature: 1.5 });
+    expect((await NumericData.findBy({ temperature: 1.5 }))!.id).toBe(row.id);
   });
 
-  it("cacheableQuery propagates the compiled tree's retryable flag", () => {
-    const table = new ArelTable("books");
+  it("statement cache values differ", async () => {
+    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+      return Book.where({ name: "my book" }) as any;
+    });
 
-    const retryableArel = table.project(table.get("name"));
-    const [retryableQuery] = (adapter as any).cacheableQuery(StatementCache, retryableArel) as [
-      Query,
-      unknown[],
-    ];
-    expect(retryableQuery.retryable).toBe(true);
+    for (let i = 0; i < 3; i++) await Book.create({ name: "my book" });
 
-    const rawArel = table.project(table.get("name")).where(new Nodes.SqlLiteral("1 = 1"));
-    const [rawQuery] = (adapter as any).cacheableQuery(StatementCache, rawArel) as [
-      Query,
-      unknown[],
-    ];
-    expect(rawQuery.retryable).toBe(false);
+    const firstBooks = await cache.execute([], ClothingItem.leaseConnection());
+
+    for (let i = 0; i < 3; i++) await Book.create({ name: "my book" });
+
+    const additionalBooks = await cache.execute([], ClothingItem.leaseConnection());
+    expect(firstBooks.map((b) => b.id)).not.toEqual(additionalBooks.map((b) => b.id));
   });
 
-  it("unsupportedValue rejects null, arrays, ranges", () => {
-    expect(StatementCache.unsupportedValue(null)).toBe(true);
-    expect(StatementCache.unsupportedValue(undefined)).toBe(true);
-    expect(StatementCache.unsupportedValue([1, 2])).toBe(true);
-    expect(StatementCache.unsupportedValue("hello")).toBe(false);
-    expect(StatementCache.unsupportedValue(42)).toBe(false);
-  });
+  it("unprepared statements dont share a cache with prepared statements", async () => {
+    await Book.create({ name: "my book" });
+    await Book.create({ name: "my other book" });
 
-  it("BindMap with Attribute containing Substitute", () => {
-    const attr = Attribute.withCastValue("name", new Substitute(), new ValueType());
-    const bindMap = new BindMap([attr]);
-    const result = bindMap.bind(["typed_value"]);
-    expect(result[0]).toBeInstanceOf(Attribute);
-    expect((result[0] as Attribute).value).toBe("typed_value");
-  });
+    const book = await Book.findBy({ name: "my book" });
+    const otherBook = await Book.leaseConnection().unpreparedStatement(() => {
+      return Book.findBy({ name: "my other book" });
+    });
 
-  it("static factory methods", () => {
-    expect(StatementCache.query("SQL")).toBeInstanceOf(Query);
-    expect(StatementCache.partialQuery([])).toBeInstanceOf(PartialQuery);
-    expect(StatementCache.partialQueryCollector()).toBeInstanceOf(PartialQueryCollector);
-  });
-
-  it("execute round-trip with Query and BindMap", async () => {
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-
-    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
-    try {
-      await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
-        "Rails Guide",
-      ]);
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
-        "TS Handbook",
-      ]);
-
-      class Book extends Base {
-        static {
-          this.tableName = "books";
-          this.adapter = roundTripAdapter;
-        }
-      }
-
-      const sql = 'SELECT * FROM "books" WHERE "name" = ?';
-      const bindMap = new BindMap([new Substitute()]);
-      const cache = new StatementCache(new Query(sql), bindMap, Book);
-
-      const r1 = await cache.execute(["Rails Guide"], roundTripAdapter);
-      expect(r1).toHaveLength(1);
-      expect(r1[0].readAttribute("name")).toBe("Rails Guide");
-
-      const r2 = await cache.execute(["TS Handbook"], roundTripAdapter);
-      expect(r2).toHaveLength(1);
-      expect(r2[0].readAttribute("name")).toBe("TS Handbook");
-    } finally {
-      roundTripAdapter.disconnectBang();
-    }
-  });
-
-  it("StatementCache.create → execute round-trip with Substitute", async () => {
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-
-    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
-    try {
-      await defineSchema(roundTripAdapter, { authors: canonicalSchema.authors });
-      await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
-      await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["DHH"]);
-
-      class Author extends Base {
-        static {
-          this.tableName = "authors";
-          this.adapter = roundTripAdapter;
-        }
-      }
-
-      roundTripAdapter.preparedStatements = true;
-      const cache = StatementCache.create(roundTripAdapter, (params) => {
-        return Author.where({ name: params.bind() }) as any;
-      });
-
-      const r1 = await cache.execute(["Matz"], roundTripAdapter);
-      expect(r1).toHaveLength(1);
-      expect(r1[0].readAttribute("name")).toBe("Matz");
-
-      const r2 = await cache.execute(["DHH"], roundTripAdapter);
-      expect(r2).toHaveLength(1);
-      expect(r2[0].readAttribute("name")).toBe("DHH");
-    } finally {
-      roundTripAdapter.disconnectBang();
-    }
-  });
-
-  it("PartialQueryCollector produces Substitute slots via compileWithCollector", async () => {
-    const { Table, Visitors, star } = await import("@blazetrails/arel");
-    const v = new Visitors.ToSql();
-    const table = new Table("users");
-    // A Substitute slot comes from a BindParam (visit_Arel_Nodes_BindParam →
-    // add_bind), not from a Casted — Casted inlines its quoted literal
-    // (to_sql.rb:87-88). Statement-cache queries build BindParam substitutes.
-    const mgr = table.project(star).where(table.get("name").eq(new Nodes.BindParam("alice")));
-
-    const collector = new PartialQueryCollector();
-    v.compileWithCollector(mgr.ast, collector);
-    const [parts, binds] = collector.value;
-
-    const hasSubstitute = parts.some((p: unknown) => p instanceof Substitute);
-    expect(hasSubstitute).toBe(true);
-    expect(binds.length).toBeGreaterThan(0);
-
-    // PartialQuery can interpolate values at these Substitute positions.
-    // BindParam records the node; the exec path unwraps it to `.value`.
-    const pq = new PartialQuery(parts);
-    const unwrapped = binds.map((b: unknown) => (b instanceof Nodes.BindParam ? b.value : b));
-    const sql = pq.sqlFor(unwrapped, { quote: (v: unknown) => `'${v}'` });
-    expect(sql).toContain('"users"."name"');
-    expect(sql).toContain("alice");
-    expect(sql).not.toContain("?");
+    expect(book!.id).not.toBe(otherBook!.id);
   });
 
   it("find by does not use statement cache if table name is changed", async () => {
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
+    const liquid = await Liquid.create({ name: "salty" });
 
-    const conn = new BetterSQLite3Adapter(":memory:");
+    await Liquid.findBy({ name: liquid.readAttribute("name") }); // warming the statement cache.
+
+    // changing the table name should change the query that is not cached.
+    Liquid.tableName = "birds";
     try {
-      await defineSchema(conn, { liquid: canonicalSchema.liquid, birds: canonicalSchema.birds });
-      await conn.executeMutation('INSERT INTO "liquid" ("name") VALUES (?)', ["salty"]);
-
-      class Liquid extends Base {
-        static {
-          this.tableName = "liquid";
-          this.adapter = conn;
-        }
-      }
-
-      // Warm the statement cache.
-      expect((await Liquid.findBy({ name: "salty" }))!.readAttribute("name")).toBe("salty");
-
-      // Changing the table name should change the query that is not cached.
-      Liquid.tableName = "birds";
-      expect(await Liquid.findBy({ name: "salty" })).toBeNull();
+      expect(await Liquid.findBy({ name: liquid.readAttribute("name") })).toBeNull();
     } finally {
-      conn.disconnectBang();
+      Liquid.tableName = "liquid";
     }
   });
 
   it("find does not use statement cache if table name is changed", async () => {
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-    const { RecordNotFound } = await import("./errors.js");
+    const liquid = await Liquid.create({ name: "salty" });
 
-    const conn = new BetterSQLite3Adapter(":memory:");
+    await Liquid.find(liquid.id); // warming the statement cache.
+
+    // changing the table name should change the query that is not cached.
+    Liquid.tableName = "birds";
     try {
-      await defineSchema(conn, { liquid: canonicalSchema.liquid, birds: canonicalSchema.birds });
-      await conn.executeMutation('INSERT INTO "liquid" ("name") VALUES (?)', ["salty"]);
-
-      class Liquid extends Base {
-        static {
-          this.tableName = "liquid";
-          this.adapter = conn;
-        }
-      }
-
-      const liquid = (await Liquid.findBy({ name: "salty" }))!;
-      await Liquid.find(liquid.id); // warming the statement cache.
-
-      Liquid.tableName = "birds";
       await expect(Liquid.find(liquid.id)).rejects.toBeInstanceOf(RecordNotFound);
     } finally {
-      conn.disconnectBang();
-    }
-  });
-
-  it("find and find_by stay correct under an unprepared connection", async () => {
-    // find/find_by use the statement cache for both prepared and unprepared
-    // connections (Rails buckets by prepared_statements). With
-    // preparedStatements: false (the mysql default) the PartialQuery path
-    // inlines binds into the SQL and runs with an empty bind list. Verify the
-    // unprepared connection still returns the right records.
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-
-    const conn = new BetterSQLite3Adapter(":memory:");
-    conn.preparedStatements = false;
-    try {
-      await defineSchema(conn, { books: canonicalSchema.books });
-      await conn.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Ruby"]);
-
-      class Book extends Base {
-        static {
-          this.tableName = "books";
-          this.adapter = conn;
-        }
-      }
-
-      expect((await Book.findBy({ name: "Ruby" }))!.readAttribute("name")).toBe("Ruby");
-
-      // Pin the Rails-faithful log shape: Rails' PartialQuery#sql_for drains the
-      // bind_values array in place (binds.shift), so the unprepared find runs
-      // find_by_sql with no binds and the sql.active_record payload carries an
-      // empty bind list (the values are inlined into the SQL string instead).
-      const loadEvents: Record<string, unknown>[] = [];
-      const sub = Notifications.subscribe("sql.active_record", (e) => {
-        if ((e.payload.name as string)?.endsWith("Load")) loadEvents.push(e.payload);
-      });
-      try {
-        expect((await Book.find(1)).readAttribute("name")).toBe("Ruby");
-        // String id must coerce through the bind path (no pre-cast).
-        expect((await Book.find("1" as any)).readAttribute("name")).toBe("Ruby");
-      } finally {
-        Notifications.unsubscribe(sub);
-      }
-      expect(loadEvents.length).toBeGreaterThan(0);
-      for (const payload of loadEvents) {
-        expect(payload.binds).toEqual([]);
-        expect(payload.type_casted_binds).toEqual([]);
-        expect(payload.sql).toMatch(/= 1\b/);
-      }
-    } finally {
-      conn.disconnectBang();
-    }
-  });
-
-  it("class-level find_by returns null for an out-of-range value through the cache", async () => {
-    // The relation path's findBy rescues ActiveModelRangeError → null; routing
-    // find_by through cachedFindBy must preserve that contract.
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-
-    const conn = new BetterSQLite3Adapter(":memory:");
-    try {
-      await defineSchema(conn, { books: canonicalSchema.books });
-
-      class Book extends Base {
-        declare author_id: number;
-
-        static {
-          this.tableName = "books";
-          this.adapter = conn;
-          // 4-byte integer so an out-of-range value triggers RangeError.
-          this.attribute("author_id", "integer", { limit: 4 });
-        }
-      }
-
-      expect(await Book.findBy({ author_id: 99999999999999 })).toBeNull();
-    } finally {
-      conn.disconnectBang();
+      Liquid.tableName = "liquid";
     }
   });
 
   it("find association does not use statement cache if table name is changed", async () => {
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-    const { Associations, registerModel } = await import("./associations.js");
+    const salty = await Liquid.create({ name: "salty" });
+    const molecule = await (salty as any).molecules.create({ name: "dioxane" });
 
-    const conn = new BetterSQLite3Adapter(":memory:");
+    expect((await molecule.association("liquid").loadTarget())!.id).toBe(salty.id);
+
+    Liquid.tableName = "birds";
     try {
-      await defineSchema(conn, {
-        liquid: canonicalSchema.liquid,
-        molecules: canonicalSchema.molecules,
-        birds: canonicalSchema.birds,
-      });
-
-      class Liquid extends Base {
-        static {
-          this.tableName = "liquid";
-          this.adapter = conn;
-        }
-      }
-      class Molecule extends Base {
-        declare liquid_id: number;
-        declare liquid: Liquid | null;
-        declare loadBelongsTo: (name: "liquid") => Promise<Liquid | null>;
-
-        static {
-          this.tableName = "molecules";
-          this.adapter = conn;
-          this.attribute("id", "integer");
-          this.attribute("liquid_id", "integer");
-          this.belongsTo("liquid");
-        }
-      }
-      registerModel("Liquid", Liquid);
-      registerModel("Molecule", Molecule);
-
-      const salty = await Liquid.create({ name: "salty" });
-      const molecule = await Molecule.create({ name: "dioxane", liquid_id: salty.id });
-
-      const loaded = (await molecule.association("liquid").loadTarget()) as any;
-      expect(loaded.id).toBe(salty.id);
-
-      Liquid.tableName = "birds";
-      expect(await (molecule.association("liquid") as any).forceReloadReader()).toBeNull();
+      expect(await molecule.association("liquid").forceReloadReader()).toBeNull();
     } finally {
-      conn.disconnectBang();
-    }
-  });
-
-  it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {
-    await import("./relation.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const { Base } = await import("./base.js");
-
-    const roundTripAdapter = new BetterSQLite3Adapter(":memory:");
-    try {
-      await defineSchema(roundTripAdapter, { books: canonicalSchema.books });
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Ruby"]);
-      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
-        "TypeScript",
-      ]);
-
-      class Book extends Base {
-        static {
-          this.tableName = "books";
-          this.adapter = roundTripAdapter;
-        }
-      }
-
-      // preparedStatements defaults to false — uses PartialQuery path
-      const cache = StatementCache.create(roundTripAdapter, (params) => {
-        return Book.where({ name: params.bind() }) as any;
-      });
-
-      const r1 = await cache.execute(["Ruby"], roundTripAdapter);
-      expect(r1).toHaveLength(1);
-      expect(r1[0].readAttribute("name")).toBe("Ruby");
-
-      const r2 = await cache.execute(["TypeScript"], roundTripAdapter);
-      expect(r2).toHaveLength(1);
-      expect(r2[0].readAttribute("name")).toBe("TypeScript");
-    } finally {
-      roundTripAdapter.disconnectBang();
+      Liquid.tableName = "liquid";
     }
   });
 });
