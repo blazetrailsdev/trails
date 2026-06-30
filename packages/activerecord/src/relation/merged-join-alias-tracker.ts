@@ -58,11 +58,12 @@ export function buildMergedJoinAliasTracker(
       // and claims it, repeats alias to `{plural_name}_{owner_table}`.
       tracker.aliasNameForTable(c.table, () => `${pluralize(underscore(c.assoc!))}_${ownerTable}`);
     } else if ((tracker.aliases.get(c.table) ?? 0) === 0) {
-      // Raw two-arg `joins(table, on)` clause (no reflection): Rails emits these
-      // verbatim and only seeds their table into the alias_tracker so a later
-      // association/merged join onto the same table collides — the raw join
-      // itself is never aliased. Claim the table without an alias candidate
-      // (the assoc-less candidate would be the malformed `_owner_table`).
+      // Raw explicit-ON join clause with no reflection (e.g. the
+      // `leftJoins(table, on)` form): Rails emits these verbatim and only seeds
+      // their table into the alias_tracker so a later association/merged join
+      // onto the same table collides — the raw join itself is never aliased.
+      // Claim the table without an alias candidate (the assoc-less candidate
+      // would be the malformed `_owner_table`).
       tracker.aliases.set(c.table, 1);
     }
   }

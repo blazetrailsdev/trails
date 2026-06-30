@@ -4676,8 +4676,9 @@ export class Relation<T extends Base> {
    * `_namedInnerJoins`. A value assigned then read back is preserved by
    * category, but — matching the reader's concat order — named joins always
    * precede raw joins regardless of their original interleaving. The
-   * SQL-emitted `_joinClauses` (trails-only `joins(table, on)` form) are not
-   * part of `joins_values` and are left untouched.
+   * SQL-emitted `_joinClauses` (the explicit-ON `leftJoins(table, on)` form and
+   * where-association joins) are not part of `joins_values` and are left
+   * untouched.
    */
   set joinsValues(value: (AssociationSpec | string | Nodes.Join)[]) {
     this.assertModifiableBang();
