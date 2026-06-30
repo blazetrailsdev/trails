@@ -3079,9 +3079,10 @@ export class Migrator {
         status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
         version: normV,
         // Mirrors Rails: `(name + scope).humanize` — the snake-case filename
-        // part, humanized (migration.rb:1331). Our proxy carries the camelized
-        // class name, so underscore it back before humanizing.
-        name: humanize(underscore(m.name)),
+        // part concatenated with the scope suffix, humanized (migration.rb:1330).
+        // Our proxy carries the camelized class name, so underscore it back
+        // before appending the (already snake-case) scope and humanizing.
+        name: humanize(underscore(m.name) + (m.scope ?? "")),
       };
     });
 
