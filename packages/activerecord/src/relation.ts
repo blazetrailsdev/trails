@@ -3511,8 +3511,12 @@ export class Relation<T extends Base> {
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // when stashed joins exist, non-LeadingJoin nodes go to join_node (appended
     // after), LeadingJoin goes to leading_join (prepended before). Without
-    // stashed joins all nodes go to leading_join (Rails' else branch).
+    // stashed joins all nodes go to leading_join (Rails' else branch). A passed
+    // `eagerJd` IS Rails' `stashed_eager_load`, so it counts toward the
+    // `stashed_eager_load || stashed_left_joins` guard even when the eager load
+    // came from promoted `includes(...).references(...)` (no `_eagerLoadAssociations`).
     const hasStashed =
+      eagerJd !== undefined ||
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
       this._leftOuterJoinsValues.length > 0 ||
