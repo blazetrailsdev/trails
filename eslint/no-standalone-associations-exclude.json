@@ -269,7 +269,6 @@
   "packages/activerecord/src/locking.test.ts::LockPerson::hasMany::lockPersonalLegacyThings",
   "packages/activerecord/src/nested-attributes.test.ts::Article::hasMany::tags",
   "packages/activerecord/src/nested-attributes.test.ts::Post::hasMany::comments",
-  "packages/activerecord/src/query-cache.test.ts::Post::hasAndBelongsToMany::categories",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::belongsTo::author",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::belongsTo::post",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::hasMany::comments",
