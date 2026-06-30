@@ -224,11 +224,11 @@ describeIfMysql("Mysql2Adapter", () => {
     it("#exec_query queries with an empty result set still return the columns", async () => {
       // Mirrors adapter_test.rb: a zero-row SELECT must still report its
       // columns from the field descriptors, not collapse to an empty Result.
-      // `subscribers` mirrors the canonical test schema.rb definition
+      // `ca_subscribers` mirrors the canonical test schema.rb definition
       // (id: false; nick/name/books_count; unique index on nick).
-      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_subscribers`");
       await adapter.executeMutation(
-        "CREATE TABLE `subscribers` (" +
+        "CREATE TABLE `ca_subscribers` (" +
           "`nick` VARCHAR(255) NOT NULL, " +
           "`name` VARCHAR(255), " +
           "`books_count` INT NOT NULL DEFAULT 0, " +
@@ -236,12 +236,12 @@ describeIfMysql("Mysql2Adapter", () => {
           ") ENGINE=InnoDB",
       );
       try {
-        const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
+        const result = await adapter.execQuery("SELECT * FROM ca_subscribers WHERE 1=0");
         expect(result).toBeInstanceOf(Result);
         expect(result.rows).toEqual([]);
         expect(result.columns).toEqual(["nick", "name", "books_count"]);
       } finally {
-        await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+        await adapter.executeMutation("DROP TABLE IF EXISTS `ca_subscribers`");
       }
     });
     it("database exists returns false if database does not exist", async () => {
@@ -262,53 +262,53 @@ describeIfMysql("Mysql2Adapter", () => {
     // Mysql2AdapterTest so test paths match Rails (no extra describe level).
     // Mirrors Rails: test/cases/adapters/mysql2/mysql2_adapter_test.rb:136–270
     //
-    //   old_cars    — integer PK  (Rails' old_cars fixture)
-    //   cars        — bigint PK   (Rails' cars fixture)
-    //   subscribers — varchar PK  (Rails' subscribers fixture)
-    //   engines     — bigint PK, used as the referencing table
+    //   ca_old_cars    — integer PK  (Rails' ca_old_cars fixture)
+    //   ca_cars        — bigint PK   (Rails' ca_cars fixture)
+    //   ca_subscribers — varchar PK  (Rails' ca_subscribers fixture)
+    //   ca_engines     — bigint PK, used as the referencing table
     beforeEach(async () => {
-      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_engines`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_old_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_subscribers`");
       await adapter.executeMutation(
-        "CREATE TABLE `old_cars` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
+        "CREATE TABLE `ca_old_cars` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
       );
       await adapter.executeMutation(
-        "CREATE TABLE `cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
+        "CREATE TABLE `ca_cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
       );
       await adapter.executeMutation(
-        "CREATE TABLE `subscribers` (`nick` VARCHAR(255) NOT NULL PRIMARY KEY) ENGINE=InnoDB",
+        "CREATE TABLE `ca_subscribers` (`nick` VARCHAR(255) NOT NULL PRIMARY KEY) ENGINE=InnoDB",
       );
       await adapter.executeMutation(
-        "CREATE TABLE `engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `old_car_id` BIGINT) ENGINE=InnoDB",
+        "CREATE TABLE `ca_engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `old_car_id` BIGINT) ENGINE=InnoDB",
       );
     });
 
     afterEach(async () => {
-      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_engines`");
       await adapter.executeMutation("DROP TABLE IF EXISTS `foos`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_old_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_subscribers`");
     });
 
     it("errors for bigint fks on integer pk table in alter table", async () => {
-      // engines.old_car_id is BIGINT but old_cars.id is INT — type mismatch
+      // ca_engines.old_car_id is BIGINT but ca_old_cars.id is INT — type mismatch
       const error = await adapter
         .executeMutation(
-          "ALTER TABLE `engines` ADD CONSTRAINT `fk_test` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
+          "ALTER TABLE `ca_engines` ADD CONSTRAINT `fk_test` FOREIGN KEY (`old_car_id`) REFERENCES `ca_old_cars` (`id`)",
         )
         .then(() => null)
         .catch((e) => e);
 
       expect(error).toBeInstanceOf(MismatchedForeignKey);
       expect(error.message).toMatch(
-        /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+        /Column `old_car_id` on table `ca_engines` does not match column `id` on `ca_old_cars`/,
       );
       expect(error.message).toMatch(/which has type `int/i);
       expect(error.message).toMatch(
-        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
+        /To resolve this issue, change the type of the `old_car_id` column on `ca_engines` to be :integer/,
       );
       expect(error.cause).toBeInstanceOf(Error);
     });
@@ -317,22 +317,22 @@ describeIfMysql("Mysql2Adapter", () => {
     it.skipIf(isMariaDb)(
       "errors for multiple fks on mismatched types for pk table in alter table",
       async () => {
-        // Add matching FK first (cars.id is BIGINT, engines.id is BIGINT — OK)
+        // Add matching FK first (ca_cars.id is BIGINT, ca_engines.id is BIGINT — OK)
         await adapter.executeMutation(
-          "ALTER TABLE `engines` ADD COLUMN `car_id` BIGINT, ADD CONSTRAINT `fk_car` FOREIGN KEY (`car_id`) REFERENCES `cars` (`id`)",
+          "ALTER TABLE `ca_engines` ADD COLUMN `car_id` BIGINT, ADD CONSTRAINT `fk_car` FOREIGN KEY (`car_id`) REFERENCES `ca_cars` (`id`)",
         );
 
-        // Then add mismatched FK (old_cars.id is INT but old_car_id is BIGINT)
+        // Then add mismatched FK (ca_old_cars.id is INT but old_car_id is BIGINT)
         const error = await adapter
           .executeMutation(
-            "ALTER TABLE `engines` ADD CONSTRAINT `fk_old_car` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
+            "ALTER TABLE `ca_engines` ADD CONSTRAINT `fk_old_car` FOREIGN KEY (`old_car_id`) REFERENCES `ca_old_cars` (`id`)",
           )
           .then(() => null)
           .catch((e) => e);
 
         expect(error).toBeInstanceOf(MismatchedForeignKey);
         expect(error.message).toMatch(
-          /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+          /Column `old_car_id` on table `ca_engines` does not match column `id` on `ca_old_cars`/,
         );
         expect(error.message).toMatch(/which has type `int/i);
         expect(error.cause).toBeInstanceOf(Error);
@@ -340,7 +340,7 @@ describeIfMysql("Mysql2Adapter", () => {
     );
 
     it("errors for bigint fks on integer pk table in create table", async () => {
-      // foos.old_car_id is BIGINT but old_cars.id is INT
+      // foos.old_car_id is BIGINT but ca_old_cars.id is INT
       const error = await adapter
         .executeMutation(
           `
@@ -348,7 +348,7 @@ describeIfMysql("Mysql2Adapter", () => {
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
               \`old_car_id\` BIGINT,
               INDEX \`idx_old_car_id\` (\`old_car_id\`),
-              CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`old_cars\` (\`id\`)
+              CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`ca_old_cars\` (\`id\`)
             ) ENGINE=InnoDB
           `,
         )
@@ -357,7 +357,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
       expect(error).toBeInstanceOf(MismatchedForeignKey);
       expect(error.message).toMatch(
-        /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`/,
+        /Column `old_car_id` on table `foos` does not match column `id` on `ca_old_cars`/,
       );
       expect(error.message).toMatch(/which has type `int/i);
       expect(error.message).toMatch(
@@ -367,7 +367,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("errors for integer fks on bigint pk table in create table", async () => {
-      // foos.car_id is INT but cars.id is BIGINT
+      // foos.car_id is INT but ca_cars.id is BIGINT
       const error = await adapter
         .executeMutation(
           `
@@ -375,7 +375,7 @@ describeIfMysql("Mysql2Adapter", () => {
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
               \`car_id\` INT,
               INDEX \`idx_car_id\` (\`car_id\`),
-              CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`cars\` (\`id\`)
+              CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`ca_cars\` (\`id\`)
             ) ENGINE=InnoDB
           `,
         )
@@ -384,7 +384,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
       expect(error).toBeInstanceOf(MismatchedForeignKey);
       expect(error.message).toMatch(
-        /Column `car_id` on table `foos` does not match column `id` on `cars`/,
+        /Column `car_id` on table `foos` does not match column `id` on `ca_cars`/,
       );
       expect(error.message).toMatch(/which has type `bigint/i);
       expect(error.message).toMatch(
@@ -394,7 +394,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("errors for bigint fks on string pk table in create table", async () => {
-      // foos.subscriber_id is BIGINT but subscribers.nick is VARCHAR
+      // foos.subscriber_id is BIGINT but ca_subscribers.nick is VARCHAR
       const error = await adapter
         .executeMutation(
           `
@@ -402,7 +402,7 @@ describeIfMysql("Mysql2Adapter", () => {
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
               \`subscriber_id\` BIGINT,
               INDEX \`idx_subscriber_id\` (\`subscriber_id\`),
-              CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`subscribers\` (\`nick\`)
+              CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`ca_subscribers\` (\`nick\`)
             ) ENGINE=InnoDB
           `,
         )
@@ -411,7 +411,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
       expect(error).toBeInstanceOf(MismatchedForeignKey);
       expect(error.message).toMatch(
-        /Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`/,
+        /Column `subscriber_id` on table `foos` does not match column `nick` on `ca_subscribers`/,
       );
       expect(error.message).toMatch(/which has type `varchar/i);
       expect(error.message).toMatch(

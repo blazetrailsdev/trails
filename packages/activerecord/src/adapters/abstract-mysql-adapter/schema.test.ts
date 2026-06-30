@@ -4,9 +4,7 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { defineFixtures } from "../../test-helpers/define-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -52,10 +50,16 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("schema", async () => {
-      await defineSchema(adapter, { posts: canonicalSchema.posts });
+      // Scratch table `ca_posts` (non-canonical) instead of the canonical `posts`
+      // so the one-schema harness never sees a canonical table created/dropped.
+      await adapter.createTable("ca_posts", { force: true }, (t: any) => {
+        t.string("title");
+        t.text("body");
+        t.string("type");
+      });
       try {
         class Post extends Base {
-          static _tableName = "posts";
+          static _tableName = "ca_posts";
         }
         Post.attribute("id", "integer");
         Post.attribute("title", "string");
@@ -67,7 +71,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
         const db = await adapter.currentDatabase();
         class OmgPost extends Base {
-          static _tableName = `${db}.posts`;
+          static _tableName = `${db}.ca_posts`;
         }
         OmgPost.inheritanceColumn = "disabled";
         OmgPost.attribute("id", "integer");
@@ -77,27 +81,27 @@ describeIfMysql("Mysql2Adapter", () => {
         const first = await (OmgPost as any).first();
         expect(first).toBeTruthy();
       } finally {
-        await adapter.dropTable("posts", { ifExists: true });
+        await adapter.dropTable("ca_posts", { ifExists: true });
       }
     });
 
     it("primary key", async () => {
-      await defineSchema(adapter, { topics: canonicalSchema.topics });
+      await adapter.createTable("ca_topics", { force: true });
       try {
-        expect(await adapter.primaryKey("topics")).toBe("id");
+        expect(await adapter.primaryKey("ca_topics")).toBe("id");
       } finally {
-        await adapter.dropTable("topics", { ifExists: true });
+        await adapter.dropTable("ca_topics", { ifExists: true });
       }
     });
 
     it("data source exists?", async () => {
-      await defineSchema(adapter, { topics: canonicalSchema.topics });
+      await adapter.createTable("ca_topics", { force: true });
       try {
         const db = await adapter.currentDatabase();
-        // Rails passes @omgpost.table_name, which is the qualified `db.topics` form.
-        expect(await adapter.dataSourceExists(`${db}.topics`)).toBe(true);
+        // Rails passes @omgpost.table_name, which is the qualified `db.ca_topics` form.
+        expect(await adapter.dataSourceExists(`${db}.ca_topics`)).toBe(true);
       } finally {
-        await adapter.dropTable("topics", { ifExists: true });
+        await adapter.dropTable("ca_topics", { ifExists: true });
       }
     });
 
@@ -200,31 +204,35 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
-    await defineSchema(a, { topics: canonicalSchema.topics });
+    await a.createTable("ca_topics", { force: true });
     try {
-      expect(await a.primaryKey("topics")).toBe("id");
+      expect(await a.primaryKey("ca_topics")).toBe("id");
     } finally {
-      await a.dropTable("topics", { ifExists: true });
+      await a.dropTable("ca_topics", { ifExists: true });
     }
   });
 
   it("foreign keys method with ansi quotes", async () => {
     const a = ansi!;
-    // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
-    // student_id referencing students(id) — both from the canonical schema.
-    await defineSchema(a, {
-      students: canonicalSchema.students,
-      lessons_students: canonicalSchema.lessons_students,
+    // Scratch tables `ca_lessons_students` (id:false, student_id) referencing
+    // `ca_students`(id), mirroring Rails' lessons_students/students shape but on
+    // non-canonical names so the one-schema harness never sees a canonical drop.
+    await a.createTable("ca_students", { force: true });
+    await a.createTable("ca_lessons_students", { id: false, force: true }, (t: any) => {
+      t.integer("student_id");
     });
     try {
-      await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
-      const fks = await a.foreignKeys("lessons_students");
+      await a.addForeignKey("ca_lessons_students", "ca_students", {
+        column: "student_id",
+        onDelete: "cascade",
+      });
+      const fks = await a.foreignKeys("ca_lessons_students");
       expect(fks).toHaveLength(1);
-      expect(fks[0].fromTable).toBe("lessons_students");
-      expect(fks[0].toTable).toBe("students");
+      expect(fks[0].fromTable).toBe("ca_lessons_students");
+      expect(fks[0].toTable).toBe("ca_students");
       expect(fks[0].onDelete).toBe("cascade");
     } finally {
-      await a.dropTable("lessons_students", "students", { ifExists: true });
+      await a.dropTable("ca_lessons_students", "ca_students", { ifExists: true });
     }
   });
 });

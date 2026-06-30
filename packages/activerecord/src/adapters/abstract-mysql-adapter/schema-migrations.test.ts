@@ -17,28 +17,28 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("SchemaMigrationsTest", () => {
     it("renaming index on foreign key", async () => {
-      // Fixture tables — mirrors Rails' engines/cars fixtures
-      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
+      // Fixture tables — mirrors Rails engines/cars fixtures, renamed off canonical names
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_engines`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ca_cars`");
       await adapter.executeMutation(
-        "CREATE TABLE `cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
+        "CREATE TABLE `ca_cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
       );
       await adapter.executeMutation(
-        "CREATE TABLE `engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `car_id` BIGINT) ENGINE=InnoDB",
+        "CREATE TABLE `ca_engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `car_id` BIGINT) ENGINE=InnoDB",
       );
       try {
-        await adapter.addIndex("engines", "car_id");
-        await adapter.addForeignKey("engines", "cars", { name: "fk_engines_cars" });
+        await adapter.addIndex("ca_engines", "car_id");
+        await adapter.addForeignKey("ca_engines", "ca_cars", { name: "fk_engines_cars" });
 
-        await adapter.renameIndex("engines", "index_engines_on_car_id", "idx_renamed");
-        const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
+        await adapter.renameIndex("ca_engines", "index_ca_engines_on_car_id", "idx_renamed");
+        const idxNames = (await adapter.indexes("ca_engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toContain("idx_renamed");
-        expect(idxNames).not.toContain("index_engines_on_car_id");
+        expect(idxNames).not.toContain("index_ca_engines_on_car_id");
 
-        await adapter.removeForeignKey("engines", { name: "fk_engines_cars" });
+        await adapter.removeForeignKey("ca_engines", { name: "fk_engines_cars" });
       } finally {
-        await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-        await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
+        await adapter.executeMutation("DROP TABLE IF EXISTS `ca_engines`");
+        await adapter.executeMutation("DROP TABLE IF EXISTS `ca_cars`");
       }
     });
 

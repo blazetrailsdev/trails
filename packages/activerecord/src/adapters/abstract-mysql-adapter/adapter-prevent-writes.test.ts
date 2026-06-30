@@ -9,13 +9,13 @@ describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-    await adapter.exec("DROP TABLE IF EXISTS `engines`");
+    await adapter.exec("DROP TABLE IF EXISTS `ca_engines`");
     await adapter.exec(
-      "CREATE TABLE `engines` (`id` int auto_increment primary key, `car_id` bigint)",
+      "CREATE TABLE `ca_engines` (`id` int auto_increment primary key, `car_id` bigint)",
     );
   });
   afterEach(async () => {
-    await adapter.exec("DROP TABLE IF EXISTS `engines`").catch(() => {});
+    await adapter.exec("DROP TABLE IF EXISTS `ca_engines`").catch(() => {});
     await adapter.close();
   });
 
@@ -33,52 +33,52 @@ describeIfMysql("Mysql2Adapter", () => {
     it("errors when an insert query is called while preventing writes", async () => {
       preventWrites(adapter);
       await expect(
-        adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')"),
+        adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')"),
       ).rejects.toBeInstanceOf(ReadOnlyError);
     });
 
     it("errors when an update query is called while preventing writes", async () => {
       allowWrites(adapter);
-      await adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
+      await adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')");
       preventWrites(adapter);
       await expect(
         adapter.execute(
-          "UPDATE `engines` SET `engines`.`car_id` = '9989' WHERE `engines`.`car_id` = '138853948594'",
+          "UPDATE `ca_engines` SET `ca_engines`.`car_id` = '9989' WHERE `ca_engines`.`car_id` = '138853948594'",
         ),
       ).rejects.toBeInstanceOf(ReadOnlyError);
     });
 
     it("errors when a delete query is called while preventing writes", async () => {
       allowWrites(adapter);
-      await adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
+      await adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')");
       preventWrites(adapter);
       await expect(
-        adapter.execute("DELETE FROM `engines` where `engines`.`car_id` = '138853948594'"),
+        adapter.execute("DELETE FROM `ca_engines` where `ca_engines`.`car_id` = '138853948594'"),
       ).rejects.toBeInstanceOf(ReadOnlyError);
     });
 
     it("errors when a replace query is called while preventing writes", async () => {
       allowWrites(adapter);
-      await adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
+      await adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')");
       preventWrites(adapter);
       await expect(
-        adapter.execute("REPLACE INTO `engines` SET `engines`.`car_id` = '249823948'"),
+        adapter.execute("REPLACE INTO `ca_engines` SET `ca_engines`.`car_id` = '249823948'"),
       ).rejects.toBeInstanceOf(ReadOnlyError);
     });
 
     it("doesnt error when a select query is called while preventing writes", async () => {
       allowWrites(adapter);
-      await adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
+      await adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')");
       preventWrites(adapter);
       const rows = await adapter.execute(
-        "SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594'",
+        "SELECT `ca_engines`.* FROM `ca_engines` WHERE `ca_engines`.`car_id` = '138853948594'",
       );
       expect(rows).toHaveLength(1);
     });
 
     it("doesnt error when a show query is called while preventing writes", async () => {
       preventWrites(adapter);
-      const rows = await adapter.execute("SHOW FULL FIELDS FROM `engines`");
+      const rows = await adapter.execute("SHOW FULL FIELDS FROM `ca_engines`");
       expect(rows).toHaveLength(2);
     });
 
@@ -91,22 +91,22 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("doesnt error when a describe query is called while preventing writes", async () => {
       preventWrites(adapter);
-      const rows = await adapter.execute("DESCRIBE engines");
+      const rows = await adapter.execute("DESCRIBE ca_engines");
       expect(rows).toHaveLength(2);
     });
 
     it("doesnt error when a desc query is called while preventing writes", async () => {
       preventWrites(adapter);
-      const rows = await adapter.execute("DESC engines");
+      const rows = await adapter.execute("DESC ca_engines");
       expect(rows).toHaveLength(2);
     });
 
     it("doesnt error when a read query with leading chars is called while preventing writes", async () => {
       allowWrites(adapter);
-      await adapter.execute("INSERT INTO `engines` (`car_id`) VALUES ('138853948594')");
+      await adapter.execute("INSERT INTO `ca_engines` (`car_id`) VALUES ('138853948594')");
       preventWrites(adapter);
       const rows = await adapter.execute(
-        "/*action:index*/(\n( SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594' ) )",
+        "/*action:index*/(\n( SELECT `ca_engines`.* FROM `ca_engines` WHERE `ca_engines`.`car_id` = '138853948594' ) )",
       );
       expect(rows).toHaveLength(1);
     });

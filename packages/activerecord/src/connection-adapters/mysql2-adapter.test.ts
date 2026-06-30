@@ -67,16 +67,19 @@ describeIfMysql("Mysql2Adapter", () => {
   // Tables touched by any test in this suite. Dropped on BOTH sides of
   // each test so a crash that skips afterEach can't poison the next
   // run (which was causing intermittent CI failures with
-  // ER_TABLE_EXISTS_ERROR on leftover `users`).
+  // ER_TABLE_EXISTS_ERROR on leftover `ca_users`).
+  // Scratch tables use non-canonical `ca_`-prefixed names (Rails scratches on
+  // `horses`/`testings`) so this file never creates or drops a canonical
+  // `TEST_SCHEMA` table — required to ride the one-schema test harness.
   const TRACKED_TABLES = [
-    "books",
-    "authors",
-    "users",
-    "members",
-    "items",
-    "accounts",
-    "products",
-    "posts",
+    "ca_books",
+    "ca_authors",
+    "ca_users",
+    "ca_members",
+    "ca_items",
+    "ca_accounts",
+    "ca_products",
+    "ca_posts",
     "widgets",
     "bind_param_items",
     "exec_test_tbl",
@@ -87,11 +90,10 @@ describeIfMysql("Mysql2Adapter", () => {
   // `SET FOREIGN_KEY_CHECKS = 0` stays in scope for every subsequent
   // DROP on the same connection. Going through the adapter would take
   // a fresh pool connection per exec() and the SET would only apply
-  // to the first call. FK checks matter here because the shared
-  // test-adapter (packages/activerecord/src/test-adapter.ts) creates
-  // users/posts/etc. BEFORE this file runs and may add FK constraints
-  // that block a plain DROP TABLE, leaving leftovers that poison the
-  // very first test of each CI run.
+  // to the first call. FK checks matter here because a prior crashed run
+  // could leave `ca_`-scratch tables behind with FK constraints (e.g.
+  // ca_books.author_id) that block a plain DROP TABLE, leaving leftovers
+  // that poison the very first test of each CI run.
   const dropTrackedObjects = async (): Promise<void> => {
     const conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
     try {
@@ -100,7 +102,7 @@ describeIfMysql("Mysql2Adapter", () => {
       // so require-table-teardown can balance these raw-created names by name.
       try {
         await conn.query(
-          "DROP TABLE IF EXISTS `books`, `authors`, `users`, `members`, `items`, `accounts`, `products`",
+          "DROP TABLE IF EXISTS `ca_books`, `ca_authors`, `ca_users`, `ca_members`, `ca_items`, `ca_accounts`, `ca_products`",
         );
       } catch {
         /* ignore */
@@ -140,48 +142,54 @@ describeIfMysql("Mysql2Adapter", () => {
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
-      await adapter.exec("CREATE TABLE `users` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)");
-      await adapter.executeMutation("INSERT INTO `users` (`name`) VALUES ('Alice')");
-      const rows = await adapter.execute("SELECT * FROM `users`");
+      await adapter.exec(
+        "CREATE TABLE `ca_users` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)",
+      );
+      await adapter.executeMutation("INSERT INTO `ca_users` (`name`) VALUES ('Alice')");
+      const rows = await adapter.execute("SELECT * FROM `ca_users`");
       expect(rows).toHaveLength(1);
       expect(rows[0].name).toBe("Alice");
     });
 
     it("returns last insert id for INSERT", async () => {
-      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)");
-      const id1 = await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('A')");
-      const id2 = await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('B')");
+      await adapter.exec(
+        "CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)",
+      );
+      const id1 = await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('A')");
+      const id2 = await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('B')");
       expect(id1).toBe(1);
       expect(id2).toBe(2);
     });
 
     it("returns affected rows for UPDATE", async () => {
       await adapter.exec(
-        "CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `active` INT DEFAULT 1)",
+        "CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `active` INT DEFAULT 1)",
       );
-      await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('A')");
-      await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('B')");
-      const affected = await adapter.executeMutation("UPDATE `items` SET `active` = 0");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('A')");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('B')");
+      const affected = await adapter.executeMutation("UPDATE `ca_items` SET `active` = 0");
       expect(affected).toBe(2);
     });
 
     it("returns affected rows for DELETE", async () => {
-      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)");
-      await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('A')");
-      await adapter.executeMutation("INSERT INTO `items` (`name`) VALUES ('B')");
-      const deleted = await adapter.executeMutation("DELETE FROM `items` WHERE `name` = 'A'");
+      await adapter.exec(
+        "CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT)",
+      );
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('A')");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`) VALUES ('B')");
+      const deleted = await adapter.executeMutation("DELETE FROM `ca_items` WHERE `name` = 'A'");
       expect(deleted).toBe(1);
     });
 
     it("supports parameterized queries", async () => {
       await adapter.exec(
-        "CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `price` INT)",
+        "CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `price` INT)",
       );
-      await adapter.executeMutation("INSERT INTO `items` (`name`, `price`) VALUES ('A', 10)");
-      await adapter.executeMutation("INSERT INTO `items` (`name`, `price`) VALUES ('B', 20)");
-      await adapter.executeMutation("INSERT INTO `items` (`name`, `price`) VALUES ('C', 30)");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`, `price`) VALUES ('A', 10)");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`, `price`) VALUES ('B', 20)");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`name`, `price`) VALUES ('C', 30)");
 
-      const rows = await adapter.execute("SELECT * FROM `items` WHERE `price` > ?", [15]);
+      const rows = await adapter.execute("SELECT * FROM `ca_items` WHERE `price` > ?", [15]);
       expect(rows).toHaveLength(2);
     });
   });
@@ -225,53 +233,53 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("transactions", () => {
     beforeEach(async () => {
       await adapter.exec(
-        "CREATE TABLE `accounts` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `balance` INT)",
+        "CREATE TABLE `ca_accounts` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` TEXT, `balance` INT)",
       );
     });
 
     it("commits on success", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Alice', 100)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Alice', 100)",
       );
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Bob', 200)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Bob', 200)",
       );
       await adapter.commit();
 
-      const rows = await adapter.execute("SELECT * FROM `accounts`");
+      const rows = await adapter.execute("SELECT * FROM `ca_accounts`");
       expect(rows).toHaveLength(2);
     });
 
     it("rolls back on failure", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Alice', 100)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Alice', 100)",
       );
       await adapter.rollback();
 
-      const rows = await adapter.execute("SELECT * FROM `accounts`");
+      const rows = await adapter.execute("SELECT * FROM `ca_accounts`");
       expect(rows).toHaveLength(0);
     });
 
     it("savepoints allow partial rollback", async () => {
       await adapter.beginTransaction();
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Alice', 100)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Alice', 100)",
       );
 
       await adapter.createSavepoint("sp1");
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Bob', 200)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Bob', 200)",
       );
       await adapter.rollbackToSavepoint("sp1");
 
       await adapter.executeMutation(
-        "INSERT INTO `accounts` (`name`, `balance`) VALUES ('Charlie', 300)",
+        "INSERT INTO `ca_accounts` (`name`, `balance`) VALUES ('Charlie', 300)",
       );
       await adapter.commit();
 
-      const rows = await adapter.execute("SELECT * FROM `accounts`");
+      const rows = await adapter.execute("SELECT * FROM `ca_accounts`");
       expect(rows).toHaveLength(2);
       const names = rows.map((r) => r.name);
       expect(names).toContain("Alice");
@@ -292,6 +300,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("Base integration", () => {
     class User extends Base {
       static {
+        this._tableName = "ca_users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
@@ -301,7 +310,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     beforeEach(async () => {
       await adapter.exec(`
-        CREATE TABLE \`users\` (
+        CREATE TABLE \`ca_users\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` TEXT,
           \`email\` TEXT,
@@ -383,14 +392,14 @@ describeIfMysql("Mysql2Adapter", () => {
     class Member extends Base {
       static {
         this.attribute("id", "integer");
-        this._tableName = "members";
+        this._tableName = "ca_members";
         this.attribute("name", "string");
       }
     }
 
     beforeEach(async () => {
       await adapter.exec(
-        "CREATE TABLE `members` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(255), `gender` VARCHAR(1), `comments` VARCHAR(255))",
+        "CREATE TABLE `ca_members` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(255), `gender` VARCHAR(1), `comments` VARCHAR(255))",
       );
       Member.adapter = adapter;
       Member.resetColumnInformation();
@@ -405,7 +414,7 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(member.id).toBeGreaterThan(0);
 
       const row = await adapter.execQuery(
-        `SELECT gender, comments FROM members WHERE id = ${member.id}`,
+        `SELECT gender, comments FROM ca_members WHERE id = ${member.id}`,
       );
       expect(row.rows[0]).toEqual([null, null]);
     });
@@ -415,6 +424,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("Relation integration", () => {
     class Product extends Base {
       static {
+        this._tableName = "ca_products";
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("price", "integer");
@@ -424,7 +434,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     beforeEach(async () => {
       await adapter.exec(`
-        CREATE TABLE \`products\` (
+        CREATE TABLE \`ca_products\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` TEXT,
           \`price\` INT,
@@ -471,6 +481,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("transaction integration", () => {
     class Account extends Base {
       static {
+        this._tableName = "ca_accounts";
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("balance", "integer", { default: 0 });
@@ -480,7 +491,7 @@ describeIfMysql("Mysql2Adapter", () => {
     beforeEach(async () => {
       // InnoDB is required for transactions
       await adapter.exec(`
-        CREATE TABLE \`accounts\` (
+        CREATE TABLE \`ca_accounts\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` TEXT,
           \`balance\` INT DEFAULT 0
@@ -519,6 +530,7 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("associations integration", () => {
     class Author extends Base {
       static {
+        this._tableName = "ca_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
       }
@@ -526,6 +538,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
     class Book extends Base {
       static {
+        this._tableName = "ca_books";
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
@@ -534,13 +547,13 @@ describeIfMysql("Mysql2Adapter", () => {
 
     beforeEach(async () => {
       await adapter.exec(`
-        CREATE TABLE \`authors\` (
+        CREATE TABLE \`ca_authors\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`name\` TEXT
         )
       `);
       await adapter.exec(`
-        CREATE TABLE \`books\` (
+        CREATE TABLE \`ca_books\` (
           \`id\` INT AUTO_INCREMENT PRIMARY KEY,
           \`title\` TEXT,
           \`author_id\` INT
@@ -612,16 +625,16 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("query_values returns the first column of each row", async () => {
-      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
-      await adapter.executeMutation("INSERT INTO `items` (`n`) VALUES (1), (2), (3)");
-      const values = await adapter.queryValues("SELECT `n` FROM `items` ORDER BY `n`");
+      await adapter.exec("CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`n`) VALUES (1), (2), (3)");
+      const values = await adapter.queryValues("SELECT `n` FROM `ca_items` ORDER BY `n`");
       expect(values.map(Number)).toEqual([1, 2, 3]);
     });
 
     it("update returns the count of affected rows", async () => {
-      await adapter.exec("CREATE TABLE `items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
-      await adapter.executeMutation("INSERT INTO `items` (`n`) VALUES (1), (2), (3)");
-      const affected = await adapter.update("UPDATE `items` SET `n` = `n` + 1");
+      await adapter.exec("CREATE TABLE `ca_items` (`id` INT AUTO_INCREMENT PRIMARY KEY, `n` INT)");
+      await adapter.executeMutation("INSERT INTO `ca_items` (`n`) VALUES (1), (2), (3)");
+      const affected = await adapter.update("UPDATE `ca_items` SET `n` = `n` + 1");
       expect(affected).toBe(3);
     });
 
