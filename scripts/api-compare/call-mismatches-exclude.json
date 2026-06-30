@@ -113,13 +113,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "locking/pessimistic.ts",
-    "rubyName": "with_lock",
-    "call": "lock!",
-    "reason": "Confirmed equivalent (RFC 0044, touch-and-pessimistic-locking-cluster): `withLock` is the port of `with_lock` and, inside the wrapping `transaction`, calls `lockBang.call(instance, lockClause)` — `lockBang` IS the `lock!` port (pessimistic.ts `InstanceMethods.lockBang`), mirroring pessimistic.rb's `transaction { lock!(lock); yield }`. The extractor keys on the Ruby name `lock!` and does not map it to the `lockBang` identifier reached via `.call`, so it reads as missing — false positive, no omission."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "ddl_transaction",
     "call": "transaction",
@@ -138,12 +131,5 @@
     "rubyName": "update_all",
     "call": "update",
     "reason": "Confirmed equivalent (RFC 0044, update-delegates-to-save-cluster): Rails `Relation#update_all` (relation.rb:617) calls `c.update(stmt, \"... Update All\")` -- the *connection*-level bulk SQL execute, not record `#update`. trails' `updateAll` issues the same bulk UPDATE via `this._conn().execUpdate(...)` (relation.ts:4068). Semantically unrelated same-named symbol, not an omission."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "touch-later.ts",
-    "rubyName": "touch_deferred_attributes",
-    "call": "touch",
-    "reason": "Confirmed equivalent (RFC 0044, touch-and-pessimistic-locking-cluster): Rails `touch_deferred_attributes` calls `touch(time: @_touch_time)`, where `TouchLater#touch` merges the still-set `@_defer_touch_attrs` and delegates to `super` (timestamp.rb `touch`). trails `touchDeferredAttributes` performs that merge inline — it clears the deferred state then calls `timestampTouch.call(this, { time }, ...deferredAttrs)` (the timestamp.ts `touch`, i.e. the same `super`) with `_skipDirtyTracking` set, landing the identical single UPDATE. The extractor keys on the Ruby name `touch` and does not follow the aliased `timestampTouch` import — false positive, no omission."
   }
 ]
