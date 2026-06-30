@@ -47,8 +47,13 @@ export const TEST_SCHEMA: Schema = {
     name: { type: "string", null: true },
   },
 
+  admin_regions: {
+    name: "string",
+  },
+
   admin_users: {
     name: "string",
+    region_id: "integer",
     settings: { type: "string", null: true, limit: 1024 },
     parent: { type: "string", null: true, limit: 1024 },
     spouse: { type: "string", null: true, limit: 1024 },

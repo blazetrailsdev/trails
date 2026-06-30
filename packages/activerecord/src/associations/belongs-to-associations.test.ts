@@ -12,6 +12,7 @@ import {
   RecordInvalid,
   registerModel,
   AssociationTypeMismatch,
+  modelRegistry,
 } from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -163,6 +164,29 @@ for (const m of [
 ]) {
   registerModel(m as any);
 }
+
+// Mirrors Rails' dynamic definitions in test_raises_type_mismatch_with_namespaced_class
+// (belongs_to_associations_test.rb:266-283):
+//   Admin.const_set "Region", Class.new(ActiveRecord::Base)
+//   Admin.const_set "RegionalUser", Class.new(Admin::User) { belongs_to(:region) }
+// The `belongs_to :region` carries NO explicit class_name, so the target class is
+// resolved namespace-relative: `region` → Admin::Region (never a top-level Region).
+class AdminRegion extends Base {
+  static _tableName = "admin_regions";
+  static moduleName = "Admin";
+  static _demodulizedName = "Region";
+}
+
+class AdminRegionalUser extends AdminUser {
+  static moduleName = "Admin";
+  static _demodulizedName = "RegionalUser";
+
+  static {
+    this.belongsTo("region");
+  }
+}
+registerModel(AdminRegion as any);
+registerModel(AdminRegionalUser as any);
 
 async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
   const prev = (Base as any).hasManyInversing;
@@ -482,12 +506,16 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", () => {
-    // The mismatch message names the resolved namespaced klass (AdminAccount),
-    // proving the wrong-type guard ran against the association's actual class —
-    // mirrors Rails' assertion shape `<Klass>(#...) expected, got "wrong value"
-    // which is an instance of String(#...)`.
-    expect(() => new AdminUser({ account: "wrong value" })).toThrow(
-      /^AdminAccount expected, got "wrong value" which is an instance of String$/,
+    // Rails requires that there is no top-level Region class, so the association's
+    // class must be resolved by walking the owner's Admin namespace —
+    // `belongs_to :region` on Admin::RegionalUser → Admin::Region.
+    expect(modelRegistry.get("Region")).toBeUndefined();
+
+    // Rails names the expected side with reflection.class_name ("Region"), the
+    // demodulized convention name — not the resolved klass ("AdminRegion").
+    expect(() => new AdminRegionalUser({ region: "wrong value" })).toThrow(AssociationTypeMismatch);
+    expect(() => new AdminRegionalUser({ region: "wrong value" })).toThrow(
+      /^Region expected, got "wrong value" which is an instance of String$/,
     );
   });
 
