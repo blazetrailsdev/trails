@@ -324,6 +324,7 @@ describe("InnerJoinAssociationTest", () => {
       declare author_id: number;
       declare thrTaggings: AssociationProxy<ThrTagging>;
       declare thrTags: AssociationProxy<ThrTag>;
+      declare miscTags: AssociationProxy<ThrTag>;
 
       static {
         this._tableName = "posts";
@@ -335,6 +336,14 @@ describe("InnerJoinAssociationTest", () => {
           through: "thrTaggings",
           source: "thrTag",
           className: "ThrTag",
+        });
+        // Mirrors Rails' `has_many :misc_tags, -> { where tags: { name: "Misc" } },
+        // through: :taggings, source: :tag` (test/models/post.rb).
+        this.hasMany("miscTags", {
+          through: "thrTaggings",
+          source: "thrTag",
+          className: "ThrTag",
+          scope: (q: any) => q.where({ tags: { name: "Misc" } }),
         });
       }
     }
@@ -369,13 +378,12 @@ describe("InnerJoinAssociationTest", () => {
     registerModel(ThrTagging);
     registerModel(ThrTag);
 
-    // Verify the through join generates correct SQL
-    const sql = ThrPost.joins("thrTags").toSql();
+    // The scoped through join filters the join clause, not the WHERE.
+    const sql = ThrPost.joins("miscTags").toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("taggings");
     expect(sql).toContain("tags");
 
-    // Verify it works end-to-end
     const author = await ThrAuthor.create({ name: "Alice" });
     const post = await ThrPost.create({ title: "P1", body: "b", author_id: author.id });
     const tag = await ThrTag.create({ name: "ruby" });
@@ -385,9 +393,14 @@ describe("InnerJoinAssociationTest", () => {
       taggable_type: "ThrPost",
     });
 
-    const results = await ThrPost.joins("thrTags").where({ id: post.id });
-    expect(results.length).toBeGreaterThan(0);
-    expect(results[0].title).toBe("P1");
+    // Mirrors Rails: `assert_not_empty posts(:welcome).tags` followed by
+    // `assert_empty Post.joins(:misc_tags).where(id: posts(:welcome).id)` — the
+    // post has a (non-"Misc") tag, so the scoped `misc_tags` join excludes it.
+    const tags = await post.thrTags.toArray();
+    expect(tags.length).toBeGreaterThan(0);
+
+    const scoped = await ThrPost.joins("miscTags").where({ id: post.id });
+    expect(scoped.length).toBe(0);
   });
 
   it("the default scope of the target is applied when joining associations", () => {
@@ -454,14 +467,17 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("joins a has_and_belongs_to_many association", async () => {
+    // Mirrors Rails' `has_and_belongs_to_many :categories` on Post, backed by
+    // `categories_posts` (test/models/post.rb, schema.rb). The local class names
+    // are unique, but the association exposed is the Rails name `categories`.
     class HabtmPost extends Base {
       declare title: string;
-      declare habtmCategories: AssociationProxy<HabtmCategory>;
+      declare categories: AssociationProxy<HabtmCategory>;
 
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
-        this.hasAndBelongsToMany("habtmCategories", {
+        this.hasAndBelongsToMany("categories", {
           className: "HabtmCategory",
           joinTable: "categories_posts",
           foreignKey: "post_id",
@@ -480,7 +496,7 @@ describe("InnerJoinAssociationTest", () => {
     registerModel(HabtmPost);
     registerModel(HabtmCategory);
 
-    const sql = HabtmPost.joins("habtmCategories").toSql();
+    const sql = HabtmPost.joins("categories").toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain("categories_posts");
     expect(sql).toContain("categories");
