@@ -561,7 +561,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Book.create({ title: "The Silmarillion", author_id: author.id });
       await Book.create({ title: "Other Book", author_id: 999 });
 
-      const books = await loadHasMany(author, "ca_books", {});
+      const books = await loadHasMany(author, "books", {});
       expect(books).toHaveLength(2);
     });
   });
