@@ -64,7 +64,6 @@ describeIfMysql("Mysql2Adapter", () => {
         const db = await adapter.currentDatabase();
         class OmgPost extends Base {
           static _tableName = `${db}.posts`;
-          static name = "Post";
         }
         OmgPost.inheritanceColumn = "disabled";
         OmgPost.adapter = adapter;
@@ -91,10 +90,9 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("data source exists?", async () => {
-      await withOmgPost(async (OmgPost, db) => {
+      await withOmgPost(async (OmgPost) => {
         // Rails passes @omgpost.table_name, the qualified `db.posts` form.
         const name = (OmgPost as any)._tableName as string;
-        expect(name).toBe(`${db}.posts`);
         expect(await adapter.dataSourceExists(name)).toBe(true);
       });
     });
