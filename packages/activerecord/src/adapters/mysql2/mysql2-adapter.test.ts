@@ -260,11 +260,14 @@ describeIfMysql("Mysql2Adapter", () => {
     // FK type-mismatch fixture tables — created/dropped around each test so
     // the FK tests are self-contained. beforeEach/afterEach live directly in
     // Mysql2AdapterTest so test paths match Rails (no extra describe level).
-    // Mirrors Rails: test/cases/adapters/mysql2/mysql2_adapter_test.rb:136–270
+    // Mirrors Rails: test/cases/adapters/mysql2/mysql2_adapter_test.rb:136–270.
+    // Rails uses the canonical old_cars/cars/subscribers/engines fixtures; we
+    // scratch on non-canonical `ca_`-prefixed names so the one-schema harness
+    // never sees a canonical table created or dropped.
     //
-    //   ca_old_cars    — integer PK  (Rails' ca_old_cars fixture)
-    //   ca_cars        — bigint PK   (Rails' ca_cars fixture)
-    //   ca_subscribers — varchar PK  (Rails' ca_subscribers fixture)
+    //   ca_old_cars    — integer PK  (Rails' old_cars fixture)
+    //   ca_cars        — bigint PK   (Rails' cars fixture)
+    //   ca_subscribers — varchar PK  (Rails' subscribers fixture)
     //   ca_engines     — bigint PK, used as the referencing table
     beforeEach(async () => {
       await adapter.executeMutation("DROP TABLE IF EXISTS `ca_engines`");
