@@ -18,6 +18,7 @@ import {
   integerToSql,
   foreignKeys,
   indexes,
+  parseMysqlName,
   MysqlSchemaStatements,
 } from "./schema-statements.js";
 import { quote } from "./quoting.js";
@@ -503,5 +504,53 @@ describe("MysqlSchemaStatements#renameColumn delegation", () => {
     const ss = new MysqlSchemaStatements(adapter as never);
     await ss.renameColumn("users", "old_name", "new_name");
     expect(calls).toEqual([["users", "old_name", "new_name"]]);
+  });
+});
+
+// parseMysqlName is a trails-specific guard (no Rails counterpart): MySQL has no
+// nested-catalog concept, so an identifier must be exactly "table" or
+// "schema.table". Every introspection helper routes table names through it
+// before COALESCE(?, database()); a malformed name that lexed leniently would
+// silently scan a different catalog/table than the caller intended.
+describe("parseMysqlName", () => {
+  it("accepts a bare table name", () => {
+    expect(parseMysqlName("widgets")).toEqual({ table: "widgets" });
+  });
+
+  it("accepts schema-qualified names, quoted or unquoted", () => {
+    expect(parseMysqlName("mydb.widgets")).toEqual({ schema: "mydb", table: "widgets" });
+    expect(parseMysqlName("`mydb`.`widgets`")).toEqual({ schema: "mydb", table: "widgets" });
+  });
+
+  it("permits whitespace inside a backtick-quoted identifier", () => {
+    // MySQL allows whitespace only inside backtick-quoted identifiers.
+    expect(parseMysqlName("`not a real table`")).toEqual({ table: "not a real table" });
+  });
+
+  it("rejects three-part identifiers instead of silently truncating", () => {
+    // The prior regex tokenizer silently kept the first two parts of "a.b.c",
+    // pointing introspection at a different table.
+    expect(() => parseMysqlName("a.b.c")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects identifiers with empty segments", () => {
+    expect(() => parseMysqlName(".widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("a..b")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("db.widgets.")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects unquoted identifiers containing whitespace", () => {
+    expect(() => parseMysqlName("db .widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("db. widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("wid gets")).toThrow(/Invalid MySQL identifier/);
+  });
+
+  it("rejects empty quoted identifiers that unquote to an empty string", () => {
+    // ``, `a`.``, ``.widgets all lex fine but unquote to "" — which would
+    // break COALESCE(?, database()) and scan the wrong catalog.
+    expect(() => parseMysqlName("``")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("``.widgets")).toThrow(/Invalid MySQL identifier/);
+    expect(() => parseMysqlName("`db`.``")).toThrow(/Invalid MySQL identifier/);
   });
 });
