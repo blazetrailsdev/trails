@@ -783,10 +783,15 @@ export async function save<T extends SaveRecord>(
   // required association's presence validation sees the defaulted FK. The block
   // may be async (e.g. `() => Developer.first()`) and trails' validation chain is
   // strictly synchronous, so we run it here — an async pre-validation phase —
-  // rather than inside the sync chain. The before_validation callback the builder
-  // registers handles the synchronous-block path (and standalone `valid?`).
-  if (typeof self._runBelongsToDefaults === "function") {
+  // rather than inside the sync chain. Gated on `validate !== false`: Rails skips
+  // perform_validations (and thus every before_validation callback, including
+  // this default) when `validate: false` (validations.rb:47-49), so the default
+  // must not fire on that path. `_belongsToDefaultsApplied` then suppresses the
+  // in-chain before_validation callback so the block runs exactly once per save
+  // (it would otherwise re-fire when the pre-pass left the reader nil).
+  if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
     await self._runBelongsToDefaults();
+    self._belongsToDefaultsApplied = true;
   }
   // A `before_validation` that needs async DB work (Rails runs it inside the
   // save transaction — transactions_test.rb:714) can't await on trails' strict-
@@ -794,7 +799,9 @@ export async function save<T extends SaveRecord>(
   // running inline. Reset the queue before the chain populates it so a prior
   // save that bailed at validation doesn't leak a stale thunk into this one.
   self._beforeValidationSideEffects = [];
-  if (!performValidations.call(this, options)) return false;
+  const validationsPassed = performValidations.call(this, options);
+  self._belongsToDefaultsApplied = false;
+  if (!validationsPassed) return false;
   if (options?.validate !== false) {
     if (!(await self._runAsyncValidations())) return false;
   }

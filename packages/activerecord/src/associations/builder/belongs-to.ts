@@ -303,10 +303,14 @@ export class BelongsTo extends SingularAssociation {
     // default block may run an async finder (e.g. `() => Developer.first()`), so
     // the awaited resolution actually runs in Base#_runBelongsToDefaults — an
     // async pre-validation phase invoked from `save` before the chain. This
-    // before_validation callback fires `default` too (no-op once the FK is
-    // populated by that phase) for fidelity and the standalone `valid?` path;
-    // it's fire-and-forget because the sync chain cannot await it.
+    // before_validation callback fires `default` for the standalone `valid?`
+    // path; it's fire-and-forget because the sync chain cannot await it. On the
+    // save path the pre-pass already ran the block once and sets
+    // `_belongsToDefaultsApplied`, so we skip here to keep the block at Rails'
+    // exactly-once (belongs_to_association.rb:46-48) — re-running would invoke a
+    // block that returned nil a second time.
     beforeValidation(model, (record: any) => {
+      if (record._belongsToDefaultsApplied) return;
       if (typeof record.association !== "function") return;
       const assoc = record.association(reflection.name);
       if (typeof assoc.default === "function") {
