@@ -41,6 +41,8 @@ describe("CpkBook eager pluck / cache_version preload-degrade", () => {
   });
 
   async function seedBooks(): Promise<void> {
+    await CpkAuthor.create({ id: 1, name: "Author One" });
+    await CpkAuthor.create({ id: 2, name: "Author Two" });
     await CpkBook.create({ author_id: 1, id: 1, title: "Alpha", revision: 1 });
     await CpkBook.create({ author_id: 1, id: 2, title: "Beta", revision: 2 });
     await CpkBook.create({ author_id: 2, id: 3, title: "Gamma", revision: 3 });
@@ -62,6 +64,17 @@ describe("CpkBook eager pluck / cache_version preload-degrade", () => {
       .limit(2)
       .pluck("title");
     expect(titles).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("pluck over a mixed joinable + unjoinable eager spec joins the joinable and degrades the rest", async () => {
+    await seedBooks();
+    // `author` (single-PK belongs_to) is joinable; `chapters` (composite-PK
+    // collection) is not. The joinable spec must still be JOINed and the
+    // unjoinable one degraded to preload, rather than the whole list throwing.
+    const titles = await CpkBook.eagerLoad("author", "chapters")
+      .order("author_id", "id")
+      .pluck("title");
+    expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
   });
 
   it("cache_version over eagerLoad('chapters') degrades to preload instead of crashing", async () => {

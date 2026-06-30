@@ -3950,20 +3950,29 @@ export class Relation<T extends Base> {
 
       const basePk = (this._modelClass as any).primaryKey ?? "id";
       const jd = new JoinDependency(this._modelClass);
-      this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+      const fallbackAssocs = this._addEagerSpecsToJoinDependency(
+        jd,
+        eagerSpecs,
+        this._aliasableReferences(),
+      );
+      // Rails joins every eager spec; trails can't join capability-gap
+      // reflections (composite-key collections, unjoinable through), so
+      // `_addEagerSpecsToJoinDependency` returns them as `fallbackAssocs` to
+      // preload. JOIN only the joinable remainder — replaying the full
+      // `eagerSpecs` through `leftOuterJoins` would re-enter JoinDependency
+      // construction and throw for the unjoinable spec. pluck reads columns only
+      // from the base and joined tables, so the preloaded fallbacks contribute
+      // nothing and are simply omitted (no preload needed).
+      const joinableSpecs = eagerSpecs.filter((s) => !fallbackAssocs.includes(s));
 
-      // If no eager association is joinable (composite-key collection or other
-      // capability-gap reflection), Rails JOINs but trails preloads. pluck reads
-      // only the requested columns from the base query, so degrade to the base
-      // relation (limit/offset preserved) instead of `leftOuterJoins`, which
-      // throws for the unjoinable spec. Mirrors _executeEagerLoad's
-      // jd.nodes.length === 0 preload fallback.
+      // No spec is joinable: degrade entirely to the base relation (limit/offset
+      // preserved), mirroring _executeEagerLoad's jd.nodes.length === 0 fallback.
       if (jd.nodes.length === 0) {
         return rel.pluck(...columns);
       }
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(joinableSpecs)) {
         // Rails apply_join_dependency, for a limit/offset over a collection
         // reflection, replaces the relation via distinct_relation_for_primary_key
         // (finder_methods.rb:463): execute a query to materialize the limited
@@ -3971,14 +3980,14 @@ export class Relation<T extends Base> {
         // limit/offset. Limiting the joined rows directly would be wrong under
         // fan-out (it limits associated rows, not parents).
         const limitedIds = await this._materializeLimitedIds(jd, basePk);
-        const limited = rel.leftOuterJoins(eagerSpecs).where({
+        const limited = rel.leftOuterJoins(joinableSpecs).where({
           [basePk]: limitedIds,
         });
         limited._limitValue = null;
         limited._offsetValue = null;
         return limited.pluck(...columns);
       }
-      return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
+      return rel.leftOuterJoins(joinableSpecs).pluck(...columns);
     }
 
     // Reflect the schema before casting results so the model's attribute
@@ -7170,18 +7179,25 @@ export class Relation<T extends Base> {
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = new JoinDependency(this._modelClass);
-        this._addEagerSpecsToJoinDependency(jd, eagerSpecs, this._aliasableReferences());
+        const fallbackAssocs = this._addEagerSpecsToJoinDependency(
+          jd,
+          eagerSpecs,
+          this._aliasableReferences(),
+        );
+        // JOIN only the joinable remainder; capability-gap reflections
+        // (composite-key collections, unjoinable through) come back as
+        // `fallbackAssocs` and would throw if replayed through `leftOuterJoins`.
+        // cache_version reads size/timestamp from the base + joined tables, so
+        // the preloaded fallbacks contribute nothing and are simply omitted.
+        const joinableSpecs = eagerSpecs.filter((s) => !fallbackAssocs.includes(s));
         if (jd.nodes.length === 0) {
-          // No eager association is joinable (composite-key collection or other
-          // capability-gap reflection): trails preloads rather than JOINs.
-          // cache_version reads size/timestamp from the base query, so degrade to
-          // the base relation (limit/offset preserved) instead of `leftOuterJoins`,
-          // which throws for the unjoinable spec. Mirrors _executeEagerLoad's
+          // No spec is joinable: degrade entirely to the base relation
+          // (limit/offset preserved), mirroring _executeEagerLoad's
           // jd.nodes.length === 0 preload fallback.
           collection = rel;
         } else if (
           hasLimitOrOffset &&
-          !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
+          !this._applyJoinDependencyIsLimitable(joinableSpecs) &&
           !Array.isArray(pk)
         ) {
           // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
@@ -7194,16 +7210,16 @@ export class Relation<T extends Base> {
           // unsupported combination as an explicit NotImplementedError rather
           // than emitting a wrong single-column `"col1,col2"` predicate.
           const limitedIds = await this._materializeLimitedIds(jd, pk);
-          collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
+          collection = rel.leftOuterJoins(joinableSpecs).where({ [pk]: limitedIds });
           collection._limitValue = null;
           collection._offsetValue = null;
-        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(joinableSpecs)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
           // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
           collection = this.applyJoinDependencyForArel();
         } else {
-          collection = rel.leftOuterJoins(eagerSpecs);
+          collection = rel.leftOuterJoins(joinableSpecs);
         }
       }
       const tsColumn = this.table.get(timestampColumn);
