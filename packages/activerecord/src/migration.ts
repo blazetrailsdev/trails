@@ -309,25 +309,6 @@ export abstract class Migration {
   }
 
   /**
-   * Class-level forward run. Defaults to running a fresh instance through the
-   * full `migrate` path; a legacy migration overrides `self.up` with the body.
-   *
-   * Mirrors: ActiveRecord::Migration.up
-   */
-  static async up(): Promise<void> {
-    await new (this as unknown as new () => Migration)().migrate("up");
-  }
-
-  /**
-   * Class-level rollback run.
-   *
-   * Mirrors: ActiveRecord::Migration.down
-   */
-  static async down(): Promise<void> {
-    await new (this as unknown as new () => Migration)().migrate("down");
-  }
-
-  /**
    * Override to define the forward migration.
    *
    * @internal
@@ -352,14 +333,18 @@ export abstract class Migration {
   }
 
   /**
-   * Rails delegate shape (`active_record/migration.rb:951`): a legacy migration
-   * defines its own class-level `self.up`/`self.down`; the instance runs that
-   * body with itself as the delegate so its schema ops route back through this
-   * instance. Returns null for the normal `change`-based path.
+   * Rails legacy delegate shape (`active_record/migration.rb:951-960`): a legacy
+   * migration defines its own class-level `self.up`/`self.down`; the instance
+   * `up`/`down` run that body with itself as the delegate (so its schema ops
+   * route back through this instance), and no-op for a direction the legacy
+   * class doesn't define (`return unless self.class.respond_to?(direction)`).
+   * Returns null for the normal `change`-based path (no class-level up/down).
    */
   private _legacyClassDirection(direction: "up" | "down"): (() => Promise<void>) | null {
     const ctor = this.constructor as typeof Migration;
-    if (!Object.prototype.hasOwnProperty.call(ctor, direction)) return null;
+    const owns = (d: "up" | "down"): boolean => Object.prototype.hasOwnProperty.call(ctor, d);
+    if (!owns("up") && !owns("down")) return null; // change-based, not legacy
+    if (!owns(direction)) return async (): Promise<void> => {}; // Rails: return unless respond_to?
     const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
     return async (): Promise<void> => {
       const prev = Migration._delegate;
