@@ -188,9 +188,12 @@ describe("RelationTest", () => {
 
   it("to xml threads :methods down to each record", async () => {
     // Rails passes the shared options hash to XmlMini.to_tag, so `:methods`
-    // (topic.rb's `topic_id`) reaches every record's serialization.
-    const xml = await Topic.all().toXml({ only: ["id"], methods: ["topicId"] });
-    const topics = await Topic.all();
+    // (topic.rb's `topic_id`) reaches every record's serialization. Filtered to
+    // base Topics (the `topics` fixtures mix Topic/Reply, which Rails would root
+    // under <objects>) so the collection is homogeneous.
+    const baseTopics = Topic.where({ type: null });
+    const xml = await baseTopics.toXml({ only: ["id"], methods: ["topicId"] });
+    const topics = await Topic.where({ type: null });
     expect(xml).toContain('<topics type="array">');
     // trails method names are camelCase, so the serialized tag is `topicId`
     // (Rails' snake_case `topic_id` would dasherize to `topic-id`).

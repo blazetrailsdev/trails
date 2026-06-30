@@ -881,11 +881,18 @@ export class DelegationMethods {
     const { root: _root, children: _children, skipInstruct = false, ...recordOptions } = options;
     const skipTypes = options.skipTypes ?? false;
 
+    // Rails (conversions.rb:189-195): the default root reflects the first
+    // element's class only when every element shares that class (`all?(first.class)`);
+    // a heterogeneous collection (e.g. mixed STI subclasses) falls back to
+    // `"objects"`. The `first.class != Hash` guard never trips here — records are
+    // always model instances, never Hashes.
     const root =
       options.root ??
       (records.length === 0
         ? "nil-classes"
-        : (records[0].constructor as { modelName: { plural: string } }).modelName.plural);
+        : records.every((r) => r.constructor === records[0].constructor)
+          ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
+          : "objects");
     const children = options.children ?? singularize(root);
     const rootTag = dasherize(root);
     const childTag = dasherize(children);
