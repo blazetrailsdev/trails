@@ -1852,70 +1852,72 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add a LEFT OUTER JOIN. Accepts:
-   * - A string association name: `leftJoins("posts")`
+   * Add a LEFT OUTER JOIN. Variadic, mirroring Rails'
+   * `left_outer_joins(*args)` (query_methods.rb:883-887), whose `!` writer does
+   * `left_outer_joins_values |= args` (query_methods.rb:889-891). Accepts:
+   * - String association names: `leftJoins("posts")`,
+   *   `leftJoins("thinkingPosts", "welcomePosts")`
    * - A hash spec for nested associations: `leftJoins({ posts: "comments" })`
-   * - An array of the above: `leftJoins(["posts", "comments"])`
-   * - A raw table name with an explicit ON clause: `leftJoins("posts", "posts.author_id = authors.id")`
+   * - Arrays of the above: `leftJoins(["posts", "comments"])`
+   *
+   * Args are stored in left_outer_joins_values and resolved via JoinDependency.
+   * Rails raises ArgumentError on a raw SQL string fragment ("only Hash, Symbol
+   * and Array are allowed"); a raw LEFT OUTER JOIN fragment goes through
+   * `joins("LEFT OUTER JOIN …")` instead.
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
-  leftJoins(table: string, on: string): Relation<T>;
-  leftJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
-  leftJoins(table: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
-    const callArgs = on !== undefined ? [table, on] : table === undefined ? [] : [table];
-    this.checkIfMethodHasArgumentsBang("left_joins", callArgs, undefined, { normalize: false });
-    const rel = this._clone();
-    if (on !== undefined) {
-      // Explicit SQL form: LEFT OUTER JOIN table ON condition — only valid for strings.
-      if (typeof table !== "string")
-        throw argumentError("leftJoins(table, on) requires a string table name");
-      if (typeof on !== "string" || !on.trim())
-        throw argumentError("leftJoins(table, on) requires a non-empty string ON condition");
-      rel._joinClauses.push({ type: "left", table, on });
-    } else {
-      // Association name/spec form — mirrors Rails left_outer_joins! storing in
-      // left_outer_joins_values for deferred resolution via JoinDependency.
-      // Rails raises ArgumentError when a raw SQL string (containing spaces) is passed;
-      // association names are always single-word identifiers.
-      if (typeof table === "string" && /\s/.test(table)) {
-        throw argumentError(
-          "only associations and hashes are supported as arguments to leftOuterJoins",
-        );
-      }
-      // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
-      // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
-      // `leftJoins([])` drop their blank specs instead of polluting join state.
-      const specs = _qm
-        .flattenedArgs(Array.isArray(table) ? table : [table])
-        .filter((s) => !_qm.isBlankArgument(s));
-      for (const spec of specs) {
-        if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
-          rel._leftOuterJoinsValues.push(spec as AssociationSpec);
-        }
-      }
-    }
-    return rel;
+  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
+    return this._leftOuterJoins("left_joins", args);
   }
 
   /**
    * Alias for leftJoins.
    *
-   * Mirrors: ActiveRecord::Relation#left_outer_joins
+   * Mirrors: ActiveRecord::Relation#left_outer_joins (`left_joins` is Rails'
+   * alias of the same method).
    */
-  leftOuterJoins(table: string, on: string): Relation<T>;
-  leftOuterJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
-  leftOuterJoins(table?: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
-    const callArgs = on !== undefined ? [table, on] : table === undefined ? [] : [table];
-    this.checkIfMethodHasArgumentsBang("left_outer_joins", callArgs, undefined, {
-      normalize: false,
-    });
-    if (on !== undefined) {
-      if (typeof table !== "string")
-        throw argumentError("leftOuterJoins(table, on) requires a string table name");
-      return this.leftJoins(table, on);
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
+    return this._leftOuterJoins("left_outer_joins", args);
+  }
+
+  /**
+   * Shared body for `leftJoins` / `leftOuterJoins`, mirroring Rails'
+   * `left_outer_joins(*args)` (query_methods.rb:883-887) →
+   * `spawn.left_outer_joins!(*args)` (query_methods.rb:889-891). The `callee`
+   * name threads through to the
+   * ArgumentError so the message matches whichever alias was called
+   * (Rails' `__callee__`). Validation runs exactly once: re-delegating between
+   * the two public methods would re-run the no-argument guard after
+   * `checkIfMethodHasArgumentsBang` compacts a blank-only `args` (e.g.
+   * `leftOuterJoins({})`) down to `[]`, which Rails treats as a no-op, not a
+   * raise.
+   *
+   * @internal
+   */
+  private _leftOuterJoins(
+    callee: string,
+    args: Array<AssociationSpec | AssociationSpec[]>,
+  ): Relation<T> {
+    this.checkIfMethodHasArgumentsBang(callee, args, undefined, { normalize: false });
+    const rel = this._clone();
+    // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
+    // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
+    // `leftJoins([])` drop their blank specs instead of polluting join state.
+    const specs = _qm.flattenedArgs(args).filter((s) => !_qm.isBlankArgument(s));
+    for (const spec of specs) {
+      // Rails raises ArgumentError when a raw SQL string (containing spaces) is
+      // passed; association names are always single-word identifiers.
+      if (typeof spec === "string" && /\s/.test(spec)) {
+        throw argumentError(
+          "only associations and hashes are supported as arguments to leftOuterJoins",
+        );
+      }
+      if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
+        rel._leftOuterJoinsValues.push(spec as AssociationSpec);
+      }
     }
-    return this.leftJoins(table);
+    return rel;
   }
 
   /**

@@ -75,7 +75,7 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {
-    const result = await Author.leftOuterJoins(["thinkingPosts", "welcomePosts"]).first();
+    const result = await Author.leftOuterJoins("thinkingPosts", "welcomePosts").first();
     expect((result as any)?.id).toBe((authors("david") as any).id);
   });
 
