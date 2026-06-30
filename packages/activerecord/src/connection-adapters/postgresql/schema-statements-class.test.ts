@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLSchemaStatements } from "./schema-statements-class.js";
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 
 function makeFakeAdapter() {
   const executed: string[] = [];

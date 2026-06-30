@@ -15,7 +15,7 @@
  * connection-adapters/abstract/schema-dumper.ts.
  */
 
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";

@@ -14,7 +14,7 @@ import {
   type IsJoinTableName,
 } from "./fixtures-registry.js";
 export type { FixtureName } from "./fixtures-registry.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 
 /**

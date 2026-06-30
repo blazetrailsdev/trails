@@ -44,7 +44,8 @@ import {
   Nodes,
   sql as arelSql,
 } from "@blazetrails/arel";
-import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
 import {
   getInheritanceColumn,

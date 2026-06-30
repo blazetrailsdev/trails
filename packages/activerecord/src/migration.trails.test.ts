@@ -13,7 +13,7 @@ import { MigrationContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration } from "./migration.js";
 import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("MigrationTest", () => {
   it("migration.connection returns _connectionOverride when set", () => {

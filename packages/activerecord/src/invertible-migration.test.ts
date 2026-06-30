@@ -10,7 +10,7 @@ import { Base } from "./base.js";
 
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {

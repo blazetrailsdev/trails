@@ -2,7 +2,7 @@ import {
   insertFixturesSet,
   type DatabaseStatementsHost,
 } from "../connection-adapters/abstract/database-statements.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { Base } from "../base.js";
 import { findStiClass } from "../inheritance.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
@@ -229,7 +229,7 @@ export function resolveFixtureId(
  * ```
  */
 export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql" | "sqlite" {
-  return adapter.adapterName;
+  return adapter.adapterName as "postgres" | "mysql" | "sqlite";
 }
 
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---

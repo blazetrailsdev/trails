@@ -8,7 +8,10 @@ import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cach
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { AdapterName, DatabaseAdapter } from "./adapter.js";
+import type {
+  AdapterName,
+  AbstractAdapter as DatabaseAdapter,
+} from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 import { Base } from "./base.js";
 

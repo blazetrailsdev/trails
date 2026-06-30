@@ -1,5 +1,5 @@
 import { defineFixtures } from "./define-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 
 type BaseClass = typeof Base;

@@ -1620,7 +1620,7 @@ describe("BasicsTest", () => {
     const conn = Base.connection;
     // `schemaCache` is typed optional on DatabaseAdapter, but AbstractAdapter's
     // getter always returns one for a connected adapter.
-    const cache = conn.schemaCache!;
+    const cache = conn.schemaCache;
     // preheat cache
     const c1 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);

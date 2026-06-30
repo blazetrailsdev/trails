@@ -36,7 +36,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
       await asExec(adapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT)`);
       const cache = adapter.schemaCache;
       expect(cache).toBeTruthy();
-      const cols = await cache!.columns(pool, tableName);
+      const cols = await cache.columns(pool, tableName);
       expect(cols).toBeTruthy();
       const names = (cols ?? []).map((c) => (c as { name: string }).name).sort();
       expect(names).toEqual(["id", "name"]);

@@ -55,6 +55,10 @@ export default defineConfig(
       "**/dist/**",
       "packages/website/static/**",
       "packages/website/build/**",
+      // Vite/Vitest config files outside any tsconfig program — the typed
+      // parser's project service cannot resolve them when linted by path.
+      "packages/website/vite.sw.config.ts",
+      "packages/website/vitest.config.ts",
       "packages/activerecord/src/type-virtualization/fixtures/**",
       "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
     ],

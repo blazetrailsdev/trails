@@ -19,7 +19,7 @@ import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";
 import { LiveParrot, DeadParrot } from "./models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./models/vegetables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 const TYPE_CONTRACT_SCHEMA = {
   topics: { title: "string" },

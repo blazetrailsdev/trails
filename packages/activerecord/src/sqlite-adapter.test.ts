@@ -8,7 +8,7 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
 
 // Async-only drivers (no `openSync()`) exercising the async construction path

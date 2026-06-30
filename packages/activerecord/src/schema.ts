@@ -1,5 +1,5 @@
 import { getEnv } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";

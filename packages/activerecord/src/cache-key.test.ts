@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";

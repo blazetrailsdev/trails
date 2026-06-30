@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -518,7 +518,7 @@ describe("AdapterTest", () => {
   it.skipIf(adapterType === "sqlite")(
     "numeric value out of ranges are translated to specific exception",
     async () => {
-      const error = (await (Base.connection as AbstractAdapter)
+      const error = (await Base.connection
         .insert("INSERT INTO books(author_id) VALUES (9223372036854775808)")
         .catch((e) => e)) as { cause?: unknown };
       expect(error).toBeInstanceOf(RangeError);
@@ -586,7 +586,7 @@ describe("AdapterTest", () => {
   // `executeMutation`, so the round-trip is asserted via the bound SELECT rather
   // than the insert return value.
   it.skipIf(adapterType === "sqlite")("select all insert update delete with binds", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
 
     await conn.insert("INSERT INTO events(id) VALUES (?)", null, null, null, null, binds);
@@ -663,9 +663,7 @@ describe("AdapterForeignKeyTest", () => {
   afterEach(cleanup);
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
-    (Base.connection as AbstractAdapter).insert(
-      `INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`,
-    );
+    Base.connection.insert(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
 
   it("foreign key violations are translated to specific exception with validate false", async () => {
     class KlassHasFk extends Base {
@@ -700,7 +698,7 @@ describe("AdapterForeignKeyTest", () => {
   });
 
   it("disable referential integrity", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     // assert_nothing_raised: a throw inside the block fails the test.
     await conn.disableReferentialIntegrity(async () => {
       await insertIntoFkTestHasFk();
@@ -739,7 +737,7 @@ describe("AdapterTestWithoutTransaction", () => {
   );
 
   it("create with query cache", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     conn.enableQueryCacheBang();
     try {
       // posts fixtures are loaded (e.g. "welcome"), so the count is fixture-backed.
@@ -755,7 +753,7 @@ describe("AdapterTestWithoutTransaction", () => {
   });
 
   it("truncate", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     expect(await Post.count()).toBeGreaterThan(0);
 
     await conn.truncate("posts");
@@ -764,7 +762,7 @@ describe("AdapterTestWithoutTransaction", () => {
   });
 
   it("truncate with query cache", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     conn.enableQueryCacheBang();
     try {
       expect(await Post.count()).toBeGreaterThan(0);
@@ -778,7 +776,7 @@ describe("AdapterTestWithoutTransaction", () => {
   });
 
   it("truncate tables", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     expect(await Post.count()).toBeGreaterThan(0);
     expect(await Author.count()).toBeGreaterThan(0);
     expect(await AuthorAddress.count()).toBeGreaterThan(0);
@@ -791,7 +789,7 @@ describe("AdapterTestWithoutTransaction", () => {
   });
 
   it("truncate tables with query cache", async () => {
-    const conn = Base.connection as AbstractAdapter;
+    const conn = Base.connection;
     conn.enableQueryCacheBang();
     try {
       expect(await Post.count()).toBeGreaterThan(0);
@@ -1392,7 +1390,7 @@ describe("InvalidateTransactionTest", () => {
     "invalidates transaction on rollback error",
     async () => {
       let invalidated = false;
-      const connection = Base.connection as AbstractAdapter;
+      const connection = Base.connection;
 
       await connection.transaction(async () => {
         try {
@@ -1501,14 +1499,14 @@ describe("AdvisoryLocksEnabledTest", () => {
   });
 
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
-    expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(true);
+    expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(true);
 
     await runWithoutConnection(async (origConnection) => {
       await Base.establishConnection({ ...origConnection, advisoryLocks: false });
-      expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(false);
+      expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(false);
 
       await Base.establishConnection({ ...origConnection, advisoryLocks: true });
-      expect(Base.leaseConnection().isAdvisoryLocksEnabled!()).toBe(true);
+      expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(true);
     });
   });
 });

@@ -5,7 +5,7 @@ import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
 import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
   const adapter = createTestAdapter();

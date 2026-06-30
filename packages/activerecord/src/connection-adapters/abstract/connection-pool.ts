@@ -5,7 +5,7 @@
  */
 
 import { adapterNameFromConfig } from "../abstract-adapter.js";
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-descriptor.js";
@@ -32,14 +32,15 @@ import { MigrationContext } from "../../migration.js";
 
 /**
  * A connection that supports transaction management.
- * Adapters extending AbstractAdapter and implementing DatabaseAdapter satisfy
- * this interface; the pool uses it for pin/unpin.
+ * An AbstractAdapter with the pin/unpin surface the pool needs; expressed as
+ * an intersection because an interface cannot `extends` the class without
+ * inheriting its private/protected members (TS2430).
  */
-interface TransactionAwareConnection extends DatabaseAdapter {
+type TransactionAwareConnection = AbstractAdapter & {
   transactionManager: TransactionManager;
   verifyBang(): void;
   resetBang(): void;
-}
+};
 
 interface PoolManagedConnection {
   lease?(): void;

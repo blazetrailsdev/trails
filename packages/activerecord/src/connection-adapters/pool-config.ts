@@ -5,7 +5,7 @@
  */
 
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-descriptor.js";

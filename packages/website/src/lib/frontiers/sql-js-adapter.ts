@@ -1,7 +1,10 @@
-import type { DatabaseAdapter } from "@blazetrails/activerecord/adapter";
 import type { Database } from "sql.js";
 
-export class SqlJsAdapter implements DatabaseAdapter {
+// Standalone in-browser sql.js contract — NOT an ActiveRecord adapter. It
+// duck-types only the handful of methods the website sandbox needs and is
+// always consumed as its own concrete `SqlJsAdapter` type, so it does not
+// implement `ActiveRecord::ConnectionAdapters::AbstractAdapter`.
+export class SqlJsAdapter {
   readonly adapterName = "SQLite";
 
   isNoDatabaseError(_error: unknown): boolean {

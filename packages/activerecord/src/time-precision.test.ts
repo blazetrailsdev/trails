@@ -2,7 +2,7 @@ import { describe, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";

@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
 import {
   ActiveRecordError,
@@ -285,10 +285,12 @@ export class TransactionCallback {
 
 /**
  * Connection interface used by Transaction classes.
- * Extends DatabaseAdapter with the DatabaseStatements methods that
- * Transaction classes call. This avoids `as any` casts throughout.
+ * An AbstractAdapter plus the DatabaseStatements methods that Transaction
+ * classes call; expressed as an intersection because an interface cannot
+ * `extends` the class without inheriting its private/protected members
+ * (TS2430). This avoids `as any` casts throughout.
  */
-export interface TransactionConnection extends DatabaseAdapter {
+export type TransactionConnection = DatabaseAdapter & {
   beginDbTransaction?(): void | Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): void | Promise<void>;
   beginDeferredTransaction?(isolation?: string | null): void | Promise<void>;
@@ -302,7 +304,7 @@ export interface TransactionConnection extends DatabaseAdapter {
   active?: boolean;
   currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void;
-}
+};
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::Transaction

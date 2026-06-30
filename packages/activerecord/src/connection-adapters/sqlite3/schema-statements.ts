@@ -8,7 +8,7 @@
  * (via alterTable rebuild). The functions below delegate to the adapter.
  */
 
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";

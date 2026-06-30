@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 describe("Relation#unscope — full Rails key coverage", () => {
   let adapter: DatabaseAdapter;

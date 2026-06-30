@@ -39,7 +39,6 @@ export default defineConfig({
       pkgAlias("@blazetrails/activesupport", "../activesupport/src/index.ts"),
       pkgAlias("@blazetrails/arel", "../arel/src/index.ts"),
       pkgAlias("@blazetrails/activemodel", "../activemodel/src/index.ts"),
-      pkgAlias("@blazetrails/activerecord/adapter", "../activerecord/src/adapter.ts"),
       pkgAlias("@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"),
       {
         find: /^@blazetrails\/activerecord\/(.+)$/,

@@ -7,7 +7,7 @@
  * wrap this with advisory locks to prevent concurrent migrations.
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ExecutionStrategy } from "./execution-strategy.js";
 import type { MigrationLike } from "./execution-strategy.js";
 

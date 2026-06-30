@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { quoteSqlValue } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("quoteSqlValue", () => {
   it("emits bare decimal for bigint (not quoted string)", () => {

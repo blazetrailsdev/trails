@@ -12,7 +12,7 @@ import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { tableNameLength, indexNameLength } from "./database-limits.js";
-import type { DatabaseAdapter } from "../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
 import {
   TableDefinition,
   Table,
@@ -194,8 +194,10 @@ export class SchemaStatements {
 
   constructor(protected readonly adapter: DatabaseAdapter & SchemaQuoter) {}
 
-  protected get adapterName() {
-    return this.adapter.adapterName;
+  protected get adapterName(): AdapterName {
+    // Base AbstractAdapter#adapterName is typed `string` (Rails-faithful
+    // "Abstract"); concrete adapters return a real AdapterName. Narrow here.
+    return this.adapter.adapterName as AdapterName;
   }
 
   get schemaCreation(): SchemaCreation {

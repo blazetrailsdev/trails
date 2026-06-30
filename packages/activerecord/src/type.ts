@@ -19,7 +19,10 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import type { AdapterName, DatabaseAdapter } from "./adapter.js";
+import type {
+  AdapterName,
+  AbstractAdapter as DatabaseAdapter,
+} from "./connection-adapters/abstract-adapter.js";
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -119,7 +122,11 @@ export function defaultValue(): Type {
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
 export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
-  return (model.connection as DatabaseAdapter | null | undefined)?.adapterName ?? "sqlite";
+  return (
+    ((model.connection as DatabaseAdapter | null | undefined)?.adapterName as
+      | AdapterName
+      | undefined) ?? "sqlite"
+  );
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.

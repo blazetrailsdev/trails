@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::TestDatabases
  */
 
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
 import type { Base } from "./base.js";

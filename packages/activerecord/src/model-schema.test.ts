@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
-import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -37,7 +36,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
         this.attribute("virtual_field", "string", { default: "v" });
       }
     }
-    const conn = Post.connection as AbstractAdapter;
+    const conn = Post.connection;
     await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
     expect(conn.schemaCache.getCachedColumnsHash("posts")).toBeUndefined();
 
@@ -56,7 +55,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
         this.attribute("virtual_field", "string", { default: "v" });
       }
     }
-    const conn = Post.connection as AbstractAdapter;
+    const conn = Post.connection;
     await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
 
     const post = await Post.create({ title: "first", body: "b" });

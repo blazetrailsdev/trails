@@ -1,7 +1,7 @@
 import { getFs, getPath, Logger, getEnv, camelize, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   TableDefinition,
@@ -252,7 +252,7 @@ export abstract class Migration {
 
   /** Return the normalized adapter name from the configured adapter. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return this.connection.adapterName;
+    return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
   }
 
   private _schema?: SchemaStatements;
@@ -1755,7 +1755,7 @@ export class MigrationContext {
   constructor(private connection: DatabaseAdapter) {}
 
   private get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return this.connection.adapterName;
+    return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
   }
 
   /** @internal Query catalog for column names+types — used after CTAS where columns derive from the SELECT. */
@@ -2877,10 +2877,7 @@ export class Migrator {
   /** @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock? */
   isUseAdvisoryLock(): boolean {
     return !!(
-      this._adapter.supportsAdvisoryLocks?.() &&
-      this._adapter.getAdvisoryLock &&
-      this._adapter.releaseAdvisoryLock &&
-      typeof this._adapter.currentDatabase === "function"
+      this._adapter.supportsAdvisoryLocks?.() && typeof this._adapter.currentDatabase === "function"
     );
   }
 

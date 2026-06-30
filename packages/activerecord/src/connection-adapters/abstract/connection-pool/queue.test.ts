@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Queue, ConnectionLeasingQueue, BiasedConditionVariable, BiasableQueue } from "./queue.js";
-import type { DatabaseAdapter } from "../../../adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 
 function fakeConn(id = 1): DatabaseAdapter {

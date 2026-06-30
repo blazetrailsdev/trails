@@ -283,7 +283,9 @@ export class DatabaseTasks {
     const scope = getEnv("SCOPE");
     const verbose = isVerbose();
 
-    const runMigration = async (adapter: import("../adapter.js").DatabaseAdapter) => {
+    const runMigration = async (
+      adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+    ) => {
       const migrator = new Migrator(adapter, this._migrations);
       migrator.verbose = verbose;
       // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
@@ -356,7 +358,9 @@ export class DatabaseTasks {
   // without a top-level import that would create a circular-dependency cycle.
   private static _baseClass: typeof import("../base.js").Base | null = null;
 
-  private static async _migrationAdapter(): Promise<import("../adapter.js").DatabaseAdapter> {
+  private static async _migrationAdapter(): Promise<
+    import("../connection-adapters/abstract-adapter.js").AbstractAdapter
+  > {
     const { Base } = await import("../base.js");
     this._baseClass = Base;
     return Base.connectionPool().leaseConnection();
@@ -1112,7 +1116,9 @@ export class DatabaseTasks {
 
   static async withTemporaryConnection<T>(
     config: DatabaseConfig,
-    fn: (adapter: import("../adapter.js").DatabaseAdapter) => Promise<T>,
+    fn: (
+      adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+    ) => Promise<T>,
   ): Promise<T> {
     return this.withTemporaryPool(config, (pool) => fn(pool.leaseConnection()));
   }
@@ -1148,7 +1154,9 @@ export class DatabaseTasks {
     this._baseClass = base;
   }
 
-  static migrationConnection(): import("../adapter.js").DatabaseAdapter | null {
+  static migrationConnection():
+    | import("../connection-adapters/abstract-adapter.js").AbstractAdapter
+    | null {
     if (!this._baseClass) return null;
     try {
       return this._baseClass.connectionPool().leaseConnection();
@@ -1176,7 +1184,7 @@ export class DatabaseTasks {
     const fs = getFs();
     if (!fs.existsSync(filename)) return true;
 
-    let adapter: import("../adapter.js").DatabaseAdapter;
+    let adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter;
     try {
       adapter = await this._migrationAdapter();
     } catch (error) {
@@ -1216,7 +1224,7 @@ export class DatabaseTasks {
    * hardcoded verbatim, matching Rails' `insert_versions_sql`.
    */
   private static async _appendSchemaInformation(filename: string): Promise<void> {
-    let adapter: import("../adapter.js").DatabaseAdapter;
+    let adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter;
     try {
       adapter = await this._migrationAdapter();
     } catch (error) {
@@ -1343,7 +1351,7 @@ export interface DatabaseTaskHandler {
 /** @internal */
 export async function withTemporaryPool<T = void>(
   dbConfig: DatabaseConfig,
-  fn: (adapter: import("../adapter.js").DatabaseAdapter) => Promise<T>,
+  fn: (adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter) => Promise<T>,
 ): Promise<T> {
   return DatabaseTasks.withTemporaryConnection(dbConfig, fn);
 }
@@ -1385,7 +1393,7 @@ export function metadataTableNames(): Set<string> {
 export function databaseAdapterFor(
   _dbConfig: DatabaseConfig,
   ...arguments_: unknown[]
-): import("../adapter.js").DatabaseAdapter | null {
+): import("../connection-adapters/abstract-adapter.js").AbstractAdapter | null {
   void arguments_;
   return DatabaseTasks.migrationConnection();
 }
@@ -1531,7 +1539,7 @@ function _normalizeSQLitePath(
 // adapters that don't yet translate at connection time.
 function _isMissingDatabaseError(
   error: unknown,
-  adapter?: import("../adapter.js").DatabaseAdapter,
+  adapter?: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
 ): boolean {
   // Delegate to the adapter's per-driver check when available.
   if (typeof adapter?.isNoDatabaseError === "function") return adapter.isNoDatabaseError(error);
