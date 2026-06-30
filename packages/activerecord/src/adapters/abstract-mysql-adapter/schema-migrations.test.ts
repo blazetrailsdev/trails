@@ -25,16 +25,22 @@ describeIfMysql("Mysql2Adapter", () => {
     setupHandlerSuite();
 
     it("renaming index on foreign key", async () => {
-      await adapter.addIndex("engines", "car_id");
-      await adapter.addForeignKey("engines", "cars", { name: "fk_engines_cars" });
-
       try {
+        await adapter.addIndex("engines", "car_id");
+        await adapter.addForeignKey("engines", "cars", { name: "fk_engines_cars" });
+
         await adapter.renameIndex("engines", "index_engines_on_car_id", "idx_renamed");
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        await adapter.removeForeignKey("engines", { name: "fk_engines_cars" });
-        await adapter.removeIndex("engines", { name: "idx_renamed" });
+        // This file skips the global adapter reset (setupHandlerSuite), so the
+        // canonical `engines` table must be restored to its original (no-index)
+        // shape even if a step above failed partway. The FK must be dropped
+        // before the index it depends on. Cover both the pre- and post-rename
+        // index names idempotently.
+        await adapter.removeForeignKey("engines", { name: "fk_engines_cars", ifExists: true });
+        await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
+        await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
       }
     });
 
