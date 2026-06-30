@@ -68,7 +68,11 @@ describe("FinderTest", () => {
 
   it("sole failing many", async () => {
     await expect(Topic.where("author_name = 'Carl'").sole()).rejects.toThrow(SoleRecordExceeded);
+    await expect(Topic.where("author_name = 'Carl'").sole()).rejects.toThrow(
+      "Wanted only one Topic",
+    );
     await expect(Topic.findSoleBy("author_name = 'Carl'")).rejects.toThrow(SoleRecordExceeded);
+    await expect(Topic.findSoleBy("author_name = 'Carl'")).rejects.toThrow("Wanted only one Topic");
   });
 
   it("first", async () => {
