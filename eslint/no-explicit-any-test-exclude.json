@@ -202,7 +202,6 @@
   "packages/activerecord/src/ordered-options.test.ts",
   "packages/activerecord/src/persistence.test.ts",
   "packages/activerecord/src/primary-keys.test.ts",
-  "packages/activerecord/src/query-cache.test.ts",
   "packages/activerecord/src/query-logs.test.ts",
   "packages/activerecord/src/readonly.test.ts",
   "packages/activerecord/src/reaper.test.ts",
