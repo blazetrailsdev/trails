@@ -97,6 +97,14 @@ export class Association {
     const opts = this.reflection.options as AssociationOptions & { anonymousClass?: unknown };
     if (opts.polymorphic || opts.through || opts.anonymousClass) return;
     const name = this.reflection.name;
+    // Prefer the rich reflection's klass getter — it does Ruby-style
+    // namespace-relative resolution (compute_class → compute_type), so a
+    // convention `belongs_to :region` on Admin::RegionalUser resolves to
+    // Admin::Region rather than a bare top-level "Region".
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
+    };
+    if (ctor._reflectOnAssociation?.(name)?.klass) return;
     const className =
       opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
     resolveModel(className);
@@ -724,10 +732,17 @@ export class Association {
     // step exists only to tolerate constant reloading in development mode, which has no
     // JS analogue, so a single `instanceof` is faithful here.
     if (klass && !(record instanceof (klass as any))) {
+      // Rails names the expected side with `reflection.class_name` — the
+      // demodulized convention name (`belongs_to :region` → "Region"), NOT the
+      // resolved `klass.name` (which for a namespace-relative target would be
+      // the flattened "AdminRegion"). Prefer the rich reflection's `className`.
+      const ctor = this.owner.constructor as typeof Base & {
+        _reflectOnAssociation?: (n: string) => { className?: string } | null;
+      };
       const expectedType =
+        ctor._reflectOnAssociation?.(this.reflection.name)?.className ??
+        this.reflection.options.className ??
         (klass as any).name ??
-        (this.reflection as any).klass?.name ??
-        (this.reflection as any).className ??
         this.reflection.name;
       const actualType =
         record == null
