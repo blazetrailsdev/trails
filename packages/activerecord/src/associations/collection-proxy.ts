@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { Rollback } from "../errors.js";
+import { concatRecordsLoop } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
@@ -1838,14 +1838,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
       return record.save();
     };
-    // Rails' `concat_records` accumulates `result &&= insert_record(...)` and
-    // `raise ActiveRecord::Rollback unless result` (collection_association.rb:438-452),
-    // so a record whose `save` merely *returns false* (a validation/callback abort
-    // that doesn't raise) still rolls back the records already inserted in this
-    // batch. Mirror that here rather than relying on a thrown error.
-    let result = true;
-    const insertAll = async (): Promise<void> => {
-      for (const record of records) {
+    // Shared `concatRecordsLoop` owns the `result &&= insert_record(...)` /
+    // `raise ActiveRecord::Rollback unless result` accumulation
+    // (collection_association.rb:438-452) so this runtime path and the OO
+    // `CollectionAssociation#concatRecords` parity surface stay in lock-step.
+    // A record whose `save` merely *returns false* (a validation/callback abort
+    // that doesn't raise) still rolls back the records already inserted.
+    const concatRecords = (): Promise<void> =>
+      concatRecordsLoop(records, async (record, resultStillTrue) => {
         // Route through replace_on_target (via _addToTarget) so set_inverse_instance
         // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
         // Rails' concat_records → add_to_target(record) { insert_record }. A record
@@ -1862,15 +1862,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // check is evaluated per record at save time (after `before_add` fires),
         // so a callback that persists the owner mid-loop flips the remaining
         // records onto the insert path — matching Rails' control flow.
-        await this._addToTarget(record, { replace: this.distinctValue }, async () => {
-          if (this._record.isNewRecord()) return true;
-          const saved = await insertRecord(record);
-          if (!saved) result = false;
+        let saved = true;
+        await this._addToTarget(record as T, { replace: this.distinctValue }, async () => {
+          // Skip the insert for a new-record owner (deferred to autosave) or once
+          // a prior record failed — Rails' `result &&= insert_record` short-circuits
+          // but still buffers this record into the target above.
+          if (this._record.isNewRecord() || !resultStillTrue) return true;
+          saved = (await insertRecord(record as T)) ?? false;
           return saved;
         });
-      }
-      if (!result) throw new Rollback();
-    };
+        return saved;
+      });
     // Rails' `CollectionAssociation#concat` wraps the inserts in a transaction
     // for a persisted owner (`transaction { concat_records(records) }`,
     // collection_association.rb:133) so a mid-batch save failure rolls back the
@@ -1878,9 +1880,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // inserts are deferred to autosave, so no DB write happens here (and a
     // BEGIN would violate the "push does not query" invariant).
     if (this._record.isNewRecord()) {
-      await insertAll();
+      await concatRecords();
     } else {
-      await this.transaction(insertAll);
+      await this.transaction(concatRecords);
     }
     return stripThenable(this._proxySelf ?? this) as this;
   }
