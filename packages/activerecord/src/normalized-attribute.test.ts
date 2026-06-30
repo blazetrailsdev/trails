@@ -4,14 +4,14 @@
  * Rails drives the canonical `Aircraft` (`aircraft` table) plus a
  * `NormalizedAircraft < Aircraft` subclass carrying `normalizes` declarations.
  * Both shapes are canonical, so this file rides the worker-built `aircraft`
- * table via `setupHandlerSuite` — no `defineSchema`, no bespoke adapter.
+ * table via `setupFixtures` — no `defineSchema`, no bespoke adapter.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { presence, titleize } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // Rails `Time#noon` — the same instant moved to 12:00:00 (midday) UTC.
@@ -41,7 +41,7 @@ class NormalizedAircraft extends Aircraft {
 }
 
 describe("NormalizedAttributeTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   let time: Temporal.Instant;
@@ -184,7 +184,7 @@ function succ(value: string): string {
 }
 
 describe("normalizes on Base", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   it("normalizes attributes before persistence", async () => {

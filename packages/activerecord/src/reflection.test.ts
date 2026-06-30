@@ -29,10 +29,10 @@ import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describe("ReflectionTest", () => {

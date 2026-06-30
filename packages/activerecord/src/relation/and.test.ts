@@ -5,12 +5,12 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("AndTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "authorAddresses"], {
+  const { authors } = fixtures(["authors", "authorAddresses"], {
     schema: canonicalSchema,
   });
 

@@ -13,7 +13,7 @@ import { Base, transaction } from "./index.js";
 import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -75,7 +75,7 @@ afterEach(async () => {
 });
 
 describe("TransactionTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   beforeAll(async () => {
     await defineSchema({ topics: canonicalSchema.topics });

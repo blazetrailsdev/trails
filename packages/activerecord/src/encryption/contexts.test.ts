@@ -4,7 +4,7 @@ import { Base } from "../index.js";
 import "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   configureEncryption,
@@ -19,7 +19,7 @@ import { NullEncryptor } from "./null-encryptor.js";
 import { Configuration as ConfigurationError } from "./errors.js";
 import { RecordInvalid } from "../validations.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describe("ActiveRecord::Encryption::ContextsTest", () => {

@@ -7,7 +7,7 @@ import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
@@ -32,7 +32,7 @@ afterAll(() => {
 describe("DelegatedTypeTest", () => {
   // Rails: `fixtures :comments, :accounts, :posts`. `{ schema }` recreates the
   // canonical fixture tables so the suite survives sibling-file contamination.
-  const { comments, accounts, posts } = useHandlerFixtures(["comments", "accounts", "posts"], {
+  const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"], {
     schema: canonicalSchema,
   });
 

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -19,10 +19,10 @@ describeIfMysql("Mysql2Adapter", () => {
   describe("SchemaMigrationsTest", () => {
     // Ride the canonical `engines`/`cars` tables built into the worker DB by
     // the global TEST_SCHEMA setup (Rails has no engines fixture — the schema
-    // alone provides the table). setupHandlerSuite skips the global adapter
+    // alone provides the table). setupFixtures skips the global adapter
     // reset so the canonical tables stay put for the DDL test below, which
     // restores their original state in its `finally`.
-    setupHandlerSuite();
+    setupFixtures();
 
     it("renaming index on foreign key", async () => {
       try {
@@ -33,7 +33,7 @@ describeIfMysql("Mysql2Adapter", () => {
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        // This file skips the global adapter reset (setupHandlerSuite), so the
+        // This file skips the global adapter reset (setupFixtures), so the
         // canonical `engines` table must be restored to its original (no-index)
         // shape even if a step above failed partway. The FK must be dropped
         // before the index it depends on. Cover both the pre- and post-rename

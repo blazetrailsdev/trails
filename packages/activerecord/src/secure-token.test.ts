@@ -7,12 +7,12 @@ import { Base } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
 import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("SecureTokenTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({ users: TEST_SCHEMA.users });

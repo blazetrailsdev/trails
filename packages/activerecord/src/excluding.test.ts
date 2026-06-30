@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { registerModel } from "./associations.js";
 import type { Relation } from "./relation.js";
@@ -20,7 +20,7 @@ describe("ExcludingTest", () => {
   // tables are pre-built per worker; seed them so each `excluding` relation has
   // rows to read back, and so the shared models resolve regardless of any
   // bespoke table a sibling file left in the worker DB.
-  const { posts, comments } = useHandlerFixtures(["posts", "comments"], {
+  const { posts, comments } = fixtures(["posts", "comments"], {
     schema: canonicalSchema,
   });
 

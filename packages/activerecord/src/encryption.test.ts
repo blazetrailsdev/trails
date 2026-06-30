@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
@@ -46,7 +46,7 @@ class TestEncryptor implements EncryptorLike {
 
 // -- Phase 2000: Core --
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema(TEST_SCHEMA);

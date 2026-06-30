@@ -27,11 +27,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   // Rides the canonical `comments` table, which carries `parent_id` for

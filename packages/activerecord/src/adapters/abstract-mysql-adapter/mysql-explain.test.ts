@@ -4,15 +4,14 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 import { registerModel } from "../../index.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 describeIfMysql("Mysql2Adapter", () => {
   registerModel(Author);
@@ -26,7 +25,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("MySQLExplainTest", () => {
     // mirrors Rails: fixtures :authors, :author_addresses
-    const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
+    const { authors } = fixtures(["authors", "authorAddresses", "posts"], {
       schema: canonicalSchema,
     });
 

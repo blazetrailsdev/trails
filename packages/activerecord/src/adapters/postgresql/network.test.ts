@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
@@ -17,7 +17,7 @@ class PostgresqlNetworkAddress extends Base {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let connection: PostgreSQLAdapter;
 

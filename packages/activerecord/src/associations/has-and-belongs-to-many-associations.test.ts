@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { association } from "../associations.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project, SpecialProject } from "../test-helpers/models/project.js";
 import {
@@ -85,7 +85,7 @@ class DeveloperWithSymbolClassName extends Developer {
 // Developer/Project models + developers_projects fixtures.
 // ==========================================================================
 describe("HasAndBelongsToManyAssociationsTest", () => {
-  const { developers, projects, computers } = useHandlerFixtures(
+  const { developers, projects, computers } = fixtures(
     [
       "developers",
       "projects",

@@ -3,7 +3,7 @@ import { Base, registerModel } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // ==========================================================================
@@ -114,7 +114,7 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
     }
   }
 
-  useHandlerFixtures(["topics", "authors"], { schema: canonicalSchema });
+  fixtures(["topics", "authors"], { schema: canonicalSchema });
 
   // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
   // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type

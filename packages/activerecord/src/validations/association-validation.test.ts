@@ -17,7 +17,7 @@
 import { afterEach, describe, expect, it, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { association } from "../associations.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
 import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -28,7 +28,7 @@ import { Interest } from "../test-helpers/models/interest.js";
 describe("AssociationValidationTest", () => {
   // Rails `fixtures :topics` — needed by test_validates_associated_missing's
   // `Topic.first`. Loading the set also registers Topic/Reply (STI).
-  useHandlerFixtures(["topics"]);
+  fixtures(["topics"]);
 
   beforeAll(() => {
     registerModel("Topic", Topic);

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../index.js";
 import { columnsOf } from "./define-schema.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { driftedTables, repairWorkerSchema } from "./schema-repair.js";
 
@@ -52,7 +52,7 @@ describe("schema-repair", () => {
   });
 
   describe("repairWorkerSchema (live DB)", () => {
-    setupHandlerSuite();
+    setupFixtures();
 
     afterEach(async () => {
       // Leave the shared worker DB canonical for sibling files.

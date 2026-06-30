@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
@@ -31,7 +31,7 @@ registerModel(CakeDesigner);
 registerModel(DrinkDesigner);
 
 describe("HMT Slot E — nested-through advanced", () => {
-  const { authors, tags, taggings } = useHandlerFixtures(
+  const { authors, tags, taggings } = fixtures(
     ["authors", "authorAddresses", "posts", "taggings", "tags"],
     { schema: canonicalSchema },
   );

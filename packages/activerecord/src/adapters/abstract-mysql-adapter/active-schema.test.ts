@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -26,7 +26,7 @@ describeIfMysql("Mysql2Adapter", () => {
     // removeIndex DDL runs through this file's separate adapter connection, which
     // must not happen while Base.connection holds a fixture transaction on
     // `people` (MySQL DDL implicitly commits and would strand that state).
-    useHandlerFixtures(["people"], {
+    fixtures(["people"], {
       schema: canonicalSchema,
       usesTransaction: ["add index"],
     });

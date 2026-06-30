@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   AdditionalValue,
@@ -22,7 +22,7 @@ import { Relation } from "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 // 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
 // base64, so we pad a known repeating byte to 32 bytes and encode. Shared

@@ -8,8 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,
@@ -39,7 +38,7 @@ registerModel("Car", Car);
 registerModel("Task", Task);
 
 describe("TimestampTest", () => {
-  const { developers, owners, pets, toys, cars, tasks } = useHandlerFixtures([
+  const { developers, owners, pets, toys, cars, tasks } = fixtures([
     "developers",
     "owners",
     "pets",
@@ -532,7 +531,7 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampsWithoutTransactionTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   afterEach(async () => {
     const ctx = new MigrationContext(Base.connection);

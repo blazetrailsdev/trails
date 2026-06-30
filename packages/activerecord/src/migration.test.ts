@@ -12,7 +12,7 @@ import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -179,7 +179,7 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithSchema()/freshContext() isolation — adding setupHandlerSuite() here
+// freshAdapterWithSchema()/freshContext() isolation — adding setupFixtures() here
 // would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
 // MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
 // depend on. Same structural reason as transaction-instrumentation.test.ts.
@@ -1841,9 +1841,9 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 
 // Connection-fallback tests need a live Base connection pool (Rails leases the
 // migration connection from ActiveRecord::Base), so they run under
-// setupHandlerSuite rather than the freshAdapter()-per-test MigrationTest block.
+// setupFixtures rather than the freshAdapter()-per-test MigrationTest block.
 describe("MigrationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   it("migration instance has connection", () => {
     const migration = new (class extends Migration {})();

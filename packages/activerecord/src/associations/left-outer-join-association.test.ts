@@ -5,12 +5,12 @@
  * Mirrors associations/left_outer_join_association_test.rb — the canonical
  * Author/Post/Comment/Rating/Essay/Categorization/Person/Friendship
  * left_outer_joins suite. Rails declares one fixtures set for the whole class;
- * we mirror that with a single `useHandlerFixtures` call seeding the canonical
+ * we mirror that with a single `fixtures` call seeding the canonical
  * association tables.
  */
 import { describe, it, expect } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Table } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
@@ -32,7 +32,7 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("LeftOuterJoinAssociationTest", () => {
-  const { authors, posts } = useHandlerFixtures(
+  const { authors, posts } = fixtures(
     [
       "authors",
       "authorAddresses",

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -74,7 +74,7 @@ describe("UpdateAllTest", () => {
     comments,
     warehouseThings,
     cpkOrderAgreements,
-  } = useHandlerFixtures(
+  } = fixtures(
     [
       "authors",
       "authorAddresses",

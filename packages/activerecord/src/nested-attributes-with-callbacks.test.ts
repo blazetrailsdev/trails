@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -76,7 +76,7 @@ registerModel("NwcBird", NwcBird);
 registerModel("NwcPirate", NwcPirate);
 
 describe("NestedAttributesWithCallbacksTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({ pirates: canonicalSchema.pirates, birds: canonicalSchema.birds });

@@ -27,8 +27,7 @@ import {
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import {
   TEST_SCHEMA as canonicalSchema,
@@ -100,7 +99,7 @@ for (const klass of [
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, accounts, clothingItems } = useHandlerFixtures(
+  const { topics, accounts, clothingItems } = fixtures(
     ["topics", "minimalistics", "accounts", "clothingItems"],
     { schema: canonicalSchema },
   );
@@ -550,7 +549,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
-  const { topics } = useHandlerFixtures(["topics", "developers", "parrots", "posts"], {
+  const { topics } = fixtures(["topics", "developers", "parrots", "posts"], {
     schema: canonicalSchema,
   });
 
@@ -632,7 +631,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = useHandlerFixtures(["topics", "companies"], {
+  const { topics } = fixtures(["topics", "companies"], {
     schema: canonicalSchema,
   });
 
@@ -742,7 +741,7 @@ describe("PersistenceTest", () => {
 // bespoke Post to canonical Client + companies fixtures.
 // ==========================================================================
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["companies"], { schema: canonicalSchema });
+  fixtures(["companies"], { schema: canonicalSchema });
 
   // Rails: test_delete_new_record
   it("delete new record", async () => {
@@ -796,7 +795,7 @@ describe("PersistenceTest", () => {
 // SpecialPost STI (persistence_test.rb#test_instantiate_creates_a_new_instance)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["posts", "authors"], { schema: canonicalSchema });
+  fixtures(["posts", "authors"], { schema: canonicalSchema });
 
   // Rails: test_instantiate_creates_a_new_instance
   it("instantiate creates a new instance", () => {
@@ -814,7 +813,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — create with custom timestamps (canonical LiveParrot).
 // ==========================================================================
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["parrots"], { schema: canonicalSchema });
+  fixtures(["parrots"], { schema: canonicalSchema });
 
   // Rails: test_create_with_custom_timestamps
   it("create with custom timestamps", async () => {
@@ -832,7 +831,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — becomes errors base (canonical AdminUser subclass).
 // ==========================================================================
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["admin/users"], { schema: canonicalSchema });
+  fixtures(["admin/users"], { schema: canonicalSchema });
 
   // Rails: test_becomes_errors_base
   it("becomes errors base", () => {
@@ -862,7 +861,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Developer = CanonicalDeveloper;
-  const { topics } = useHandlerFixtures(["topics", "minivans", "developers"], {
+  const { topics } = fixtures(["topics", "minivans", "developers"], {
     schema: canonicalSchema,
   });
 
@@ -938,7 +937,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
 
   // Rails: test_delete
   it("delete", async () => {
@@ -1015,7 +1014,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, people } = useHandlerFixtures(["topics", "people", "cars"], {
+  const { topics, people } = fixtures(["topics", "people", "cars"], {
     schema: canonicalSchema,
   });
 
@@ -1073,7 +1072,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   const Topic = CanonicalTopic;
@@ -1296,7 +1295,7 @@ describe("PersistenceTest", () => {
   }); // QueryConstraintsTest
 });
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["items"], { schema: canonicalSchema });
+  fixtures(["items"], { schema: canonicalSchema });
 
   const Item = CanonicalItem;
 
@@ -1322,7 +1321,7 @@ describe("PersistenceTest", () => {
   });
 });
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["topics", "posts", "authors"], { schema: canonicalSchema });
+  fixtures(["topics", "posts", "authors"], { schema: canonicalSchema });
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
 
@@ -1361,7 +1360,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["topics", "developers"], { schema: canonicalSchema });
+  fixtures(["topics", "developers"], { schema: canonicalSchema });
   const Topic = CanonicalTopic;
 
   it("update column", async () => {
@@ -1443,7 +1442,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — composite primary key destroy (persistence_test.rb)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  const { cpkBooks } = useHandlerFixtures(["cpkAuthors", "cpkBooks"], {
+  const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"], {
     schema: canonicalSchema,
   });
 
@@ -1488,7 +1487,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = useHandlerFixtures(["topics", "companies"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics", "companies"], { schema: canonicalSchema });
 
   it("becomes after reload schema from cache", () => {
     (Reply as any).defineAttributeMethods();
@@ -1547,7 +1546,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — readonly attributes + non-id primary keys (persistence_test.rb)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  const { developers } = useHandlerFixtures(["developers", "minivans", "speedometers"], {
+  const { developers } = fixtures(["developers", "minivans", "speedometers"], {
     schema: canonicalSchema,
   });
 
@@ -1592,7 +1591,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     // uuid is a PG-only defineSchema type, so the schema is only applied on
@@ -1632,7 +1631,7 @@ describe("PersistenceTest", () => {
 // becomes + restricted-name dirty tracking (persistence_test.rb:473)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  useHandlerFixtures(["companies"], { schema: canonicalSchema });
+  fixtures(["companies"], { schema: canonicalSchema });
   // Warm the schema cache so Company's column accessors (incl. the restricted
   // `name` reader) are generated before `new Company(...)`, matching Rails where
   // the connection reflects columns lazily on first use.

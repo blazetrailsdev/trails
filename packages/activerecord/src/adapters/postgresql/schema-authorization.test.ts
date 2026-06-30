@@ -5,14 +5,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeSchemaThingModel } from "./schema-ar-models.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";
 const USERS = ["rails_pg_schema_user1", "rails_pg_schema_user2"];
 
-setupHandlerSuite();
+setupFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

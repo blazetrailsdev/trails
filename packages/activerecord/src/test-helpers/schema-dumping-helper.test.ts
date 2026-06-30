@@ -2,14 +2,14 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
 
-setupHandlerSuite();
+setupFixtures();
 
 beforeAll(() => {
   adapter = Base.adapter;

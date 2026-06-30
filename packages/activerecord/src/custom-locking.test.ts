@@ -5,17 +5,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { adapterType } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 describe("CustomLockingTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
-  const { people } = useHandlerFixtures(["people"], { schema: canonicalSchema });
+  const { people } = fixtures(["people"], { schema: canonicalSchema });
   beforeAll(async () => {
     await defineSchema({ people: canonicalSchema.people }, { dropExisting: true });
   });

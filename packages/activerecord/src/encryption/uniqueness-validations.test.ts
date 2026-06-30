@@ -6,7 +6,7 @@ import {
   makeKeyProvider,
 } from "./test-helpers.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
@@ -18,7 +18,7 @@ import { Relation } from "../relation.js";
 import { Base } from "../index.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {

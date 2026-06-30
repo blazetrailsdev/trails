@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql/column.js";
 
@@ -19,7 +19,7 @@ class IntervalDataType extends Base {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let adapter: PostgreSQLAdapter;
   let columnMax: PostgreSQLColumn;

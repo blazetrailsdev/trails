@@ -22,8 +22,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { captureLogOutput } from "./testing/sql-capture.js";
@@ -107,7 +106,7 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   registerModel("Author", Author);
   registerModel("Book", Book);
   registerModel("Cart", Cart);
@@ -118,7 +117,7 @@ describe("InsertAllTest", () => {
   registerModel("Speedometer", Speedometer);
   registerModel("Subscriber", Subscriber);
   registerModel("Subscription", Subscription);
-  useHandlerFixtures(["authors", "books"], {
+  fixtures(["authors", "books"], {
     schema: canonicalSchema,
     // These two raise a DB-level RecordNotUnique; a PG unique violation aborts
     // the surrounding transaction and poisons transactional-fixtures teardown,

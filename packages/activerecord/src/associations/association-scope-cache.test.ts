@@ -19,15 +19,14 @@ import { registerModel } from "../index.js";
 import { loadHasMany, loadBelongsTo } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 
 describe("Association scope cache", () => {
-  setupHandlerSuite();
-  const { authors, posts } = useHandlerFixtures(["authors", "posts", "comments"]);
+  setupFixtures();
+  const { authors, posts } = fixtures(["authors", "posts", "comments"]);
 
   beforeAll(async () => {
     registerModel(Author);

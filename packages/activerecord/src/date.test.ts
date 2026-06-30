@@ -4,21 +4,21 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {
-  // `useHandlerFixtures` wires `setupHandlerSuite` internally, so no separate call.
+  // `fixtures` wires `setupFixtures` internally, so no separate call.
   // Rails date_test.rb declares no `fixtures`; wiring the canonical `topics`
   // table (and recreating its shape via `{ schema }`) lets the file ride the
   // shared Topic model with a real `last_read` date column instead of an inline
   // scratch table that collided under parallel forks.
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   // Force-recreate the canonical `topics` table to its full shape. Under
   // vitest's per-file module isolation the signature/schema caches reset to
-  // canonical each file, so `useHandlerFixtures`' own `{ schema }` `defineSchema`
+  // canonical each file, so `fixtures`' own `{ schema }` `defineSchema`
   // sees a cache-hit and skips the repair — leaving a reduced `topics` shape
   // (e.g. `attribute-methods.test.ts` / `finder.test.ts` both declare a bespoke
   // `topics` with NO `last_read` column) that a sibling handler-suite file
@@ -26,7 +26,7 @@ describe("DateTest", () => {
   // date cases below `Topic.create({ last_read })` then fail with a missing
   // `last_read` column — the documented PG flake. `dropExisting` drops +
   // recreates `topics` unconditionally so the column is always present.
-  // Registered after `useHandlerFixtures` so this `beforeAll` runs last and wins.
+  // Registered after `fixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
     await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
     // Eagerly resolve the `last_read` date type (Rails loads schema at boot). The

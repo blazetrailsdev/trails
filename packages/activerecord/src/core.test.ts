@@ -6,14 +6,14 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 
 describe("CoreTest", () => {
   // Rails `CoreTest` declares `fixtures :topics`; every inspect/pretty-print
   // case reads `topics(:first)` (id 1, "The First Topic", author "David").
-  const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
 
   /** Stub `Topic.attributes_for_inspect`, restoring the prior own-property. */
   async function withAttributesForInspect<T>(value: unknown, fn: () => T | Promise<T>): Promise<T> {

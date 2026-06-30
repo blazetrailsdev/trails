@@ -2,14 +2,14 @@ import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, Rollback } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 // Mirrors vendor/rails/activerecord/test/models/lesson.rb — `class LessonError`.
 class LessonError extends Error {}
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {

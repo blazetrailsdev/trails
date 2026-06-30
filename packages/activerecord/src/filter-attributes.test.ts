@@ -4,7 +4,7 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 import { User } from "./test-helpers/models/user.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -13,7 +13,7 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 // `User`. With the YAML store coder implemented, `Admin::User` (which declares
 // `store("params", { coder: "YAML" })`) now loads and the `admin/users` fixture set is
 // registry-resident, so the Admin::User-backed assertions run on the real model.
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({

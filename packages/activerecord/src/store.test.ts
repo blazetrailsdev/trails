@@ -3,10 +3,10 @@ import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Base, storedAttributes, ConfigurationError } from "./index.js";
 import { storeAccessor } from "./store.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Rails: fixtures :'admin/users'
-const { "admin/users": adminUsers } = useHandlerFixtures(["admin/accounts", "admin/users"]);
+const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("StoreTest", () => {
   let john: InstanceType<typeof AdminUser>;

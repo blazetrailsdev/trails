@@ -2,11 +2,11 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("EagerSingularizationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {

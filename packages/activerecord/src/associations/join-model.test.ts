@@ -19,9 +19,8 @@ import {
   EagerLoadPolymorphicError,
 } from "./errors.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
   Post,
@@ -112,10 +111,10 @@ class ScopedSourceTag extends Base {
 }
 
 describe("AssociationsJoinModelTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
-  const { authors, posts, categories, tags, taggings, comments, items, books, vertices } =
-    useHandlerFixtures([
+  const { authors, posts, categories, tags, taggings, comments, items, books, vertices } = fixtures(
+    [
       "authors",
       "authorAddresses",
       "posts",
@@ -129,7 +128,8 @@ describe("AssociationsJoinModelTest", () => {
       "vertices",
       "authorFavorites",
       "cpkOrders",
-    ]);
+    ],
+  );
   registerModel(Author);
   registerModel(Post);
   registerModel(Tag);

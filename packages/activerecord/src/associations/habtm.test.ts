@@ -9,16 +9,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "../index.js";
 import { registerModel, association } from "../associations.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
 import { Project as CanonicalProject } from "../test-helpers/models/project.js";
 
 describe("has_and_belongs_to_many", () => {
-  const { developers, projects } = useHandlerFixtures(
-    ["developers", "projects", "developersProjects"],
-    { schema: canonicalSchema },
-  );
+  const { developers, projects } = fixtures(["developers", "projects", "developersProjects"], {
+    schema: canonicalSchema,
+  });
 
   beforeEach(() => {
     registerModel("Developer", CanonicalDeveloper);

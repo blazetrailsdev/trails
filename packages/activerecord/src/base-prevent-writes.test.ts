@@ -4,11 +4,11 @@ import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 describe("BasePreventWritesTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   class Bird extends Base {

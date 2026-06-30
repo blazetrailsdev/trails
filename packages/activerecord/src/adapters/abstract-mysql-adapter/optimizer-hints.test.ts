@@ -7,7 +7,7 @@ import { describeIfSupports } from "../../test-helpers/supports.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
 // Rails wraps the whole OptimizerHintsTest body in `if supports_optimizer_hints?`
@@ -16,7 +16,7 @@ import { Post } from "../../test-helpers/models/post.js";
 describeIfMysql("Mysql2Adapter", () => {
   describeIfSupports("optimizer_hints", "OptimizerHintsTest", () => {
     // mirrors Rails: fixtures :posts
-    useHandlerFixtures(["posts"], { schema: canonicalSchema });
+    fixtures(["posts"], { schema: canonicalSchema });
 
     let adapter: Mysql2Adapter;
     beforeAll(async () => {

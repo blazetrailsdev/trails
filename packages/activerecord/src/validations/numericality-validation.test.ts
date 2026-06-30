@@ -7,10 +7,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { NumericData } from "../test-helpers/models/numeric-data.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 beforeAll(async () => {
   await NumericData.loadSchema();

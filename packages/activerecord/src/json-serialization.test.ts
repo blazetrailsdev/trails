@@ -25,15 +25,14 @@ import { Comment } from "./test-helpers/models/comment.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
 // Establish the worker's canonical template DB for the whole file so the
 // in-memory `Contact` suite below doesn't lazily initialize a bare connection
 // that would shadow the handler clone for the fixture-backed suite.
-setupHandlerSuite();
+setupFixtures();
 
 registerModel(Author);
 registerModel(Post);
@@ -215,7 +214,7 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  const { authors } = useHandlerFixtures([
+  const { authors } = fixtures([
     "authors",
     "authorAddresses",
     "posts",

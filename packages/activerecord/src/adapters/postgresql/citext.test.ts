@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base, Rollback } from "../../index.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
@@ -17,7 +17,7 @@ class Citext extends Base {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let connection: PostgreSQLAdapter;
 

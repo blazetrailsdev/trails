@@ -133,7 +133,9 @@ function harvestUseFixturesCall(node, keys) {
     node.type !== "CallExpression" ||
     !node.callee ||
     node.callee.type !== "Identifier" ||
-    (node.callee.name !== "useFixtures" && node.callee.name !== "useHandlerFixtures")
+    (node.callee.name !== "useFixtures" &&
+      node.callee.name !== "useHandlerFixtures" &&
+      node.callee.name !== "fixtures")
   ) {
     return false;
   }

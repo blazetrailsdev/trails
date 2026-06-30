@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineFixtures, defineJoinTableFixtures } from "./test-helpers/define-fixtures.js";
@@ -54,7 +54,7 @@ Associations.hasAndBelongsToMany.call(Distinct, "selects");
 // declare time), so we mirror it verbatim for class-body parity.
 Associations.hasMany.call(Distinct, "values", { through: "groups" });
 
-setupHandlerSuite();
+setupFixtures();
 
 // `adapter.schemaStatements()` is optional on the adapter interface; fall back
 // to constructing one directly, mirroring define-schema.ts.

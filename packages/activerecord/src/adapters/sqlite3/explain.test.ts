@@ -4,7 +4,7 @@
 import { it, expect } from "vitest";
 import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { Author } from "../../test-helpers/models/author.js";
 import "../../test-helpers/models/post.js";
@@ -17,7 +17,7 @@ describeIfSqlite("SQLite3ExplainTest", () => {
   // Rails `fixtures :authors, :author_addresses`. `schema` recreates the
   // canonical tables so the shared Author/Post models resolve regardless of
   // any bespoke schema a sibling file left in the shared worker DB.
-  const { authors } = useHandlerFixtures(["authors", "authorAddresses"], {
+  const { authors } = fixtures(["authors", "authorAddresses"], {
     schema: canonicalSchema,
   });
 

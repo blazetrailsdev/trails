@@ -9,7 +9,7 @@ import { Relation } from "./index.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { quoteTableName as canonicalQuoteTableName } from "./test-helpers/quote-regex.js";
 // Aliased so the canonical models read clearly alongside the merge-block usage
@@ -60,7 +60,7 @@ class UpdateAllTestModel extends Base {
 // RelationTest — targets relation_test.rb
 //
 // Converged onto the canonical schema (RFC 0019): rows come from canonical
-// fixtures via `useHandlerFixtures`, never `defineSchema`. Rails'
+// fixtures via `fixtures`, never `defineSchema`. Rails'
 // `fixtures :posts, :comments, :authors, :author_addresses, :ratings,
 // :categorizations` maps to the registry-name array below.
 //
@@ -71,10 +71,9 @@ class UpdateAllTestModel extends Base {
 // scope to records they create under the rolled-back transactional fixture.
 // ==========================================================================
 describe("RelationTest", () => {
-  useHandlerFixtures(
-    ["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"],
-    { schema: canonicalSchema },
-  );
+  fixtures(["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"], {
+    schema: canonicalSchema,
+  });
 
   beforeAll(() => {
     registerModel(CanonAuthor);
@@ -519,7 +518,7 @@ describe("RelationTest", () => {
 // describe name so `test:compare` matches it to Ruby's `RelationTest` in
 // relation_test.rb.
 describe("RelationTest", () => {
-  const { authors } = useHandlerFixtures(
+  const { authors } = fixtures(
     ["authors", "posts", "comments", "ratings", "categorizations", "categories"],
     {
       schema: canonicalSchema,

@@ -4,9 +4,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
@@ -111,7 +110,7 @@ function sample<T>(arr: T[]): T {
 }
 
 describe("EagerLoadPolyAssocsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(
@@ -179,7 +178,7 @@ describe("EagerLoadPolyAssocsTest", () => {
 });
 
 describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
-  useHandlerFixtures(["categories"]);
+  fixtures(["categories"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
@@ -17,7 +17,7 @@ class PostgresqlDomain extends Base {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let connection: PostgreSQLAdapter;
 

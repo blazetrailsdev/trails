@@ -15,7 +15,7 @@ import { Nodes } from "@blazetrails/arel";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import {
   Developer,
@@ -92,7 +92,7 @@ describe("DefaultScopingTest", () => {
   // the join + STI-association ports (default scope through joins, `unscoped`
   // joins, STI association with `unscoped`), which read the canonical posts and
   // comments fixtures exactly as Rails does.
-  const { developers, posts, comments } = useHandlerFixtures(["developers", "posts", "comments"], {
+  const { developers, posts, comments } = fixtures(["developers", "posts", "comments"], {
     schema: canonicalSchema,
   });
 

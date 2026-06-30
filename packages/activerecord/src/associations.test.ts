@@ -9,9 +9,8 @@ import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vite
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
@@ -70,7 +69,7 @@ function expectQuotedColumnInSql(
 }
 
 describe("AssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(() => {
     registerModel("CpkOrder", CpkOrder);
@@ -108,7 +107,7 @@ describe("AssociationProxyTest", () => {
     Human,
     Interest,
   ]);
-  const { authors, developers, members, posts, categories } = useHandlerFixtures(
+  const { authors, developers, members, posts, categories } = fixtures(
     [
       "authorAddresses",
       "authors",
@@ -395,7 +394,7 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   afterEach(() => vi.restoreAllMocks());
@@ -1581,12 +1580,12 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
-  // Tests are synchronous reflection checks — no DB queries. setupHandlerSuite +
+  // Tests are synchronous reflection checks — no DB queries. setupFixtures +
   // useHandlerTransactionalFixtures keep _skipGlobalResetDepth > 0 so the global
   // beforeEach does not call resetTestAdapterState() (dropAllTables) between tests,
   // which would silently drop canonical tables (cpk_order_agreements, cpk_cars, etc.)
   // needed by the later AssociationsTest describe block.
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
@@ -1683,7 +1682,7 @@ describe("OverridingAssociationsTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
-  const { computers, developers, posts, comments } = useHandlerFixtures(
+  const { computers, developers, posts, comments } = fixtures(
     ["computers", "developers", "posts", "comments"],
     { schema: canonicalSchema },
   );
@@ -1762,8 +1761,8 @@ describe("WithAnnotationsTest", () => {
     }
   }
 
-  setupHandlerSuite();
-  const { pirates } = useHandlerFixtures(
+  setupFixtures();
+  const { pirates } = fixtures(
     ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
     { schema: canonicalSchema },
   );
@@ -1852,7 +1851,7 @@ describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
   // :author_favorites`); the subselect test reads them through the association.
   const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
-    useHandlerFixtures(
+    fixtures(
       [
         "companies",
         "authors",

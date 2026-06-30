@@ -14,8 +14,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -85,7 +84,7 @@ async function findAllOrdered(klass: any, include: unknown = null): Promise<any[
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   const {
     authors,
@@ -1145,11 +1144,11 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
   // The point of these tests is that preload/eager_load split an IN clause whose
   // id list exceeds the adapter's bind-parameter limit, so the row count must be
-  // the real fixture size. The per-row reload in useHandlerFixtures is too slow
+  // the real fixture size. The per-row reload in fixtures is too slow
   // at this scale, so seed via chunked insertAll (no reload) and clean up after.
   const TOTAL = 65536;
   beforeAll(async () => {
@@ -1199,11 +1198,7 @@ describe("EagerLoadingTooManyIdsTest", () => {
 // describe name so test:compare matches the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { shardedBlogs } = useHandlerFixtures([
-    "shardedBlogs",
-    "shardedBlogPosts",
-    "shardedComments",
-  ]);
+  const { shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
   beforeAll(async () => {
     await defineSchema(
       {
@@ -1255,7 +1250,7 @@ describe("EagerAssociationTest", () => {
 // main block above declares ad-hoc per-test models against a local schema.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { posts, categories } = useHandlerFixtures([
+  const { posts, categories } = fixtures([
     "categories",
     "posts",
     "categoriesPosts",
@@ -1343,7 +1338,7 @@ describe("EagerAssociationTest", () => {
 // the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  useHandlerFixtures(["developers", "projects", "developersProjects"]);
+  fixtures(["developers", "projects", "developersProjects"]);
   // Force-recreate the canonical tables with `dropExisting` (mirrors the
   // EagerAssociationTest block above). Sibling files share the per-worker SQLite
   // DB and define `developers`/`projects` with different column sets, and the
@@ -1453,7 +1448,7 @@ describe("EagerAssociationTest", () => {
 // `developer.projects` after the initial load issues no further queries.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { developers } = useHandlerFixtures(["developers", "projects", "developersProjects"]);
+  const { developers } = fixtures(["developers", "projects", "developersProjects"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -1556,7 +1551,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors, posts, people, authorAddresses } = useHandlerFixtures([
+  const { authors, posts, people, authorAddresses } = fixtures([
     "authors",
     "posts",
     "comments",
@@ -1836,7 +1831,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors, posts, comments, categories, people } = useHandlerFixtures([
+  const { authors, posts, comments, categories, people } = fixtures([
     "authors",
     "posts",
     "comments",
@@ -2372,7 +2367,7 @@ describe("EagerAssociationTest", () => {
 // Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { pets } = useHandlerFixtures(["owners", "pets"]);
+  const { pets } = fixtures(["owners", "pets"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -2406,7 +2401,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "authorFavorites"]);
+  const { authors } = fixtures(["authors", "authorFavorites"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -2440,7 +2435,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { companies } = useHandlerFixtures(["companies"]);
+  const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
     // Partial schema: the eager SELECT projects only real `companies` columns.
     await defineSchema({ companies: canonicalSchema.companies }, { dropExisting: true });
@@ -2467,7 +2462,7 @@ describe("EagerAssociationTest", () => {
 // test:compare matches the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { accounts } = useHandlerFixtures(["companies", "accounts"]);
+  const { accounts } = fixtures(["companies", "accounts"]);
   beforeAll(async () => {
     await defineSchema(
       {
@@ -2511,7 +2506,7 @@ describe("EagerAssociationTest", () => {
 // sponsorable_* columns via `foreign_type:`/`foreign_key:`).
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { sponsors, members } = useHandlerFixtures(["members", "sponsors"]);
+  const { sponsors, members } = fixtures(["members", "sponsors"]);
   beforeAll(async () => {
     await defineSchema(
       { members: canonicalSchema.members, sponsors: canonicalSchema.sponsors } as Schema,
@@ -2541,7 +2536,7 @@ describe("EagerAssociationTest", () => {
 // primary_key: name).
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "essays"]);
+  const { authors } = fixtures(["authors", "essays"]);
   beforeAll(async () => {
     await defineSchema(
       { authors: canonicalSchema.authors, essays: canonicalSchema.essays } as Schema,
@@ -2578,7 +2573,7 @@ describe("EagerAssociationTest", () => {
 // that reference the joined `tags` table via `references`/`eager_load`.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { posts, taggings } = useHandlerFixtures(["posts", "tags", "taggings"]);
+  const { posts, taggings } = fixtures(["posts", "tags", "taggings"]);
   beforeAll(async () => {
     await defineSchema(
       {
@@ -2626,7 +2621,7 @@ describe("EagerAssociationTest", () => {
 // test:compare matches the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { jobs, references, people } = useHandlerFixtures(["jobs", "references", "people"]);
+  const { jobs, references, people } = fixtures(["jobs", "references", "people"]);
   beforeAll(async () => {
     await defineSchema(
       {
@@ -2689,12 +2684,12 @@ describe("EagerAssociationTest", () => {
 // composite-key preloading cases.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { shardedBlogs, shardedBlogPosts, shardedComments } = useHandlerFixtures(
+  const { shardedBlogs, shardedBlogPosts, shardedComments } = fixtures(
     ["shardedBlogs", "shardedBlogPosts", "shardedComments", "shardedTags", "shardedBlogPostsTags"],
     { schema: canonicalSchema },
   );
 
-  // useHandlerFixtures loads the rows but does not register the models under the
+  // fixtures loads the rows but does not register the models under the
   // class names the associations resolve by; register them here (dynamic import
   // keeps these out of the file's top-level scope).
   beforeAll(async () => {
@@ -2803,7 +2798,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "posts", "comments"]);
+  const { authors } = fixtures(["authors", "posts", "comments"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -2879,7 +2874,7 @@ describe("EagerAssociationTest", () => {
 // so test:compare matches the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { posts } = useHandlerFixtures(["authors", "posts", "comments"]);
+  const { posts } = fixtures(["authors", "posts", "comments"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -2933,7 +2928,7 @@ describe("EagerAssociationTest", () => {
 // test:compare matches the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors, comments, people, posts } = useHandlerFixtures([
+  const { authors, comments, people, posts } = fixtures([
     "authors",
     "posts",
     "comments",
@@ -3090,7 +3085,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { members } = useHandlerFixtures(["members", "memberships", "clubs"]);
+  const { members } = fixtures(["members", "memberships", "clubs"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -3121,7 +3116,7 @@ describe("EagerAssociationTest", () => {
 // `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -3165,7 +3160,7 @@ describe("EagerAssociationTest", () => {
 // the Rails `EagerAssociationTest` class.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { authors, posts, developers, projects } = useHandlerFixtures([
+  const { authors, posts, developers, projects } = fixtures([
     "authors",
     "posts",
     "comments",

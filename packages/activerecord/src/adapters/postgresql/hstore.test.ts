@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base, serialize, Migration } from "../../index.js";
 import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
@@ -38,7 +38,7 @@ class HstoreWithSerialize extends Hstore {}
 serialize(HstoreWithSerialize, "tags", { coder: TagCollection });
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let connection: PostgreSQLAdapter;
   let column: any;

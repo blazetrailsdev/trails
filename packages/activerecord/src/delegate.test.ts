@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {

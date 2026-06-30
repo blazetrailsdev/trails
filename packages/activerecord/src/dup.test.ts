@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { clearTimestampAttributes } from "./timestamp.js";
@@ -25,7 +25,7 @@ for (const klass of [Topic, Reply, SillyReply, UniqueReply, SillyUniqueReply]) {
 
 describe("DupTest", () => {
   // Mirrors Rails `fixtures :topics, :cars`.
-  useHandlerFixtures(["topics", "cars"], { schema: canonicalSchema });
+  fixtures(["topics", "cars"], { schema: canonicalSchema });
 
   beforeAll(async () => {
     // Car declares `attribute :wheels_owned_at`, so its cold-cache `load_schema`

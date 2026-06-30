@@ -8,7 +8,7 @@ import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
 // Rails wraps the whole PostgresqlOptimizerHintsTest body in
@@ -21,7 +21,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // `author_id: 1` (David); our ported posts fixture references the author by
     // label, so authors must be declared first for that ref to resolve to
     // David's id (1) rather than the label-hash fallback.
-    useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
+    fixtures(["authors", "posts"], { schema: canonicalSchema });
 
     beforeAll(async () => {
       // Mirrors Rails setup: enable_extension!("pg_hint_plan")

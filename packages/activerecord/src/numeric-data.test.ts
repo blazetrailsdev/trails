@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
@@ -14,7 +14,7 @@ import { adapterType } from "./test-adapter.js";
 // only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
 const itPg = adapterType === "postgres" ? it : it.skip;
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {

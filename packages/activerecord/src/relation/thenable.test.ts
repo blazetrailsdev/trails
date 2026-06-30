@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Relation, association, registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -17,7 +17,7 @@ registerModel(Post);
 registerModel(Comment);
 
 describe("Thenable", () => {
-  const { posts } = useHandlerFixtures(["authorAddresses", "authors", "posts", "comments"], {
+  const { posts } = fixtures(["authorAddresses", "authors", "posts", "comments"], {
     schema: canonicalSchema,
   });
 

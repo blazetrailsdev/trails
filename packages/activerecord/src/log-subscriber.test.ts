@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
@@ -104,7 +104,7 @@ describe("LogSubscriberTest", () => {
   // The DB-backed tests (basic/exists query logging) drive a real query
   // through the auto-attached production LogSubscriber, which logs via
   // ActiveRecord::Base.logger. A `developers` table is all those SELECTs need.
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({

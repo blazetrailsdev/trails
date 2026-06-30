@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import {
   MyAppBusinessCompany,
   MyAppBusinessFirm,
@@ -20,7 +20,7 @@ import { ShopCollection } from "./test-helpers/models/shop.js";
 import { ShopProduct } from "./test-helpers/models/shop.js";
 
 describe("ModulesTest", () => {
-  useHandlerFixtures([
+  fixtures([
     "accounts",
     "companies",
     "projects",

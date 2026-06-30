@@ -4,14 +4,13 @@
 // Rails test names and assertions as closely as TypeScript allows.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
 import { association } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
@@ -62,7 +61,7 @@ function assertCache(
 }
 
 describe("QueryCacheTest", () => {
-  useHandlerFixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
+  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
     schema: canonicalSchema,
   });
 
@@ -569,7 +568,7 @@ describe("QueryCacheTest", () => {
 });
 
 describe("QueryCacheMutableParamTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   // Mirrors Rails' `class JsonObj; self.table_name = "json_objs"; attribute
   // :payload, :json; end` — a scratch table Rails creates in `setup` (not a
@@ -623,7 +622,7 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  useHandlerFixtures(["tasks", "posts", "categories", "categoriesPosts"], {
+  fixtures(["tasks", "posts", "categories", "categoriesPosts"], {
     schema: canonicalSchema,
   });
 
@@ -714,7 +713,7 @@ describe("QueryCacheExpiryTest", () => {
 });
 
 describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
-  useHandlerFixtures(["tasks"], {
+  fixtures(["tasks"], {
     schema: canonicalSchema,
     usesTransaction: ["payload with open transaction"],
   });

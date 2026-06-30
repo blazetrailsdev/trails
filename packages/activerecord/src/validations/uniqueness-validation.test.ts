@@ -16,8 +16,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply } from "../test-helpers/models/reply.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";
@@ -118,9 +117,9 @@ for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
 }
 
 describe("UniquenessValidationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   // Rails `fixtures :topics, "warehouse-things"`.
-  useHandlerFixtures(["topics", "warehouseThings"]);
+  fixtures(["topics", "warehouseThings"]);
 
   beforeAll(() => {
     registerModel("Topic", Topic);
@@ -702,8 +701,8 @@ describe("UniquenessValidationTest", () => {
 });
 
 describe("UniquenessValidationWithIndexTest", () => {
-  setupHandlerSuite();
-  useHandlerFixtures(["topics"]);
+  setupFixtures();
+  fixtures(["topics"]);
 
   afterEach(() => {
     Topic.clearValidatorsBang();
@@ -834,8 +833,8 @@ describe("UniquenessValidationWithIndexTest", () => {
 });
 
 describe("UniquenessWithCompositeKey", () => {
-  setupHandlerSuite();
-  useHandlerFixtures(["cpkAuthors"]);
+  setupFixtures();
+  fixtures(["cpkAuthors"]);
 
   beforeAll(() => {
     registerModel("CpkAuthor", CpkAuthor);

@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { registerModel } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
@@ -22,7 +22,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 // Mirrors Rails `fixtures :nodes, :trees, :owners, :pets`. The fixture loader
 // seeds explicit PKs and resets serial sequences, which a plain `create` does
 // not do for the custom-named `owner_id`/`pet_id` PKs on Postgres.
-const { nodes, trees, owners, pets } = useHandlerFixtures(["nodes", "trees", "owners", "pets"]);
+const { nodes, trees, owners, pets } = fixtures(["nodes", "trees", "owners", "pets"]);
 
 registerModel("Invoice", Invoice);
 registerModel("LineItem", LineItem);

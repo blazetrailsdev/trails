@@ -11,7 +11,7 @@ import { registerModel } from "../associations.js";
 import { ProtectedParams } from "../test-helpers/protected-params.js";
 import { adapterType } from "../test-adapter.js";
 import { seconds } from "@blazetrails/activesupport";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -63,7 +63,7 @@ describe("WhereTest", () => {
     priceEstimates,
     essays,
     topics,
-  } = useHandlerFixtures(
+  } = fixtures(
     [
       "authors",
       "authorAddresses",

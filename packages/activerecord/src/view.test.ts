@@ -9,9 +9,8 @@
 import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
@@ -63,7 +62,7 @@ async function rebuildBooksTables(): Promise<void> {
 // so gate this suite the same way (all adapters support views, so it gates
 // nothing at runtime — it keeps the gate-fidelity match with Rails).
 describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
-  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+  const { books } = fixtures(["books", "authors"], { schema: canonicalSchema });
 
   class Ebook extends Base {
     static override _tableName = "ebooks'";
@@ -148,7 +147,7 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 // Rails sets `self.use_transactional_tests = false` on this class
 // (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   const { books } = useFixtures(["books", "authors"], () => Base.connection, {
     schema: canonicalSchema,
   });
@@ -220,12 +219,12 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 // UpdateableViewTest — MySQL/PG only (SQLite views do not support DML)
 // ---------------------------------------------------------------------------
 // Rails sets `self.use_transactional_tests = false` here because DML through
-// views must commit to be visible across connections. useHandlerFixtures wraps
+// views must commit to be visible across connections. fixtures wraps
 // each test in a savepoint; on MySQL a different pool connection for
 // PrintedBook.last() cannot see the uncommitted row. Mirror Rails by using
 // useFixtures (per-test reload via beforeEach/afterEach, no savepoint) instead.
 describe("UpdateableViewTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   const { books } = useFixtures(["books", "authors"], () => Base.connection, {
     schema: canonicalSchema,
   });

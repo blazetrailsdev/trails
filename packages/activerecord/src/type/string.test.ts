@@ -2,12 +2,12 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 // Rails' Class.new(Base) { self.table_name = "authors" } generates

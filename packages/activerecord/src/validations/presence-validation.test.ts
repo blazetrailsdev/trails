@@ -8,7 +8,7 @@ import { Base, registerModel } from "../index.js";
 import { association } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -39,7 +39,7 @@ function setAssoc(record: Base, name: string, value: unknown) {
 }
 
 describe("PresenceValidationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {

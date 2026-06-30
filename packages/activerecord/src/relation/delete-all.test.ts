@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/delete_all_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -23,7 +23,7 @@ for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, C
 // DeleteAllTest — targets relation/delete_all_test.rb
 // ==========================================================================
 describe("DeleteAllTest", () => {
-  const { authors, posts, cpkOrderAgreements } = useHandlerFixtures(
+  const { authors, posts, cpkOrderAgreements } = fixtures(
     [
       "authors",
       "authorAddresses",

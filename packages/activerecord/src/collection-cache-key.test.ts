@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -43,7 +43,7 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("CollectionCacheKeyTest", () => {
-  const { topics, projects } = useHandlerFixtures(
+  const { topics, projects } = fixtures(
     ["developers", "developersProjects", "projects", "topics", "comments", "posts"],
     {
       schema: canonicalSchema,

@@ -5,7 +5,7 @@
  * Ports vendor/rails/activerecord/test/cases/transactions_test.rb onto the
  * canonical schema: the Rails `TransactionTest` drives `Topic`/`Reply`/`Movie`/
  * `Cpk::Book`/`Author` against `fixtures :topics, :developers, :authors,
- * :author_addresses, :posts`. We mirror that with `useHandlerFixtures` on the
+ * :author_addresses, :posts`. We mirror that with `fixtures` on the
  * canonical models. Deliberate-error / connection-eviction / query-counting
  * tests opt out of the per-test fixture transaction via `usesTransaction` so a
  * raised StatementInvalid (or a connection thrown away from the pool) cannot
@@ -24,7 +24,7 @@ import {
 
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
@@ -61,36 +61,33 @@ for (const klass of [
 // + TransactionTest — targets transactions_test.rb
 // ==========================================================================
 describe("TransactionTest", () => {
-  const { topics } = useHandlerFixtures(
-    ["topics", "developers", "authors", "authorAddresses", "posts"],
-    {
-      schema: canonicalSchema,
-      usesTransaction: [
-        "successful with return outside inner transaction",
-        "number of transactions in commit",
-        "rollback when commit raises",
-        "transactions state from rollback",
-        "transactions state from commit",
-        "mark transaction state as committed",
-        "mark transaction state as rolledback",
-        "mark transaction state as nil",
-        "rollback on composite key model",
-        "restore composite id after rollback",
-        // TransactionTest uses use_transactional_tests=false (transactions_test.rb:196),
-        // so the user's transaction() is a RealTransaction (full_rollback?=true).
-        // These tests nest saves inside an outer transaction; without a RealTransaction,
-        // the outer fixture SavepointTransaction (full_rollback?=false) combined with
-        // level>1 causes _restoreTransactionRecordState to skip restore.
-        "rollback dirty changes",
-        "rollback dirty changes multiple saves",
-        "rollback dirty changes then retry save",
-        "rolling back in a callback rollbacks before save",
-        "restore frozen state after double destroy",
-        "restore new record after double save",
-        "restore previously new record after double save",
-      ],
-    },
-  );
+  const { topics } = fixtures(["topics", "developers", "authors", "authorAddresses", "posts"], {
+    schema: canonicalSchema,
+    usesTransaction: [
+      "successful with return outside inner transaction",
+      "number of transactions in commit",
+      "rollback when commit raises",
+      "transactions state from rollback",
+      "transactions state from commit",
+      "mark transaction state as committed",
+      "mark transaction state as rolledback",
+      "mark transaction state as nil",
+      "rollback on composite key model",
+      "restore composite id after rollback",
+      // TransactionTest uses use_transactional_tests=false (transactions_test.rb:196),
+      // so the user's transaction() is a RealTransaction (full_rollback?=true).
+      // These tests nest saves inside an outer transaction; without a RealTransaction,
+      // the outer fixture SavepointTransaction (full_rollback?=false) combined with
+      // level>1 causes _restoreTransactionRecordState to skip restore.
+      "rollback dirty changes",
+      "rollback dirty changes multiple saves",
+      "rollback dirty changes then retry save",
+      "rolling back in a callback rollbacks before save",
+      "restore frozen state after double destroy",
+      "restore new record after double save",
+      "restore previously new record after double save",
+    ],
+  });
 
   let first: any;
   let second: any;
@@ -1301,7 +1298,7 @@ describe("TransactionTest", () => {
 // poison transactional-fixtures teardown.
 // ==========================================================================
 describe("TransactionTest", () => {
-  const { topics } = useHandlerFixtures(["topics"], {
+  const { topics } = fixtures(["topics"], {
     schema: canonicalSchema,
     usesTransaction: [
       "rollback dirty changes even with raise during rollback removes from pool",
@@ -1406,7 +1403,7 @@ describe("TransactionTest", () => {
 // `topics` table is recreated for this describe via `{ schema }`.
 // ==========================================================================
 describe("TransactionTest", () => {
-  useHandlerFixtures(["topics"], {
+  fixtures(["topics"], {
     schema: canonicalSchema,
     usesTransaction: [
       "savepoints name",
@@ -1701,7 +1698,7 @@ describe("TransactionTest", () => {
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   itIfSupports("savepoints", "automatic savepoint in outer transaction", async () => {
     const first = (await Topic.find(1)) as any;
@@ -1743,7 +1740,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionUUIDTest", () => {
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   it("the uuid is lazily computed", async () => {
     await Topic.transaction(async () => {
@@ -1787,7 +1784,7 @@ describe("ConcurrentTransactionTest", () => {
 // guards the standalone `transaction(Model, (tx) => ...)` callback wiring).
 // ==========================================================================
 describe("TransactionTest", () => {
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   it("call after commit after transaction commits", async () => {
     const log: string[] = [];

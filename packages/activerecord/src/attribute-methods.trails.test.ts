@@ -12,7 +12,7 @@ import { Base, ReadonlyAttributeError } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
@@ -31,7 +31,7 @@ interface Generatable {
 const generatable = (cls: unknown): Generatable => cls as Generatable;
 
 describe("AttributeMethodsTest (trails)", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);

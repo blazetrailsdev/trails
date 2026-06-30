@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
@@ -24,7 +24,7 @@ afterAll(() => {
 // is created via raw DDL below; defineSchema({}) marks the file
 // as TM-Phase-5 compliant. The outer per-test transaction rolls back
 // inserts and any addColumn DDL done inside it() bodies.
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {

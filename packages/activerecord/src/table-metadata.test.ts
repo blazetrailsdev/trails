@@ -4,7 +4,7 @@ import { Table } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { TableMetadata } from "./table-metadata.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 class AuditLog extends Base {
@@ -23,7 +23,7 @@ class AuditRequiredDeveloper extends Base {
 }
 
 describe("TableMetadataTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema({
       developers: TEST_SCHEMA.developers,

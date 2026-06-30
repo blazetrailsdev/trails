@@ -27,7 +27,7 @@ import {
   SelectedMembership,
   TenantMembership,
 } from "../test-helpers/models/membership.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 registerModel(Member);
 registerModel(Organization);
@@ -80,7 +80,7 @@ async function captureSql(block: () => Promise<unknown>): Promise<string[]> {
 }
 
 describe("HasOneThroughDisableJoinsAssociationsTest", () => {
-  const { members, organizations } = useHandlerFixtures([
+  const { members, organizations } = fixtures([
     "members",
     "organizations",
     "memberDetails",

@@ -5,10 +5,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 describeIfMysql("Mysql2Adapter", () => {
   useHandlerTransactionalFixtures();

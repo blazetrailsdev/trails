@@ -5,9 +5,9 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Base, Range, UnknownAttributeReference } from "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 // ==========================================================================
 // SanitizeTest — targets sanitize_test.rb

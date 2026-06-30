@@ -8,8 +8,7 @@ import { throwAbort } from "@blazetrails/activesupport";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
@@ -56,7 +55,7 @@ function makeAuthorWithCallbacks(callbacks: any) {
 // Creates the canonical `authors`/`posts` tables on the handler connection.
 // Used by the has_many callback describes below.
 function setupAuthorPostSuite(): void {
-  setupHandlerSuite();
+  setupFixtures();
   withTransactionalFixtures(() => Base.connection);
   beforeAll(async () => {
     await defineSchema(Base.connection, {
@@ -537,7 +536,7 @@ describe("AssociationCallbacksTest", () => {
 // (associations/callbacks_test.rb:105-111).
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   withTransactionalFixtures(() => Base.connection);
   beforeAll(async () => {
     registerModel(Company);
@@ -572,10 +571,9 @@ describe("AssociationCallbacksTest", () => {
 // developers_projects fixtures.
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  const { projects, developers } = useHandlerFixtures(
-    ["projects", "developers", "developersProjects"],
-    { schema: canonicalSchema },
-  );
+  const { projects, developers } = fixtures(["projects", "developers", "developersProjects"], {
+    schema: canonicalSchema,
+  });
   // The fixture-schema slice only creates the tables the fixtures touch;
   // creating a Developer autosaves an `audit_logs` row (its `before_create`),
   // so that table must exist too.

@@ -178,7 +178,7 @@ function collectCallNamesIn(node, out = new Set()) {
 }
 
 // Fixture helpers that produce a named accessor via destructuring.
-const ACCESSOR_HELPERS = new Set(["useFixtures", "useHandlerFixtures"]);
+const ACCESSOR_HELPERS = new Set(["useFixtures", "useHandlerFixtures", "fixtures"]);
 // Fixture helpers that satisfy the check without a named accessor.
 const TRANSACTIONAL_HELPERS = new Set(["useHandlerTransactionalFixtures"]);
 

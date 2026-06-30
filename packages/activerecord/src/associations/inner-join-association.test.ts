@@ -5,12 +5,12 @@
  * Mirrors associations/inner_join_association_test.rb — the canonical
  * Author/Post/Comment/Essay/Category/Categorization/Person/Tagging/Tag/Sharded/
  * Friendship inner-join suite. Rails declares one fixtures set for the whole
- * class; we mirror that with a single `useHandlerFixtures` call seeding the
+ * class; we mirror that with a single `fixtures` call seeding the
  * canonical association tables.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass, enableSti } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
@@ -33,25 +33,24 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("InnerJoinAssociationTest", () => {
-  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts } =
-    useHandlerFixtures(
-      [
-        "authors",
-        "authorAddresses",
-        "essays",
-        "posts",
-        "comments",
-        "categories",
-        "categoriesPosts",
-        "categorizations",
-        "taggings",
-        "tags",
-        "people",
-        "shardedComments",
-        "shardedBlogPosts",
-      ],
-      { schema: canonicalSchema },
-    );
+  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts } = fixtures(
+    [
+      "authors",
+      "authorAddresses",
+      "essays",
+      "posts",
+      "comments",
+      "categories",
+      "categoriesPosts",
+      "categorizations",
+      "taggings",
+      "tags",
+      "people",
+      "shardedComments",
+      "shardedBlogPosts",
+    ],
+    { schema: canonicalSchema },
+  );
 
   enableSti(Category);
   registerModel(Author);

@@ -10,8 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { makeRange, throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
 
@@ -220,8 +219,8 @@ class CallbackHaltedDeveloper extends Base {
   }
 }
 
-setupHandlerSuite();
-const { developers } = useHandlerFixtures(["developers"], { schema: canonicalSchema });
+setupFixtures();
+const { developers } = fixtures(["developers"], { schema: canonicalSchema });
 
 function assertSaveCallbacksNotCalled(someone: CallbackHaltedDeveloper): void {
   expect(someone.afterSaveCalled).toBe(false);

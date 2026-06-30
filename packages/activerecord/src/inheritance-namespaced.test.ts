@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { stiName, polymorphicName, qualifiedName, namespaceSegments } from "./inheritance.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import {
@@ -23,7 +23,7 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 
 describe("InheritanceTest (module-namespaced sti_name)", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({ clothing_items: canonicalSchema.clothing_items });

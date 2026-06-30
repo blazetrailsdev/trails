@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import type { Schema } from "../test-helpers/define-schema.js";
@@ -14,7 +14,7 @@ import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("OrderTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "authorAddresses"]);
+  const { authors } = fixtures(["authors", "authorAddresses"]);
   // Force-recreate the canonical tables with `dropExisting` (mirrors
   // named-scoping.test.ts). The per-worker SQLite DB is shared across files
   // and sibling files define `books`/`authors` with different column sets;

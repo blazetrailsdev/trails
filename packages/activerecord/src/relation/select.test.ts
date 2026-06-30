@@ -8,7 +8,7 @@ import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
@@ -25,7 +25,7 @@ const sym = (name: string) => Symbol(name) as unknown as string;
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
 describe("SelectTest", () => {
-  // `useHandlerFixtures` wires `setupHandlerSuite` internally. Mirrors Rails
+  // `fixtures` wires `setupFixtures` internally. Mirrors Rails
   // `fixtures :posts, :comments`; the canonical `welcome` post
   // ("Welcome to the weblog") drives the `UPPER(title)` assertions and its
   // `greetings` comment ("Thank you for the welcome") drives the merge tests.
@@ -37,7 +37,7 @@ describe("SelectTest", () => {
   // fixture rows (only assert `to_sql` + that the query raises), so they opt out
   // of the wrapping transaction via `usesTransaction` and run in autocommit —
   // the failed statement then errors cleanly without leaving an aborted txn.
-  useHandlerFixtures(["posts", "comments"], {
+  fixtures(["posts", "comments"], {
     schema: canonicalSchema,
     usesTransaction: [
       "select with not exists field",

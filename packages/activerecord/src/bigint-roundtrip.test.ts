@@ -8,11 +8,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { MigrationContext } from "./migration.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 // `metrics` is a trails-only scratch table (no Rails counterpart). Build it via

@@ -5,13 +5,13 @@ import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { Topic } from "../../test-helpers/models/topic.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {
     // Rails `fixtures :topics` — load canonical topics via the handler connection.
-    const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+    const { topics } = fixtures(["topics"], { schema: canonicalSchema });
 
     beforeAll(async () => {
       await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS ten");

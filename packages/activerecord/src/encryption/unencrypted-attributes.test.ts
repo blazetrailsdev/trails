@@ -8,7 +8,7 @@ import {
   withoutEncryption,
 } from "./test-helpers.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
@@ -20,7 +20,7 @@ import { Decryption as DecryptionError } from "./errors.js";
 // before the model is imported — load it lazily after configureEncryption().
 let EncryptedPost: typeof EncryptedPostType;
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   configureEncryption();

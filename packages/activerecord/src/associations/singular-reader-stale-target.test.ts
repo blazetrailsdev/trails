@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, enableSti, registerSubclass } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 type Rec = Record<string, unknown>;
 
@@ -20,7 +20,7 @@ async function targetId(reader: unknown): Promise<unknown> {
 }
 
 describe("BelongsToAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies"]);
+  const { companies } = fixtures(["companies"]);
 
   beforeAll(async () => {
     registerModel(Company);

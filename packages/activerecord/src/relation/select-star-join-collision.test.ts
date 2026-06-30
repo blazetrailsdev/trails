@@ -18,7 +18,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Friendship } from "../test-helpers/models/friendship.js";
@@ -29,10 +29,10 @@ import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 registerModel(Friendship);
 
 describe("SELECT * column collision in joined relations", () => {
-  // `useHandlerFixtures` wires setupHandlerSuite + transactional fixtures +
+  // `fixtures` wires setupFixtures + transactional fixtures +
   // fixture seeding in one call; `schema` recreates the canonical `people` /
   // `friendships` tables so a sibling file's reduced shape can't survive in.
-  const { people } = useHandlerFixtures(["people", "friendships"], { schema: TEST_SCHEMA });
+  const { people } = fixtures(["people", "friendships"], { schema: TEST_SCHEMA });
 
   it("hydrates the target's columns, not the join table's, when ids collide", async () => {
     // friendships("Connection 1"): id=1, friend_id=michael(1), follower_id=david(2).

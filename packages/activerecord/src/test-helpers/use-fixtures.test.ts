@@ -13,7 +13,7 @@ import {
 } from "./define-fixtures.js";
 import { defineSchema } from "./define-schema.js";
 import { createTestAdapter } from "../test-adapter.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
@@ -254,7 +254,7 @@ describe("useFixtures type contract", () => {
 // --- useFixtures by registry name (string[] overload, real seeding) ---
 
 describe("useFixtures by registry name", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -315,7 +315,7 @@ describe("useFixtures by registry name", () => {
 });
 
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -358,7 +358,7 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 });
 
 describe("useFixtures seeds a single-row HABTM join table", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -379,7 +379,7 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 // --- vertices + edges cross-fixture ref() ---
 
 describe("useFixtures vertices and edges", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -405,7 +405,7 @@ describe("useFixtures vertices and edges", () => {
 // --- useFixtures schema auto-derivation ({ schema } option) ---
 
 describe("useFixtures { schema } auto-derivation", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   // No manual `beforeAll(() => defineSchema(...))`: passing the full TEST_SCHEMA lets
@@ -448,7 +448,7 @@ describe("deriveFixtureSchema", () => {
 // --- timestamp auto-stamp (Rails' fill_timestamps) ---
 
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -474,7 +474,7 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
 // --- string / non-integer declared primary keys ---
 
 describe("useFixtures with a string primary key", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -503,7 +503,7 @@ describe("useFixtures with a string primary key", () => {
 // --- custom / absent PK column names (model defaults to `id`, schema differs) ---
 
 describe("useFixtures reconciles the PK column against the schema", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -548,7 +548,7 @@ describe("useFixtures reconciles the PK column against the schema", () => {
 // --- composite primary keys ---
 
 describe("useFixtures seeds composite-primary-key tables", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -599,7 +599,7 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 // --- STI subclass standalone load ---
 
 describe("useFixtures resolves STI subclasses on standalone load", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -751,7 +751,7 @@ describe("resolveFixtureNames same-table guard", () => {
 // seedable on the strictest engine. An entry that can't seed must move to the
 // registry's gap list, not stay exposed.
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   // Encrypted entries (encryptedBooks…) reload through the encrypted attribute
   // type, which needs keys + the cleartext fallback. Configure (scoped) so the
@@ -789,7 +789,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
 // --- encryption add-on bootstrap (opt-in addOn hook) ---
 
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   // Reading encrypted fixtures back needs keys + the cleartext fallback. Configure

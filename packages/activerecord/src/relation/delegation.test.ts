@@ -13,7 +13,7 @@ import {
 } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -24,7 +24,7 @@ describe("DelegationTest", () => {
   // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
   // `comments` is added for the Enumerable delegation sweep below
   // (DelegationRelationTest declares `fixtures :comments`).
-  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+  fixtures(["posts", "comments"], { schema: canonicalSchema });
 
   registerModel(Post);
   registerModel(Comment);
@@ -559,7 +559,7 @@ describe("DelegationTest", () => {
 });
 
 describe("DelegationCachingTest", () => {
-  const { projects } = useHandlerFixtures(["projects", "developers", "developersProjects"], {
+  const { projects } = fixtures(["projects", "developers", "developersProjects"], {
     schema: canonicalSchema,
   });
 

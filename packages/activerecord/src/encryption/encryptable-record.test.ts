@@ -30,7 +30,7 @@ import {
 import { Configurable } from "./configurable.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { itIfSupports } from "../test-helpers/supports.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import { isEncryptedAttribute } from "../encryption.js";
@@ -758,7 +758,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     restoreEncryption?.();
   });
 
-  const { encryptedBooks } = useHandlerFixtures(["encryptedBooks"], { schema: canonicalSchema });
+  const { encryptedBooks } = fixtures(["encryptedBooks"], { schema: canonicalSchema });
 
   it("can only save unencrypted attributes when frozen encryption is true", async () => {
     const book = encryptedBooks("awdr");

@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { association, registerModel, AssociationRelation } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
 
@@ -18,7 +18,7 @@ registerModel(Ship);
 registerModel(ShipPart);
 
 describe("AssociationRelation", () => {
-  useHandlerFixtures(["ships"]);
+  fixtures(["ships"]);
 
   async function freshShip(): Promise<Ship> {
     const ship = new Ship({ name: "Dev" });

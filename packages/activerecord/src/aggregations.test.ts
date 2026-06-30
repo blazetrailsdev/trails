@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf, reflectOnAggregation } from "./index.js";
 
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import {
   Customer as CustomerModel,
@@ -32,7 +32,7 @@ afterAll(() => {
 describe("AggregationsTest", () => {
   // Mirrors Rails `fixtures :customers` via the shared Customer model; `{ schema }`
   // recreates the canonical `customers` table to survive sibling-file contamination.
-  const { customers } = useHandlerFixtures(["customers"], { schema: canonicalSchema });
+  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
 
   // Rails: test_find_single_value_object
   it("find single value object", () => {
