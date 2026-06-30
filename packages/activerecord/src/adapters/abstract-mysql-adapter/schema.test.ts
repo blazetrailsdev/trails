@@ -217,10 +217,13 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     // Scratch tables mirroring Rails' lessons_students join table (id:false with
     // lesson_id + student_id references, schema.rb:715) and students(id), but on
     // non-canonical names so the one-schema harness never sees a canonical drop.
+    // `t.references` defaults to :bigint, so the reference columns are bigint to
+    // match ca_students' default bigint PK (otherwise addForeignKey trips MySQL
+    // type compatibility instead of exercising foreign_keys under ANSI quotes).
     await a.createTable("ca_students", { force: true });
     await a.createTable("ca_lessons_students", { id: false, force: true }, (t: any) => {
-      t.integer("lesson_id");
-      t.integer("student_id");
+      t.bigint("lesson_id");
+      t.bigint("student_id");
     });
     try {
       await a.addForeignKey("ca_lessons_students", "ca_students", {
