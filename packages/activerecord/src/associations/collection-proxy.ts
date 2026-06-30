@@ -1845,7 +1845,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // A record whose `save` merely *returns false* (a validation/callback abort
     // that doesn't raise) still rolls back the records already inserted.
     const concatRecords = (): Promise<void> =>
-      concatRecordsLoop(records, async (record) => {
+      concatRecordsLoop(records, async (record, resultStillTrue) => {
         // Route through replace_on_target (via _addToTarget) so set_inverse_instance
         // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
         // Rails' concat_records → add_to_target(record) { insert_record }. A record
@@ -1864,7 +1864,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // records onto the insert path — matching Rails' control flow.
         let saved = true;
         await this._addToTarget(record as T, { replace: this.distinctValue }, async () => {
-          if (this._record.isNewRecord()) return true;
+          // Skip the insert for a new-record owner (deferred to autosave) or once
+          // a prior record failed — Rails' `result &&= insert_record` short-circuits
+          // but still buffers this record into the target above.
+          if (this._record.isNewRecord() || !resultStillTrue) return true;
           saved = (await insertRecord(record as T)) ?? false;
           return saved;
         });

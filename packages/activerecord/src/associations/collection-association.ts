@@ -216,10 +216,13 @@ export class CollectionAssociation extends Association {
    * @internal
    */
   protected async concatRecords(records: Base[], shouldRaise = false): Promise<Base[]> {
-    await concatRecordsLoop(records, async (record) => {
+    await concatRecordsLoop(records, async (record, resultStillTrue) => {
       (this as any).raiseOnTypeMismatchBang(record);
       const added = this.addToTarget(record);
-      if (!added || this.owner.isNewRecord()) return true;
+      // `!added` → before_add aborted; `resultStillTrue === false` → a prior
+      // record failed, so Rails' `result &&= insert_record` short-circuits the
+      // save while still buffering this record above.
+      if (!added || this.owner.isNewRecord() || !resultStillTrue) return true;
       return await this.insertRecord(record, true, shouldRaise);
     });
     return records;
@@ -959,11 +962,18 @@ export class CollectionAssociation extends Association {
  * so a record whose `save` merely returns false (a validation/callback abort that
  * doesn't raise) still rolls back the records already inserted in this batch.
  *
- * `addRecord` returns whether the record's insert succeeded — a record that is
- * only added in memory (new-record owner, or a `before_add` abort that skips the
- * insert) returns true so it does not flip `result`. The surrounding transaction
- * wrap lives at each call site (`CollectionAssociation#concat` /
- * `CollectionProxy#push`) since a new-record owner skips it.
+ * Rails' `result &&= insert_record(...)` short-circuits: once `result` is false,
+ * `insert_record` is no longer evaluated for the remaining records, even though
+ * `add_to_target` still runs for each (the record is still type-checked and added
+ * to the in-memory target — `replace_on_target` ignores the block's return
+ * value). `addRecord` receives `resultStillTrue` so callers reproduce that: do the
+ * per-record target/callback work unconditionally, but only attempt the insert
+ * while the accumulated result is still true. It returns whether this record's
+ * insert succeeded — a record only added in memory (new-record owner, a
+ * `before_add` abort, or the post-failure short-circuit) returns true so the fold
+ * leaves `result` unchanged. The surrounding transaction wrap lives at each call
+ * site (`CollectionAssociation#concat` / `CollectionProxy#push`) since a
+ * new-record owner skips it.
  *
  * Single implementation shared by the runtime `CollectionProxy#push` path and the
  * `CollectionAssociation#concat`/`concatRecords` parity surface so the two can't
@@ -973,11 +983,15 @@ export class CollectionAssociation extends Association {
  */
 export async function concatRecordsLoop(
   records: Base[],
-  addRecord: (record: Base) => Promise<boolean>,
+  addRecord: (record: Base, resultStillTrue: boolean) => Promise<boolean>,
 ): Promise<void> {
   let result = true;
   for (const record of records) {
-    if (!(await addRecord(record))) result = false;
+    // `add_to_target` always runs (so the record is type-checked and buffered),
+    // but the insert inside `addRecord` is gated on the current `result` to match
+    // Ruby's `result &&= insert_record(...)` short-circuit.
+    const inserted = await addRecord(record, result);
+    result = result && inserted;
   }
   if (!result) throw new Rollback();
 }
