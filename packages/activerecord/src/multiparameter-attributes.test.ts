@@ -6,6 +6,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -19,10 +20,21 @@ describe("MultiParameterAttributeTest", () => {
   // types correctly on all adapters including MariaDB. Mirrors date.test.ts.
   useHandlerFixtures(["topics"], { schema: TEST_SCHEMA });
 
-  // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.
-  // Without this, the sync loadSchema path runs before the cache is applied to the
-  // model class and marks _schemaLoaded=true with empty _attributeDefinitions.
+  // Force-recreate the canonical `topics` table to its full shape first. Under
+  // vitest's per-file module isolation the signature/schema caches reset to
+  // canonical each file, so `useHandlerFixtures`' own `{ schema }` `defineSchema`
+  // sees a cache-hit and skips the repair — leaving a reduced `topics` shape
+  // (`attribute-methods.test.ts` / `finder.test.ts` both declare a bespoke
+  // `topics` with NO `last_read` column) that a sibling file co-scheduled earlier
+  // in the same fork wrote to the shared worker DB. The `last_read(Ni)`
+  // multiparameter cases below then fail with a missing `last_read` column.
+  // `dropExisting` drops + recreates `topics` unconditionally. Mirrors
+  // date.test.ts.
   beforeAll(async () => {
+    await defineSchema({ topics: TEST_SCHEMA.topics }, { dropExisting: true });
+    // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.
+    // Without this, the sync loadSchema path runs before the cache is applied to the
+    // model class and marks _schemaLoaded=true with empty _attributeDefinitions.
     await Topic.loadSchema();
   });
 
