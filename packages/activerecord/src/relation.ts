@@ -5547,7 +5547,6 @@ export class Relation<T extends Base> {
     const [idSql, idBinds] = this._compileAstWithBinds(
       this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
     );
-    if (process.env.DEBUG_IDSQL) console.error("IDSQL:", idSql);
     const idRows = await this._conn().execute(idSql, idBinds);
     return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
