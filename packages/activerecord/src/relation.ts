@@ -3988,7 +3988,20 @@ export class Relation<T extends Base> {
       // broken SQL.
       if (fallbackAssocs.length > 0) {
         const safeTables = this._joinedTableNames();
-        for (const t of this._resolveAssocTables(joinableSpecs)) safeTables.add(t);
+        // `_joinedTableNames` / `_resolveAssocTables` only resolve string specs.
+        // Resolve hash/array manual-join and joinable-eager specs to their
+        // tables through a JoinDependency (which handles every spec shape) so a
+        // pluck column reaching a joined table of any shape is recognized as
+        // servable rather than misclassified as an unjoinable fallback.
+        const joinedJd = new JoinDependency(this._modelClass);
+        for (const spec of [
+          ...this._namedInnerJoins,
+          ...this._leftOuterJoinsValues,
+          ...joinableSpecs,
+        ]) {
+          joinedJd.addAssociationSpec(spec);
+        }
+        for (const node of joinedJd.nodes) safeTables.add(node.tableName.toLowerCase());
         const referencesUnservableTable = columns.some((c) => {
           const text = typeof c === "string" ? c : c instanceof Nodes.SqlLiteral ? c.value : "";
           return this.tablesInString(text).some((t) => !safeTables.has(t));
