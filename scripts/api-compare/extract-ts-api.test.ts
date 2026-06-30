@@ -160,6 +160,83 @@ describe("body call capture", () => {
     expect(m.calls).toEqual(["apply", "call", "helper", "lockBang", "transaction"]);
   });
 
+  it('records `new Foo(...)` as a "constructor" call (Ruby `Foo.new`)', () => {
+    // Ruby `StatementPool.new(...)` records the call `new`, which conventions.ts
+    // maps to the TS `constructor`. A direct return and a local-bound-then-
+    // returned instantiation must produce the IDENTICAL call-set — the body
+    // shape is irrelevant (#4284's buildStatementPool false positive).
+    const direct = extractFromSource(
+      `class Foo { build() { return new StatementPool(c, typeCast(this._x)); } }`,
+    );
+    const bound = extractFromSource(
+      `class Foo {
+        build() {
+          const pool = new StatementPool(c, typeCast(this._x));
+          pool.y = 1;
+          return pool;
+        }
+      }`,
+    );
+    const expected = ["constructor", "typeCast"];
+    expect(direct.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
+    expect(bound.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
+  });
+
+  it("resolves a one-level delegation to a private helper's call-set", () => {
+    // `build()` delegates to a single-statement helper that does the `new`;
+    // the helper's calls (here `constructor`) are credited back to `build` so
+    // extracting an instantiation into a one-liner is parity-equivalent.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.makePool(c); }
+        private makePool(c) { return new StatementPool(c, this._x); }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "constructor",
+      "makePool",
+    ]);
+  });
+
+  it("resolves delegation ONE level only (no transitive chasing)", () => {
+    // build → mid → leaf. `build` inherits `mid`'s DIRECT calls (`leaf`), but
+    // NOT `leaf`'s body calls (`constructor`) — that would be a second level.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.mid(); }
+        private mid() { return this.leaf(); }
+        private leaf() { return new Pool(); }
+      }`,
+    );
+    const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.calls]));
+    expect(byName["build"]).toEqual(["leaf", "mid"]);
+    expect(byName["mid"]).toEqual(["constructor", "leaf"]);
+  });
+
+  it("does not credit delegation to an unknown / inherited helper", () => {
+    // `inheritedHook` is not a method of this class — nothing to union, and the
+    // delegating method keeps only the literal call name.
+    const cls = extractFromSource(`class Foo { build() { return this.inheritedHook(); } }`);
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(["inheritedHook"]);
+  });
+
+  it("does not merge a same-named static helper into a `this.helper()` delegation", () => {
+    // `this.makePool()` dispatches to the INSTANCE helper (which makes no call);
+    // the static `makePool` (`new Pool()`) shares the name but has a separate
+    // `Class.makePool(...)` call site and must not leak its `constructor` in.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.makePool(); }
+        private makePool() { return cached(); }
+        private static makePool() { return new Pool(); }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "cached",
+      "makePool",
+    ]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {

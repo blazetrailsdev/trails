@@ -1302,6 +1302,14 @@ export function extractClass(
   const classMethods: MethodInfo[] = [];
   const includes: string[] = [];
   const extendsArr: string[] = [];
+  // One-level helper-delegation resolution: `method → helper it delegates to`
+  // (filled during the member loop) plus every same-class INSTANCE method's
+  // direct calls, unioned in a post-pass below so a delegating method inherits
+  // its helper's call-set. Keyed instance-only because `this.helper(...)`
+  // dispatches to an instance method — a same-named static method has a separate
+  // `Class.helper(...)` call site and must not be merged in.
+  const delegations: { method: MethodInfo; helper: string }[] = [];
+  const instanceCallsByName = new Map<string, string[]>();
 
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
@@ -1335,6 +1343,13 @@ export function extractClass(
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
       };
+      // Only instance methods are reachable via `this.helper(...)` and only
+      // instance methods delegate through it — record both on the instance side.
+      if (!isStatic) {
+        if (calls !== undefined) instanceCallsByName.set(memberName, calls);
+        const helper = delegatedHelper(member.body);
+        if (helper) delegations.push({ method, helper });
+      }
       if (isStatic) {
         classMethods.push(method);
       } else {
@@ -1403,6 +1418,17 @@ export function extractClass(
         instanceMethods.push(method);
       }
     }
+  }
+
+  // Post-pass: union each delegating method's helper call-set into its own
+  // (one level — the helper's DIRECT calls only, no transitive chasing). The
+  // helper's instantiations are already recorded as `constructor`, so a method
+  // delegating to a one-line `new Foo(...)` helper still credits the ctor call.
+  for (const { method, helper } of delegations) {
+    const helperCalls = instanceCallsByName.get(helper);
+    if (!helperCalls) continue;
+    const merged = new Set([...(method.calls ?? []), ...helperCalls]);
+    method.calls = [...merged].sort();
   }
 
   return {
@@ -1650,7 +1676,14 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
   const resolve = (name: string): string => aliases?.get(name) ?? name;
   const names = new Set<string>();
   const visit = (n: ts.Node): void => {
-    if (ts.isCallExpression(n)) {
+    if (ts.isNewExpression(n)) {
+      // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
+      // call as `new`, which conventions.ts maps to the TS `constructor`; record
+      // `constructor` here so an instantiation counts toward the call set. Args
+      // are still walked below, so calls nested in constructor arguments
+      // (`new Foo(typeCast(x))`) are credited regardless of body shape.
+      names.add("constructor");
+    } else if (ts.isCallExpression(n)) {
       const callee = n.expression;
       if (ts.isIdentifier(callee)) {
         names.add(callee.text);
@@ -1681,6 +1714,34 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
   ts.forEachChild(node, visit);
   if (names.size === 0) return undefined;
   return [...names].sort();
+}
+
+/**
+ * If `body` is a trivial single-statement delegation to a sibling instance
+ * method — `return this.helper(...)` or a bare `this.helper(...)` as the only
+ * statement — return that helper's name, else undefined. Used to credit the
+ * helper's call-set back to the delegating method (one level only), so a method
+ * extracted into a one-line private helper reads as equivalent to inlining it.
+ * Concrete repro: `buildStatementPool() { return this.makeStatementPool(c); }`.
+ */
+function delegatedHelper(body: ts.Node | undefined): string | undefined {
+  if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
+  const stmt = body.statements[0];
+  const expr = ts.isReturnStatement(stmt)
+    ? stmt.expression
+    : ts.isExpressionStatement(stmt)
+      ? stmt.expression
+      : undefined;
+  if (!expr || !ts.isCallExpression(expr)) return undefined;
+  const callee = expr.expression;
+  if (
+    ts.isPropertyAccessExpression(callee) &&
+    callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    ts.isIdentifier(callee.name)
+  ) {
+    return callee.name.text;
+  }
+  return undefined;
 }
 
 function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): ParamInfo[] {
