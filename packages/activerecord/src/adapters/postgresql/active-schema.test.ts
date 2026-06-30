@@ -16,7 +16,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
-    await adapter.exec("DROP TABLE IF EXISTS people");
+    await adapter.exec("DROP TABLE IF EXISTS ex_people");
     await adapter.close();
   });
 
@@ -56,19 +56,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("add index", async () => {
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
       await adapter.exec(
-        "CREATE TABLE people (id serial primary key, last_name varchar, first_name varchar, state varchar)",
+        "CREATE TABLE ex_people (id serial primary key, last_name varchar, first_name varchar, state varchar)",
       );
 
-      await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("ex_people", ["last_name"], {
         unique: true,
         where: "state = 'active'",
         name: "index_people_on_last_name",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(true);
       {
-        const indexes = await adapter.indexes("people");
+        const indexes = await adapter.indexes("ex_people");
         const idx = indexes.find((i) => i.name === "index_people_on_last_name");
         expect(idx).toBeDefined();
         expect(idx!.unique).toBe(true);
@@ -77,103 +77,103 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
-      await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("ex_people", ["last_name"], {
         algorithm: "concurrently",
         name: "index_people_on_last_name",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX CONCURRENTLY IF EXISTS index_people_on_last_name");
 
       await expect(
-        adapter.addIndex("people", ["last_name"], {
+        adapter.addIndex("ex_people", ["last_name"], {
           algorithm: "copy",
           name: "index_people_on_last_name",
         }),
       ).rejects.toThrow();
 
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
 
     it("add index quotes a bare column name where", async () => {
       // Mirrors Rails PG#add_index_options: when `:where` is itself a column
       // name, it is quoted as an identifier rather than passed through verbatim.
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
       await adapter.exec(
-        "CREATE TABLE people (id serial primary key, last_name varchar, active boolean)",
+        "CREATE TABLE ex_people (id serial primary key, last_name varchar, active boolean)",
       );
 
       // A bare column name in `:where` is quoted as an identifier by
       // addIndexOptions (Rails' add_index_options) — assert via that
       // SQL-builder seam since addIndex itself now returns void.
       {
-        const [idx] = await adapter.addIndexOptions("people", ["last_name"], {
+        const [idx] = await adapter.addIndexOptions("ex_people", ["last_name"], {
           where: "active",
         });
         expect(idx.where).toBe(`"active"`);
       }
-      await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("ex_people", ["last_name"], {
         where: "active",
         name: "index_people_on_last_name",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
       // A non-column where expression is left verbatim.
       {
-        const [idx] = await adapter.addIndexOptions("people", ["last_name"], {
+        const [idx] = await adapter.addIndexOptions("ex_people", ["last_name"], {
           where: "active IS TRUE",
         });
         expect(idx.where).toBe("active IS TRUE");
       }
-      await adapter.addIndex("people", ["last_name"], {
+      await adapter.addIndex("ex_people", ["last_name"], {
         where: "active IS TRUE",
         name: "index_people_on_last_name",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(true);
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(true);
       await adapter.exec("DROP INDEX IF EXISTS index_people_on_last_name");
 
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
 
     it("rename index validates the new name length", async () => {
       // Mirrors Rails PG#rename_index → validate_index_length!.
-      await adapter.exec("DROP TABLE IF EXISTS people");
-      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
-      await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
+      await adapter.exec("CREATE TABLE ex_people (id serial primary key, last_name varchar)");
+      await adapter.exec('CREATE INDEX index_people_on_last_name ON ex_people ("last_name")');
 
       await expect(
-        adapter.renameIndex("people", "index_people_on_last_name", "a".repeat(65)),
+        adapter.renameIndex("ex_people", "index_people_on_last_name", "a".repeat(65)),
       ).rejects.toThrow(/too long/);
 
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
 
     it("remove index", async () => {
-      await adapter.exec("DROP TABLE IF EXISTS people");
-      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
-      await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
-      await adapter.removeIndex("people", {
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
+      await adapter.exec("CREATE TABLE ex_people (id serial primary key, last_name varchar)");
+      await adapter.exec('CREATE INDEX index_people_on_last_name ON ex_people ("last_name")');
+      await adapter.removeIndex("ex_people", {
         name: "index_people_on_last_name",
         algorithm: "concurrently",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(false);
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(false);
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
 
     it("remove index when name is specified", async () => {
-      await adapter.exec("DROP TABLE IF EXISTS people");
-      await adapter.exec("CREATE TABLE people (id serial primary key, last_name varchar)");
-      await adapter.exec('CREATE INDEX index_people_on_last_name ON people ("last_name")');
-      await adapter.removeIndex("people", {
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
+      await adapter.exec("CREATE TABLE ex_people (id serial primary key, last_name varchar)");
+      await adapter.exec('CREATE INDEX index_people_on_last_name ON ex_people ("last_name")');
+      await adapter.removeIndex("ex_people", {
         name: "index_people_on_last_name",
         algorithm: "concurrently",
       });
-      expect(await adapter.indexNameExists("people", "index_people_on_last_name")).toBe(false);
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      expect(await adapter.indexNameExists("ex_people", "index_people_on_last_name")).toBe(false);
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
 
     it("remove index with wrong option", async () => {
-      await expect(adapter.removeIndex("people", {} as any)).rejects.toThrow();
+      await expect(adapter.removeIndex("ex_people", {} as any)).rejects.toThrow();
     });
 
     it("add_index default name routes through generate_index_name length fallback", async () => {
@@ -181,25 +181,25 @@ describeIfPg("PostgreSQLAdapter", () => {
       // generate_index_name (length/hash fallback), so it agrees with
       // remove_index for over-long table+column combinations rather than
       // emitting a raw, truncated identifier.
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
       await adapter.exec(
-        "CREATE TABLE people (id serial primary key, very_long_column_name_one varchar, very_long_column_name_two varchar)",
+        "CREATE TABLE ex_people (id serial primary key, very_long_column_name_one varchar, very_long_column_name_two varchar)",
       );
 
       const cols = ["very_long_column_name_one", "very_long_column_name_two"];
-      const expectedName = adapter.generateIndexName("people", cols);
+      const expectedName = adapter.generateIndexName("ex_people", cols);
       // Sanity: this combination is long enough to trigger the hash fallback.
-      expect(expectedName).not.toBe(`index_people_on_${cols.join("_and_")}`);
+      expect(expectedName).not.toBe(`index_ex_people_on_${cols.join("_and_")}`);
       expect(expectedName.length).toBeLessThanOrEqual(63);
 
-      await adapter.addIndex("people", cols);
-      expect(await adapter.indexNameExists("people", expectedName)).toBe(true);
+      await adapter.addIndex("ex_people", cols);
+      expect(await adapter.indexNameExists("ex_people", expectedName)).toBe(true);
 
       // remove_index by column resolves the same default name and round-trips.
-      await adapter.removeIndex("people", { column: cols });
-      expect(await adapter.indexNameExists("people", expectedName)).toBe(false);
+      await adapter.removeIndex("ex_people", { column: cols });
+      expect(await adapter.indexNameExists("ex_people", expectedName)).toBe(false);
 
-      await adapter.exec("DROP TABLE IF EXISTS people");
+      await adapter.exec("DROP TABLE IF EXISTS ex_people");
     });
   });
 });
