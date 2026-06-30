@@ -536,4 +536,155 @@ describe("EnumTest", () => {
       defineEnum(K, "status_2", ["id"], { suffix: true });
     }).not.toThrow();
   });
+
+  it(":_default is invalid in the new API", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    expect(() => defineEnum(K, "status", ["proposed"], { _default: "proposed" } as any)).toThrow(
+      /invalid option\(s\): :_default/,
+    );
+  });
+
+  it(":_prefix is invalid in the new API", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    expect(() => defineEnum(K, "status", ["proposed"], { _prefix: true } as any)).toThrow(
+      /invalid option\(s\): :_prefix/,
+    );
+  });
+
+  it(":_suffix is invalid in the new API", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    expect(() => defineEnum(K, "status", ["proposed"], { _suffix: true } as any)).toThrow(
+      /invalid option\(s\): :_suffix/,
+    );
+  });
+
+  it(":_scopes is invalid in the new API", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    expect(() => defineEnum(K, "status", ["proposed"], { _scopes: false } as any)).toThrow(
+      /invalid option\(s\): :_scopes/,
+    );
+  });
+
+  it(":_instance_methods is invalid in the new API", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    expect(() =>
+      defineEnum(K, "status", ["proposed"], { _instance_methods: false } as any),
+    ).toThrow(/invalid option\(s\): :_instance_methods/);
+  });
+
+  it("declare multiple enums with suffix: true", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    K.attribute("nullable_status", "integer");
+    defineEnum(K, "status", { value_1: 0 }, { suffix: true });
+    defineEnum(K, "nullable_status", { value_1: 0 }, { suffix: true });
+    const instance = new K() as any;
+    expect(typeof instance.isValue1Status).toBe("function");
+    expect(typeof instance.isValue1NullableStatus).toBe("function");
+  });
+
+  it("option names can be used as label", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    K.enum("status", { default: 0, scopes: 1, prefix: 2, suffix: 3 });
+    const book = new K({ status: 0 }) as any;
+    expect(book.isDefault()).toBe(true);
+    expect(book.isScopes()).toBe(false);
+    expect(book.isPrefix()).toBe(false);
+    expect(book.isSuffix()).toBe(false);
+  });
+
+  it("capital characters for enum names", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("extended_warranty", "integer");
+    K.enum("extended_warranty", { extendedSilver: 0, extendedGold: 1 });
+    const computer = (K as any).extendedSilver().build();
+    expect(computer.isExtendedSilver()).toBe(true);
+    expect(computer.isExtendedGold()).toBe(false);
+  });
+
+  it("unicode characters for enum names", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("language", "integer");
+    defineEnum(K, "language", ["🇺🇸", "🇪🇸", "🇫🇷"]);
+    const book = (K as any)["🇺🇸"]().build();
+    expect(book["is🇺🇸"]()).toBe(true);
+    expect(book["is🇪🇸"]()).toBe(false);
+  });
+
+  it("mangling collision for enum names", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("timezone", "integer");
+    K.enum("timezone", { "Etc/GMT+1": 0, "Etc/GMT-1": 1 });
+    // Special characters mangle into distinct, non-colliding method names.
+    expect(typeof (K as any).etcGMT1).toBe("function");
+    expect(typeof (K as any)["etc::GMT+1"]).toBe("function");
+    const computer = (K as any).etcGMT1().build();
+    expect(computer.isEtcGMT1()).toBe(true);
+  });
+
+  it("enums are inheritable", async () => {
+    class Subklass1 extends Book {}
+    const book = await (Subklass1 as any).proposed().create();
+    expect(book.isProposed()).toBe(true);
+    book.status = "written";
+    expect(book.status).toBe("written");
+    expect(book.attributeWas("status")).toBe("proposed");
+  });
+
+  it("serializable? with large number label", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    defineEnum(K, "status", ["9223372036854775808", "-9223372036854775809"]);
+    const type = K.typeForAttribute("status") as any;
+    expect(type.isSerializable("9223372036854775808")).toBe(true);
+    expect(type.isSerializable("-9223372036854775809")).toBe(true);
+    expect(type.isSerializable(9223372036854775808)).toBe(false);
+  });
+
+  it("validate inclusion of value in array", async () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    defineEnum(K, "status", ["proposed", "written"]);
+    (K as any).validatesInclusionOf("status", { in: ["written"] });
+    const invalidBook = new K({ status: 0 }) as any;
+    expect(await invalidBook.isValid()).toBe(false);
+    const validBook = new K({ status: 1 }) as any;
+    expect(await validBook.isValid()).toBe(true);
+  });
+
+  it("uses default status when no status is provided in fixtures", async () => {
+    const book = (await Book.find(books("tlg").id)) as any;
+    expect(book.isProposed()).toBe(true);
+    expect(book.isInEnglish()).toBe(true);
+  });
 });
