@@ -868,11 +868,18 @@ export class DelegationMethods {
    * `root.singularize` (`<post>`). Empty collections use `nil-classes` (or the
    * supplied `:root`) and self-close. `skipTypes` drops every `type=` attribute
    * (including `type="array"`); `skipInstruct` omits the XML declaration;
-   * `:only`/`:except` thread down into each record's serialization.
+   * The remaining serializer options (`:only`/`:except`/`:methods`/`:include`)
+   * thread down into each record's serialization, mirroring Rails passing the
+   * same options hash to `XmlMini.to_tag` after deleting only `:children` /
+   * `:skip_instruct` (conversions.rb:197-208).
    */
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
     const records = (await this.toArray()) as unknown as XmlSerializable[];
-    const { skipTypes = false, skipInstruct = false } = options;
+    // Strip the collection-only keys; everything else (only/except/methods/
+    // include/skipTypes) is forwarded to each record's `toXml`, as Rails passes
+    // the shared options hash down to `XmlMini.to_tag`.
+    const { root: _root, children: _children, skipInstruct = false, ...recordOptions } = options;
+    const skipTypes = options.skipTypes ?? false;
 
     const root =
       options.root ??
@@ -885,7 +892,7 @@ export class DelegationMethods {
     const arrayAttr = skipTypes ? "" : ' type="array"';
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const childOpts = { only: options.only, except: options.except, skipTypes, root: childTag };
+    const childOpts = { ...recordOptions, root: childTag };
 
     if (records.length === 0) {
       return `${instruct}<${rootTag}${arrayAttr}/>`;

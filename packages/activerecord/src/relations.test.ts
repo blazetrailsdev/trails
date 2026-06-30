@@ -186,6 +186,17 @@ describe("RelationTest", () => {
     expect(relationXml).toContain('type="array"');
   });
 
+  it("to xml threads :methods down to each record", async () => {
+    // Rails passes the shared options hash to XmlMini.to_tag, so `:methods`
+    // (topic.rb's `topic_id`) reaches every record's serialization.
+    const xml = await Topic.all().toXml({ only: ["id"], methods: ["topicId"] });
+    const topics = await Topic.all();
+    expect(xml).toContain('<topics type="array">');
+    // trails method names are camelCase, so the serialized tag is `topicId`
+    // (Rails' snake_case `topic_id` would dasherize to `topic-id`).
+    expect(xml).toContain(`<topicId type="integer">${topics[0].id}</topicId>`);
+  });
+
   it("scoped all", async () => {
     const topicsArr = await Topic.all();
     expect(Array.isArray(topicsArr)).toBe(true);
