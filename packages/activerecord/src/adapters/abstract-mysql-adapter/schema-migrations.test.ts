@@ -31,8 +31,7 @@ describeIfMysql("Mysql2Adapter", () => {
       try {
         await adapter.renameIndex("engines", "index_engines_on_car_id", "idx_renamed");
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
-        expect(idxNames).toContain("idx_renamed");
-        expect(idxNames).not.toContain("index_engines_on_car_id");
+        expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
         await adapter.removeForeignKey("engines", { name: "fk_engines_cars" });
         await adapter.removeIndex("engines", { name: "idx_renamed" });
