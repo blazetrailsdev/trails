@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -789,16 +789,15 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await rawTransactionOpen(connection)).toBe(false);
   });
 
-  // Mirrors Rails' `@connection.stub(:retry_deadline, value) { ... }`.
+  // Mirrors Rails' `@connection.stub(:retry_deadline, value) { ... }` — stub the
+  // getter (not the backing `_config` field) to match the Rails idiom and the
+  // project's vi.spyOn mocking convention.
   async function withRetryDeadline(value: number, body: () => Promise<void>): Promise<void> {
-    const config = (connection as unknown as { _config: { retryDeadline?: number | null } })
-      ._config;
-    const original = config.retryDeadline;
-    config.retryDeadline = value;
+    vi.spyOn(connection, "retryDeadline", "get").mockReturnValue(value);
     try {
       await body();
     } finally {
-      config.retryDeadline = original;
+      vi.restoreAllMocks();
     }
   }
 
@@ -1156,8 +1155,8 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       // eagerly), which would have run configure_connection before our override
       // is installed. Disconnect so the first query reconnects and re-runs it.
       fresh.disconnectBang();
-      (fresh as unknown as { _config: { connectionRetries: number } })._config.connectionRetries =
-        1;
+      // Rails relies on the default connection_retries (1); trails' getter
+      // defaults to 1 too (abstract-adapter.ts:1581), so no explicit set needed.
       const failures: Error[] = [new ConnectionFailed("Oops"), new ConnectionFailed("Oops 2")];
       const original = fresh.configureConnection.bind(fresh);
       (
