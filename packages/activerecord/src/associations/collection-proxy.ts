@@ -2482,6 +2482,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
+    // The join row keys the source by the source association's primary key
+    // (e.g. CpkOrderTag belongs_to :order, primary_key: "id"), which may be a
+    // single scalar even when the source model's own PK is composite. Read the
+    // target value through that mapped key, not the source model's composite
+    // `primaryKey`, so the join-row lookup matches.
+    const throughAssociations: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+    const sourceReflection = throughAssociations.find((a: any) => a.name === sourceName);
+    const sourcePk =
+      sourceReflection?.options.primaryKey ?? (records[0]?.constructor as typeof Base).primaryKey;
 
     // All-or-nothing before_remove (see remove_records in collection_association.rb):
     // one record halting aborts the whole removal — no join rows are destroyed.
@@ -2491,9 +2500,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const removed: Base[] = [];
     for (const record of records) {
-      const targetPk = record._readAttribute(
-        (record.constructor as typeof Base).primaryKey as string,
-      );
+      const targetPk = record._readAttribute(sourcePk as string);
       const joinRecord = await throughModel.findBy({
         ...ownerConditions,
         [sourceFk]: targetPk,
@@ -2630,19 +2637,29 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: T[]): Promise<void> {
+    // For has_many :through, Rails' HasManyThroughAssociation#delete_records
+    // (has_many_through_association.rb:148-163) runs `scope.destroy_all` on the
+    // THROUGH (join) scope only — it destroys the join rows and removes the
+    // source records from the in-memory target, but never destroys the source
+    // records themselves. `_deleteThrough` destroys the join rows and prunes
+    // the target, so route the through path straight there (inside the
+    // transaction when any record is persisted, matching delete_or_destroy).
+    if (this._isThrough) {
+      const run = async () => {
+        await this._deleteThrough(records);
+      };
+      if (records.some((r) => !r.isNewRecord())) {
+        await this.transaction(run);
+      } else {
+        await run();
+      }
+      return;
+    }
     const destroyed: Base[] = [];
     const run = async () => {
       for (const record of records) {
         await record.destroy();
         if (record.isDestroyed()) destroyed.push(record);
-      }
-      // For has_many :through, Rails' HasManyThroughAssociation#delete_records
-      // destroys the join rows inside the same `transaction { remove_records }`
-      // (has_many_through_association.rb:148-163), so a failure leaves neither
-      // the targets destroyed nor the join rows orphaned. Run _deleteThrough
-      // inside `run` so it shares the transaction below.
-      if (destroyed.length > 0 && this._isThrough) {
-        await this._deleteThrough(destroyed);
       }
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
@@ -2654,7 +2671,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     // Non-through join/target pruning happens after the destroy batch (it is
     // pure in-memory bookkeeping, not a DB write that needs the transaction).
-    if (destroyed.length > 0 && !this._isThrough) {
+    if (destroyed.length > 0) {
       this._removeFromTarget(destroyed);
     }
   }
