@@ -799,8 +799,14 @@ export async function save<T extends SaveRecord>(
   // running inline. Reset the queue before the chain populates it so a prior
   // save that bailed at validation doesn't leak a stale thunk into this one.
   self._beforeValidationSideEffects = [];
-  const validationsPassed = performValidations.call(this, options);
-  self._belongsToDefaultsApplied = false;
+  let validationsPassed: boolean;
+  try {
+    validationsPassed = performValidations.call(this, options);
+  } finally {
+    // Clear even if a validation callback throws, so a later standalone
+    // `valid?` on this instance still fires the belongs_to default.
+    self._belongsToDefaultsApplied = false;
+  }
   if (!validationsPassed) return false;
   if (options?.validate !== false) {
     if (!(await self._runAsyncValidations())) return false;
