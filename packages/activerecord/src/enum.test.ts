@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, defineEnum } from "./index.js";
+import { setEnumWarn } from "./enum.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -686,5 +687,56 @@ describe("EnumTest", () => {
     const book = (await Book.find(books("tlg").id)) as any;
     expect(book.isProposed()).toBe(true);
     expect(book.isInEnglish()).toBe(true);
+  });
+
+  it("scopes can be disabled by :scopes", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    defineEnum(K, "status", ["proposed", "written"], { scopes: false } as any);
+    expect((K as any).proposed).toBeUndefined();
+  });
+
+  it("default methods can be disabled by :instance_methods", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    defineEnum(K, "status", ["proposed", "written"], { instanceMethods: false } as any);
+    expect((new K() as any).isProposed).toBeUndefined();
+  });
+
+  it("overloaded default by :default", () => {
+    class K extends Base {
+      static _tableName = "books";
+    }
+    K.attribute("status", "integer");
+    defineEnum(K, "status", ["proposed", "written", "published"], { default: "published" } as any);
+    expect((new K() as any).status).toBe("published");
+  });
+
+  it("attempting to modify enum raises error", () => {
+    expect(() => {
+      (Book as any).statuses.published = 40;
+    }).toThrow();
+    expect(() => {
+      delete (Book as any).statuses.published;
+    }).toThrow();
+  });
+
+  it("enum doesn't log a warning if no clashes detected", () => {
+    const warns: string[] = [];
+    setEnumWarn((m) => warns.push(m));
+    try {
+      class K extends Base {
+        static _tableName = "books";
+      }
+      K.attribute("status", "integer");
+      defineEnum(K, "status", ["not_sent"]);
+      expect(warns).toHaveLength(0);
+    } finally {
+      setEnumWarn(() => {});
+    }
   });
 });

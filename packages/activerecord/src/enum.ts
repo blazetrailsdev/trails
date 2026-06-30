@@ -48,8 +48,13 @@ export function installEnumAttribute(
   klass: typeof Base,
   attribute: string,
   enumType: EnumType,
+  defaultValue?: string | number,
 ): void {
-  klass.attribute(attribute, enumType);
+  klass.attribute(
+    attribute,
+    enumType,
+    defaultValue === undefined ? undefined : { default: defaultValue },
+  );
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
   // accessor attribute() installed.
@@ -320,6 +325,7 @@ export function _enum(
     scopes?: boolean;
     instanceMethods?: boolean;
     validate?: boolean;
+    default?: string | number;
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
@@ -330,6 +336,11 @@ export function _enum(
   const mapping = Array.isArray(values)
     ? Object.fromEntries(values.map((v, i) => [v, i]))
     : (values as Record<string, number>);
+
+  // Rails: `scopes:` / `instance_methods:` default to true; `false` opts out of
+  // the generated class scopes / instance predicate+bang methods respectively.
+  const scopesEnabled = options?.scopes !== false;
+  const instanceMethodsEnabled = options?.instanceMethods !== false;
 
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
@@ -378,7 +389,15 @@ export function _enum(
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
   // install the label-returning accessor via the shared installEnumAttribute.
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
-  installEnumAttribute(this, attrName, enumType);
+  // Rails: `enum :status, [...], default: :published` seeds the column default
+  // with the serialized stored value of the given label (or a raw value).
+  const enumDefault =
+    options?.default == null
+      ? undefined
+      : typeof options.default === "string" && options.default in mapping
+        ? mapping[options.default]
+        : options.default;
+  installEnumAttribute(this, attrName, enumType, enumDefault);
 
   // Conflict-detection pass, then the generation pass — both ported from the
   // former standalone `defineEnum`, now folded in so `_enum` is the single enum
@@ -434,21 +453,46 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    this.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
+    if (scopesEnabled) this.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
 
     if (friendlyName !== fullName) {
-      this.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
+      if (scopesEnabled) {
+        this.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
+        this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
+      }
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      Object.defineProperty(this.prototype, fp, {
+      if (instanceMethodsEnabled) {
+        Object.defineProperty(this.prototype, fp, {
+          value: function (this: Base) {
+            return this.readAttribute(attribute) === n;
+          },
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(this.prototype, `${friendlyName}Bang`, {
+          value: function (this: EnumInstanceHost) {
+            return this.updateBang({ [attribute]: value });
+          },
+          writable: true,
+          configurable: true,
+        });
+      }
+    }
+
+    if (instanceMethodsEnabled) {
+      // Predicate: user.active? → user.isActive()
+      Object.defineProperty(this.prototype, predicateName, {
         value: function (this: Base) {
           return this.readAttribute(attribute) === n;
         },
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(this.prototype, `${friendlyName}Bang`, {
+
+      // Bang setter: user.active! → user.activeBang() persists via update!.
+      // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
+      Object.defineProperty(this.prototype, bangName, {
         value: function (this: EnumInstanceHost) {
           return this.updateBang({ [attribute]: value });
         },
@@ -457,33 +501,14 @@ export function _enum(
       });
     }
 
-    // Predicate: user.active? → user.isActive()
-    Object.defineProperty(this.prototype, predicateName, {
-      value: function (this: Base) {
-        return this.readAttribute(attribute) === n;
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // Bang setter: user.active! → user.activeBang() persists via update!.
-    // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
-    Object.defineProperty(this.prototype, bangName, {
-      value: function (this: EnumInstanceHost) {
-        return this.updateBang({ [attribute]: value });
-      },
-      writable: true,
-      configurable: true,
-    });
-
     // whereNot scope: Model.notDraft()
-    this.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
+    if (scopesEnabled) this.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
     // bracket notation only.
     const originalName = methodName(n);
-    if (/[^\w\x80-\uffff]/.test(originalName)) {
+    if (instanceMethodsEnabled && /[^\w\x80-\uffff]/.test(originalName)) {
       Object.defineProperty(this.prototype, `is${originalName}`, {
         value: function (this: Base) {
           return this.readAttribute(attribute) === n;
@@ -505,7 +530,10 @@ export function _enum(
   // for `status`). Rails: `singleton_class.define_method(name.to_s.pluralize)`.
   Object.defineProperty(this, pluralize(attribute), {
     get() {
-      return { ...mapping };
+      // Rails returns a frozen hash — mutating `Book.statuses` raises
+      // (FrozenError). In strict-mode ESM, writing/deleting a frozen object
+      // property throws TypeError, matching that contract.
+      return Object.freeze({ ...mapping });
     },
     configurable: true,
   });
