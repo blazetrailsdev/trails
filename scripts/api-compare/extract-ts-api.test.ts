@@ -141,6 +141,25 @@ describe("body call capture", () => {
     expect(save.calls).toEqual(["save"]);
   });
 
+  it("credits X.call(...)/X.apply(...) to the dispatched identifier as well as call/apply", () => {
+    // Mirrors locking/pessimistic.ts `withLock` → `lockBang.call(instance, ...)`,
+    // the `lock!` port invoked indirectly inside the wrapping transaction.
+    const cls = extractFromSource(
+      `class Foo {
+        withLock(lock) {
+          this.transaction(() => {
+            lockBang.call(this, lock);
+            helper.apply(this, [1]);
+          });
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "withLock")!;
+    // Additive: the dispatched identifier is credited alongside the literal
+    // call/apply name (so a Ruby `Proc#call` match is never lost).
+    expect(m.calls).toEqual(["apply", "call", "helper", "lockBang", "transaction"]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
@@ -151,6 +170,52 @@ describe("body call capture", () => {
     const byName = Object.fromEntries(methods.map((m) => [m.name, m.calls]));
     expect(byName["where"]).toEqual(["buildWhere", "spawn"]);
     expect(byName["toArrow"]).toEqual(["records"]);
+  });
+});
+
+describe("body call capture — renamed-import aliases", () => {
+  it("credits a renamed-import call back to the original imported name", () => {
+    // Mirrors touch-later.ts `touchDeferredAttributes` → `timestampTouch.call(...)`
+    // where `import { touch as timestampTouch } from "./timestamp.js"`.
+    const info = extractFromFiles("/p", {
+      "timestamp.ts": `export function touch(): void {}`,
+      "touch-later.ts": `
+        import { touch as timestampTouch } from "./timestamp.js";
+        export class TouchLater {
+          touchDeferredAttributes(): void {
+            timestampTouch.call(this, { time: 1 });
+            timestampTouch();
+          }
+        }
+      `,
+    });
+    const cls = info.classes["touch-later.ts:TouchLater"];
+    const m = cls.instanceMethods.find((m) => m.name === "touchDeferredAttributes")!;
+    // `touch` (resolved from `timestampTouch` via both the aliased direct call
+    // and the `.call` dispatch) plus the retained literal `call`.
+    expect(m.calls).toEqual(["call", "timestampTouch", "touch"]);
+  });
+
+  it("does not leak one file's aliases into another", () => {
+    const info = extractFromFiles("/p", {
+      "a.ts": `
+        import { touch as renamed } from "./b.js";
+        export class A { run(): void { renamed(); } }
+      `,
+      "b.ts": `
+        export function touch(): void {}
+        export class B { go(): void { renamed(); } }
+      `,
+    });
+    // In b.ts, `renamed` is an undeclared identifier — it must stay "renamed",
+    // proving a.ts's alias map was cleared before b.ts was walked.
+    expect(info.classes["a.ts:A"].instanceMethods.find((m) => m.name === "run")!.calls).toEqual([
+      "renamed",
+      "touch",
+    ]);
+    expect(info.classes["b.ts:B"].instanceMethods.find((m) => m.name === "go")!.calls).toEqual([
+      "renamed",
+    ]);
   });
 });
 

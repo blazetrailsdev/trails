@@ -37,6 +37,15 @@ import { extractorSchemaToken } from "./extractor-schema.js";
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Per-file map of local import name → original imported name, for relative
+ * `import { original as local }` bindings. Set before each source file is
+ * walked (see the per-file loop in extractFromProgram) so `extractCalls` can
+ * credit `local(...)` and `local.call(...)` back to the ported `original`
+ * name. Cleared between files to avoid leaking one file's aliases into another.
+ */
+let currentImportAliases: ReadonlyMap<string, string> | undefined;
+
 interface CacheEntry {
   schemaVersion: string;
   fingerprint: string;
@@ -344,6 +353,8 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     // Local-name → source-module map for this file, used to resolve the
     // two-step re-export pattern (`import { X } ...; export { X };`).
     const localImports = new Map<string, { sourceName: string; moduleSpecifier: string }>();
+    // Renamed-import aliases for this file, consumed by extractCalls below.
+    currentImportAliases = collectImportAliases(sourceFile);
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -667,6 +678,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         };
       }
     }
+    currentImportAliases = undefined;
   }
 
   // Post-pass: resolve named re-exports. For each `export { X } from
@@ -1591,6 +1603,29 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
   return out;
 }
 
+/** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
+function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
+  const aliases = new Map<string, string>();
+  ts.forEachChild(sourceFile, (node) => {
+    if (
+      !ts.isImportDeclaration(node) ||
+      !node.importClause?.namedBindings ||
+      !ts.isNamedImports(node.importClause.namedBindings) ||
+      !ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      return;
+    }
+    const spec = node.moduleSpecifier.text;
+    if (!spec.startsWith("./") && !spec.startsWith("../")) return;
+    for (const el of node.importClause.namedBindings.elements) {
+      if (el.propertyName && el.propertyName.text !== el.name.text) {
+        aliases.set(el.name.text, el.propertyName.text);
+      }
+    }
+  });
+  return aliases;
+}
+
 /**
  * Collect the set of method names a body invokes — the TS counterpart of the
  * Ruby extractor's `calls` array (see extract-ruby-api.rb). For each
@@ -1600,6 +1635,10 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
  * call-set parity dimension in compare.ts can diff it against the Ruby side
  * without caring about call order or count.
  *
+ * `X.call(...)` / `X.apply(...)` and renamed-import calls are additionally
+ * resolved to the dispatched/original name (see the visit body) so indirect
+ * invocations of a ported method still count toward its call set.
+ *
  * Wired into method/function bodies (class methods, exported + export-list
  * functions, object-literal mixin methods). Get/set accessor bodies are not
  * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
@@ -1607,14 +1646,29 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
  */
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
+  const aliases = currentImportAliases;
+  const resolve = (name: string): string => aliases?.get(name) ?? name;
   const names = new Set<string>();
   const visit = (n: ts.Node): void => {
     if (ts.isCallExpression(n)) {
       const callee = n.expression;
       if (ts.isIdentifier(callee)) {
         names.add(callee.text);
+        // Renamed-import call (`import { a as b }; b()`): also credit the
+        // original imported name so it matches the ported call set.
+        names.add(resolve(callee.text));
       } else if (ts.isPropertyAccessExpression(callee)) {
-        names.add(callee.name.text);
+        const prop = callee.name.text;
+        names.add(prop);
+        // `X.call(...)` / `X.apply(...)` also dispatch the function bound to
+        // `X` (the project's `this`-typed mixin convention, plus Ruby's
+        // `meth.call`/`send` indirection). Additionally credit the dispatched
+        // identifier — resolved through import aliases — so an indirect
+        // invocation of a ported method counts toward its call set. Additive:
+        // the literal `call`/`apply` name is retained, so no prior match is lost.
+        if ((prop === "call" || prop === "apply") && ts.isIdentifier(callee.expression)) {
+          names.add(resolve(callee.expression.text));
+        }
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"
