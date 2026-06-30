@@ -1,25 +1,37 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Ported from vendor/rails/activerecord/test/cases/instrumentation_test.rb.
  */
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
+import { Book } from "./test-helpers/models/book.js";
+import { Author } from "./test-helpers/models/author.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
-const TEST_SCHEMA = {
-  books: { name: "string", type: "string", format: "string", status: "string" },
-  authors: { name: "string" },
+for (const model of [Book, Author]) {
+  registerModel(model);
+}
+
+// The canonical `books`/`authors` tables back the Rails `Book`/`Author`
+// models; the tests create their own rows inline (matching Rails' inline
+// `Book.create`), so no fixtures are loaded.
+const INSTRUMENTATION_SCHEMA = {
+  books: canonicalSchema.books,
+  authors: canonicalSchema.authors,
 } as const;
 
 describe("InstrumentationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(INSTRUMENTATION_SCHEMA);
   });
 
   afterEach(() => {
@@ -94,11 +106,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on load", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     await Book.create({ name: "test book" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -109,11 +116,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on create", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("INSERT")) capturedName = event.payload.name;
@@ -123,12 +125,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on update", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("format", "string");
-      }
-    }
     const book = await Book.create({ name: "test book", format: "paperback" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -139,12 +135,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on update all", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("format", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("UPDATE")) capturedName = event.payload.name;
@@ -154,11 +144,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on destroy", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     const book = await Book.create({ name: "test book" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -169,11 +154,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on delete all", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("DELETE")) capturedName = event.payload.name;
@@ -183,11 +163,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on pluck", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("SELECT")) capturedName = event.payload.name;
@@ -197,11 +172,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on count", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.name === "Book Count") capturedName = event.payload.name;
@@ -211,12 +181,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on grouped count", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("status", "string");
-      }
-    }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.name === "Book Count") capturedName = event.payload.name;
@@ -226,11 +190,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on select all", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 1" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -243,11 +202,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on pluck", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 2" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -260,11 +214,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on raw sql", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 3" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -277,11 +226,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on cache", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     await Book.create({ name: "row count book" });
     const events: any[] = [];
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -299,11 +243,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache disabled", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     const connection = Base.connection;
     let capturedConnection: unknown;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -314,11 +253,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache enabled", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     const connection = Base.connection;
     let capturedConnection: unknown;
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -332,17 +266,13 @@ describe("InstrumentationTest", () => {
   });
 
   it("no instantiation notification when no records", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    await Author.create({ name: "David" });
+    const author = await Author.create({ id: 100, name: "David" });
     let called = false;
     Notifications.subscribe("instantiation.active_record", () => {
       called = true;
     });
     await Author.where({ id: 0 });
+    await author.books;
     expect(called).toBe(false);
   });
 });
@@ -351,7 +281,7 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(INSTRUMENTATION_SCHEMA);
   });
 
   afterEach(() => {
@@ -359,11 +289,6 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
   });
 
   it("payload without an open transaction", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -378,11 +303,6 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
   });
 
   it("payload with an open transaction", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -402,7 +322,7 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
 describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(INSTRUMENTATION_SCHEMA);
   });
 
   afterEach(() => {
@@ -410,11 +330,6 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
   });
 
   it("payload without an open transaction", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
@@ -429,11 +344,6 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
   });
 
   it("payload with an open transaction", async () => {
-    class Book extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
     let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
