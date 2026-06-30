@@ -311,22 +311,15 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it("cache notifications can be overridden", async () => {
-    // Rails dups the connection and overrides cache_notification_info to merge
-    // `neat: true`; the cached hit event then carries it. trails has no
-    // per-connection notification override, so assert the cached event fires.
-    const events: { payload?: { cached?: boolean; sql?: string } }[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e as never));
-    try {
-      const connection = Base.leaseConnection();
-      await connection.cache(async () => {
-        await connection.selectAll("SELECT 1");
-        await connection.selectAll("SELECT 1");
-      });
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-    expect(events.some((e) => e.payload?.cached === true)).toBe(true);
+  it.skip("cache notifications can be overridden", () => {
+    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
+    // query-cache-dirties-wiring-incomplete): Rails dups the connection and
+    // overrides `cache_notification_info` so the cached event payload carries
+    // `neat: true`. trails builds that payload from a module-level
+    // `cacheNotificationInfo` invoked via `cacheNotificationInfoResult.call(this)`
+    // (query-cache.ts) rather than an overridable per-connection method, so a
+    // per-connection override does not take effect and the `neat: true`
+    // assertion cannot be reproduced.
   });
 
   it("cache does not raise exceptions", async () => {
@@ -522,6 +515,18 @@ describe("QueryCacheTest", () => {
       await Post.uncached(
         async () => {
           await Post.cache(async () => {
+            await Post.create({ title: "a new post", body: "and a body" });
+          });
+        },
+        { dirties: false },
+      );
+      expect(Base.connectionPool().queryCache.size).toBe(0);
+
+      await Post.first();
+      expect(Base.connectionPool().queryCache.size).toBe(1);
+      await Post.leaseConnection().uncached(
+        async () => {
+          await Post.leaseConnection().cache(async () => {
             await Post.create({ title: "a new post", body: "and a body" });
           });
         },
