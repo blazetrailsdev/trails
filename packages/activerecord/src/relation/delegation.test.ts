@@ -498,7 +498,9 @@ describe("DelegationTest", () => {
       expect(xml).toContain("</comments>");
       expect(xml).toContain("<comment>");
       const records = await Comment.where({ type: "Comment" });
-      expect(xml).toContain(`<id type="integer">${records[0].id}</id>`);
+      // The `type="integer"` attribute is adapter-dependent (PG/MariaDB return
+      // ids as BigInt/string, not JS number), so match the id tag agnostically.
+      expect(xml).toMatch(new RegExp(`<id[^>]*>${records[0].id}</id>`));
     });
 
     it("to_xml(skip_types: true) drops the type attributes and skip_instruct omits the prolog", async () => {

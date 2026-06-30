@@ -196,8 +196,10 @@ describe("RelationTest", () => {
     const topics = await Topic.where({ type: null });
     expect(xml).toContain('<topics type="array">');
     // trails method names are camelCase, so the serialized tag is `topicId`
-    // (Rails' snake_case `topic_id` would dasherize to `topic-id`).
-    expect(xml).toContain(`<topicId type="integer">${topics[0].id}</topicId>`);
+    // (Rails' snake_case `topic_id` would dasherize to `topic-id`). The
+    // `type="integer"` attribute is adapter-dependent (PG/MariaDB return the id
+    // as BigInt/string, not JS number), so match the tag agnostically.
+    expect(xml).toMatch(new RegExp(`<topicId[^>]*>${topics[0].id}</topicId>`));
   });
 
   it("scoped all", async () => {
