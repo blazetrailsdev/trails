@@ -48,6 +48,9 @@ describe("FinderTest", () => {
 
   it("take bang missing", async () => {
     await expect(Topic.where("title = 'This title does not exist'").takeBang()).rejects.toThrow(
+      RecordNotFound,
+    );
+    await expect(Topic.where("title = 'This title does not exist'").takeBang()).rejects.toThrow(
       "Couldn't find Topic",
     );
   });
@@ -59,7 +62,13 @@ describe("FinderTest", () => {
 
   it("sole failing none", async () => {
     await expect(Topic.where("title = 'This title does not exist'").sole()).rejects.toThrow(
+      RecordNotFound,
+    );
+    await expect(Topic.where("title = 'This title does not exist'").sole()).rejects.toThrow(
       "Couldn't find Topic",
+    );
+    await expect(Topic.findSoleBy("title = 'This title does not exist'")).rejects.toThrow(
+      RecordNotFound,
     );
     await expect(Topic.findSoleBy("title = 'This title does not exist'")).rejects.toThrow(
       "Couldn't find Topic",
@@ -92,6 +101,9 @@ describe("FinderTest", () => {
 
   it("first bang missing", async () => {
     await expect(Topic.where("title = 'This title does not exist'").firstBang()).rejects.toThrow(
+      RecordNotFound,
+    );
+    await expect(Topic.where("title = 'This title does not exist'").firstBang()).rejects.toThrow(
       "Couldn't find Topic",
     );
   });
@@ -109,6 +121,7 @@ describe("FinderTest", () => {
   it("model class responds to first bang", async () => {
     expect(await Topic.firstBang()).toBeTruthy();
     await Topic.deleteAll();
+    await expect(Topic.firstBang()).rejects.toThrow(RecordNotFound);
     await expect(Topic.firstBang()).rejects.toThrow("Couldn't find Topic");
   });
 
@@ -131,6 +144,7 @@ describe("FinderTest", () => {
   it("model class responds to second bang", async () => {
     expect(await Topic.secondBang()).toBeTruthy();
     await Topic.deleteAll();
+    await expect(Topic.secondBang()).rejects.toThrow(RecordNotFound);
     await expect(Topic.secondBang()).rejects.toThrow("Couldn't find Topic");
   });
 
@@ -153,6 +167,7 @@ describe("FinderTest", () => {
   it("model class responds to third bang", async () => {
     expect(await Topic.thirdBang()).toBeTruthy();
     await Topic.deleteAll();
+    await expect(Topic.thirdBang()).rejects.toThrow(RecordNotFound);
     await expect(Topic.thirdBang()).rejects.toThrow("Couldn't find Topic");
   });
 });
