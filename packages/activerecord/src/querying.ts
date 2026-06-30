@@ -215,11 +215,6 @@ export function distinct<T extends typeof Base>(this: T): Relation<InstanceType<
 /** Mirrors: ActiveRecord::Querying#joins */
 export function joins<T extends typeof Base>(
   this: T,
-  tableOrSql?: string,
-  on?: string,
-): Relation<InstanceType<T>>;
-export function joins<T extends typeof Base>(
-  this: T,
   ...nodes: import("@blazetrails/arel").Nodes.Join[]
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
