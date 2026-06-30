@@ -88,7 +88,13 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("primary key", async () => {
       await withOmgPost(async (OmgPost) => {
-        expect((OmgPost as any).primaryKey).toBe("id");
+        // Rails asserts @omgpost.primary_key, which delegates to the connection's
+        // primary-key lookup for the schema-qualified table_name. The trails
+        // static getter can return the convention "id" from a cold cache without
+        // touching MySQL, so assert through the adapter on the qualified name to
+        // actually exercise primaryKey("db.posts").
+        const name = (OmgPost as any)._tableName as string;
+        expect(await adapter.primaryKey(name)).toBe("id");
       });
     });
 
