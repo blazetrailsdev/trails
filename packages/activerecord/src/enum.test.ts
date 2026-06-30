@@ -79,15 +79,22 @@ describe("EnumTest", () => {
     expect((book as any).author_visibility).toBe("visible");
     expect((book as any).illustrator_visibility).toBe("visible");
     expect((book as any).difficulty).toBe("medium");
-    expect((book as any).cover).toBe("soft");
+    // Rails also asserts `@book.cover == "soft"` as an enum reader; `cover` is a
+    // raw string column on canonical Book (no enum), so the assertion is pending
+    // (0023-surfaced-deviations/enum-canonical-book-gaps) to avoid false fidelity.
   });
 
-  // Rails also asserts `Book.forgotten.first` (last_read `forgotten: nil`, not
-  // mapped on canonical Book) and `authors(:david).unpublished_books.first`.
-  it.skip("find via scope", async () => {
+  it("find via scope", async () => {
+    book = books("awdr");
     expect((await (Book as any).published().first())?.id).toBe(book.id);
     expect((await (Book as any).read().first())?.id).toBe(book.id);
     expect((await (Book as any).inEnglish().first())?.id).toBe(book.id);
+    expect((await (Book as any).authorVisibilityVisible().first())?.id).toBe(book.id);
+    expect((await (Book as any).illustratorVisibilityVisible().first())?.id).toBe(book.id);
+    expect((await (Book as any).mediumToRead().first())?.id).toBe(book.id);
+    // Rails also asserts `Book.forgotten.first == books(:ddd)` (last_read
+    // `forgotten: nil`, not mapped on canonical Book) and
+    // `authors(:david).unpublished_books.first` — both pending.
   });
 
   it("find via negative scope", async () => {
@@ -141,21 +148,37 @@ describe("EnumTest", () => {
     expect((Book.where({ status: "written" }).build() as any).isProposed()).toBe(false);
   });
 
-  // Rails: `@book.hard!` (cover bang) — `cover` enum not on canonical Book.
-  it.skip("update by declaration", () => {});
+  it("update by declaration", async () => {
+    await (book as any).writtenBang();
+    expect((book as any).isWritten()).toBe(true);
+    await (book as any).inEnglishBang();
+    expect((book as any).isInEnglish()).toBe(true);
+    await (book as any).authorVisibilityVisibleBang();
+    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
+    // Rails also asserts `@book.hard!` — `cover` enum not on canonical Book.
+  });
 
-  // Rails: `@book.update! cover: :hard` — `cover` enum not on canonical Book.
-  it.skip("update by setter", () => {});
+  it("update by setter", async () => {
+    await book.updateBang({ status: "written" });
+    expect((book as any).isWritten()).toBe(true);
+    // Rails also asserts `@book.update! cover: :hard` — `cover` enum absent.
+  });
 
   // Rails overrides `published!` to return a string; trails' generated bang
   // setter isn't overridable in the same way.
   it.skip("enum methods are overwritable", () => {});
 
-  // Rails: `@book.cover = :hard` — `cover` enum not on canonical Book.
-  it.skip("direct assignment", () => {});
+  it("direct assignment", () => {
+    (book as any).status = "written";
+    expect((book as any).isWritten()).toBe(true);
+    // Rails also asserts `@book.cover = :hard` — `cover` enum not on canonical Book.
+  });
 
-  // Rails: `@book.cover = "hard"` — `cover` enum not on canonical Book.
-  it.skip("assign string value", () => {});
+  it("assign string value", () => {
+    (book as any).status = "written";
+    expect((book as any).isWritten()).toBe(true);
+    // Rails also asserts `@book.cover = "hard"` — `cover` enum not on canonical Book.
+  });
 
   // Rails reads `@book.changed_attributes[:status]` (old-value hash); trails'
   // `changedAttributes` is a string[] of names, not a name→old-value map.
