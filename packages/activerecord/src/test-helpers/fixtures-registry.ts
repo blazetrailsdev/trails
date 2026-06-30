@@ -1,5 +1,4 @@
 import type { Base } from "../base.js";
-import { registerModel } from "../associations.js";
 
 import * as FixtureData from "./fixtures/index.js";
 
@@ -15,7 +14,15 @@ type FixtureAttrs = Record<string, unknown>;
  * to seed time means a test only loads the models for the fixtures it requests.
  */
 export interface FixtureModelEntry {
-  readonly model: () => Promise<BaseClass>;
+  /**
+   * Resolves the set's model class. May return an array whose FIRST element is
+   * the table-bearing model and whose remaining elements are extra classes to
+   * register alongside it — STI subclasses (so `findStiClass` resolves each
+   * row's inheritance-column value) or HABTM targets whose join table the loader
+   * writes. `resolveFixtureNames` passes the whole list to `registerModel`'s
+   * array form, which also routes any STI subclass through `registerSubclass`.
+   */
+  readonly model: () => Promise<BaseClass | readonly BaseClass[]>;
   readonly data: Record<string, FixtureAttrs>;
   /**
    * Optional add-on bootstrap awaited BEFORE the {@link FixtureModelEntry.model}
@@ -285,11 +292,15 @@ export const fixtureRegistry = {
     // materializes `computers_developers` rows from the owner's `sharedComputers`
     // association label, so that table must be created even when the join set
     // isn't requested by name.
-    model: () =>
+    model: (): Promise<
+      [
+        typeof import("./models/developer.js").Developer,
+        typeof import("./models/computer.js").Computer,
+      ]
+    > =>
       import("./models/developer.js").then(async (m) => {
         const { Computer } = await import("./models/computer.js");
-        registerModel(Computer);
-        return m.Developer;
+        return [m.Developer, Computer];
       }),
     data: FixtureData.developerFixtureData,
   },
@@ -436,12 +447,13 @@ export const fixtureRegistry = {
     // in `modelRegistry` (Rails' autoloader analog — `findStiClass` resolves the
     // inheritance-column value through it) lets the base reload hydrate each row
     // as its declared `parrot_sti_class` subclass.
-    model: () =>
-      import("./models/parrot.js").then((m) => {
-        registerModel(m.LiveParrot);
-        registerModel(m.DeadParrot);
-        return m.Parrot;
-      }),
+    model: (): Promise<
+      [
+        typeof import("./models/parrot.js").Parrot,
+        typeof import("./models/parrot.js").LiveParrot,
+        typeof import("./models/parrot.js").DeadParrot,
+      ]
+    > => import("./models/parrot.js").then((m) => [m.Parrot, m.LiveParrot, m.DeadParrot]),
     data: FixtureData.parrotFixtureData,
   },
   parrotsPirates: {
@@ -594,13 +606,20 @@ export const fixtureRegistry = {
     // STI base with custom inheritance column `custom_type`. Register the
     // subclasses the fixture rows reference so the base reload resolves each
     // `custom_type` value to its concrete class.
-    model: () =>
-      import("./models/vegetables.js").then((m) => {
-        registerModel(m.Cucumber);
-        registerModel(m.Cabbage);
-        registerModel(m.RedCabbage);
-        return m.Vegetable;
-      }),
+    model: (): Promise<
+      [
+        typeof import("./models/vegetables.js").Vegetable,
+        typeof import("./models/vegetables.js").Cucumber,
+        typeof import("./models/vegetables.js").Cabbage,
+        typeof import("./models/vegetables.js").RedCabbage,
+      ]
+    > =>
+      import("./models/vegetables.js").then((m) => [
+        m.Vegetable,
+        m.Cucumber,
+        m.Cabbage,
+        m.RedCabbage,
+      ]),
     data: FixtureData.vegetableFixtureData,
   },
   warehouseThings: {
@@ -627,11 +646,21 @@ void _registryConforms;
 /** Union of all registered fixture-set names. */
 export type FixtureName = keyof typeof fixtureRegistry;
 
-/** The canonical model class registered for fixture-set `N` (never for join-table sets). */
+/**
+ * The canonical model class registered for fixture-set `N` (never for join-table sets).
+ * For an entry whose `model` thunk returns a tuple (the table-bearing model plus extra
+ * classes to register), this is the FIRST element — the table-bearing model.
+ */
 export type RegistryModel<N extends FixtureName> = (typeof fixtureRegistry)[N] extends {
-  model: () => Promise<infer M extends BaseClass>;
+  model: () => Promise<infer R>;
 }
-  ? M
+  ? R extends readonly [infer First, ...unknown[]]
+    ? First extends BaseClass
+      ? First
+      : never
+    : R extends BaseClass
+      ? R
+      : never
   : never;
 
 /** True for join-table fixture-set names (no model class). */
