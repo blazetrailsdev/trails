@@ -17,6 +17,10 @@ import {
   currentPreventingWrites,
   withIsolatedConnectionState,
 } from "./core.js";
+import { setTrailsRoot } from "@blazetrails/activesupport";
+import * as nodeFs from "node:fs";
+import * as nodeOs from "node:os";
+import * as nodePath from "node:path";
 
 function setupConnection() {
   const config = new HashConfig("test", "primary", {
@@ -898,5 +902,37 @@ describe("establish_connection accepts a DatabaseConfig", () => {
     expect(restored).toBe(captured);
     expect(restored.adapter).toBe("sqlite3");
     expect(restored.configurationHash.database).toBe(":memory:");
+  });
+});
+
+describe("loadConfigFile resolves config/database.* against Trails.root", () => {
+  let tmpRoot: string;
+
+  afterEach(() => {
+    setTrailsRoot(null);
+    Base.connectionHandler.clearAllConnectionsBang();
+    if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  // Mirrors Rails' optional `Rails.root` seam: a relative `config/database.*`
+  // is loaded from the application root when `Trails.root` is set, rather than
+  // the raw process cwd.
+  it("loads config/database.json from the injected root", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "ar-trails-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.json"),
+      JSON.stringify({ test: { adapter: "sqlite3", database: ":memory:" } }),
+    );
+    setTrailsRoot(tmpRoot);
+
+    class RootConfigModel extends Base {}
+    (RootConfigModel as any).configurations = undefined;
+
+    await RootConfigModel.establishConnection();
+
+    const dbConfig = RootConfigModel.connectionDbConfig();
+    expect(dbConfig.adapter).toBe("sqlite3");
+    expect(dbConfig.configurationHash.database).toBe(":memory:");
   });
 });

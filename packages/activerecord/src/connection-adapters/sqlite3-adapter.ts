@@ -58,7 +58,13 @@ import {
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import { getFs, getPath, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  getFs,
+  getPath,
+  Notifications,
+  runLoadHooks,
+  trailsRoot,
+} from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 import {
   returningColumnValues as sqliteReturningColumnValues,
@@ -363,10 +369,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * the non-`:memory:`/non-`file:` branch of Rails' `SQLite3Adapter#initialize`
    * (`File.expand_path(db, Rails.root)` + `FileUtils.mkdir_p(File.dirname(db))`).
    *
-   * Deviation: Rails expands relative to `Rails.root`; trails has no
-   * `Rails.root`, so we resolve relative to the working directory
-   * (`getFs().cwd()`) — the closest app-relative equivalent. An absolute path
-   * passes through `resolve` unchanged, matching Rails.
+   * Mirrors Rails' optional `Rails.root` seam: when `Trails.root` is set (by
+   * trailties' boot), relative paths expand against it; otherwise we fall back
+   * to the working directory (`getFs().cwd()`). An absolute path passes through
+   * `resolve` unchanged, matching Rails.
    *
    * The directory is created through the fs adapter rather than `node:fs`, and
    * synchronously: like Rails' `initialize`, this constructor is synchronous
@@ -379,7 +385,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private prepareDatabasePath(filename: string): string {
     const fs = getFs();
     const path = getPath();
-    const expanded = path.resolve(fs.cwd(), filename);
+    const expanded = path.resolve(trailsRoot() ?? fs.cwd(), filename);
     const dirname = path.dirname(expanded);
     // Mirrors Rails' `unless File.directory?(dirname)`: a missing parent — or
     // one that exists as a regular file — falls into the mkdir branch, where

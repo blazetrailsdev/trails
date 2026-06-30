@@ -8,6 +8,7 @@ import {
   getFsAsync,
   getPathAsync,
   runLoadHooks,
+  setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
@@ -106,6 +107,10 @@ export class Application extends Engine {
    */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
+    // Publish the resolved app root so ActiveRecord's path-resolution sites
+    // (SQLite DB path, config/database.* lookup) expand against it — mirrors
+    // Rails wiring `Rails.root` for the framework to read.
+    setTrailsRoot(await this.requireRoot());
     this.runInitializers(group, this);
     this._initialized = true;
     runLoadHooks("after_initialize", this);
