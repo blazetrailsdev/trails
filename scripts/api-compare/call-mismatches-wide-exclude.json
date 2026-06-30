@@ -26035,6 +26035,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "discard!",
+    "call": "synchronize",
+    "reason": "Rails wraps discard! in @lock.synchronize (Ruby Mutex); trails' single-threaded async model has no lock to acquire, matching the existing disconnect!/reconnect! synchronize exclusions in this file."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "initialize",
     "call": "push",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

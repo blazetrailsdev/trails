@@ -280,6 +280,11 @@ describeIfPg("PostgresqlConnectionTest", () => {
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     const endSpy = conn ? vi.spyOn(conn, "end") : null;
+    // Grab the underlying socket up front: after discardBang abandons it
+    // (listeners stripped, unref'd) the client can no longer be cleanly
+    // end()ed, so the test destroys the raw socket directly to free the fd.
+    const socket = (conn as unknown as { connection?: { stream?: { destroy?: () => void } } })
+      ?.connection?.stream;
     try {
       expect(a.active).toBe(true);
       a.discardBang();
@@ -290,7 +295,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
       // actively close the socket, violating that fork-safety contract.
       expect(endSpy).not.toHaveBeenCalled();
     } finally {
-      await conn?.end().catch(() => {});
+      socket?.destroy?.();
     }
   });
 
