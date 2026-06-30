@@ -5,7 +5,6 @@ import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { defineFixtures } from "../../test-helpers/define-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -75,9 +74,13 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("schema", async () => {
       await withOmgPost(async (OmgPost) => {
-        await defineFixtures(adapter, OmgPost, {
-          welcome: { title: "Welcome to the weblog", body: "Such a lovely day", type: "Post" },
-        });
+        // Rails loads `fixtures :posts` into the unqualified `posts` table; the
+        // qualified `db.posts` @omgpost only reads it. Insert into the plain
+        // table name to avoid quoting the schema-qualified name as one identifier.
+        await adapter.executeMutation(
+          "INSERT INTO `posts` (`title`, `body`, `type`) " +
+            "VALUES ('Welcome to the weblog', 'Such a lovely day', 'Post')",
+        );
         const first = await (OmgPost as any).first();
         expect(first).toBeTruthy();
       });
