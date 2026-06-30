@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -16,29 +17,30 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("SchemaMigrationsTest", () => {
+    // Ride the canonical `engines`/`cars` tables built into the worker DB by
+    // the global TEST_SCHEMA setup (Rails has no engines fixture — the schema
+    // alone provides the table). setupHandlerSuite skips the global adapter
+    // reset so the canonical tables stay put for the DDL test below, which
+    // restores their original state in its `finally`.
+    setupHandlerSuite();
+
     it("renaming index on foreign key", async () => {
-      // Fixture tables — mirrors Rails' engines/cars fixtures
-      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
-      await adapter.executeMutation(
-        "CREATE TABLE `cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
-      );
-      await adapter.executeMutation(
-        "CREATE TABLE `engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `car_id` BIGINT) ENGINE=InnoDB",
-      );
       try {
         await adapter.addIndex("engines", "car_id");
         await adapter.addForeignKey("engines", "cars", { name: "fk_engines_cars" });
 
         await adapter.renameIndex("engines", "index_engines_on_car_id", "idx_renamed");
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
-        expect(idxNames).toContain("idx_renamed");
-        expect(idxNames).not.toContain("index_engines_on_car_id");
-
-        await adapter.removeForeignKey("engines", { name: "fk_engines_cars" });
+        expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-        await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
+        // This file skips the global adapter reset (setupHandlerSuite), so the
+        // canonical `engines` table must be restored to its original (no-index)
+        // shape even if a step above failed partway. The FK must be dropped
+        // before the index it depends on. Cover both the pre- and post-rename
+        // index names idempotently.
+        await adapter.removeForeignKey("engines", { name: "fk_engines_cars", ifExists: true });
+        await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
+        await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
       }
     });
 
