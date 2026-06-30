@@ -61,8 +61,14 @@ describeIfMysql("Mysql2Adapter", () => {
       await defineSchema(adapter, { posts: canonicalSchema.posts });
       try {
         const db = await adapter.currentDatabase();
+        // Mirror Rails' `def self.name; "Post"` override on the anonymous
+        // @omgpost class. Safe to override the class name here: trails' model
+        // registry is opt-in via registerModel() (no auto-`inherited` hook), and
+        // OmgPost is never registered, so this cannot collide with a canonical
+        // Post.
         class OmgPost extends Base {
           static _tableName = `${db}.posts`;
+          static name = "Post";
         }
         OmgPost.inheritanceColumn = "disabled";
         OmgPost.adapter = adapter;
