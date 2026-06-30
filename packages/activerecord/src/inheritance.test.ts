@@ -86,10 +86,10 @@ describe("InheritanceTest", () => {
     expect(stiName(NamespacedCompany)).toBe("Company");
   });
 
-  it.skip("compute type success", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails computeType enforces a subclass constraint
-    // that Rails compute_type does not — cross-hierarchy lookup (e.g. Author from Company)
-    // throws SubclassNotFound in trails. Story: compute-type-sibling-lookup (RFC 0019).
+  it("compute type success", () => {
+    // registerModel is trails' analog of Rails' autoload — make the Author
+    // constant resolvable so compute_type's namespace walk can find it.
+    registerModel(Author);
     expect(Company.computeType("Author")).toBe(Author);
   });
 
