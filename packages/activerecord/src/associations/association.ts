@@ -100,11 +100,17 @@ export class Association {
     // Prefer the rich reflection's klass getter — it does Ruby-style
     // namespace-relative resolution (compute_class → compute_type), so a
     // convention `belongs_to :region` on Admin::RegionalUser resolves to
-    // Admin::Region rather than a bare top-level "Region".
+    // Admin::Region rather than a bare top-level "Region". On failure fall
+    // through to the bare lookup below, which raises the faithful NameError
+    // Rails' check_validity! surfaces for a genuinely missing class.
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
     };
-    if (ctor._reflectOnAssociation?.(name)?.klass) return;
+    try {
+      if (ctor._reflectOnAssociation?.(name)?.klass) return;
+    } catch {
+      // namespace resolution failed — defer to the resolveModel NameError
+    }
     const className =
       opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
     resolveModel(className);
