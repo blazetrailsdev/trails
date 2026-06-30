@@ -689,7 +689,8 @@ export const TEST_SCHEMA: Schema = {
     // Rails declares this via `t.references :car`, which defaults to bigint.
     // The adapter_prevent_writes test inserts car_id '138853948594', which
     // overflows a 32-bit integer column on MySQL/MariaDB — widen to bigint to
-    // match Rails.
+    // match Rails. Also matches the bigint `cars.id` PK so the engines→cars
+    // foreign key (SchemaMigrationsTest) has matching column types.
     car_id: "big_integer",
   },
 
