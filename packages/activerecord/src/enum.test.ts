@@ -288,7 +288,7 @@ describe("EnumTest", () => {
   });
 
   it("reverted changes are not dirty going from nil to value and back", async () => {
-    const created = await Book.create({ nullable_status: null });
+    const created = await Book.createBang({ nullable_status: null });
     (created as any).nullable_status = "married";
     expect(created.attributeChanged("nullable_status")).toBe(true);
     (created as any).nullable_status = null;
@@ -370,10 +370,27 @@ describe("EnumTest", () => {
   it.skip("attributes_for_database", () => {});
 
   it("invalid definition values raise an ArgumentError", () => {
-    expect(() => Book.enum("status_x", [] as any)).toThrow(ArgumentError);
-    expect(() => Book.enum("status_x", {} as any)).toThrow(ArgumentError);
-    expect(() => Book.enum("status_x", { "": 1, active: 2 } as any)).toThrow(ArgumentError);
-    expect(() => Book.enum("status_x", ["active", ""] as any)).toThrow(ArgumentError);
+    // Rails wraps each in `Class.new(ActiveRecord::Base) { self.table_name =
+    // "books"; enum :status, ... }`; mirror with a fresh class on the books
+    // table so a bad definition never mutates the canonical Book.
+    const defineStatusEnum = (values: unknown) => {
+      class K extends Base {
+        static _tableName = "books";
+      }
+      (K as any).enum("status", values);
+    };
+    expect(() => defineStatusEnum(undefined)).toThrow(ArgumentError); // no-arg `enum :status`
+    expect(() => defineStatusEnum({})).toThrow(ArgumentError);
+    expect(() => defineStatusEnum([])).toThrow(ArgumentError);
+    expect(() => defineStatusEnum([{ proposed: 1, written: 2 }])).toThrow(ArgumentError);
+    expect(() => defineStatusEnum({ "": 1, active: 2 })).toThrow(ArgumentError);
+    expect(() => defineStatusEnum(["active", ""])).toThrow(ArgumentError);
+    expect(() => defineStatusEnum(new (class {})())).toThrow(ArgumentError);
+    // Rails also asserts the exact message patterns (`must not be empty`,
+    // `must not contain a blank name`, `must only contain symbols or strings`,
+    // `must be either a non-empty hash or an array`); trails' wording differs, so
+    // the message surface is asserted in enum.trails.test.ts
+    // (assertValidEnumDefinitionValues) rather than against Rails' strings here.
   });
 
   // Rails: conflict detection on reserved AR method names — message surface is
