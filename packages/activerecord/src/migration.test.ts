@@ -4,6 +4,7 @@
  *          activerecord/test/cases/invertible_migration_test.rb
  */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
@@ -87,6 +88,10 @@ afterAll(async () => {
   await ctx.dropTable("pre_old_suf", o);
   await ctx.dropTable("products", o);
   await ctx.dropTable("rv_bulk", o);
+  await ctx.dropTable("test_binary_limits", o);
+  await ctx.dropTable("test_integer_limits", o);
+  await ctx.dropTable("test_text_limits", o);
+  await ctx.dropTable("test_text_sizes", o);
   await ctx.dropTable("things", o);
   await ctx.dropTable("users", o);
   await ctx.dropTable("values", o);
@@ -295,15 +300,17 @@ describe("MigrationTest", () => {
     expect(typeof adapter.execute).toBe("function");
   });
 
-  it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", () => {
-    // When an integer value exceeds limits, it should be stored as-is in memory adapter
-    class Counter extends Base {
-      static {
-        this.attribute("count", "integer");
-      }
-    }
-    const cols = Counter.columnsHash();
-    expect(cols["count"]).toBeDefined();
+  it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    const error = await ctx
+      .createTable("test_integer_limits", { force: true }, (t) => {
+        t.column("bigone", "integer", { limit: 10 });
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect(error.message).toContain("No integer type has byte size 10");
+    await ctx.dropTable("test_integer_limits", { ifExists: true });
   });
 
   it("create table with binary column", () => {
@@ -1080,40 +1087,45 @@ describe("MigrationTest", () => {
     },
   );
 
-  it.skipIf(adapterType === "sqlite")("out of range text limit should raise", () => {
-    // In our memory adapter, large text columns are represented as strings without size limits
-    class Article extends Base {
-      static {
-        this.attribute("body", "string");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    expect(cols["body"]).toBeDefined();
-    expect(cols["body"].type).toBe("string");
+  it.skipIf(adapterType === "sqlite")("out of range text limit should raise", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    const error = await ctx
+      .createTable("test_text_limits", { force: true }, (t) => {
+        t.text("bigtext", { limit: 0xfffffffff });
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect(error.message).toContain(`No text type has byte size ${0xfffffffff}`);
+    await ctx.dropTable("test_text_limits", { ifExists: true });
   });
 
-  it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", () => {
-    // In our memory adapter, binary data is represented as strings without size limits
-    class Attachment extends Base {
-      static {
-        this.attribute("data", "string");
-      }
-    }
-    const cols = (Attachment as any).columnsHash();
-    expect(cols["data"]).toBeDefined();
-    expect(cols["data"].type).toBe("string");
+  it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    const error = await ctx
+      .createTable("test_binary_limits", { force: true }, (t) => {
+        t.binary("bigbinary", { limit: 0xfffffffff });
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect(error.message).toContain(`No binary type has byte size ${0xfffffffff}`);
+    await ctx.dropTable("test_binary_limits", { ifExists: true });
   });
 
-  it.skipIf(adapterType !== "mysql")("invalid text size should raise", () => {
-    // In our memory adapter, text columns don't enforce size limits; verify basic attribute definition
-    class Post extends Base {
-      static {
-        this.attribute("content", "string");
-      }
-    }
-    const cols = (Post as any).columnsHash();
-    expect(cols["content"]).toBeDefined();
-    expect(typeof cols["content"].name).toBe("string");
+  it.skipIf(adapterType !== "mysql")("invalid text size should raise", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    const error = await ctx
+      .createTable("test_text_sizes", { force: true }, (t) => {
+        t.text("bigtext", { size: 0xfffffffff } as any);
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect(error.message).toBe(
+      `${0xfffffffff} is invalid :size value. Only :tiny, :medium, and :long are allowed.`,
+    );
+    await ctx.dropTable("test_text_sizes", { ifExists: true });
   });
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
