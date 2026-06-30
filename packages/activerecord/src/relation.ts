@@ -488,6 +488,14 @@ export class Relation<T extends Base> {
   // Tri-state (Rails `@values.fetch(:reordering, nil)`): `undefined` = unset,
   // distinct from an explicit `false`. Mirrors `_isStrictLoading` below.
   private _reordering: boolean | undefined = undefined;
+  // `:reverse_order` is in SINGLE_VALUE_METHODS, so query_methods.rb's
+  // `VALUE_METHODS.each` generates a `reverse_order_value` reader/writer pair
+  // (`@values.fetch(:reverse_order, nil)`). In the pinned Rails, `reverse_order!`
+  // realizes the flip *eagerly* via `reverse_sql_order` (it rewrites
+  // `order_values`) and never touches `reverse_order_value`, so the accessor is a
+  // vestigial stored flag defaulting to nil. reverseOrderBang mirrors that eager
+  // rewrite; this field just backs the generated accessor.
+  private _reverseOrderValue: boolean | undefined = undefined;
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
   private _selectColumns: (string | symbol | Nodes.Node)[] | null = null;
@@ -4680,6 +4688,21 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Mirrors: ActiveRecord::Relation#reverse_order_value — the
+   * `VALUE_METHODS.each`-generated accessor over the `:reverse_order` single
+   * value. In the pinned Rails `reverse_order!` flips the order eagerly through
+   * `reverse_sql_order` and leaves this flag at its `nil` default, so the reader
+   * returns `undefined` unless a caller assigns it directly.
+   */
+  get reverseOrderValue(): boolean | undefined {
+    return this._reverseOrderValue;
+  }
+  set reverseOrderValue(value: boolean | undefined) {
+    this.assertModifiableBang();
+    this._reverseOrderValue = value;
+  }
+
+  /**
    * Mirrors: ActiveRecord::Relation#reordering_value — `@values.fetch(
    * :reordering, nil)`: `undefined` when unset, distinct from an explicit
    * `false`.
@@ -7254,6 +7277,7 @@ export class Relation<T extends Base> {
     this._orderClauses = [...source._orderClauses];
     this._rawOrderClauses = [...source._rawOrderClauses];
     this._reordering = source._reordering;
+    this._reverseOrderValue = source._reverseOrderValue;
     this._limitValue = source._limitValue;
     this._offsetValue = source._offsetValue;
     this._selectColumns = source._selectColumns ? [...source._selectColumns] : null;

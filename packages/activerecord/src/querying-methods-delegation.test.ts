@@ -70,6 +70,21 @@ describe("Base static query delegations", () => {
     expect(rel.distinctValue).toBe(true);
   });
 
+  it("reverse_order_value round-trips and survives cloning", () => {
+    // `:reverse_order` is in SINGLE_VALUE_METHODS, so query_methods.rb's
+    // VALUE_METHODS.each generates a reverse_order_value reader/writer that
+    // defaults to nil. Rails' initialize_copy dups @values, so the flag is
+    // preserved across every spawn/clone.
+    const rel = Topic.all();
+    expect(rel.reverseOrderValue).toBeUndefined();
+
+    rel.reverseOrderValue = true;
+    expect(rel.reverseOrderValue).toBe(true);
+
+    const cloned = rel.where({ title: "Alice" });
+    expect(cloned.reverseOrderValue).toBe(true);
+  });
+
   it("Base.none() returns empty relation", async () => {
     await Topic.create({ title: "Alice" });
 
