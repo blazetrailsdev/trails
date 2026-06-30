@@ -3063,22 +3063,47 @@ export class Relation<T extends Base> {
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
-    const joinedTables = this._joinedTableNames();
-    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
-  }
-
-  /**
-   * Table names reachable from the relation's manual joins plus the base table:
-   * Rails `build_joins([])`'s joined-table extraction (relation.rb:1474-1488).
-   * `_leftOuterJoinsValues` / `_namedInnerJoins` hold association names resolved
-   * to tables; `_joinClauses` / `_joinValues` carry already-built or raw joins.
-   * @internal
-   */
-  private _joinedTableNames(): Set<string> {
     const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     // _namedInnerJoins holds association names too (joins(:assoc) routed through
     // JoinDependency with InnerJoin). Resolve to table names so references to
     // those tables don't spuriously promote includes to eager_load.
+    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
+    const joinedTables = new Set<string>([
+      ...this._joinClauses.map((j) => j.table.toLowerCase()),
+      ...leftOuterTables,
+      ...namedInnerTables,
+      ...this._joinValues.flatMap((v) => {
+        if (typeof v === "string") {
+          const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
+          const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : v;
+          return this.tablesInString(sqlText);
+        }
+        if (v instanceof Nodes.StringJoin) {
+          const sqlText = v.left instanceof Nodes.SqlLiteral ? v.left.value : v.toSql();
+          return this.tablesInString(sqlText);
+        }
+        const leftName = (v.left as any)?.name;
+        if (typeof leftName === "string") return [leftName.toLowerCase()];
+        return this.tablesInString(v.toSql());
+      }),
+      String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
+    ]);
+
+    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+  }
+
+  /**
+   * Table names reachable from the relation's manual joins plus the base table,
+   * used by the pluck eager-degrade guard to tell a servable column from one
+   * reaching for an unjoinable fallback association. Mirrors the joined-table
+   * extraction in `referencesEagerLoadedTables` (Rails `build_joins([])`,
+   * relation.rb:1474-1488); kept as a sibling rather than a shared callee so the
+   * ported `references_eager_loaded_tables?` body retains its Arel/StringJoin
+   * usage for the api-compare dependency + call-set parity gates.
+   * @internal
+   */
+  private _joinedTableNames(): Set<string> {
+    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
     const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
     return new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
