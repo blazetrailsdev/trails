@@ -342,20 +342,23 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("joins a belongs_to association with a composite foreign key", async () => {
-    const { ShardedComment } = await import("../test-helpers/models/sharded.js");
+    const { ShardedComment, ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
     const firstPostComments = await ShardedComment.joins("blogPost").where({
       blogPost: { title: "My first post in my Blog1!" },
     });
-    const expectedBlogPost = shardedBlogPosts("great_post_blog_one");
+    const expectedBlogPostFixture = shardedBlogPosts("great_post_blog_one");
+    const expectedBlogPost = await ShardedBlogPost.where({
+      blog_id: (expectedBlogPostFixture as any).blog_id,
+      id: (expectedBlogPostFixture as any).id,
+    }).first();
 
     expect(firstPostComments.length).toBeGreaterThan(0);
     // Rails: assert_equal(expected_blog_post.comments.to_a.sort, first_post_comments.sort).
-    // The joined comments belong to the great_post_blog_one fixture; verify via
-    // the (working) belongs_to side that each comment points back at it.
-    for (const comment of firstPostComments) {
-      const blogPost = await (comment as any).blogPost;
-      expect(blogPost.id).toBe((expectedBlogPost as any).id);
-    }
+    const expectedComments = await (expectedBlogPost as any).comments;
+    const sortById = (a: any, b: any) => Number(a.id) - Number(b.id);
+    expect([...firstPostComments].sort(sortById).map((c) => Number(c.id))).toEqual(
+      [...expectedComments].sort(sortById).map((c: any) => Number(c.id)),
+    );
   });
 
   // BLOCKED (tracked-pending-convergence): `joins` on a has_many association with
