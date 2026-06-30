@@ -12,8 +12,9 @@ import {
   dirtiesQueryCache,
 } from "./connection-adapters/abstract/query-cache.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { TEST_SCHEMA as CANONICAL_SCHEMA } from "./test-helpers/test-schema.js";
 
-const TEST_SCHEMA = { tasks: { title: "string" } } as const;
+const TEST_SCHEMA = { posts: CANONICAL_SCHEMA.posts } as const;
 
 describe("makeCachedSelectAll (unit)", () => {
   function makeHost(store: Store) {
@@ -31,8 +32,8 @@ describe("makeCachedSelectAll (unit)", () => {
     const cached = makeCachedSelectAll(base as never);
     const host = makeHost(store);
 
-    const r1 = await cached.call(host as never, "SELECT * FROM tasks");
-    const r2 = await cached.call(host as never, "SELECT * FROM tasks");
+    const r1 = await cached.call(host as never, "SELECT * FROM posts");
+    const r2 = await cached.call(host as never, "SELECT * FROM posts");
 
     expect(calls).toBe(1);
     expect(r1.toArray()).toEqual([{ id: 1, title: "first" }]);
@@ -51,8 +52,8 @@ describe("makeCachedSelectAll (unit)", () => {
     const cached = makeCachedSelectAll(base as never);
     const host = makeHost(store);
 
-    await cached.call(host as never, "SELECT * FROM tasks");
-    await cached.call(host as never, "SELECT * FROM tasks");
+    await cached.call(host as never, "SELECT * FROM posts");
+    await cached.call(host as never, "SELECT * FROM posts");
 
     expect(calls).toBe(2);
     expect(store.size).toBe(0);
@@ -69,8 +70,8 @@ describe("makeCachedSelectAll (unit)", () => {
     const cached = makeCachedSelectAll(base as never);
     const host = makeHost(store);
 
-    await cached.call(host as never, "SELECT * FROM tasks FOR UPDATE");
-    await cached.call(host as never, "SELECT * FROM tasks FOR UPDATE");
+    await cached.call(host as never, "SELECT * FROM posts FOR UPDATE");
+    await cached.call(host as never, "SELECT * FROM posts FOR UPDATE");
 
     expect(calls).toBe(2);
     expect(store.size).toBe(0);
@@ -87,9 +88,9 @@ describe("makeCachedSelectAll (unit)", () => {
     const cached = makeCachedSelectAll(base as never);
     const host = makeHost(store);
 
-    await cached.call(host as never, "SELECT * FROM tasks WHERE id = ?", null, [1]);
-    await cached.call(host as never, "SELECT * FROM tasks WHERE id = ?", null, [2]);
-    await cached.call(host as never, "SELECT * FROM tasks WHERE id = ?", null, [1]);
+    await cached.call(host as never, "SELECT * FROM posts WHERE id = ?", null, [1]);
+    await cached.call(host as never, "SELECT * FROM posts WHERE id = ?", null, [2]);
+    await cached.call(host as never, "SELECT * FROM posts WHERE id = ?", null, [1]);
 
     expect(calls).toBe(2);
     expect(store.size).toBe(2);
@@ -163,23 +164,23 @@ describe("QueryCache mixin live adapter path", () => {
     expect(a.queryCache?.enabled).toBe(true);
 
     try {
-      await b.executeMutation("INSERT INTO tasks (title) VALUES ('one')");
-      const r1 = await a.selectAll("SELECT * FROM tasks ORDER BY id");
+      await b.executeMutation("INSERT INTO posts (title, body) VALUES ('one', 'b')");
+      const r1 = await a.selectAll("SELECT * FROM posts ORDER BY id");
       expect(r1.length).toBe(1);
       expect(a.queryCache?.size).toBe(1);
 
       // Out-of-band insert via `b` — `a`'s cached result stays stale, proving
       // the second selectAll is a cache hit, not a fresh query.
-      await b.executeMutation("INSERT INTO tasks (title) VALUES ('two')");
-      const r2 = await a.selectAll("SELECT * FROM tasks ORDER BY id");
+      await b.executeMutation("INSERT INTO posts (title, body) VALUES ('two', 'b')");
+      const r2 = await a.selectAll("SELECT * FROM posts ORDER BY id");
       expect(r2.length).toBe(1);
 
       // A write through `a`'s wrapped exec path dirties the cache
       // (dirtiesQueryCache wiring on execInsert).
-      await a.execInsert("INSERT INTO tasks (title) VALUES ('three')");
+      await a.execInsert("INSERT INTO posts (title, body) VALUES ('three', 'b')");
       expect(a.queryCache?.empty).toBe(true);
 
-      const r3 = await a.selectAll("SELECT * FROM tasks ORDER BY id");
+      const r3 = await a.selectAll("SELECT * FROM posts ORDER BY id");
       expect(r3.length).toBe(3);
     } finally {
       // `b` is a standalone raw connection (own driver pool on PG/MySQL); close

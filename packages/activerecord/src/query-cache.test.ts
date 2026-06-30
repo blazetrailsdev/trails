@@ -126,7 +126,7 @@ function makePoolWithQCache(
   return new ConnectionPool(pc);
 }
 
-const TEST_SCHEMA = { tasks: { title: "string" } } as const;
+const TEST_SCHEMA = { posts: CANONICAL_SCHEMA.posts } as const;
 
 async function setup() {
   // A raw (non-pooled) adapter has no `pool`, so the connection-level
@@ -137,20 +137,22 @@ async function setup() {
   await defineSchema(cached, TEST_SCHEMA);
   cached._queryCache = new Store();
 
-  class Task extends Base {
+  class Post extends Base {
+    static _tableName = "posts";
     static {
       // Raw (non-pooled) adapter can't warm the schema cache, so declare the PK
-      // for the strict writeFromUser id write-back (matches Post/Category below).
+      // for the strict writeFromUser id write-back (matches Category below).
       this.attribute("id", "integer");
       this.attribute("title", "string");
+      this.attribute("body", "text");
       this.adapter = cached;
     }
   }
   const hits = trackHits(cached);
-  return { cached, hits, Task };
+  return { cached, hits, Post };
 }
 
-// A Task backed by a real ConnectionPool (not a bare raw adapter), so the
+// A Post backed by a real ConnectionPool (not a bare raw adapter), so the
 // model-level `Model.cache` / `Model.uncached` delegation — which routes
 // through `connection_pool` exactly like Rails' QueryCache::ClassMethods —
 // has a pool to drive. The leased connection is also wired as the model's
@@ -170,19 +172,21 @@ async function setupPooledTask() {
   const conn = pool.leaseConnection();
   await defineSchema(conn as unknown as Parameters<typeof defineSchema>[0], TEST_SCHEMA);
 
-  class Task extends Base {
+  class Post extends Base {
+    static _tableName = "posts";
     static {
       this.attribute("id", "integer");
       this.attribute("title", "string");
+      this.attribute("body", "text");
       this.adapter = conn;
     }
   }
   // `Model.cache` resolves its pool via `connectionPool()`; the model is bound
   // to a standalone pool not registered with the handler, so point the resolver
   // and `connected?` at it directly.
-  (Task as unknown as { connectionPool: () => ConnectionPool }).connectionPool = () => pool;
-  (Task as unknown as { isConnectedQ: () => boolean }).isConnectedQ = () => true;
-  return { pool, conn, Task };
+  (Post as unknown as { connectionPool: () => ConnectionPool }).connectionPool = () => pool;
+  (Post as unknown as { isConnectedQ: () => boolean }).isConnectedQ = () => true;
+  return { pool, conn, Post };
 }
 
 // Post<=>Category HABTM bound to a standalone raw adapter, mirroring Rails'
@@ -224,49 +228,49 @@ async function setupHabtm() {
 
 describe("QueryCacheTest", () => {
   it("execute clear cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     cached.enableQueryCacheBang();
-    await Task.create({ title: "first" });
+    await Post.create({ title: "first", body: "b" });
     expect(cached.queryCache.empty).toBe(true);
   });
 
   it("exec query clear cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     cached.enableQueryCacheBang();
-    await Task.create({ title: "first" });
-    await Task.all();
+    await Post.create({ title: "first", body: "b" });
+    await Post.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
-    await Task.create({ title: "second" });
+    await Post.create({ title: "second", body: "b" });
     expect(cached.queryCache.empty).toBe(true);
   });
 
   it("writes should always clear cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     cached.enableQueryCacheBang();
-    await Task.create({ title: "first" });
-    await Task.all();
+    await Post.create({ title: "first", body: "b" });
+    await Post.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
-    const t = await Task.first();
+    const t = await Post.first();
     (t as any).title = "updated";
     await (t as any).save();
     expect(cached.queryCache.empty).toBe(true);
   });
 
   it("reads dont clear disabled cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     cached.disableQueryCacheBang();
-    await Task.create({ title: "first" });
-    await Task.all();
+    await Post.create({ title: "first", body: "b" });
+    await Post.all();
     expect(cached.queryCache.empty).toBe(true);
   });
 
   it("exceptional middleware clears and disables cache on error", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     expect(cached.queryCache.enabled).toBe(false);
     const mw = makeMiddleware(async () => {
-      await Task.create({ title: "row" });
-      await Task.all();
-      await Task.all();
+      await Post.create({ title: "row", body: "b" });
+      await Post.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       throw new Error("lol borked");
     }, [cached]);
@@ -336,11 +340,11 @@ describe("QueryCacheTest", () => {
   });
 
   it("middleware caches", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "row" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "row", body: "b" });
     const mw = makeMiddleware(async () => {
-      await Task.all();
-      await Task.all();
+      await Post.all();
+      await Post.all();
       expect(cached.queryCache.size).toBe(1);
     }, [cached]);
     await mw();
@@ -356,27 +360,27 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache passing a relation", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "cached" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "cached", body: "b" });
     await cached.cache(async () => {
-      const r1 = await Task.all();
-      const r2 = await Task.all();
+      const r1 = await Post.all();
+      const r2 = await Post.all();
       expect(r1).toHaveLength(1);
       expect(r2).toHaveLength(1);
     });
   });
 
   it("select all with cache", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "cached" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "cached", body: "b" });
     const queries = trackQueries(cached);
     await cached.cache(async () => {
       queries.reset();
       // Pass a Relation directly to the adapter, like Rails'
       // `select_all(Post.all)` — it is unwrapped to its Arel AST and the cache
       // serves the second call, so only one query reaches the database.
-      const r1 = await cached.selectAll(Task.all());
-      const r2 = await cached.selectAll(Task.all());
+      const r1 = await cached.selectAll(Post.all());
+      const r2 = await cached.selectAll(Post.all());
       expect(r1.length).toBe(1);
       expect(r2.length).toBe(1);
     });
@@ -384,22 +388,22 @@ describe("QueryCacheTest", () => {
   });
 
   it("find queries", async () => {
-    const { cached, Task } = await setup();
-    const t = await Task.create({ title: "findme" });
+    const { cached, Post } = await setup();
+    const t = await Post.create({ title: "findme", body: "b" });
     cached.enableQueryCacheBang();
-    await Task.find(t.id);
-    await Task.find(t.id);
+    await Post.find(t.id);
+    await Post.find(t.id);
     expect(cached.queryCache.size).toBeGreaterThan(0);
   });
 
   it("find queries with cache", async () => {
-    const { cached, hits, Task } = await setup();
-    const t = await Task.create({ title: "test" });
+    const { cached, hits, Post } = await setup();
+    const t = await Post.create({ title: "test", body: "b" });
     await cached.cache(async () => {
       hits.reset();
-      const r1 = await Task.find(t.id);
+      const r1 = await Post.find(t.id);
       const hitsAfterFirst = hits.count;
-      const r2 = await Task.find(t.id);
+      const r2 = await Post.find(t.id);
       expect(r1.title).toBe("test");
       expect(r2.title).toBe("test");
       expect(hits.count).toBeGreaterThan(hitsAfterFirst);
@@ -407,68 +411,68 @@ describe("QueryCacheTest", () => {
   });
 
   it("find queries with cache multi record", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "a" });
-    await Task.create({ title: "b" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "a", body: "b" });
+    await Post.create({ title: "b", body: "b" });
     await cached.cache(async () => {
-      const r1 = await Task.all();
-      const r2 = await Task.all();
+      const r1 = await Post.all();
+      const r2 = await Post.all();
       expect(r1).toHaveLength(2);
       expect(r2).toHaveLength(2);
     });
   });
 
   it("find queries with multi cache blocks", async () => {
-    const { cached, Task } = await setup();
-    const t = await Task.create({ title: "test" });
+    const { cached, Post } = await setup();
+    const t = await Post.create({ title: "test", body: "b" });
     await cached.cache(async () => {
-      await Task.find(t.id);
+      await Post.find(t.id);
     });
     await cached.cache(async () => {
-      await Task.find(t.id);
+      await Post.find(t.id);
     });
   });
 
   it("count queries with cache", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "a", body: "b" });
     await cached.cache(async () => {
-      const c1 = await Task.count();
-      const c2 = await Task.count();
+      const c1 = await Post.count();
+      const c2 = await Post.count();
       expect(c1).toBe(1);
       expect(c2).toBe(1);
     });
   });
 
   it("exists queries with cache", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "a", body: "b" });
     await cached.cache(async () => {
-      const e1 = await Task.exists();
-      const e2 = await Task.exists();
+      const e1 = await Post.exists();
+      const e2 = await Post.exists();
       expect(e1).toBe(true);
       expect(e2).toBe(true);
     });
   });
 
   it("select all with cache", async () => {
-    const { cached, hits, Task } = await setup();
-    await Task.create({ title: "all" });
+    const { cached, hits, Post } = await setup();
+    await Post.create({ title: "all", body: "b" });
     await cached.cache(async () => {
       hits.reset();
-      await Task.all();
+      await Post.all();
       const hitsAfterFirst = hits.count;
-      await Task.all();
+      await Post.all();
       expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("select one with cache", async () => {
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_one')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('sel_one', 'b')");
     await cached.cache(async () => {
       hits.reset();
-      const sql = 'SELECT * FROM "tasks" LIMIT 1';
+      const sql = 'SELECT * FROM "posts" LIMIT 1';
       const r1 = await cached.selectOne(sql);
       const hitsAfterFirst = hits.count;
       const r2 = await cached.selectOne(sql);
@@ -480,10 +484,10 @@ describe("QueryCacheTest", () => {
 
   it("select value with cache", async () => {
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_val')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('sel_val', 'b')");
     await cached.cache(async () => {
       hits.reset();
-      const sql = 'SELECT title FROM "tasks" LIMIT 1';
+      const sql = 'SELECT title FROM "posts" LIMIT 1';
       const v1 = await cached.selectValue(sql);
       const hitsAfterFirst = hits.count;
       const v2 = await cached.selectValue(sql);
@@ -495,11 +499,11 @@ describe("QueryCacheTest", () => {
 
   it("select values with cache", async () => {
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('a')");
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('b')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('a', 'b')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('b', 'b')");
     await cached.cache(async () => {
       hits.reset();
-      const sql = 'SELECT title FROM "tasks" ORDER BY title';
+      const sql = 'SELECT title FROM "posts" ORDER BY title';
       const v1 = await cached.selectValues(sql);
       const hitsAfterFirst = hits.count;
       const v2 = await cached.selectValues(sql);
@@ -511,10 +515,10 @@ describe("QueryCacheTest", () => {
 
   it("select rows with cache", async () => {
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('row1')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('row1', 'b')");
     await cached.cache(async () => {
       hits.reset();
-      const sql = 'SELECT * FROM "tasks" LIMIT 1';
+      const sql = 'SELECT * FROM "posts" LIMIT 1';
       const r1 = await cached.selectRows(sql);
       const hitsAfterFirst = hits.count;
       const r2 = await cached.selectRows(sql);
@@ -527,8 +531,8 @@ describe("QueryCacheTest", () => {
   it("query cache dups results correctly", async () => {
     const { cached } = await setup();
     cached.enableQueryCacheBang();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('dup')");
-    const sql = 'SELECT * FROM "tasks"';
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('dup', 'b')");
+    const sql = 'SELECT * FROM "posts"';
     const r1 = (await cached.selectAll(sql)).toArray();
     const r2 = (await cached.selectAll(sql)).toArray();
     expect(r1[0]).not.toBe(r2[0]);
@@ -539,12 +543,12 @@ describe("QueryCacheTest", () => {
     // Rails: cached hits emit sql.active_record with cached:true so callers can
     // distinguish cache hits from real queries in instrumentation subscribers.
     const { cached } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('notif')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('notif', 'b')");
     const events: unknown[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event) => {
       events.push(event);
     });
-    const sql = 'SELECT * FROM "tasks"';
+    const sql = 'SELECT * FROM "posts"';
     try {
       await cached.cache(async () => {
         await cached.selectAll(sql);
@@ -563,9 +567,9 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache does not raise exceptions", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     cached.enableQueryCacheBang();
-    await expect(Task.all().toArray()).resolves.toBeDefined();
+    await expect(Post.all().toArray()).resolves.toBeDefined();
   });
 
   it("cache works with prepended sql comments", async () => {
@@ -589,20 +593,20 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache is flat", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "flat" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "flat", body: "b" });
     await cached.cache(async () => {
-      const results = await Task.all();
+      const results = await Post.all();
       expect(Array.isArray(results)).toBe(true);
       expect(results[0]).not.toBeInstanceOf(Array);
     });
   });
 
   it("cache does not wrap results in arrays", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "nowrap" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "nowrap", body: "b" });
     await cached.cache(async () => {
-      const results = await Task.all();
+      const results = await Post.all();
       expect(Array.isArray(results)).toBe(true);
     });
   });
@@ -630,7 +634,7 @@ describe("QueryCacheTest", () => {
       calls++;
       return Result.fromRowHashes([{ val: 1 }]);
     });
-    const forUpdateSql = 'SELECT 1 AS val FROM "tasks" FOR UPDATE';
+    const forUpdateSql = 'SELECT 1 AS val FROM "posts" FOR UPDATE';
     await selectAll.call(cached, forUpdateSql);
     await selectAll.call(cached, forUpdateSql);
     expect(calls).toBe(2);
@@ -638,16 +642,16 @@ describe("QueryCacheTest", () => {
 
   it("cache is available when connection is connected", async () => {
     await withExecutionContext(async () => {
-      const { pool, conn, Task } = await setupPooledTask();
-      const t = await Task.create({ title: "row" });
+      const { pool, conn, Post } = await setupPooledTask();
+      const t = await Post.create({ title: "row", body: "b" });
       const queries = trackQueries(conn);
       // Drive the model-level `Model.cache` delegation (Rails'
       // QueryCache::ClassMethods#cache), which enables the pool's query cache
       // for the block — the second find is served from cache, so only one query
       // reaches the connection.
-      await Task.cache(async () => {
-        await Task.find(t.id);
-        await Task.find(t.id);
+      await Post.cache(async () => {
+        await Post.find(t.id);
+        await Post.find(t.id);
         expect(queries.count).toBe(1);
         expect(pool.queryCache.size).toBe(1);
       });
@@ -666,14 +670,14 @@ describe("QueryCacheTest", () => {
   // dedicated checks below pin the ClassMethods wiring directly.
   it("uncached delegates to the connection pool", async () => {
     await withExecutionContext(async () => {
-      const { pool, conn, Task } = await setupPooledTask();
+      const { pool, conn, Post } = await setupPooledTask();
       pool.enableQueryCacheBang();
-      const t = await Task.create({ title: "row" });
-      await Task.find(t.id);
+      const t = await Post.create({ title: "row", body: "b" });
+      await Post.find(t.id);
       const queries = trackQueries(conn);
-      await Task.uncached(async () => {
-        await Task.find(t.id);
-        await Task.find(t.id);
+      await Post.uncached(async () => {
+        await Post.find(t.id);
+        await Post.find(t.id);
       });
       // With the cache disabled inside the block, both finds hit the connection.
       expect(queries.count).toBe(2);
@@ -695,47 +699,47 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache executes new queries within block", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "a", body: "b" });
     await cached.cache(async () => {
-      const r1 = await Task.all();
+      const r1 = await Post.all();
       expect(r1).toHaveLength(1);
-      await Task.create({ title: "b" });
-      const r2 = await Task.all();
+      await Post.create({ title: "b", body: "b" });
+      const r2 = await Post.all();
       expect(r2).toHaveLength(2);
     });
   });
 
   it("query cache doesnt leak cached results of rolled back queries", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "before" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "before", body: "b" });
     cached.enableQueryCacheBang();
     await cached.beginTransaction();
-    await Task.create({ title: "during" });
+    await Post.create({ title: "during", body: "b" });
     await cached.rollback();
-    const results = await Task.all();
+    const results = await Post.all();
     expect(results).toHaveLength(1);
     expect(results[0].title).toBe("before");
   });
 
   it("query cached even when types are reset", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     const queries = trackQueries(cached);
-    const t = await Task.create({ title: "reset" });
+    const t = await Post.create({ title: "reset", body: "b" });
     await cached.cache(async () => {
       // Warm the cache
-      await Task.find(t.id);
+      await Post.find(t.id);
 
       // Clear the place where type information is cached. (Rails also clears the
       // find-by and attribute-method caches; those aren't separately exposed as
       // statics here, and resetting column information already drops the type
       // map this test guards.)
-      (Task as any).resetColumnInformation();
+      (Post as any).resetColumnInformation();
 
-      // Mirrors Rails' `assert_no_queries { Task.find(1) }`: the find is served
+      // Mirrors Rails' `assert_no_queries { Post.find(1) }`: the find is served
       // entirely from the query cache, so no query reaches the connection.
       queries.reset();
-      const r = await Task.find(t.id);
+      const r = await Post.find(t.id);
       expect(r.title).toBe("reset");
       expect(queries.count).toBe(0);
     });
@@ -816,10 +820,10 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache uncached dirties", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "a", body: "b" });
     cached.enableQueryCacheBang();
-    await Task.all();
+    await Post.all();
     expect(cached.queryCache.size).toBeGreaterThan(0);
     await cached.uncached(async () => {
       expect(cached.queryCache.enabled).toBe(false);
@@ -837,8 +841,8 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache uncached dirties disabled with nested cache", async () => {
-    const { cached, Task } = await setup();
-    await Task.create({ title: "nested" });
+    const { cached, Post } = await setup();
+    await Post.create({ title: "nested", body: "b" });
     cached.enableQueryCacheBang();
     await cached.uncached(async () => {
       expect(cached.queryCache.enabled).toBe(false);
@@ -867,11 +871,11 @@ describe("QueryCacheMutableParamTest", () => {
     // Rails: mutating a bind array after a query is cached must not corrupt the
     // cached result or produce wrong results on later calls.
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('bind_task')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('bind_task', 'b')");
     await cached.cache(async () => {
       hits.reset();
       const binds = ["bind_task"];
-      const sql = 'SELECT * FROM "tasks" WHERE title = ?';
+      const sql = 'SELECT * FROM "posts" WHERE title = ?';
       const r1 = (await cached.selectAll(sql, null, binds)).toArray();
       expect(r1).toHaveLength(1);
       const hitsAfterFirst = hits.count;
@@ -900,15 +904,15 @@ describe("QuerySerializedParamTest", () => {
     // produce a cache hit and return identical results. (Rails supports passing
     // an AR record directly via id_for_database; here we use the primitive id,
     // which is the value the ORM ultimately binds for both cases.)
-    const { cached, hits, Task } = await setup();
-    const t = await Task.create({ title: "serialized_ar" });
+    const { cached, hits, Post } = await setup();
+    const t = await Post.create({ title: "serialized_ar", body: "b" });
     await cached.cache(async () => {
       hits.reset();
-      const r1 = await Task.where({ id: t.id });
+      const r1 = await Post.where({ id: t.id });
       expect(r1).toHaveLength(1);
       expect(r1[0]?.id).toBe(t.id);
       const hitsAfterFirst = hits.count;
-      const r2 = await Task.where({ id: t.id });
+      const r2 = await Post.where({ id: t.id });
       expect(r2).toHaveLength(1);
       expect(r2[0]?.id).toBe(t.id);
       expect(hits.count).toBeGreaterThan(hitsAfterFirst); // cache hit
@@ -920,10 +924,10 @@ describe("QuerySerializedParamTest", () => {
     // the cache key is derived from value equality, so two separate but equal
     // strings hit the same cache entry.
     const { cached, hits } = await setup();
-    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('str_serial')");
+    await cached.executeMutation("INSERT INTO posts (title, body) VALUES ('str_serial', 'b')");
     await cached.cache(async () => {
       hits.reset();
-      const sql = 'SELECT * FROM "tasks" WHERE title = ?';
+      const sql = 'SELECT * FROM "posts" WHERE title = ?';
       // Two separately constructed string values with the same content must share a cache key.
       const bind1 = "str_serial";
       const bind2 = `${"str"}_serial`; // constructed separately, same value
@@ -939,36 +943,31 @@ describe("QuerySerializedParamTest", () => {
 
 describe("QueryCacheExpiryTest", () => {
   it("cache gets cleared after migration", async () => {
-    const cached = rawAdapter();
-    cached._queryCache = new Store();
-    const { Migration } = await import("./migration.js");
-    class SetupMig extends Migration {
-      async up() {
-        await this.createTable("qc_mig_tasks", (t) => {
-          t.string("title");
-        });
-      }
-      async down() {}
-    }
-    await new SetupMig().run(cached, "up");
+    // Rails warms the cache then `change_column :posts, :title, :string, limit: 80`
+    // and restores the old definition. The DDL clears the per-connection query
+    // cache. We change and then restore `posts.title` on a dedicated raw adapter
+    // so the canonical column ends the test at its original definition.
+    const { cached } = await setup();
     cached.enableQueryCacheBang();
-    await cached.selectAll(`SELECT * FROM ${cached.quoteTableName("qc_mig_tasks")}`);
+    await cached.selectAll(`SELECT * FROM ${cached.quoteTableName("posts")}`);
     expect(cached.queryCache.size).toBeGreaterThan(0);
+    const { Migration } = await import("./migration.js");
     class ChangeMig extends Migration {
       async up() {
-        await this.changeColumn("qc_mig_tasks", "title", "text");
+        await this.changeColumn("posts", "title", "string", { limit: 80 });
       }
       async down() {}
     }
     await new ChangeMig().run(cached, "up");
     expect(cached.queryCache.empty).toBe(true);
-    class TeardownMig extends Migration {
+    // restore the old definition
+    class RestoreMig extends Migration {
       async up() {
-        await this.dropTable("qc_mig_tasks", { ifExists: true });
+        await this.changeColumn("posts", "title", "string");
       }
       async down() {}
     }
-    await new TeardownMig().run(cached, "up");
+    await new RestoreMig().run(cached, "up");
   });
 
   it("enable disable", async () => {
@@ -981,10 +980,10 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it("update", async () => {
-    const { cached, Task } = await setup();
-    const task = await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    const task = await Post.create({ title: "a", body: "b" });
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       (task as any).title = "b";
       await (task as any).save();
@@ -992,63 +991,63 @@ describe("QueryCacheExpiryTest", () => {
     });
   });
   it("destroy", async () => {
-    const { cached, Task } = await setup();
-    const task = await Task.create({ title: "a" });
+    const { cached, Post } = await setup();
+    const task = await Post.create({ title: "a", body: "b" });
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
       await (task as any).destroy();
       expect(cached.queryCache.empty).toBe(true);
     });
   });
   it("insert", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.create({ title: "a" });
+      await Post.create({ title: "a", body: "b" });
       expect(cached.queryCache.empty).toBe(true);
     });
   });
   itIfSupports("insert_on_duplicate_skip", "insert all", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.insert({ title: "a" });
+      await Post.insert({ title: "a", body: "b" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.insertAll([{ title: "b" }]);
+      await Post.insertAll([{ title: "b", body: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
     });
   });
   it("insert all bang", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.insertBang({ title: "a" });
+      await Post.insertBang({ title: "a", body: "b" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.insertAllBang([{ title: "b" }]);
+      await Post.insertAllBang([{ title: "b", body: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
     });
   });
   itIfSupports("insert_on_duplicate_update", "upsert all", async () => {
-    const { cached, Task } = await setup();
+    const { cached, Post } = await setup();
     await cached.cache(async () => {
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.upsert({ title: "a" });
+      await Post.upsert({ title: "a", body: "b" });
       expect(cached.queryCache.empty).toBe(true);
 
-      await Task.all();
+      await Post.all();
       expect(cached.queryCache.size).toBeGreaterThan(0);
-      await Task.upsertAll([{ title: "b" }]);
+      await Post.upsertAll([{ title: "b", body: "b" }]);
       expect(cached.queryCache.empty).toBe(true);
     });
   });
