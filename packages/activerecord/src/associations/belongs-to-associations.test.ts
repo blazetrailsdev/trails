@@ -475,6 +475,33 @@ describe("BelongsToAssociationsTest", () => {
     expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
   });
 
+  it("default with required association", async () => {
+    const david = await Developer.find(developers("david").id);
+    const jamis = await Developer.find(developers("jamis").id);
+
+    class TempDefault extends Base {
+      declare developer: Developer | null;
+      declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
+      static _tableName = "ships";
+      static {
+        this.belongsTo("developer", {
+          default: () => Developer.first(),
+          optional: false,
+          inverseOf: false,
+        });
+      }
+    }
+
+    // The required presence validation must see the defaulted FK, so the save
+    // succeeds even though no developer was supplied.
+    let ship = await TempDefault.create({});
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(david.id);
+
+    ship = await TempDefault.create({ developer: jamis });
+    expect((await ship.loadBelongsTo("developer"))!.id).toBe(jamis.id);
+  });
+
   it("default scope on relations is not cached", async () => {
     const counter = 0;
     const comment = await Comment.first();

@@ -1,7 +1,7 @@
 import { underscore, pluralize, camelize, isBlank } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeSave, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { modelRegistry } from "../../associations.js";
 import {
   flushPendingCounterCacheColumns,
@@ -296,19 +296,25 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {
-    // Rails registers this on before_validation
-    // (builder/belongs_to.rb#add_default_callbacks) so the defaulted target
-    // also satisfies a presence validation on a required association. Trails'
-    // validation chain is strictly synchronous, but the default block may run
-    // an async finder (e.g. `() => Developer.first()`), so we defer to
-    // before_save — the next async-capable lifecycle phase that still runs
-    // before the FK is written.
-    beforeSave(model, async (record: any) => {
-      if (typeof record.association === "function") {
-        const assoc = record.association(reflection.name);
-        if (typeof assoc.default === "function") {
-          await assoc.default(reflection.options?.default);
-        }
+    // Mirrors Rails Associations::Builder::BelongsTo.add_default_callbacks:
+    //   model.before_validation { |o| o.association(name).default(&default) }
+    // so the defaulted target satisfies a presence validation on a required
+    // association. trails' validation chain is strictly synchronous while the
+    // default block may run an async finder (e.g. `() => Developer.first()`), so
+    // the awaited resolution actually runs in Base#_runBelongsToDefaults — an
+    // async pre-validation phase invoked from `save` before the chain. This
+    // before_validation callback fires `default` for the standalone `valid?`
+    // path; it's fire-and-forget because the sync chain cannot await it. On the
+    // save path the pre-pass already ran the block once and sets
+    // `_belongsToDefaultsApplied`, so we skip here to keep the block at Rails'
+    // exactly-once (belongs_to_association.rb:46-48) — re-running would invoke a
+    // block that returned nil a second time.
+    beforeValidation(model, (record: any) => {
+      if (record._belongsToDefaultsApplied) return;
+      if (typeof record.association !== "function") return;
+      const assoc = record.association(reflection.name);
+      if (typeof assoc.default === "function") {
+        void assoc.default(reflection.options?.default);
       }
     });
   }
