@@ -778,6 +778,16 @@ export async function save<T extends SaveRecord>(
   // destroyed and invalid raises RecordInvalid (validations first), not
   // RecordNotSaved.
   const self = this as any;
+  // Resolve `belongs_to ..., default:` blocks before validation. Rails registers
+  // these on before_validation (builder/belongs_to.rb#add_default_callbacks) so a
+  // required association's presence validation sees the defaulted FK. The block
+  // may be async (e.g. `() => Developer.first()`) and trails' validation chain is
+  // strictly synchronous, so we run it here — an async pre-validation phase —
+  // rather than inside the sync chain. The before_validation callback the builder
+  // registers handles the synchronous-block path (and standalone `valid?`).
+  if (typeof self._runBelongsToDefaults === "function") {
+    await self._runBelongsToDefaults();
+  }
   // A `before_validation` that needs async DB work (Rails runs it inside the
   // save transaction — transactions_test.rb:714) can't await on trails' strict-
   // sync validation chain, so such a callback defers its thunk here instead of

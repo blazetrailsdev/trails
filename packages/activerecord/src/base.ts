@@ -3633,6 +3633,33 @@ export class Base extends Model {
     }
   }
 
+  /**
+   * Resolve `belongs_to ..., default:` blocks before validation runs.
+   *
+   * Rails registers the default on before_validation
+   * (associations/builder/belongs_to.rb#add_default_callbacks) so a required
+   * association's presence validation sees the defaulted foreign key. trails'
+   * validation chain is strictly synchronous while a default block may be async
+   * (e.g. `() => Developer.first()`), so the async resolution runs here — an
+   * async pre-validation phase invoked from `save` — rather than inside the sync
+   * chain. The synchronous before_validation callback the builder registers
+   * still covers sync blocks and the standalone `valid?` path.
+   *
+   * @internal
+   */
+  private async _runBelongsToDefaults(): Promise<void> {
+    const ctor = this.constructor as typeof Base;
+    if (typeof (this as any).association !== "function") return;
+    for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
+      const block = (ref as any).options?.default;
+      if (block == null) continue;
+      const assoc = (this as any).association(ref.name);
+      if (typeof assoc?.default === "function") {
+        await assoc.default(block);
+      }
+    }
+  }
+
   private async _destroyRow(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
 

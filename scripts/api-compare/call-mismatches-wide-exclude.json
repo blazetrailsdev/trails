@@ -15444,13 +15444,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/builder/belongs-to.ts",
-    "rubyName": "add_default_callbacks",
-    "call": "before_validation",
-    "reason": "Intentional deviation: Rails registers the default on before_validation, but trails' validation chain is strictly synchronous and the default block may be async (e.g. () => Developer.first()), so addDefaultCallbacks registers it on beforeSave instead. Documented in belongs-to.ts and AssociationOptions.default."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "add_touch_callbacks",
     "call": "foreign_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

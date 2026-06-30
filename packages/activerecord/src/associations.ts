@@ -137,16 +137,13 @@ export interface AssociationOptions {
   required?: boolean;
   optional?: boolean;
   /** belongs_to-only: sets the association from this block when the foreign
-   * key is nil. The block runs on save (Rails runs it on before_validation;
-   * trails defers to before_save because the validation chain is synchronous
-   * and the block may be async, e.g. `() => Developer.first()`).
-   *
-   * Limitation vs Rails: because the default fires on before_save rather than
-   * before_validation, it does NOT satisfy a presence validation on a required
-   * association. `belongsTo(name, { default, optional: false })` validates the
-   * still-nil FK first and fails before the default can fill it — in Rails the
-   * same combination saves cleanly. Use `default` only with optional (the
-   * trails default) associations. */
+   * key is nil. Mirrors Rails' before_validation default
+   * (associations/builder/belongs_to.rb#add_default_callbacks): the block fills
+   * the FK before validation, so `belongsTo(name, { default, optional: false })`
+   * saves cleanly — the required-association presence validation sees the
+   * defaulted target. A possibly-async block (e.g. `() => Developer.first()`) is
+   * resolved in an async pre-validation phase on save; a synchronous block also
+   * fires during a standalone `valid?`. */
   default?: (owner: Base) => Base | null | Promise<Base | null>;
   beforeAdd?:
     | ((owner: Base, record: Base) => void | false)
