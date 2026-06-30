@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
 import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
+import { registerModel } from "../associations.js";
 import { FixtureSet } from "./fixture-set.js";
 import { Base } from "../base.js";
 import "../relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
@@ -20,6 +21,24 @@ import { Post } from "./models/post.js";
 import { LiveParrot, DeadParrot } from "./models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+
+/**
+ * Resolves an entry's model thunk to its table-bearing class, registering the
+ * full resolved list exactly as {@link resolveFixtureNames} does. The thunk may
+ * return an array (a table-bearing model plus extra classes to register, e.g.
+ * STI subclasses or HABTM targets); the first element is the table-bearing one.
+ * Registration is what these conformance/seed assertions implicitly depend on —
+ * e.g. `developers` seeds its `sharedComputers` HABTM label only once `Computer`
+ * is registered, which used to happen as a side effect of the model thunk.
+ */
+async function resolvePrimaryModel(entry: {
+  model: () => Promise<typeof Base | readonly (typeof Base)[]>;
+}): Promise<typeof Base> {
+  const resolved = await entry.model();
+  const models = (Array.isArray(resolved) ? resolved : [resolved]) as (typeof Base)[];
+  registerModel(models);
+  return models[0];
+}
 
 const TYPE_CONTRACT_SCHEMA = {
   topics: { title: "string" },
@@ -408,7 +427,14 @@ describe("useFixtures { schema } auto-derivation", () => {
 describe("deriveFixtureSchema", () => {
   it("slices only the requested sets' tables out of the full schema", async () => {
     const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
-    expect(Object.keys(sub).sort()).toEqual([Author.tableName, Post.tableName].sort());
+    // `posts` pulls in `categories_posts` too: `sliceSchema` includes the join
+    // table of any HABTM association on a model-backed set (the loader may write
+    // join rows from an owner association label). Post HABTM categories now
+    // resolves because resolving the set registers Post, so its through
+    // reflection's join table is detectable.
+    expect(Object.keys(sub).sort()).toEqual(
+      [Author.tableName, Post.tableName, "categories_posts"].sort(),
+    );
     // The slice carries the real column spec, not a placeholder.
     expect(sub[Author.tableName]).toBe(TEST_SCHEMA[Author.tableName]);
   });
@@ -633,7 +659,7 @@ describe("fixtureRegistry conformance", () => {
         expect(entry.joinTable.length, `${name}: joinTable must be non-empty`).toBeGreaterThan(0);
       } else {
         if ("addOn" in entry) await entry.addOn?.();
-        const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
+        const ModelClass = await resolvePrimaryModel(entry);
         expect(typeof ModelClass, `${name}: model thunk must resolve to a class`).toBe("function");
         expect(
           ModelClass.prototype instanceof Base,
@@ -677,7 +703,7 @@ describe("fixtureRegistry ref targets", () => {
         loadable.add(entry.joinTable);
       } else {
         if ("addOn" in entry) await entry.addOn?.();
-        const M = await (entry as { model: () => Promise<typeof Base> }).model();
+        const M = await resolvePrimaryModel(entry);
         loadable.add(M.tableName);
       }
     }
@@ -749,7 +775,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
           await defineJoinTableFixtures(Base.adapter, entry.joinTable, data);
         } else {
           if ("addOn" in entry) await entry.addOn?.();
-          const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
+          const ModelClass = await resolvePrimaryModel(entry);
           await defineFixtures(Base.adapter, ModelClass, data);
         }
       } catch (e) {
@@ -860,7 +886,14 @@ describe("useFixtures encryption add-on is opt-in", () => {
     const originalAddOn = entry.addOn;
     const originalModel = entry.model;
     const order: string[] = [];
-    const stubModel = { tableName: "encrypted_books" } as unknown as typeof Base;
+    // A minimal class (not a bare object): `resolveFixtureNames` now folds in
+    // `registerModel`, which writes the model's static `_modelsByName` map, so
+    // the stub must carry that shape. `tableName` keeps the resolver happy.
+    class StubModel {
+      static tableName = "encrypted_books";
+      static _modelsByName = new Map<string, unknown>();
+    }
+    const stubModel = StubModel as unknown as typeof Base;
     entry.addOn = vi.fn(async () => {
       order.push("addOn");
     });

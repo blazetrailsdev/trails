@@ -16,6 +16,7 @@ import {
 export type { FixtureName } from "./fixtures-registry.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
+import { registerModel } from "../associations.js";
 
 /**
  * A tableless fixture entry: seeds rows directly into the named table with no
@@ -130,7 +131,18 @@ export async function resolveFixtureNames(
       model = null;
     } else {
       if ("addOn" in entry) await entry.addOn?.();
-      const m = await entry.model();
+      const resolved = await entry.model();
+      // A declared fixture set makes its model resolvable, exactly as Rails'
+      // `fixtures :authors` autoloads the `Author` constant on first reference —
+      // no explicit `registerModel` call in the test. The thunk may return an
+      // array whose first element is the table-bearing model and the rest are
+      // extra classes to register alongside it (STI subclasses so `findStiClass`
+      // resolves each row's inheritance-column value; HABTM targets whose join
+      // table the loader writes). The array form routes any STI subclass through
+      // `registerSubclass`. Idempotent across files/tests (Map.set).
+      const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
+      registerModel(models);
+      const m = models[0];
       table = m.tableName;
       model = m;
     }

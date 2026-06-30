@@ -18,15 +18,15 @@ import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
 import { Owner } from "../test-helpers/models/owner.js";
 
-registerModel(Author);
-registerModel(Post);
+// `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
+// fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
+// `Pet`, `Toy`) register automatically when the set resolves — no `registerModel`
+// needed, mirroring Rails' `fixtures :authors`. `Comment`, `Tagging`, `Tag`, and
+// `Owner` are association targets with no fixture set of their own, so they still
+// register explicitly until the autoload fallback (part b) lands.
 registerModel(Comment);
 registerModel(Tagging);
 registerModel(Tag);
-registerModel(CpkAuthor);
-registerModel(CpkBook);
-registerModel(Pet);
-registerModel(Toy);
 registerModel(Owner);
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
