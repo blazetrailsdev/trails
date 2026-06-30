@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../index.js";
 import { registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
@@ -30,7 +30,7 @@ type BoundSqlLiteralBuilders = {
 };
 
 describe("bound SQL literal with Relation bind value", () => {
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   it("inlines a Relation positional bind as an IN subquery", async () => {
     const approved = Topic.where({ approved: true });

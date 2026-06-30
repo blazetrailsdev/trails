@@ -26,7 +26,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 
@@ -130,7 +130,7 @@ async function assertTouching(
   }
 }
 
-const { topics, categories, cars, dogLovers, people, subscribers } = useHandlerFixtures(
+const { topics, categories, cars, dogLovers, people, subscribers } = fixtures(
   [
     "topics",
     "categories",

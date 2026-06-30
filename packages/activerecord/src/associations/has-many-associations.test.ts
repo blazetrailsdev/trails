@@ -43,9 +43,8 @@ import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
 // collide with the bespoke `class Author` / `class Post` declarations in the
 // still-unconverted describes below. Without the alias, esbuild renames those
@@ -105,7 +104,7 @@ import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/m
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  const { people } = useHandlerFixtures([
+  const { people } = fixtures([
     "authors",
     "authorAddresses",
     "essays",
@@ -184,7 +183,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
     registerModel(Company);
@@ -253,7 +252,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   it("should generate valid sql", () => {
@@ -268,7 +267,7 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { posts, humans, categories } = useHandlerFixtures(
+  const { posts, humans, categories } = fixtures(
     ["posts", "comments", "humans", "categories", "essays", "tags", "taggings", "people"],
     { schema: TEST_SCHEMA },
   );
@@ -401,7 +400,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -469,12 +468,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = useHandlerFixtures([
-    "companies",
-    "developers",
-    "projects",
-    "developersProjects",
-  ]);
+  const { companies } = fixtures(["companies", "developers", "projects", "developersProjects"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -652,7 +646,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -999,9 +993,9 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
-  const { companies } = useHandlerFixtures(["companies"]);
+  const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -1121,7 +1115,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies"]);
+  const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
     await defineSchema(
       Base.connection,
@@ -1212,7 +1206,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
@@ -5508,7 +5502,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { posts } = useHandlerFixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
+  const { posts } = fixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -5544,7 +5538,7 @@ describe("HasManyAssociationsTest", () => {
 // `beforeAll` means schema DDL runs once per file and each test runs inside
 // BEGIN/ROLLBACK rather than rebuilding tables.
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
@@ -5761,7 +5755,7 @@ describe("HasManyAssociationsTest", () => {
 // scope applies), `:all_bulbs` (unscope where:name), `:other_bulbs`
 // (unscope + rewrite), `:old_bulbs` (rewhere).
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(
@@ -5828,7 +5822,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { authors } = useHandlerFixtures(["authors", "posts"], { schema: TEST_SCHEMA });
+  const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
     registerModel(HmAuthor);
@@ -5853,12 +5847,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  const { authors, people } = useHandlerFixtures([
-    "authors",
-    "authorAddresses",
-    "essays",
-    "people",
-  ]);
+  const { authors, people } = fixtures(["authors", "authorAddresses", "essays", "people"]);
 
   beforeAll(async () => {
     registerModel(HmAuthor);
@@ -5902,14 +5891,14 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies, topics } = useHandlerFixtures(
+  const { companies, topics } = fixtures(
     ["companies", "accounts", "topics", "posts", "comments", "taggings", "cars", "bulbs"],
     { schema: TEST_SCHEMA },
   );
 
   beforeAll(async () => {
     // Create images table separately — no images fixture file exists,
-    // so it isn't included in the useHandlerFixtures set above.
+    // so it isn't included in the fixtures set above.
     await defineSchema({ images: TEST_SCHEMA.images });
   });
 
@@ -6097,7 +6086,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("AsyncHasManyAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
     registerModel(Company);
@@ -6128,7 +6117,7 @@ describe("AsyncHasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { topics } = useHandlerFixtures(["companies", "accounts", "topics"], {
+  const { topics } = fixtures(["companies", "accounts", "topics"], {
     schema: TEST_SCHEMA,
   });
 
@@ -6230,7 +6219,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cars } = useHandlerFixtures(["cars", "topics", "ships", "treasures"], {
+  const { cars } = fixtures(["cars", "topics", "ships", "treasures"], {
     schema: TEST_SCHEMA,
   });
 
@@ -6336,7 +6325,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -6384,12 +6373,12 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cpkAuthors, shardedBlogPosts } = useHandlerFixtures(
+  const { cpkAuthors, shardedBlogPosts } = fixtures(
     ["cpkAuthors", "cpkBooks", "shardedBlogs", "shardedBlogPosts", "shardedComments"],
     { schema: TEST_SCHEMA },
   );
 
-  // useHandlerFixtures loads the fixture rows but does not register the models
+  // fixtures loads the fixture rows but does not register the models
   // under the class names the associations resolve by (`CpkBook`,
   // `ShardedComment`), so register them here (dynamic import keeps these out of
   // the file's top-level scope, where bespoke same-named classes in
@@ -6455,7 +6444,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { categories } = useHandlerFixtures(["categories", "categorizations"], {
+  const { categories } = fixtures(["categories", "categorizations"], {
     schema: TEST_SCHEMA,
   });
 
@@ -6487,7 +6476,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  useHandlerFixtures(
+  fixtures(
     {
       user_comments_counts: [UserCommentsCount, {}],
       post_comments_counts: [PostCommentsCount, {}],

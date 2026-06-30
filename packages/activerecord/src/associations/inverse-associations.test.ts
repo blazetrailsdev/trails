@@ -12,8 +12,7 @@ import {
   InverseOfAssociationRecursiveError,
 } from "../index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
@@ -93,7 +92,7 @@ async function withAutomaticScopeInversing(
 }
 
 describe("AutomaticInverseFindingTests", () => {
-  const { books } = useHandlerFixtures(
+  const { books } = fixtures(
     ["ratings", "comments", "cars", "bulbs", "books", "subscriptions", "subscribers"],
     {
       schema: canonicalSchema,
@@ -319,7 +318,7 @@ describe("AutomaticInverseFindingTests", () => {
 });
 
 describe("InverseAssociationTests", () => {
-  useHandlerFixtures({
+  fixtures({
     companies: [Company, {}],
     developers: [Developer, {}],
     projects: [Project, {}],
@@ -398,7 +397,7 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("InverseHasOneTests", () => {
-  const { humans } = useHandlerFixtures(["humans", "faces"], { schema: canonicalSchema });
+  const { humans } = fixtures(["humans", "faces"], { schema: canonicalSchema });
   beforeAll(() => {
     registerModel(Human);
     registerModel(Face);
@@ -509,7 +508,7 @@ describe("InverseHasOneTests", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  const { humans, comments, authors } = useHandlerFixtures(
+  const { humans, comments, authors } = fixtures(
     // authors before posts: a `ref("authors", …)` in the posts fixtures resolves
     // to a CRC32 fallback id unless the authors set is already loaded, which
     // would orphan every post's `author_id`.
@@ -842,7 +841,7 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseBelongsToTests", () => {
-  const { faces, interests } = useHandlerFixtures(["humans", "faces", "interests"], {
+  const { faces, interests } = fixtures(["humans", "faces", "interests"], {
     schema: canonicalSchema,
   });
   beforeAll(() => {
@@ -1048,7 +1047,7 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  const { faces, interests } = useHandlerFixtures(["humans", "faces", "interests"], {
+  const { faces, interests } = fixtures(["humans", "faces", "interests"], {
     schema: canonicalSchema,
   });
   beforeAll(() => {
@@ -1238,7 +1237,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 // NOTE - these tests might not be meaningful, ripped as they were from the parental_control plugin
 // which would guess the inverse rather than look for an explicit configuration option.
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  useHandlerFixtures(["humans", "interests", "zines"], { schema: canonicalSchema });
+  fixtures(["humans", "interests", "zines"], { schema: canonicalSchema });
   beforeAll(() => {
     [Human, Interest, Zine].forEach((m) => registerModel(m));
   });
@@ -1262,7 +1261,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 // dedicated `branches` table setup BrokenBranch needs without disturbing the
 // fixture-backed block above.
 describe("InverseBelongsToTests", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema(canonicalSchema);
     [Branch, BrokenBranch].forEach((m) => registerModel(m));

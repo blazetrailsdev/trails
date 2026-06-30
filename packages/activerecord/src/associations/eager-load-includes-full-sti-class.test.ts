@@ -15,7 +15,7 @@ import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 
@@ -79,7 +79,7 @@ describe("PolymorphicNonFullClassNamesTest", () => {
 // stays at its default of true), flipping store_full_sti_class never changes how
 // the taggable association resolves — both branches must find the tagging.
 function runStiSharedTests(storeFullStiClass: boolean): void {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
@@ -153,7 +153,7 @@ function runStiSharedTests(storeFullStiClass: boolean): void {
 // disagrees with how the row was written, the type-column value mismatches and
 // the association resolves to nil.
 function runPolymorphicSharedTests(storeFullClassName: boolean): void {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {

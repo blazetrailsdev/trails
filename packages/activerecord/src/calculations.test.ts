@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Company, Firm, DependentFirm, Client } from "./test-helpers/models/company.js";
@@ -31,7 +31,7 @@ import { Edge } from "./test-helpers/models/edge.js";
 describe("CalculationsTest", () => {
   // fixtures :companies, :accounts, :authors, :author_addresses, :topics,
   //          :speedometers, :minivans, :books, :posts, :comments, :cpk_books
-  const { companies, topics, cpkBooks, minivans } = useHandlerFixtures(
+  const { companies, topics, cpkBooks, minivans } = fixtures(
     [
       "companies",
       "accounts",

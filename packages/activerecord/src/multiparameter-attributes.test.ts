@@ -7,22 +7,22 @@ import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
 describe("MultiParameterAttributeTest", () => {
-  // useHandlerFixtures wires setupHandlerSuite + withTransactionalFixtures + defineSchema.
+  // fixtures wires setupFixtures + withTransactionalFixtures + defineSchema.
   // The defineSchema call warms the pool's schema cache for topics so the synchronous
   // loadSchema path (triggered by new Topic() inside tests) finds the date/time column
   // types correctly on all adapters including MariaDB. Mirrors date.test.ts.
-  useHandlerFixtures(["topics"], { schema: TEST_SCHEMA });
+  fixtures(["topics"], { schema: TEST_SCHEMA });
 
   // Force-recreate the canonical `topics` table to its full shape first. Under
   // vitest's per-file module isolation the signature/schema caches reset to
-  // canonical each file, so `useHandlerFixtures`' own `{ schema }` `defineSchema`
+  // canonical each file, so `fixtures`' own `{ schema }` `defineSchema`
   // sees a cache-hit and skips the repair — leaving a reduced `topics` shape
   // (`attribute-methods.test.ts` / `finder.test.ts` both declare a bespoke
   // `topics` with NO `last_read` column) that a sibling file co-scheduled earlier

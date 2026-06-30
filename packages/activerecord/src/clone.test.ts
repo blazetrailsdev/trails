@@ -3,14 +3,14 @@
  * model + handler `topics` fixtures, test names verbatim from the Ruby methods.
  */
 import { describe, it, expect } from "vitest";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("CloneTest", () => {
-  // `useHandlerFixtures` wires `setupHandlerSuite` internally and is
+  // `fixtures` wires `setupFixtures` internally and is
   // transactional, mirroring Rails' `fixtures :topics`.
-  useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"], { schema: canonicalSchema });
 
   it("persisted", async () => {
     const topic = await Topic.first();

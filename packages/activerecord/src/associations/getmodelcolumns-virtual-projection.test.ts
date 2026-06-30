@@ -13,15 +13,14 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Firm, Company, Client } from "../test-helpers/models/company.js";
 import { registerModel } from "../index.js";
 
 describe("getModelColumns virtual-attribute eager projection", () => {
-  setupHandlerSuite();
-  const { companies } = useHandlerFixtures(["companies"]);
+  setupFixtures();
+  const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
     await defineSchema({ companies: TEST_SCHEMA.companies }, { dropExisting: true });
   });

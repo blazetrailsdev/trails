@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { defineSchema } from "./define-schema.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { repairValidations } from "./repair-validations.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({

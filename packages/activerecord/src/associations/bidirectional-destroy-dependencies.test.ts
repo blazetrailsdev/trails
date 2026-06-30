@@ -5,11 +5,11 @@
  * Mirrors associations/bidirectional_destroy_dependencies_test.rb — the
  * mutually `dependent: :destroy` Content/ContentPosition pair. Rails declares
  * `fixtures :content, :content_positions`; we mirror that with one
- * `useHandlerFixtures` call seeding the canonical tables.
+ * `fixtures` call seeding the canonical tables.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import {
   Content,
@@ -18,7 +18,7 @@ import {
 } from "../test-helpers/models/content.js";
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  useHandlerFixtures(["content", "contentPositions"], { schema: canonicalSchema });
+  fixtures(["content", "contentPositions"], { schema: canonicalSchema });
 
   registerModel(Content);
   registerModel(ContentPosition);

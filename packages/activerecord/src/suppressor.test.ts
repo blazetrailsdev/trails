@@ -4,12 +4,12 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { Notification } from "./test-helpers/models/notification.js";
 import { User, UserWithNotification } from "./test-helpers/models/user.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describe("SuppressorTest", () => {

@@ -20,7 +20,7 @@ import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js"
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType } from "@blazetrails/activemodel";
@@ -79,7 +79,7 @@ const SCHEMA = {
 // BasicsTest — targets base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(SCHEMA);
@@ -2085,7 +2085,7 @@ describe("BasicsTest", () => {
 // BasicsTest2 — additional coverage for base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(SCHEMA);
@@ -2209,7 +2209,7 @@ describe("BasicsTest", () => {
 });
 
 describe("BasicsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(SCHEMA);

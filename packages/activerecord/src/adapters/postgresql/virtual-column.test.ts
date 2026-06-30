@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -22,7 +22,7 @@ afterAll(() => {
 // The `virtual_columns` table uses PG generated/virtual columns, which
 // aren't expressible via defineSchema. The table is built inline below;
 // defineSchema({}) marks the file as TM-Phase-5 compliant.
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {

@@ -10,7 +10,7 @@ import { Base } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
@@ -83,7 +83,7 @@ const TEST_SCHEMA = {
 // AttributeMethodsTest — targets attribute_methods_test.rb
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -909,7 +909,7 @@ describe("AttributeMethodsTest", () => {
 // AttributeMethodsTestExtra — additional targets for attribute_methods_test.rb
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1278,7 +1278,7 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 
 describe("attribute_alias arelTable integration", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);

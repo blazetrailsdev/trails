@@ -13,8 +13,7 @@ import { afterEach, describe, expect, it, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid, registerModel } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, WrongReply } from "../test-helpers/models/reply.js";
@@ -23,7 +22,7 @@ import { Parrot } from "../test-helpers/models/parrot.js";
 import { Company } from "../test-helpers/models/company.js";
 import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 // `isAttributeCameFromUser` is mixed into Base instances but not surfaced on the
 // model's declared instance type, so narrow it through a typed shim.
@@ -34,7 +33,7 @@ function cameFromUser(record: object, attr: string): boolean {
 describe("ValidationsTest", () => {
   // Rails `fixtures :topics, :developers`. Loading the topics set registers the
   // Topic/Reply STI subtree; loading developers builds the developers table.
-  useHandlerFixtures(["topics", "developers"]);
+  fixtures(["topics", "developers"]);
 
   beforeAll(() => {
     registerModel("Topic", Topic);

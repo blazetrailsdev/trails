@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -40,7 +40,7 @@ registerModel(Author);
 registerModel(FirstPost);
 registerModel(SpecialPostWithDefaultScope);
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 const { developers, people, references, authors } = useFixtures(

@@ -18,13 +18,13 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("column_names sync virtual exclusion", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema({ posts: TEST_SCHEMA.posts });
   });

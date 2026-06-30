@@ -27,7 +27,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { describeIfSupports } from "./test-helpers/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -95,7 +95,7 @@ function checkPirateAfterSaveFailure(pirate: Rec): void {
 }
 
 describe("DirtyTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   // Canonical-schema shield. This suite rides the preloaded canonical tables
@@ -1189,7 +1189,7 @@ describe("DirtyTest", () => {
 // set is unchanged (PG only).
 // ==========================================================================
 describeIfSupports("identity_columns", "DirtyTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   beforeEach(async () => {
     const conn = Base.connection as unknown as {

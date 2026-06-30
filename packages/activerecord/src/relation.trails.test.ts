@@ -15,9 +15,8 @@ import { registerModel, modelRegistry } from "./associations.js";
 import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
@@ -69,7 +68,7 @@ describe("isBlank / isPresent", () => {
 });
 
 describe("RelationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
@@ -465,7 +464,7 @@ describe("RelationTest", () => {
 // to exactly the same SQL as `relation.toSql()` — i.e. the legacy string-assembly
 // path and the Arel-manager path can no longer drift.
 describe("Relation#arel build_arel convergence", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(() => {
     registerModel("Widget", Widget);
@@ -585,7 +584,7 @@ describe("Relation#arel build_arel convergence", () => {
 });
 
 describe("RelationTest", () => {
-  const { authors } = useHandlerFixtures(
+  const { authors } = fixtures(
     ["authors", "posts", "comments", "ratings", "categorizations", "categories"],
     {
       schema: canonicalSchema,

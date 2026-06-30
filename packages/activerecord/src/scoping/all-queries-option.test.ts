@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { DeveloperwithDefaultMentorScopeNot } from "../test-helpers/models/developer.js";
 
@@ -9,7 +9,7 @@ import { DeveloperwithDefaultMentorScopeNot } from "../test-helpers/models/devel
 // applies to ordinary reads but is suppressed when `all_queries: true` is
 // requested — the path `_find_record` uses on reload.
 describe("Base.all all_queries option", () => {
-  useHandlerFixtures([], { schema: canonicalSchema });
+  fixtures([], { schema: canonicalSchema });
 
   it("applies a non-all_queries default scope to all() but not to all({ allQueries: true })", () => {
     const normal = DeveloperwithDefaultMentorScopeNot.all().toSql();

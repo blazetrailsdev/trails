@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { registerModel } from "./associations.js";
@@ -17,7 +17,7 @@ import { Author } from "./test-helpers/models/author.js";
 registerModel(Author);
 
 describe("RelationTest", () => {
-  useHandlerFixtures(["authors", "authorAddresses"], { schema: canonicalSchema });
+  fixtures(["authors", "authorAddresses"], { schema: canonicalSchema });
 
   it("find in empty array", async () => {
     const authors = Author.all().where({ id: [] });

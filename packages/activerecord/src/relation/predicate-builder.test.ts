@@ -5,7 +5,7 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
@@ -27,7 +27,7 @@ describe("PredicateBuilderTest", () => {
 
   // Rails declares no fixtures here; we still ride the canonical tables so the
   // models' schema is warmed for the synchronous `toSql()` assertions below.
-  useHandlerFixtures(["topics", "posts", "authors", "products"], {
+  fixtures(["topics", "posts", "authors", "products"], {
     schema: canonicalSchema,
   });
 

@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { useFixtures } from "./use-fixtures.js";
 import { defineJoinTableFixtures } from "./define-fixtures.js";
 import { defineSchema } from "./define-schema.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { Tree } from "./models/tree.js";
 import { Base } from "../base.js";
@@ -23,7 +23,7 @@ const NAKED_SCHEMA = {
 } as const;
 
 describe("tableless useFixtures (naked/yml)", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   beforeAll(async () => {
     await defineSchema(Base.connection, NAKED_SCHEMA);

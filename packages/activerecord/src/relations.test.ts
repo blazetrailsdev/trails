@@ -9,7 +9,7 @@ import {
   Base,
 } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -58,7 +58,7 @@ describe("RelationTest", () => {
     companies,
     minivans,
     cpkOrders,
-  } = useHandlerFixtures(
+  } = fixtures(
     [
       "authors",
       "authorAddresses",

@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, loadHabtm } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
@@ -30,9 +30,9 @@ interface ReflectionHost {
 // same models Rails' strict_loading_test.rb drives (`has_many :audit_logs`,
 // `has_one :ship`, `belongs_to :firm`, `has_and_belongs_to_many :projects`).
 describe("StrictLoadingNewRecordFindTargetTest", () => {
-  // `useHandlerFixtures` wires `setupHandlerSuite` internally; the `developers`
+  // `fixtures` wires `setupFixtures` internally; the `developers`
   // fixture gives a persisted owner for the unchanged-behavior assertion.
-  const { developers } = useHandlerFixtures(["developers"]);
+  const { developers } = fixtures(["developers"]);
   // The loaders resolve target classes by name from the registry; register the
   // canonical targets so `Developer`'s declared associations resolve.
   registerModel(Developer);

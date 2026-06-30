@@ -29,7 +29,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment, SpecialComment, SubSpecialComment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
@@ -47,7 +47,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     authors,
     ratings,
     comments: fixtureComments,
-  } = useHandlerFixtures(["authors", "authorAddresses", "posts", "comments", "ratings"], {
+  } = fixtures(["authors", "authorAddresses", "posts", "comments", "ratings"], {
     schema: canonicalSchema,
   });
 

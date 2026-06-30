@@ -4,9 +4,9 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
-useHandlerFixtures({});
+fixtures({});
 
 describe("AbsenceValidationTest", () => {
   function makeModel() {

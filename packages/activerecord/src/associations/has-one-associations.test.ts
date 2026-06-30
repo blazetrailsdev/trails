@@ -41,7 +41,7 @@ import { Post } from "../test-helpers/models/post.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Room } from "../test-helpers/models/room.js";
 import { User } from "../test-helpers/models/user.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import {
   assertQueriesCount,
   assertNoQueries,
@@ -76,7 +76,7 @@ function registerCompanyModels(): void {
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
 describe("HasOneAssociationsTest", () => {
-  const { companies, accounts } = useHandlerFixtures([
+  const { companies, accounts } = fixtures([
     "companies",
     "accounts",
     "developers",
@@ -888,7 +888,7 @@ describe("HasOneAssociationsTest", () => {
 // AsyncHasOneAssociationsTest — mirrors AsyncHasOneAssociationsTest
 // ==========================================================================
 describe("AsyncHasOneAssociationsTest", () => {
-  const { companies } = useHandlerFixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
     registerCompanyModels();

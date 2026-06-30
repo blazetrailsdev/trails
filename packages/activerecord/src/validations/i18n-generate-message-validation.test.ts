@@ -2,10 +2,10 @@ import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-useHandlerFixtures({});
+fixtures({});
 
 describe("I18nGenerateMessageValidationTest", () => {
   afterEach(() => {

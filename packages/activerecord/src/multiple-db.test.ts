@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { setupSecondPool } from "./test-helpers/setup-second-pool.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { isSqliteRun } from "./test-helpers/sqlite-template.js";
@@ -16,9 +16,9 @@ import { Bird } from "./test-helpers/models/bird.js";
 // reproduce the split with a second in-memory SQLite pool on ARUnit2Model. The
 // PG/MySQL suites don't provision a second named database, so gate to SQLite.
 describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
-  // Rails sets `self.use_transactional_tests = false`; setupHandlerSuite pins
+  // Rails sets `self.use_transactional_tests = false`; setupFixtures pins
   // the schema/fixtures across the file (skips the global per-test reset).
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await setupSecondPool();
   });

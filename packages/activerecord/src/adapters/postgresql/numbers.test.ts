@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 
 // Rails: class PostgresqlNumber < ActiveRecord::Base
@@ -14,7 +14,7 @@ class PostgresqlNumber extends Base {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   let connection: PostgreSQLAdapter;
 

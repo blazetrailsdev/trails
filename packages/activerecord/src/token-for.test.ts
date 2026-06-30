@@ -12,7 +12,7 @@ import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 // Rails: class User < ::User { generates_token_for :lookup; … }
@@ -39,7 +39,7 @@ describe("TokenForTest", () => {
   // transaction instrumenter (InstrumentationAlreadyStartedError). Cleaning up
   // with deleteAll in afterEach (the signed-id.test.ts pattern) keeps the shared
   // `users` table isolated without an enclosing transaction.
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema({
       users: TEST_SCHEMA.users,

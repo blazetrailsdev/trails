@@ -12,12 +12,12 @@ import { Author } from "./test-helpers/models/author.js";
 import { SerializedPost } from "./test-helpers/models/post.js";
 import { bookFixtureData } from "./test-helpers/fixtures/books.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {

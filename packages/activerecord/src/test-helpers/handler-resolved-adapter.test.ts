@@ -13,7 +13,7 @@ import { Base } from "../base.js";
 import { defineSchema } from "./define-schema.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import { clearAppliedSchemaSignatures } from "./define-schema.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -34,7 +34,7 @@ class HandlerResolvedComment extends Base {
 describe("handler-resolved adapter (Phase D-0)", () => {
   // Bootstraps Base.connectionHandler and skips the global resetTestAdapterState()
   // for this suite. D-1..N test files use the same one-liner.
-  setupHandlerSuite();
+  setupFixtures();
 
   // No adapter arg — resolves via Base.connectionHandler. This is the
   // new Rails-shape call pattern that D-1..N test files will use.

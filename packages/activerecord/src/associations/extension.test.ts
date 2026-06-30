@@ -7,7 +7,7 @@ import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment, OopsError } from "../test-helpers/models/comment.js";
@@ -24,18 +24,18 @@ registerModel(Project);
 // `with_content` extension block) + real posts/comments fixture lookups,
 // mirroring `AssociationsExtensionsTest` against `posts(:welcome).comments`.
 describe("AssociationsExtensionsTest", () => {
-  const { posts, comments, developers, projects } = useHandlerFixtures(
+  const { posts, comments, developers, projects } = fixtures(
     ["posts", "comments", "developers", "projects", "developersProjects"],
     { schema: canonicalSchema },
   );
   // Force-recreate `posts`/`comments` to the canonical shape. Under vitest's
   // per-file module isolation the signature/schema caches reset to canonical
-  // each file, so `useHandlerFixtures`' own `defineSchema` sees a cache-hit and
+  // each file, so `fixtures`' own `defineSchema` sees a cache-hit and
   // skips the repair — leaving a reduced `posts:{title}` shape (no `body`) that
   // a sibling handler-suite file co-scheduled earlier in the same fork wrote to
   // the shared worker DB. `dropExisting` drops + recreates unconditionally, so
   // the posts fixture INSERT (which carries a `body` value) finds the column.
-  // Registered after `useHandlerFixtures` so this `beforeAll` runs last and wins.
+  // Registered after `fixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
     await defineSchema(
       {

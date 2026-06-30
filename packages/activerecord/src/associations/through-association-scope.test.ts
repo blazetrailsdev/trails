@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -38,10 +38,9 @@ registerModel(Comment);
 });
 
 describe("Preloader::ThroughAssociation#through_scope", () => {
-  const { authors, posts } = useHandlerFixtures(
-    ["authors", "authorAddresses", "posts", "comments"],
-    { schema: canonicalSchema },
-  );
+  const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"], {
+    schema: canonicalSchema,
+  });
 
   function throughLoader(owners: Author[], name: string, scope?: any): ThroughAssociation {
     const loaders = new Preloader({

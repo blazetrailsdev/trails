@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { registerModel } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -44,7 +44,7 @@ const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("NamedScopingTest", () => {
-  const { topics, posts, authors } = useHandlerFixtures(
+  const { topics, posts, authors } = fixtures(
     ["topics", "posts", "authors", "comments", "authorAddresses"],
     { schema: canonicalSchema },
   );

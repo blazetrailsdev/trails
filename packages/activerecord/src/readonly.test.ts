@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { registerModel } from "./associations.js";
 
 import { Developer } from "./test-helpers/models/developer.js";
@@ -34,7 +34,7 @@ registerModel(Comment);
 registerModel(Project);
 
 describe("ReadOnlyTest", () => {
-  const { developers, people, posts } = useHandlerFixtures([
+  const { developers, people, posts } = fixtures([
     "developers",
     "people",
     "posts",

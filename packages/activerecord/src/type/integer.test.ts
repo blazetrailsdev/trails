@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 
-setupHandlerSuite();
+setupFixtures();
 
 describe("IntegerTest", () => {
   it("casting ActiveRecord models", () => {

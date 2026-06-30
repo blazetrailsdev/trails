@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import "../associations/collection-proxy.js";
@@ -34,7 +34,7 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 describe("CpkBook eager pluck / cache_version preload-degrade", () => {
   // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
   // empty cpk tables and let transactional rollback clean up each insert.
-  useHandlerFixtures([], { schema: canonicalSchema });
+  fixtures([], { schema: canonicalSchema });
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));

@@ -15,7 +15,7 @@ import {
 import { Associations, association } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
@@ -47,7 +47,7 @@ describe("OptimisticLockingTest", () => {
   // bespoke `LockWithoutDefault*` (Rails declares these top-level, no fixtures)
   // and `ReadonlyNameShip < Ship` tables are canonical too. Treasures are listed
   // before peoples_treasures so their IDs are resolved first (ref ordering).
-  const { people, stringKeyObjects, legacyThings, references } = useHandlerFixtures(
+  const { people, stringKeyObjects, legacyThings, references } = fixtures(
     ["people", "stringKeyObjects", "legacyThings", "references", "treasures", "peoplesTreasures"],
     { schema: canonicalSchema },
   );
@@ -671,7 +671,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     "destroy existing object with locking column value null in the database",
     "destroy stale object",
   ];
-  const { people, legacyThings } = useHandlerFixtures(["people", "legacyThings", "references"], {
+  const { people, legacyThings } = fixtures(["people", "legacyThings", "references"], {
     schema: canonicalSchema,
     usesTransaction: schemaChangeTests,
   });
@@ -821,7 +821,7 @@ describe("PessimisticLockingTest", () => {
   // `with lock sets isolation` must run outside the transactional-fixtures
   // wrapper — setting an isolation level inside a nested transaction raises
   // (mirrors Rails, where isolation requires a top-level transaction).
-  const { people } = useHandlerFixtures(["people"], {
+  const { people } = fixtures(["people"], {
     schema: canonicalSchema,
     usesTransaction: ["with lock sets isolation"],
   });

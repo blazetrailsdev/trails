@@ -6,11 +6,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
@@ -25,7 +24,7 @@ import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 // bespoke below, tracked for convergence under RFC 0048.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
   const rid = (r: unknown) => (r as { id: number }).id;
   const Topic = CanonicalTopic;
   // Register by Rails name so STI Reply rows resolve their belongs_to :topic
@@ -208,7 +207,7 @@ const TEST_SCHEMA = {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2037,7 +2036,7 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2218,7 +2217,7 @@ describe("FinderTest", () => {
       this.attribute("active", "boolean");
     }
   }
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
@@ -2241,7 +2240,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2261,7 +2260,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   it("include on unloaded relation with composite primary key match", async () => {

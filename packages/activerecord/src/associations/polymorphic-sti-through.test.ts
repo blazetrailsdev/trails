@@ -30,7 +30,7 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Hotel } from "../test-helpers/models/hotel.js";
 import { Department } from "../test-helpers/models/department.js";
 import { Chef } from "../test-helpers/models/chef.js";
@@ -44,7 +44,7 @@ registerModel(CakeDesigner);
 registerModel(DrinkDesigner);
 
 describe("HABTM Slot E — polymorphic + STI through", () => {
-  useHandlerFixtures([], { schema: canonicalSchema });
+  fixtures([], { schema: canonicalSchema });
 
   async function seed() {
     const hotel = await Hotel.create({});

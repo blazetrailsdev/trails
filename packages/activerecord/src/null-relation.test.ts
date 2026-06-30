@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { association, registerModel } from "./associations.js";
@@ -25,7 +25,7 @@ registerModel(Topic);
 describe("NullRelationTest", () => {
   // Mirrors Rails `fixtures :posts, :comments`; `{ schema }` recreates the
   // canonical tables so the suite survives sibling-file contamination.
-  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+  fixtures(["posts", "comments"], { schema: canonicalSchema });
 
   it("none", async () => {
     await assertNoQueries(false, async () => {

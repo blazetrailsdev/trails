@@ -6,7 +6,7 @@ import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -16,7 +16,7 @@ describe("InstrumentationTest", () => {
   registerModel("Author", Author);
   registerModel("Book", Book);
   registerModel("ClothingItem", ClothingItem);
-  useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+  fixtures(["books", "authors"], { schema: canonicalSchema });
 
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -232,7 +232,7 @@ function transactionInSqlActiveRecordPayloadTests(): void {
 
 describe("TransactionInSqlActiveRecordPayloadTest", () => {
   registerModel("Book", Book);
-  useHandlerFixtures(["books"], { schema: canonicalSchema });
+  fixtures(["books"], { schema: canonicalSchema });
 
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -245,7 +245,7 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
   registerModel("Book", Book);
   // Rails: `self.use_transactional_tests = false` — neither case may run inside
   // the rollback-on-teardown outer transaction.
-  useHandlerFixtures(["books"], {
+  fixtures(["books"], {
     schema: canonicalSchema,
     usesTransaction: ["payload without an open transaction", "payload with an open transaction"],
   });

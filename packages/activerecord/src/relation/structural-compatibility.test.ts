@@ -5,13 +5,13 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("StructuralCompatibilityTest", () => {
   // Mirrors Rails `fixtures :posts`.
-  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+  fixtures(["posts"], { schema: canonicalSchema });
 
   it("compatible values", () => {
     const left = Post.where({ id: 1 });

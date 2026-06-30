@@ -7,10 +7,10 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Developer } from "./test-helpers/models/developer.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("timestamp alias resolution", () => {
-  useHandlerFixtures(["developers"]);
+  fixtures(["developers"]);
 
   it("fixtures auto-fill the aliased timestamp column", async () => {
     const dev = await Developer.first();

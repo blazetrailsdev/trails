@@ -8,7 +8,7 @@ import { Nodes } from "@blazetrails/arel";
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
@@ -35,7 +35,7 @@ registerModel([
 const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((r: any) => r.id);
 
 describe("RelationMergingTest", () => {
-  const { authors, developers } = useHandlerFixtures(
+  const { authors, developers } = fixtures(
     ["developers", "comments", "authors", "authorAddresses", "posts", "ratings"],
     { schema: canonicalSchema },
   );
@@ -388,18 +388,15 @@ describe("RelationMergingTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  const { posts } = useHandlerFixtures(
-    ["posts", "authors", "authorAddresses", "developers", "comments"],
-    {
-      schema: canonicalSchema,
-      // The same-alias CTE case deliberately triggers a StatementInvalid, which
-      // aborts the PG transaction and would poison shared transactional
-      // fixtures; run it outside the shared transaction.
-      usesTransaction: [
-        "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
-      ],
-    },
-  );
+  const { posts } = fixtures(["posts", "authors", "authorAddresses", "developers", "comments"], {
+    schema: canonicalSchema,
+    // The same-alias CTE case deliberately triggers a StatementInvalid, which
+    // aborts the PG transaction and would poison shared transactional
+    // fixtures; run it outside the shared transaction.
+    usesTransaction: [
+      "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
+    ],
+  });
 
   it("merging where relations", async () => {
     const helloByBob = await Post.where({ body: "hello" })

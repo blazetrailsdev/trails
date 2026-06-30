@@ -13,12 +13,12 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Developer, SpecialDeveloper } from "./test-helpers/models/developer.js";
 
 describe("columnsHash warm-cache same-table read", () => {
-  useHandlerFixtures(["developers"], { schema: canonicalSchema });
+  fixtures(["developers"], { schema: canonicalSchema });
 
   it("reads real columns for a fresh sibling of an ignoredColumns model", () => {
     // Warm the cache via the sibling that DECLARES `ignoredColumns`

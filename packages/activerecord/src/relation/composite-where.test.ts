@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 
@@ -21,7 +21,7 @@ describe("Relation#where — composite-key form", () => {
   // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
   // fixtures are loaded — so we ride the canonical, empty `cpk_books`
   // table and let transactional rollback clean up each test's inserts.
-  useHandlerFixtures([], { schema: canonicalSchema });
+  fixtures([], { schema: canonicalSchema });
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));

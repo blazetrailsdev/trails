@@ -7,7 +7,7 @@ import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { registerModel } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 
 // Pet `belongs_to :owner, touch: true` resolves Owner through the association
@@ -44,7 +44,7 @@ async function withCacheVersioning(fn: () => Promise<void> | void): Promise<void
 }
 
 describe("IntegrationTest", () => {
-  const { owners, pets } = useHandlerFixtures(["companies", "developers", "owners", "pets"]);
+  const { owners, pets } = fixtures(["companies", "developers", "owners", "pets"]);
 
   it("to param should return string", async () => {
     expect(typeof (await Client.first())!.toParam()).toBe("string");

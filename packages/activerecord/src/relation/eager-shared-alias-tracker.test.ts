@@ -18,7 +18,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -26,7 +26,7 @@ import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("eager build_joins shared AliasTracker", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     registerModel("Post", Post);

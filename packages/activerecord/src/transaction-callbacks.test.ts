@@ -22,7 +22,7 @@ import {
 } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 function defineBehaviourTopic() {
@@ -47,7 +47,7 @@ function defineBehaviourTopic() {
 
 // Rails `fixtures :topics, :owners, :pets`. `{ schema }` recreates the canonical
 // tables so sibling-file contamination on the shared worker DB can't leak rows.
-useHandlerFixtures(["topics", "owners", "pets"], {
+fixtures(["topics", "owners", "pets"], {
   schema: canonicalSchema,
 });
 

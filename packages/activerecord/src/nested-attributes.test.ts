@@ -17,9 +17,8 @@ import { Associations, association as collectionProxyFor } from "./associations.
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
@@ -137,7 +136,7 @@ async function seedPirate(): Promise<{
 // NestedAttributesTest — targets nested_attributes_test.rb
 // ==========================================================================
 describe("NestedAttributesTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -321,7 +320,7 @@ describe("NestedAttributesTest", () => {
 });
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -615,7 +614,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 });
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -882,7 +881,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 });
 
 describe("TestNestedAttributesInGeneral", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1238,7 +1237,7 @@ describe("TestNestedAttributesInGeneral", () => {
 });
 
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
-  const { owners, pets } = useHandlerFixtures(["owners", "pets"], { schema: canonicalSchema });
+  const { owners, pets } = fixtures(["owners", "pets"], { schema: canonicalSchema });
 
   it("should update existing records with non standard primary key", async () => {
     registerModel(Owner);
@@ -1272,7 +1271,7 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
 });
 
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1335,7 +1334,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 });
 
 describe("TestNestedAttributesWithExtend", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1379,7 +1378,7 @@ describe("TestNestedAttributesWithExtend", () => {
 });
 
 describe("TestNestedAttributesForDelegatedType", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1451,7 +1450,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
 });
 
 describe("assigning nested attributes target", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1470,7 +1469,7 @@ describe("assigning nested attributes target", () => {
 });
 
 describe("assigning nested attributes target with nil placeholder for rejected item", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1491,7 +1490,7 @@ describe("assigning nested attributes target with nil placeholder for rejected i
 });
 
 describe("can use symbols as object identifier", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1514,7 +1513,7 @@ describe("can use symbols as object identifier", () => {
 });
 
 describe("numeric column changes from zero to no empty string", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1538,7 +1537,7 @@ describe("numeric column changes from zero to no empty string", () => {
 });
 
 describe("should also work with a HashWithIndifferentAccess", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1555,7 +1554,7 @@ describe("should also work with a HashWithIndifferentAccess", () => {
 });
 
 describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1581,7 +1580,7 @@ describe("should automatically build new associated models for each entry in a h
 });
 
 describe("should not assign destroy key to a record", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1601,7 +1600,7 @@ describe("should not assign destroy key to a record", () => {
 });
 
 describe("should not destroy the associated model until the parent is saved", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1623,7 +1622,7 @@ describe("should not destroy the associated model until the parent is saved", ()
 });
 
 describe("should not load association when updating existing records", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1642,7 +1641,7 @@ describe("should not load association when updating existing records", () => {
 });
 
 describe("should not overwrite unsaved updates when loading association", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1657,7 +1656,7 @@ describe("should not overwrite unsaved updates when loading association", () => 
 });
 
 describe("should not remove scheduled destroys when loading association", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1672,7 +1671,7 @@ describe("should not remove scheduled destroys when loading association", () => 
 });
 
 describe("should preserve order when not overwriting unsaved updates", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1686,7 +1685,7 @@ describe("should preserve order when not overwriting unsaved updates", () => {
 });
 
 describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1703,7 +1702,7 @@ describe("should raise RecordNotFound if an id belonging to a different record i
 });
 
 describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1719,7 +1718,7 @@ describe("should raise an UnknownAttributeError for non existing nested attribut
 });
 
 describe("should raise an argument error if something else than a hash is passed", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1736,7 +1735,7 @@ describe("should raise an argument error if something else than a hash is passed
 });
 
 describe("should refresh saved records when not overwriting unsaved updates", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1756,7 +1755,7 @@ describe("should refresh saved records when not overwriting unsaved updates", ()
 });
 
 describe("should save only one association on create", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1775,7 +1774,7 @@ describe("should save only one association on create", () => {
 });
 
 describe("should sort the hash by the keys before building new associated models", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1799,7 +1798,7 @@ describe("should sort the hash by the keys before building new associated models
 });
 
 describe("should take a hash and assign the attributes to the associated models", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1817,7 +1816,7 @@ describe("should take a hash and assign the attributes to the associated models"
 });
 
 describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1845,7 +1844,7 @@ describe("should take a hash with composite id keys and assign the attributes to
 });
 
 describe("should take an array and assign the attributes to the associated models", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1863,7 +1862,7 @@ describe("should take an array and assign the attributes to the associated model
 });
 
 describe("should work with update as well", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1879,7 +1878,7 @@ describe("should work with update as well", () => {
 });
 
 describe("validate presence of parent works with inverse of", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1908,7 +1907,7 @@ describe("validate presence of parent works with inverse of", () => {
 });
 
 describe("acceptsNestedAttributesFor", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -1973,7 +1972,7 @@ describe("acceptsNestedAttributesFor", () => {
 });
 
 describe("Nested Attributes (Rails-guided)", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2149,7 +2148,7 @@ describe("Nested Attributes (Rails-guided)", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2242,7 +2241,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
@@ -2373,7 +2372,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // Rails: NestedAttributesOnACollectionAssociationTests is mixed into
 // TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);

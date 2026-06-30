@@ -3,8 +3,7 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { association } from "../associations.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -79,7 +78,7 @@ import {
 import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
 
 describe("HasManyThroughAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   const {
     posts,
     readers,
@@ -114,7 +113,7 @@ describe("HasManyThroughAssociationsTest", () => {
     cpkOrders,
     cpkOrderTags,
     organizations,
-  } = useHandlerFixtures(
+  } = fixtures(
     [
       "posts",
       "readers",
@@ -160,7 +159,7 @@ describe("HasManyThroughAssociationsTest", () => {
   );
 
   // Register models at describe-time (synchronously) so reflections
-  // are available before any eager validation triggered by useHandlerFixtures.
+  // are available before any eager validation triggered by fixtures.
   registerModel([
     Tag,
     OrderedTag,
@@ -2096,7 +2095,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   describe("through scope (canonical)", () => {
-    const { authors: canonicalAuthors } = useHandlerFixtures(["authors", "posts", "comments"], {
+    const { authors: canonicalAuthors } = fixtures(["authors", "posts", "comments"], {
       schema: canonicalSchema,
     });
 

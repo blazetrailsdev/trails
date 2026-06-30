@@ -5,9 +5,8 @@ import { setPermanentConnectionCheckout } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 import {
@@ -538,7 +537,7 @@ describe("ConnectionHandlingTest", () => {
 });
 
 describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   it("calls .load() on a Relation returned from the block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
@@ -786,7 +785,7 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
   // wrapping transaction) — opt out by name via `usesTransaction`.
   const testName =
     "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed";
-  useHandlerFixtures(["posts"], {
+  fixtures(["posts"], {
     schema: canonicalSchema,
     usesTransaction: [testName],
   });

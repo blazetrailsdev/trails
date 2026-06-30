@@ -5,11 +5,11 @@
  * Mirrors associations/cascaded_eager_loading_test.rb — the cascaded
  * Author/Post/Comment/Categorization/Category/Topic/Vertex eager-loading suite.
  * Rails declares a single fixtures set for the whole class; we mirror that with
- * one `useHandlerFixtures` call seeding the canonical association tables.
+ * one `fixtures` call seeding the canonical association tables.
  */
 import { describe, it, expect } from "vitest";
 import { registerModel, enableSti, registerSubclass, resetCallbacks } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -32,7 +32,7 @@ import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices, companies, people } = useHandlerFixtures(
+  const { authors, topics, vertices, companies, people } = fixtures(
     [
       "authors",
       "posts",

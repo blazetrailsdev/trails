@@ -7,7 +7,7 @@ import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { queryLogs } from "./query-logs-instance.js";
 import { queryTransformers, type QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
@@ -27,10 +27,10 @@ function leaseConnection(): RawAdapter {
 // (Rails' `assert_queries_match` / `SQLCounter`), exactly as the Rails
 // counterpart does (`Dashboard.first`, `connection.execute "SELECT 1"`).
 describe("QueryLogsTest", () => {
-  // Rails: `fixtures :dashboards`. `useHandlerFixtures` wires the handler suite
+  // Rails: `fixtures :dashboards`. `fixtures` wires the handler suite
   // internally. `schema: canonicalSchema` defends against sibling-file schema
   // contamination in the shared worker DB.
-  useHandlerFixtures(["dashboards"], { schema: canonicalSchema });
+  fixtures(["dashboards"], { schema: canonicalSchema });
 
   let originalTransformers: QueryTransformer[];
 

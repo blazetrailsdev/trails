@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { registerModel } from "../index.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -16,7 +16,7 @@ import { Author } from "../test-helpers/models/author.js";
 describe("FieldOrderedValuesTest", () => {
   // Mirrors Rails `fixtures :posts`. The enum/string/nil book tests destroy_all
   // and create their own rows, so `books`/`authors` are defined (no fixtures).
-  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+  fixtures(["posts"], { schema: canonicalSchema });
   beforeAll(async () => {
     await defineSchema({
       authors: canonicalSchema.authors,

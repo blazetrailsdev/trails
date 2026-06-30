@@ -15,8 +15,7 @@ import {
   modelRegistry,
 } from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -199,8 +198,8 @@ async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
-  setupHandlerSuite();
-  const { authors, authorAddresses } = useHandlerFixtures(["authors", "authorAddresses"], {
+  setupFixtures();
+  const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"], {
     schema: canonicalSchema,
   });
 
@@ -216,7 +215,7 @@ describe("BelongsToWithForeignKeyTest", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   const {
     accounts,
     companies,
@@ -233,7 +232,7 @@ describe("BelongsToAssociationsTest", () => {
     members,
     nodes,
     cpkBooks,
-  } = useHandlerFixtures(
+  } = fixtures(
     [
       "accounts",
       "companies",
@@ -2025,9 +2024,9 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
-  const { companies } = useHandlerFixtures(["companies"], { schema: canonicalSchema });
+  const { companies } = fixtures(["companies"], { schema: canonicalSchema });
 
   it("async load belongs to", async () => {
     const client = await Client.find(3);

@@ -6,7 +6,7 @@ import "../../index.js";
 import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { Developer } from "../../test-helpers/models/developer.js";
 import { Computer } from "../../test-helpers/models/computer.js";
@@ -26,7 +26,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // `computers_developers` join table the `sharedComputers` label materializes)
     // so the shared Developer model resolves regardless of any bespoke schema a
     // sibling file left in the worker DB.
-    const { developers } = useHandlerFixtures(
+    const { developers } = fixtures(
       { developers: [Developer, developerFixtureData] },
       { schema: canonicalSchema },
     );

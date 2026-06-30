@@ -3,8 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { association } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
@@ -36,8 +35,8 @@ function djasScope(owner: Base, assocName: string): any {
 }
 
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
-  setupHandlerSuite();
-  const { authors } = useHandlerFixtures(["posts", "authors", "comments", "authorAddresses"], {
+  setupFixtures();
+  const { authors } = fixtures(["posts", "authors", "comments", "authorAddresses"], {
     schema: canonicalSchema,
   });
 

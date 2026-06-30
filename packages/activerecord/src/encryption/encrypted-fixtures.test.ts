@@ -2,14 +2,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../base.js";
 import "../relation.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   let restoreEncryption: (() => void) | undefined;
@@ -40,7 +40,7 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
 // set. A second EncryptableFixtureTest describe (its own handler suite) isolates
 // the seeders while keeping the Rails-matching describe path flat.
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
 
   let restoreEncryption: (() => void) | undefined;

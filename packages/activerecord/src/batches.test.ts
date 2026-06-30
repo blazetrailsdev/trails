@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { Relation } from "./index.js";
 import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./ar-config.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
@@ -31,7 +31,7 @@ import { registerModel } from "./associations.js";
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
-  const { posts } = useHandlerFixtures(
+  const { posts } = fixtures(
     [
       "posts",
       "taggings",

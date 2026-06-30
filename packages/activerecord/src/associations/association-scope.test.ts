@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations, loadHasMany, loadHasOne } from "../associations.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -18,7 +18,7 @@ import { Club } from "../test-helpers/models/club.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
 
 describe("AssociationScope", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   // The DB-roundtrip cases ride the canonical Author/Post/Comment,
   // Categorization/Category, Tag/Tagging and Member/Membership/Club models —

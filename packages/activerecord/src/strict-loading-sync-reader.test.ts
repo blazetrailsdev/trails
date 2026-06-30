@@ -2,13 +2,13 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { seedAssociationCache } from "./test-helpers/seed-association-cache.js";
 
 describe("strict loading — sync singular reader (Phase R.3)", () => {
-  const { developers, ships } = useHandlerFixtures(["developers", "ships"]);
+  const { developers, ships } = fixtures(["developers", "ships"]);
 
   beforeAll(() => {
     registerModel(Developer);

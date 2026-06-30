@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { StringType, typeRegistry } from "@blazetrails/activemodel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import {
   stiName,
   isDescendsFromActiveRecord,
@@ -51,7 +51,7 @@ import { Author } from "./test-helpers/models/author.js";
 import { ShopProduct, ShopProductType } from "./test-helpers/models/shop.js";
 
 describe("InheritanceTest", () => {
-  const { companies } = useHandlerFixtures([
+  const { companies } = fixtures([
     "companies",
     "projects",
     "subscribers",
@@ -518,7 +518,7 @@ describe("InheritanceTest", () => {
 });
 
 describe("InheritanceComputeTypeTest", () => {
-  useHandlerFixtures(["companies"]);
+  fixtures(["companies"]);
 
   it.skip("instantiation doesnt try to require corresponding file", () => {
     // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
@@ -548,7 +548,7 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("InheritanceAttributeTest", () => {
-  useHandlerFixtures(["companies"]);
+  fixtures(["companies"]);
 
   // Local test classes mapping to the companies table with a type-attribute default.
   // Rails uses module-scoped class names ("InheritanceAttributeTest::Startup"); trails uses
@@ -578,7 +578,7 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("InheritanceAttributeMappingTest", () => {
-  useHandlerFixtures(["companies", "sponsors"]);
+  fixtures(["companies", "sponsors"]);
 
   // Rails: ActiveRecord::Type::String subclass that round-trips type names through
   // "omg_<underscored>" serialization. Registered once at module evaluation time.

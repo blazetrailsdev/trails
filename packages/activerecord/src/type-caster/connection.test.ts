@@ -2,11 +2,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
 import { Connection } from "./connection.js";
 import { AttributedDeveloper, DeveloperName } from "../test-helpers/models/developer.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("ConnectionTest", () => {
-  useHandlerFixtures(["developers"], { schema: TEST_SCHEMA });
+  fixtures(["developers"], { schema: TEST_SCHEMA });
 
   beforeAll(async () => {
     await AttributedDeveloper.loadSchema();

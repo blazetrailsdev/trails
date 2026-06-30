@@ -29,7 +29,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { createSidecarTestAdapter, adapterType } from "../test-adapter.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
@@ -124,7 +124,7 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     // the derived-table subquery actually scopes the rows. Executes against
     // the active adapter (each CI lane runs its own backend).
     describe("executing through Relation#pluck", () => {
-      useHandlerFixtures(["posts"], { schema: canonicalSchema });
+      fixtures(["posts"], { schema: canonicalSchema });
       beforeAll(async () => {
         await defineSchema({ posts: canonicalSchema.posts }, { dropExisting: true });
       });

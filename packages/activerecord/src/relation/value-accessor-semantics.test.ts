@@ -10,13 +10,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({ posts: TEST_SCHEMA.posts });

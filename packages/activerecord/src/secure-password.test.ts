@@ -6,12 +6,12 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("SecurePasswordTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({ users: TEST_SCHEMA.users });

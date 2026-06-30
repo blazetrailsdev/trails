@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
-import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { setupFixtures } from "./fixtures.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -28,7 +28,7 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
   }
 }
 
-setupHandlerSuite();
+setupFixtures();
 
 beforeAll(() => {
   adapter = Base.adapter;

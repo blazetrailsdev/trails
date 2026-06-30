@@ -7,8 +7,7 @@ import { SchemaDumper } from "./schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
@@ -20,7 +19,7 @@ import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
 describe("PrimaryKeysTest", () => {
-  const { topics, subscribers, mixedCaseMonkeys } = useHandlerFixtures(
+  const { topics, subscribers, mixedCaseMonkeys } = fixtures(
     ["topics", "subscribers", "movies", "mixedCaseMonkeys"],
     { schema: canonicalSchema },
   );
@@ -410,7 +409,7 @@ describe("PrimaryKeysTest", () => {
 });
 
 describe("PrimaryKeyWithAutoIncrementTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   class AutoIncrement extends Base {
     static _tableName = "auto_increments";
@@ -468,7 +467,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 });
 
 describe("PrimaryKeyAnyTypeTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   class Barcode extends Base {
     static _tableName = "barcodes";
@@ -533,7 +532,7 @@ async function primaryKeysOf(tableName: string): Promise<string[]> {
 }
 
 describe("CompositePrimaryKeyTest", () => {
-  const { cpkBooks } = useHandlerFixtures(["cpkAuthors", "cpkOrders", "cpkBooks"], {
+  const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"], {
     schema: canonicalSchema,
   });
 
@@ -681,7 +680,7 @@ describe("CompositePrimaryKeyTest", () => {
 });
 
 describe("PrimaryKeyIntegerNilDefaultTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   beforeEach(async () => {
     await (Base.connection as any).dropTable("int_defaults", { ifExists: true });
@@ -718,7 +717,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
 });
 
 describe("PrimaryKeyIntegerTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   class Widget extends Base {
     static _tableName = "widgets";

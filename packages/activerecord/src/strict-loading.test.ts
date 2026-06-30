@@ -13,7 +13,7 @@ import {
   setActionOnStrictLoadingViolation,
 } from "./index.js";
 import { association, loadBelongsTo, loadHasOne } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
@@ -71,12 +71,7 @@ async function withStrictLoadingByDefault<T>(model: typeof Base, fn: () => Promi
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
 describe("StrictLoadingTest", () => {
-  const { developers, ships } = useHandlerFixtures([
-    "developers",
-    "developersProjects",
-    "projects",
-    "ships",
-  ]);
+  const { developers, ships } = fixtures(["developers", "developersProjects", "projects", "ships"]);
 
   beforeAll(() => {
     registerModel(Developer);
@@ -873,7 +868,7 @@ describe("StrictLoadingTest", () => {
 // StrictLoadingFixturesTest — targets strict_loading_test.rb (bottom class)
 // ==========================================================================
 describe("StrictLoadingFixturesTest", () => {
-  const { strictZines } = useHandlerFixtures(["strictZines"]);
+  const { strictZines } = fixtures(["strictZines"]);
 
   beforeAll(() => {
     registerModel(StrictZine);

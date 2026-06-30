@@ -9,7 +9,7 @@ import { SchemaStatements } from "../../connection-adapters/abstract/schema-stat
 import { RecordNotFound } from "../../errors.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base, registerModel } from "../../index.js";
 
 beforeAll(() => {
@@ -25,7 +25,7 @@ afterAll(() => {
 // in beforeAll). defineSchema can express the `uuid` column type but
 // not the function-call default; defineSchema({}) marks the
 // file as TM-Phase-5 compliant.
-setupHandlerSuite();
+setupFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

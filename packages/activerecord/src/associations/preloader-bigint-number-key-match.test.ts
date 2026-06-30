@@ -10,8 +10,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Preloader } from "./preloader.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -25,8 +24,8 @@ type RecordInternals = {
 const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
 
 describe("Preloader BigInt PK / number FK key match", () => {
-  setupHandlerSuite();
-  const { authors } = useHandlerFixtures(["authors", "posts"], { schema: TEST_SCHEMA });
+  setupFixtures();
+  const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
 
   beforeAll(() => {
     registerModel("Author", Author);

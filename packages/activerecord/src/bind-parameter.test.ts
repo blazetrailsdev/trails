@@ -12,7 +12,7 @@ import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -75,7 +75,7 @@ function logBinds(binds: unknown[], sql = "select * from topics where id = ?"): 
 // unprepared, logging no binds (matching Rails).
 describe("BindParameterTest", () => {
   // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
-  useHandlerFixtures(["topics", "authors", "authorAddresses", "posts"], {
+  fixtures(["topics", "authors", "authorAddresses", "posts"], {
     schema: canonicalSchema,
   });
 

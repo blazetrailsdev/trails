@@ -10,7 +10,7 @@ import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
@@ -20,7 +20,7 @@ registerModel("Molecule", Molecule);
 registerModel("Electron", Electron);
 registerModel("NumericData", NumericData);
 
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {

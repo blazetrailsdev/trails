@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, pgServerVersion } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
-import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 // Rails PostgreSQLAdapter#supports_nulls_not_distinct? — PG 15+ (150000).
@@ -31,7 +31,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLActiveSchemaTest", () => {
     // `add_index_options` introspects the canonical `people` table when a bare
     // column name is passed as `:where`; seed it through the fixtures framework.
-    useHandlerFixtures(["people"], { schema: canonicalSchema });
+    fixtures(["people"], { schema: canonicalSchema });
 
     it("create database with encoding", async () => {
       let sqls = await captureSql(() => adapter.createDatabase("matt"), { stub: adapter });

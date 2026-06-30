@@ -36,7 +36,7 @@ import {
   computePrimaryKey,
   addAutosaveAssociationCallbacks,
 } from "./autosave-association.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
@@ -44,7 +44,7 @@ function cacheAssoc(record: Base, name: string, value: unknown) {
   record.association(name).setTarget(value as any);
 }
 
-setupHandlerSuite();
+setupFixtures();
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   // Transactional fixtures roll back every persisted pirate/ship/parrot per test
@@ -4871,7 +4871,7 @@ describe("computePrimaryKey", () => {
 // (save_collection_association -> association.destroy(record)) which fires the
 // before_remove/after_remove callbacks, not record-level child.destroy().
 describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalBird);

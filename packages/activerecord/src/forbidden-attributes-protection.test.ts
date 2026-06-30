@@ -23,7 +23,7 @@ import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { registerModel } from "./associations.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ProtectedParams } from "./test-helpers/protected-params.js";
 
@@ -34,7 +34,7 @@ registerModel(Ship);
 registerModel(Treasure);
 
 describe("ForbiddenAttributesProtectionTest", () => {
-  useHandlerFixtures(["people", "companies"], { schema: canonicalSchema });
+  fixtures(["people", "companies"], { schema: canonicalSchema });
 
   it("forbidden attributes cannot be used for mass assignment", () => {
     const params = new ProtectedParams({ first_name: "Guille", gender: "m" });

@@ -14,7 +14,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { adapterType } from "./test-adapter.js";
@@ -50,7 +50,7 @@ class UnoverloadedType extends Base {
 }
 
 describe("CustomPropertiesTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     // Reflect the canonical `overloaded_types` columns onto each class that

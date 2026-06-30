@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
 
@@ -20,7 +20,7 @@ afterAll(() => {
 // expressible as a static defineSchema spec. defineSchema({})
 // marks the file as TM-Phase-5 compliant. The outer transaction wrapping
 // each test rolls back those tables (PG DDL is transactional).
-setupHandlerSuite();
+setupFixtures();
 useHandlerTransactionalFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {

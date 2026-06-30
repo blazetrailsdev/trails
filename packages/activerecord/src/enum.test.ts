@@ -20,11 +20,11 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("EnumTest", () => {
-  const { books } = useHandlerFixtures(["books"], { schema: TEST_SCHEMA });
+  const { books } = fixtures(["books"], { schema: TEST_SCHEMA });
 
   beforeAll(() => {
     registerModel(Book);

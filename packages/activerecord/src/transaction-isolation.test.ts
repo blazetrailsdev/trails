@@ -3,14 +3,14 @@ import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { adapterSupports } from "./test-helpers/supports.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { describeIfPg, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).
 // Rails: TransactionIsolationUnsupportedTest
 describe("TransactionIsolationUnsupportedTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
@@ -49,7 +49,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
 // body that also runs on MySQL is required before their gate can match Rails'
 // mysql,postgresql adapter set).
 describe("TransactionIsolationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
@@ -93,7 +93,7 @@ describe("TransactionIsolationTest", () => {
 // their transactions run on independent physical connections — matching Rails'
 // `Tag.establish_connection :arunit` / `Tag2.establish_connection :arunit` pattern.
 describeIfPg("TransactionIsolationTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   class Tag extends Base {
     static {

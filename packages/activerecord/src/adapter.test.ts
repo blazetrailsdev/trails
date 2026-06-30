@@ -21,8 +21,7 @@ import {
   registerModel,
 } from "./index.js";
 import { Result } from "./result.js";
-import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
@@ -231,7 +230,7 @@ describe("AdapterTest", () => {
   registerModel("Post", Post);
   registerModel("Book", Book);
   registerModel("Event", Event);
-  useHandlerFixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
+  fixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
     schema: canonicalSchema,
     usesTransaction: [
       // Raise a DB error mid-statement (aborts an open PG transaction, poisoning
@@ -539,7 +538,7 @@ describe("AdapterTest", () => {
 // header), so we add it via raw DDL once per worker and tear it down after,
 // then drive the tables directly (Rails sets `use_transactional_tests = false`).
 describe("AdapterForeignKeyTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   const addFkSql = (): string =>
     "ALTER TABLE fk_test_has_fk ADD CONSTRAINT fk_name " +
@@ -667,13 +666,10 @@ describe("AdapterTestWithoutTransaction", () => {
     "reset empty table with custom pk",
     "reset table with non integer pk",
   ];
-  const { posts } = useHandlerFixtures(
-    ["posts", "authors", "authorAddresses", "movies", "subscribers"],
-    {
-      schema: canonicalSchema,
-      usesTransaction: withoutTransaction,
-    },
-  );
+  const { posts } = fixtures(["posts", "authors", "authorAddresses", "movies", "subscribers"], {
+    schema: canonicalSchema,
+    usesTransaction: withoutTransaction,
+  });
 
   it("create with query cache", async () => {
     const conn = Base.connection;
@@ -1318,7 +1314,7 @@ describe("AdapterThreadSafetyTest", () => {
 // the abstract/sqlite/pg default is false, matching Rails
 // savepoint_errors_invalidate_transactions?.
 describe("InvalidateTransactionTest", () => {
-  setupHandlerSuite();
+  setupFixtures();
 
   // Rails wraps this in `if connection.savepoint_errors_invalidate_transactions?`
   // — a capability guard (true only on MySQL), not an adapter-fidelity gate
