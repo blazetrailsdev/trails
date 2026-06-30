@@ -44,13 +44,11 @@ function castInheritanceColumnValue(
  * @internal
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
-  const klass = resolveComputedType(baseClass, typeName);
-  if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
-    throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
-    );
-  }
-  return klass;
+  // Rails' compute_type resolves any constant reachable through the model's
+  // module nesting and imposes NO subclass relationship — a sibling in the same
+  // namespace (e.g. Business::Client.compute_type("Firm")) resolves fine. The STI
+  // subclass constraint lives in find_sti_class ({@link stiClassFor}), not here.
+  return resolveComputedType(baseClass, typeName);
 }
 
 /**
@@ -82,8 +80,9 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
  * leaking through (so a demodulized type stored under a namespaced model resolves
  * via the namespace prefix even when the bare name is unregistered). A leading
  * `::` is an absolute reference resolved directly. Throws NameError when nothing
- * resolves. Does NOT enforce a subclass relationship — that is {@link computeType}'s
- * (and Rails' find_sti_class's) job, leaving this usable for polymorphic targets.
+ * resolves. Does NOT enforce a subclass relationship — that is {@link stiClassFor}'s
+ * (Rails' find_sti_class's) job, leaving this usable for polymorphic and sibling
+ * targets.
  *
  * @internal
  */
