@@ -10,6 +10,148 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+// Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
+// rows (topics(:second), topics(:fourth)).
+import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
+
+// ==========================================================================
+// FinderTest — faithful port of finder_test.rb riding canonical Topic +
+// topics fixtures (RFC 0048 convergence). Ordinal-finder cluster
+// (finder_test.rb take/sole/first/second/third). The remaining clusters
+// (fourth/fifth/*-to-last/last/integer/exists/find-by/conditions) are still
+// bespoke below, tracked for convergence under RFC 0048.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+  const rid = (r: unknown) => (r as { id: number }).id;
+  const Topic = CanonicalTopic;
+  // Register by Rails name so STI Reply rows resolve their belongs_to :topic
+  // even before the first query warms the model registry (touch-first tests).
+  registerModel("Topic", Topic);
+  registerModel("Reply", CanonicalReply);
+
+  it("take", async () => {
+    expect(rid(await Topic.where("title = 'The First Topic'").take())).toBe(rid(topics("first")));
+  });
+
+  it("take failing", async () => {
+    expect(await Topic.where("title = 'This title does not exist'").take()).toBeNull();
+  });
+
+  it("take bang present", async () => {
+    const record = await Topic.where("title = 'The Second Topic of the day'").takeBang();
+    expect(rid(record)).toBe(rid(topics("second")));
+  });
+
+  it("take bang missing", async () => {
+    await expect(Topic.where("title = 'This title does not exist'").takeBang()).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("sole", async () => {
+    expect(rid(await Topic.where("title = 'The First Topic'").sole())).toBe(rid(topics("first")));
+    expect(rid(await Topic.findSoleBy("title = 'The First Topic'"))).toBe(rid(topics("first")));
+  });
+
+  it("sole failing none", async () => {
+    await expect(Topic.where("title = 'This title does not exist'").sole()).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+    await expect(Topic.findSoleBy("title = 'This title does not exist'")).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("sole failing many", async () => {
+    await expect(Topic.where("author_name = 'Carl'").sole()).rejects.toThrow(SoleRecordExceeded);
+    await expect(Topic.findSoleBy("author_name = 'Carl'")).rejects.toThrow(SoleRecordExceeded);
+  });
+
+  it("first", async () => {
+    expect((await Topic.where("title = 'The Second Topic of the day'").first())!.title).toBe(
+      topics("second").title,
+    );
+  });
+
+  it("first failing", async () => {
+    expect(await Topic.where("title = 'The Second Topic of the day!'").first()).toBeNull();
+  });
+
+  it("first bang present", async () => {
+    const record = await Topic.where("title = 'The Second Topic of the day'").firstBang();
+    expect(rid(record)).toBe(rid(topics("second")));
+  });
+
+  it("first bang missing", async () => {
+    await expect(Topic.where("title = 'This title does not exist'").firstBang()).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("first have primary key order by default", async () => {
+    // Rails touches the expected row because PostgreSQL changes the default
+    // order if no order clause is used.
+    const expected = topics("first");
+    await expected.touch();
+    expect(rid(await Topic.first())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).first())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).first())).toBe(rid(expected));
+  });
+
+  it("model class responds to first bang", async () => {
+    expect(await Topic.firstBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.firstBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("second", async () => {
+    expect((await Topic.second())!.title).toBe(topics("second").title);
+  });
+
+  it("second with offset", async () => {
+    expect(rid(await Topic.offset(3).second())).toBe(rid(topics("fifth")));
+  });
+
+  it("second have primary key order by default", async () => {
+    const expected = topics("second");
+    await expected.touch();
+    expect(rid(await Topic.second())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).second())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).second())).toBe(rid(expected));
+  });
+
+  it("model class responds to second bang", async () => {
+    expect(await Topic.secondBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.secondBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("third", async () => {
+    expect((await Topic.third())!.title).toBe(topics("third").title);
+  });
+
+  it("third with offset", async () => {
+    expect(rid(await Topic.offset(2).third())).toBe(rid(topics("fifth")));
+  });
+
+  it("third have primary key order by default", async () => {
+    const expected = topics("third");
+    await expected.touch();
+    expect(rid(await Topic.third())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).third())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).third())).toBe(rid(expected));
+  });
+
+  it("model class responds to third bang", async () => {
+    expect(await Topic.thirdBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.thirdBang()).rejects.toThrow("Couldn't find Topic");
+  });
+});
 
 const TEST_SCHEMA = {
   topics: {
@@ -110,211 +252,6 @@ describe("FinderTest", () => {
       }
     }
     expect(await Topic.exists()).toBe(false);
-  });
-
-  it("take", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().take();
-    expect(record).not.toBeNull();
-  });
-
-  it("take failing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = await Topic.all().take();
-    expect(record).toBeNull();
-  });
-
-  it("take bang present", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().takeBang();
-    expect(record).not.toBeNull();
-  });
-
-  it("take bang missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.all().takeBang()).rejects.toThrow(RecordNotFound);
-    await expect(Topic.all().takeBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("sole", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "only" });
-    const record = await Topic.all().sole();
-    expect(record.title).toBe("only");
-  });
-
-  it("sole failing none", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.all().sole()).rejects.toThrow(RecordNotFound);
-  });
-
-  it("sole failing many", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await expect(Topic.all().sole()).rejects.toThrow(SoleRecordExceeded);
-  });
-
-  it("first", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().first();
-    expect(record).not.toBeNull();
-  });
-
-  it("first failing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = await Topic.all().first();
-    expect(record).toBeNull();
-  });
-
-  it("first bang present", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().firstBang();
-    expect(record).not.toBeNull();
-  });
-
-  it("first bang missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.all().firstBang()).rejects.toThrow(RecordNotFound);
-    await expect(Topic.all().firstBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("first have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "a" });
-    const first = await Topic.all().first();
-    // First should be first created (by PK order)
-    expect(first).not.toBeNull();
-  });
-
-  it("second", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const second = await Topic.all().second();
-    expect(second).not.toBeNull();
-  });
-
-  it("second with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const second = await Topic.all().offset(1).second();
-    expect(second).not.toBeNull();
-  });
-
-  it("second have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const second = await Topic.all().second();
-    expect(second).not.toBeNull();
-  });
-
-  it("third", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const third = await Topic.all().third();
-    expect(third).not.toBeNull();
-  });
-
-  it("third with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    await Topic.create({ title: "d" });
-    const third = await Topic.all().offset(1).third();
-    expect(third).not.toBeNull();
-  });
-
-  it("third have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const third = await Topic.all().third();
-    expect(third).not.toBeNull();
   });
 
   it("fourth", async () => {
@@ -727,26 +664,6 @@ describe("FinderTest", () => {
     const found = await Topic.where({ title: value }).first();
     expect(found).not.toBeNull();
     expect((found as Topic).title).toBe(value);
-  });
-
-  it("model class responds to second bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().secondBang).toBe("function");
-    await expect(Topic.all().secondBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to third bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().thirdBang).toBe("function");
-    await expect(Topic.all().thirdBang()).rejects.toThrow("Couldn't find Topic");
   });
 
   it("model class responds to fourth bang", async () => {
@@ -1798,11 +1715,6 @@ describe("FinderTest", () => {
   it("find on relation with large number", async () => {
     const { Post } = makeModel();
     await expect(Post.find(99999999)).rejects.toThrow();
-  });
-
-  it("model class responds to first bang", () => {
-    const { Post } = makeModel();
-    expect(typeof Post.all().firstBang).toBe("function");
   });
 
   it("second to last", async () => {

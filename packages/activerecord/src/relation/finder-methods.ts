@@ -353,9 +353,9 @@ export async function performFindByBang(
 
 export async function performFindSoleBy(
   this: FinderRelation,
-  conditions: Record<string, unknown>,
+  ...conditions: unknown[]
 ): Promise<any> {
-  return performSole.call(this.where(conditions));
+  return performSole.call((this.where as any)(...conditions));
 }
 
 function hasOrder(rel: FinderRelation): boolean {
@@ -446,7 +446,9 @@ export async function performSole(this: FinderRelation): Promise<any> {
   rel._limitValue = 2;
   const records = await rel.toArray();
   if (records.length === 0) {
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    // Rails Relation#sole calls `raise_record_not_found_exception!` with no
+    // args → "Couldn't find <Model>".
+    raiseRecordNotFoundExceptionBang.call(this);
   }
   if (records.length > 1) {
     throw new SoleRecordExceeded(this._modelClass);
