@@ -242,6 +242,7 @@ describe("AdapterTest", () => {
       "numeric value out of ranges are translated to specific exception",
       "uniqueness violations are translated to specific exception",
       "not null violations are translated to specific exception",
+      "database related exceptions are translated to statement invalid",
       "indexes",
       "remove index when name and wrong column name specified",
       "remove index when name and wrong column name specified positional argument",
