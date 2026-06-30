@@ -1603,20 +1603,6 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
   return out;
 }
 
-/**
- * Collect the set of method names a body invokes — the TS counterpart of the
- * Ruby extractor's `calls` array (see extract-ruby-api.rb). For each
- * CallExpression we record the final identifier of the callee:
- * `this.runCallbacks(...)` → `runCallbacks`, `foo.bar()` → `bar`, `baz()` →
- * `baz`. Returns a sorted, de-duplicated list (undefined when empty), so the
- * call-set parity dimension in compare.ts can diff it against the Ruby side
- * without caring about call order or count.
- *
- * Wired into method/function bodies (class methods, exported + export-list
- * functions, object-literal mixin methods). Get/set accessor bodies are not
- * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
- * which are accessor-shaped, so accessors would contribute no signal.
- */
 /** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
@@ -1640,6 +1626,24 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   return aliases;
 }
 
+/**
+ * Collect the set of method names a body invokes — the TS counterpart of the
+ * Ruby extractor's `calls` array (see extract-ruby-api.rb). For each
+ * CallExpression we record the final identifier of the callee:
+ * `this.runCallbacks(...)` → `runCallbacks`, `foo.bar()` → `bar`, `baz()` →
+ * `baz`. Returns a sorted, de-duplicated list (undefined when empty), so the
+ * call-set parity dimension in compare.ts can diff it against the Ruby side
+ * without caring about call order or count.
+ *
+ * `X.call(...)` / `X.apply(...)` and renamed-import calls are additionally
+ * resolved to the dispatched/original name (see the visit body) so indirect
+ * invocations of a ported method still count toward its call set.
+ *
+ * Wired into method/function bodies (class methods, exported + export-list
+ * functions, object-literal mixin methods). Get/set accessor bodies are not
+ * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
+ * which are accessor-shaped, so accessors would contribute no signal.
+ */
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
