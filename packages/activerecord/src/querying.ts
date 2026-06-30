@@ -219,7 +219,7 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  stringArray: string[],
+  specArray: AssociationSpec[],
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
@@ -237,20 +237,16 @@ export function joins<T extends typeof Base>(
   this: T,
   ...args: Array<
     | string
-    | string[]
+    | AssociationSpec[]
     | import("@blazetrails/arel").Nodes.Join
     | Record<string, AssociationSpec | AssociationSpec[]>
     | undefined
   >
 ): Relation<InstanceType<T>> {
   const relation = this.all();
-  // Flatten string array passed as single argument: joins(["a", "b"])
-  // Gate on all-string to avoid misrouting mixed or non-string arrays.
-  if (
-    args.length === 1 &&
-    Array.isArray(args[0]) &&
-    (args[0] as unknown[]).every((x) => typeof x === "string")
-  ) {
+  // A single array arg (joins(["a", "b"]) or joins([{ post: "author" }]))
+  // forwards as-is; Relation#joins flattens it like Rails' args.flatten!.
+  if (args.length === 1 && Array.isArray(args[0])) {
     return relation.joins(args[0]);
   }
   if (args.length === 1 && _isPlainObject(args[0])) {
