@@ -120,9 +120,14 @@ describe("CoreTest", () => {
   // Tracked: 0023-surfaced-deviations/inspect-dispatch-overridable-attribute-for-inspect.
   it.skip("inspect with overridden attribute for inspect", () => {});
 
-  it("full inspect lists all attributes", () => {
-    const topic = topics("first") as any;
-    expect(topic.fullInspect()).toBe(fullInspectString(topic));
+  it("full inspect lists all attributes", async () => {
+    // Rails full_inspect == inspect_with_attributes(all_attributes_for_inspect),
+    // ignoring attributes_for_inspect: stub it to a limited list and confirm
+    // every attribute is still emitted (core.rb:786-793).
+    await withAttributesForInspect(["id", "title"], () => {
+      const topic = topics("first") as any;
+      expect(topic.fullInspect()).toBe(fullInspectString(topic));
+    });
   });
 
   // Rails pretty_print_* exercise Ruby's `PP` pretty-printer rendering of a

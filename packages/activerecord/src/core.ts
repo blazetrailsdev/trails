@@ -300,8 +300,15 @@ export function isStrictLoadingAll(this: StrictLoadingModeHost): boolean {
   return strictLoadingMode.call(this) === "all";
 }
 
+/**
+ * Like {@link inspect} but ignores `attributes_for_inspect`, always listing
+ * every attribute.
+ *
+ * Mirrors: ActiveRecord::Core#full_inspect
+ * (`inspect_with_attributes(all_attributes_for_inspect)`)
+ */
 export function fullInspect(this: CoreRecord): string {
-  return inspect.call(this);
+  return inspectWithAttributes.call(this as any, allAttributesForInspect.call(this));
 }
 
 // ---------------------------------------------------------------------------
