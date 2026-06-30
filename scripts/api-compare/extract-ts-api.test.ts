@@ -160,6 +160,44 @@ describe("body call capture", () => {
     expect(m.calls).toEqual(["apply", "call", "helper", "lockBang", "transaction"]);
   });
 
+  it('records `new Foo(...)` as a "constructor" call (Ruby `Foo.new`)', () => {
+    // Ruby `StatementPool.new(...)` records the call `new`, which conventions.ts
+    // maps to the TS `constructor`. A direct return and a local-bound-then-
+    // returned instantiation must produce the IDENTICAL call-set — the body
+    // shape is irrelevant (#4284's buildStatementPool false positive).
+    const direct = extractFromSource(
+      `class Foo { build() { return new StatementPool(c, typeCast(this._x)); } }`,
+    );
+    const bound = extractFromSource(
+      `class Foo {
+        build() {
+          const pool = new StatementPool(c, typeCast(this._x));
+          pool.y = 1;
+          return pool;
+        }
+      }`,
+    );
+    const expected = ["constructor", "typeCast"];
+    expect(direct.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
+    expect(bound.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
+  });
+
+  it("resolves a one-level delegation to a private helper's call-set", () => {
+    // `build()` delegates to a single-statement helper that does the `new`;
+    // the helper's calls (here `constructor`) are credited back to `build` so
+    // extracting an instantiation into a one-liner is parity-equivalent.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.makePool(c); }
+        private makePool(c) { return new StatementPool(c, this._x); }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "constructor",
+      "makePool",
+    ]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
