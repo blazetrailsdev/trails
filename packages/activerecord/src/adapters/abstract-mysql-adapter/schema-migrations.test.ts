@@ -28,7 +28,12 @@ describeIfMysql("Mysql2Adapter", () => {
       );
       try {
         await adapter.addIndex("ca_engines", "car_id");
-        await adapter.addForeignKey("ca_engines", "ca_cars", { name: "fk_engines_cars" });
+        // Explicit column: addForeignKey would otherwise infer the FK column from
+        // the to-table singular (`ca_car_id`), which doesn't exist on ca_engines.
+        await adapter.addForeignKey("ca_engines", "ca_cars", {
+          name: "fk_engines_cars",
+          column: "car_id",
+        });
 
         await adapter.renameIndex("ca_engines", "index_ca_engines_on_car_id", "idx_renamed");
         const idxNames = (await adapter.indexes("ca_engines")).map((i: { name: string }) => i.name);
