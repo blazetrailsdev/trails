@@ -142,7 +142,6 @@ import {
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
-import { buildMergedJoinAliasTracker } from "./relation/merged-join-alias-tracker.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -464,14 +463,6 @@ const StrictLoadingScope = {
  * resolves its klass through the join-dependency walk.
  */
 type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown };
-
-/**
- * A normalized association forest: each key is an association name and its value
- * is the forest of its nested children. Built from the mixed string/dotted/
- * array/hash spec shapes so the eager-load and manual-`joins` trees can be
- * walked in parallel (Rails `JoinDependency#walk`).
- */
-type SpecForest = Map<string, SpecForest>;
 
 /**
  * Shared frozen empty array returned by value readers whose backing field is
@@ -2882,144 +2873,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolved table names for the `includes ∩ joins` intersection — the tables
-   * whose eager-load OUTER JOIN is redundant because `joins(:assoc)` already
-   * emits an INNER JOIN to them. Scoped to the intersection (not every named
-   * inner join) so an eager table that merely coincides with an unrelated
-   * `joins(...)` table is not silently dropped. The intersecting association is
-   * the canonical (first) occurrence of its table in the eager JoinDependency,
-   * so it is emitted un-aliased and matches by bare table name here.
-   */
-  private _joinedIncludesTables(): Set<string> {
-    return new Set(this._resolveAssocTables(this._joinedIncludesValues()));
-  }
-
-  /**
-   * Normalize a mixed association-spec list (strings, dotted paths, arrays,
-   * nested hashes) into a {@link SpecForest}. `"posts.comments"` and
-   * `{posts: :comments}` both nest `posts → comments`; arrays merge siblings.
-   */
-  private _specForest(specs: AssociationSpec[]): SpecForest {
-    const forest: SpecForest = new Map();
-    for (const spec of specs) this._addSpecToForest(spec, forest);
-    return forest;
-  }
-
-  private _addSpecToForest(spec: AssociationSpec, forest: SpecForest): void {
-    if (typeof spec === "string") {
-      const [head, ...rest] = spec.split(".");
-      let child = forest.get(head);
-      if (!child) forest.set(head, (child = new Map()));
-      if (rest.length > 0) this._addSpecToForest(rest.join("."), child);
-      return;
-    }
-    if (Array.isArray(spec)) {
-      for (const s of spec) this._addSpecToForest(s, forest);
-      return;
-    }
-    if (spec && typeof spec === "object") {
-      for (const [key, value] of Object.entries(spec)) {
-        let child = forest.get(key);
-        if (!child) forest.set(key, (child = new Map()));
-        if (value != null) this._addSpecToForest(value as AssociationSpec, child);
-      }
-    }
-  }
-
-  /**
-   * Resolve the target TABLE and model of an association NAME on a given model
-   * class, so a spec forest can be walked level by level. Plain
-   * belongsTo/hasOne/hasMany (and through, whose final target resolves the same
-   * way) map name → target via `className` or the camelized (singularized for
-   * collections) name. When the target model isn't registered, fall back to the
-   * lowercased association name as the table — mirroring `_resolveAssocTables`,
-   * so the #3990 string-root dedup is preserved for an unregistered target — but
-   * with a null `klass`, since the walk cannot descend without the child model.
-   */
-  private _assocTargetModel(
-    modelClass: any,
-    name: string,
-  ): { table: string; klass: any; intermediateTables: string[] } | null {
-    const assoc = (modelClass?._associations ?? []).find((a: any) => a.name === name);
-    if (!assoc) return null;
-    const isPlural =
-      assoc.type === "hasMany" ||
-      assoc.type === "hasAndBelongsToMany" ||
-      (assoc.type as string) === "hasManyThrough";
-    const className = assoc.options?.className ?? _camelize(isPlural ? _singularize(name) : name);
-    const klass = modelRegistry.get(className) ?? null;
-    // A :through association materializes the full reflection chain — the
-    // intermediate join table(s) plus the target. Rails `JoinDependency#walk`
-    // dedups every table in that chain against a coinciding manual join, not
-    // just the final target, so surface the through-intermediate table(s) too.
-    const intermediateTables: string[] = [];
-    const throughName = assoc.options?.through;
-    if (throughName != null) {
-      const throughChain = this._assocTargetModel(modelClass, throughName);
-      if (throughChain) {
-        intermediateTables.push(...throughChain.intermediateTables, throughChain.table);
-      }
-    }
-    return { table: String(klass?.tableName ?? name).toLowerCase(), klass, intermediateTables };
-  }
-
-  /**
-   * Tables shared by the eager-load tree and a manual `joins(...)` tree at the
-   * SAME association path — Rails' `JoinDependency#walk` recurses and dedups a
-   * coinciding join at EVERY level (join_dependency.rb:214-219), not just the
-   * root. So a nested or hash-form manual join (`joins(posts: :comments)`)
-   * collapses both `posts` AND `comments` against `eager_load(posts: :comments)`:
-   * the manual INNER JOIN wins and `_buildEagerJoinManager` skips the eager OUTER
-   * JOIN. Matching is by reflection NAME (mirroring `walk`'s `match?`), so an
-   * eager node that merely shares a table with an unrelated `joins(...)` via a
-   * different reflection is NOT dropped.
-   */
-  private _walkSharedManualEagerTables(): Set<string> {
-    const out = new Set<string>();
-    if (this._namedInnerJoins.length === 0) return out;
-    const eager = this._specForest([
-      ...this._eagerLoadAssociations,
-      ...this._includesToPromoteFromReferences(),
-    ]);
-    const manual = this._specForest(this._namedInnerJoins);
-    this._collectSharedTables(this._modelClass, eager, manual, out);
-    return out;
-  }
-
-  private _collectSharedTables(
-    modelClass: any,
-    eager: SpecForest,
-    manual: SpecForest,
-    out: Set<string>,
-  ): void {
-    for (const [name, eagerChild] of eager) {
-      const manualChild = manual.get(name);
-      if (manualChild === undefined) continue;
-      const target = this._assocTargetModel(modelClass, name);
-      if (!target) continue;
-      for (const t of target.intermediateTables) out.add(t);
-      out.add(target.table);
-      // Descend only when the child model is known; an unregistered target still
-      // dedups this level (name-as-table fallback) but cannot resolve deeper.
-      if (target.klass) this._collectSharedTables(target.klass, eagerChild, manualChild, out);
-    }
-  }
-
-  /**
-   * Tables whose eager-load OUTER JOIN is redundant because a manual
-   * `joins(...)` INNER JOIN already covers them: the `includes ∩ joins`
-   * intersection plus every level of an `eager_load`/promoted spec that
-   * coincides with a manual join (`_walkSharedManualEagerTables`).
-   * `_buildEagerJoinManager` skips re-emitting the eager join for these, leaving
-   * nested children to hang off the manual join.
-   */
-  private _dedupedManualJoinTables(): Set<string> {
-    const tables = this._joinedIncludesTables();
-    for (const t of this._walkSharedManualEagerTables()) tables.add(t);
-    return tables;
-  }
-
-  /**
    * Resolve association-name join specs to their lowercased table names. An
    * unresolved spec falls back to its own lowercased name (matching the inline
    * resolution in `referencesEagerLoadedTables`).
@@ -3164,43 +3017,17 @@ export class Relation<T extends Base> {
   private _addEagerSpecsToJoinDependency(
     jd: JoinDependency,
     specs: AssociationSpec[],
-    references: string[] = [],
   ): AssociationSpec[] {
-    // Seed the JoinDependency's construction alias tracker with the tables the
-    // manual `joins(...)` buckets emit (excluding the includes ∩ joins
-    // intersection, which intentionally shares one un-aliased table). Mirrors
-    // Rails' single `build_joins` alias_tracker: a through-association
-    // intermediate landing on a manually-joined table then collides at
-    // construction and aliases to its `alias_candidate`
-    // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`),
-    // instead of emitting a second un-aliased `posts` (ambiguous column).
-    // Deduped manual-join tables are excluded: their table is genuinely shared —
-    // `_buildEagerJoinManager` skips re-emitting the eager OUTER JOIN and the
-    // projection reads the manual INNER JOIN's un-aliased table. This covers both
-    // the `includes ∩ joins` intersection (Rails `joined_includes_values`) AND an
-    // `eager_load`/promoted/dotted ROOT that coincides with a manual join of the
-    // SAME association (`joins(:posts).eager_load(posts: :comments)`): excluding
-    // it from the seed keeps the eager root un-aliased so the skip dedups it to a
-    // single `posts` (manual INNER), mirroring Rails' `walk` (`r.table = l.table`).
-    // Every other manual-join table IS seeded, so a through-association
-    // intermediate landing on it still aliases to its `alias_candidate`
-    // (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`).
-    const dedupedTables = this._dedupedManualJoinTables();
-    const seedTables = [
-      ...this._resolveAssocTables(this._namedInnerJoins),
-      ...this._joinClauses.map((j) => j.table.toLowerCase()),
-    ].filter((t) => !dedupedTables.has(t));
-    if (seedTables.length > 0) jd.seedConstructionTables(seedTables);
-
+    // Populate the JoinDependency tree only. Alias resolution and `references`
+    // re-aliasing (`authors AS author`) are deferred to emit-time: the eager JD
+    // is folded into the single `build_joins` `emitJoinPlan` call (via
+    // `_applyJoinsToManager(manager, jd)`), whose one shared `AliasTracker` and
+    // `walk` fold handle collisions against the manual joins — there is no
+    // separate construction tracker to seed and no skip filter to compute.
     const fallbackAssocs: AssociationSpec[] = [];
     for (const spec of specs) {
       if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);
     }
-    // Consume references lazily, mirroring Rails' join_constraints → make_constraints
-    // (join_dependency.rb:88–92, :202): re-alias each joined node whose reflection
-    // name is referenced (`authors AS author`). The mutation lands on the tree
-    // nodes, so the downstream SELECT projection and `arelJoin` reads pick it up.
-    if (references.length > 0) jd.joinConstraints([], undefined, references);
     return fallbackAssocs;
   }
 
@@ -3221,11 +3048,7 @@ export class Relation<T extends Base> {
     }
 
     const jd = new JoinDependency(this._modelClass);
-    const fallbackAssocs = this._addEagerSpecsToJoinDependency(
-      jd,
-      eagerAssociations,
-      this._aliasableReferences(),
-    );
+    const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
 
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
@@ -3672,16 +3495,18 @@ export class Relation<T extends Base> {
     for (const spec of specs) jd.validateEagerLoadSpec(spec);
   }
 
-  private _applyJoinsToManager(manager: SelectManager): void {
+  private _applyJoinsToManager(manager: SelectManager, eagerJd?: JoinDependency): void {
     // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
     // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
-    // `from(relation)` subquery path) also delegates to. The two callers differ
-    // only in eager handling: here eager OUTER JOINs are pre-emitted by
-    // `_buildEagerJoinManager` (so `manager.joinSourceCount > 0` signals the
-    // stash and eager-covered left-outer associations are filtered out below),
-    // whereas `buildJoins` folds eager into the stashed bucket via
-    // `buildJoinBuckets`. The shared emitter handles raw join clauses, the
-    // shared AliasTracker, and the left_outer/joins dedup fold.
+    // `from(relation)` subquery path) also delegates to. When `eagerJd` is
+    // supplied (the eager SELECT path, `_buildEagerJoinManager` /
+    // `_buildEagerIdSubquery`) it is folded into `stashedJoins` exactly as Rails
+    // `apply_join_dependency` folds the eager JoinDependency into `joins_values`,
+    // so the manual joins AND the eager JD emit through ONE `build_joins` call
+    // with ONE shared `AliasTracker` and dedup via the JD `walk` fold — no
+    // separate eager tracker, no table-name skip filter. The shared emitter
+    // handles raw join clauses, the shared AliasTracker, and the
+    // left_outer/joins/eager dedup fold.
     //
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // when stashed joins exist, non-LeadingJoin nodes go to join_node (appended
@@ -3725,42 +3550,19 @@ export class Relation<T extends Base> {
             Nodes.OuterJoin,
           )
         : null;
+    const stashedJoins: JoinDependency[] = [];
+    if (leftOuterJd) stashedJoins.push(leftOuterJd);
+    // Fold the eager JoinDependency in last, mirroring Rails' `joins_values`
+    // ordering (left-outer stash unshifted ahead of the eager stash in
+    // `build_join_buckets`). `walk` dedups any eager node coinciding with a
+    // manual INNER / left-outer join against the single shared tracker.
+    if (eagerJd) stashedJoins.push(eagerJd);
     _qm.emitJoinPlan.call(this as any, manager, {
       leadingJoins,
       joinNodes,
-      stashedJoins: leftOuterJd ? [leftOuterJd] : [],
+      stashedJoins,
       namedJoins: [],
     });
-  }
-
-  /**
-   * Build the shared `build_joins` AliasTracker that the eager SELECT-preview
-   * paths (`_buildEagerJoinManager` / `_buildEagerIdSubquery`) thread into their
-   * eager JoinDependency's `joinConstraints`, mirroring Rails' one
-   * `alias_tracker(leading_joins + join_nodes, aliases)` per `build_joins`
-   * (query_methods.rb). It seeds the base table plus the `_joinValues` (raw /
-   * string) join nodes and `_joinClauses` (via `buildMergedJoinAliasTracker`),
-   * then folds in the manual named-inner-join tables exactly as
-   * `_addEagerSpecsToJoinDependency`'s `seedConstructionTables` does for the
-   * `undefined`-tracker path (excluding the `_dedupedManualJoinTables`, whose
-   * eager OUTER JOIN is skipped and whose column projection reads the manual
-   * INNER JOIN's un-aliased table). The new piece over `seedConstructionTables`
-   * is the raw `_joinValues` string-join awareness: the tracker counts those
-   * nodes lazily via `initialCountFor`, so an eager
-   * `includes(:x).references(:x)` landing on a table a raw `joins("… authors …")`
-   * already claimed collides and aliases at emit-time in `makeConstraints`
-   * (`authors` → `authors_posts`) instead of emitting a duplicate unaliased join.
-   */
-  private _buildEagerSharedJoinTracker(): AliasTracker {
-    const joinNodes: Nodes.Join[] = this._joinValues.map((v) =>
-      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
-    );
-    const tracker = buildMergedJoinAliasTracker(this as any, joinNodes);
-    const dedupedTables = this._dedupedManualJoinTables();
-    for (const t of this._resolveAssocTables(this._namedInnerJoins)) {
-      if (!dedupedTables.has(t) && (tracker.aliases.get(t) ?? 0) === 0) tracker.aliases.set(t, 1);
-    }
-    return tracker;
   }
 
   /**
@@ -3985,11 +3787,7 @@ export class Relation<T extends Base> {
 
       const basePk = (this._modelClass as any).primaryKey ?? "id";
       const jd = new JoinDependency(this._modelClass);
-      const fallbackAssocs = this._addEagerSpecsToJoinDependency(
-        jd,
-        eagerSpecs,
-        this._aliasableReferences(),
-      );
+      const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerSpecs);
       // Rails joins every eager spec; trails can't join capability-gap
       // reflections (composite-key collections, unjoinable through), so
       // `_addEagerSpecsToJoinDependency` returns them as `fallbackAssocs` to
@@ -5356,11 +5154,7 @@ export class Relation<T extends Base> {
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     const jd = new JoinDependency(this._modelClass);
-    this._addEagerSpecsToJoinDependency(
-      jd,
-      this._deferredDistinctPkEagerSpecs(),
-      this._aliasableReferences(),
-    );
+    this._addEagerSpecsToJoinDependency(jd, this._deferredDistinctPkEagerSpecs());
     return this._buildEagerIdSubquery(jd, basePk);
   }
 
@@ -5374,11 +5168,7 @@ export class Relation<T extends Base> {
   async _materializeDistinctPkIds(): Promise<unknown[]> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     const jd = new JoinDependency(this._modelClass);
-    this._addEagerSpecsToJoinDependency(
-      jd,
-      this._deferredDistinctPkEagerSpecs(),
-      this._aliasableReferences(),
-    );
+    this._addEagerSpecsToJoinDependency(jd, this._deferredDistinctPkEagerSpecs());
     if (jd.nodes.length === 0) return [];
     return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
   }
@@ -5636,52 +5426,29 @@ export class Relation<T extends Base> {
   ): SelectManager {
     const table = this._modelClass.arelTable;
 
-    // Shared `build_joins` AliasTracker seeded with the manual raw joins (Rails'
-    // single alias_tracker). Threading it into the eager JoinDependency makes an
-    // eager `includes(:x).references(:x)` that lands on a table an explicit
-    // `.joins` already claimed collide and alias at emit-time, instead of
-    // emitting a duplicate unaliased join a fresh per-emit tracker never saw.
-    const sharedTracker = this._buildEagerSharedJoinTracker();
-
-    // Resolve emit-time table aliases first (Rails make_constraints): a duplicate
-    // join onto an already-joined table (e.g. nested includes reaching the same
-    // table via two paths) is aliased to its `alias_candidate` here, and a join
-    // named by `references` takes the referenced name. This MUST run before the
-    // column-alias projection below, which reads each node's now-aliased table.
-    const joinNodes = jd.joinConstraints([], sharedTracker, this._aliasableReferences());
+    // Emit the manual joins AND the eager JoinDependency through the single
+    // `build_joins` port (`emitJoinPlan`), folding `jd` into `stashedJoins` the
+    // way Rails `apply_join_dependency` folds the eager JD into `joins_values`.
+    // One shared `AliasTracker` spans every join, and `walk` dedups an eager node
+    // that coincides with a manual INNER / left-outer join — replacing the former
+    // parallel eager tracker (`_buildEagerSharedJoinTracker`) and the
+    // `_dedupedManualJoinTables` table-name skip. The fold aliases `jd`'s nodes
+    // in place, so the column-alias projection below reads their resolved tables
+    // (a deduped node now points at the manual join's un-aliased table).
+    const manager = table.project();
+    this._applyJoinsToManager(manager, jd);
 
     // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
     // an explicit `select` keeps its own projection and the JoinDependency only
     // contributes the base PK (t0_r0) plus the joined tables' alias columns.
-    // Without a select, the base table projects every column as `t0_r*`.
+    // Without a select, the base table projects every column as `t0_r*`. Runs
+    // AFTER `emitJoinPlan` so each node's emit-time alias is resolved.
     const selectCols = this._selectColumns ?? [];
     const aliasNodes = jd.applyColumnAliases(this);
     const projection =
       selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
-    const manager = table.project(...(projection as Parameters<typeof table.project>));
+    manager.project(...(projection as Parameters<typeof manager.project>));
 
-    // Skip eager-load JOINs for tables in the `includes ∩ joins` intersection
-    // (Rails joined_includes_values) and for eager/promoted roots that coincide
-    // with a manual `joins(...)` (Rails `walk` dedup): `_applyJoinsToManager`
-    // emits the named INNER JOIN, and the JoinDependency projection above reads
-    // its columns by the same (unaliased) table name — so re-emitting the eager
-    // OUTER JOIN here would duplicate the join.
-    const joinedIncludesTables = this._dedupedManualJoinTables();
-    // When an eager ROOT is deduped to its manual INNER JOIN, a nested eager
-    // child (e.g. `comments` under a deduped `posts`) joins ON the manual table,
-    // so the manual join must be emitted FIRST — otherwise the child's ON
-    // forward-references a not-yet-joined table (PostgreSQL/MySQL reject it).
-    const manualJoinsFirst = this._walkSharedManualEagerTables().size > 0;
-    if (manualJoinsFirst) this._applyJoinsToManager(manager);
-    for (const node of joinNodes) {
-      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
-      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
-        continue;
-      }
-      manager.appendJoinNode(node);
-    }
-
-    if (!manualJoinsFirst) this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
     if (this._isDistinct) manager.distinct();
@@ -5745,30 +5512,12 @@ export class Relation<T extends Base> {
         ? table.project(new Nodes.SqlLiteral(distinctSelectSql))
         : table.project(table.get(basePk));
     idSubquery.distinct();
-    // Resolve emit-time aliases (Rails make_constraints) so a duplicate join is
-    // aliased here too — this subquery can be built before `_buildEagerJoinManager`
-    // (the limited-ids path), so it cannot rely on the nodes being pre-aliased.
-    // Aliasing is deterministic and idempotent across repeated emits of the JD.
-    // Skip eager OUTER JOINs for `includes ∩ joins` tables — `_applyJoinsToManager`
-    // emits them as the named INNER JOIN below, so re-emitting here would produce
-    // a duplicate join (ambiguous-column error). Mirrors `_buildEagerJoinManager`.
-    const joinedIncludesTables = this._dedupedManualJoinTables();
-    // A deduped eager root's nested child joins ON the manual table, so the
-    // manual join must precede it (see `_buildEagerJoinManager`).
-    const manualJoinsFirst = this._walkSharedManualEagerTables().size > 0;
-    // This subquery is its own `build_joins` statement, so it gets its own shared
-    // AliasTracker spanning its eager JoinDependency and the manual joins
-    // (`_applyJoinsToManager`) — same threading as `_buildEagerJoinManager`.
-    const sharedTracker = this._buildEagerSharedJoinTracker();
-    if (manualJoinsFirst) this._applyJoinsToManager(idSubquery);
-    for (const node of jd.joinConstraints([], sharedTracker, this._aliasableReferences())) {
-      const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
-      if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
-        continue;
-      }
-      idSubquery.appendJoinNode(node);
-    }
-    if (!manualJoinsFirst) this._applyJoinsToManager(idSubquery);
+    // This subquery is its own `build_joins` statement: fold the eager JD into
+    // `stashedJoins` so it emits through the single `emitJoinPlan` port with one
+    // shared `AliasTracker` spanning the eager JoinDependency and the manual
+    // joins, deduping coinciding nodes via `walk` — same threading as
+    // `_buildEagerJoinManager`.
+    this._applyJoinsToManager(idSubquery, jd);
     this._applyWheresToManager(idSubquery, table);
     this._applyOrderToManager(idSubquery, table);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
@@ -5798,6 +5547,7 @@ export class Relation<T extends Base> {
     const [idSql, idBinds] = this._compileAstWithBinds(
       this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
     );
+    if (process.env.DEBUG_IDSQL) console.error("IDSQL:", idSql);
     const idRows = await this._conn().execute(idSql, idBinds);
     return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
@@ -5877,7 +5627,7 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
     const jd = new JoinDependency(this._modelClass);
-    this._addEagerSpecsToJoinDependency(jd, allEager, this._aliasableReferences());
+    this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
     return this._buildEagerJoinManager(jd, basePk);
@@ -7250,11 +7000,7 @@ export class Relation<T extends Base> {
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = new JoinDependency(this._modelClass);
-        const fallbackAssocs = this._addEagerSpecsToJoinDependency(
-          jd,
-          eagerSpecs,
-          this._aliasableReferences(),
-        );
+        const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerSpecs);
         // JOIN only the joinable remainder; capability-gap reflections
         // (composite-key collections, unjoinable through) come back as
         // `fallbackAssocs` and would throw if replayed through `leftOuterJoins`.

@@ -176,13 +176,6 @@ export class JoinDependency {
     string,
     { aliased: Table; effectiveName: string; terminated: boolean }
   > = new Map();
-  /**
-   * Manual-join tables this dependency must treat as already-claimed when it
-   * builds a fresh emit-time AliasTracker (the eager-load path emits with no
-   * shared `build_joins` tracker). Registered via `seedConstructionTables`.
-   * @internal
-   */
-  private _seedTables: string[] = [];
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -209,20 +202,6 @@ export class JoinDependency {
   /** @internal */
   get joinRoot(): JoinBase {
     return this._joinRoot;
-  }
-
-  /**
-   * Register manual-join tables (from the relation's `joins(...)` buckets) so the
-   * fresh emit-time AliasTracker seeds them as already-claimed. Mirrors Rails'
-   * single `build_joins` alias_tracker: a through-intermediate landing on a
-   * manually-joined table collides at emit and aliases to its `alias_candidate`
-   * (`joins(:posts).eager_load(:comments)` → `posts` + `posts_authors`).
-   * @internal
-   */
-  seedConstructionTables(tableNames: Iterable<string>): void {
-    for (const t of tableNames) {
-      if (t && !this._seedTables.includes(t)) this._seedTables.push(t);
-    }
   }
 
   get nodes(): JoinPart[] {
@@ -636,19 +615,14 @@ export class JoinDependency {
     references?: string[],
   ): Nodes.Join[] {
     // Aliasing is resolved here, at emit-time, against the AliasTracker — either
-    // the shared one threaded in from `build_joins` (so merged joins collide and
-    // alias) or a fresh tracker seeded with the base table AND any manual-join
-    // tables from `seedConstructionTables` (so an eager through-intermediate
-    // landing on a `joins(...)` table collides — the eager path emits against this
-    // fresh tracker, not the `build_joins` one). A fresh tracker per emit keeps
-    // re-emit idempotent and mirrors Rails creating one `AliasTracker.create`.
+    // the shared one threaded in from `build_joins` (so merged/eager joins collide
+    // and alias against the manual joins) or, absent one, a fresh tracker seeded
+    // with just the base table. A fresh tracker per emit keeps re-emit idempotent
+    // and mirrors Rails creating one `AliasTracker.create`.
     if (aliasTracker) {
       this._aliasTracker = aliasTracker;
     } else {
       this._aliasTracker = new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
-      for (const t of this._seedTables) {
-        if ((this._aliasTracker.aliases.get(t) ?? 0) === 0) this._aliasTracker.aliases.set(t, 1);
-      }
     }
     // Clear each through-group's resolved flag so this fresh emit re-resolves
     // aliases from scratch. Cover the `joinsToAdd` (stashed/merged) roots too:
@@ -774,9 +748,13 @@ export class JoinDependency {
    * pass (`_resolveThroughGroup`), mirroring `JoinAssociation#join_constraints`.
    * @internal
    */
-  private _resolveChildAlias(parent: JoinPart, child: JoinPart): void {
+  private _resolveChildAlias(
+    parent: JoinPart,
+    child: JoinPart,
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+  ): void {
     if (child.throughGroup) {
-      this._resolveThroughGroup(parent, child.throughGroup);
+      this._resolveThroughGroup(parent, child.throughGroup, joinType);
       return;
     }
     if (!(child instanceof JoinAssociation)) {
@@ -821,7 +799,10 @@ export class JoinDependency {
     // Rails: `@joined_tables[reflection] ||= [table, root] if OuterJoin`. The
     // direct include is the root link of its own one-link chain, so terminated
     // is true — a later through path sharing this tail reuses the one alias.
-    if (this._joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
+    // Keyed off the PARAMETER `join_type` (not the JD's own `_joinType`), so an
+    // eager OUTER-JOIN dependency folded into an INNER-JOIN primary via
+    // `walk`/`joinConstraints` still memoizes its shared chain tails.
+    if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
       this._joinedTables.set(chainKey, {
         aliased: child.arelTable as Table,
         effectiveName: child.effectiveSqlName,
@@ -901,7 +882,11 @@ export class JoinDependency {
    * redistributed onto the group's tree nodes. Runs once per group per emit.
    * @internal
    */
-  private _resolveThroughGroup(parent: JoinPart, group: ThroughJoinGroup): void {
+  private _resolveThroughGroup(
+    parent: JoinPart,
+    group: ThroughJoinGroup,
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+  ): void {
     if (group.resolved) return;
     group.resolved = true;
     const chainLen = group.reflection.chain.length;
@@ -942,8 +927,10 @@ export class JoinDependency {
             ? new Table(tableName)
             : new Table(tableName, { as: effectiveName });
         resolvedByIdx[idx] = { effectiveName, aliased };
-        // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`.
-        if (this._joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
+        // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`. Keyed
+        // off the PARAMETER `join_type` so an eager OUTER-JOIN dependency folded
+        // into an INNER-JOIN primary still memoizes its shared chain tails.
+        if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
           this._joinedTables.set(chainKey, { aliased, effectiveName, terminated: root });
         }
         return [aliased, false];
@@ -998,7 +985,7 @@ export class JoinDependency {
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    this._resolveChildAlias(parent, child);
+    this._resolveChildAlias(parent, child, joinType);
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {
