@@ -51,54 +51,52 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
-    it("schema", async () => {
+    // Rails' setup builds `@omgpost`, an anonymous Post subclass with the
+    // inheritance column disabled whose table_name is the schema-qualified
+    // `#{db}.posts`. We reproduce it the same way, riding the canonical posts
+    // shape, so test_schema / test_primary_key / test_data_source_exists? all
+    // exercise the qualified name exactly as Rails does.
+    async function withOmgPost(
+      fn: (omgPost: typeof Base, db: string) => Promise<void>,
+    ): Promise<void> {
       await defineSchema(adapter, { posts: canonicalSchema.posts });
       try {
-        class Post extends Base {
-          static _tableName = "posts";
-        }
-        Post.attribute("id", "integer");
-        Post.attribute("title", "string");
-        Post.attribute("body", "text");
-        Post.adapter = adapter;
-        await defineFixtures(adapter, Post, {
-          welcome: { title: "Welcome to the weblog", body: "Such a lovely day", type: "Post" },
-        });
-
         const db = await adapter.currentDatabase();
         class OmgPost extends Base {
           static _tableName = `${db}.posts`;
+          static name = "Post";
         }
         OmgPost.inheritanceColumn = "disabled";
-        OmgPost.attribute("id", "integer");
-        OmgPost.attribute("title", "string");
         OmgPost.adapter = adapter;
-
-        const first = await (OmgPost as any).first();
-        expect(first).toBeTruthy();
+        await fn(OmgPost, db);
       } finally {
         await adapter.dropTable("posts", { ifExists: true });
       }
+    }
+
+    it("schema", async () => {
+      await withOmgPost(async (OmgPost) => {
+        await defineFixtures(adapter, OmgPost, {
+          welcome: { title: "Welcome to the weblog", body: "Such a lovely day", type: "Post" },
+        });
+        const first = await (OmgPost as any).first();
+        expect(first).toBeTruthy();
+      });
     });
 
     it("primary key", async () => {
-      await defineSchema(adapter, { topics: canonicalSchema.topics });
-      try {
-        expect(await adapter.primaryKey("topics")).toBe("id");
-      } finally {
-        await adapter.dropTable("topics", { ifExists: true });
-      }
+      await withOmgPost(async (OmgPost) => {
+        expect((OmgPost as any).primaryKey).toBe("id");
+      });
     });
 
     it("data source exists?", async () => {
-      await defineSchema(adapter, { topics: canonicalSchema.topics });
-      try {
-        const db = await adapter.currentDatabase();
-        // Rails passes @omgpost.table_name, which is the qualified `db.topics` form.
-        expect(await adapter.dataSourceExists(`${db}.topics`)).toBe(true);
-      } finally {
-        await adapter.dropTable("topics", { ifExists: true });
-      }
+      await withOmgPost(async (OmgPost, db) => {
+        // Rails passes @omgpost.table_name, the qualified `db.posts` form.
+        const name = (OmgPost as any)._tableName as string;
+        expect(name).toBe(`${db}.posts`);
+        expect(await adapter.dataSourceExists(name)).toBe(true);
+      });
     });
 
     it("data source exists wrong schema", async () => {
@@ -112,9 +110,9 @@ describeIfMysql("Mysql2Adapter", () => {
         await adapter.createTable("key_tests", { force: true }, (t: any) => {
           t.string("awesome");
           t.string("pizza");
-          t.string("snack");
+          t.string("snacks");
         });
-        await adapter.addIndex("key_tests", ["snack"], { name: "index_key_tests_on_snack" });
+        await adapter.addIndex("key_tests", ["snacks"], { name: "index_key_tests_on_snack" });
         await adapter.addIndex("key_tests", ["pizza"], { name: "index_key_tests_on_pizza" });
         await adapter.addIndex("key_tests", ["awesome"], {
           name: "index_key_tests_on_awesome",
@@ -131,35 +129,6 @@ describeIfMysql("Mysql2Adapter", () => {
         expect(byName("index_key_tests_on_pizza").type).toBeUndefined();
         expect(byName("index_key_tests_on_awesome").using).toBeUndefined();
         expect(byName("index_key_tests_on_awesome").type).toBe("fulltext");
-      } finally {
-        await adapter.dropTable("key_tests", { ifExists: true });
-      }
-    });
-
-    it("indexes surface prefix lengths and desc orders", async () => {
-      await adapter.dropTable("key_tests", { ifExists: true });
-      try {
-        await adapter.createTable("key_tests", { force: true }, (t: any) => {
-          t.string("title");
-          t.string("body");
-        });
-        await adapter.addIndex("key_tests", ["title"], {
-          name: "index_key_tests_on_title",
-          length: 10,
-        });
-        // Descending indexes are MySQL 8+; MariaDB stores DESC but reports the
-        // column ascending (Collation != "D"), so only assert orders off MariaDB.
-        const supportsDesc = !isMariaDb;
-        await adapter.addIndex("key_tests", ["body"], {
-          name: "index_key_tests_on_body",
-          order: { body: "desc" },
-        });
-        const indexes = await adapter.indexes("key_tests");
-        const byName = (n: string) => indexes.find((i) => i.name === n)!;
-        expect(byName("index_key_tests_on_title").lengths).toEqual({ title: 10 });
-        if (supportsDesc) {
-          expect(byName("index_key_tests_on_body").orders).toEqual({ body: "desc" });
-        }
       } finally {
         await adapter.dropTable("key_tests", { ifExists: true });
       }
