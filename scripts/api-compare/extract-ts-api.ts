@@ -1303,11 +1303,13 @@ export function extractClass(
   const includes: string[] = [];
   const extendsArr: string[] = [];
   // One-level helper-delegation resolution: `method → helper it delegates to`
-  // (filled during the member loop) plus every same-class method's direct calls,
-  // unioned in a post-pass below so a delegating method inherits its helper's
-  // call-set.
+  // (filled during the member loop) plus every same-class INSTANCE method's
+  // direct calls, unioned in a post-pass below so a delegating method inherits
+  // its helper's call-set. Keyed instance-only because `this.helper(...)`
+  // dispatches to an instance method — a same-named static method has a separate
+  // `Class.helper(...)` call site and must not be merged in.
   const delegations: { method: MethodInfo; helper: string }[] = [];
-  const directCallsByName = new Map<string, string[]>();
+  const instanceCallsByName = new Map<string, string[]>();
 
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
@@ -1341,9 +1343,13 @@ export function extractClass(
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
       };
-      if (calls !== undefined) directCallsByName.set(memberName, calls);
-      const helper = delegatedHelper(member.body);
-      if (helper) delegations.push({ method, helper });
+      // Only instance methods are reachable via `this.helper(...)` and only
+      // instance methods delegate through it — record both on the instance side.
+      if (!isStatic) {
+        if (calls !== undefined) instanceCallsByName.set(memberName, calls);
+        const helper = delegatedHelper(member.body);
+        if (helper) delegations.push({ method, helper });
+      }
       if (isStatic) {
         classMethods.push(method);
       } else {
@@ -1419,7 +1425,7 @@ export function extractClass(
   // helper's instantiations are already recorded as `constructor`, so a method
   // delegating to a one-line `new Foo(...)` helper still credits the ctor call.
   for (const { method, helper } of delegations) {
-    const helperCalls = directCallsByName.get(helper);
+    const helperCalls = instanceCallsByName.get(helper);
     if (!helperCalls) continue;
     const merged = new Set([...(method.calls ?? []), ...helperCalls]);
     method.calls = [...merged].sort();

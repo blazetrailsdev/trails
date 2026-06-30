@@ -220,6 +220,23 @@ describe("body call capture", () => {
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(["inheritedHook"]);
   });
 
+  it("does not merge a same-named static helper into a `this.helper()` delegation", () => {
+    // `this.makePool()` dispatches to the INSTANCE helper (which makes no call);
+    // the static `makePool` (`new Pool()`) shares the name but has a separate
+    // `Class.makePool(...)` call site and must not leak its `constructor` in.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.makePool(); }
+        private makePool() { return cached(); }
+        private static makePool() { return new Pool(); }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "cached",
+      "makePool",
+    ]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
