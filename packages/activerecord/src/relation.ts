@@ -3968,16 +3968,23 @@ export class Relation<T extends Base> {
       // A pluck column may reference a degraded (unjoinable) association's own
       // table (e.g. `pluck("cpk_chapters.title")`). Rails JOINs that table;
       // trails cannot (composite-key capability gap), and silently preloading it
-      // would emit SQL against an unjoined table. Route those columns back
-      // through the full-spec join, which raises the explicit capability-gap
-      // error rather than degrade into broken SQL.
+      // would emit SQL against an unjoined table. The degraded query can only
+      // project the base table plus the joinable specs' tables, so treat a
+      // column referencing any OTHER table as reaching for an unjoinable
+      // fallback — covering nested hash/array fallback shapes that
+      // `_resolveAssocTables` (string-spec only) can't resolve directly. Route
+      // those back through the full-spec join, which raises the explicit
+      // capability-gap error rather than degrade into broken SQL.
       if (fallbackAssocs.length > 0) {
-        const fallbackTables = new Set(this._resolveAssocTables(fallbackAssocs));
-        const referencesFallbackTable = columns.some((c) => {
+        const baseTable = String(
+          (this._modelClass as unknown as { tableName?: string }).tableName ?? "",
+        ).toLowerCase();
+        const safeTables = new Set<string>([baseTable, ...this._resolveAssocTables(joinableSpecs)]);
+        const referencesUnservableTable = columns.some((c) => {
           const text = typeof c === "string" ? c : c instanceof Nodes.SqlLiteral ? c.value : "";
-          return this.tablesInString(text).some((t) => fallbackTables.has(t));
+          return this.tablesInString(text).some((t) => !safeTables.has(t));
         });
-        if (referencesFallbackTable) {
+        if (referencesUnservableTable) {
           return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
         }
       }

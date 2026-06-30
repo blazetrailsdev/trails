@@ -88,6 +88,17 @@ describe("CpkBook eager pluck / cache_version preload-degrade", () => {
     );
   });
 
+  it("pluck of a nested-hash unjoinable eager spec's table also surfaces the explicit error", async () => {
+    await seedBooks();
+    // `{ chapters: "book" }` is a nested-hash spec whose root (`chapters`) is the
+    // unjoinable composite-PK collection, so `addAssociationSpec` returns the
+    // whole hash as a fallback — a shape `_resolveAssocTables` can't resolve. The
+    // base/joinable safe-table check still catches the cpk_chapters reference.
+    await expect(
+      CpkBook.eagerLoad({ chapters: "book" }).pluck("cpk_chapters.title"),
+    ).rejects.toThrow(/chapters/);
+  });
+
   it("cache_version over eagerLoad('chapters') degrades to preload instead of crashing", async () => {
     await withCollectionCacheVersioning(async () => {
       await seedBooks();
