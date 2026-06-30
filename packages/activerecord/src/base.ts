@@ -3192,6 +3192,13 @@ export class Base extends Model {
   declare static validatesUniqueness: typeof _Validations.validatesUniqueness;
 
   /**
+   * Register uniqueness validations for one or more attributes.
+   *
+   * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
+   */
+  declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
+
+  /**
    * Clear all validators — including the deferred uniqueness validators kept off
    * the synchronous validator chain in `_asyncValidations`. Rails'
    * `clear_validators!` empties every validator on the class; without resetting

@@ -11,20 +11,22 @@
 import { EachValidator } from "@blazetrails/activemodel";
 
 /**
- * Registers AssociatedValidator(s) for the named associations.
+ * Registers an AssociatedValidator for the named associations, delegating
+ * through `_mergeAttributes` so multiple / nested-array attr lists (Rails'
+ * `*attr_names` arity) and the trailing options hash are normalized the same
+ * way as the other `validates_*_of` helpers.
  *
  * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
+ * (activerecord/lib/active_record/validations/associated.rb:60-62).
  */
 export function validatesAssociated(
-  this: { validatesWith(vc: unknown, opts: Record<string, unknown>): void },
-  ...args: (string | Record<string, unknown>)[]
+  this: {
+    validatesWith(vc: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
 ): void {
-  const last = args[args.length - 1];
-  const opts =
-    typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
-  for (const name of args as string[]) {
-    this.validatesWith(AssociatedValidator, { ...opts, attributes: [name] });
-  }
+  this.validatesWith(AssociatedValidator, this._mergeAttributes(attrNames));
 }
 
 export class AssociatedValidator extends EachValidator {

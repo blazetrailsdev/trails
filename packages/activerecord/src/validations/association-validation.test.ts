@@ -88,6 +88,19 @@ describe("AssociationValidationTest", () => {
     expect(r.isValid()).toBe(true);
   });
 
+  it("validates associated with multiple attributes and array forms", () => {
+    // Rails' `validates_associated(*attr_names)` arity: `_merge_attributes`
+    // flattens nested arrays and supports several association names in one call.
+    Topic.validatesAssociated(["replies"], "openReplies");
+    const invalid = { isValid: () => false };
+    const t = new Topic();
+    seedAssociationCache(t, "replies", [invalid]);
+    seedAssociationCache(t, "openReplies", [invalid]);
+    expect(t.isValid()).toBe(false);
+    expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
+    expect(t.errors.messagesFor("openReplies").length).toBeGreaterThan(0);
+  });
+
   it("validates associated marked for destruction", () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");

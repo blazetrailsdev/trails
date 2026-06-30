@@ -67,6 +67,26 @@ export function validatesUniqueness(
   (klass._asyncValidations as Array<unknown>).push({ attribute, options, declaringClass: this });
 }
 
+/**
+ * Register deferred uniqueness validations for one or more attributes,
+ * delegating through `_mergeAttributes` so multiple / nested-array attr lists
+ * (Rails' `*attr_names` arity) and the trailing options hash are normalized the
+ * same way as the other `validates_*_of` helpers. Each attribute gets its own
+ * deferred registration via {@link validatesUniqueness}.
+ *
+ * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
+ * (activerecord/lib/active_record/validations/uniqueness.rb:291-292).
+ */
+export function validatesUniquenessOf(
+  this: { _mergeAttributes(attrNames: unknown[]): Record<string, unknown> },
+  ...attrNames: unknown[]
+): void {
+  const { attributes, ...options } = this._mergeAttributes(attrNames);
+  for (const attribute of attributes as string[]) {
+    validatesUniqueness.call(this, attribute, options);
+  }
+}
+
 export class UniquenessValidator extends EachValidator {
   private _klass: any;
 
