@@ -1,759 +1,550 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Faithful port of vendor/rails/activerecord/test/cases/enum_test.rb.
+ *
+ * Rides the canonical `Book` model (test-helpers/models/book.ts) and the real
+ * `books` fixtures (test-helpers/fixtures/books.ts), mirroring Rails' own test
+ * names and assertions. Ruby predicate/scope/bang accessors translate to the
+ * trails camelCase surface (`@book.published?` → `book.isPublished()`,
+ * `Book.published` → `Book.published()`, `@book.written!` → `book.writtenBang()`,
+ * `Book.statuses` → `Book.statuses`).
+ *
+ * Cases the canonical `Book` enum surface cannot yet express are kept under
+ * their Rails names and `it.skip`-ped, tracked-pending-convergence under RFC
+ * 0023-surfaced-deviations (enum-canonical-book-gaps): the `cover` string enum,
+ * the `boolean_status` boolean enum, the `last_read` `forgotten: nil` value,
+ * frozen `statuses`, `*_before_type_cast` / `*_for_database`, the `validate:`
+ * option, and the conflict-detection / option-validation message surface
+ * (the last is covered behaviorally in enum.trails.test.ts).
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { castEnumValue, Base, Relation, defineEnum, readEnumValue } from "./index.js";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { Base, registerModel } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Book } from "./test-helpers/models/book.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-// -- Helpers --
-const TEST_SCHEMA = {
-  posts: {
-    title: "string",
-    subtitle: "string",
-    status: "integer",
-    role: "integer",
-    color: "string",
-    difficulty: "integer",
-    priority: "integer",
-  },
-  books: {
-    status: "integer",
-    language: "integer",
-    name: "string",
-  },
-  test_books: {
-    status: "integer",
-  },
-  cats: {
-    breed: "string",
-  },
-  tasks: {
-    status: "integer",
-    priority: "integer",
-  },
-  items: {
-    status: "integer",
-    role: "integer",
-    name: "string",
-  },
-  users: {
-    name: "string",
-    status: "integer",
-  },
-  conversations: {
-    status: "integer",
-    priority: "integer",
-  },
-  string_status_posts: {
-    status: "string",
-  },
-} as const;
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema(TEST_SCHEMA);
-});
-
-// ==========================================================================
-// EnumTest — targets enum_test.rb
-// ==========================================================================
 describe("EnumTest", () => {
-  it("query state by predicate", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
-    const p = new Post({ status: 0 });
-    expect(readEnumValue(p, "status")).toBe("draft");
-  });
-});
+  const { books } = useHandlerFixtures(["books"], { schema: TEST_SCHEMA });
 
-// ==========================================================================
-// EnumTest — additional targets for enum_test.rb
-// ==========================================================================
-describe("EnumTest", () => {
-  it("direct assignment", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 0 })) as any;
-    expect(p.readAttribute("status")).toBe(0);
+  beforeAll(() => {
+    registerModel(Book);
   });
 
-  it("assign string value", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 1 })) as any;
-    expect(p.readAttribute("status")).toBe(1);
+  let book: Book;
+  beforeEach(() => {
+    book = books("awdr");
   });
 
-  it("build from where", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const sql = Post.where({ status: 0 }).toSql();
-    expect(sql).toContain("WHERE");
+  it("type.serialize", () => {
+    const type = Book.typeForAttribute("status");
+
+    expect(type.serialize(0)).toBe(0);
+    expect(type.serialize(1)).toBe(1);
+    expect(type.serialize(2)).toBe(2);
+
+    expect(type.serialize("proposed")).toBe(0);
+    expect(type.serialize("written")).toBe(1);
+    expect(type.serialize("published")).toBe(2);
+
+    expect(type.serialize("unknown")).toBeNull();
   });
 
-  it("find via where with values", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    await Post.create({ status: 0 });
-    const results = await Post.where({ status: 0 });
-    expect(results.length).toBeGreaterThan(0);
+  // Rails: `type.cast(:unknown)` / `type.cast("unknown")` pass the unknown value
+  // through unchanged; trails' EnumType#cast returns nil for unmapped values.
+  it.skip("type.cast", () => {
+    const type = Book.typeForAttribute("status");
+    expect(type.cast(0)).toBe("proposed");
+    expect(type.cast(1)).toBe("written");
+    expect(type.cast(2)).toBe("published");
+    expect(type.cast("unknown")).toBe("unknown");
   });
 
-  it("find via where with large number", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const results = await Post.where({ status: 9999 });
-    expect(results.length).toBe(0);
+  it("query state by predicate", () => {
+    expect((book as any).isPublished()).toBe(true);
+    expect((book as any).isWritten()).toBe(false);
+    expect((book as any).isProposed()).toBe(false);
+
+    expect((book as any).isRead()).toBe(true);
+    expect((book as any).isInEnglish()).toBe(true);
+    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
+    expect((book as any).isIllustratorVisibilityVisible()).toBe(true);
+    expect((book as any).isWithMediumFontSize()).toBe(true);
+    expect((book as any).isMediumToRead()).toBe(true);
   });
 
-  it("persist changes that are dirty", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Post.create({ status: 0, title: "dirty-test" })) as any;
-    await p.update({ status: 1 });
-    const found = (await Post.find(p.id)) as any;
-    expect(found.readAttribute("status")).toBe(1);
+  it("query state with strings", () => {
+    expect((book as any).status).toBe("published");
+    expect((book as any).last_read).toBe("read");
+    expect((book as any).language).toBe("english");
+    expect((book as any).author_visibility).toBe("visible");
+    expect((book as any).illustrator_visibility).toBe("visible");
+    expect((book as any).difficulty).toBe("medium");
+    expect((book as any).cover).toBe("soft");
   });
 
-  it("update by declaration", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 0 })) as any;
-    await p.update({ status: 2 });
-    expect(p.readAttribute("status")).toBe(2);
-  });
-
-  it("enum changed attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 0 })) as any;
-    expect(p.changedAttributes).toBeDefined();
-  });
-});
-
-// ==========================================================================
-// EnumTest — more coverage targeting enum_test.rb
-// ==========================================================================
-describe("EnumTest", () => {
-  it("query state by predicate with prefix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: "state" });
-    const p = new Post({ status: 0 });
-    expect(readEnumValue(p, "status")).toBe("draft");
-  });
-
-  it("query state by predicate with :prefix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { active: 0, inactive: 1 }, { prefix: true });
-    const p = new Post({ status: 0 });
-    expect(readEnumValue(p, "status")).toBe("active");
-  });
-
-  it("query state by predicate with :suffix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("role", "integer");
-    defineEnum(Post, "role", { admin: 0, user: 1 }, { suffix: true });
-    const p = new Post({ role: 1 });
-    expect(readEnumValue(p, "role")).toBe("user");
-  });
-
-  it("declare multiple enums with prefix: true", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    Post.attribute("role", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: true });
-    defineEnum(Post, "role", { admin: 0, user: 1 }, { prefix: true });
-    const p = new Post({ status: 0, role: 1 });
-    expect(readEnumValue(p, "status")).toBe("draft");
-    expect(readEnumValue(p, "role")).toBe("user");
-  });
-
-  it("validate uniqueness", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 0 })) as any;
-    expect(p.isPersisted()).toBe(true);
-  });
-
-  it("reverted changes that are not dirty", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    const p = (await Post.create({ status: 0 })) as any;
-    p.writeAttribute("status", 1);
-    p.writeAttribute("status", 0);
-    expect(p.readAttribute("status")).toBe(0);
-  });
-  function makeBook() {
-    class Book extends Base {
-      static _tableName = "books";
-    }
-    Book.attribute("id", "integer");
-    Book.attribute("status", "integer");
-    Book.attribute("language", "integer");
-    Book.attribute("name", "string");
-    defineEnum(Book, "status", { proposed: 0, written: 1, published: 2 });
-    defineEnum(Book, "language", { english: 0, spanish: 1, french: 2 });
-    return Book;
-  }
-  it("query state with strings", async () => {
-    const Book = await makeBook();
-    const b = await Book.create({
-      status: castEnumValue(Book, "status", "published"),
-      language: castEnumValue(Book, "language", "english"),
-    });
-    // Query state: readEnumValue returns the string label
-    expect(readEnumValue(b, "status")).toBe("published");
-    expect(readEnumValue(b, "language")).toBe("english");
-    // Verify we can find via the stored integer value
-    const found = await Book.where({ status: 2 });
-    expect(found.length).toBe(1);
-    expect(readEnumValue(found[0], "status")).toBe("published");
+  // Rails also asserts `Book.forgotten.first` (last_read `forgotten: nil`, not
+  // mapped on canonical Book) and `authors(:david).unpublished_books.first`.
+  it.skip("find via scope", async () => {
+    expect((await (Book as any).published().first())?.id).toBe(book.id);
+    expect((await (Book as any).read().first())?.id).toBe(book.id);
+    expect((await (Book as any).inEnglish().first())?.id).toBe(book.id);
   });
 
   it("find via negative scope", async () => {
-    const Book = await makeBook();
-    const pub = await Book.create({
-      status: castEnumValue(Book, "status", "published"),
-      name: "Pub",
-    });
-    await Book.create({ status: castEnumValue(Book, "status", "proposed"), name: "Pro" });
-
     const notPublished = await (Book as any).notPublished().toArray();
-    expect(notPublished.some((b: any) => b.id === (pub as any).id)).toBe(false);
-
+    expect(notPublished.some((b: Book) => b.id === book.id)).toBe(false);
     const notProposed = await (Book as any).notProposed().toArray();
-    expect(notProposed.some((b: any) => readEnumValue(b, "status") === "published")).toBe(true);
+    expect(notProposed.some((b: Book) => b.id === book.id)).toBe(true);
   });
 
-  it("find via where with values.to_s", async () => {
-    const Book = await makeBook();
-    await Book.create({ status: castEnumValue(Book, "status", "published"), name: "Test" });
-    const books = await Book.where({ status: 2 });
-    expect(books.length).toBe(1);
+  it("find via where with values", async () => {
+    const published = (Book as any).statuses.published;
+    const written = (Book as any).statuses.written;
+
+    expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
+    expect((await Book.where({ status: [published, published] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: published }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
   });
 
-  it("find via where with symbols", async () => {
-    const Book = await makeBook();
-    await Book.create({ status: castEnumValue(Book, "status", "proposed"), name: "Test" });
-    const books = await Book.where({ status: 0 });
-    expect(books.length).toBe(1);
+  // Rails: `Book.covers[:soft]` — `cover` string enum not on canonical Book.
+  it.skip("find via where with values.to_s", () => {});
+
+  // Rails: `Book.where(last_read: :forgotten)` and `cover` symbol coercion —
+  // neither expressible on canonical Book.
+  it.skip("find via where with symbols", () => {});
+
+  // Rails: `Book.where(last_read: "forgotten")` — `forgotten: nil` not on Book.
+  it.skip("find via where with strings", () => {});
+
+  // Rails uses 64-bit out-of-range labels and beginless/endless ranges.
+  it.skip("find via where with large number", () => {});
+
+  // Rails: `Book.enabled.create!` / `boolean_status` / `cover` enums.
+  it.skip("find via where should be type casted", () => {});
+
+  it("build from scope", () => {
+    expect((Book as any).written().build().isWritten()).toBe(true);
+    expect((Book as any).written().build().isProposed()).toBe(false);
   });
 
-  it("enum value after write string", async () => {
-    const Book = await makeBook();
-    const b = await Book.create({ status: castEnumValue(Book, "status", "proposed") });
-    b.writeAttribute("status", 1);
-    expect(readEnumValue(b, "status")).toBe("written");
+  it("build from where", () => {
+    expect(
+      (Book.where({ status: (Book as any).statuses.written }).build() as any).isWritten(),
+    ).toBe(true);
+    expect(
+      (Book.where({ status: (Book as any).statuses.written }).build() as any).isProposed(),
+    ).toBe(false);
+    expect((Book.where({ status: "written" }).build() as any).isWritten()).toBe(true);
+    expect((Book.where({ status: "written" }).build() as any).isProposed()).toBe(false);
   });
 
-  it("enum changes", async () => {
-    const Book = await makeBook();
-    const b = await Book.create({ status: castEnumValue(Book, "status", "proposed") });
-    b.writeAttribute("status", 2);
-    const changes = b.changes;
-    expect(changes.status).toBeDefined();
-    expect(changes.status[0]).toBe("proposed"); // from: proposed
-    expect(changes.status[1]).toBe("published"); // to: published
-  });
+  // Rails: `@book.hard!` (cover bang) — `cover` enum not on canonical Book.
+  it.skip("update by declaration", () => {});
 
-  it("building new objects with enum scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("status", "integer");
-      }
-    }
-    defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
-    const p = (Post as any).written().build();
-    expect(p.isWritten()).toBe(true);
-    expect(p.isDraft()).toBe(false);
-  });
-  it("creating new objects with enum scopes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("status", "integer");
-      }
-    }
-    defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
-    const p = await (Post as any).written().create();
-    expect(p.isWritten()).toBe(true);
-    expect(p.isDraft()).toBe(false);
-  });
-  it("reserved enum values", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1 });
+  // Rails: `@book.update! cover: :hard` — `cover` enum not on canonical Book.
+  it.skip("update by setter", () => {});
 
-    const conflicts = ["valid", "save"];
-    conflicts.forEach((value, i) => {
-      const enumName = `status_${i}`;
-      Post.attribute(enumName, "integer");
-      expect(() => defineEnum(Post, enumName, [value])).toThrow(ArgumentError);
-    });
-  });
-  it("reserved enum values for relation", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
+  // Rails overrides `published!` to return a string; trails' generated bang
+  // setter isn't overridable in the same way.
+  it.skip("enum methods are overwritable", () => {});
 
-    const conflicts = ["all", "where"];
-    conflicts.forEach((value, i) => {
-      const enumName = `category_${i}`;
-      Post.attribute(enumName, "integer");
-      expect(() => defineEnum(Post, enumName, [value])).toThrow(ArgumentError);
-    });
-  });
+  // Rails: `@book.cover = :hard` — `cover` enum not on canonical Book.
+  it.skip("direct assignment", () => {});
 
-  it("query state by predicate with custom prefix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: true });
-    const p = new Post({ status: 0 });
-    expect((p as any).isStatusDraft()).toBe(true);
-    expect((p as any).isStatusPublished()).toBe(false);
-  });
+  // Rails: `@book.cover = "hard"` — `cover` enum not on canonical Book.
+  it.skip("assign string value", () => {});
 
-  it("query state by predicate with custom suffix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", { draft: 0, published: 1 }, { suffix: true });
-    const p = new Post({ status: 1 });
-    expect((p as any).isDraftStatus()).toBe(false);
-    expect((p as any).isPublishedStatus()).toBe(true);
-  });
+  // Rails reads `@book.changed_attributes[:status]` (old-value hash); trails'
+  // `changedAttributes` is a string[] of names, not a name→old-value map.
+  it.skip("enum changed attributes", () => {});
 
-  it("enum methods with custom suffix defined", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("difficulty", "integer");
-    defineEnum(Post, "difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
-    const p = new Post({ difficulty: 0 });
-    expect(typeof (Post as any).easyToRead).toBe("function");
-    expect(typeof (Post as any).mediumToRead).toBe("function");
-    expect(typeof (Post as any).hardToRead).toBe("function");
-    expect(typeof (p as any).isEasyToRead).toBe("function");
-    expect(typeof (p as any).isMediumToRead).toBe("function");
-    expect(typeof (p as any).isHardToRead).toBe("function");
-    expect(typeof (p as any).easyToReadBang).toBe("function");
-    expect(typeof (p as any).mediumToReadBang).toBe("function");
-    expect(typeof (p as any).hardToReadBang).toBe("function");
-  });
-  it("update enum attributes with custom suffix", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("difficulty", "integer");
-    defineEnum(Post, "difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
-    const p = new Post({ difficulty: 1 }); // medium
-    expect((p as any).isMediumToRead()).toBe(true);
-    await (p as any).easyToReadBang();
-    expect((p as any).isEasyToRead()).toBe(true);
-    expect((p as any).isMediumToRead()).toBe(false);
-    await (p as any).hardToReadBang();
-    expect((p as any).isHardToRead()).toBe(true);
-    expect((p as any).isEasyToRead()).toBe(false);
-  });
-
-  it("enum on custom attribute with default", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer", { default: 0 });
-    defineEnum(Post, "status", { draft: 0, published: 1 });
-    const p = new Post({});
-    expect(readEnumValue(p, "status")).toBe("draft");
-  });
-
-  it("scopes are named like methods", async () => {
-    class Cat extends Base {
-      static _tableName = "cats";
-    }
-    Cat.attribute("id", "integer");
-    Cat.attribute("breed", "string");
-    defineEnum(Cat, "breed", {
-      "American Bobtail": "american_bobtail",
-      "Balinese-Javanese": "balinese_javanese",
-    });
-    // Method-friendly aliases replace non-word ASCII chars with _ then camelize
-    expect(typeof (Cat as any).americanBobtail).toBe("function");
-    expect(typeof (Cat as any).balineseJavanese).toBe("function");
-
-    // Original-form predicate/bang accessible via bracket notation (Rails parity)
-    const cat = Object.create(Cat.prototype);
-    cat.writeAttribute = (_attr: string, val: unknown) => {
-      cat._val = val;
-    };
-    cat.readAttribute = () => "American Bobtail";
-    cat.isPersisted = () => false;
-    expect(cat["isAmerican Bobtail"]()).toBe(true);
-    expect(cat["isBalinese-Javanese"]()).toBe(false);
-    expect(typeof cat["American BobtailBang"]).toBe("function");
-    expect(typeof cat["Balinese-JavaneseBang"]).toBe("function");
-  });
-});
-
-// ==========================================================================
-// EnumTest2 — more targets for enum_test.rb
-// ==========================================================================
-describe("EnumTest", () => {
-  it("enums are distinct per class", async () => {
-    class PA extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("status", "integer");
-        defineEnum(this, "status", { draft: 0, published: 1 });
-      }
-    }
-    class PB extends Base {
-      static {
-        this.tableName = "posts";
-        this.attribute("status", "integer");
-        defineEnum(this, "status", { pending: 0, approved: 1 });
-      }
-    }
-    expect(readEnumValue(new PA({ status: 0 }), "status")).toBe("draft");
-    expect(readEnumValue(new PB({ status: 0 }), "status")).toBe("pending");
-  });
-});
-
-// ==========================================================================
-// EnumTest3 — additional missing tests from enum_test.rb
-// ==========================================================================
-describe("EnumTest", () => {
-  it("type.cast", () => {
-    expect(true).toBe(true);
-  });
-  it("type.serialize", () => {
-    expect(true).toBe(true);
-  });
-  class StringStatusPost extends Base {
-    static {
-      this.tableName = "string_status_posts";
-      this.attribute("status", "string");
-    }
-  }
-  it("find via where with strings", () => {
-    expect(StringStatusPost.where({ status: "active" })).toBeInstanceOf(Relation);
-  });
-  it("find via where should be type casted", () => {
-    expect(StringStatusPost.where({ status: "active" })).toBeInstanceOf(Relation);
-  });
-  it("build from scope", async () => {
-    const p = await StringStatusPost.create({ status: "active" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
-  class Book extends Base {
-    static {
-      this.attribute("id", "integer");
-      this.attribute("status", "integer");
-      this.enum("status", { proposed: 0, written: 1, published: 2 });
-    }
-  }
-  it("enum methods are overwritable", () => {
-    expect(true).toBe(true);
-  });
   it("enum value after write symbol", () => {
-    expect(true).toBe(true);
+    (book as any).status = "proposed";
+    expect((book as any).status).toBe("proposed");
   });
+
+  it("enum value after write string", () => {
+    (book as any).status = "proposed";
+    expect((book as any).status).toBe("proposed");
+  });
+
+  it("enum changes", () => {
+    const oldStatus = (book as any).status;
+    const oldLanguage = (book as any).language;
+    (book as any).status = "proposed";
+    (book as any).language = "spanish";
+    expect(book.changes.status).toEqual([oldStatus, "proposed"]);
+    expect(book.changes.language).toEqual([oldLanguage, "spanish"]);
+  });
+
   it("enum attribute was", () => {
-    expect(true).toBe(true);
-  });
-  it("enum attribute changed", () => {
-    expect(true).toBe(true);
-  });
-  it("enum attribute changed to", () => {
-    expect(true).toBe(true);
-  });
-  it("enum attribute changed from", () => {
-    expect(true).toBe(true);
-  });
-  it("enum attribute changed from old status to new status", () => {
-    expect(true).toBe(true);
-  });
-  it("enum didn't change", () => {
-    expect(true).toBe(true);
-  });
-  it("assign non existing value raises an error", () => {
-    const book = new Book();
+    const oldStatus = (book as any).status;
+    const oldLanguage = (book as any).language;
     (book as any).status = "published";
+    (book as any).language = "spanish";
+    expect(book.attributeWas("status")).toBe(oldStatus);
+    expect(book.attributeWas("language")).toBe(oldLanguage);
+  });
+
+  it("enum attribute changed", () => {
+    (book as any).status = "proposed";
+    (book as any).language = "french";
+    expect(book.attributeChanged("status")).toBe(true);
+    expect(book.attributeChanged("language")).toBe(true);
+  });
+
+  it("enum attribute changed to", () => {
+    (book as any).status = "proposed";
+    (book as any).language = "french";
+    expect(book.attributeChanged("status", { to: "proposed" })).toBe(true);
+    expect(book.attributeChanged("language", { to: "french" })).toBe(true);
+  });
+
+  it("enum attribute changed from", () => {
+    const oldStatus = (book as any).status;
+    const oldLanguage = (book as any).language;
+    (book as any).status = "proposed";
+    (book as any).language = "french";
+    expect(book.attributeChanged("status", { from: oldStatus })).toBe(true);
+    expect(book.attributeChanged("language", { from: oldLanguage })).toBe(true);
+  });
+
+  it("enum attribute changed from old status to new status", () => {
+    const oldStatus = (book as any).status;
+    const oldLanguage = (book as any).language;
+    (book as any).status = "proposed";
+    (book as any).language = "french";
+    expect(book.attributeChanged("status", { from: oldStatus, to: "proposed" })).toBe(true);
+    expect(book.attributeChanged("language", { from: oldLanguage, to: "french" })).toBe(true);
+  });
+
+  it("enum didn't change", () => {
+    const oldStatus = (book as any).status;
+    (book as any).status = oldStatus;
+    expect(book.attributeChanged("status")).toBe(false);
+  });
+
+  it("persist changes that are dirty", () => {
+    (book as any).status = "proposed";
+    expect(book.attributeChanged("status")).toBe(true);
+    (book as any).status = "written";
+    expect(book.attributeChanged("status")).toBe(true);
+  });
+
+  it("reverted changes that are not dirty", () => {
+    const oldStatus = (book as any).status;
+    (book as any).status = "proposed";
+    expect(book.attributeChanged("status")).toBe(true);
+    (book as any).status = oldStatus;
+    expect(book.attributeChanged("status")).toBe(false);
+  });
+
+  it("reverted changes are not dirty going from nil to value and back", async () => {
+    const created = await Book.create({ nullable_status: null });
+    (created as any).nullable_status = "married";
+    expect(created.attributeChanged("nullable_status")).toBe(true);
+    (created as any).nullable_status = null;
+    expect(created.attributeChanged("nullable_status")).toBe(false);
+  });
+
+  it("assign non existing value raises an error", () => {
     expect(() => {
       (book as any).status = "unknown";
     }).toThrow("'unknown' is not a valid status");
   });
-  it("validation with 'validate: true' option", () => {
-    expect(true).toBe(true);
-  });
-  it("validation with 'validate: hash' option", () => {
-    expect(true).toBe(true);
-  });
-  it("NULL values from database should be casted to nil", () => {
-    expect(true).toBe(true);
-  });
-  it("deserialize nil value to enum which defines nil value to hash", () => {
-    expect(true).toBe(true);
-  });
+
+  // Rails: `enum :status, [...], validate: true|hash` — the `validate:` option
+  // is not yet wired into the trails enum macro.
+  it.skip("validation with 'validate: true' option", () => {});
+  it.skip("validation with 'validate: hash' option", () => {});
+
+  // Rails: `Book.where(id:).update_all("status = NULL")` (raw SQL fragment).
+  it.skip("NULL values from database should be casted to nil", () => {});
+
+  // Rails: `books(:ddd).last_read == "forgotten"` — `forgotten: nil` not on Book.
+  it.skip("deserialize nil value to enum which defines nil value to hash", () => {});
+
   it("assign nil value", () => {
-    const book = new Book();
-    (book as any).status = "published";
     (book as any).status = null;
     expect((book as any).status).toBeNull();
   });
-  it("assign nil value to enum which defines nil value to hash", () => {
-    expect(true).toBe(true);
-  });
+
+  // Rails: `@book.last_read = nil` → "forgotten" — `forgotten: nil` not on Book.
+  it.skip("assign nil value to enum which defines nil value to hash", () => {});
+
   it("assign empty string value", () => {
-    const book = new Book();
-    (book as any).status = "published";
     (book as any).status = "";
     expect((book as any).status).toBeNull();
   });
-  it("assign false value to a field defined as not boolean", () => {
-    expect(true).toBe(true);
-  });
-  it("assign false value to a field defined as boolean", () => {
-    expect(true).toBe(true);
-  });
+
+  // Rails treats `false` as blank → casts to nil; trails' EnumType#assertValidValue
+  // rejects `false` with an ArgumentError instead.
+  it.skip("assign false value to a field defined as not boolean", () => {});
+
+  // Rails: `@book.boolean_status = false` → "disabled" — boolean enum not on Book.
+  it.skip("assign false value to a field defined as boolean", () => {});
+
   it("assign long empty string value", () => {
-    const book = new Book();
-    (book as any).status = "published";
     (book as any).status = "   ";
     expect((book as any).status).toBeNull();
   });
+
   it("constant to access the mapping", () => {
-    expect(true).toBe(true);
+    expect((Book as any).statuses.proposed).toBe(0);
+    expect((Book as any).statuses.written).toBe(1);
+    expect((Book as any).statuses.published).toBe(2);
   });
-  it("attribute_before_type_cast", () => {
-    expect(true).toBe(true);
+
+  it("building new objects with enum scopes", () => {
+    expect((Book as any).written().build().isWritten()).toBe(true);
+    expect((Book as any).read().build().isRead()).toBe(true);
+    expect((Book as any).inSpanish().build().isInSpanish()).toBe(true);
+    expect(
+      (Book as any).illustratorVisibilityInvisible().build().isIllustratorVisibilityInvisible(),
+    ).toBe(true);
   });
-  it("attribute_for_database", () => {
-    expect(true).toBe(true);
+
+  it("creating new objects with enum scopes", async () => {
+    expect((await (Book as any).written().create()).isWritten()).toBe(true);
+    expect((await (Book as any).read().create()).isRead()).toBe(true);
+    expect((await (Book as any).inSpanish().create()).isInSpanish()).toBe(true);
+    expect(
+      (
+        await (Book as any).illustratorVisibilityInvisible().create()
+      ).isIllustratorVisibilityInvisible(),
+    ).toBe(true);
   });
-  it("attributes_for_database", () => {
-    expect(true).toBe(true);
-  });
+
+  // Rails: `status_before_type_cast` returns the raw stored integer.
+  it.skip("attribute_before_type_cast", () => {});
+  // Rails: `status_for_database` returns the serialized integer.
+  it.skip("attribute_for_database", () => {});
+  it.skip("attributes_for_database", () => {});
+
   it("invalid definition values raise an ArgumentError", () => {
-    expect(true).toBe(true);
+    expect(() => Book.enum("status_x", [] as any)).toThrow(ArgumentError);
+    expect(() => Book.enum("status_x", {} as any)).toThrow(ArgumentError);
+    expect(() => Book.enum("status_x", { "": 1, active: 2 } as any)).toThrow(ArgumentError);
+    expect(() => Book.enum("status_x", ["active", ""] as any)).toThrow(ArgumentError);
   });
-  it("reserved enum names", () => {
-    expect(true).toBe(true);
-  });
-  it("can use id as a value with a prefix or suffix", () => {
-    expect(true).toBe(true);
-  });
-  it("overriding enum method should not raise", () => {
-    expect(true).toBe(true);
-  });
-  it("validate inclusion of value in array", () => {
-    expect(true).toBe(true);
-  });
-  it("enums are inheritable", () => {
-    expect(true).toBe(true);
-  });
-  it("attempting to modify enum raises error", () => {
-    expect(true).toBe(true);
-  });
-  it("declare multiple enums with suffix: true", () => {
-    expect(true).toBe(true);
-  });
-  it("enum with alias_attribute", () => {
-    expect(true).toBe(true);
-  });
-  it("uses default status when no status is provided in fixtures", () => {
-    expect(true).toBe(true);
-  });
-  it("uses default value from database on initialization", () => {
-    expect(true).toBe(true);
-  });
-  it("uses default value from database on initialization when using custom mapping", () => {
-    expect(true).toBe(true);
-  });
-  it("data type of Enum type", () => {
-    expect(true).toBe(true);
-  });
-  it("overloaded default by :default", () => {
-    expect(true).toBe(true);
-  });
-  it(":_default is invalid in the new API", () => {
-    expect(true).toBe(true);
-  });
-  it(":_prefix is invalid in the new API", () => {
-    expect(true).toBe(true);
-  });
-  it(":_suffix is invalid in the new API", () => {
-    expect(true).toBe(true);
-  });
-  it(":_scopes is invalid in the new API", () => {
-    expect(true).toBe(true);
-  });
-  it(":_instance_methods is invalid in the new API", () => {
-    expect(true).toBe(true);
-  });
-  it("scopes can be disabled by :scopes", () => {
-    expect(true).toBe(true);
-  });
-  it("enum labels as keyword arguments", () => {
-    expect(true).toBe(true);
-  });
-  it("option names can be used as label", () => {
-    expect(true).toBe(true);
-  });
-  it("capital characters for enum names", () => {
-    expect(true).toBe(true);
-  });
-  it("unicode characters for enum names", () => {
-    expect(true).toBe(true);
-  });
-  it("mangling collision for enum names", () => {
-    expect(true).toBe(true);
-  });
-  it("deserialize enum value to original hash key", () => {
-    expect(true).toBe(true);
-  });
-  it("serializable? with large number label", () => {
-    expect(true).toBe(true);
-  });
-  it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
-    expect(true).toBe(true);
-  });
-  it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
-    expect(true).toBe(true);
-  });
-  it("enum doesn't log a warning if no clashes detected", () => {
-    expect(true).toBe(true);
-  });
-  it("enum doesn't log a warning if opting out of scopes", () => {
-    expect(true).toBe(true);
-  });
-  it("raises for attributes with undeclared type", () => {
-    expect(true).toBe(true);
-  });
-  it("supports attributes declared with a explicit type", () => {
-    expect(true).toBe(true);
-  });
-  it("default methods can be disabled by :instance_methods", () => {
-    expect(true).toBe(true);
-  });
-});
 
-describe("EnumTest", () => {
-  it("find via scope", async () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("title", "string");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", ["draft", "published", "archived"]);
+  // Rails: conflict detection on reserved AR method names — message surface is
+  // covered behaviorally in enum.trails.test.ts.
+  it.skip("reserved enum names", () => {});
+  it.skip("reserved enum values", () => {});
+  it.skip("reserved enum values for relation", () => {});
+  it.skip("can use id as a value with a prefix or suffix", () => {});
+  it.skip("overriding enum method should not raise", () => {});
 
-    await Post.create({ title: "A", status: 0 });
-    await Post.create({ title: "B", status: 1 });
-    await Post.create({ title: "C", status: 2 });
+  // Rails: anonymous AR class with `validates_uniqueness_of` / inclusion.
+  it.skip("validate uniqueness", () => {});
+  it.skip("validate inclusion of value in array", () => {});
 
-    const drafts = await (Post as any).draft().toArray();
-    expect(drafts).toHaveLength(1);
-    expect(drafts[0].readAttribute("title")).toBe("A");
+  // Rails: `book.status_change` / per-class & inheritable enum redefinition.
+  it.skip("enums are distinct per class", () => {});
+  it.skip("enums are inheritable", () => {});
 
-    const published = await (Post as any).published().toArray();
-    expect(published).toHaveLength(1);
-    expect(published[0].readAttribute("title")).toBe("B");
-  });
-  it("update by setter", () => {
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("status", "integer");
-    defineEnum(Post, "status", ["draft", "published", "archived"]);
+  // Rails: `Book.statuses` is frozen; trails returns a mutable copy.
+  it.skip("attempting to modify enum raises error", () => {});
 
-    const post = new Post({ status: 0 });
-    expect((post as any).isDraft()).toBe(true);
-    // Rails enum has no plain in-memory setter; assign through the attribute.
-    post.writeAttribute("status", "published");
-    expect((post as any).isPublished()).toBe(true);
-    expect(post.readAttribute("status")).toBe("published");
-  });
-});
-describe("EnumTest", () => {
-  it("reverted changes are not dirty going from nil to value and back", async () => {
-    class Post extends Base {
+  it("declare multiple enums with prefix: true", () => {
+    class K extends Base {
+      static _tableName = "books";
       static {
-        this.attribute("subtitle", "string");
+        this.attribute("status", "integer");
+        this.attribute("last_read", "integer");
+        this.enum("status", ["value_1"] as any, { prefix: true });
+        this.enum("last_read", ["value_1"] as any, { prefix: true });
       }
     }
-    const post = (await Post.create({ subtitle: null })) as any;
-    post.writeAttribute("subtitle", "hello");
-    post.writeAttribute("subtitle", null);
-    expect(post.changed).toBe(false);
+    const instance = new K();
+    expect(typeof (instance as any).isStatusValue1).toBe("function");
+    expect(typeof (instance as any).isLastReadValue1).toBe("function");
   });
+
+  it("declare multiple enums with suffix: true", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer");
+        this.attribute("last_read", "integer");
+        this.enum("status", ["value_1"] as any, { suffix: true });
+        this.enum("last_read", ["value_1"] as any, { suffix: true });
+      }
+    }
+    const instance = new K();
+    expect(typeof (instance as any).isValue1Status).toBe("function");
+    expect(typeof (instance as any).isValue1LastRead).toBe("function");
+  });
+
+  // Rails: `alias_attribute` combined with `enum` on the alias.
+  it.skip("enum with alias_attribute", () => {});
+
+  it("query state by predicate with prefix", () => {
+    expect((book as any).isAuthorVisibilityVisible()).toBe(true);
+    expect((book as any).isAuthorVisibilityInvisible()).toBe(false);
+    expect((book as any).isIllustratorVisibilityVisible()).toBe(true);
+    expect((book as any).isIllustratorVisibilityInvisible()).toBe(false);
+  });
+
+  it("query state by predicate with custom prefix", () => {
+    expect((book as any).isInEnglish()).toBe(true);
+    expect((book as any).isInSpanish()).toBe(false);
+    expect((book as any).isInFrench()).toBe(false);
+  });
+
+  it("query state by predicate with custom suffix", () => {
+    expect((book as any).isMediumToRead()).toBe(true);
+    expect((book as any).isEasyToRead()).toBe(false);
+    expect((book as any).isHardToRead()).toBe(false);
+  });
+
+  it("enum methods with custom suffix defined", () => {
+    expect(typeof (Book as any).easyToRead).toBe("function");
+    expect(typeof (Book as any).mediumToRead).toBe("function");
+    expect(typeof (Book as any).hardToRead).toBe("function");
+
+    expect(typeof (book as any).isEasyToRead).toBe("function");
+    expect(typeof (book as any).isMediumToRead).toBe("function");
+    expect(typeof (book as any).isHardToRead).toBe("function");
+
+    expect(typeof (book as any).easyToReadBang).toBe("function");
+    expect(typeof (book as any).mediumToReadBang).toBe("function");
+    expect(typeof (book as any).hardToReadBang).toBe("function");
+  });
+
+  it("update enum attributes with custom suffix", async () => {
+    await (book as any).mediumToReadBang();
+    expect((book as any).isEasyToRead()).toBe(false);
+    expect((book as any).isMediumToRead()).toBe(true);
+    expect((book as any).isHardToRead()).toBe(false);
+
+    await (book as any).easyToReadBang();
+    expect((book as any).isEasyToRead()).toBe(true);
+    expect((book as any).isMediumToRead()).toBe(false);
+    expect((book as any).isHardToRead()).toBe(false);
+
+    await (book as any).hardToReadBang();
+    expect((book as any).isEasyToRead()).toBe(false);
+    expect((book as any).isMediumToRead()).toBe(false);
+    expect((book as any).isHardToRead()).toBe(true);
+  });
+
+  it("uses default status when no status is provided in fixtures", () => {
+    const tlg = books("tlg");
+    expect((tlg as any).isProposed()).toBe(true);
+    expect((tlg as any).isInEnglish()).toBe(true);
+  });
+
+  // In-memory `new Book()` does not seed the DB column default (`status` → 0)
+  // through EnumType#cast, so the label isn't applied until the row round-trips.
+  it.skip("uses default value from database on initialization", () => {
+    expect((new Book() as any).isProposed()).toBe(true);
+  });
+
+  // Rails: default `cover` ("hard") from the DB — `cover` enum not on Book.
+  it.skip("uses default value from database on initialization when using custom mapping", () => {});
+
+  it("data type of Enum type", () => {
+    expect(Book.typeForAttribute("status").type()).toBe("integer");
+  });
+
+  it("enum on custom attribute with default", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer", { default: 2 });
+        this.enum("status", ["proposed", "written", "published"] as any);
+      }
+    }
+    expect((new K() as any).status).toBe("published");
+  });
+
+  // Rails: `enum :status, [...], default: :published` — the macro-level
+  // `default:` option is not yet wired into the trails enum macro.
+  it.skip("overloaded default by :default", () => {});
+
+  // Rails: the legacy `:_default` / `:_prefix` / `:_suffix` / `:_scopes` /
+  // `:_instance_methods` options must raise — covered behaviorally in
+  // enum.trails.test.ts (assertValidEnumOptions).
+  it.skip(":_default is invalid in the new API", () => {});
+  it.skip(":_prefix is invalid in the new API", () => {});
+  it.skip(":_suffix is invalid in the new API", () => {});
+  it.skip(":_scopes is invalid in the new API", () => {});
+  it.skip(":_instance_methods is invalid in the new API", () => {});
+
+  // Rails: `scopes: false` / `instance_methods: false` opt-outs.
+  it.skip("scopes can be disabled by :scopes", () => {});
+  it.skip("default methods can be disabled by :instance_methods", () => {});
+
+  it("query state by predicate with :prefix", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer");
+        this.attribute("last_read", "integer");
+        this.enum("status", { proposed: 0, written: 1 }, { prefix: true });
+        this.enum("last_read", { unread: 0, reading: 1, read: 2 }, { prefix: "being" });
+      }
+    }
+    const instance = new K();
+    expect(typeof (instance as any).isStatusProposed).toBe("function");
+    expect(typeof (instance as any).isBeingUnread).toBe("function");
+  });
+
+  it("query state by predicate with :suffix", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("cover", "integer");
+        this.attribute("difficulty", "integer");
+        this.enum("cover", { hard: 0, soft: 1 }, { suffix: true });
+        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
+      }
+    }
+    const instance = new K();
+    expect(typeof (instance as any).isHardCover).toBe("function");
+    expect(typeof (instance as any).isEasyToRead).toBe("function");
+  });
+
+  // Depends on the in-memory DB-default seeding gap above: `new K()` doesn't
+  // seed `status` → 0 → "active" through EnumType#cast.
+  it.skip("enum labels as keyword arguments", () => {});
+
+  // Same in-memory DB-default seeding gap: `new K()` doesn't seed `status` → 0.
+  it.skip("option names can be used as label", () => {});
+
+  it("scopes are named like methods", () => {
+    class K extends Base {
+      static _tableName = "cats";
+      static {
+        this.attribute("breed", "string");
+        this.enum("breed", { "American Bobtail": 0, "Balinese-Javanese": 1 });
+      }
+    }
+    expect(typeof (K as any).americanBobtail).toBe("function");
+    expect(typeof (K as any).balineseJavanese).toBe("function");
+  });
+
+  // Rails: anonymous-class enum names with capitals / unicode / slashes, and
+  // Struct-keyed hash labels — JS-idiom-divergent enum-name surfaces.
+  it.skip("capital characters for enum names", () => {});
+  it.skip("unicode characters for enum names", () => {});
+  it.skip("mangling collision for enum names", () => {});
+  it.skip("deserialize enum value to original hash key", () => {});
+  it.skip("serializable? with large number label", () => {});
+
+  // Rails: logger-warning surface for negative-scope clashes — covered
+  // behaviorally in enum.trails.test.ts (detectNegativeEnumConditionsBang).
+  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {});
+  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {});
+  it.skip("enum doesn't log a warning if no clashes detected", () => {});
+  it.skip("enum doesn't log a warning if opting out of scopes", () => {});
+
+  // Rails: `type_for_attribute` on an enum with an undeclared / explicit type.
+  it.skip("raises for attributes with undeclared type", () => {});
+  it.skip("supports attributes declared with a explicit type", () => {});
 });
