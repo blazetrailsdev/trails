@@ -141,6 +141,7 @@ import {
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
+import { buildMergedJoinAliasTracker } from "./relation/merged-join-alias-tracker.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -3697,6 +3698,36 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Build the shared `build_joins` AliasTracker that the eager SELECT-preview
+   * paths (`_buildEagerJoinManager` / `_buildEagerIdSubquery`) thread into their
+   * eager JoinDependency's `joinConstraints`, mirroring Rails' one
+   * `alias_tracker(leading_joins + join_nodes, aliases)` per `build_joins`
+   * (query_methods.rb). It seeds the base table plus the `_joinValues` (raw /
+   * string) join nodes and `_joinClauses` (via `buildMergedJoinAliasTracker`),
+   * then folds in the manual named-inner-join tables exactly as
+   * `_addEagerSpecsToJoinDependency`'s `seedConstructionTables` does for the
+   * `undefined`-tracker path (excluding the `_dedupedManualJoinTables`, whose
+   * eager OUTER JOIN is skipped and whose column projection reads the manual
+   * INNER JOIN's un-aliased table). The new piece over `seedConstructionTables`
+   * is the raw `_joinValues` string-join awareness: the tracker counts those
+   * nodes lazily via `initialCountFor`, so an eager
+   * `includes(:x).references(:x)` landing on a table a raw `joins("… authors …")`
+   * already claimed collides and aliases at emit-time in `makeConstraints`
+   * (`authors` → `authors_posts`) instead of emitting a duplicate unaliased join.
+   */
+  private _buildEagerSharedJoinTracker(): AliasTracker {
+    const joinNodes: Nodes.Join[] = this._joinValues.map((v) =>
+      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
+    );
+    const tracker = buildMergedJoinAliasTracker(this as any, joinNodes);
+    const dedupedTables = this._dedupedManualJoinTables();
+    for (const t of this._resolveAssocTables(this._namedInnerJoins)) {
+      if (!dedupedTables.has(t) && (tracker.aliases.get(t) ?? 0) === 0) tracker.aliases.set(t, 1);
+    }
+    return tracker;
+  }
+
+  /**
    * Check if any records exist, optionally with conditions.
    *
    * Mirrors: ActiveRecord::Relation#exists?
@@ -5515,12 +5546,19 @@ export class Relation<T extends Base> {
   ): SelectManager {
     const table = this._modelClass.arelTable;
 
+    // Shared `build_joins` AliasTracker seeded with the manual raw joins (Rails'
+    // single alias_tracker). Threading it into the eager JoinDependency makes an
+    // eager `includes(:x).references(:x)` that lands on a table an explicit
+    // `.joins` already claimed collide and alias at emit-time, instead of
+    // emitting a duplicate unaliased join a fresh per-emit tracker never saw.
+    const sharedTracker = this._buildEagerSharedJoinTracker();
+
     // Resolve emit-time table aliases first (Rails make_constraints): a duplicate
     // join onto an already-joined table (e.g. nested includes reaching the same
     // table via two paths) is aliased to its `alias_candidate` here, and a join
     // named by `references` takes the referenced name. This MUST run before the
     // column-alias projection below, which reads each node's now-aliased table.
-    const joinNodes = jd.joinConstraints([], undefined, this._aliasableReferences());
+    const joinNodes = jd.joinConstraints([], sharedTracker, this._aliasableReferences());
 
     // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
     // an explicit `select` keeps its own projection and the JoinDependency only
@@ -5628,8 +5666,12 @@ export class Relation<T extends Base> {
     // A deduped eager root's nested child joins ON the manual table, so the
     // manual join must precede it (see `_buildEagerJoinManager`).
     const manualJoinsFirst = this._walkSharedManualEagerTables().size > 0;
+    // This subquery is its own `build_joins` statement, so it gets its own shared
+    // AliasTracker spanning its eager JoinDependency and the manual joins
+    // (`_applyJoinsToManager`) — same threading as `_buildEagerJoinManager`.
+    const sharedTracker = this._buildEagerSharedJoinTracker();
     if (manualJoinsFirst) this._applyJoinsToManager(idSubquery);
-    for (const node of jd.joinConstraints([], undefined, this._aliasableReferences())) {
+    for (const node of jd.joinConstraints([], sharedTracker, this._aliasableReferences())) {
       const joinedTable = (node as { left?: { name?: unknown } }).left?.name;
       if (typeof joinedTable === "string" && joinedIncludesTables.has(joinedTable.toLowerCase())) {
         continue;
