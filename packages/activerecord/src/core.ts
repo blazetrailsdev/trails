@@ -155,6 +155,64 @@ export function isEqual(this: CoreRecord, other: unknown): boolean {
   return primaryKeyValuesEqual(this.id, (other as CoreRecord).id);
 }
 
+// Per-instance identity keys for records without primary-key values present.
+// Mirrors Ruby's `super` (Object#hash): a stable, unique value per object, so
+// two distinct new records never dedup against each other.
+const identityHashKeys = new WeakMap<object, symbol>();
+
+// Per-constructor identity tokens. Rails combines `self.class.hash` with the
+// id, so the class *object's* identity — not its name — participates in the
+// hash. Keying on `constructor.name` would collide two distinct model classes
+// that happen to share a JS name, whereas `isEqual` demands exact constructor
+// identity; this WeakMap gives each constructor a stable, unique token.
+const constructorHashTokens = new WeakMap<object, number>();
+let nextConstructorToken = 0;
+
+function constructorToken(ctor: object): number {
+  let token = constructorHashTokens.get(ctor);
+  if (token === undefined) {
+    token = nextConstructorToken++;
+    constructorHashTokens.set(ctor, token);
+  }
+  return token;
+}
+
+// Serialize a scalar or composite id into a stable, injective string. Unlike
+// `JSON.stringify`, this tolerates `bigint` values, which trails' `big_integer`
+// type preserves and which Rails hashes without issue via `id.hash`. Array
+// elements are length-prefixed so component boundaries can never collapse —
+// Rails' `Array#hash` likewise preserves element boundaries, so two distinct
+// composite ids must not share a key (`core.rb:641-648`).
+function serializeIdForHash(id: unknown): string {
+  if (Array.isArray(id)) {
+    return `A${id.map((el) => lengthPrefixed(serializeIdForHash(el))).join("")}`;
+  }
+  return `S${typeof id}:${String(id)}`;
+}
+
+function lengthPrefixed(value: string): string {
+  return `${value.length}:${value}`;
+}
+
+/**
+ * Return a value that dedups records the way Ruby's `hash` + `eql?` do: two
+ * records of the same class with equal primary-key values share a key, while
+ * records without primary-key values present are unique per instance.
+ *
+ * Mirrors: ActiveRecord::Core#hash
+ */
+export function hash(this: CoreRecord): unknown {
+  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
+    return `${constructorToken(this.constructor)}#${serializeIdForHash(this.id)}`;
+  }
+  let key = identityHashKeys.get(this);
+  if (key === undefined) {
+    key = Symbol("record-hash");
+    identityHashKeys.set(this, key);
+  }
+  return key;
+}
+
 /**
  * Compare two primary-key values by value. Composite keys are arrays and must
  * be compared element-wise; scalar keys compare directly.

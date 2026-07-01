@@ -194,30 +194,30 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("dumps schema from adapter introspection", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("articles", {}, (t) => {
+    await ctx.createTable("horses", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
     });
     const result = await TopLevelDumper.dump(adapter);
-    expect(result).toContain("articles");
+    expect(result).toContain("horses");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
   });
 
   it("dumps schema with indexes from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("comments", {}, (t) => {
+    await ctx.createTable("testings", {}, (t) => {
       t.integer("post_id");
     });
-    await ctx.addIndex("comments", "post_id", { name: "index_comments_on_post_id" });
+    await ctx.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
     const result = await TopLevelDumper.dump(adapter);
     expect(result).toContain("addIndex");
-    expect(result).toContain("index_comments_on_post_id");
+    expect(result).toContain("index_testings_on_post_id");
   });
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("events", {}, (t) => {
+    await ctx.createTable("octopuses", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
     const result = await TopLevelDumper.dump(adapter);
@@ -243,11 +243,11 @@ describe("SchemaDumperAdapterTest", () => {
     const { InternalMetadata } = await import("./internal-metadata.js");
     await new SchemaMigration(adapter).createTable();
     await new InternalMetadata(adapter).createTable();
-    await ctx.createTable("products", {}, (t) => {
+    await ctx.createTable("reminders", {}, (t) => {
       t.string("name");
     });
     const result = await TopLevelDumper.dump(adapter);
-    expect(result).toContain("products");
+    expect(result).toContain("reminders");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");
   });
@@ -334,11 +334,11 @@ describe("SchemaDumperAdapterTest", () => {
   afterAll(async () => {
     const cleanupCtx = new MigrationContext(createTestAdapter());
     const o = { ifExists: true } as const;
-    await cleanupCtx.dropTable("articles", o);
     await cleanupCtx.dropTable("codes", o);
-    await cleanupCtx.dropTable("comments", o);
-    await cleanupCtx.dropTable("events", o);
-    await cleanupCtx.dropTable("products", o);
+    await cleanupCtx.dropTable("horses", o);
+    await cleanupCtx.dropTable("octopuses", o);
+    await cleanupCtx.dropTable("reminders", o);
+    await cleanupCtx.dropTable("testings", o);
   });
 });
 

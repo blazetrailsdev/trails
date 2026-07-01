@@ -465,9 +465,7 @@ describe("UpdateAllTest", () => {
     }
   });
 
-  // TRACKED DEVIATION: JoinDependency cannot build a join for CpkOrder.hasMany("orderAgreements")
-  // (composite primary key model + single-column FK association). Skipped pending CPK join support.
-  it.skip("update all composite model with join subquery", async () => {
+  it("update all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
     const joinScope = CpkOrder.joins("orderAgreements").where({
       cpk_order_agreements: { signature: agreement.signature },
