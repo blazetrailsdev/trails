@@ -160,6 +160,23 @@ export function isEqual(this: CoreRecord, other: unknown): boolean {
 // two distinct new records never dedup against each other.
 const identityHashKeys = new WeakMap<object, symbol>();
 
+// Per-constructor identity tokens. Rails combines `self.class.hash` with the
+// id, so the class *object's* identity — not its name — participates in the
+// hash. Keying on `constructor.name` would collide two distinct model classes
+// that happen to share a JS name, whereas `isEqual` demands exact constructor
+// identity; this WeakMap gives each constructor a stable, unique token.
+const constructorHashTokens = new WeakMap<object, number>();
+let nextConstructorToken = 0;
+
+function constructorToken(ctor: object): number {
+  let token = constructorHashTokens.get(ctor);
+  if (token === undefined) {
+    token = nextConstructorToken++;
+    constructorHashTokens.set(ctor, token);
+  }
+  return token;
+}
+
 /**
  * Return a value that dedups records the way Ruby's `hash` + `eql?` do: two
  * records of the same class with equal primary-key values share a key, while
@@ -169,7 +186,7 @@ const identityHashKeys = new WeakMap<object, symbol>();
  */
 export function hash(this: CoreRecord): unknown {
   if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
-    return `${this.constructor.name}#${JSON.stringify(this.id)}`;
+    return `${constructorToken(this.constructor)}#${JSON.stringify(this.id)}`;
   }
   let key = identityHashKeys.get(this);
   if (key === undefined) {
