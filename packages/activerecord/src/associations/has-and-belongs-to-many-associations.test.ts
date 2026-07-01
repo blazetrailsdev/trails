@@ -1135,14 +1135,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await (professor as any).courses.count()).toBe(1);
   });
 
-  // BLOCKED (tracked-pending-convergence): a habtm association scope's
-  // `unscope(where: "name")` is applied on the direct load path (the target's
-  // `default_scope where(name: "David")` is correctly removed there) but is NOT
-  // threaded into the eager-load/preload query built by `includes(:developers)`,
-  // so the default_scope name filter survives and excludes the "Not David"
-  // developer → size 0 instead of 1. Deviation:
-  // habtm-scope-unscope-not-threaded-through-eager-load (RFC 0023).
-  it.skip("habtm scope can unscope", async () => {
+  it("habtm scope can unscope", async () => {
     const project = new ProjectUnscopingDavidDefaultScope({});
     await (project as any).saveBang();
 
