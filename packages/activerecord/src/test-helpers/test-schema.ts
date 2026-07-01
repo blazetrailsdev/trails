@@ -347,8 +347,13 @@ export const TEST_SCHEMA: Schema = {
     comment: "string",
   },
 
-  // Composite PK is configured on the model level; the DB table keeps the
-  // default autoincrement `id` so order rows still get one.
+  // Rails' cpk_orders table is composite-PK `[shop_id, id]`, and its fixtures
+  // omit both key columns — Rails' FixtureSet.composite_identify fills them from
+  // the label. Our loader can't yet resolve a `ref()` to a specific column of a
+  // composite-PK target (define-fixtures.ts:633-635), so the belongs_to FK in
+  // cpk_order_agreements would miss the row. Until that fixture-infra gap is
+  // closed (RFC 0023 cpk-composite-fixture-ref-resolution), keep the table on a
+  // single autoincrement `id` and pin shop_id in the fixture rows instead.
   cpk_orders: {
     shop_id: "integer",
     status: "string",
