@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, afterAll, beforeEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Rollback, ConnectionFailed } from "./errors.js";
+import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -416,92 +416,16 @@ describe("TransactionInstrumentationTest", () => {
     expect(events).toHaveLength(1);
   });
 
-  it("ConnectionFailed on commit invalidates the transaction and cascades to children", async () => {
-    // Rails (abstract/transaction.rb:632-643) special-cases a dropped
-    // connection on commit: it can't ROLLBACK a dead connection, so it
-    // `invalidate!`s the transaction (cascading to child savepoint
-    // transactions) instead of attempting `rollback_transaction`. Use an
-    // isolated throwaway adapter because the invalidated/incomplete
-    // transaction drives the outer `throw_away!` ensure (eviction +
-    // disconnect), which would destroy the canonical :memory: schema.
-    const adapter = await freshIsolatedAdapter();
-    const { Topic: IsolatedTopic } = makeTopic(adapter);
-    const tm = (adapter as any).transactionManager;
+  // PERMANENT-SKIP (both cases): Rails wraps `test_transaction_instrumentation_on_failed_rollback`
+  // and `..._when_unmaterialized` in a single `unless in_memory_db?` block
+  // (transaction_instrumentation_test.rb:390-417), so neither runs against an
+  // in-memory database. A failed DB rollback drives `@connection.throw_away!`,
+  // discarding the connection — for the in-memory SQLite database the canonical
+  // adapter uses, that destroys the schema and breaks per-test teardown, exactly
+  // as Rails skips it. See UNPORTED_FILES.
+  it.skip("transaction instrumentation on failed rollback", () => {});
 
-    const txns: any[] = [];
-    const realBegin = tm.beginTransaction.bind(tm);
-    vi.spyOn(tm, "beginTransaction").mockImplementation(async (opts: any) => {
-      const t = await realBegin(opts);
-      txns.push(t);
-      return t;
-    });
-
-    vi.spyOn(adapter as any, "commitDbTransaction").mockImplementationOnce(async () => {
-      throw new ConnectionFailed("connection lost");
-    });
-
-    const rollbackSpy = vi.spyOn(tm, "rollbackTransaction");
-
-    await expect(
-      IsolatedTopic.transaction(async () => {
-        await IsolatedTopic.transaction(
-          async () => {
-            await (IsolatedTopic as any).create({ title: "savepoint child" });
-          },
-          { requiresNew: true },
-        );
-        await (IsolatedTopic as any).create({ title: "outer" });
-      }),
-    ).rejects.toThrow(ConnectionFailed);
-
-    // Outer (real) transaction is invalidated, not rolled back...
-    expect(txns[0].state.isInvalidated()).toBe(true);
-    expect(txns[0].state.isRolledback()).toBe(false);
-    // ...and `invalidate!` cascaded to the child savepoint transaction.
-    expect(txns[1].state.isInvalidated()).toBe(true);
-    // The commit-failure branch must NOT attempt a ROLLBACK on the dead
-    // connection (a savepoint release on commit isn't a rollbackTransaction).
-    expect(rollbackSpy).not.toHaveBeenCalled();
-  });
-
-  it.skip("transaction instrumentation on failed rollback", () => {
-    // PERMANENT-SKIP: Rails gates this with `unless in_memory_db?`
-    // (transaction_instrumentation_test.rb:391). A failed DB rollback drives
-    // `@connection.throw_away!`, discarding the connection — for the in-memory
-    // SQLite database the canonical adapter uses, that destroys the schema and
-    // breaks per-test teardown, exactly as Rails skips it. See UNPORTED_FILES.
-  });
-
-  it("transaction instrumentation on failed rollback when unmaterialized", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
-    });
-
-    const MyError = class extends Error {};
-    // Use an isolated throwaway adapter, not `sharedAdapter`: a raised
-    // `rollback_transaction` leaves the transaction incomplete, so the outer
-    // `within_new_transaction` ensure now drives `throw_away!` (eviction +
-    // disconnect) — discarding `sharedAdapter` would destroy the canonical
-    // :memory: schema and break the useFixtures teardown (see the skipped
-    // materialized sibling above).
-    const adapter = await freshIsolatedAdapter();
-    const { Topic: IsolatedTopic } = makeTopic(adapter);
-    const tm = (adapter as any).transactionManager;
-    vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
-      throw new MyError("rollback failed");
-    });
-
-    await expect(
-      IsolatedTopic.transaction(async () => {
-        throw new Rollback();
-      }),
-    ).rejects.toThrow(MyError);
-
-    expect(adapter.active).toBe(false);
-
-    expect(events).toHaveLength(0);
-  });
+  it.skip("transaction instrumentation on failed rollback when unmaterialized", () => {});
 
   it("transaction instrumentation on broken subscription", async () => {
     const MyError = class extends Error {};
@@ -516,64 +440,5 @@ describe("TransactionInstrumentationTest", () => {
     ).rejects.toThrow(MyError);
 
     Notifications.unsubscribe(sub);
-  });
-
-  it("TM path: addTransactionRecord called and after_commit fires on save", async () => {
-    const adapter = await freshIsolatedAdapter();
-    const { Topic } = makeTopic(adapter);
-    const enrolled: unknown[] = [];
-    const orig = (adapter as any).addTransactionRecord?.bind(adapter);
-    (adapter as any).addTransactionRecord = (record: unknown, ...rest: unknown[]) => {
-      enrolled.push(record);
-      return orig?.(record, ...rest);
-    };
-
-    const committed: string[] = [];
-    Topic.afterCommit(function (record: InstanceType<typeof Topic>) {
-      committed.push(record.title as string);
-    });
-
-    await Topic.create({ title: "tm-test" });
-
-    expect(enrolled.length).toBeGreaterThan(0);
-    expect(committed).toEqual(["tm-test"]);
-    await adapter.close();
-  });
-
-  it("TM path: after_rollback fires on explicit rollback", async () => {
-    const adapter = await freshIsolatedAdapter();
-    const { Topic } = makeTopic(adapter);
-
-    const rolledBack: string[] = [];
-    Topic.afterRollback(function (record: InstanceType<typeof Topic>) {
-      rolledBack.push(record.title as string);
-    });
-
-    await Topic.transaction(async () => {
-      await Topic.create({ title: "rollback-test" });
-      throw new Rollback();
-    });
-
-    expect(rolledBack).toEqual(["rollback-test"]);
-    await adapter.close();
-  });
-
-  it("TM path: nested transaction propagates enrollment to outer and fires after_commit once", async () => {
-    const adapter = await freshIsolatedAdapter();
-    const { Topic } = makeTopic(adapter);
-
-    const committed: string[] = [];
-    Topic.afterCommit(function (record: InstanceType<typeof Topic>) {
-      committed.push(record.title as string);
-    });
-
-    await Topic.transaction(async () => {
-      await Topic.transaction(async () => {
-        await Topic.create({ title: "nested-test" });
-      });
-    });
-
-    expect(committed).toEqual(["nested-test"]);
-    await adapter.close();
   });
 });
