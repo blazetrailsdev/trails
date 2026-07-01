@@ -469,39 +469,23 @@ interface IntrospectionHost {
  */
 export async function columns(this: IntrospectionHost, tableName: string): Promise<Column[]> {
   const { schema, table } = this.parseMysqlName(tableName);
-  // The `pk_index` correlated subquery resolves whether each column belongs to
-  // the table's real PRIMARY key. MySQL/MariaDB report `column_key = 'PRI'` not
-  // only for genuine PRIMARY KEY columns but also for a UNIQUE index over NOT
-  // NULL columns when the table has no PRIMARY KEY (the "promoted unique" case,
-  // e.g. string_key_objects' `t.index :id, unique: true`). Rails never derives a
-  // per-column primary flag from `column_key`; it resolves the primary key from
-  // `information_schema.statistics` where `index_name = 'PRIMARY'`. Mirror that
-  // so a promoted unique index stays a plain unique key and the dumper emits
-  // `id: false` (as Rails/MySQL). Folded into this SELECT to avoid a second
-  // round-trip (QueryCacheTest counts introspection queries).
   const rows = await this.schemaQuery(
-    `SELECT c.column_name AS name,
-            c.column_default AS default_value,
-            c.is_nullable AS nullable,
-            c.data_type AS type,
-            c.column_type AS full_type,
-            c.character_maximum_length AS char_len,
-            c.numeric_precision AS num_precision,
-            c.numeric_scale AS num_scale,
-            c.collation_name AS collation,
-            c.column_comment AS comment,
-            c.extra AS extra,
-            (SELECT s.index_name
-               FROM information_schema.statistics s
-               WHERE s.table_schema = c.table_schema
-               AND s.table_name = c.table_name
-               AND s.column_name = c.column_name
-               AND s.index_name = 'PRIMARY'
-               LIMIT 1) AS pk_index
-       FROM information_schema.columns c
-       WHERE c.table_schema = COALESCE(?, database())
-       AND c.table_name = ?
-       ORDER BY c.ordinal_position`,
+    `SELECT column_name AS name,
+            column_default AS default_value,
+            is_nullable AS nullable,
+            data_type AS type,
+            column_type AS full_type,
+            character_maximum_length AS char_len,
+            numeric_precision AS num_precision,
+            numeric_scale AS num_scale,
+            column_key AS col_key,
+            collation_name AS collation,
+            column_comment AS comment,
+            extra AS extra
+       FROM information_schema.columns
+       WHERE table_schema = COALESCE(?, database())
+       AND table_name = ?
+       ORDER BY ordinal_position`,
     [schema ?? null, table],
   );
 
@@ -560,6 +544,7 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     });
     const nullable =
       String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !== "NO";
+    const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
     const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
     const extra = extraRaw.toLowerCase();
     // Mirror newColumnFromField's function-default detection (mysql/schema-statements.ts):
@@ -645,7 +630,7 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
         collation: (r.collation ?? r.COLLATION ?? null) as string | null,
         comment: presence((r.comment ?? r.COMMENT) as string | null | undefined) ?? null,
         defaultFunction: defFn,
-        primaryKey: (r.pk_index ?? r.PK_INDEX ?? r.INDEX_NAME) != null,
+        primaryKey: colKey === "PRI",
         autoIncrement: extra === "auto_increment",
         // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`).
         // End-anchored (JS `$` without /m ≡ Ruby `\z`): the modifier only ever trails the
