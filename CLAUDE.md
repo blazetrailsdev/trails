@@ -25,8 +25,9 @@ package list, and the `declare` / associations / enums / schema reference, see
 - **Do NOT poll for CI results.** Once `/link` is run, CI outcomes arrive
   automatically via the webhook when the run finishes — no `gh pr checks`
   watch loops, no repeated `gh run` polling, no sleeping-and-rechecking
-  (it just wastes turns). The webhook reports failures only, so absence of a
-  failure notification means CI passed; don't read silence as "still running".
+  (it just wastes turns). The webhook reports failures only: if the run fails
+  a notification lands here, so no notification means CI passed. Move on after
+  linking — don't wait around watching for a result.
 - **Do NOT run the whole test suite locally** (`pnpm test`, `pnpm -r test`,
   `pnpm --filter activerecord test`, etc.). CI runs the full suite on every
   push. Locally, run only the individual test files or small groups you
