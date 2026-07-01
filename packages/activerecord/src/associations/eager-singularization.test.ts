@@ -1,7 +1,18 @@
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ *
+ * Mirrors associations/eager_singularization_test.rb. The tables under test
+ * (viri/octopi/passes/buses/crises_messes/messes/crises/successes/analyses/
+ * dresses/compresses) are deliberately irregular plurals with no schema.rb
+ * analog; Rails creates them dynamically in setup and drops them in teardown.
+ * We mirror that with MigrationContext createTable/dropTable — the model table
+ * names derive from the inflector exactly as in Rails (no _tableName hacks).
+ */
 import type { AssociationProxy } from "./collection-proxy.js";
-import { describe, it, beforeAll, expect } from "vitest";
+import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { MigrationContext } from "../migration.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
@@ -9,271 +20,210 @@ describe("EagerSingularizationTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
+  let ctx: MigrationContext;
+
   beforeAll(async () => {
-    // These tables are deliberately irregular plurals (viri/octopi/messes/
-    // crises/…) to exercise singularization edge cases; they are test-local by
-    // design and have no canonical-schema counterpart.
-    //
-    // Rails' eager_singularization_test.rb creates a conventional `crises_messes`
-    // HABTM join table dynamically in setup/teardown (no schema.rb analog). Per
-    // RFC 0019 collision-table convergence, bespoke join tables with no canonical
-    // analog are renamed file-unique (`es_crises_messes`) so they can never
-    // clobber a shared join table re-primed by a divergent sibling under parallel
-    // forks. The model tables (`messes`/`crises`) keep their Rails names; only the
-    // join table is namespaced. The association still wires via an explicit
-    // `joinTable:`, so behavior is identical to Rails.
-    /* eslint-disable blazetrails/require-canonical-schema */
-    await defineSchema({
-      viri: { octopus_id: "integer", species: "string" },
-      octopi: { species: "string" },
-      passes: { bus_id: "integer", rides: "integer" },
-      buses: { name: "string" },
-      es_crises_messes: {
-        columns: { crisis_id: "integer", mess_id: "integer" },
-        primaryKey: false,
-      },
-      messes: { name: "string" },
-      crises: { name: "string" },
-      successes: { name: "string" },
-      analyses: { crisis_id: "integer", success_id: "integer" },
-      dresses: { crisis_id: "integer" },
-      compresses: { dress_id: "integer" },
+    ctx = new MigrationContext(Base.connection);
+    await ctx.createTable("viri", { force: true }, (t) => {
+      t.integer("octopus_id");
+      t.string("species");
     });
-    /* eslint-enable blazetrails/require-canonical-schema */
+    await ctx.createTable("octopi", { force: true }, (t) => {
+      t.string("species");
+    });
+    await ctx.createTable("passes", { force: true }, (t) => {
+      t.integer("bus_id");
+      t.integer("rides");
+    });
+    await ctx.createTable("buses", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("crises_messes", { id: false, force: true }, (t) => {
+      t.integer("crisis_id");
+      t.integer("mess_id");
+    });
+    await ctx.createTable("messes", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("crises", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("successes", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("analyses", { force: true }, (t) => {
+      t.integer("crisis_id");
+      t.integer("success_id");
+    });
+    await ctx.createTable("dresses", { force: true }, (t) => {
+      t.integer("crisis_id");
+    });
+    await ctx.createTable("compresses", { force: true }, (t) => {
+      t.integer("dress_id");
+    });
   });
 
-  function makeModels() {
-    class Virus extends Base {
-      declare octopus_id: number | null;
-      declare species: string | null;
-      declare octopus: Octopus | null;
-      declare loadBelongsTo: (name: "octopus") => Promise<Octopus | null>;
+  afterAll(async () => {
+    await ctx.dropTable(
+      "viri",
+      "octopi",
+      "passes",
+      "buses",
+      "crises_messes",
+      "messes",
+      "crises",
+      "successes",
+      "analyses",
+      "dresses",
+      "compresses",
+      { ifExists: true },
+    );
+  });
 
-      static {
-        this._tableName = "viri";
-        this.attribute("octopus_id", "integer");
-        this.attribute("species", "string");
-        this.belongsTo("octopus", {
-          className: "EsOctopus",
-          foreignKey: "octopus_id",
-        });
-      }
+  class Virus extends Base {
+    declare octopus_id: number | null;
+    declare species: string | null;
+    declare octopus: Octopus | null;
+
+    static {
+      this.attribute("octopus_id", "integer");
+      this.attribute("species", "string");
+      this.belongsTo("octopus");
     }
-    class Octopus extends Base {
-      declare species: string | null;
-      declare virus: Virus | null;
-      declare loadHasOne: (name: "virus") => Promise<Virus | null>;
+  }
+  class Octopus extends Base {
+    declare species: string | null;
+    declare virus: Virus | null;
 
-      static {
-        this._tableName = "octopi";
-        this.attribute("species", "string");
-        this.hasOne("virus", {
-          className: "EsVirus",
-          foreignKey: "octopus_id",
-        });
-      }
+    static {
+      this.attribute("species", "string");
+      this.hasOne("virus");
     }
-    class Pass extends Base {
-      declare bus_id: number | null;
-      declare rides: number | null;
-      declare bus: Bus | null;
-      declare loadBelongsTo: (name: "bus") => Promise<Bus | null>;
+  }
+  class Pass extends Base {
+    declare bus_id: number | null;
+    declare rides: number | null;
+    declare bus: Bus | null;
 
-      static {
-        this._tableName = "passes";
-        this.attribute("bus_id", "integer");
-        this.attribute("rides", "integer");
-        this.belongsTo("bus", {
-          className: "EsBus",
-          foreignKey: "bus_id",
-        });
-      }
+    static {
+      this.attribute("bus_id", "integer");
+      this.attribute("rides", "integer");
+      this.belongsTo("bus");
     }
-    class Bus extends Base {
-      declare name: string | null;
-      declare passes: AssociationProxy<Pass>;
+  }
+  class Bus extends Base {
+    declare name: string | null;
+    declare passes: AssociationProxy<Pass>;
 
-      static {
-        this._tableName = "buses";
-        this.attribute("name", "string");
-        this.hasMany("passes", {
-          className: "EsPass",
-          foreignKey: "bus_id",
-        });
-      }
+    static {
+      this.attribute("name", "string");
+      this.hasMany("passes");
     }
-    class Mess extends Base {
-      declare name: string | null;
-      declare crises: AssociationProxy<Crisis>;
+  }
+  class Mess extends Base {
+    declare name: string | null;
+    declare crises: AssociationProxy<Crisis>;
 
-      static {
-        this._tableName = "messes";
-        this.attribute("name", "string");
-        this.hasAndBelongsToMany("crises", {
-          className: "EsCrisis",
-          joinTable: "es_crises_messes",
-          foreignKey: "mess_id",
-          associationForeignKey: "crisis_id",
-        });
-      }
+    static {
+      this.attribute("name", "string");
+      this.hasAndBelongsToMany("crises");
     }
-    class Crisis extends Base {
-      declare name: string | null;
-      declare messes: AssociationProxy<Mess>;
-      declare analyses: AssociationProxy<Analysis>;
-      declare successes: AssociationProxy<Success>;
-      declare dresses: AssociationProxy<Dress>;
-      declare compresses: AssociationProxy<Compress>;
+  }
+  class Crisis extends Base {
+    declare name: string | null;
+    declare messes: AssociationProxy<Mess>;
+    declare analyses: AssociationProxy<Analysis>;
+    declare successes: AssociationProxy<Success>;
+    declare dresses: AssociationProxy<Dress>;
+    declare compresses: AssociationProxy<Compress>;
 
-      static {
-        this._tableName = "crises";
-        this.attribute("name", "string");
-        this.hasAndBelongsToMany("messes", {
-          className: "EsMess",
-          joinTable: "es_crises_messes",
-          foreignKey: "crisis_id",
-          associationForeignKey: "mess_id",
-        });
-        this.hasMany("analyses", {
-          className: "EsAnalysis",
-          foreignKey: "crisis_id",
-          dependent: "destroy",
-        });
-        this.hasMany("successes", {
-          className: "EsSuccess",
-          through: "analyses",
-          source: "success",
-        });
-        this.hasMany("dresses", {
-          className: "EsDress",
-          foreignKey: "crisis_id",
-          dependent: "destroy",
-        });
-        this.hasMany("compresses", {
-          className: "EsCompress",
-          through: "dresses",
-          source: "compresses",
-        });
-      }
+    static {
+      this.attribute("name", "string");
+      this.hasAndBelongsToMany("messes");
+      this.hasMany("analyses", { dependent: "destroy" });
+      this.hasMany("successes", { through: "analyses" });
+      this.hasMany("dresses", { dependent: "destroy" });
+      this.hasMany("compresses", { through: "dresses" });
     }
-    class Success extends Base {
-      declare name: string | null;
-      declare analyses: AssociationProxy<Analysis>;
-      declare crises: AssociationProxy<Crisis>;
+  }
+  class Analysis extends Base {
+    declare crisis_id: number | null;
+    declare success_id: number | null;
+    declare crisis: Crisis | null;
+    declare success: Success | null;
 
-      static {
-        this._tableName = "successes";
-        this.attribute("name", "string");
-        this.hasMany("analyses", {
-          className: "EsAnalysis",
-          foreignKey: "success_id",
-          dependent: "destroy",
-        });
-        this.hasMany("crises", {
-          className: "EsCrisis",
-          through: "analyses",
-          source: "crisis",
-        });
-      }
+    static {
+      this.attribute("crisis_id", "integer");
+      this.attribute("success_id", "integer");
+      this.belongsTo("crisis");
+      this.belongsTo("success");
     }
-    class Analysis extends Base {
-      declare crisis_id: number | null;
-      declare success_id: number | null;
-      declare crisis: Crisis | null;
-      declare success: Success | null;
-      declare loadBelongsTo: ((name: "crisis") => Promise<Crisis | null>) &
-        ((name: "success") => Promise<Success | null>);
+  }
+  class Success extends Base {
+    declare name: string | null;
+    declare analyses: AssociationProxy<Analysis>;
+    declare crises: AssociationProxy<Crisis>;
 
-      static {
-        this._tableName = "analyses";
-        this.attribute("crisis_id", "integer");
-        this.attribute("success_id", "integer");
-        this.belongsTo("crisis", {
-          className: "EsCrisis",
-          foreignKey: "crisis_id",
-        });
-        this.belongsTo("success", {
-          className: "EsSuccess",
-          foreignKey: "success_id",
-        });
-      }
+    static {
+      this.attribute("name", "string");
+      this.hasMany("analyses", { dependent: "destroy" });
+      this.hasMany("crises", { through: "analyses" });
     }
-    class Dress extends Base {
-      declare crisis_id: number | null;
-      declare crisis: Crisis | null;
-      declare compresses: AssociationProxy<Compress>;
-      declare loadBelongsTo: (name: "crisis") => Promise<Crisis | null>;
+  }
+  class Dress extends Base {
+    declare crisis_id: number | null;
+    declare crisis: Crisis | null;
+    declare compresses: AssociationProxy<Compress>;
 
-      static {
-        this._tableName = "dresses";
-        this.attribute("crisis_id", "integer");
-        this.belongsTo("crisis", {
-          className: "EsCrisis",
-          foreignKey: "crisis_id",
-        });
-        this.hasMany("compresses", {
-          className: "EsCompress",
-          foreignKey: "dress_id",
-        });
-      }
+    static {
+      this.attribute("crisis_id", "integer");
+      this.belongsTo("crisis");
+      this.hasMany("compresses");
     }
-    class Compress extends Base {
-      declare dress_id: number | null;
-      declare dress: Dress | null;
-      declare loadBelongsTo: (name: "dress") => Promise<Dress | null>;
+  }
+  class Compress extends Base {
+    declare dress_id: number | null;
+    declare dress: Dress | null;
 
-      static {
-        this._tableName = "compresses";
-        this.attribute("dress_id", "integer");
-        this.belongsTo("dress", {
-          className: "EsDress",
-          foreignKey: "dress_id",
-        });
-      }
+    static {
+      this.attribute("dress_id", "integer");
+      this.belongsTo("dress");
     }
-
-    registerModel("EsVirus", Virus);
-    registerModel("EsOctopus", Octopus);
-    registerModel("EsPass", Pass);
-    registerModel("EsBus", Bus);
-    registerModel("EsMess", Mess);
-    registerModel("EsCrisis", Crisis);
-    registerModel("EsSuccess", Success);
-    registerModel("EsAnalysis", Analysis);
-    registerModel("EsDress", Dress);
-    registerModel("EsCompress", Compress);
-
-    return { Virus, Octopus, Pass, Bus, Mess, Crisis, Success };
   }
 
+  registerModel("Virus", Virus);
+  registerModel("Octopus", Octopus);
+  registerModel("Pass", Pass);
+  registerModel("Bus", Bus);
+  registerModel("Mess", Mess);
+  registerModel("Crisis", Crisis);
+  registerModel("Success", Success);
+  registerModel("Analysis", Analysis);
+  registerModel("Dress", Dress);
+  registerModel("Compress", Compress);
+
   it("eager no extra singularization belongs to", async () => {
-    const { Virus } = makeModels();
     await expect(Virus.all().includes("octopus").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has one", async () => {
-    const { Octopus } = makeModels();
     await expect(Octopus.all().includes("virus").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many", async () => {
-    const { Bus } = makeModels();
     await expect(Bus.all().includes("passes").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has and belongs to many", async () => {
-    const { Crisis, Mess } = makeModels();
     await expect(Crisis.all().includes("messes").toArray()).resolves.toBeDefined();
     await expect(Mess.all().includes("crises").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many through belongs to", async () => {
-    const { Crisis } = makeModels();
     await expect(Crisis.all().includes("successes").toArray()).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many through has many", async () => {
-    const { Crisis } = makeModels();
     await expect(Crisis.all().includes("compresses").toArray()).resolves.toBeDefined();
   });
 });
