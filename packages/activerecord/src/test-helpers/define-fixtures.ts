@@ -673,11 +673,14 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // entries for labels omitted from a subset reload. The prior entry is captured
   // so we can roll back if the INSERT itself fails — `ref()` resolution must not
   // observe ids for rows that never landed in the database.
-  // Single-PK tables register a scalar id per label; composite-PK tables register a
-  // per-column key map (each key column taken from the row when a literal, else
-  // generated from the label via compositeIdentify — mirroring the row-build below).
-  // A belongs_to `ref()` into a composite target picks the association's primary-key
-  // column out of that map via resolveCompositeRefColumn.
+  // Single-PK tables register a scalar id per label up front. Composite-PK tables
+  // register a per-column key map instead, but only AFTER each row is built in the
+  // loop below — a key column may be a `ref()` whose resolved value differs from
+  // `compositeIdentify(label)`, so the registry must reflect the actual row (Rails
+  // bases generation on the resolved row, table_row.rb:127-137). A belongs_to
+  // `ref()` into a composite target picks its primary-key column out of that map via
+  // resolveCompositeRefColumn; a forward-ref (target not yet registered) falls back
+  // to compositeIdentify there.
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
     for (const label of labels) {
@@ -688,20 +691,6 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         (fixtures[label] as FixtureAttrs)[pkCol],
       );
       tableIds.set(label, id);
-    }
-  } else if (Array.isArray(pkCol)) {
-    for (const label of labels) {
-      const attrs = fixtures[label] as FixtureAttrs;
-      const generated = compositeIdentify(label, pkCol);
-      const keyMap: Record<string, number | string> = {};
-      for (const keyCol of pkCol) {
-        const v = attrs[keyCol];
-        keyMap[keyCol] =
-          (typeof v === "number" && Number.isInteger(v)) || typeof v === "string"
-            ? v
-            : generated[keyCol];
-      }
-      tableIds.set(label, keyMap);
     }
   }
   const adapterIds = declaredIdsFor(adapter);
@@ -955,6 +944,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         if (tableColumnNames !== null && !tableColumnNames.has(keyCol)) continue;
         row[keyCol] = generated[keyCol]!;
       }
+      // Register the resolved key map so a belongs_to `ref()` into this composite
+      // row reads the actual key components — including any `ref()`-valued column,
+      // whose resolved value differs from compositeIdentify(label). tableIds is the
+      // same Map already swapped into the adapter registry, so this is visible to
+      // later rows in this same set immediately.
+      const keyMap: Record<string, number | string> = {};
+      for (const keyCol of pkCol) {
+        const v = row[keyCol];
+        if (typeof v === "number" || typeof v === "string") keyMap[keyCol] = v;
+      }
+      tableIds.set(label, keyMap);
     }
 
     // Resolve enums against the row's STI subclass (Rails' reflection_class):
