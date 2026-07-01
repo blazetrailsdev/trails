@@ -986,6 +986,31 @@ export function commitAndPush(opts: {
           releaseTasksLock(lock);
           process.exit(1);
         }
+        // A "[rejected]"/"fetch first" is not always a *lost* race. The tasks
+        // repo's own `.husky/post-commit` hook auto-pushes `main` to origin in
+        // the background after every commit — including the commit we just made
+        // above. That background push and this explicit push race: when the
+        // hook's push lands first, origin/main advances to OUR commit, and git
+        // then rejects THIS push with "[rejected] main -> main (stale info /
+        // fetch first)" even though the mutation is already on origin/main. That
+        // is a success, not a lost race — resetting + retrying (or exiting with
+        // raceExitCode) would wrongly report failure for a landed mutation, the
+        // exact false-negative that produced a scary error on a clean priority
+        // flip. Distinguish the two by fetching origin/main and comparing it to
+        // our HEAD: if they match, our commit is on the remote — return success.
+        // A genuine lost race leaves origin/main at someone ELSE's commit, so
+        // this check fails and the real reset/retry path below runs unchanged.
+        try {
+          const localHead = git(["rev-parse", "HEAD"], { silent: true, cwd });
+          git(["fetch", "--quiet", "origin", "main"], { silent: true, cwd });
+          const remoteHead = git(["rev-parse", "origin/main"], { silent: true, cwd });
+          if (localHead && remoteHead && localHead === remoteHead) {
+            return;
+          }
+        } catch {
+          /* offline / no origin — can't confirm the commit landed; fall through
+             to the genuine-race reset+retry path, which is the safe default. */
+        }
         git(["reset", "--hard", "origin/main"], { silent: true, cwd });
         if (attempt === 1) {
           console.error(opts.raceMessage);
