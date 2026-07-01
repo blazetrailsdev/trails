@@ -21,7 +21,10 @@ import { polymorphicName } from "../inheritance.js";
  */
 export class CollectionAssociation extends Association {
   declare target: Base[];
-  nestedAttributesTarget: Base[] | null = null;
+  // A `null` entry is a placeholder for a rejected new record, preserving the
+  // 1:1 ordering with the assigned attributes collection (Rails
+  // nested_attributes.rb:487-547).
+  nestedAttributesTarget: (Base | null)[] | null = null;
   protected _associationIds: unknown[] | null = null;
   _pendingReplace: { newTarget: Base[]; originalTarget: Base[]; wasLoaded: boolean } | null = null;
   // trails-specific (RFC 0030): memoized named-scope relations built off the

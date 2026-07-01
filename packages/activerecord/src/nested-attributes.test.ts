@@ -1151,9 +1151,12 @@ function collectionAssociationTests(
     (pirate as any)[setter] = params;
     await pirate.save();
     const nat = (
-      pirate.association(associationName) as unknown as { nestedAttributesTarget: Base[] }
+      pirate.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
     ).nestedAttributesTarget;
-    expect(nat.map((r) => String(r.id))).toEqual([String(child1.id), String(child2.id)]);
+    expect(nat.map((r) => (r ? String(r.id) : null))).toEqual([
+      String(child1.id),
+      String(child2.id),
+    ]);
   });
 
   it("assigning nested attributes target with nil placeholder for rejected item", async () => {

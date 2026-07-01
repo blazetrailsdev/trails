@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import type { CollectionAssociation } from "./associations/collection-association.js";
 import {
   modelRegistry,
   _cacheSingularTarget,
@@ -628,6 +629,19 @@ function storePendingNestedAttributes(
 function nestedTypeName(value: unknown): string {
   if (value === null) return "NilClass";
   if (value === undefined) return "undefined";
+  switch (typeof value) {
+    case "boolean":
+      return value ? "TrueClass" : "FalseClass";
+    case "number":
+      return Number.isInteger(value) ? "Integer" : "Float";
+    case "bigint":
+      return "Integer";
+    case "string":
+      return "String";
+    case "symbol":
+      return "Symbol";
+  }
+  // Objects/arrays: JS constructor name aligns with Ruby's (Array, Hash-likes, …).
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
@@ -792,6 +806,15 @@ export function assignNestedAttributesForCollectionAssociation(
   // Rails collects the assignment's result records into `nested_attributes_target`
   // (association's accessor), preserving order and inserting a `nil` placeholder
   // for a rejected new record (nested_attributes.rb:520-544).
+  //
+  // The `else` (non-autosave existing-record) branch does NOT append to
+  // `nestedTarget`, which would break that 1:1 ordering — but it is unreachable
+  // for any `accepts_nested_attributes_for` collection: `acceptsNestedAttributesFor`
+  // unconditionally sets `assocExists.options.autosave = true` (above), and
+  // `assocDef` is re-read from the live `_associations` array on every call, so
+  // `isAutosave` is always true here. The branch remains only as a guard for a
+  // hypothetical direct caller on a non-autosave collection (which never sets a
+  // nestedAttributesTarget and defers everything to the post-save flush).
   const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
@@ -812,9 +835,8 @@ export function assignNestedAttributesForCollectionAssociation(
   if (deferred.length > 0) {
     storePendingNestedAttributes(record, associationName, deferred);
   }
-  (
-    record.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
-  ).nestedAttributesTarget = nestedTarget;
+  (record.association(associationName) as CollectionAssociation).nestedAttributesTarget =
+    nestedTarget;
 }
 
 /**
