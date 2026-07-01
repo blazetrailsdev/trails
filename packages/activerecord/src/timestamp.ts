@@ -273,15 +273,62 @@ interface TimestampInstanceHost {
 
 export function touchAttributesWithTime(
   this: TimestampHost,
-  ...names: string[]
+  // Mirrors Rails' `def touch_attributes_with_time(*names, time: nil)` — the
+  // splatted column names followed by the (nullable) `time` keyword. TS forbids
+  // an *optional* element after a rest element, so `time` is required at the
+  // type level; callers pass `undefined` for the current-time default.
+  ...args: [...names: string[], time: Temporal.Instant | undefined]
 ): Record<string, Temporal.Instant> {
-  const time = currentTimeFromProperTimezone();
+  const names = args.slice(0, -1) as string[];
+  const time = args[args.length - 1] as Temporal.Instant | undefined;
+  const resolvedTime = time ?? currentTimeFromProperTimezone();
   const resolved = names.map((n) => this._attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
   const allNames = [...new Set([...updateAttrs, ...resolved])];
   const result: Record<string, Temporal.Instant> = {};
-  for (const name of allNames) result[name] = time;
+  for (const name of allNames) result[name] = resolvedTime;
   return result;
+}
+
+/**
+ * The `touch:` option accepted by counter-cache mutators
+ * (`update_counters` / `reset_counters` / `increment_counter`). Mirrors
+ * Rails, where `touch` may be `true`, a column name, an array of column
+ * names, or a `{ time: }` hash (optionally alongside column names).
+ */
+export type CounterCacheTouchOption =
+  | boolean
+  | string
+  | Array<string | { time?: Temporal.Instant }>
+  | { time?: Temporal.Instant };
+
+/**
+ * Parse a counter-cache `touch:` option into the `names` + `time` arguments
+ * for `touchAttributesWithTime`, mirroring the inline branch Rails runs in
+ * both `Relation#update_counters` (relation.rb:935-939) and
+ * `CounterCache::ClassMethods#reset_counters` (counter_cache.rb:61-66):
+ *
+ *   names = touch if touch != true
+ *   names = Array.wrap(names)
+ *   options = names.extract_options!   # the trailing `{ time: }` hash
+ *
+ * `touch: []` yields no names (not a skip): like Rails, the caller then calls
+ * `touch_attributes_with_time()` with none, still touching the default
+ * update-timestamp columns.
+ */
+export function parseCounterCacheTouch(touch: CounterCacheTouchOption): {
+  names: string[];
+  time?: Temporal.Instant;
+} {
+  const wrapped: Array<string | { time?: Temporal.Instant }> =
+    touch === true || touch === false ? [] : Array.isArray(touch) ? touch : [touch];
+  // Mirror Ruby's Array#extract_options!: a trailing plain-object arg is the
+  // `{ time: }` keyword hash, not a column name.
+  const last = wrapped[wrapped.length - 1];
+  if (last !== undefined && typeof last === "object") {
+    return { names: wrapped.slice(0, -1) as string[], time: last.time };
+  }
+  return { names: wrapped as string[] };
 }
 
 export function timestampAttributesForCreateInModel(this: TimestampHost): string[] {

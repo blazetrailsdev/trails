@@ -124,7 +124,11 @@ import {
   getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
 } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
-import { touchAttributesWithTime } from "./timestamp.js";
+import {
+  touchAttributesWithTime,
+  parseCounterCacheTouch,
+  type CounterCacheTouchOption,
+} from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
 import {
   renderBind as _renderBind,
@@ -4137,7 +4141,7 @@ export class Relation<T extends Base> {
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
     // so optimistic locking (lock_version increment) is applied — mirrors Rails
     // touch_all which calls update_all internally (relation.rb).
-    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
+    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, undefined);
     const updates: Record<string, unknown> = {};
     for (const [col, time] of Object.entries(touchUpdates)) {
       updates[col] = new Nodes.Quoted(time);
@@ -6318,7 +6322,7 @@ export class Relation<T extends Base> {
    */
   async updateCounters(
     counters: Record<string, number | { time?: Temporal.Instant }>,
-    options?: { touch?: boolean | string | string[] | { time?: Temporal.Instant } },
+    options?: { touch?: CounterCacheTouchOption },
   ): Promise<number> {
     if (this._isNone) return 0;
 
@@ -6342,38 +6346,17 @@ export class Relation<T extends Base> {
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
-    const touchOption = touchFromCounters ?? options?.touch;
+    const touchOption = (touchFromCounters ?? options?.touch) as
+      | CounterCacheTouchOption
+      | undefined;
     if (touchOption) {
-      // `touch: []` is an explicit "skip timestamp updates" signal. Rails'
-      // counter_cache test `update counters doesn't touch timestamps with
-      // touch: []` asserts this behavior (its Rails implementation is
-      // incidentally a no-op because the test never reloads the record).
-      const isEmptyArray = Array.isArray(touchOption) && touchOption.length === 0;
-      if (!isEmptyArray) {
-        // touch: { time: now } — Rails: when touch is a Hash, extract :time for explicit timestamp
-        const explicitTime =
-          touchOption !== null &&
-          typeof touchOption === "object" &&
-          !Array.isArray(touchOption) &&
-          "time" in touchOption
-            ? (touchOption as { time: Temporal.Instant }).time
-            : undefined;
-
-        if (explicitTime) {
-          // Explicit time: resolve timestamp columns (same as touchAttributesWithTime) but
-          // use the given time instead of currentTimeFromProperTimezone().
-          const attrs = touchAttributesWithTime.call(this._modelClass);
-          for (const col of Object.keys(attrs)) {
-            updates[col] = new Nodes.Quoted(explicitTime);
-          }
-        } else {
-          const names =
-            touchOption === true ? [] : ([] as string[]).concat(touchOption as string | string[]);
-          const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names);
-          for (const [col, time] of Object.entries(touchUpdates)) {
-            updates[col] = new Nodes.Quoted(time);
-          }
-        }
+      // Mirror Rails relation.rb: parse touch into names + time (`{ time: }`
+      // hash form; `touch: []` → no names), then touch the update-timestamp
+      // columns via touchAttributesWithTime — same call Rails makes.
+      const { names, time } = parseCounterCacheTouch(touchOption);
+      const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
+      for (const [col, t] of Object.entries(touchUpdates)) {
+        updates[col] = new Nodes.Quoted(t);
       }
     }
 
