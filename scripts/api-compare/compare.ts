@@ -1782,7 +1782,17 @@ export function main() {
   const jsonPath = path.join(OUTPUT_DIR, `api-comparison${modeSuffix}.json`);
   fs.writeFileSync(
     jsonPath,
-    JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
+    // Strip bodyHashes here: it's a large per-pair list that lives in its own
+    // artifact (body-hashes.json below); embedding it in the coverage report
+    // too would duplicate ~9k records for no consumer.
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        results: results.map(({ bodyHashes: _bodyHashes, ...rest }) => rest),
+      },
+      null,
+      2,
+    ),
   );
 
   // Advisory arity artifact — always written; flat across packages. Per-mode

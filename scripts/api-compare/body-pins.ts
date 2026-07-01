@@ -165,21 +165,22 @@ export function pinPairs(
   select: { rubyFile: string } | { all: true },
 ): BodyPin[] {
   const byKey = new Map<string, BodyPin>(pins.map((p) => [keyOf(p), p]));
-  for (const [key, digest] of currentDigests(records)) {
-    const [pkg, rubyFile, rubyName] = splitKey(key);
-    if ("rubyFile" in select && rubyFile !== select.rubyFile) continue;
+  for (const r of records) {
+    if ("rubyFile" in select && r.rubyFile !== select.rubyFile) continue;
+    const key = keyOf(r);
+    // Records dedupe to one pin per key (a Ruby method can appear under several
+    // TS candidates, all sharing its body digest); first sighting wins.
+    if (byKey.get(key)?.digest === r.digest) continue;
     const prior = byKey.get(key);
-    byKey.set(key, { package: pkg, rubyFile, rubyName, digest, reason: prior?.reason });
+    byKey.set(key, {
+      package: r.package,
+      rubyFile: r.rubyFile,
+      rubyName: r.rubyName,
+      digest: r.digest,
+      reason: prior?.reason,
+    });
   }
   return sortPins([...byKey.values()]);
-}
-
-// keyOf is `${package} ${rubyFile} ${rubyName}`; rubyName can't contain a space
-// but rubyFile/package can't either in practice, so split on the first two.
-function splitKey(key: string): [string, string, string] {
-  const first = key.indexOf(" ");
-  const second = key.indexOf(" ", first + 1);
-  return [key.slice(0, first), key.slice(first + 1, second), key.slice(second + 1)];
 }
 
 export async function readJson<T>(file: string): Promise<T> {
