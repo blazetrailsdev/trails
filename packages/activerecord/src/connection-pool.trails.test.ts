@@ -555,7 +555,7 @@ describe("ConnectionPool schema cache", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-lazy-load-"));
     const dbFile = path.join(tmp, "lazy.sqlite3");
     const cacheFile = path.join(tmp, "schema_cache.json");
-    await writeCacheFixture(cacheFile, "gadgets", 0);
+    await writeCacheFixture(cacheFile, "more_testings", 0);
 
     const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
     SchemaReflection.lazilyLoadSchemaCache = true;
@@ -575,12 +575,12 @@ describe("ConnectionPool schema cache", () => {
       pool.releaseConnection();
       await pool._lazyLoadPromise;
       // BoundSchemaReflection side:
-      expect(pool.schemaCache.isCached("gadgets")).toBe(true);
+      expect(pool.schemaCache.isCached("more_testings")).toBe(true);
       // Adapter-visible raw cache (poolConfig.schemaCache) — after
       // lazy load the reflection's internal cache is propagated so
       // adapter.schemaCache consumers see preloaded data without DB.
       expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isCached("gadgets")).toBe(true);
+      expect(pool.poolConfig.schemaCache!.isCached("more_testings")).toBe(true);
     } finally {
       SchemaReflection.lazilyLoadSchemaCache = prevLazy;
       await closePoolConnections(pool);
@@ -829,7 +829,7 @@ describe("ConnectionPool schema cache", () => {
     const seeded = new BetterSQLite3Adapter(dbFile);
     try {
       await seeded.executeMutation(
-        "CREATE TABLE gizmos (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
+        "CREATE TABLE testings (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
       );
     } finally {
       await seeded.close();
@@ -850,13 +850,13 @@ describe("ConnectionPool schema cache", () => {
       const parsed = JSON.parse(fs.readFileSync(filename, "utf8")) as {
         columns: Record<string, unknown[]>;
       };
-      expect(Object.keys(parsed.columns)).toContain("gizmos");
+      expect(Object.keys(parsed.columns)).toContain("testings");
     } finally {
       await closePoolConnections(pool);
-      // Explicit teardown for the raw-created `gizmos` table (also removed with
+      // Explicit teardown for the raw-created `testings` table (also removed with
       // tmp below) to balance require-table-teardown.
       const cleanup = new BetterSQLite3Adapter(dbFile);
-      await cleanup.executeMutation("DROP TABLE IF EXISTS gizmos");
+      await cleanup.executeMutation("DROP TABLE IF EXISTS testings");
       await cleanup.close();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
