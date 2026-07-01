@@ -177,14 +177,21 @@ function constructorToken(ctor: object): number {
   return token;
 }
 
-// Serialize a scalar or composite id into a stable string component. Unlike
+// Serialize a scalar or composite id into a stable, injective string. Unlike
 // `JSON.stringify`, this tolerates `bigint` values, which trails' `big_integer`
-// type preserves and which Rails hashes without issue via `id.hash`.
+// type preserves and which Rails hashes without issue via `id.hash`. Array
+// elements are length-prefixed so component boundaries can never collapse —
+// Rails' `Array#hash` likewise preserves element boundaries, so two distinct
+// composite ids must not share a key (`core.rb:641-648`).
 function serializeIdForHash(id: unknown): string {
   if (Array.isArray(id)) {
-    return id.map(serializeIdForHash).join(",");
+    return `A${id.map((el) => lengthPrefixed(serializeIdForHash(el))).join("")}`;
   }
-  return `${typeof id}:${String(id)}`;
+  return `S${typeof id}:${String(id)}`;
+}
+
+function lengthPrefixed(value: string): string {
+  return `${value.length}:${value}`;
 }
 
 /**
