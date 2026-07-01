@@ -41,9 +41,11 @@
  *                 other packages never contribute this metric to their summary
  *                 totals or the JSON. Report-only: no CI gate, no exclude.json,
  *                 does not affect any count. Emitted to the JSON artifact
- *                 regardless of this flag. Compares assertion *counts* only;
- *                 comparing assertion *expectations* (kinds / expected values)
- *                 is planned follow-up.
+ *                 regardless of this flag. By default the section prints
+ *                 per-file mismatch counts; add --missing to expand the
+ *                 per-test `rails N vs trails M` detail. Compares assertion
+ *                 *counts* only; comparing assertion *expectations* (kinds /
+ *                 expected values) is planned follow-up.
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -877,12 +879,24 @@ function main() {
         `  FUTURE WORK: compares assertion *counts* only; comparing assertion *expectations*`,
       );
       console.log(`  (kinds / expected values) is planned follow-up, not implemented.`);
+      // Per-test lines are verbose (thousands of them); gate them on --missing,
+      // mirroring how the per-file table expands missing-test names only under
+      // --missing. Without it, show just the per-file mismatch counts.
+      console.log(
+        showMissing
+          ? `  (per-test detail shown; pass without --missing for per-file counts only)`
+          : `  (per-file counts; pass --missing to expand per-test detail)`,
+      );
       console.log(`  ${"-".repeat(86)}`);
       for (const f of filesWithAssertionMismatch) {
-        for (const am of f.assertionMismatches!) {
-          console.log(
-            `    ${f.rubyFile} › ${am.description} — rails ${am.railsCount} vs trails ${am.trailsCount}`,
-          );
+        if (showMissing) {
+          for (const am of f.assertionMismatches!) {
+            console.log(
+              `    ${f.rubyFile} › ${am.description} — rails ${am.railsCount} vs trails ${am.trailsCount}`,
+            );
+          }
+        } else {
+          console.log(`    ${f.rubyFile} — ${f.assertionMismatches!.length} mismatches`);
         }
       }
       console.log("");
