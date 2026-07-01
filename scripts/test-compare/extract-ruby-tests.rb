@@ -51,12 +51,11 @@ SKIP_PATTERNS = [
   /\/migration\//,  # Migration test infrastructure (not test cases themselves)
 ]
 
-# Is `name` an assertion call? Matched by PREFIX (not a fixed list) so we count
-# the full breadth of Rails assertions symmetrically with the TS side (see
-# isAssertionCallee in extract-ts-core.ts): the `assert_*`/`refute_*` families
-# incl. Rails' many custom helpers (assert_queries_count, assert_no_queries,
-# assert_not_predicate, assert_cycle, …) a fixed whitelist kept missing, the
-# `must_*`/`wont_*` spec forms, and the `expect` primitive. The `(_|\z)`/`_`
+# Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
+# TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
+# of Rails assertions: the `assert_*`/`refute_*` families incl. custom helpers
+# (assert_queries_count, assert_no_queries, assert_cycle, …) a whitelist kept
+# missing, the `must_*`/`wont_*` spec forms, and `expect`. The `(_|\z)`/`_`
 # anchors keep look-alikes (`asserted`, `assertion`) out.
 def assertion_method?(name)
   return false unless name
@@ -884,18 +883,20 @@ class TestExtractor
     when :command, :fcall
       name = ident_name(node[1])
       results << name if assertion_method?(name)
-    when :call
-      # method.must_equal etc
+    when :vcall
+      # bare no-arg call: `assert_auto_incremented`
+      name = ident_name(node[1])
+      results << name if assertion_method?(name)
+    when :call, :command_call
+      # receiver form: `x.must_equal y` / `sql.must_be_like %{…}`
       name = ident_name(node[3]) if node[3]
       results << name if assertion_method?(name)
     end
 
-    # NOTE: a parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
-    # [:fcall, ...], [:arg_paren, ...]]`. We deliberately do NOT match
-    # `:method_add_arg` here — the recursion below descends into its `:fcall`
-    # child, which the branch above already records. Matching the wrapper too
-    # would count the call twice (harmless under the uniq'd `assertions` set,
-    # but wrong for the raw `assertionCount`).
+    # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg, [:fcall,
+    # ...], ...]`; we do NOT match `:method_add_arg` because the recursion below
+    # descends into its `:fcall` child, already recorded above — matching the
+    # wrapper too would double-count (invisible under the uniq'd `assertions`).
     node.each { |child| find_assertions(child, results) if child.is_a?(Array) }
   end
 

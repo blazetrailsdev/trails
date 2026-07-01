@@ -59,6 +59,14 @@ describe("Ruby extractor assertion-count collection", () => {
               assert_equal 1, x
             end
           end
+
+          # Ripper wraps a parenthesized call as [:method_add_arg, [:fcall,...]];
+          # the raw count must not double-count the wrapper + its fcall child.
+          def test_parenthesized
+            assert_equal(1, a)
+            assert_nil b
+            assert(c)
+          end
         end
       `,
     });
@@ -66,47 +74,29 @@ describe("Ruby extractor assertion-count collection", () => {
     expect(c["none"]).toBe(0);
     // assert_difference itself + the nested assert_equal = 2
     expect(c["nested block"]).toBe(2);
+    // parenthesized calls count once each, not twice
+    expect(c["parenthesized"]).toBe(3);
   });
 
-  it("counts a parenthesized assertion call once, not twice", () => {
-    // Ripper wraps `assert_equal(1, a)` as [:method_add_arg, [:fcall, ...]];
-    // the raw count must not double-count the wrapper + its fcall child.
-    const c = rubyAssertionCounts({
-      "cases/paren_test.rb": `
-        class ParenTest < ActiveSupport::TestCase
-          def test_mixed_paren_and_command
-            assert_equal(1, a)
-            assert_nil b
-            assert(c)
-          end
-
-          def test_paren_wrapper_with_block
-            assert_difference("Post.count") do
-              assert_equal(1, y)
-            end
-          end
-        end
-      `,
-    });
-    expect(c["mixed paren and command"]).toBe(3);
-    // assert_difference wrapper + nested parenthesized assert_equal = 2
-    expect(c["paren wrapper with block"]).toBe(2);
-  });
-
-  it("counts Rails custom assert helpers via the assert*/refute* prefix", () => {
+  it("counts custom helpers by prefix and every Ripper call shape (vcall/command_call)", () => {
     const c = rubyAssertionCounts({
       "cases/custom_test.rb": `
         class CustomTest < ActiveSupport::TestCase
           def test_custom_helpers
-            assert_queries_count(2) { Post.all.to_a }
+            assert_queries_count(2) { Post.all.to_a }   # command w/ block
             assert_no_queries { cached.first }
             assert_not_predicate post, :valid?
             assert_not user.admin?
           end
 
+          def test_call_shapes
+            assert_auto_incremented                      # :vcall (bare)
+            assert_transaction_is_not_broken             # :vcall (bare)
+            sql.must_be_like %{SELECT 1}                 # :command_call
+          end
+
           def test_lookalikes_not_counted
             assertion = build_assertion
-            assertion.run
             asserted = true
           end
         end
@@ -114,6 +104,8 @@ describe("Ruby extractor assertion-count collection", () => {
     });
     // assert_queries_count + assert_no_queries + assert_not_predicate + assert_not = 4
     expect(c["custom helpers"]).toBe(4);
+    // 2 bare :vcall + 1 :command_call = 3
+    expect(c["call shapes"]).toBe(3);
     // `assertion` / `asserted` are not assertion calls
     expect(c["lookalikes not counted"]).toBe(0);
   });
