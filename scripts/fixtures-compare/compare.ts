@@ -12,6 +12,10 @@ import type {
   Schema,
   TableSchema,
 } from "../../packages/activerecord/src/test-helpers/define-schema.js";
+import {
+  isWrappedSchema,
+  columnsOf,
+} from "../../packages/activerecord/src/test-helpers/define-schema.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -506,26 +510,24 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   return false;
 }
 
-// Mirror of the (non-exported) discriminator in define-schema.ts. Kept in
-// strict step with `isWrappedSchema` there (require well-typed primaryKey,
-// columns map, AND no other top-level keys; PK arrays must be all strings).
-// Returns the column map plus whether `defineSchema` creates an implicit
-// `id` column — only the legacy shape gets one; define-schema.ts sets
-// `createOpts.id = false` for BOTH `primaryKey: false` and `primaryKey:
-// string[]`, so any wrapped form has no implicit `id`.
-const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes"]);
+// Delegate the wrapped/legacy discrimination to the real `isWrappedSchema`
+// (imported from define-schema.ts) so this stays in lock-step — a hand-rolled
+// mirror silently misclassified the `indexes`-only wrapper form (a wrapper with
+// `columns` + `indexes` but no `primaryKey`, e.g. canonical `companies`), which
+// `isWrappedSchema` accepts but the old `"primaryKey" in table` check rejected.
+//
+// `hasImplicitId` mirrors define-schema.ts's `createOpts`: the implicit
+// auto-increment `id` is suppressed only for `primaryKey: false` and the array
+// (composite / single-serial) form; a wrapper whose `primaryKey` is omitted
+// (indexes-only) still gets the default `id`, exactly as the legacy shape does.
 function tableShape(table: TableSchema): {
   columns: Record<string, unknown>;
   hasImplicitId: boolean;
 } {
-  if (table && typeof table === "object" && "primaryKey" in table) {
-    const pk = (table as { primaryKey?: unknown }).primaryKey;
-    const cols = (table as { columns?: unknown }).columns;
-    const pkOk = pk === false || (Array.isArray(pk) && pk.every((v) => typeof v === "string"));
-    const onlyWrapperKeys = Object.keys(table).every((k) => WRAPPER_KEYS.has(k));
-    if (pkOk && cols && typeof cols === "object" && onlyWrapperKeys) {
-      return { columns: cols as Record<string, unknown>, hasImplicitId: false };
-    }
+  if (isWrappedSchema(table)) {
+    const pk = table.primaryKey;
+    const hasImplicitId = pk !== false && !Array.isArray(pk);
+    return { columns: columnsOf(table) as Record<string, unknown>, hasImplicitId };
   }
   return { columns: table as Record<string, unknown>, hasImplicitId: true };
 }
