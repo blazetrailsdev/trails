@@ -141,13 +141,30 @@ export async function prettyPrint(
  * Mirrors: ActiveRecord::Core#==
  */
 export function isEqual(this: CoreRecord, other: unknown): boolean {
+  // Rails' Object#== identity check (`super`): same exact object.
+  if (this === other) return true;
   if (other === null || other === undefined) return false;
   if (typeof other !== "object") return false;
-  if (!(other instanceof (this.constructor as any))) return false;
+  // `instance_of?(self.class)` is an exact-class match, not subclass.
   if (this.constructor !== (other as any).constructor) return false;
-  const thisId = this.id;
-  const otherId = (other as CoreRecord).id;
-  return thisId != null && thisId === otherId;
+  // A record with no primary-key values present (a new record whose id
+  // columns are all nil) is different from any other record. For a composite
+  // primary key this requires every id column to be set.
+  if (!(this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent())
+    return false;
+  return primaryKeyValuesEqual(this.id, (other as CoreRecord).id);
+}
+
+/**
+ * Compare two primary-key values by value. Composite keys are arrays and must
+ * be compared element-wise; scalar keys compare directly.
+ */
+function primaryKeyValuesEqual(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((value, index) => value === b[index]);
+  }
+  return a === b;
 }
 
 /**
