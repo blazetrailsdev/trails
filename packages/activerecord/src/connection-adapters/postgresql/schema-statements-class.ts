@@ -1853,6 +1853,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
        WHERE ${tableCondition}
          AND i.indisprimary = true
+       -- Resolve the FIRST primary-key column deterministically (mirrors Rails
+       -- pk_and_sequence_for's cons.conkey[1]); without the ORDER BY a composite
+       -- PK's ANY(i.indkey) join could return an arbitrary column under LIMIT 1.
+       ORDER BY array_position(i.indkey, a.attnum)
        LIMIT 1`,
       binds,
     );
