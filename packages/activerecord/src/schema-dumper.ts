@@ -106,6 +106,10 @@ function conciseOptions<T>(
   // An expression index carries `columns` as a string; a per-column option map
   // only applies to a column array, so guard before comparing counts.
   const values = Object.values(options as Record<string, T>);
+  // An empty per-column map means the option is absent (e.g. sqlite reflects
+  // `orders: {}` for an index with no explicit sort order) — omit it entirely
+  // rather than dumping a stray `order: {}`. Rails never emits an empty map.
+  if (values.length === 0) return undefined;
   if (Array.isArray(columns) && columns.length === values.length && new Set(values).size === 1) {
     return values[0];
   }

@@ -483,15 +483,46 @@ export const TEST_SCHEMA: Schema = {
   },
 
   companies: {
-    type: "string",
-    firm_id: "integer",
-    firm_name: "string",
-    name: "string",
-    client_of: "big_integer",
-    rating: { type: "big_integer", default: 1 },
-    account_id: "integer",
-    description: { type: "string", default: "" },
-    status: { type: "integer", default: 0 },
+    columns: {
+      type: "string",
+      firm_id: "integer",
+      firm_name: "string",
+      name: "string",
+      client_of: "big_integer",
+      rating: { type: "big_integer", default: 1 },
+      account_id: "integer",
+      description: { type: "string", default: "" },
+      status: { type: "integer", default: 0 },
+    },
+    // Mirrors schema.rb `create_table :companies` secondary indexes, in order.
+    // Adapter-gated DDL (sub-part length → MySQL, nulls-not-distinct → PG≥15,
+    // expression index → supports_expression_index?) is dropped by defineSchema
+    // / SchemaCreation on unsupporting backends, matching Rails.
+    indexes: [
+      // Rails declares `order: :desc` (scalar). Stored as an explicit per-column
+      // map so the value survives the shared-worker reconstruct path (a scalar
+      // order is dropped by the connected `add_index` path); the dumper collapses
+      // the uniform map back to Rails' scalar `order: :desc` form.
+      { columns: ["name", "rating"], order: { name: "desc", rating: "desc" } },
+      { columns: ["name", "description"], length: 10 },
+      {
+        columns: ["firm_id", "type", "rating"],
+        name: "company_index",
+        length: { type: 10 },
+        order: { rating: "desc" },
+      },
+      {
+        columns: ["firm_id", "type"],
+        name: "company_partial_index",
+        where: "(rating > 10)",
+      },
+      { columns: ["firm_id"], name: "company_nulls_not_distinct", nullsNotDistinct: true },
+      { columns: "name", name: "company_name_index", using: "btree" },
+      {
+        columns: "(CASE WHEN rating > 0 THEN lower(name) END) DESC",
+        name: "company_expression_index",
+      },
+    ],
   },
 
   content: {

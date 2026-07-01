@@ -66,6 +66,9 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `supports_partial_index?`: PostgreSQL + SQLite true, abstract default false.
   // (postgresql_adapter.rb:200, sqlite3_adapter.rb:151)
   partial_index: ["postgres", "sqlite"],
+  // `supports_index_sort_order?`: PostgreSQL + MySQL + SQLite all true.
+  // (postgresql_adapter.rb:196, abstract_mysql_adapter.rb:100, sqlite3_adapter.rb:147)
+  index_sort_order: ALL,
   // `supports_index_include?`: PostgreSQL ≥ 11.0 (pg17 qualifies), abstract default false.
   // (postgresql_adapter.rb:204)
   index_include: ["postgres"],
