@@ -11,18 +11,9 @@
  * accommodations, not behavioral deviations.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import {
-  Base,
-  RecordNotFound,
-  registerModel,
-  acceptsNestedAttributesFor,
-  TooManyRecords,
-} from "./index.js";
+import { Base, RecordNotFound, registerModel, TooManyRecords } from "./index.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { Owner } from "./test-helpers/models/owner.js";
@@ -42,16 +33,26 @@ import { Message } from "./test-helpers/models/message.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
-function registerCommonModels(): void {
-  registerModel(Pirate);
-  registerModel(Ship);
-  registerModel(Bird);
-  registerModel(Parrot);
-  registerModel(Treasure);
-  registerModel(ShipPart);
-  registerModel(Developer);
-  registerModel(Human);
-  registerModel(Interest);
+// The canonical models these tests exercise, declared as (data-less) fixture
+// sets. Declaring a set derives its slice of TEST_SCHEMA (plus HABTM join
+// tables) and auto-registers the model on resolution — replacing the manual
+// `defineSchema` + `registerModel` bootstrap. Empty data means no seeded rows;
+// each test builds the records it needs (matching Rails, which doesn't declare
+// fixtures for these classes).
+type ExtraFixtures = Record<string, readonly [typeof Base, Record<string, unknown>]>;
+function coreFixtures(extra: ExtraFixtures = {}) {
+  return fixtures({
+    pirates: [Pirate, {}],
+    ships: [Ship, {}],
+    birds: [Bird, {}],
+    parrots: [Parrot, {}],
+    treasures: [Treasure, {}],
+    ship_parts: [ShipPart, {}],
+    developers: [Developer, {}],
+    humans: [Human, {}],
+    interests: [Interest, {}],
+    ...extra,
+  });
 }
 
 async function shipOf(pirate: Pirate): Promise<Ship | null> {
@@ -66,17 +67,15 @@ async function pirateOf(ship: Ship): Promise<Pirate | null> {
 // TestNestedAttributesInGeneral
 // ==========================================================================
 describe("TestNestedAttributesInGeneral", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
+  coreFixtures({
+    cpk_orders: [CpkOrder, {}],
+    cpk_books: [CpkBook, {}],
+    cpk_chapters: [CpkChapter, {}],
   });
-
-  beforeAll(registerCommonModels);
 
   // teardown { Pirate.accepts_nested_attributes_for :ship, allow_destroy: true, reject_if: proc(&:empty?) }
   function resetShipConfig(): void {
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
       rejectIf: (a) => Object.keys(a).length === 0,
     });
@@ -128,7 +127,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should raise an ArgumentError for non existing associations", () => {
-    expect(() => acceptsNestedAttributesFor(Pirate, "honesty")).toThrow(/No association found/);
+    expect(() => Pirate.acceptsNestedAttributesFor("honesty")).toThrow(/No association found/);
   });
 
   // tracked-pending-convergence (0023-surfaced-deviations): building a nested
@@ -148,7 +147,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should disable allow destroy by default", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship");
+    Pirate.acceptsNestedAttributesFor("ship");
     const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
@@ -169,7 +168,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("reject if method without arguments", async () => {
     // Rails `reject_if: :new_record?` — the method runs on the owner; a new
     // (unsaved) pirate rejects the nested ship.
-    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     (pirate as any).shipAttributes = { name: "Black Pearl" };
     const before = Number(await Ship.count());
@@ -181,7 +180,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("reject if method with arguments", async () => {
     // Rails `reject_if: :reject_empty_ships_on_create` —
     // `attributes.delete("_reject_me_if_new").present? && !persisted?`
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (attrs, rec) => {
         const v = attrs["_reject_me_if_new"];
         return v != null && v !== "" && v !== false && !rec.isPersisted();
@@ -205,7 +204,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("allows class to override setter and call super", () => {
     class MeanPirate extends Pirate {}
     registerModel("MeanPirate", MeanPirate);
-    acceptsNestedAttributesFor(MeanPirate, "parrot");
+    MeanPirate.acceptsNestedAttributesFor("parrot");
     const proto = MeanPirate.prototype as unknown as Record<string, unknown>;
     const original = Object.getOwnPropertyDescriptor(proto, "parrotAttributes")!.set!;
     Object.defineProperty(proto, "parrotAttributes", {
@@ -223,10 +222,10 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("accepts nested attributes for can be overridden in subclasses", () => {
-    acceptsNestedAttributesFor(Pirate, "parrot");
+    Pirate.acceptsNestedAttributesFor("parrot");
     class MeanPirate extends Pirate {}
     registerModel("MeanPirate", MeanPirate);
-    acceptsNestedAttributesFor(MeanPirate, "parrot");
+    MeanPirate.acceptsNestedAttributesFor("parrot");
 
     const meanPirate = new MeanPirate();
     (meanPirate as any).parrotAttributes = { name: "James" };
@@ -235,7 +234,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with indifferent keys", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: (a) => !a["name"] });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !a["name"] });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     (pirate as any).shipAttributes = { name: "Hello Pearl" };
     const before = Number(await Ship.count());
@@ -245,7 +244,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with a proc which returns true always for has one", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: () => true });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: () => true });
     const pirate = await Pirate.create({ catchphrase: "Stop wastin' me time" });
     const ship = await (pirate as any).createShip({ name: "s1" });
     await pirate.update({ shipAttributes: { name: "s2", id: ship.id } });
@@ -254,7 +253,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reuse already built new record", () => {
-    acceptsNestedAttributesFor(Pirate, "ship");
+    Pirate.acceptsNestedAttributesFor("ship");
     const pirate = new Pirate();
     const shipBuiltFirst = (pirate.association("ship") as any).build();
     (pirate as any).shipAttributes = { name: "Ship 1" };
@@ -263,7 +262,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("do not allow assigning foreign key when reusing existing new record", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship");
+    Pirate.acceptsNestedAttributesFor("ship");
     const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
@@ -274,7 +273,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with a proc which returns true always for has many", async () => {
-    acceptsNestedAttributesFor(Human, "interests", { rejectIf: () => true });
+    Human.acceptsNestedAttributesFor("interests", { rejectIf: () => true });
     const human = await Human.create({ name: "John" });
     const interest = await (human as any).interests.create({ topic: "photography" });
     await human.update({ interestsAttributes: { topic: "gardening", id: interest.id } });
@@ -282,7 +281,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("destroy works independent of reject if", async () => {
-    acceptsNestedAttributesFor(Human, "interests", { rejectIf: () => true, allowDestroy: true });
+    Human.acceptsNestedAttributesFor("interests", { rejectIf: () => true, allowDestroy: true });
     const human = await Human.create({ name: "Jon" });
     const interest = await (human as any).interests.create({ topic: "the ladies" });
     await human.update({ interestsAttributes: { _destroy: "1", id: interest.id } });
@@ -291,7 +290,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if is not short circuited if allow destroy is false", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (a) => a["name"] === "The Golden Hind",
       allowDestroy: false,
     });
@@ -316,7 +315,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("has many association updating a single record", async () => {
-    acceptsNestedAttributesFor(Human, "interests");
+    Human.acceptsNestedAttributesFor("interests");
     const human = await Human.create({ name: "John" });
     const interest = await (human as any).interests.create({ topic: "photography" });
     await human.update({ interestsAttributes: { topic: "gardening", id: interest.id } });
@@ -324,7 +323,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with blank nested attributes id", async () => {
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (a) => a["id"] == null || a["id"] === "",
     });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
@@ -334,7 +333,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("first and array index zero methods return the same value when nested attributes are set to update existing record", async () => {
-    acceptsNestedAttributesFor(Human, "interests");
+    Human.acceptsNestedAttributesFor("interests");
     const created = await Human.create({ name: "John" });
     const interest = await (created as any).interests.create({ topic: "gardening" });
     const human = await Human.find(created.id);
@@ -345,7 +344,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("should not create duplicates with create with", async () => {
-    acceptsNestedAttributesFor(Human, "interests");
+    Human.acceptsNestedAttributesFor("interests");
     const before = Number(await Interest.count());
     await Human.createWith({ interestsAttributes: [{ topic: "Pirate king" }] }).findOrCreateByBang({
       name: "Monkey D. Luffy",
@@ -354,9 +353,6 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("updating models with cpk provided as strings", async () => {
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    registerModel(CpkChapter);
     const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
     await (book as any).chapters.createBang({ id: [1, 3], title: "Title" });
     await book.updateBang({ chaptersAttributes: { id: ["1", "3"], title: "New title" } });
@@ -370,14 +366,9 @@ describe("TestNestedAttributesInGeneral", () => {
 // TestNestedAttributesOnAHasOneAssociation
 // ==========================================================================
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
   // Rails' treasure.rb declares `accepts_nested_attributes_for :looter`.
-  beforeAll(() => acceptsNestedAttributesFor(Treasure, "looter"));
+  beforeAll(() => Treasure.acceptsNestedAttributesFor("looter"));
 
   async function setup(): Promise<{ pirate: Pirate; ship: Ship }> {
     const pirate = await Pirate.createBang({
@@ -508,14 +499,14 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
   it("should not destroy an existing record if allow destroy is false", async () => {
     const { pirate, ship } = await setup();
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: false,
       rejectIf: (a) => Object.keys(a).length === 0,
     });
     await pirate.update({ shipAttributes: { id: ship.id, _destroy: "1" } });
     const reloaded = await shipOf(await Pirate.find(pirate.id));
     expect(String(reloaded!.id)).toBe(String(ship.id));
-    acceptsNestedAttributesFor(Pirate, "ship", {
+    Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
       rejectIf: (a) => Object.keys(a).length === 0,
     });
@@ -593,7 +584,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true, allowDestroy: true });
+    Pirate.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true, allowDestroy: true });
     const { pirate, ship } = await setup();
     await (ship as any).delete();
     const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
@@ -602,7 +593,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     });
     expect(await shipOf(await Pirate.find(pirate.id))).toBeFalsy();
     await expect(Ship.find(newShip.id)).rejects.toThrow(RecordNotFound);
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true, allowDestroy: false });
+    Pirate.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true, allowDestroy: false });
   });
 
   it("should raise an argument error if something other than a hash is passed in", async () => {
@@ -617,12 +608,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 // TestNestedAttributesOnABelongsToAssociation
 // ==========================================================================
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
 
   async function setup(): Promise<{ ship: Ship; pirate: Pirate }> {
     const ship = new Ship({ name: "Nights Dirty Lightning" });
@@ -757,13 +743,13 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
   it("should not destroy an existing record if allow destroy is false", async () => {
     const { ship, pirate } = await setup();
-    acceptsNestedAttributesFor(Ship, "pirate", {
+    Ship.acceptsNestedAttributesFor("pirate", {
       allowDestroy: false,
       rejectIf: (a) => Object.keys(a).length === 0,
     });
     await ship.update({ pirateAttributes: { id: pirate.id, _destroy: "1" } });
     await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
-    acceptsNestedAttributesFor(Ship, "pirate", {
+    Ship.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
       rejectIf: (a) => Object.keys(a).length === 0,
     });
@@ -823,7 +809,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
-    acceptsNestedAttributesFor(Ship, "updateOnlyPirate", { updateOnly: true, allowDestroy: true });
+    Ship.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true, allowDestroy: true });
     const { ship, pirate } = await setup();
     await (pirate as any).delete();
     const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
@@ -831,7 +817,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
       updateOnlyPirateAttributes: { catchphrase: "Arr", id: newPirate.id, _destroy: true },
     });
     await expect(Pirate.find(newPirate.id)).rejects.toThrow(RecordNotFound);
-    acceptsNestedAttributesFor(Ship, "updateOnlyPirate", { updateOnly: true, allowDestroy: false });
+    Ship.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true, allowDestroy: false });
   });
 
   it("should raise an argument error if something other than a hash is passed in", async () => {
@@ -1177,12 +1163,7 @@ function collectionAssociationTests(
 }
 
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
 
   collectionAssociationTests("birds", Bird, async () => {
     const pirate = await Pirate.createBang({
@@ -1212,7 +1193,7 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
   });
 
   it("numeric column changes from zero to no empty string", async () => {
-    acceptsNestedAttributesFor(Human, "interests");
+    Human.acceptsNestedAttributesFor("interests");
     await repairValidations(Interest, async () => {
       (Interest as any).validates("zine_id", { numericality: true });
       const human = await Human.create({ name: "John" });
@@ -1226,12 +1207,7 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
 });
 
 describe("TestNestedAttributesOnAHasAndBelongsToManyAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
 
   collectionAssociationTests("parrots", Parrot, async () => {
     const pirate = await Pirate.createBang({
@@ -1283,13 +1259,8 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 }
 
 describe("TestNestedAttributesLimitNumeric", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
-  beforeAll(() => acceptsNestedAttributesFor(Pirate, "parrots", { limit: 2 }));
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: 2 }));
   limitTests(
     async () =>
       await Pirate.createBang({
@@ -1299,13 +1270,8 @@ describe("TestNestedAttributesLimitNumeric", () => {
 });
 
 describe("TestNestedAttributesLimitSymbol", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
-  beforeAll(() => acceptsNestedAttributesFor(Pirate, "parrots", { limit: "parrotsLimit" }));
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: "parrotsLimit" }));
   limitTests(
     async () =>
       (await Pirate.createBang({
@@ -1316,13 +1282,8 @@ describe("TestNestedAttributesLimitSymbol", () => {
 });
 
 describe("TestNestedAttributesLimitProc", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
-  beforeAll(() => acceptsNestedAttributesFor(Pirate, "parrots", { limit: () => 2 }));
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: () => 2 }));
   limitTests(
     async () =>
       await Pirate.createBang({
@@ -1335,10 +1296,10 @@ describe("TestNestedAttributesLimitProc", () => {
 // TestNestedAttributesWithNonStandardPrimaryKeys
 // ==========================================================================
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
-  const { owners, pets } = fixtures(["owners", "pets"], { schema: canonicalSchema });
+  const { owners, pets } = fixtures(["owners", "pets"]);
 
   beforeAll(() => {
-    acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
+    Owner.acceptsNestedAttributesFor("pets", { allowDestroy: true });
   });
 
   it("should update existing records with non standard primary key", async () => {
@@ -1368,12 +1329,7 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
 // TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations
 // ==========================================================================
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
 
   async function setup() {
     const pirate = await Pirate.createBang({ catchphrase: "My baby takes tha mornin' train!" });
@@ -1447,12 +1403,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 // TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations
 // ==========================================================================
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-  beforeAll(registerCommonModels);
+  coreFixtures();
 
   async function setup() {
     const ship = await Ship.createBang({ name: "The good ship Dollypop" });
@@ -1549,15 +1500,9 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // TestIndexErrorsWithNestedAttributesOnlyMode
 // ==========================================================================
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
+  fixtures({ guitars: [Guitar, {}], tuning_pegs: [TuningPeg, {}] });
   beforeAll(() => {
-    registerModel(Guitar);
-    registerModel(TuningPeg);
-    acceptsNestedAttributesFor(Guitar, "tuningPegs", {
+    Guitar.acceptsNestedAttributesFor("tuningPegs", {
       rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
     });
   });
@@ -1589,12 +1534,6 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 // TestNestedAttributesWithExtend
 // ==========================================================================
 describe("TestNestedAttributesWithExtend", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
-
   // tracked-pending-convergence (0023-surfaced-deviations): the `extend:` option
   // on an association (Rails `has_many :treasures, extend: PostTreasuresExtension`)
   // is not wired into nested-attributes builds — the extension module's overrides
@@ -1609,15 +1548,9 @@ describe("TestNestedAttributesWithExtend", () => {
 // TestNestedAttributesForDelegatedType
 // ==========================================================================
 describe("TestNestedAttributesForDelegatedType", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
+  fixtures({ entries: [Entry, {}], messages: [Message, {}] });
   beforeAll(() => {
-    registerModel(Entry);
-    registerModel(Message);
-    acceptsNestedAttributesFor(Entry, "entryable");
+    Entry.acceptsNestedAttributesFor("entryable");
   });
 
   // tracked-pending-convergence (0023-surfaced-deviations): nested attributes

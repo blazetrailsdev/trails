@@ -1585,6 +1585,18 @@ export class Base extends Model {
   }
 
   /**
+   * Declare that this model accepts nested attributes for an association.
+   *
+   * Mirrors: ActiveRecord::NestedAttributes::ClassMethods#accepts_nested_attributes_for
+   */
+  static acceptsNestedAttributesFor(
+    associationName: string,
+    options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
+  ): void {
+    _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
+  }
+
+  /**
    * Secret backing signed_id_verifier (process-global in trails).
    *
    * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
