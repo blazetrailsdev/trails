@@ -58,16 +58,16 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["helpers"]).toBe(3);
   });
 
-  it("counts refute* but not expect-prefixed helper names", () => {
+  it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {
     const src = `
       it("mixed", () => {
         expectQuotedColumnInSql(sql);
         refuteEqual(a, b);
       });
     `;
-    // expectQuotedColumnInSql is not the bare `expect(...)` primitive and does
-    // not match the assert/refute/must/wont prefix; refuteEqual does. = 1
-    expect(tsAssertionCounts(src)["mixed"]).toBe(1);
+    // expectQuotedColumnInSql stands in for a Rails assert_* twin, so it counts;
+    // refuteEqual counts too. = 2
+    expect(tsAssertionCounts(src)["mixed"]).toBe(2);
   });
 
   it("recognizes minitest spec-form twins (must*/wont*/refute*) for symmetry with Ruby", () => {
@@ -89,7 +89,7 @@ describe("TS extractor assertion-count collection", () => {
         const assertion = build();   // 'assert'+ 'ion' — no boundary
         assertion.run();
         asserted();                  // 'assert' + 'ed' — no boundary
-        expectation();               // not the bare expect primitive
+        expectation();               // 'expect' + 'ation' — no boundary
         expect(v).toBe(1);           // the only real assertion
       });
     `;

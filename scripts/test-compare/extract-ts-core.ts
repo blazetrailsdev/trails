@@ -16,15 +16,15 @@ const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
  * PREFIX (not a fixed list) so both sides symmetrically count the full breadth
  * of Rails assertions: the `assert*`/`refute*` families incl. custom helpers
  * (`assertQueriesCount`, `assertNoQueries`, `assertCycle`, …), the `must*`/
- * `wont*` spec forms, and the `expect(...)` primitive. The `[A-Z]|$` anchor
- * keeps look-alikes (`assertion`, `asserted`) out. Only the inner `expect(x)`
- * call in an `expect(x).toEqual(y)` chain has an identifier callee, so each
- * chain counts once.
+ * `wont*` spec forms, the bare `expect(...)` primitive, and trails' own
+ * `expect*` assertion helpers (`expectQuotedColumnInSql`, `expectValueInRow`)
+ * that stand in for a Rails `assert_*` twin. The `[A-Z]|$` anchor keeps
+ * look-alikes (`assertion`, `asserted`, `expected`) out. Only the inner
+ * `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier callee,
+ * so each chain counts once.
  */
 function isAssertionCallee(name: string): boolean {
-  return (
-    name === "expect" || /^(assert|refute)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name)
-  );
+  return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
 }
 
 /** Non-deduplicated count of assertion calls in a test node's subtree. */
