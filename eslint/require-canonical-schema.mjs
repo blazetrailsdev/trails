@@ -77,6 +77,20 @@ function repoRel(filename) {
 
 const CANONICAL_SOURCE = /(^|\/)test-helpers\/test-schema(\.js)?$/;
 
+/**
+ * Peel `as const` / `satisfies T` wrappers off an expression so downstream
+ * checks see the underlying node. Without this, `const X = {…} as const` has a
+ * `TSAsExpression` init (not an `ObjectExpression`) and any bespoke schema so
+ * wrapped evades the ratchet entirely. Applied everywhere an init/value/arg is
+ * examined (whole-arg, resolved const init, per-table value, spread argument).
+ */
+function unwrapAs(node) {
+  while (node && (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression")) {
+    node = node.expression;
+  }
+  return node;
+}
+
 /** `DefineSchemaOpts` currently only has `dropExisting`. */
 function isOptsObject(node) {
   return (
@@ -97,12 +111,12 @@ function schemaArgOf(call) {
   if (args.length === 0) return null;
   // Strip a trailing opts object, but only when there is something before it
   // (a lone `defineSchema({})` is an empty *schema*, not opts).
-  if (args.length >= 2 && isOptsObject(args[args.length - 1])) {
+  if (args.length >= 2 && isOptsObject(unwrapAs(args[args.length - 1]))) {
     args = args.slice(0, -1);
   }
-  if (args.length === 1) return args[0];
+  if (args.length === 1) return unwrapAs(args[0]);
   // (adapter, schema)
-  return args[1];
+  return unwrapAs(args[1]);
 }
 
 const rule = {
@@ -149,8 +163,9 @@ const rule = {
         if (variable) {
           if (variable.defs.length !== 1) return null;
           const def = variable.defs[0];
-          if (def.type === "Variable" && def.node.init?.type === "ObjectExpression") {
-            return def.node.init;
+          if (def.type === "Variable") {
+            const init = unwrapAs(def.node.init);
+            if (init?.type === "ObjectExpression") return init;
           }
           return null;
         }
@@ -182,6 +197,7 @@ const rule = {
      * both would back the key with the wrong canonical shape.
      */
     function isCanonicalTableValue(value, key) {
+      value = unwrapAs(value);
       if (value?.type !== "MemberExpression") return false;
       if (!isCanonicalIdentifier(value.object)) return false;
       return key !== null && memberPropName(value) === key;
@@ -192,7 +208,7 @@ const rule = {
         if (prop.type === "SpreadElement" || prop.type === "ExperimentalSpreadProperty") {
           // Spreading the whole canonical schema (`...TEST_SCHEMA`) is the only
           // canonical spread.
-          if (!isCanonicalIdentifier(prop.argument)) {
+          if (!isCanonicalIdentifier(unwrapAs(prop.argument))) {
             context.report({ node: prop, messageId: "inlineSpread" });
           }
           continue;
