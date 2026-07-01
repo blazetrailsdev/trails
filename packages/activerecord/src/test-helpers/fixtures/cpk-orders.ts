@@ -4,9 +4,10 @@
 // (schema.rb) and the composite PK lives only on the model (Cpk::Order), so
 // `FixtureSet.composite_identify` — keyed on `model_class.composite_primary_key?`
 // — fills shop_id from the label. Our fixture loader keys the composite fill on
-// the schema pk, so it never fills shop_id; pin it here to keep the composite
-// delete/update subquery tuple non-NULL. The values mirror Rails' logical shop
-// assignment (grocery shop 1, coffee shop 2). Tracked for full convergence in
+// the schema pk, so it never fills shop_id; the shop_id values below are a
+// trails-only bridge (arbitrary non-NULL integers, NOT Rails fixture data) so
+// the composite delete/update subquery tuple `(shop_id, id) IN (…)` is not NULL.
+// Tracked for full convergence — filling shop_id label-derived like Rails — in
 // RFC 0023 cpk-composite-fixture-ref-resolution.
 export const cpkOrderFixtureData = {
   cpk_groceries_order_1: {
