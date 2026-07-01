@@ -1070,17 +1070,33 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // hints are scoped to single-arg forms.
     const paramMatch = /\((\d+)\)/.exec(raw);
     const isDtPrec = /^(datetime|timestamp|time)\b/i.test(raw);
-    const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-    const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-    const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
-    const castType = this.lookupCastType(baseSqlType);
-    const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
+    let precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let scale: number | null = null;
+    let baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
+    const dslTypeName = (() => {
+      const t = this.lookupCastType(baseSqlType);
+      return t.type() !== "value" ? t.type() : baseSqlType.toLowerCase();
+    })();
+    // Decimal precision/scale must be read off the FULL type string, not the
+    // paren-stripped base: `paramMatch` mis-reads a single-arg `DECIMAL(55)` as
+    // a limit and drops the `(55)` from `baseSqlType`. Re-resolve from `raw` —
+    // as Rails' `fetch_type_metadata` carries the whole sql_type — so the cast
+    // type keeps precision/scale, and hold the full string as `sqlType` so the
+    // attribute cast type rounds to the declared precision (numericality).
+    if (dslTypeName === "decimal") {
+      const decimalCastType = this.lookupCastType(raw);
+      precision = decimalCastType.precision ?? null;
+      scale = decimalCastType.scale ?? null;
+      limit = null;
+      baseSqlType = raw;
+    }
     return new SqlTypeMetadata({
       sqlType: baseSqlType,
       type: dslTypeName,
       limit,
       precision,
-      scale: null,
+      scale,
     });
   }
 

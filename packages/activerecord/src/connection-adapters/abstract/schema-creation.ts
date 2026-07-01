@@ -384,7 +384,11 @@ export class SchemaCreation {
         sql = "TEXT";
         break;
       case "integer":
-        sql = "INTEGER";
+        // Rails' `type_to_sql` appends an explicit `limit` as `integer(N)`
+        // (schema_statements.rb:1409). SQLite stores the declared type
+        // verbatim, so reflecting it back recovers the byte-width limit — the
+        // dumper's `limit:` option round-trips only when it is emitted here.
+        sql = options.limit != null ? `INTEGER(${options.limit})` : "INTEGER";
         break;
       case "bigint":
         sql = "BIGINT";
@@ -392,10 +396,19 @@ export class SchemaCreation {
       case "float":
         sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
         break;
-      case "decimal":
+      case "decimal": {
+        // Mirror Rails' `type_to_sql` decimal branch (schema_statements.rb:1390):
+        // `decimal(precision,scale)` when a scale is given, else `decimal(precision)`
+        // — no space after the comma, so `extract_scale`/`extract_precision`
+        // reflect it back byte-for-byte as Rails does.
         this.validateDecimalPrecision(options);
-        sql = `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
+        const precision = options.precision ?? 10;
+        sql =
+          options.scale != null
+            ? `DECIMAL(${precision},${options.scale})`
+            : `DECIMAL(${precision})`;
         break;
+      }
       case "boolean":
         sql = "BOOLEAN";
         break;
