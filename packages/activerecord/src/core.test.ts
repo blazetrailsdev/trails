@@ -9,6 +9,7 @@ import { formatForInspect } from "./attribute-inspection.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 
 describe("CoreTest", () => {
   // Rails `CoreTest` declares `fixtures :topics`; every inspect/pretty-print
@@ -127,8 +128,17 @@ describe("CoreTest", () => {
   // Tracked: 0023-surfaced-deviations/find-by-statement-cache-introspection.
   it.skip("find by cache does not duplicate entries", () => {});
 
-  // Rails: Cpk::Book.new(id: [1, 2]) == Cpk::Book.new(id: [1, 2]) is true.
-  // trails returns false for equal composite ids on new records.
-  // Tracked: 0023-surfaced-deviations/cpk-equality-new-record-composite-id.
-  it.skip("composite pk models equality", () => {});
+  it("composite pk models equality", () => {
+    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 2] }))).toBe(true);
+
+    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 3] }))).toBe(false);
+    expect(new CpkBook().equals(new CpkBook())).toBe(false);
+    expect(new CpkBook({ title: "Book A" }).equals(new CpkBook({ title: "Book B" }))).toBe(false);
+    expect(new CpkBook({ author_id: 1 }).equals(new CpkBook({ author_id: 1 }))).toBe(false);
+    expect(
+      new CpkBook({ author_id: 1, title: "Same title" }).equals(
+        new CpkBook({ author_id: 1, title: "Same title" }),
+      ),
+    ).toBe(false);
+  });
 });
