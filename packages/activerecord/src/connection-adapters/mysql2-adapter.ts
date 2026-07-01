@@ -1319,14 +1319,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._activeState = false;
     this._connectGeneration++;
     // Mirror Rails' private `Mysql2Adapter#reconnect` (mysql2_adapter.rb:150):
-    // close the raw handle and null it, but do NOT run the full disconnect!
-    // path — that resets the transaction manager, discarding the (restorable)
-    // transaction stack before the inherited reconnectBang's own
-    // resetTransaction({ restore: … }) can swap it back in. The base
-    // disconnectBang's non-transaction teardown (clearCache + _connection reset)
-    // is reproduced here so only reset_transaction is skipped.
-    this.clearCacheBang();
-    this._rawConnectionDirty = false;
+    // `@raw_connection&.close; @raw_connection = nil; connect`. Crucially it does
+    // NOT run the full `disconnect!` path, which resets the transaction manager
+    // and would discard the (restorable) transaction stack before the inherited
+    // reconnectBang's own resetTransaction({ restore: … }) can swap it back in.
+    // clearCache! / @raw_connection_dirty are reconnectBang's responsibility
+    // (abstract_adapter.rb reconnect!), so they are deliberately not repeated
+    // here — only the raw-handle teardown and _connection reset are.
     this._connection = null;
     this._closeRawHandle();
     this._activeState = true;
