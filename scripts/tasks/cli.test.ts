@@ -65,6 +65,7 @@ import {
   rfcStatusError,
   setFrontmatterList,
   resolveTasksDir,
+  isDepResolved,
   statusEdits,
   statusOf,
   statusTransitionError,
@@ -97,6 +98,7 @@ function story(over: Partial<StoryEntry>): StoryEntry {
     claim: null,
     assignee: null,
     blocked_by: null,
+    closed_reason: null,
     file_path: "0001-r/stories/x.md",
     ...over,
   };
@@ -143,6 +145,21 @@ describe("ready", () => {
         .map((s) => s.id)
         .sort(),
     ).toEqual(["a", "e"]);
+  });
+
+  it("treats a closed dep as resolved (same as done)", () => {
+    const idx = index([
+      story({ id: "doneDep", status: "done" }),
+      story({ id: "closedDep", status: "closed", closed_reason: '"superseded"' }),
+      story({ id: "a", status: "ready", deps: ["doneDep"] }),
+      story({ id: "b", status: "ready", deps: ["closedDep"] }),
+      story({ id: "c", status: "ready", deps: ["closedDep", "doneDep"] }),
+    ]);
+    expect(
+      ready(idx)
+        .map((s) => s.id)
+        .sort(),
+    ).toEqual(["a", "b", "c"]);
   });
 
   it("excludes ready stories whose own RFC is not active", () => {
@@ -586,6 +603,27 @@ describe("statusEdits", () => {
       pr: "null",
     });
   });
+
+  it("clears closed-reason, claim, assignee, and pr when reopening to ready", () => {
+    expect(statusEdits("closed", "ready")).toEqual({
+      status: "ready",
+      "closed-reason": "null",
+      claim: "null",
+      assignee: "null",
+      pr: "null",
+    });
+  });
+});
+
+describe("isDepResolved", () => {
+  it("treats done and closed as resolved, everything else as open", () => {
+    expect(isDepResolved("done")).toBe(true);
+    expect(isDepResolved("closed")).toBe(true);
+    expect(isDepResolved("ready")).toBe(false);
+    expect(isDepResolved("blocked")).toBe(false);
+    expect(isDepResolved(null)).toBe(false);
+    expect(isDepResolved(undefined)).toBe(false);
+  });
 });
 
 describe("statusTransitionError", () => {
@@ -603,6 +641,16 @@ describe("statusTransitionError", () => {
 
   it("allows blocked → ready (the documented unblock path has no dedicated verb)", () => {
     expect(statusTransitionError("blocked", "ready")).toBeNull();
+  });
+
+  it("allows closed → ready (reopen path, mirroring unblock)", () => {
+    expect(statusTransitionError("closed", "ready")).toBeNull();
+  });
+
+  it("redirects status-set to closed at the dedicated close verb", () => {
+    const err = statusTransitionError("draft", "closed");
+    expect(err).toMatch(/won't set status closed/);
+    expect(err).toMatch(/close <id> --reason <text>/);
   });
 
   it("rejects an unrecognized current status instead of throwing", () => {

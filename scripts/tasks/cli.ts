@@ -66,7 +66,14 @@ const TASKS_DIR_IS_SYMLINK =
   !envDir(process.env.TASKS_DIR) &&
   !envDir(process.env.RFCS_DIR);
 
-export type StoryStatus = "draft" | "ready" | "claimed" | "in-progress" | "done" | "blocked";
+export type StoryStatus =
+  | "draft"
+  | "ready"
+  | "claimed"
+  | "in-progress"
+  | "done"
+  | "blocked"
+  | "closed";
 export type RfcStatus = "draft" | "active" | "closed" | "postponed" | "superseded";
 export const STORY_STATUSES: readonly StoryStatus[] = [
   "draft",
@@ -75,6 +82,7 @@ export const STORY_STATUSES: readonly StoryStatus[] = [
   "in-progress",
   "done",
   "blocked",
+  "closed",
 ];
 export const RFC_STATUSES: readonly RfcStatus[] = [
   "draft",
@@ -108,6 +116,7 @@ export interface StoryEntry {
   claim: string | null;
   assignee: string | null;
   blocked_by: string | null;
+  closed_reason: string | null;
   file_path: string;
 }
 export interface Index {
@@ -162,6 +171,13 @@ function isIndexStale(indexPath: string): boolean {
 
 // ──────────────────── pure queries ────────────────────
 
+// The terminal story statuses: a dep in either state no longer gates a
+// dependent. `done` shipped the work; `closed` abandoned it — neither will
+// ever move again, so both count as "resolved" for dep purposes.
+export function isDepResolved(status: string | null | undefined): boolean {
+  return status === "done" || status === "closed";
+}
+
 export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
   const rfcStatus = new Map(index.rfcs.map((r) => [r.id, r.status]));
   const storyStatus = new Map(index.stories.map((s) => [s.id, s.status]));
@@ -179,7 +195,10 @@ export function ready(index: Index, opts: { rfc?: string } = {}): StoryEntry[] {
         // can't be confirmed active.
         if (rfcStatus.get(s.rfc) !== "active") return false;
         if (opts.rfc && s.rfc !== opts.rfc) return false;
-        if (s.deps.some((d) => storyStatus.get(d) !== "done")) return false;
+        // A dep is satisfied when it is `done` OR `closed`: a closed story will
+        // never ship, but it will also never block — treating it as resolved
+        // (same as done) is what keeps a dependent from being stranded forever.
+        if (s.deps.some((d) => !isDepResolved(storyStatus.get(d)))) return false;
         if (s.deps_rfc.some((d) => rfcStatus.get(d) !== "closed")) return false;
         return true;
       })
@@ -476,6 +495,7 @@ const FRONTMATTER_KEY_ORDER = [
   "claim",
   "assignee",
   "blocked-by",
+  "closed-reason",
 ];
 
 // Splits a story file into its frontmatter delimiters, the key/value lines
@@ -1138,6 +1158,39 @@ function block(id: string, reason: string): void {
   console.log(`blocked ${id}: ${reason}`);
 }
 
+// Terminally close a story that will never ship code (superseded / abandoned /
+// won't-do). Analogous to `block`, but terminal: closing REQUIRES a reason
+// (stamped as `closed-reason`, the way `block` stamps `blocked-by`) and clears
+// the claim/assignee/blocked-by a closed story has no business carrying. Any
+// non-`done` state may close directly — this is the sanctioned exit for a
+// superseded story, replacing the old `blocked → ready → done --force` dance.
+// `done` is refused: a completed story is already terminal and closing it would
+// erase that it shipped. The recheck runs inside the mutator (post-`git pull`)
+// so a concurrent flip is never clobbered.
+function close(id: string, reason: string): void {
+  flip(id, `close: ${id} — ${reason}`, RETRY_MSG(id), 4, (file) => {
+    const from = statusOf(readFileSync(file, "utf8"));
+    if (from === "done") {
+      console.error(`error: ${id} is done — a completed story cannot be closed`);
+      throw new MutatorEarlyExit(2);
+    }
+    if (from === "closed") {
+      // A concurrent agent already closed it; the pull brought that back.
+      // Re-applying would leave nothing to commit, so bail cleanly.
+      console.log(`${id} already closed`);
+      throw new MutatorEarlyExit(0);
+    }
+    editFrontmatter(file, {
+      status: "closed",
+      "closed-reason": JSON.stringify(reason),
+      "blocked-by": "null",
+      claim: "null",
+      assignee: "null",
+    });
+  });
+  console.log(`closed ${id}: ${reason}`);
+}
+
 // Set (or, with `priority === null`, clear) a story's ready-queue priority.
 // Lower sorts first; absent = unprioritized (sorts last). Unlike the other
 // mutations this leaves `status` untouched — it only reorders the queue. The
@@ -1180,6 +1233,10 @@ const STATUS_TRANSITIONS: Record<StoryStatus, readonly StoryStatus[]> = {
   "in-progress": [],
   done: [],
   blocked: ["ready"],
+  // Reopening a closed story returns it to the ready queue (mirrors the
+  // blocked → ready unblock path). Closing itself has a dedicated `close` verb
+  // — see STATUS_VERB_HINT — so `status-set <id> closed` is redirected there.
+  closed: ["ready"],
 };
 
 // Work-tracking statuses own dedicated verbs that also stamp pr/assignee/
@@ -1190,6 +1247,7 @@ const STATUS_VERB_HINT: Partial<Record<StoryStatus, string>> = {
   "in-progress": "in-progress <id> --pr <N>",
   done: "done <id> --pr <N>",
   blocked: "block <id> --reason <text>",
+  closed: "close <id> --reason <text>",
 };
 
 // Reads the `status:` scalar from a story file's frontmatter, parsed with the
@@ -1242,6 +1300,11 @@ export function statusEdits(from: string | null, target: StoryStatus): Record<st
   const edits: Record<string, string> = { status: target };
   if (from === "blocked" && target === "ready") {
     Object.assign(edits, { "blocked-by": "null", claim: "null", assignee: "null", pr: "null" });
+  }
+  // Reopening a closed story: clear the `closed-reason` the `close` verb stamped
+  // and reset to the unclaimed ready shape, exactly as the unblock path does.
+  if (from === "closed" && target === "ready") {
+    Object.assign(edits, { "closed-reason": "null", claim: "null", assignee: "null", pr: "null" });
   }
   return edits;
 }
@@ -1860,6 +1923,7 @@ pr: null
 claim: null
 assignee: null
 blocked-by: null
+closed-reason: null
 ---
 ${body}`;
 }
@@ -2842,6 +2906,13 @@ function main(): void {
       block(id, reason);
       break;
     }
+    case "close": {
+      const id = pos[0];
+      const reason = stringFlag(flags, "reason") ?? pos[1];
+      if (!id || !reason) usage();
+      close(id, reason);
+      break;
+    }
     case "refine": {
       const id = pos[0];
       if (!id) usage();
@@ -2919,10 +2990,11 @@ function usage(): never {
   in-progress <id> --pr <N>
   done <id> --pr <N> [--force]
   block <id> --reason "<text>"
+  close <id> --reason "<text>"                 (terminally close a non-done story: superseded/abandoned/won't-do)
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   edit <id-or-rfc-slug>                        ($EDITOR body edit for a story or RFC README)
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
-  status-set <id> <status>                     (draft ↔ ready, blocked → ready; validates the transition)
+  status-set <id> <status>                     (draft ↔ ready, blocked → ready, closed → ready; validates the transition)
   rfc <slug> [--status <s>] [--supersede <other-slug>] [--relate <csv>] [--clusters <csv>] [--packages <csv>]
   set-deps <id> <csv>                          (replace deps; checks references + cycles; empty csv clears)
   set-deps-rfc <id> <csv>                      (replace deps-rfc; checks references; empty csv clears)
