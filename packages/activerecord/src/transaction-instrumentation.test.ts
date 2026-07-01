@@ -79,6 +79,15 @@ describe("TransactionInstrumentationTest", () => {
   // before `sharedAdapter` exists (it's built per-test in `beforeEach` for TM
   // isolation). The object-map form keeps the throwaway `Topic` off the
   // registry, matching Rails' `Class.new`.
+  //
+  // Routing through `fixtures()` also runs `setupHandlerSuite()`, which pushes
+  // a global-reset skip for this describe (so `resetTestAdapterState()` is not
+  // called between this file's tests). That is inert here: every test drives a
+  // dedicated per-test `sharedAdapter` / `Topic.adapter` override and never
+  // touches the shared canonical pool, `Base.connection`, or `createTestAdapter`
+  // (see the block comment above) — nothing in this file depends on the
+  // shared-pool reset. The skip is refcounted and popped in `setupHandlerSuite`'s
+  // `afterAll`, so it cannot leak into worker-scheduled neighbors.
   const { topics } = fixtures(
     { topics: [Topic, topicFixtureData] },
     { connection: () => sharedAdapter, useTransactionalTests: false, schema: undefined },
