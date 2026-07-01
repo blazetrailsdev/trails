@@ -431,6 +431,13 @@ export class SchemaStatements {
     columns: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
+    // Prime the cached database version before building the index definition,
+    // mirroring renameIndex/checkConstraints/renameColumnForAlter. Several
+    // version-gated predicates (e.g. MySQL's supportsIndexSortOrder) read
+    // `databaseVersion` synchronously and silently yield `false` on a cold
+    // connection (`undefined?.gte(...) !== true`); addIndex runs on the
+    // shared-worker reconstruct path before any query warms the cache.
+    await this.adapter.getDatabaseVersion?.();
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,
