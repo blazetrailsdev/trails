@@ -851,12 +851,32 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       tableName,
     );
 
+    const colNames = new Set(cols.map((c) => c.name));
+
     // Filter generated (virtual) columns — PG rejects INSERT on those columns.
     // Mirrors Rails: build_fixture_sql rejects schema_cache.columns_hash entries where column.virtual?
     const virtualNames = new Set(cols.filter((c) => c.isVirtual()).map((c) => c.name));
     if (virtualNames.size > 0) {
       for (const row of rows) {
         for (const name of virtualNames) delete row[name];
+      }
+    }
+
+    // Rails fills the MODEL's composite-PK columns from the label via
+    // FixtureSet.composite_identify whenever `model_class.composite_primary_key?`
+    // — even when the table keeps a single autoincrement `id` (e.g. Cpk::Order:
+    // model `[shop_id, id]`, table `id`). The schema-PK path above only seeds the
+    // schema's own `id`, so generate any remaining model-PK column that the table
+    // has and the row omits (the schema PK column is left as already seeded, so
+    // ref() targets stay consistent). `rows[i]` corresponds to `labels[i]`.
+    if (Array.isArray(declaredPk) && typeof pkCol === "string") {
+      for (let i = 0; i < rows.length; i++) {
+        const generated = compositeIdentify(labels[i] as string, declaredPk);
+        for (const keyCol of declaredPk) {
+          if (keyCol !== pkCol && colNames.has(keyCol) && !(keyCol in rows[i])) {
+            rows[i][keyCol] = generated[keyCol]!;
+          }
+        }
       }
     }
 
@@ -867,7 +887,6 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     // toys, …) can't seed without this. A Temporal.Instant is used so the adapter's
     // quoting renders an engine-safe datetime literal (no tz offset on MySQL).
     if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
-      const colNames = new Set(cols.map((c) => c.name));
       // Mirrors Rails FixtureSet::TableRow#fill_timestamps → model_metadata
       // #timestamp_column_names == all_timestamp_attributes_in_model: the model's
       // *alias-resolved* timestamp columns (e.g. Developer → legacy_updated_at),

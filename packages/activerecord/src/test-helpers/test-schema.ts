@@ -350,11 +350,11 @@ export const TEST_SCHEMA: Schema = {
   // Rails keeps cpk_orders on a DB-level autoincrement `id` (schema.rb) and
   // declares the composite PK only on the MODEL (Cpk::Order:
   // `self.primary_key = [:shop_id, :id]`), so this single-id table matches Rails.
-  // Rails' fixtures still omit shop_id: FixtureSet.composite_identify keys on
-  // `model_class.composite_primary_key?` and fills it from the label. Our loader
-  // keys the composite fill on the SCHEMA pk instead, so it never fills shop_id;
-  // pin it in the fixture rows to keep the composite delete/update subquery
-  // tuple non-NULL. Tracked in RFC 0023 cpk-composite-fixture-ref-resolution.
+  // Rails' fixtures omit shop_id: FixtureSet.composite_identify keys on
+  // `model_class.composite_primary_key?` and fills it from the label. The fixture
+  // loader mirrors that (defineFixtures' model-composite-PK fill), generating
+  // shop_id at load time so the composite delete/update subquery tuple is
+  // non-NULL without pinning fixture data.
   cpk_orders: {
     shop_id: "integer",
     status: "string",
