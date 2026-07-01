@@ -6,7 +6,11 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { queryConstraintsList } from "../persistence.js";
-import { sourceReflection, throughTargetScope } from "./through-association.js";
+import {
+  sourceReflection,
+  staleStateImpl as throughStaleState,
+  throughTargetScope,
+} from "./through-association.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -38,6 +42,18 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   protected override targetScope(): unknown {
     return throughTargetScope(this, super["targetScope"]());
+  }
+
+  /**
+   * Mirrors Rails' `ThroughAssociation#stale_state` — when the through
+   * reflection is a `belongs_to`, the association goes stale as the owner's
+   * through foreign key changes (e.g. `minivan.speedometer_id = …`).
+   * @internal
+   */
+  protected override staleState(): unknown {
+    const vals = throughStaleState(this);
+    if (!vals) return null;
+    return vals.length === 1 ? vals[0] : JSON.stringify(vals);
   }
 
   /**
