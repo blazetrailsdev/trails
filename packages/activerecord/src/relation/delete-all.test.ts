@@ -162,9 +162,7 @@ describe("DeleteAllTest", () => {
     expect(await Post.find(posts("welcome").id)).toBeTruthy();
   });
 
-  // TRACKED DEVIATION: JoinDependency cannot build a join for CpkOrder.hasMany("orderAgreements")
-  // (composite primary key model + single-column FK association). Skipped pending CPK join support.
-  it.skip("delete all composite model with join subquery", async () => {
+  it("delete all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
     const joinScope = CpkOrder.joins("orderAgreements").where(
       "cpk_order_agreements.signature = ?",
