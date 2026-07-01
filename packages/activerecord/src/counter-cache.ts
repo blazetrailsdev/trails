@@ -2,7 +2,11 @@ import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
-import { counterCacheTouchUpdates, type CounterCacheTouchOption } from "./timestamp.js";
+import {
+  touchAttributesWithTime,
+  parseCounterCacheTouch,
+  type CounterCacheTouchOption,
+} from "./timestamp.js";
 
 /**
  * Counter cache operations for ActiveRecord models.
@@ -199,10 +203,11 @@ export async function resetCounters(
   }
 
   if (options.touch) {
-    // Resolve the `touch:` option to timestamp column → time updates, honoring
-    // the `{ time: }` hash form (and combined column names) — see relation.rb.
-    const touchUpdates = counterCacheTouchUpdates(this, options.touch);
-    if (touchUpdates) Object.assign(updates, touchUpdates);
+    // Mirror Rails counter_cache.rb: parse touch into names + time (`{ time: }`
+    // hash form; `touch: []` → no names), then touch via touchAttributesWithTime.
+    const { names, time } = parseCounterCacheTouch(options.touch);
+    const touchUpdates = touchAttributesWithTime.call(this, names, time);
+    Object.assign(updates, touchUpdates);
   }
 
   if (Object.keys(updates).length > 0) {
