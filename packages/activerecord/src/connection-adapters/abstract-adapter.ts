@@ -2021,17 +2021,14 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   static extractScale(sqlType: string): number | undefined {
-    // Tolerate the whitespace trails' `type_to_sql` emits after the comma
-    // (`DECIMAL(10, 2)`) — Rails' own `decimal(10,2)` has none, but our schema
-    // creation spaces it, so a materialized decimal must still round-trip.
-    if (/\(\s*\d+\s*\)/.test(sqlType)) return 0;
-    const match = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
+    if (/\(\d+\)/.test(sqlType)) return 0;
+    const match = /\(\d+,(\d+)\)/.exec(sqlType);
     return match ? Number.parseInt(match[1], 10) : undefined;
   }
 
   /** @internal */
   static extractPrecision(sqlType: string): number | undefined {
-    const match = /\(\s*(\d+)\s*(,\s*\d+\s*)?\)/.exec(sqlType);
+    const match = /\((\d+)(,\d+)?\)/.exec(sqlType);
     return match ? Number.parseInt(match[1], 10) : undefined;
   }
 

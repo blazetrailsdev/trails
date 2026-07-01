@@ -396,10 +396,19 @@ export class SchemaCreation {
       case "float":
         sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
         break;
-      case "decimal":
+      case "decimal": {
+        // Mirror Rails' `type_to_sql` decimal branch (schema_statements.rb:1390):
+        // `decimal(precision,scale)` when a scale is given, else `decimal(precision)`
+        // — no space after the comma, so `extract_scale`/`extract_precision`
+        // reflect it back faithfully.
         this.validateDecimalPrecision(options);
-        sql = `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
+        const precision = options.precision ?? 10;
+        sql =
+          options.scale != null
+            ? `DECIMAL(${precision},${options.scale})`
+            : `DECIMAL(${precision})`;
         break;
+      }
       case "boolean":
         sql = "BOOLEAN";
         break;
