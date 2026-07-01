@@ -12,8 +12,8 @@
  * `withExampleTable`: it creates the ephemeral `ex` table, runs the block, and
  * drops it in a finally.
  *
- * Tracked deviations (RFC 0023 surfaced-deviations,
- * converge-pg-adapter-test-files-one-schema follow-ups):
+ * Tracked deviations (RFC 0023 surfaced-deviations, story
+ * pg-adapter-test-port-surfaced-deviations):
  *   - test_connection_error / test_reconnection_error /
  *     test_reconnect_after_bad_connection_on_check_version /
  *     test_bad_connection / test_bad_connection_to_postgres_database assert on
