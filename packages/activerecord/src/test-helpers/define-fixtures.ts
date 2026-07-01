@@ -548,8 +548,11 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
  *   from the label via `compositeIdentify`, mirroring Rails'
  *   `generate_composite_primary_key`/`composite_identify`. Reload matches on the
  *   full key tuple. A model that declares a composite `primaryKey` over a table
- *   whose schema PK is a plain `id` (e.g. `CpkOrder`) is seeded as single-PK,
- *   deferring to the schema.
+ *   whose schema PK is a plain `id` (e.g. `CpkOrder`: model `[shop_id, id]`,
+ *   table `id`) seeds the schema `id` as single-PK, then additionally fills the
+ *   remaining model-PK columns (`shop_id`) from the label — mirroring Rails'
+ *   `fill_row_model_attributes`, which keys `composite_identify` on
+ *   `model_class.composite_primary_key?` (the model PK, not the table PK).
  * - Timestamps: when the model records timestamps, any existing
  *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
  *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
