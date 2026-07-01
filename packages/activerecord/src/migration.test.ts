@@ -33,6 +33,7 @@ function emitTableSql(td: TableDefinition): string {
   return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
 }
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports, adapterSupports } from "./test-helpers/supports.js";
@@ -43,26 +44,76 @@ import {
   MYSQL_TEST_URL,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
-// Tables some tests rely on existing before any migration runs. Under
-// AR_NO_AUTO_SCHEMA=1 the test adapter no longer auto-creates missing
-// tables, so we materialize them up front via defineSchema().
-const TEST_SCHEMA = {
-  people: { name: "string" },
-  posts: { title: "string" },
-  events: { name: "string" },
-} as const;
-
-async function freshAdapterWithSchema(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   const adapter = createTestAdapter();
   const ctx = new MigrationContext(adapter);
   return { adapter, ctx };
 }
+
+// The migration-on-`people` tests (Rails runs `add_column/remove_column
+// "people", "last_name"` through a `Migrator`) need the canonical `people`
+// table materialized before the migrator runs. Under AR_NO_AUTO_SCHEMA=1 the
+// SQLite lane's leased adapter has no template, so define the canonical `people`
+// shape (a subset of the canonical TEST_SCHEMA — never a fabricated shape);
+// on the template lanes this is a cache-hit no-op.
+async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, { people: TEST_SCHEMA.people });
+  return adapter;
+}
+
+// Build a MigrationProxy whose `up` runs `body` (e.g. `add_column "people", …`)
+// — the trails equivalent of Rails' anonymous `Class.new(Migration) { def
+// migrate(x); … end }` migrations that the people-migration tests feed to a
+// `Migrator`.
+function migrateProxy(version: number, body: (m: Migration) => Promise<void>): MigrationProxy {
+  return {
+    version: String(version),
+    name: `Migration${version}`,
+    migration: () =>
+      new (class extends Migration {
+        override async up(): Promise<void> {
+          await body(this);
+        }
+        override async down(): Promise<void> {}
+      })(),
+  };
+}
+
+// Mirrors migration_test.rb's `assert_column Person` / `assert_no_column
+// Person`: re-read Person's columns from the migration DB, then restore Person's
+// original adapter and column cache (our leased test adapter is per-instance).
+async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
+  const original = (Person as any)._adapter;
+  try {
+    (Person as any).adapter = adp;
+    (Person as any).resetColumnInformation();
+    await loadSchemaFromAdapter.call(Person as any);
+    return Person.columnNames();
+  } finally {
+    (Person as any)._adapter = original;
+    (Person as any).resetColumnInformation();
+  }
+}
+
+// Mirrors migration_test.rb's teardown, which strips the scratch columns the
+// people-migration tests add back off the shared canonical `people` table and
+// clears recorded versions — so sibling files see the pristine canonical shape.
+afterEach(async () => {
+  const adapter = createTestAdapter();
+  const ctx = new MigrationContext(adapter);
+  try {
+    await ctx.removeColumn("people", "last_name", { ifExists: true });
+  } catch {
+    /* column absent / adapter without the column — nothing to strip */
+  }
+  try {
+    await new SchemaMigration(adapter).deleteAllVersions();
+  } catch {
+    /* schema_migrations may not exist yet */
+  }
+  (Person as any).resetColumnInformation();
+});
 
 // Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
 // does too); they leak into the shared per-worker DB, so drop each by name —
@@ -70,7 +121,6 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
 afterAll(async () => {
   const { ctx } = freshContext();
   const o = { ifExists: true } as const;
-  await ctx.dropTable("articles", o);
   await ctx.dropTable("big_numbers", o);
   await ctx.dropTable("binary_testings", o);
   await ctx.dropTable("bk1", o);
@@ -89,14 +139,13 @@ afterAll(async () => {
   await ctx.dropTable("old_name", o);
   await ctx.dropTable("pend_t", o);
   await ctx.dropTable("pre_old_suf", o);
-  await ctx.dropTable("products", o);
   await ctx.dropTable("rv_bulk", o);
   await ctx.dropTable("test_binary_limits", o);
   await ctx.dropTable("test_integer_limits", o);
   await ctx.dropTable("test_text_limits", o);
   await ctx.dropTable("test_text_sizes", o);
+  await ctx.dropTable("testings", o);
   await ctx.dropTable("things", o);
-  await ctx.dropTable("users", o);
   await ctx.dropTable("values", o);
   await ctx.dropTable("widgets", o);
 });
@@ -129,11 +178,20 @@ function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}):
 
 describe("MigrationTest", () => {
   it("add column with if not exists not set", async () => {
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await expect(ctx.addColumn("users", "name", "string")).rejects.toThrow(/already exists/);
+    // Rails migration_a adds `last_name` on `people`; migration_b re-adds it
+    // with if_not_exists unset and must raise. Ride the canonical `people`
+    // table via a Migrator, exactly as migration_test.rb does.
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
+    await expect(
+      new Migrator(adapter, [
+        migrateProxy(101, (m) => m.addColumn("people", "last_name", "string")),
+      ]).up(101),
+    ).rejects.toThrow();
   });
 
   it("rename table with prefix and suffix", async () => {
@@ -159,16 +217,31 @@ describe("MigrationTest", () => {
 
   describe("IndexForTableWithSchemaMigrationTest", () => {
     it.skipIf(adapterType !== "postgres")("add and remove index", async () => {
-      const { ctx } = freshContext();
-      await ctx.createTable("users", {}, (t) => {
-        t.string("email");
-      });
+      // PG-only, mirrors migration_test.rb: create a dedicated `my_schema`
+      // Postgres schema and drive add/remove index on `my_schema.values`,
+      // dropping the schema in the ensure — no canonical table involved.
+      const adapter = freshAdapter() as DatabaseAdapter & {
+        createSchema(name: string): Promise<void>;
+        dropSchema(name: string): Promise<void>;
+      };
+      await adapter.createSchema("my_schema");
+      try {
+        const ctx = new MigrationContext(adapter);
+        // Torn down via dropSchema("my_schema") in the finally below (which
+        // drops the schema and its tables); the lint rule only tracks dropTable.
+        // eslint-disable-next-line blazetrails/require-table-teardown
+        await ctx.createTable("my_schema.values", { force: true }, (t) => {
+          t.integer("value");
+        });
 
-      await ctx.addIndex("users", "email");
-      expect(ctx.indexExists("users", "email")).toBe(true);
+        await ctx.addIndex("my_schema.values", "value");
+        expect(ctx.indexExists("my_schema.values", "value")).toBe(true);
 
-      await ctx.removeIndex("users", { column: "email" });
-      expect(ctx.indexExists("users", "email")).toBe(false);
+        await ctx.removeIndex("my_schema.values", { column: "value" });
+        expect(ctx.indexExists("my_schema.values", "value")).toBe(false);
+      } finally {
+        await adapter.dropSchema("my_schema");
+      }
     });
   });
 });
@@ -187,7 +260,7 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithSchema()/freshContext() isolation — adding setupFixtures() here
+// freshAdapterWithPeople()/freshContext() isolation — adding setupFixtures() here
 // would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
 // MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
 // depend on. Same structural reason as transaction-instrumentation.test.ts.
@@ -221,19 +294,20 @@ describe("MigrationTest", () => {
   });
 
   it("add column with if not exists set to true", async () => {
-    // Rails: migration_a adds `last_name`; migration_b re-adds it with
-    // if_not_exists: true and asserts it does not raise. We exercise the same
-    // live add_column path on a scratch table (the sibling tests' isolation
-    // idiom) instead of mutating the shared canonical `people` table.
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.addColumn("users", "last_name", "string");
-    expect(ctx.columnExists("users", "last_name")).toBe(true);
+    // Rails: migration_a adds `last_name` on `people`; migration_b re-adds it
+    // with if_not_exists: true and asserts it does not raise. Ride the canonical
+    // `people` table via a Migrator, as migration_test.rb does.
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
     // if_not_exists: true must not raise even though the column already exists.
-    await ctx.addColumn("users", "last_name", "string", { ifNotExists: true });
-    expect(ctx.columnExists("users", "last_name")).toBe(true);
+    await new Migrator(adapter, [
+      migrateProxy(101, (m) => m.addColumn("people", "last_name", "string", { ifNotExists: true })),
+    ]).up(101);
+    expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
   it("add table with decimals", async () => {
@@ -322,35 +396,39 @@ describe("MigrationTest", () => {
     }
   });
 
-  it("instance based migration up", async () => {
-    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
-    const adp = await freshAdapterWithSchema();
-    class Event extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adp;
-      }
+  // Rails' MockMigration flips went_up/went_down when migrate(:up)/migrate(:down)
+  // drives the corresponding hook — no table or DDL involved.
+  class MockMigration extends Migration {
+    wentUp = false;
+    wentDown = false;
+    override async up(): Promise<void> {
+      this.wentUp = true;
     }
-    const event = await Event.create({ name: "launch" });
-    expect(event.id).toBeDefined();
-    expect((event as any).name).toBe("launch");
+    override async down(): Promise<void> {
+      this.wentDown = true;
+    }
+  }
+
+  it("instance based migration up", async () => {
+    const migration = new MockMigration();
+    (migration as any).adapter = freshAdapter();
+    expect(migration.wentUp).toBe(false);
+    expect(migration.wentDown).toBe(false);
+
+    await migration.migrate("up");
+    expect(migration.wentUp).toBe(true);
+    expect(migration.wentDown).toBe(false);
   });
 
   it("instance based migration down", async () => {
-    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
-    const adp = await freshAdapterWithSchema();
-    class Event extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adp;
-      }
-    }
-    const event = await Event.create({ name: "launch" });
-    await event.destroy();
-    const found = await Event.find(event.id!).catch(() => null);
-    expect(found).toBeNull();
+    const migration = new MockMigration();
+    (migration as any).adapter = freshAdapter();
+    expect(migration.wentUp).toBe(false);
+    expect(migration.wentDown).toBe(false);
+
+    await migration.migrate("down");
+    expect(migration.wentUp).toBe(false);
+    expect(migration.wentDown).toBe(true);
   });
 
   it("schema migrations table name", () => {
@@ -452,17 +530,20 @@ describe("MigrationTest", () => {
   });
 
   it("remove column with if not exists not set", async () => {
-    // Rails adds `last_name`, removes it, then removes it again with
-    // if_not_exists unset: SQLite tolerates the missing column, other adapters
-    // raise. Exercise the live remove_column path on a scratch table.
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-      t.string("last_name");
-    });
-    expect(ctx.columnExists("users", "last_name")).toBe(true);
-    await ctx.removeColumn("users", "last_name");
-    expect(ctx.columnExists("users", "last_name")).toBe(false);
+    // Rails migration_a adds `last_name` on `people`, migration_b removes it,
+    // migration_c removes it again with if_not_exists unset: SQLite tolerates
+    // the missing column, other adapters raise. Ride the canonical `people`
+    // table via a Migrator, as migration_test.rb does.
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
+    await new Migrator(adapter, [
+      migrateProxy(101, (m) => m.removeColumn("people", "last_name")),
+    ]).up(101);
+    expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // Removing a missing column with if_not_exists unset raises on every
     // adapter in trails. Rails matches this on PG (`column ... does not exist`)
@@ -475,10 +556,14 @@ describe("MigrationTest", () => {
     // -convergence under 0023-surfaced-deviations story
     // sqlite-remove-column-tolerate-missing; assert the current trails raise
     // until the rebuild path lands.
-    const error = await ctx.removeColumn("users", "last_name").catch((e) => e);
+    const error = await new Migrator(adapter, [
+      migrateProxy(102, (m) => m.removeColumn("people", "last_name")),
+    ])
+      .up(102)
+      .catch((e) => e);
     expect(error).toBeInstanceOf(Error);
     expect(error.message).toMatch(
-      /no such column.*last_name|column "last_name" of relation "users" does not exist|check that.*exists/i,
+      /no such column.*last_name|column "last_name" of relation "people" does not exist|check that.*exists/i,
     );
   });
 
@@ -550,7 +635,7 @@ describe("MigrationTest", () => {
     // equivalent is `Migrator.fromDir(dir, adapter)`, which discovers
     // `\d+_*.ts` files, imports each as a MigrationLike, and runs them in
     // version order.
-    const adp = await freshAdapterWithSchema();
+    const adp = await freshAdapterWithPeople();
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");
     const here = dirname(fileURLToPath(import.meta.url));
@@ -667,30 +752,60 @@ describe("MigrationTest", () => {
   });
 
   it("remove column with if exists set", async () => {
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.removeColumn("users", "nonexistent", { ifExists: true });
-    expect(ctx.tableExists("users")).toBe(true);
+    // Rails migration_a adds `last_name` on `people`, migration_b removes it,
+    // migration_c removes it again with if_exists: true and asserts nothing
+    // raised. Ride the canonical `people` table via a Migrator.
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
+    await new Migrator(adapter, [
+      migrateProxy(101, (m) => m.removeColumn("people", "last_name")),
+    ]).up(101);
+    expect(await personColumnNames(adapter)).not.toContain("last_name");
+
+    // if_exists: true must not raise even though the column is already gone.
+    await new Migrator(adapter, [
+      migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true })),
+    ]).up(102);
+    expect(await personColumnNames(adapter)).not.toContain("last_name");
   });
 
   it("add column with casted type if not exists set to true", async () => {
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.addColumn("users", "name", "string", { ifNotExists: true });
-    expect(ctx.columnExists("users", "name")).toBe(true);
+    // Rails migration_a adds `last_name` on `people` with a casted type (:char
+    // on PG, :blob elsewhere); migration_b re-adds the same casted type with
+    // if_not_exists: true and asserts nothing raised. Ride canonical `people`.
+    const type = adapterType === "postgres" ? "string" : "binary";
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", type)),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
+    await new Migrator(adapter, [
+      migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true })),
+    ]).up(101);
+    expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
   it("add column with if not exists set to true does not raise if type is different", async () => {
-    const { ctx } = freshContext();
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.addColumn("users", "name", "integer", { ifNotExists: true });
-    expect(ctx.columnExists("users", "name")).toBe(true);
+    // Rails migration_a adds `last_name` :string on `people`; migration_b re-adds
+    // it as :boolean with if_not_exists: true and asserts nothing raised (a
+    // differing type is still a no-op). Ride canonical `people`.
+    const adapter = await freshAdapterWithPeople();
+    await new Migrator(adapter, [
+      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
+    ]).up(100);
+    expect(await personColumnNames(adapter)).toContain("last_name");
+
+    await new Migrator(adapter, [
+      migrateProxy(101, (m) =>
+        m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
+      ),
+    ]).up(101);
+    expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
   it("method missing delegates to connection", () => {
