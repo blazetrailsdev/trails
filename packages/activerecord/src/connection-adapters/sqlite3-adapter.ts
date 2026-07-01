@@ -1078,7 +1078,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
     // Decimal/numeric carry `precision`/`scale` in a two-arg `(p,s)` form that
     // `paramMatch` (single-arg only) skips — `baseSqlType` still holds the full
-    // `DECIMAL(10,2)`, so the resolved cast type already parsed them. Mirror
+    // `DECIMAL(10, 2)`, so the resolved cast type already parsed them. Mirror
     // Rails' `fetch_type_metadata`, which sources limit/precision/scale straight
     // off the cast type, so a materialized decimal round-trips through the dumper.
     if (dslTypeName === "decimal") {
