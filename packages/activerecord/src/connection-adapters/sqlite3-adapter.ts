@@ -1073,18 +1073,23 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     let precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
     let limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
     let scale: number | null = null;
-    const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
-    const castType = this.lookupCastType(baseSqlType);
-    const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
-    // Decimal/numeric carry `precision`/`scale` in a two-arg `(p,s)` form that
-    // `paramMatch` (single-arg only) skips — `baseSqlType` still holds the full
-    // `DECIMAL(10, 2)`, so the resolved cast type already parsed them. Mirror
-    // Rails' `fetch_type_metadata`, which sources limit/precision/scale straight
-    // off the cast type, so a materialized decimal round-trips through the dumper.
+    let baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
+    const dslTypeName = (() => {
+      const t = this.lookupCastType(baseSqlType);
+      return t.type() !== "value" ? t.type() : baseSqlType.toLowerCase();
+    })();
+    // Decimal precision/scale must be read off the FULL type string, not the
+    // paren-stripped base: `paramMatch` mis-reads a single-arg `DECIMAL(55)` as
+    // a limit and drops the `(55)` from `baseSqlType`. Re-resolve from `raw` —
+    // as Rails' `fetch_type_metadata` carries the whole sql_type — so the cast
+    // type keeps precision/scale, and hold the full string as `sqlType` so the
+    // attribute cast type rounds to the declared precision (numericality).
     if (dslTypeName === "decimal") {
-      precision = castType.precision ?? null;
-      scale = castType.scale ?? null;
+      const decimalCastType = this.lookupCastType(raw);
+      precision = decimalCastType.precision ?? null;
+      scale = decimalCastType.scale ?? null;
       limit = null;
+      baseSqlType = raw;
     }
     return new SqlTypeMetadata({
       sqlType: baseSqlType,

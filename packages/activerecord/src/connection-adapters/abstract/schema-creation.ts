@@ -396,16 +396,19 @@ export class SchemaCreation {
       case "float":
         sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
         break;
-      case "decimal":
-        // Always emit the two-arg `DECIMAL(p, s)` form (scale defaulting to 0).
-        // SQLite's decimal cast-type reg(sqlite3-adapter.ts) recovers precision
-        // and scale from this, and — unlike a single-arg `DECIMAL(p)` — the
-        // two-arg form does not trip `fetch_type_metadata`'s single-arg `(N)`
-        // matcher, which would otherwise strip the parens and drop precision
-        // from the attribute cast type (breaking decimal rounding).
+      case "decimal": {
+        // Mirror Rails' `type_to_sql` decimal branch (schema_statements.rb:1390):
+        // `decimal(precision,scale)` when a scale is given, else `decimal(precision)`
+        // — no space after the comma, so `extract_scale`/`extract_precision`
+        // reflect it back byte-for-byte as Rails does.
         this.validateDecimalPrecision(options);
-        sql = `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
+        const precision = options.precision ?? 10;
+        sql =
+          options.scale != null
+            ? `DECIMAL(${precision},${options.scale})`
+            : `DECIMAL(${precision})`;
         break;
+      }
       case "boolean":
         sql = "BOOLEAN";
         break;
