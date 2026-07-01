@@ -35,6 +35,9 @@ import {
  * @example  // by registry name
  *   const { authors, posts } = fixtures(["authors", "posts"]);
  *
+ * @example  // non-transactional (Rails `use_transactional_tests = false`)
+ *   const { books } = fixtures(["books", "authors"], { useTransactionalTests: false });
+ *
  * @internal
  */
 export function fixtures<M extends FixtureMap>(
