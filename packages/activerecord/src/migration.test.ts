@@ -215,18 +215,12 @@ describe("MigrationTest", () => {
     );
   });
 
-  describe("IndexForTableWithSchemaMigrationTest", () => {
-    // Tracked-pending-convergence: this faithful Rails port (schema-qualified
-    // `my_schema.values`) surfaces a trails deviation. Rails' PG adapter strips
-    // the schema in its `index_name` override (postgresql/schema_statements.rb:576)
-    // → `index_values_on_value`, and schema-qualifies the DROP in `remove_index`
-    // (:543, via PostgreSQL::Name). trails has neither override: the base
-    // derivation keeps the schema (`index_my_schema.values_on_value`) and the base
-    // `removeIndex` issues a bare, schema-unaware `DROP INDEX`, so remove fails
-    // with `index ... does not exist` (SQLSTATE 42704). The multi-method PG-adapter
-    // fix is out of scope for this test-only convergence; un-skip under RFC 0048
-    // story fix-schema-qualified-index-name-derivation.
-    it.skip("add and remove index", async () => {
+  describeIfPg("IndexForTableWithSchemaMigrationTest", () => {
+    // Schema-qualified `my_schema.values`: Rails' PG `index_name` strips the
+    // schema (postgresql/schema_statements.rb) → `index_values_on_value`,
+    // created in `my_schema` via the schema-qualified table, and `remove_index`
+    // re-qualifies the DROP with the table's schema so add/remove stay symmetric.
+    it("add and remove index", async () => {
       // PG-only, mirrors migration_test.rb: create a dedicated `my_schema`
       // Postgres schema and drive add/remove index on `my_schema.values`,
       // dropping the schema in the ensure — no canonical table involved.

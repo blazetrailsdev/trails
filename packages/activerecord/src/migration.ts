@@ -2423,8 +2423,15 @@ export class MigrationContext {
       cols.length === 1 && /\W/.test(cols[0])
         ? [cols[0].match(/\w+/g)?.join("_") ?? cols[0]]
         : cols;
-    const indexName = options?.name ?? `index_${table}_on_${nameParts.join("_and_")}`;
     const an = this._adapterName;
+    // Rails' PostgreSQL `index_name` strips the schema qualifier before deriving
+    // the default name (postgresql/schema_statements.rb), so a `my_schema.values`
+    // table indexes as `index_values_on_value` (created in `my_schema` via the
+    // schema-qualified table), keeping add/remove symmetric.
+    const schemaDot = an === "postgres" ? table.indexOf(".") : -1;
+    const schema = schemaDot === -1 ? "" : table.slice(0, schemaDot);
+    const nameTable = schemaDot === -1 ? table : table.slice(schemaDot + 1);
+    const indexName = options?.name ?? `index_${nameTable}_on_${nameParts.join("_and_")}`;
     // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
     const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
     const uniqueStr = !typeStr && unique ? "UNIQUE " : "";
@@ -2461,8 +2468,11 @@ export class MigrationContext {
     if (an === "mysql" && comment) sql += ` COMMENT ${this.connection.quote(comment)}`;
     await this.connection.executeMutation(sql);
     if (an === "postgres" && comment) {
+      const qualifiedIndex = schema
+        ? `${this.connection.quoteIdentifier(schema)}.${this.connection.quoteIdentifier(indexName)}`
+        : this.connection.quoteIdentifier(indexName);
       await this.connection.executeMutation(
-        `COMMENT ON INDEX ${this.connection.quoteIdentifier(indexName)} IS ${this.connection.quote(comment)}`,
+        `COMMENT ON INDEX ${qualifiedIndex} IS ${this.connection.quote(comment)}`,
       );
     }
     if (!this._indexes.has(table)) this._indexes.set(table, []);
@@ -2488,14 +2498,26 @@ export class MigrationContext {
     table: string,
     options: { column?: string | string[]; name?: string },
   ): Promise<void> {
+    // Rails' PostgreSQL `remove_index` strips the schema before deriving the
+    // default index name and re-qualifies the `DROP INDEX` with the table's
+    // schema (postgresql/schema_statements.rb, via PostgreSQL::Name), so the
+    // name matches what `addIndex` created in that schema.
+    const isPg = this.connection.adapterName === "postgres";
+    const schemaDot = isPg ? table.indexOf(".") : -1;
+    const schema = schemaDot === -1 ? "" : table.slice(0, schemaDot);
+    const bareTable = schemaDot === -1 ? table : table.slice(schemaDot + 1);
     let indexName = options.name;
     if (!indexName && options.column) {
       const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${table}_on_${cols.join("_and_")}`;
+      indexName = `index_${bareTable}_on_${cols.join("_and_")}`;
     }
     if (indexName) {
       if (this.connection.adapterName === "mysql") {
         await this.connection.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
+      } else if (schema) {
+        await this.connection.executeMutation(
+          `DROP INDEX ${this.connection.quoteIdentifier(schema)}.${this.connection.quoteIdentifier(indexName)}`,
+        );
       } else {
         await this.connection.executeMutation(`DROP INDEX "${indexName}"`);
       }
