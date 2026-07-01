@@ -1834,8 +1834,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
+      // Quote the identifier (mirrors Rails quote(quote_table_name(table)) in
+      // pk_and_sequence_for) so a mixed-case name like "CamelCase" resolves
+      // case-sensitively instead of folding to lowercase via a bare to_regclass.
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass(quote_ident($1))`;
     }
 
     const rows = await this.pg.schemaQuery(
