@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { Base } from "./base.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+import type { SchemaSource } from "./schema-dumper.js";
 import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
+import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
@@ -31,6 +35,163 @@ async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>)
   }
 }
 
+// Faithful port of the Rails cases that dump the *standard loaded schema*
+// (`standard_dump` / `dump_table_schema "companies"`). Rails loads `schema.rb`;
+// we ride the canonical `TEST_SCHEMA` — the trails mirror of `schema.rb` —
+// which `setupFixtures()` materializes on the shared worker DB and shields from
+// the per-test reset, so `Base.adapter` already carries every canonical table.
+// No per-test ad-hoc tables. Split into its own describe (no bespoke
+// table-building cases) so nothing `force`-recreates a canonical table out from
+// under the dump.
+describe("SchemaDumperTest", () => {
+  setupFixtures();
+
+  function canonicalSource(): SchemaSource {
+    return Base.adapter as unknown as SchemaSource;
+  }
+  function standardDump(ignoreTables: (string | RegExp)[] = []): Promise<string> {
+    return dumpAllTableSchema(canonicalSource(), ignoreTables);
+  }
+  function dumpCanonicalTable(...tables: string[]): Promise<string> {
+    return dumpTableSchema(canonicalSource(), ...tables);
+  }
+
+  it("schema dump", async () => {
+    const output = await standardDump();
+    expect(output).toMatch(/createTable\("accounts"/);
+    expect(output).toMatch(/createTable\("authors"/);
+    expect(output).not.toMatch(/createTable\("schema_migrations"/);
+    expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
+  });
+
+  it("schema dump uses force cascade on create table", async () => {
+    const output = await dumpCanonicalTable("authors");
+    expect(output).toMatch(/createTable\("authors",.*force:\s*"cascade"/);
+  });
+
+  it("schema dump excludes sqlite sequence", async () => {
+    const output = await standardDump();
+    expect(output).not.toMatch(/createTable\("sqlite_sequence"/);
+  });
+
+  it("schema dump includes camelcase table name", async () => {
+    const output = await standardDump();
+    expect(output).toMatch(/createTable\("CamelCase"/);
+  });
+
+  it("types no line up", async () => {
+    const output = await standardDump();
+    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
+    for (const line of columnLines) {
+      expect(line).not.toMatch(/\bt\.\w+\s{2,}/);
+    }
+  });
+  it("arguments no line up", async () => {
+    const output = await standardDump();
+    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
+    // no padding before option keys — each key is preceded by "{ " or ", ", never extra spaces
+    for (const pattern of [/default: /, /limit: /, /null: /]) {
+      for (const line of columnLines.filter((l) => pattern.test(l))) {
+        const m = line.match(pattern)!;
+        const before = line.slice(m.index! - 2, m.index);
+        expect(before === "{ " || before === ", ").toBe(true);
+      }
+    }
+  });
+
+  it("no dump errors", async () => {
+    const output = await standardDump();
+    expect(output).not.toContain("# Could not dump table");
+  });
+
+  it("schema dump includes not null columns", async () => {
+    // Rails: dump_all_table_schema([/^[^r]/]) — keep only tables starting with
+    // `r`, then assert some column dumps `null: false`.
+    const output = await standardDump([/^[^r]/]);
+    expect(output).toContain("null: false");
+  });
+
+  it("schema dump with string ignored table", async () => {
+    // Rails: dump_table_schema("authors") — every other data source is ignored.
+    const output = await dumpCanonicalTable("authors");
+    expect(output).not.toMatch(/createTable\("accounts"/);
+    expect(output).toMatch(/createTable\("authors"/);
+    expect(output).not.toMatch(/createTable\("schema_migrations"/);
+    expect(output).not.toMatch(/createTable\("ar_internal_metadata"/);
+  });
+
+  it("schema dump does not emit id false for normal tables", async () => {
+    const output = await dumpCanonicalTable("authors");
+    expect(output).not.toContain("id: false");
+    expect(output).not.toContain('t.integer("id"');
+  });
+
+  it("schema dump should honor nonstandard primary keys", async () => {
+    // Rails: standard_dump — canonical `movies` has `primary_key: "movieid"`.
+    const output = await standardDump();
+    const match = output.match(/createTable\("movies"(.*)/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toMatch(/primaryKey: "movieid"/);
+  });
+
+  it("schema dump should use false as default", async () => {
+    // Rails: dump_table_schema "booleans" — canonical `has_fun` default false.
+    const output = await dumpCanonicalTable("booleans");
+    expect(output).toMatch(/t\.boolean\("has_fun",.*default: false/);
+  });
+
+  it("schema dump does not include limit for text field", async () => {
+    // Rails: dump_table_schema "admin_users" — canonical `params` is text.
+    const output = await dumpCanonicalTable("admin_users");
+    expect(output).toMatch(/t\.text\("params"\)/);
+    expect(output).not.toMatch(/text.*"params".*limit/);
+  });
+
+  it("schema dump does not include limit for binary field", async () => {
+    const output = await dumpCanonicalTable("binaries");
+    expect(output).toMatch(/t\.binary\("data"\)/);
+    expect(output).not.toMatch(/binary.*"data".*limit/);
+  });
+
+  it("schema dump does not include limit for float field", async () => {
+    const output = await dumpCanonicalTable("numeric_data");
+    expect(output).toMatch(/t\.float\("temperature"\)/);
+    expect(output).not.toMatch(/float.*"temperature".*limit/);
+  });
+
+  it("schema dump aliased types", async () => {
+    // Rails: standard_dump — canonical `binaries.blob_data` (t.blob) dumps as
+    // binary, `numeric_data.numeric_number` (t.numeric) dumps as decimal.
+    const output = await standardDump();
+    expect(output).toMatch(/t\.binary\("blob_data"\)/);
+    expect(output).toMatch(/t\.decimal\("numeric_number"/);
+  });
+
+  it("schema dump keeps id column when id is false and id column added", async () => {
+    // Rails: standard_dump — canonical `goofy_string_id` is `id: false` with a
+    // non-PK `id` string column.
+    const output = await standardDump();
+    const match = output.match(/createTable\("goofy_string_id"(.*)\n(.*)\n/);
+    expect(match).not.toBeNull();
+    expect(match![1]).toMatch(/id: false/);
+    expect(match![2]).toMatch(/t\.string\("id",.*null: false/);
+  });
+
+  it("schema dump keeps id false when id is false and unique not null column added", async () => {
+    // Rails: standard_dump — canonical `string_key_objects` stays `id: false`.
+    const output = await standardDump();
+    expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
+  });
+});
+
+// Deferred-convergence cases: still build ad-hoc, non-canonical tables (indexes
+// with sort-order/length options the canonical `TEST_SCHEMA` cannot yet express,
+// adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
+// in `schema.rb`, table-name prefix/suffix migrations, etc.). Kept on the
+// plain per-test reset (no `setupFixtures()`) so their bespoke tables are
+// dropped between tests. Converging these needs the `defineSchema` IndexSpec
+// extension + canonical `companies` indexes + the missing adapter tables —
+// tracked as follow-up stories under RFC 0048.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(async () => {
@@ -79,90 +240,20 @@ describe("SchemaDumperTest", () => {
     expect(result).toContain("defineSchema");
   });
 
-  it("schema dump", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-      t.integer("age");
-    });
+  it("schema dump with regexp ignored table", async () => {
+    await ctx.createTable("users", {}, (t) => t.string("name"));
+    await ctx.createTable("temp_cache", {}, (t) => t.string("val"));
+    SchemaDumper.ignoreTables = [/^temp_/];
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("createTable");
     expect(output).toContain("users");
+    expect(output).not.toContain("temp_cache");
   });
 
-  it("schema dump uses force cascade on create table", async () => {
-    await ctx.createTable("authors", {}, (t) => {
-      t.string("name");
-    });
-    const output = SchemaDumper.dump(ctx) as string;
-    expect(output).toMatch(/createTable\("authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
-  });
-
-  it("schema dump excludes sqlite sequence", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    const adapter = createTestAdapter();
-    const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("auto_inc", {}, (t) => {
-      t.string("name");
-    });
-    const output = await TopLevelDumper.dump(adapter);
-    expect(output).not.toMatch(/createTable\("sqlite_sequence"/);
-  });
-
-  it("schema dump includes camelcase table name", async () => {
-    await ctx.createTable("CamelTable", {}, (t) => {
-      t.string("name");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("CamelTable");
-  });
-
-  it("types no line up", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-      t.integer("age");
-      t.boolean("active");
-      t.text("bio");
-    });
-    const output = SchemaDumper.dump(ctx) as string;
-    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
-    for (const line of columnLines) {
-      expect(line).not.toMatch(/\bt\.\w+\s{2,}/);
-    }
-  });
-  it("arguments no line up", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name", { null: false });
-      t.integer("age", { default: 0 });
-      t.string("code", { limit: 10, null: false });
-    });
-    const output = SchemaDumper.dump(ctx) as string;
-    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
-    // no padding before option keys — each key is preceded by "{ " or ", ", never extra spaces
-    for (const pattern of [/default: /, /limit: /, /null: /]) {
-      for (const line of columnLines.filter((l) => pattern.test(l))) {
-        const m = line.match(pattern)!;
-        const before = line.slice(m.index! - 2, m.index);
-        expect(before === "{ " || before === ", ").toBe(true);
-      }
-    }
-  });
-
-  it("no dump errors", async () => {
-    await ctx.createTable("safe", {}, (t) => {
-      t.string("name");
-    });
-    expect(() => SchemaDumper.dump(ctx)).not.toThrow();
-  });
-
-  it("schema dump includes not null columns", async () => {
-    await ctx.createTable("strict", {}, (t) => {
-      t.string("name", { null: false });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("strict");
-    expect(output).toContain("null: false");
-  });
-
+  // Deferred: SQLite reflection of a `defineSchema`-materialized table does not
+  // recover decimal precision/scale or integer limit, so these three cannot yet
+  // ride the canonical `numeric_data` / `integer_limits` via `standard_dump`.
+  // They stay on freshly-built ad-hoc tables (whose DDL the dumper reflects
+  // faithfully) until the canonical-materialization gap is closed.
   it("schema dump includes limit constraint for integer columns", async () => {
     await ctx.createTable("limits", {}, (t) => {
       t.integer("small_int", { limit: 2 });
@@ -171,22 +262,21 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("limit: 2");
   });
 
-  it("schema dump with string ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
-    await ctx.createTable("ignored_table", {}, (t) => t.string("val"));
-    SchemaDumper.ignoreTables = ["ignored_table"];
+  it("schema dump includes decimal options", async () => {
+    await ctx.createTable("numeric_data", {}, (t) => {
+      t.decimal("bank_balance", { precision: 10, scale: 2 });
+    });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("users");
-    expect(output).not.toContain("ignored_table");
+    expect(output).toContain("precision: 10");
+    expect(output).toContain("scale: 2");
   });
 
-  it("schema dump with regexp ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
-    await ctx.createTable("temp_cache", {}, (t) => t.string("val"));
-    SchemaDumper.ignoreTables = [/^temp_/];
+  it("schema dump keeps large precision integer columns as decimal", async () => {
+    await ctx.createTable("numeric_data", {}, (t) => {
+      t.decimal("atoms_in_universe", { precision: 55 });
+    });
     const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("users");
-    expect(output).not.toContain("temp_cache");
+    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
   });
 
   it("schema dumps index columns in right order", async () => {
@@ -260,7 +350,7 @@ describe("SchemaDumperTest", () => {
   });
   it("schema dumps index length", async () => {
     const { adapter: lenAdapter, ctx: lenCtx } = freshCtx();
-    await lenCtx.createTable("companies", {}, (t) => {
+    await lenCtx.createTable("companies", { force: true }, (t) => {
       t.string("name");
       t.string("description");
     });
@@ -277,7 +367,7 @@ describe("SchemaDumperTest", () => {
     const { SchemaStatements } =
       await import("./connection-adapters/abstract/schema-statements.js");
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
-    await testCtx.createTable("products", {}, (t) => {
+    await testCtx.createTable("products", { force: true }, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
     });
@@ -347,74 +437,6 @@ describe("SchemaDumperTest", () => {
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
     },
   );
-
-  it("schema dump does not emit id false for normal tables", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).not.toContain("id: false");
-    expect(output).not.toContain('t.integer("id"');
-  });
-
-  it("schema dump should honor nonstandard primary keys", async () => {
-    await ctx.createTable("custom_pk", { id: false }, (t) => {
-      t.string("code");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("id: false");
-  });
-
-  it("schema dump should use false as default", async () => {
-    await ctx.createTable("booleans", {}, (t) => {
-      t.boolean("has_fun", { default: false });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/boolean.*"has_fun".*default: false/);
-  });
-
-  it("schema dump does not include limit for text field", async () => {
-    await ctx.createTable("posts", {}, (t) => {
-      t.text("params");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('t.text("params")');
-    expect(output).not.toMatch(/text.*"params".*limit/);
-  });
-
-  it("schema dump does not include limit for binary field", async () => {
-    await ctx.createTable("binaries", {}, (t) => {
-      t.binary("data");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('t.binary("data")');
-    expect(output).not.toMatch(/binary.*"data".*limit/);
-  });
-
-  it("schema dump does not include limit for float field", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.float("temperature");
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('t.float("temperature")');
-    expect(output).not.toMatch(/float.*"temperature".*limit/);
-  });
-
-  it("schema dump aliased types", async () => {
-    await ctx.createTable("aliased_types", {}, (t) => {
-      t.blob("blob_data");
-      t.numeric("numeric_number");
-    });
-    try {
-      const output = SchemaDumper.dump(ctx);
-      expect(output).toMatch(/t\.binary\("blob_data"\)/);
-      expect(output).toMatch(/t\.decimal\("numeric_number"/);
-    } finally {
-      // Drop the bespoke table so it doesn't linger on the shared worker DB
-      // and perturb other files' schema-signature caching / scheduling.
-      await ctx.dropTable("aliased_types");
-    }
-  });
   itIfSupports("expression_index", "schema dump expression indices", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
@@ -482,7 +504,7 @@ describe("SchemaDumperTest", () => {
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
       const { adapter, ctx: testCtx } = freshSidecarCtx();
-      await testCtx.createTable("booleans", {}, (t) => {
+      await testCtx.createTable("booleans", { force: true }, (t) => {
         t.boolean("has_fun", { default: false });
       });
       const output = await SchemaDumper.dump(adapter);
@@ -510,15 +532,6 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain(
       'addIndex("key_tests", "pizza", { name: "index_key_tests_on_pizza" })',
     );
-  });
-
-  it("schema dump includes decimal options", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("bank_balance", { precision: 10, scale: 2 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("precision: 10");
-    expect(output).toContain("scale: 2");
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes bigint default", async () => {
@@ -612,7 +625,7 @@ describe("SchemaDumperTest", () => {
   );
   it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
     const { adapter, ctx: testCtx } = freshSidecarCtx();
-    await testCtx.createTable("numeric_data", {}, (t) => {
+    await testCtx.createTable("numeric_data", { force: true }, (t) => {
       t.float("temperature_with_limit", { limit: 24 });
     });
     const output = await SchemaDumper.dump(adapter);
@@ -633,31 +646,6 @@ describe("SchemaDumperTest", () => {
       }
     },
   );
-  it("schema dump keeps large precision integer columns as decimal", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("atoms_in_universe", { precision: 55 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
-  });
-
-  it("schema dump keeps id column when id is false and id column added", async () => {
-    await ctx.createTable("goofy_string_id", { id: false }, (t) => {
-      t.string("id", { null: false });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("id: false");
-    expect(output).toMatch(/string.*"id".*null: false/);
-  });
-
-  it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await ctx.createTable("string_key_objects", { id: false }, (t) => {
-      t.string("key", { null: false });
-    });
-    await ctx.addIndex("string_key_objects", "key", { unique: true });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
-  });
 
   itIfSupports(
     "foreign_keys",
@@ -946,25 +934,23 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 });
 
-// These tests dump real schemas built via MigrationContext on the shared
-// per-worker DB; drop every table they create, by name, so the leaked tables
-// don't collide with sibling files under parallel forks.
+// The deferred bespoke cases in the second `SchemaDumperTest` describe build
+// real ad-hoc tables via MigrationContext on the shared per-worker DB; drop
+// every one they create, by name, so the leaked tables don't collide with
+// sibling files under parallel forks. The canonical tables the first describe
+// *rides* (accounts/authors/binaries/movies/…) are shielded by `setupFixtures`
+// and are NOT dropped here. `companies`/`booleans`/`numeric_data`/`posts`/
+// `products` appear only because deferred cases still `force`-recreate them on
+// some adapters; the per-file schema repair restores the canonical shape after.
 afterAll(async () => {
   const { ctx } = freshCtx();
   const o = { ifExists: true } as const;
-  await ctx.dropTable("authors", o);
-  await ctx.dropTable("auto_inc", o);
   await ctx.dropTable("bigint_array", o);
-  await ctx.dropTable("binaries", o);
   await ctx.dropTable("binary_fields", o);
   await ctx.dropTable("booleans", o);
-  await ctx.dropTable("CamelTable", o);
   await ctx.dropTable("companies", o);
-  await ctx.dropTable("custom_pk", o);
   await ctx.dropTable("defaults", o);
   await ctx.dropTable("dump_defaults", o);
-  await ctx.dropTable("goofy_string_id", o);
-  await ctx.dropTable("ignored_table", o);
   await ctx.dropTable("indexed", o);
   await ctx.dropTable("infinity_defaults", o);
   await ctx.dropTable("key_tests", o);
@@ -977,9 +963,6 @@ afterAll(async () => {
   await ctx.dropTable("postgresql_times", o);
   await ctx.dropTable("posts", o);
   await ctx.dropTable("products", o);
-  await ctx.dropTable("safe", o);
-  await ctx.dropTable("strict", o);
-  await ctx.dropTable("string_key_objects", o);
   await ctx.dropTable("temp_cache", o);
   await ctx.dropTable("test_schema_exclusion", o);
   await ctx.dropTable("test_schema_unique", o);
