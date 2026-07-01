@@ -36,11 +36,14 @@
  *                 the JSON artifact regardless of this flag.
  *   --assertions  Print the assertion-count-mismatch report — matched,
  *                 implemented tests whose trails port has a different number of
- *                 assertion calls than its Rails counterpart. Report-only: no CI
- *                 gate, no exclude.json, does not affect any count. Always
- *                 emitted to the JSON artifact regardless of this flag. Compares
- *                 assertion *counts* only; comparing assertion *expectations*
- *                 (kinds / expected values) is planned follow-up.
+ *                 assertion calls than its Rails counterpart. Scoped to the
+ *                 activerecord package for now (see ASSERTION_REPORT_PACKAGES);
+ *                 other packages never contribute this metric to their summary
+ *                 totals or the JSON. Report-only: no CI gate, no exclude.json,
+ *                 does not affect any count. Emitted to the JSON artifact
+ *                 regardless of this flag. Compares assertion *counts* only;
+ *                 comparing assertion *expectations* (kinds / expected values)
+ *                 is planned follow-up.
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -59,6 +62,13 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
+
+// Packages the assertion-count comparison is reported for. Scoped to
+// activerecord for now (RFC follow-up may widen it) — both extractors populate
+// `assertionCount` for every package, but we only surface the mismatch metric
+// (summary tokens, `--assertions` section, JSON `assertionMismatches`) here so
+// the advisory number doesn't leak into unrelated packages' totals.
+const ASSERTION_REPORT_PACKAGES = new Set(["activerecord"]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -484,6 +494,7 @@ function main() {
       // expectations (kinds / expected values) is planned follow-up, not done
       // here.
       const recordAssertion = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
         const railsCount = rubyTc.assertionCount;
         const trailsCount = tsInfo.assertionCount;
         if (!isAssertionCountMismatch(railsCount, trailsCount, tsInfo.pending)) return;

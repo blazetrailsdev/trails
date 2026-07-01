@@ -49,6 +49,22 @@ const ASSERTION_CALLEES = new Set([
   "assertChanges",
   "assertNoChanges",
   "assertDeprecated",
+  // Minitest spec-style forms. Trails ports these to `expect(...)` rather than
+  // literal `mustEqual`/`wontEqual` helpers, so in practice they never match a
+  // TS callee — but they are kept here so this set is a faithful twin of the
+  // full Ruby ASSERTION_METHODS list (and stays symmetric if such a helper is
+  // ever introduced).
+  "mustEqual",
+  "mustBeNil",
+  "mustBeLike",
+  "mustBeEmpty",
+  "mustInclude",
+  "mustRespondTo",
+  "mustBeInstanceOf",
+  "mustRaise",
+  "wontBeNil",
+  "wontEqual",
+  "wontBeEmpty",
   "refute",
   "refuteEqual",
   "refuteNil",

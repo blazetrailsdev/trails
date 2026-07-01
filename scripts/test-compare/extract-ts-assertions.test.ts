@@ -70,6 +70,19 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["mixed"]).toBe(1);
   });
 
+  it("recognizes minitest spec-form twins (must*/wont*/refute*) for symmetry with Ruby", () => {
+    const src = `
+      it("spec forms", () => {
+        mustEqual(a, 1);
+        wontEqual(b, 2);
+        refuteNil(c);
+      });
+    `;
+    // These mirror Ruby's must_equal/wont_equal/refute_nil so the two sides
+    // count the same assertion-kind set (trails normally ports them to expect()).
+    expect(tsAssertionCounts(src)["spec forms"]).toBe(3);
+  });
+
   it("reports zero for an assertion-free body", () => {
     const src = `
       it("no asserts", () => {
