@@ -555,12 +555,12 @@ describe("useFixtures seeds composite-primary-key tables", () => {
   });
 
   // CpkOrder declares a composite model PK (`["shop_id", "id"]`) while the test
-  // schema keeps a plain autoincrement `id`: it seeds the schema `id` as a
-  // single-PK, then also fills the remaining model-PK column (`shop_id`) from the
-  // label (mirroring Rails' composite_identify keyed on the model PK).
-  // CpkOrderTag's schema PK IS composite (`["order_id", "tag_id"]`); both key
-  // columns are supplied by ref()s in the fixture row. cpkOrders loads first so
-  // its declared ids back the cpkOrderTags order_id ref().
+  // schema keeps a plain autoincrement `id`; Rails' composite_primary_key? is
+  // model-level, so both key columns are generated from the label via
+  // compositeIdentify. CpkOrderTag's schema PK IS composite (`["order_id",
+  // "tag_id"]`); both key columns are supplied by ref()s in the fixture row.
+  // cpkOrders loads first so its declared key map backs the cpkOrderTags
+  // order_id ref() (which resolves to the order's `id` column).
   const { cpkOrders, cpkOrderTags, cpkBooks } = useFixtures(
     ["cpkOrders", "cpkOrderTags", "cpkBooks"],
     () => Base.adapter,
