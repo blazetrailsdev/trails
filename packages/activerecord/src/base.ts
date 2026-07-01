@@ -236,6 +236,7 @@ import {
   inspect as _inspect,
   attributeForInspect as _attributeForInspect,
   isEqual as _isEqual,
+  hash as _hash,
   isPresent as _isPresent,
   isBlank as _isBlank,
   filterAttributes as _coreFilterAttributes,
@@ -4238,6 +4239,13 @@ export class Base extends Model {
   declare isEqual: (other: unknown) => boolean;
 
   /**
+   * Return a value that dedups records the way Ruby's `hash` + `eql?` do.
+   *
+   * Mirrors: ActiveRecord::Core#hash
+   */
+  declare hash: () => unknown;
+
+  /**
    * Return a string suitable for use as a URL slug.
    * Override in subclasses for friendly URLs.
    *
@@ -4672,6 +4680,7 @@ include(Base, {
   prettyPrint: _Core.prettyPrint,
   attributeForInspect: _attributeForInspect,
   isEqual: _isEqual,
+  hash: _hash,
   isPresent: _isPresent,
   isBlank: _isBlank,
   isReadonly: _Core.isReadonly,

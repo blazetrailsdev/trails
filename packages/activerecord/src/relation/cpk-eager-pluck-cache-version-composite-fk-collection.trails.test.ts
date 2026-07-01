@@ -10,14 +10,17 @@
  * cpk_chapters.book_id = cpk_books.id`), so `eagerLoad("chapters")` JOINs like
  * Rails and `pluck` / `cache_version` read from the joined query.
  *
- * Two residual, separately-tracked trails deviations remain (hence the
+ * The composite-FK `belongsTo` direction is likewise converged: a nested spec
+ * whose inner segment is a composite-FK `belongsTo` (`{ chapters: "book" }`)
+ * now JOINs both segments (`joinConstraints` keys
+ * `target.association_primary_key = source.foreign_key` per column).
+ *
+ * One residual, separately-tracked trails deviation remains (hence the
  * `*.trails.test.ts` suffix):
  *   - A limit/offset over the joined collection needs the composite-PK
  *     `distinct_relation_for_primary_key` materialization, which trails can't do
  *     yet — it surfaces an explicit NotImplementedError
  *     (0023-surfaced-deviations/composite-pk-distinct-relation-materialization).
- *   - A nested spec whose inner segment is a composite-FK `belongsTo`
- *     (`{ chapters: "book" }`) is still unjoinable, so it degrades.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
@@ -26,6 +29,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "../associations/join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 import "../associations/collection-proxy.js";
 import "../association-relation.js";
 
@@ -62,6 +66,31 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters"]);
   });
 
+  it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
+    const jd = new JoinDependency(CpkBook as unknown as typeof Base);
+    const node = jd.addAssociation("order");
+    expect(node).not.toBeNull();
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const and = on.expr as Nodes.And;
+    // belongsTo keys target.association_primary_key = source.foreign_key per
+    // column: cpk_orders.shop_id = cpk_books.shop_id AND
+    // cpk_orders.id = cpk_books.order_id.
+    expect(and.children).toHaveLength(2);
+    type Attr = { name: string; relation: { name: string } };
+    const [c0, c1] = and.children as Nodes.Equality[];
+    const c0l = c0.left as unknown as Attr;
+    const c0r = c0.right as unknown as Attr;
+    const c1l = c1.left as unknown as Attr;
+    const c1r = c1.right as unknown as Attr;
+    expect(c0l.name).toBe("shop_id");
+    expect(c0l.relation.name).toBe("cpk_orders");
+    expect(c0r.name).toBe("shop_id");
+    expect(c0r.relation.name).toBe("cpk_books");
+    expect(c1l.name).toBe("id");
+    expect(c1r.name).toBe("order_id");
+  });
+
   it("pluck over eagerLoad('chapters') joins the composite-FK collection", async () => {
     await seedBooks();
     const titles = await CpkBook.eagerLoad("chapters").order("author_id", "id").pluck("title");
@@ -96,16 +125,21 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     ).rejects.toThrow(/limit\/offset over a collection association/);
   });
 
-  it("pluck of a nested-hash spec's inner composite-FK belongsTo degrades", async () => {
+  it("pluck of a nested-hash spec's inner composite-FK belongsTo joins both segments", async () => {
     await seedBooks();
-    // `{ chapters: "book" }` nests a composite-FK `belongsTo` (`chapters.book`),
-    // which is still unjoinable, so `addAssociationSpec` returns the whole hash
-    // as a fallback. The base/joinable safe-table check catches the reference
-    // to the unjoined table and routes back through the full-spec join, which
-    // raises the explicit capability-gap error for the inner segment.
-    await expect(
-      CpkBook.eagerLoad({ chapters: "book" }).pluck("cpk_chapters.title"),
-    ).rejects.toThrow(/book/);
+    // `{ chapters: "book" }` nests a composite-FK `belongsTo` (`chapters.book`).
+    // Both segments now JOIN: `chapters` keys the composite FK↔PK tuple, and the
+    // inner `book` belongsTo keys `cpk_books.author_id = cpk_chapters.author_id
+    // AND cpk_books.id = cpk_chapters.book_id`.
+    const jd = new JoinDependency(CpkBook as unknown as typeof Base);
+    jd.addAssociationSpec({ chapters: "book" });
+    const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
+    expect(nodes.map((n) => n.assocName)).toEqual(["chapters", "chapters.book"]);
+
+    const titles = await CpkBook.eagerLoad({ chapters: "book" })
+      .order("cpk_books.author_id", "cpk_books.id")
+      .pluck("cpk_chapters.title");
+    expect(titles).toEqual(["ch-1", null, null]);
   });
 
   it("cache_version over eagerLoad('chapters') joins the composite-FK collection", async () => {

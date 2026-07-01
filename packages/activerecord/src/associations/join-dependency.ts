@@ -271,13 +271,16 @@ export class JoinDependency {
         throw new EagerLoadPolymorphicError(assocName);
       }
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
-      if (Array.isArray(foreignKey)) return null;
+      // A composite FK belongsTo JOIN is built by the reflection-driven
+      // `joinConstraints` (composite tuple ON clause). Only the inline fallback,
+      // which emits single-column equality, still bails on a composite key.
+      if (Array.isArray(foreignKey) && !reflection) return null;
       const className = assocDef.options.className ?? _camelize(assocName);
       targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       primaryKey = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
-      if (Array.isArray(primaryKey)) return null;
+      if (Array.isArray(primaryKey) && !reflection) return null;
       isBelongsTo = true;
     } else if (
       assocDef.type === "hasMany" ||
@@ -334,11 +337,11 @@ export class JoinDependency {
 
     // A has_many/has_one join keys off the target's foreign key against the
     // source's primary key — the target model's own primary key is never used
-    // for the ON clause. A belongs_to join keys off `primaryKey` (already
-    // range-checked above). So a composite-PK target (e.g. the auto-generated
-    // HABTM middle join model, whose PK is `[ownerFk, targetFk]`) is still a
-    // valid join target and must not degrade to preloading.
-    if (isBelongsTo) {
+    // for the ON clause. A belongs_to join keys off `primaryKey`. A composite-PK
+    // target is still a valid join target: the reflection-driven
+    // `joinConstraints` builds the composite tuple ON clause. Only the inline
+    // fallback (single-column equality) must bail on a composite target PK.
+    if (isBelongsTo && !reflection) {
       const targetModelPk = (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetModelPk)) return null;
     }

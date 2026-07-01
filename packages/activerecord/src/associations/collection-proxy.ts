@@ -801,7 +801,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (Array.isArray(pk)) {
       const vals = pk.map((col) => r._readAttribute(col));
       if (vals.some((v) => v == null)) return null;
-      return JSON.stringify(vals);
+      // Stringify each column value (matching the scalar branch below) so a
+      // BigInt PK value — how PG/MariaDB surface a bigint `id` — is serializable;
+      // JSON.stringify throws on a raw BigInt.
+      return JSON.stringify(vals.map((v) => String(v)));
     }
     const val = r._readAttribute(pk);
     return val == null ? null : String(val);
