@@ -2,9 +2,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { setupSecondPool } from "./test-helpers/setup-second-pool.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { isSqliteRun } from "./test-helpers/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
@@ -28,9 +27,18 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // Seed in insertion order (colleges → courses → entrants) so FK refs resolve.
   // Entrant course_id is supplied explicitly because `entrantFixtureData` uses
   // ref("courses", …) which can't cross adapter registries (arunit2 ↔ primary).
-  const { colleges } = useFixtures(["colleges"], () => College.connection);
-  const { courses } = useFixtures(["courses"], () => Course.connection);
-  const { entrants } = useFixtures(
+  // Seed each set through its model-specific connection via `fixtures()`'
+  // caller-supplied `connection` knob. `use_transactional_tests = false`
+  // (Rails), and `schema: undefined` because the tables are created by
+  // `setupSecondPool` (colleges/courses in arunit2, entrants in primary), not
+  // sliced from the canonical `TEST_SCHEMA` default.
+  const seedOpts = { useTransactionalTests: false, schema: undefined } as const;
+  const { colleges } = fixtures(["colleges"], {
+    connection: () => College.connection,
+    ...seedOpts,
+  });
+  const { courses } = fixtures(["courses"], { connection: () => Course.connection, ...seedOpts });
+  const { entrants } = fixtures(
     {
       entrants: [
         Entrant,
@@ -41,7 +49,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
         },
       ],
     },
-    () => Entrant.connection,
+    { connection: () => Entrant.connection, ...seedOpts },
   );
 
   it("connected", () => {
