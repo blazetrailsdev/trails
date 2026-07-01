@@ -5,6 +5,7 @@
   "packages/activerecord/src/adapters/mysql2/mysql2-adapter.test.ts",
   "packages/activerecord/src/adapters/mysql2/mysql2-adapter.trails.test.ts",
   "packages/activerecord/src/adapters/postgresql/active-schema.test.ts",
+  "packages/activerecord/src/adapters/postgresql/postgresql-adapter.test.ts",
   "packages/activerecord/src/adapters/postgresql/postgresql-adapter.trails.test.ts",
   "packages/activerecord/src/associations/eager-singularization.test.ts",
   "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",
