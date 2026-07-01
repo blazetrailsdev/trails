@@ -206,6 +206,10 @@ export interface WithTransactionalFixturesOptions {
    * (`view_test.rb` `ViewWithoutPrimaryKeyTest`/`UpdateableViewTest`) and
    * `signed_id_test.rb`. Ignored by {@link withTransactionalFixtures} itself,
    * which is only invoked on the transactional path.
+   *
+   * NOTE: distinct from the same-named no-arg *function* `useTransactionalTests()`
+   * in `use-transactional-tests.ts` (opt-in per-test txn isolation for the
+   * `Base.connection` path). This is a boolean option; that is a helper call.
    */
   useTransactionalTests?: boolean;
 
