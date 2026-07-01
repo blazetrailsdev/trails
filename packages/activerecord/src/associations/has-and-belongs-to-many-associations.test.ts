@@ -291,7 +291,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await jamis.projects.push(actionController);
 
     expect(await jamis.projects.size()).toBe(2);
-    expect((await jamis.projects.reload()).length ?? 2).toBeDefined();
+    expect(await (await jamis.projects.reload()).size()).toBe(2);
     expect(await (await actionController.developers.reload()).size()).toBe(2);
   });
 
@@ -310,8 +310,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     await actionController.developers.push(jamis);
 
-    expect((await jamis.projects.reload()).length ?? 2).toBeDefined();
+    expect(await (await jamis.projects.reload()).size()).toBe(2);
     expect(await actionController.developers.size()).toBe(2);
+    expect(await (await actionController.developers.reload()).size()).toBe(2);
   });
 
   it("adding from the project fixed timestamp", async () => {
@@ -323,7 +324,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await actionController.developers.push(jamis);
 
     expect(String((jamis as any).updated_at)).toBe(updatedAt);
+    expect(await (await jamis.projects.reload()).size()).toBe(2);
     expect(await actionController.developers.size()).toBe(2);
+    expect(await (await actionController.developers.reload()).size()).toBe(2);
   });
 
   it("adding multiple", async () => {
@@ -331,6 +334,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await aredridel.projects.reload();
     await aredridel.projects.push(await Project.find(1), await Project.find(2));
     expect(await aredridel.projects.size()).toBe(2);
+    expect(await (await aredridel.projects.reload()).size()).toBe(2);
   });
 
   it("adding a collection", async () => {
@@ -338,9 +342,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await aredridel.projects.reload();
     await aredridel.projects.concat(await Project.find(1), await Project.find(2));
     expect(await aredridel.projects.size()).toBe(2);
+    expect(await (await aredridel.projects.reload()).size()).toBe(2);
   });
 
   it("habtm adding before save", async () => {
+    const noOfDevels = Number(await Developer.count());
+    const noOfProjects = Number(await Project.count());
     const aredridel = new Developer({ name: "Aredridel", salary: 50000 });
     const projekt = new Project({ name: "Projekt" });
     await aredridel.projects.concat(await Project.find(1), projekt);
@@ -348,7 +355,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(projekt.isNewRecord()).toBe(true);
     expect(await aredridel.save()).toBe(true);
     expect(aredridel.isNewRecord()).toBe(false);
+    expect(Number(await Developer.count())).toBe(noOfDevels + 1);
+    expect(Number(await Project.count())).toBe(noOfProjects + 1);
     expect(await aredridel.projects.size()).toBe(2);
+    expect(await (await aredridel.projects.reload()).size()).toBe(2);
   });
 
   it("habtm saving multiple relationships", async () => {
@@ -488,6 +498,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await david.projects.delete(activeRecord);
 
     expect(await david.projects.size()).toBe(1);
+    expect(await (await david.projects.reload()).size()).toBe(1);
     expect(await (await activeRecord.developers.reload()).size()).toBe(2);
   });
 
@@ -496,6 +507,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await david.projects.reload();
     await david.projects.delete(...(await Project.all()));
     expect(await david.projects.size()).toBe(0);
+    expect(await (await david.projects.reload()).size()).toBe(0);
   });
 
   it("deleting all", async () => {
@@ -503,6 +515,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await david.projects.reload();
     await david.projects.clear();
     expect(await david.projects.size()).toBe(0);
+    expect(await (await david.projects.reload()).size()).toBe(0);
   });
 
   it("removing associations on destroy", async () => {
@@ -521,27 +534,36 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const project = await Project.find(1);
     await david.projects.reload();
     expect(await david.projects.size()).toBe(2);
+    expect(await project.developers.size()).toBe(3);
 
+    const projectCountBefore = Number(await Project.count());
     await david.projects.destroy(project);
+    expect(Number(await Project.count())).toBe(projectCountBefore);
 
     const joins = await Base.connection.execute(
       `SELECT * FROM developers_projects WHERE developer_id = ${david.id} AND project_id = ${project.id}`,
     );
     expect(joins.length).toBe(0);
+    await david.reload();
+    expect(await david.projects.size()).toBe(1);
     expect(await (await david.projects.reload()).size()).toBe(1);
   });
 
   it("destroying many", async () => {
     const david = await Developer.find(1);
     await david.projects.reload();
-    const allProjects = await david.projects.toArray();
+    const allProjects = await Project.all();
 
+    const projectCountBefore = Number(await Project.count());
     await david.projects.destroy(...allProjects);
+    expect(Number(await Project.count())).toBe(projectCountBefore);
 
     const joins = await Base.connection.execute(
       `SELECT * FROM developers_projects WHERE developer_id = ${david.id}`,
     );
     expect(joins.length).toBe(0);
+    await david.reload();
+    expect(await david.projects.size()).toBe(0);
     expect(await (await david.projects.reload()).size()).toBe(0);
   });
 
@@ -550,12 +572,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await david.projects.reload();
     expect((await david.projects.toArray()).length).toBeGreaterThan(0);
 
+    const projectCountBefore = Number(await Project.count());
     await david.projects.destroyAll();
+    expect(Number(await Project.count())).toBe(projectCountBefore);
 
     const joins = await Base.connection.execute(
       `SELECT * FROM developers_projects WHERE developer_id = ${david.id}`,
     );
     expect(joins.length).toBe(0);
+    expect((await david.projects.toArray()).length).toBe(0);
     expect(await (await david.projects.reload()).size()).toBe(0);
   });
 
