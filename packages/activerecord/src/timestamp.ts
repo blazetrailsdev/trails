@@ -320,17 +320,17 @@ export type CounterCacheTouchOption =
  *   options = names.extract_options!
  *   touch_attributes_with_time(*names, **options)
  *
- * Returns `undefined` when there is nothing to touch — including the
- * `touch: []` "skip timestamps" signal trails preserves as a no-op.
+ * Returns `undefined` only for `touch: false` (callers already guard on
+ * truthiness, so this is defensive). `touch: []` is NOT special-cased: like
+ * Rails, `Array.wrap([]).extract_options!` leaves no names, so
+ * `touch_attributes_with_time()` still touches the default update-timestamp
+ * columns (relation.rb:935-940, timestamp.rb:56-61).
  */
 export function counterCacheTouchUpdates(
   modelClass: TimestampHost,
   touch: CounterCacheTouchOption,
 ): Record<string, Temporal.Instant> | undefined {
-  // `touch: false` never reaches here (callers guard on truthiness); `touch: []`
-  // is an explicit "skip timestamp updates" signal.
   if (touch === false) return undefined;
-  if (Array.isArray(touch) && touch.length === 0) return undefined;
   const wrapped: Array<string | { time?: Temporal.Instant }> =
     touch === true ? [] : Array.isArray(touch) ? touch : [touch];
   // Mirror Ruby's Array#extract_options!: a trailing plain-object arg is the

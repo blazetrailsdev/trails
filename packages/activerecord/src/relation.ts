@@ -6350,8 +6350,8 @@ export class Relation<T extends Base> {
       | CounterCacheTouchOption
       | undefined;
     if (touchOption) {
-      // `touch: []` yields undefined ("skip timestamps"); otherwise resolve the
-      // column → time map (honoring the `{ time: }` hash form) — see relation.rb.
+      // Resolve the touch column → time map, honoring the `{ time: }` hash form
+      // (and `touch: []` → default update-timestamp columns) — see relation.rb.
       const touchUpdates = counterCacheTouchUpdates(this._modelClass, touchOption);
       if (touchUpdates) {
         for (const [col, time] of Object.entries(touchUpdates)) {
