@@ -52,6 +52,21 @@ export class SchemaDumper extends BaseSchemaDumper {
     await super.table(tableName, lines);
   }
 
+  /**
+   * The table's primary-key columns, in key order. Defaults to the columns
+   * carrying the per-column `primaryKey` flag (reordered by the live PK order).
+   * Dialects whose per-column flag can over-report (e.g. MySQL's `column_key`
+   * promotes a UNIQUE NOT NULL index to `PRI` when there is no PRIMARY KEY)
+   * override this to consult the authoritative primary key instead.
+   * @internal
+   */
+  protected resolvePrimaryKeyColumns(tableName: string, columns: ColumnInfo[]): ColumnInfo[] {
+    return this.orderPrimaryKeyColumns(
+      tableName,
+      columns.filter((c) => c.primaryKey),
+    );
+  }
+
   /** @internal */
   protected override orderPrimaryKeyColumns(
     tableName: string,
@@ -242,10 +257,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     adapterTableOpts: Record<string, unknown> = {},
     inlineConstraints: string[] = [],
   ): void {
-    const pkColumns = this.orderPrimaryKeyColumns(
-      tableName,
-      columns.filter((c) => c.primaryKey),
-    );
+    const pkColumns = this.resolvePrimaryKeyColumns(tableName, columns);
     const hasCompositePk = pkColumns.length > 1;
     const pkColumn = pkColumns[0];
     // The single-PK column name Rails skips in the column loop (`next if column.name == pk`).
