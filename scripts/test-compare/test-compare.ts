@@ -854,6 +854,19 @@ function main() {
     if (showAssertions && filesWithAssertionMismatch.length > 0) {
       console.log(`  ASSERTION COUNT MISMATCHES (rails vs trails — count only, informational):`);
       console.log(`  ${"-".repeat(86)}`);
+      console.log(
+        `  Note: count-only. A difference is often a legitimate port divergence, not a bug —`,
+      );
+      console.log(`  e.g. Rails wrappers outside the assertion whitelist (assert_no_queries /`);
+      console.log(
+        `  assert_queries_count) read as 0, or trails asserts a different shape. Report-only:`,
+      );
+      console.log(`  no CI gate, no exclude.json.`);
+      console.log(
+        `  FUTURE WORK: compares assertion *counts* only; comparing assertion *expectations*`,
+      );
+      console.log(`  (kinds / expected values) is planned follow-up, not implemented.`);
+      console.log(`  ${"-".repeat(86)}`);
       for (const f of filesWithAssertionMismatch) {
         for (const am of f.assertionMismatches!) {
           console.log(
