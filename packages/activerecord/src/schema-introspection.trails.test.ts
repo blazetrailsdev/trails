@@ -34,7 +34,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 // per-worker DB; drop them by name so they don't collide with sibling files.
 afterEach(async () => {
   const ctx = new MigrationContext(createTestAdapter());
-  await ctx.dropTable("widgets", "gadgets", "users", "standalone", { ifExists: true });
+  await ctx.dropTable("widgets", "gadgets", "gizmos", "standalone", { ifExists: true });
 });
 
 describe("introspectTables", () => {
@@ -294,7 +294,7 @@ describe("introspectForeignKeys", () => {
   it("returns [] from the SchemaStatements fallback when adapter lacks foreignKeys()", async () => {
     const realAdapter = createTestAdapter();
     const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("gizmos", {}, (t) => {
       t.string("name");
     });
 
@@ -303,7 +303,7 @@ describe("introspectForeignKeys", () => {
     // SchemaStatements.foreignKeys() checks the underlying adapter for
     // .foreignKeys() and returns [] when it's not a function. Our wrapper
     // goes through that same fallback path when the adapter is stripped.
-    const fks = await introspectForeignKeys(stripped, "users");
+    const fks = await introspectForeignKeys(stripped, "gizmos");
 
     expect(fks).toEqual([]);
   });

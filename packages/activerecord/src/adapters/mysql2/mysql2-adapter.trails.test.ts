@@ -210,24 +210,25 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
   it("#exec_query queries with an empty result set still return the columns", async () => {
     // Mirrors adapter_test.rb: a zero-row SELECT must still report its
     // columns from the field descriptors, not collapse to an empty Result.
-    // `subscribers` mirrors the canonical test schema.rb definition
-    // (id: false; nick/name/books_count; unique index on nick).
-    await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+    // Scratch table shaped after the canonical subscribers schema.rb
+    // definition (id: false; nick/name/books_count; unique index on nick)
+    // but under a non-canonical name so it never touches a real table.
+    await adapter.executeMutation("DROP TABLE IF EXISTS `ex_subscribers`");
     await adapter.executeMutation(
-      "CREATE TABLE `subscribers` (" +
+      "CREATE TABLE `ex_subscribers` (" +
         "`nick` VARCHAR(255) NOT NULL, " +
         "`name` VARCHAR(255), " +
         "`books_count` INT NOT NULL DEFAULT 0, " +
-        "UNIQUE KEY `index_subscribers_on_nick` (`nick`)" +
+        "UNIQUE KEY `index_ex_subscribers_on_nick` (`nick`)" +
         ") ENGINE=InnoDB",
     );
     try {
-      const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
+      const result = await adapter.execQuery("SELECT * FROM ex_subscribers WHERE 1=0");
       expect(result).toBeInstanceOf(Result);
       expect(result.rows).toEqual([]);
       expect(result.columns).toEqual(["nick", "name", "books_count"]);
     } finally {
-      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `ex_subscribers`");
     }
   });
 
