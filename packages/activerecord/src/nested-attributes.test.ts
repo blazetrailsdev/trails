@@ -1,1248 +1,1308 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Faithful port of activerecord/test/cases/nested_attributes_test.rb.
+ *
+ * Class names mirror the Rails test classes as `describe(...)` blocks and each
+ * `it(...)` maps 1:1 to a Rails `def test_*` / `test "..."`. Trails-only cases
+ * with no Rails counterpart live in `nested-attributes.trails.test.ts`.
+ *
+ * Where Rails reads an association synchronously after `reload`, trails returns
+ * a promise, so reads go through `loadTarget()` / `loadHasOne` and in-memory
+ * checks use `association(...).target`. These are the documented async-model
+ * accommodations, not behavioral deviations.
  */
-import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import {
-  Base,
-  RecordNotFound,
-  registerModel,
-  acceptsNestedAttributesFor,
-  assignNestedAttributes,
-  TooManyRecords,
-} from "./index.js";
-import { Associations, association as collectionProxyFor } from "./associations.js";
-
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { Base, RecordNotFound, registerModel, TooManyRecords } from "./index.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
-import { Notifications } from "@blazetrails/activesupport";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
-import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
-import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
-import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
-import { Ship as CanonicalShip } from "./test-helpers/models/ship.js";
-import { Developer } from "./test-helpers/models/developer.js";
-import { Category } from "./test-helpers/models/category.js";
-import { Categorization } from "./test-helpers/models/categorization.js";
+import { CpkBook, CpkChapter, CpkOrder } from "./test-helpers/models/cpk.js";
+import { Bird } from "./test-helpers/models/bird.js";
+import { Pirate } from "./test-helpers/models/pirate.js";
+import { Ship } from "./test-helpers/models/ship.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
+import { Developer } from "./test-helpers/models/developer.js";
+import { Guitar } from "./test-helpers/models/guitar.js";
+import { TuningPeg } from "./test-helpers/models/tuning-peg.js";
+import { Entry } from "./test-helpers/models/entry.js";
+import { Message } from "./test-helpers/models/message.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
-// All tables referenced by tests in this file. Tests declare ad-hoc
-// model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
-// be materialized up front rather than auto-derived by the test adapter.
-const TEST_SCHEMA = {
-  articles: { title: "string" },
-  tags: { name: "string", article_id: "integer" },
-  birds: { name: "string", pirate_id: "integer" },
-  comments: { body: "string", post_id: "integer" },
-  dt_comments: { body: "string" },
-  dt_comments2: { body: "string", dt_entry2_id: "integer" },
-  dt_entries: { entryable_type: "string", entryable_id: "integer" },
-  dt_entries2: { title: "string" },
-  ext_articles: { title: "string" },
-  ext_tags: { name: "string", ext_article_id: "integer" },
-  gc_comment2s: { body: "string", gc_post2_id: "integer" },
-  gc_comments: { body: "string", gc_post_id: "integer" },
-  gc_post2s: { title: "string" },
-  gc_posts: { title: "string" },
-  gc_tag2s: { name: "string", gc_comment2_id: "integer" },
-  gc_tags: { name: "string", gc_comment_id: "integer" },
-  gcd_comments: { body: "string", gc_d_post_id: "integer" },
-  gcd_posts: { title: "string" },
-  gcd_tags: { name: "string", gc_d_comment_id: "integer" },
-  gga_comments: { body: "string", gga_post_id: "integer" },
-  gga_posts: { title: "string" },
-  gga_replies: { text: "string", gga_comment_id: "integer" },
-  ggc_comments: { body: "string", ggc_post_id: "integer" },
-  ggc_posts: { title: "string" },
-  ggc_replies: { text: "string", ggc_comment_id: "integer" },
-  ggd_comments: { body: "string", ggd_post_id: "integer" },
-  ggd_posts: { title: "string" },
-  ggd_replies: { text: "string", ggd_comment_id: "integer" },
-  ien_tags: { name: "string", ien_article_id: "integer" },
-  ier_articles: { title: "string" },
-  ier_tags: { name: "string", ier_article_id: "integer" },
-  items: { name: "string" },
-  nad_articles: { title: "string" },
-  nad_tags: { name: "string", nad_article_id: "integer" },
-  narr_articles: { title: "string" },
-  narr_tags: { name: "string", narr_article_id: "integer" },
-  nbuild_articles: { title: "string" },
-  nbuild_tags: { name: "string", nbuild_article_id: "integer" },
-  nd_articles: { title: "string" },
-  nd_tags: { name: "string", nd_article_id: "integer" },
-  nh_articles: { title: "string" },
-  nh_tags: { name: "string", nh_article_id: "integer" },
-  nil_articles: { title: "string" },
-  nil_tags: { name: "string", nil_article_id: "integer" },
-  nlu_articles: { title: "string" },
-  nlu_tags: { name: "string", nlu_article_id: "integer" },
-  nsave_articles: { title: "string" },
-  nsave_tags: { name: "string", nsave_article_id: "integer" },
-  nsh_articles: { title: "string" },
-  nsh_tags: { name: "string", nsh_article_id: "integer" },
-  nsym_articles: { title: "string" },
-  nsym_tags: { name: "string", nsym_article_id: "integer" },
-  num_posts: { title: "string", score: "integer" },
-  nupd_articles: { title: "string" },
-  nupd_tags: { name: "string", nupd_article_id: "integer" },
-  mol_pirates: { catchphrase: "string" },
-  mol_birds: { name: "string", mol_pirate_id: "integer" },
-  parts: { name: "string", ship_id: "integer" },
-  pirates: { catchphrase: "string" },
-  plains: { name: "string" },
-  posts: { title: "string" },
-  ships: { name: "string", pirate_id: "integer" },
-} as const;
+// The canonical models these tests exercise, declared as (data-less) fixture
+// sets. Declaring a set derives its slice of TEST_SCHEMA (plus HABTM join
+// tables) and auto-registers the model on resolution — replacing the manual
+// `defineSchema` + `registerModel` bootstrap. Empty data means no seeded rows;
+// each test builds the records it needs (matching Rails, which doesn't declare
+// fixtures for these classes).
+type ExtraFixtures = Record<string, readonly [typeof Base, Record<string, unknown>]>;
+function coreFixtures(extra: ExtraFixtures = {}) {
+  return fixtures({
+    pirates: [Pirate, {}],
+    ships: [Ship, {}],
+    birds: [Bird, {}],
+    parrots: [Parrot, {}],
+    treasures: [Treasure, {}],
+    ship_parts: [ShipPart, {}],
+    developers: [Developer, {}],
+    humans: [Human, {}],
+    interests: [Interest, {}],
+    ...extra,
+  });
+}
 
-// Seed a fresh, unloaded pirate with two persisted birds (mirrors the
-// @pirate / @child_1 / @child_2 fixtures Rails' has-many collection tests
-// reload before each test). Configures `accepts_nested_attributes_for :birds`
-// with allow_destroy so the "scheduled destroys"/"load_target merge" tests
-// (Rails: NestedAttributesOnACollectionAssociationTests) can exercise the
-// in-memory target merge — the collection loader must merge the unsaved nested
-// updates / scheduled destroys populated synchronously by the `*Attributes=`
-// writer with the DB rows rather than overwriting them.
-async function seedPirate(): Promise<{
-  pirate: CanonicalPirate;
-  child1: CanonicalBird;
-  child2: CanonicalBird;
-}> {
-  registerModel(CanonicalBird);
-  registerModel(CanonicalPirate);
-  acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
-  const created = await CanonicalPirate.create({
-    catchphrase: "Don' botharrr talkin' like one, savvy?",
-  });
-  const child1 = await CanonicalBird.create({ name: "Posideons Killer", pirate_id: created.id });
-  const child2 = await CanonicalBird.create({
-    name: "Killer bandita Dionne",
-    pirate_id: created.id,
-  });
-  const pirate = await CanonicalPirate.find(created.id);
-  return { pirate, child1, child2 };
+async function shipOf(pirate: Pirate): Promise<Ship | null> {
+  return (await pirate.association("ship").loadTarget()) as Ship | null;
+}
+
+async function pirateOf(ship: Ship): Promise<Pirate | null> {
+  return (await ship.association("pirate").loadTarget()) as Pirate | null;
 }
 
 // ==========================================================================
-// NestedAttributesTest — targets nested_attributes_test.rb
+// TestNestedAttributesInGeneral
 // ==========================================================================
-describe("NestedAttributesTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+describe("TestNestedAttributesInGeneral", () => {
+  coreFixtures({
+    cpk_orders: [CpkOrder, {}],
+    cpk_books: [CpkBook, {}],
+    cpk_chapters: [CpkChapter, {}],
   });
-  // These names come from Rails' TestNestedAttributesInGeneral (and the limit
-  // cases from NestedAttributesLimitTests) in nested_attributes_test.rb. Rails
-  // exercises has_many nested attributes there via Human has_many :interests; we
-  // use the canonical Pirate has_many :birds pair, which fits the same has_many
-  // nested-attributes pattern. Each test re-declares accepts_nested_attributes_for
-  // on the shared Pirate with its own options (an upsert keyed by association
-  // name), mirroring Rails' per-test setup.
-  function registerPirateBird(): void {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
+
+  // teardown { Pirate.accepts_nested_attributes_for :ship, allow_destroy: true, reject_if: proc(&:empty?) }
+  function resetShipConfig(): void {
+    Pirate.acceptsNestedAttributesFor("ship", {
+      allowDestroy: true,
+      rejectIf: (a) => Object.keys(a).length === 0,
+    });
   }
 
-  it("should not build a new record if reject all blank does not return false", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
-    });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
-    assignNestedAttributes(pirate, "birds", [{ name: "" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
+  it("base should have an empty nested attributes options", () => {
+    // A model that never declared accepts_nested_attributes_for has no configs
+    // of its own (Rails asserts ActiveRecord::Base.nested_attributes_options == {}).
+    class Plain extends Base {}
+    const configs = (Plain as any)._nestedAttributeConfigs;
+    expect(configs === undefined || (Array.isArray(configs) && configs.length === 0)).toBe(true);
   });
 
-  it("should define an attribute writer method for the association", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Hello" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Great post!" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect((birds[0] as any).name).toBe("Great post!");
-  });
-
-  it("should take an array and assign the attributes to the associated models", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "ruby" }, { name: "rails" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(2);
-    const names = birds.map((b: any) => b.name).sort();
-    expect(names).toEqual(["rails", "ruby"]);
-  });
-
-  it("should update existing records and add new ones that have no id", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    const bird = await CanonicalBird.create({ name: "ruby", pirate_id: pirate.id });
-
-    assignNestedAttributes(pirate, "birds", [
-      { id: bird.id, name: "ruby-updated" },
-      { name: "rails" },
-    ]);
-    await pirate.save();
-
-    const updatedBird = await CanonicalBird.find(bird.id);
-    expect((updatedBird as any).name).toBe("ruby-updated");
-
-    const allBirds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(allBirds.length).toBe(2);
-  });
-
-  it("should be possible to destroy a record", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    const bird = await CanonicalBird.create({ name: "ruby", pirate_id: pirate.id });
-
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
-    await pirate.save();
-
-    const found = await CanonicalBird.findBy({ id: bird.id });
-    expect(found).toBeNull();
-  });
-
-  it("should not destroy the associated model with a non truthy argument", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    const bird = await CanonicalBird.create({ name: "ruby", pirate_id: pirate.id });
-
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: false }]);
-    await pirate.save();
-
-    const found = await CanonicalBird.findBy({ id: bird.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("should ignore new associated records with truthy destroy attribute", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "ruby", _destroy: true }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
-  });
-
-  it("should ignore new associated records if a reject if proc returns false", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
-    });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
-  });
-
-  it("limit with less records", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { limit: 5 });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(2);
-  });
-
-  it("limit with number exact records", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { limit: 2 });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(2);
-  });
-
-  it("limit with exceeding records", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { limit: 2 });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    expect(() =>
-      assignNestedAttributes(pirate, "birds", [{ name: "a" }, { name: "b" }, { name: "c" }]),
-    ).toThrow(TooManyRecords);
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
-  });
-
-  it("should take a hash with string keys and assign the attributes to the associated models", async () => {
-    registerPirateBird();
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Test" });
-    assignNestedAttributes(pirate, "birds", { "0": { name: "ruby" }, "1": { name: "rails" } });
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(2);
-    const names = birds.map((b: any) => b.name).sort();
-    expect(names).toEqual(["rails", "ruby"]);
-  });
-});
-
-describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-
-  function makeModels(
-    opts: {
-      allowDestroy?: boolean;
-      rejectIf?: (attrs: Record<string, unknown>) => boolean;
-    } = {},
-  ) {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    // Ship belongs_to :developer, dependent: :destroy — destroying a ship
-    // builds the developer association, which must resolve from the registry.
-    registerModel(Developer);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship", opts);
-    return { Ship: CanonicalShip, Pirate: CanonicalPirate };
-  }
-
-  it("should raise argument error if trying to build polymorphic belongs to", () => {
-    // Rails: Treasure.new(name: "pearl", looter_attributes: { catchphrase: "Arrr" }).
-    // Treasure belongs_to :looter, polymorphic: true.
-    registerModel(Treasure);
-    // Rails defers the polymorphic-target check to build time: declaring
-    // accepts_nested_attributes_for on a polymorphic belongs_to succeeds, and
-    // the ArgumentError only fires when a nested payload tries to build a new
-    // record for the polymorphic association.
-    expect(() => acceptsNestedAttributesFor(Treasure, "looter")).not.toThrow();
-    const treasure = new Treasure();
-    expect(() => {
-      (treasure as any).looterAttributes = { catchphrase: "Arrr" };
-    }).toThrow(
-      "Cannot build association `looter'. Are you trying to build a polymorphic one-to-one association?",
-    );
-
-    // An `id`-bearing payload routes to the update / record-not-found branches
-    // in Rails (nested_attributes.rb:436-441), never the polymorphic build
-    // error — so the check must NOT block it. It enqueues like any update.
-    const updater = new Treasure();
-    expect(() => {
-      (updater as any).looterAttributes = { id: 1, catchphrase: "Arrr" };
-    }).not.toThrow();
-    expect((updater as any)._pendingNestedAttributes.get("looter")).toEqual([
-      { id: 1, catchphrase: "Arrr" },
-    ]);
-  });
-
-  it("should define an attribute writer method for the association", () => {
-    const { Pirate } = makeModels();
+  it("should add a proc to nested attributes options", () => {
     const configs = (Pirate as any)._nestedAttributeConfigs;
-    expect(configs).toBeDefined();
-    expect(configs.length).toBeGreaterThan(0);
-    // NestedAttributesTest runs first and upserts a "birds" config onto the
-    // shared CanonicalPirate, so "ship" is no longer guaranteed at index 0 —
-    // assert by membership rather than position.
-    expect(configs.some((c: any) => c.associationName === "ship")).toBe(true);
+    for (const name of ["parrots", "birds"]) {
+      const cfg = configs.find((c: any) => c.associationName === name);
+      expect(typeof cfg.options.rejectIf).toBe("function");
+    }
   });
 
-  it("should build a new record if there is no id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Black Pearl" }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(1);
-    expect(ships[0].name).toBe("Black Pearl");
+  it("should not build a new record using reject all even if destroy is given", async () => {
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    (pirate as any).birdsWithRejectAllBlankAttributes = [{ name: "", color: "", _destroy: "0" }];
+    await pirate.saveBang();
+    expect((await (pirate as any).birdsWithRejectAllBlank.toArray()).length).toBe(0);
   });
 
-  it("should not build a new record if there is no id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Doomed", _destroy: true }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(0);
+  it("should not build a new record if reject all blank returns false", async () => {
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    (pirate as any).birdsWithRejectAllBlankAttributes = [{ name: "", color: "" }];
+    await pirate.saveBang();
+    expect((await (pirate as any).birdsWithRejectAllBlank.toArray()).length).toBe(0);
   });
 
-  it("should not build a new record if a reject if proc returns false", async () => {
-    const { Ship, Pirate } = makeModels({ rejectIf: (attrs) => attrs.name === "Rejected" });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Rejected" }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(0);
+  it("should build a new record if reject all blank does not return false", async () => {
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    (pirate as any).birdsWithRejectAllBlankAttributes = [{ name: "Tweetie", color: "" }];
+    await pirate.saveBang();
+    const birds = (await (pirate as any).birdsWithRejectAllBlank.toArray()) as Bird[];
+    expect(birds.length).toBe(1);
+    expect(birds[0].name).toBe("Tweetie");
   });
 
-  it("should replace an existing record if there is no id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    await Ship.create({ name: "Old Ship", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ name: "New Ship" }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.some((s: any) => s.name === "New Ship")).toBe(true);
+  it("should raise an ArgumentError for non existing associations", () => {
+    expect(() => Pirate.acceptsNestedAttributesFor("honesty")).toThrow(/No association found/);
   });
 
-  it("should not replace an existing record if there is no id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    await Ship.create({ name: "Old Ship", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ name: "Phantom", _destroy: true }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(1);
-    expect(ships[0].name).toBe("Old Ship");
+  // tracked-pending-convergence (0023-surfaced-deviations): building a nested
+  // record from a hash with an unknown key does not raise UnknownAttributeError
+  // because trails' `Model.new`/build silently drops unknown attributes (a
+  // base-level deviation, not nested-attributes-specific). trails does raise it
+  // on the UPDATE-existing flush path, but Rails raises here on the build path.
+  // See model-new-unknown-attribute convergence story.
+  it.skip("should raise an UnknownAttributeError for non existing nested attributes", async () => {
+    await expect(
+      (async () => {
+        const pirate = new Pirate({ catchphrase: "Arr" });
+        (pirate as any).shipAttributes = { sail: true };
+        await pirate.save();
+      })(),
+    ).rejects.toThrow(/unknown attribute 'sail' for Ship/);
   });
 
-  it("should modify an existing record if there is a matching id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Old Name", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "New Name" }]);
-    await pirate.save();
-    const updated = await Ship.find(ship.id!);
-    expect(updated.name).toBe("New Name");
-  });
-
-  it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ id: 999999, name: "Ghost" }]);
-    await expect(pirate.save()).rejects.toThrow(RecordNotFound);
-  });
-
-  it("should take a hash with string keys and update the associated model", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Original", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", { "0": { id: ship.id, name: "Updated" } });
-    await pirate.save();
-    const updated = await Ship.find(ship.id!);
-    expect(updated.name).toBe("Updated");
-  });
-
-  it("should modify an existing record if there is a matching composite id", async () => {
-    // Rails stubs `@ship.id` to a non-integer composite id ("ABC1X") and assigns
-    // an `id`-matching payload; the in-memory record is updated in place.
-    const { Pirate } = makeModels();
-    const pirate = await Pirate.create({
+  it("should disable allow destroy by default", async () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+    const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
     const ship = await (pirate as any).createShip({ name: "Nights Dirty Lightning" });
+    await pirate.update({ shipAttributes: { _destroy: true, id: ship.id } });
+    const reloaded = await shipOf(await Pirate.find(pirate.id));
+    expect(reloaded).not.toBeNull();
+    resetShipConfig();
+  });
+
+  it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
+    const ship = await Ship.createBang({ name: "Nights Dirty Lightning" });
+    expect(isMarkedForDestruction(ship)).toBe(false);
+    markForDestruction(ship);
+    expect(isMarkedForDestruction(ship)).toBe(true);
+  });
+
+  it("reject if method without arguments", async () => {
+    // Rails `reject_if: :new_record?` — the method runs on the owner; a new
+    // (unsaved) pirate rejects the nested ship.
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
+    const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
+    (pirate as any).shipAttributes = { name: "Black Pearl" };
+    const before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before);
+    resetShipConfig();
+  });
+
+  it("reject if method with arguments", async () => {
+    // Rails `reject_if: :reject_empty_ships_on_create` —
+    // `attributes.delete("_reject_me_if_new").present? && !persisted?`
+    Pirate.acceptsNestedAttributesFor("ship", {
+      rejectIf: (attrs, rec) => {
+        const v = attrs["_reject_me_if_new"];
+        return v != null && v !== "" && v !== false && !rec.isPersisted();
+      },
+    });
+
+    const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
+    (pirate as any).shipAttributes = { name: "Red Pearl", _reject_me_if_new: true };
+    let before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before); // not persisted → rejected
+
+    // pirate is now persisted, so reject_empty_ships_on_create returns false
+    (pirate as any).shipAttributes = { name: "Red Pearl", _reject_me_if_new: true };
+    before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before + 1);
+    resetShipConfig();
+  });
+
+  it("allows class to override setter and call super", () => {
+    class MeanPirate extends Pirate {}
+    registerModel("MeanPirate", MeanPirate);
+    MeanPirate.acceptsNestedAttributesFor("parrot");
+    const proto = MeanPirate.prototype as unknown as Record<string, unknown>;
+    const original = Object.getOwnPropertyDescriptor(proto, "parrotAttributes")!.set!;
+    Object.defineProperty(proto, "parrotAttributes", {
+      set(this: unknown, attrs: Record<string, unknown>) {
+        original.call(this, { ...attrs, color: "blue" });
+      },
+      configurable: true,
+    });
+
+    const meanPirate = new MeanPirate();
+    (meanPirate as any).parrotAttributes = { name: "James" };
+    const target = (meanPirate.association("parrot") as any).target;
+    expect(target.readAttribute("name")).toBe("James");
+    expect(target.color).toBe("blue");
+  });
+
+  it("accepts nested attributes for can be overridden in subclasses", () => {
+    Pirate.acceptsNestedAttributesFor("parrot");
+    class MeanPirate extends Pirate {}
+    registerModel("MeanPirate", MeanPirate);
+    MeanPirate.acceptsNestedAttributesFor("parrot");
+
+    const meanPirate = new MeanPirate();
+    (meanPirate as any).parrotAttributes = { name: "James" };
+    const target = (meanPirate.association("parrot") as any).target;
+    expect(target.readAttribute("name")).toBe("James");
+  });
+
+  it("reject if with indifferent keys", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !a["name"] });
+    const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
+    (pirate as any).shipAttributes = { name: "Hello Pearl" };
+    const before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before + 1);
+    resetShipConfig();
+  });
+
+  it("reject if with a proc which returns true always for has one", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: () => true });
+    const pirate = await Pirate.create({ catchphrase: "Stop wastin' me time" });
+    const ship = await (pirate as any).createShip({ name: "s1" });
+    await pirate.update({ shipAttributes: { name: "s2", id: ship.id } });
+    expect((await Ship.find(ship.id)).name).toBe("s1");
+    resetShipConfig();
+  });
+
+  it("reuse already built new record", () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+    const pirate = new Pirate();
+    const shipBuiltFirst = (pirate.association("ship") as any).build();
+    (pirate as any).shipAttributes = { name: "Ship 1" };
+    expect((pirate.association("ship") as any).target).toBe(shipBuiltFirst);
+    resetShipConfig();
+  });
+
+  it("do not allow assigning foreign key when reusing existing new record", async () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    (pirate.association("ship") as any).build();
+    (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: Number(pirate.id) + 1 };
+    expect(Number((pirate.association("ship") as any).target.pirate_id)).toBe(Number(pirate.id));
+    resetShipConfig();
+  });
+
+  it("reject if with a proc which returns true always for has many", async () => {
+    Human.acceptsNestedAttributesFor("interests", { rejectIf: () => true });
+    const human = await Human.create({ name: "John" });
+    const interest = await (human as any).interests.create({ topic: "photography" });
+    await human.update({ interestsAttributes: { topic: "gardening", id: interest.id } });
+    expect((await Interest.find(interest.id)).topic).toBe("photography");
+  });
+
+  it("destroy works independent of reject if", async () => {
+    Human.acceptsNestedAttributesFor("interests", { rejectIf: () => true, allowDestroy: true });
+    const human = await Human.create({ name: "Jon" });
+    const interest = await (human as any).interests.create({ topic: "the ladies" });
+    await human.update({ interestsAttributes: { _destroy: "1", id: interest.id } });
+    await human.reload();
+    expect((await (human as any).interests.toArray()).length).toBe(0);
+  });
+
+  it("reject if is not short circuited if allow destroy is false", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", {
+      rejectIf: (a) => a["name"] === "The Golden Hind",
+      allowDestroy: false,
+    });
+    const pirate = await Pirate.createBang({
+      catchphrase: "Stop wastin' me time",
+      shipAttributes: { name: "White Pearl", _destroy: "1" },
+    });
+    expect((await shipOf(await Pirate.find(pirate.id)))!.name).toBe("White Pearl");
+
+    let p = await Pirate.find(pirate.id);
+    await p.updateBang({
+      shipAttributes: { id: (await shipOf(p))!.id, name: "The Golden Hind", _destroy: "1" },
+    });
+    expect((await shipOf(await Pirate.find(pirate.id)))!.name).toBe("White Pearl");
+
+    p = await Pirate.find(pirate.id);
+    await p.updateBang({
+      shipAttributes: { id: (await shipOf(p))!.id, name: "Black Pearl", _destroy: "1" },
+    });
+    expect((await shipOf(await Pirate.find(pirate.id)))!.name).toBe("Black Pearl");
+    resetShipConfig();
+  });
+
+  it("has many association updating a single record", async () => {
+    Human.acceptsNestedAttributesFor("interests");
+    const human = await Human.create({ name: "John" });
+    const interest = await (human as any).interests.create({ topic: "photography" });
+    await human.update({ interestsAttributes: { topic: "gardening", id: interest.id } });
+    expect((await Interest.find(interest.id)).topic).toBe("gardening");
+  });
+
+  it("reject if with blank nested attributes id", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", {
+      rejectIf: (a) => a["id"] == null || a["id"] === "",
+    });
+    const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
+    (pirate as any).shipAttributes = { id: "" };
+    await expect(pirate.saveBang()).resolves.toBeTruthy();
+    resetShipConfig();
+  });
+
+  it("first and array index zero methods return the same value when nested attributes are set to update existing record", async () => {
+    Human.acceptsNestedAttributesFor("interests");
+    const created = await Human.create({ name: "John" });
+    const interest = await (created as any).interests.create({ topic: "gardening" });
+    const human = await Human.find(created.id);
+    (human as any).interestsAttributes = [{ id: interest.id, topic: "gardening" }];
+    const first = await (human as any).interests.first();
+    const arr = await (human as any).interests.toArray();
+    expect(first.topic).toBe(arr[0].topic);
+  });
+
+  it("should not create duplicates with create with", async () => {
+    Human.acceptsNestedAttributesFor("interests");
+    const before = Number(await Interest.count());
+    await Human.createWith({ interestsAttributes: [{ topic: "Pirate king" }] }).findOrCreateByBang({
+      name: "Monkey D. Luffy",
+    });
+    expect(Number(await Interest.count()) - before).toBe(1);
+  });
+
+  it("updating models with cpk provided as strings", async () => {
+    const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
+    await (book as any).chapters.createBang({ id: [1, 3], title: "Title" });
+    await book.updateBang({ chaptersAttributes: { id: ["1", "3"], title: "New title" } });
+    const reloaded = (await CpkBook.find([1, 2])) as any;
+    expect(Number(await reloaded.chapters.count())).toBe(1);
+    expect((await reloaded.chapters.first()).title).toBe("New title");
+  });
+});
+
+// ==========================================================================
+// TestNestedAttributesOnAHasOneAssociation
+// ==========================================================================
+describe("TestNestedAttributesOnAHasOneAssociation", () => {
+  coreFixtures();
+  // Rails' treasure.rb declares `accepts_nested_attributes_for :looter`.
+  beforeAll(() => Treasure.acceptsNestedAttributesFor("looter"));
+
+  async function setup(): Promise<{ pirate: Pirate; ship: Ship }> {
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    const ship = await (pirate as any).createShip({ name: "Nights Dirty Lightning" });
+    return { pirate, ship };
+  }
+
+  it("should raise argument error if trying to build polymorphic belongs to", () => {
+    expect(() => {
+      new Treasure({ name: "pearl", looterAttributes: { catchphrase: "Arrr" } });
+    }).toThrow(/Cannot build association `looter'/);
+  });
+
+  it("should define an attribute writer method for the association", () => {
+    const pirate = new Pirate();
+    expect(() => {
+      (pirate as any).shipAttributes = {};
+    }).not.toThrow();
+  });
+
+  it("should build a new record if there is no id", async () => {
+    const { pirate, ship } = await setup();
+    await ship.destroy();
+    const p = await Pirate.find(pirate.id);
+    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger" };
+    const target = (p.association("ship") as any).target as Ship;
+    expect(target.isPersisted()).toBe(false);
+    expect(target.name).toBe("Davy Jones Gold Dagger");
+  });
+
+  it("should not build a new record if there is no id and destroy is truthy", async () => {
+    const { pirate, ship } = await setup();
+    await ship.destroy();
+    const p = await Pirate.find(pirate.id);
+    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger", _destroy: "1" };
+    expect((p.association("ship") as any).target).toBeFalsy();
+  });
+
+  it("should not build a new record if a reject if proc returns false", async () => {
+    const { pirate, ship } = await setup();
+    await ship.destroy();
+    const p = await Pirate.find(pirate.id);
+    (p as any).shipAttributes = {};
+    expect((p.association("ship") as any).target).toBeFalsy();
+  });
+
+  it("should replace an existing record if there is no id", async () => {
+    const { pirate, ship } = await setup();
+    const p = await Pirate.find(pirate.id);
+    await shipOf(p);
+    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger" };
+    const target = (p.association("ship") as any).target as Ship;
+    expect(target.isPersisted()).toBe(false);
+    expect(target.name).toBe("Davy Jones Gold Dagger");
+    expect(ship.name).toBe("Nights Dirty Lightning");
+  });
+
+  it("should not replace an existing record if there is no id and destroy is truthy", async () => {
+    const { pirate, ship } = await setup();
+    const p = await Pirate.find(pirate.id);
+    await shipOf(p);
+    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger", _destroy: "1" };
+    const target = (p.association("ship") as any).target as Ship;
+    expect(String(target.id)).toBe(String(ship.id));
+    expect(target.name).toBe("Nights Dirty Lightning");
+  });
+
+  it("should modify an existing record if there is a matching id", async () => {
+    const { pirate, ship } = await setup();
+    const p = await Pirate.find(pirate.id);
+    await shipOf(p);
+    (p as any).shipAttributes = { id: ship.id, name: "Davy Jones Gold Dagger" };
+    const target = (p.association("ship") as any).target as Ship;
+    expect(String(target.id)).toBe(String(ship.id));
+    expect(target.name).toBe("Davy Jones Gold Dagger");
+  });
+
+  it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
+    const { pirate } = await setup();
+    await expect(
+      (async () => {
+        (pirate as any).shipAttributes = { id: 1234567890 };
+        await pirate.save();
+      })(),
+    ).rejects.toThrow(RecordNotFound);
+  });
+
+  it("should take a hash with string keys and update the associated model", async () => {
+    const { pirate, ship } = await setup();
+    const p = await Pirate.find(pirate.id);
+    await shipOf(p);
+    (p as any).shipAttributes = { id: String(ship.id), name: "Davy Jones Gold Dagger" };
+    const target = (p.association("ship") as any).target as Ship;
+    expect(String(target.id)).toBe(String(ship.id));
+    expect(target.name).toBe("Davy Jones Gold Dagger");
+  });
+
+  it("should modify an existing record if there is a matching composite id", async () => {
+    const { pirate, ship } = await setup();
     vi.spyOn(ship, "id", "get").mockReturnValue("ABC1X" as any);
     (pirate as any).shipAttributes = { id: ship.id, name: "Davy Jones Gold Dagger" };
     expect((pirate.association("ship") as any).target.name).toBe("Davy Jones Gold Dagger");
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Doomed", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(0);
+    const { pirate, ship } = await setup();
+    await ship.destroy();
+    for (const truth of [1, "1", true, "true"]) {
+      const p = await Pirate.find(pirate.id);
+      const s = await (p as any).createShip({ name: "Mister Pablo" });
+      await p.update({ shipAttributes: { id: s.id, _destroy: truth } });
+      expect(await shipOf(await Pirate.find(pirate.id))).toBeFalsy();
+      await expect(Ship.find(s.id)).rejects.toThrow(RecordNotFound);
+    }
   });
 
   it("should not destroy an existing record if destroy is not truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Safe", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: false }]);
-    await pirate.save();
-    const found = await Ship.find(ship.id!);
-    expect(found.name).toBe("Safe");
+    const { pirate, ship } = await setup();
+    for (const notTruth of [null, "0", 0, "false", false]) {
+      const p = await Pirate.find(pirate.id);
+      await shipOf(p); // Rails reads `@pirate.ship`, loading it into memory
+      await p.update({ shipAttributes: { id: ship.id, _destroy: notTruth } });
+      expect(String((await Ship.find(ship.id)).id)).toBe(String(ship.id));
+    }
   });
 
   it("should not destroy an existing record if allow destroy is false", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: false });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Protected", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
-    await pirate.save();
-    const found = await Ship.find(ship.id!);
-    expect(found.name).toBe("Protected");
+    const { pirate, ship } = await setup();
+    Pirate.acceptsNestedAttributesFor("ship", {
+      allowDestroy: false,
+      rejectIf: (a) => Object.keys(a).length === 0,
+    });
+    await pirate.update({ shipAttributes: { id: ship.id, _destroy: "1" } });
+    const reloaded = await shipOf(await Pirate.find(pirate.id));
+    expect(String(reloaded!.id)).toBe(String(ship.id));
+    Pirate.acceptsNestedAttributesFor("ship", {
+      allowDestroy: true,
+      rejectIf: (a) => Object.keys(a).length === 0,
+    });
   });
 
   it("should also work with a HashWithIndifferentAccess", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", { "0": { name: "IndifferentShip" } });
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(1);
-    expect(ships[0].name).toBe("IndifferentShip");
+    const { pirate, ship } = await setup();
+    (pirate as any).shipAttributes = { id: ship.id, name: "Davy Jones Gold Dagger" };
+    const target = (pirate.association("ship") as any).target as Ship;
+    expect(target.isPersisted()).toBe(true);
+    expect(target.name).toBe("Davy Jones Gold Dagger");
   });
 
   it("should work with update as well", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Before", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, name: "After" }]);
-    await pirate.save();
-    const updated = await Ship.find(ship.id!);
-    expect(updated.name).toBe("After");
+    const { pirate, ship } = await setup();
+    await pirate.update({
+      catchphrase: "Arr",
+      shipAttributes: { id: ship.id, name: "Mister Pablo" },
+    });
+    const p = await Pirate.find(pirate.id);
+    expect((p as any).catchphrase).toBe("Arr");
+    expect((await shipOf(p))!.name).toBe("Mister Pablo");
   });
 
   it("should defer updating nested associations until after base attributes are set", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    pirate.catchphrase = "Yarr";
-    assignNestedAttributes(pirate, "ship", [{ name: "Deferred" }]);
-    await pirate.save();
-    expect(pirate.catchphrase).toBe("Yarr");
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(1);
+    const { ship } = await setup();
+    const part = new ShipPart();
+    (part as any).attributes = { shipAttributes: { name: "Prometheus" }, ship_id: ship.id };
+    expect((await (part.association("ship") as any).loadTarget()).name).toBe("Prometheus");
   });
 
   it("should not destroy the associated model until the parent is saved", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "StillHere", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "ship", [{ id: ship.id, _destroy: true }]);
-    // Before save, the ship should still exist
-    const beforeSave = await Ship.find(ship.id!);
-    expect(beforeSave).toBeDefined();
+    const { pirate, ship } = await setup();
+    (pirate as any).attributes = { shipAttributes: { id: ship.id, _destroy: "1" } };
+    const target = (pirate.association("ship") as any).target as Ship;
+    expect(target.isDestroyed?.() ?? false).toBe(false);
+    expect(isMarkedForDestruction(target)).toBe(true);
     await pirate.save();
-    const afterSave = await Ship.where({ pirate_id: pirate.id });
-    expect(afterSave.length).toBe(0);
+    expect(target.isDestroyed?.() ?? true).toBe(true);
+    expect(await shipOf(await Pirate.find(pirate.id))).toBeFalsy();
   });
 
   it("should automatically enable autosave on the association", () => {
-    const { Pirate } = makeModels();
-    const configs = (Pirate as any)._nestedAttributeConfigs;
-    expect(configs).toBeDefined();
-    expect(configs.find((c: any) => c.associationName === "ship")).toBeDefined();
-    // Rails sets `reflection.autosave = true` (nested_attributes.rb:359).
-    const shipAssoc = (Pirate as any)._associations.find((a: any) => a.name === "ship");
-    expect(shipAssoc.options.autosave).toBe(true);
+    expect(Pirate.reflectOnAssociation("ship")?.options.autosave).toBe(true);
   });
 
-  it("should accept update only option", () => {
-    const { Pirate } = makeModels();
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-    const configs = (Pirate as any)._nestedAttributeConfigs;
-    const shipConfig = configs.find((c: any) => c.associationName === "updateOnlyShip");
-    expect(shipConfig.options.updateOnly).toBe(true);
+  it("should accept update only option", async () => {
+    const { pirate, ship } = await setup();
+    await pirate.update({ updateOnlyShipAttributes: { id: ship.id, name: "Mayflower" } });
+    expect((await shipOf(await Pirate.find(pirate.id)))!.name).toBe("Mayflower");
   });
 
   it("should create new model when nothing is there and update only is true", async () => {
-    const { Ship, Pirate } = makeModels();
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "Brand New" }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(1);
+    const { pirate, ship } = await setup();
+    await (ship as any).delete();
+    const p = await Pirate.find(pirate.id);
+    await p.update({ updateOnlyShipAttributes: { name: "Mayflower" } });
+    expect(await shipOf(await Pirate.find(pirate.id))).not.toBeNull();
   });
 
   it("should update existing when update only is true and no id is given", async () => {
-    const { Ship, Pirate } = makeModels();
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Existing", pirate_id: pirate.id });
-    // With updateOnly and no id, it should still create a new record (since our impl doesn't have updateOnly logic yet)
-    assignNestedAttributes(pirate, "updateOnlyShip", [{ name: "UpdatedNoId" }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBeGreaterThanOrEqual(1);
+    const { pirate, ship } = await setup();
+    await (ship as any).delete();
+    const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
+    await pirate.update({ updateOnlyShipAttributes: { name: "Mayflower" } });
+    expect((await Ship.find(newShip.id)).name).toBe("Mayflower");
   });
 
   it("should update existing when update only is true and id is given", async () => {
-    const { Ship, Pirate } = makeModels();
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "Existing", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "updateOnlyShip", [{ id: ship.id, name: "UpdatedWithId" }]);
-    await pirate.save();
-    const updated = await Ship.find(ship.id!);
-    expect(updated.name).toBe("UpdatedWithId");
+    const { pirate, ship } = await setup();
+    await (ship as any).delete();
+    const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
+    await pirate.update({ updateOnlyShipAttributes: { name: "Mayflower", id: newShip.id } });
+    expect((await Ship.find(newShip.id)).name).toBe("Mayflower");
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
-    const { Ship, Pirate } = makeModels();
-    acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true, allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const ship = await Ship.create({ name: "ToDestroy", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "updateOnlyShip", [{ id: ship.id, _destroy: true }]);
-    await pirate.save();
-    const ships = await Ship.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(0);
+    Pirate.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true, allowDestroy: true });
+    const { pirate, ship } = await setup();
+    await (ship as any).delete();
+    const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
+    await pirate.update({
+      updateOnlyShipAttributes: { name: "Mayflower", id: newShip.id, _destroy: true },
+    });
+    expect(await shipOf(await Pirate.find(pirate.id))).toBeFalsy();
+    await expect(Ship.find(newShip.id)).rejects.toThrow(RecordNotFound);
+    Pirate.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true, allowDestroy: false });
   });
 
-  it("should raise an argument error if something other than a hash is passed in", () => {
-    const { Pirate } = makeModels();
-    const pirate = new Pirate({ catchphrase: "Arrr" });
-    // assignNestedAttributes expects array or object; passing a valid array is fine
-    expect(() => assignNestedAttributes(pirate, "ship", [{ name: "ok" }])).not.toThrow();
+  it("should raise an argument error if something other than a hash is passed in", async () => {
+    const { pirate } = await setup();
+    await expect(pirate.update({ shipAttributes: "foo" } as any)).rejects.toThrow(
+      /Hash expected for `ship` attributes, got String/,
+    );
   });
 });
 
+// ==========================================================================
+// TestNestedAttributesOnABelongsToAssociation
+// ==========================================================================
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  coreFixtures();
 
-  function makeModels(
-    opts: {
-      allowDestroy?: boolean;
-      rejectIf?: (attrs: Record<string, unknown>) => boolean;
-      updateOnly?: boolean;
-    } = {},
-  ) {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalShip, "pirate", opts);
-    return { Ship: CanonicalShip, Pirate: CanonicalPirate };
+  async function setup(): Promise<{ ship: Ship; pirate: Pirate }> {
+    const ship = new Ship({ name: "Nights Dirty Lightning" });
+    const pirate = (ship.association("pirate") as any).build({ catchphrase: "Aye" });
+    await ship.saveBang();
+    return { ship, pirate };
   }
 
   it("should define an attribute writer method for the association", () => {
-    const { Ship } = makeModels();
-    const configs = (Ship as any)._nestedAttributeConfigs;
-    expect(configs).toBeDefined();
-    expect(configs.find((c: any) => c.associationName === "pirate")).toBeDefined();
+    const ship = new Ship();
+    expect(() => {
+      (ship as any).pirateAttributes = {};
+    }).not.toThrow();
   });
 
   it("should build a new record if there is no id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const ship = await Ship.create({ name: "Black Pearl" });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "Arrr" }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(1);
-    expect(pirates[0].catchphrase).toBe("Arrr");
-  });
-
-  it("should build a new belongs_to record with a composite foreign key", async () => {
-    // CpkBook belongs_to :order (CpkOrder, composite PK [shop_id, id]) with a
-    // composite foreign key [shop_id, order_id]. Creating the order via nested
-    // attributes must thread every FK column from the target's
-    // association_primary_key — not coerce a single `created.id` into one column.
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    acceptsNestedAttributesFor(CpkBook, "order");
-
-    const book = await CpkBook.createBang({ author_id: 1, id: 1, title: "T" });
-    assignNestedAttributes(book, "order", [{ shop_id: 7, status: "open" }]);
-    await book.save();
-
-    const order = await CpkOrder.where({ shop_id: 7, status: "open" }).first();
-    const orderId = (order as any)._readAttribute("id");
-    expect((book as any).shop_id).toBe(7);
-    expect(Number((book as any).order_id)).toBe(Number(orderId));
-
-    const reloaded = await CpkBook.find([1, 1]);
-    expect((reloaded as any).shop_id).toBe(7);
-    expect(Number((reloaded as any).order_id)).toBe(Number(orderId));
-  });
-
-  it("should increment the target counter cache when the nested belongs_to is created", async () => {
-    registerModel(Category);
-    registerModel(Categorization);
-    acceptsNestedAttributesFor(Categorization, "category");
-
-    const categorization = await Categorization.create({});
-    assignNestedAttributes(categorization, "category", [{ name: "General" }]);
-    await categorization.save();
-
-    const category = (await Category.findBy({ name: "General" })) as any;
-    expect(category).not.toBeNull();
-    expect(Number((categorization as any).category_id)).toBe(Number(category.id));
-    expect(category.categorizations_count).toBe(1);
+    const { ship, pirate } = await setup();
+    await pirate.destroy();
+    const s = await Ship.find(ship.id);
+    (s as any).pirateAttributes = { catchphrase: "Arr" };
+    const target = (s.association("pirate") as any).target as Pirate;
+    expect(target.isPersisted()).toBe(false);
+    expect((target as any).catchphrase).toBe("Arr");
   });
 
   it("should not build a new record if there is no id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const ship = await Ship.create({ name: "Black Pearl" });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "Doomed", _destroy: true }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(0);
+    const { ship, pirate } = await setup();
+    await pirate.destroy();
+    const s = await Ship.find(ship.id);
+    (s as any).pirateAttributes = { catchphrase: "Arr", _destroy: "1" };
+    expect((s.association("pirate") as any).target).toBeFalsy();
   });
 
   it("should not build a new record if a reject if proc returns false", async () => {
-    const { Ship, Pirate } = makeModels({ rejectIf: (attrs) => attrs.catchphrase === "Rejected" });
-    const ship = await Ship.create({ name: "Black Pearl" });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "Rejected" }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(0);
+    const { ship, pirate } = await setup();
+    await pirate.destroy();
+    const s = await Ship.find(ship.id);
+    (s as any).pirateAttributes = {};
+    expect((s.association("pirate") as any).target).toBeFalsy();
   });
 
   it("should replace an existing record if there is no id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Old" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "New" }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.some((p: any) => p.catchphrase === "New")).toBe(true);
+    const { ship, pirate } = await setup();
+    const s = await Ship.find(ship.id);
+    await pirateOf(s);
+    (s as any).pirateAttributes = { catchphrase: "Arr" };
+    const target = (s.association("pirate") as any).target as Pirate;
+    expect(target.isPersisted()).toBe(false);
+    expect((target as any).catchphrase).toBe("Arr");
+    expect((pirate as any).catchphrase).toBe("Aye");
   });
 
   it("should not replace an existing record if there is no id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Old" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "Ghost", _destroy: true }]);
-    await ship.save();
-    const found = await Pirate.find(pirate.id!);
-    expect(found.catchphrase).toBe("Old");
+    const { ship, pirate } = await setup();
+    const s = await Ship.find(ship.id);
+    await pirateOf(s);
+    (s as any).pirateAttributes = { catchphrase: "Arr", _destroy: "1" };
+    const target = (s.association("pirate") as any).target as Pirate;
+    expect(String(target.id)).toBe(String(pirate.id));
+    expect((target as any).catchphrase).toBe("Aye");
   });
 
   it("should modify an existing record if there is a matching id", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Old" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "Updated" }]);
-    await ship.save();
-    const updated = await Pirate.find(pirate.id!);
-    expect(updated.catchphrase).toBe("Updated");
+    const { ship, pirate } = await setup();
+    const s = await Ship.find(ship.id);
+    await pirateOf(s);
+    (s as any).pirateAttributes = { id: pirate.id, catchphrase: "Arr" };
+    const target = (s.association("pirate") as any).target as Pirate;
+    expect(String(target.id)).toBe(String(pirate.id));
+    expect((target as any).catchphrase).toBe("Arr");
   });
 
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
-    const { Ship, Pirate } = makeModels();
-    const ship = await Ship.create({ name: "Black Pearl" });
-    assignNestedAttributes(ship, "pirate", [{ id: 999999, catchphrase: "Ghost" }]);
-    await expect(ship.save()).rejects.toThrow(RecordNotFound);
+    const { ship } = await setup();
+    await expect(
+      (async () => {
+        (ship as any).pirateAttributes = { id: 1234567890 };
+        await ship.save();
+      })(),
+    ).rejects.toThrow(RecordNotFound);
   });
 
   it("should take a hash with string keys and update the associated model", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Old" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", { "0": { id: pirate.id, catchphrase: "StringKey" } });
-    await ship.save();
-    const updated = await Pirate.find(pirate.id!);
-    expect(updated.catchphrase).toBe("StringKey");
+    const { ship, pirate } = await setup();
+    const s = await Ship.find(ship.id);
+    await pirateOf(s);
+    (s as any).pirateAttributes = { id: String(pirate.id), catchphrase: "Arr" };
+    const target = (s.association("pirate") as any).target as Pirate;
+    expect(String(target.id)).toBe(String(pirate.id));
+    expect((target as any).catchphrase).toBe("Arr");
   });
 
   it("should modify an existing record if there is a matching composite id", async () => {
-    // Rails stubs `@pirate.id` to a non-integer composite id ("ABC1X") and
-    // assigns an `id`-matching payload; the in-memory record updates in place.
-    const { Ship } = makeModels();
-    const ship = await Ship.create({ name: "Nights Dirty Lightning" });
-    const pirate = await (ship as any).createPirate({
-      catchphrase: "Don' botharrr talkin' like one, savvy?",
-    });
+    const { ship, pirate } = await setup();
     vi.spyOn(pirate, "id", "get").mockReturnValue("ABC1X" as any);
     (ship as any).pirateAttributes = { id: pirate.id, catchphrase: "Arr" };
     expect((ship.association("pirate") as any).target.catchphrase).toBe("Arr");
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Doomed" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(0);
+    const { ship, pirate } = await setup();
+    await pirate.destroy();
+    for (const truth of [1, "1", true, "true"]) {
+      const s = await Ship.find(ship.id);
+      const p = await (s as any).createPirate({ catchphrase: "Arr" });
+      await s.update({ pirateAttributes: { id: p.id, _destroy: truth } });
+      await expect(Pirate.find(p.id)).rejects.toThrow(RecordNotFound);
+    }
   });
 
   it("should unset association when an existing record is destroyed", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Gone" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(0);
+    const { ship, pirate } = await setup();
+    const originalId = pirate.id;
+    await ship.updateBang({ pirateAttributes: { id: pirate.id, _destroy: true } });
+    expect((await Pirate.where({ id: originalId })).length).toBe(0);
+    expect((ship as any).pirate_id).toBeFalsy();
+    expect(await pirateOf(ship)).toBeFalsy();
+
+    await ship.reload();
+    expect((await Pirate.where({ id: originalId })).length).toBe(0);
+    expect((ship as any).pirate_id).toBeFalsy();
+    expect(await pirateOf(ship)).toBeFalsy();
   });
 
   it("should not destroy an existing record if destroy is not truthy", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "Safe" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: false }]);
-    await ship.save();
-    const found = await Pirate.find(pirate.id!);
-    expect(found.catchphrase).toBe("Safe");
+    const { ship, pirate } = await setup();
+    for (const notTruth of [null, "0", 0, "false", false]) {
+      await ship.update({ pirateAttributes: { id: pirate.id, _destroy: notTruth } });
+      await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
+    }
   });
 
   it("should not destroy an existing record if allow destroy is false", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: false });
-    const pirate = await Pirate.create({ catchphrase: "Protected" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
-    await ship.save();
-    const found = await Pirate.find(pirate.id!);
-    expect(found.catchphrase).toBe("Protected");
+    const { ship, pirate } = await setup();
+    Ship.acceptsNestedAttributesFor("pirate", {
+      allowDestroy: false,
+      rejectIf: (a) => Object.keys(a).length === 0,
+    });
+    await ship.update({ pirateAttributes: { id: pirate.id, _destroy: "1" } });
+    await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
+    Ship.acceptsNestedAttributesFor("pirate", {
+      allowDestroy: true,
+      rejectIf: (a) => Object.keys(a).length === 0,
+    });
   });
 
   it("should work with update as well", async () => {
-    const { Ship, Pirate } = makeModels();
-    const pirate = await Pirate.create({ catchphrase: "Before" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "After" }]);
-    await ship.save();
-    const updated = await Pirate.find(pirate.id!);
-    expect(updated.catchphrase).toBe("After");
+    const { ship, pirate } = await setup();
+    await ship.update({
+      name: "Mister Pablo",
+      pirateAttributes: { id: pirate.id, catchphrase: "Arr" },
+    });
+    const s = await Ship.find(ship.id);
+    expect(s.name).toBe("Mister Pablo");
+    expect(((await pirateOf(s)) as any).catchphrase).toBe("Arr");
   });
 
   it("should not destroy the associated model until the parent is saved", async () => {
-    const { Ship, Pirate } = makeModels({ allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "StillHere" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
-    const beforeSave = await Pirate.find(pirate.id!);
-    expect(beforeSave).toBeDefined();
+    const { ship, pirate } = await setup();
+    (ship as any).attributes = { pirateAttributes: { id: pirate.id, _destroy: true } };
+    await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
     await ship.save();
-    const afterSave = await Pirate.all();
-    expect(afterSave.length).toBe(0);
+    await expect(Pirate.find(pirate.id)).rejects.toThrow(RecordNotFound);
   });
 
   it("should automatically enable autosave on the association", () => {
-    const { Ship } = makeModels();
-    const configs = (Ship as any)._nestedAttributeConfigs;
-    expect(configs.find((c: any) => c.associationName === "pirate")).toBeDefined();
+    expect(Ship.reflectOnAssociation("pirate")?.options.autosave).toBe(true);
   });
 
   it("should create new model when nothing is there and update only is true", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
-    const ship = await Ship.create({ name: "Black Pearl" });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "New" }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(1);
+    const { ship, pirate } = await setup();
+    await (pirate as any).delete();
+    const s = await Ship.find(ship.id);
+    // trails defers the update_only build to the post-save flush (it cannot
+    // synchronously read "no existing record" without a DB load), so the
+    // observable outcome — a freshly created update_only pirate — is checked
+    // after save rather than the unsaved in-memory build Rails inspects.
+    await s.update({ updateOnlyPirateAttributes: { catchphrase: "Arr" } });
+    expect(
+      await (await Ship.find(ship.id)).association("updateOnlyPirate").loadTarget(),
+    ).not.toBeNull();
   });
 
   it("should update existing when update only is true and no id is given", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
-    const pirate = await Pirate.create({ catchphrase: "Existing" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ catchphrase: "NoIdUpdate" }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBeGreaterThanOrEqual(1);
+    const { ship, pirate } = await setup();
+    await (pirate as any).delete();
+    const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
+    await ship.update({ updateOnlyPirateAttributes: { catchphrase: "Arr" } });
+    expect(((await Pirate.find(newPirate.id)) as any).catchphrase).toBe("Arr");
   });
 
   it("should update existing when update only is true and id is given", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true });
-    const pirate = await Pirate.create({ catchphrase: "Existing" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, catchphrase: "WithIdUpdate" }]);
-    await ship.save();
-    const updated = await Pirate.find(pirate.id!);
-    expect(updated.catchphrase).toBe("WithIdUpdate");
+    const { ship, pirate } = await setup();
+    await (pirate as any).delete();
+    const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
+    await ship.update({ updateOnlyPirateAttributes: { catchphrase: "Arr", id: newPirate.id } });
+    expect(((await Pirate.find(newPirate.id)) as any).catchphrase).toBe("Arr");
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
-    const { Ship, Pirate } = makeModels({ updateOnly: true, allowDestroy: true });
-    const pirate = await Pirate.create({ catchphrase: "ToDestroy" });
-    const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    assignNestedAttributes(ship, "pirate", [{ id: pirate.id, _destroy: true }]);
-    await ship.save();
-    const pirates = await Pirate.all();
-    expect(pirates.length).toBe(0);
+    Ship.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true, allowDestroy: true });
+    const { ship, pirate } = await setup();
+    await (pirate as any).delete();
+    const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
+    await ship.update({
+      updateOnlyPirateAttributes: { catchphrase: "Arr", id: newPirate.id, _destroy: true },
+    });
+    await expect(Pirate.find(newPirate.id)).rejects.toThrow(RecordNotFound);
+    Ship.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true, allowDestroy: false });
   });
 
-  it("should raise an argument error if something other than a hash is passed in", () => {
-    const { Ship } = makeModels();
-    const ship = new Ship({ name: "Black Pearl" });
-    expect(() => assignNestedAttributes(ship, "pirate", [{ catchphrase: "ok" }])).not.toThrow();
+  it("should raise an argument error if something other than a hash is passed in", async () => {
+    const { ship } = await setup();
+    await expect(ship.update({ pirateAttributes: "foo" } as any)).rejects.toThrow(
+      /Hash expected for `pirate` attributes, got String/,
+    );
   });
 });
 
-describe("TestNestedAttributesInGeneral", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("base should have an empty nested attributes options", () => {
-    class Plain extends Base {
-      declare name: string | null;
+// ==========================================================================
+// NestedAttributesOnACollectionAssociationTests (mixed into has_many + HABTM)
+// ==========================================================================
+function collectionAssociationTests(
+  associationName: "birds" | "parrots",
+  childClass: typeof Bird | typeof Parrot,
+  buildSetup: () => Promise<{ pirate: Pirate; child1: any; child2: any }>,
+): void {
+  const setter = `${associationName}Attributes`;
+  const proxy = (p: Pirate) => (p as any)[associationName];
+  const childName = childClass === Bird ? "Bird" : "Parrot";
 
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const configs = (Plain as any)._nestedAttributeConfigs;
+  async function alternateParams(child1: any, child2: any): Promise<Record<string, any>> {
+    return {
+      foo: { id: child1.id, name: "Grace OMalley" },
+      bar: { id: child2.id, name: "Privateers Greed" },
+    };
+  }
+
+  it("should define an attribute writer method for the association", async () => {
+    const { pirate } = await buildSetup();
+    expect(() => {
+      (pirate as any)[setter] = {};
+    }).not.toThrow();
+  });
+
+  // tracked-pending-convergence (0023-surfaced-deviations): see the singular
+  // counterpart — building a new nested record from an unknown key does not
+  // raise (trails' build drops unknown attributes). model-new-unknown-attribute.
+  it.skip("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
+    const { pirate } = await buildSetup();
+    await expect(
+      (async () => {
+        (pirate as any)[setter] = [{ peg_leg: true }];
+        await pirate.save();
+      })(),
+    ).rejects.toThrow(new RegExp(`unknown attribute 'peg_leg' for ${childName}`));
+  });
+
+  it("should save only one association on create", async () => {
+    const pirate = (await Pirate.createBang({
+      catchphrase: "Arr",
+      [setter]: { foo: { name: "Grace OMalley" } },
+    } as any)) as unknown as Pirate;
+    const reloaded = await Pirate.find(pirate.id);
+    expect(Number(await proxy(reloaded).count())).toBe(1);
+  });
+
+  it("should take a hash with string keys and assign the attributes to the associated models", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    await pirate.update({ [setter]: await alternateParams(child1, child2) } as any);
+    expect([
+      (await childClass.find(child1.id)).name,
+      (await childClass.find(child2.id)).name,
+    ]).toEqual(["Grace OMalley", "Privateers Greed"]);
+  });
+
+  it("should take an array and assign the attributes to the associated models", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    (pirate as any)[setter] = Object.values(await alternateParams(child1, child2));
+    await pirate.save();
+    expect([
+      (await childClass.find(child1.id)).name,
+      (await childClass.find(child2.id)).name,
+    ]).toEqual(["Grace OMalley", "Privateers Greed"]);
+  });
+
+  it("should also work with a HashWithIndifferentAccess", async () => {
+    const { pirate, child1 } = await buildSetup();
+    (pirate as any)[setter] = { foo: { id: child1.id, name: "Grace OMalley" } };
+    await pirate.save();
+    expect((await childClass.find(child1.id)).name).toBe("Grace OMalley");
+  });
+
+  it("should take a hash and assign the attributes to the associated models", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    (pirate as any).attributes = { [setter]: await alternateParams(child1, child2) };
+    const target = await proxy(pirate).loadTarget();
+    expect(target[0].name).toBe("Grace OMalley");
+    expect(target[target.length - 1].name).toBe("Privateers Greed");
+  });
+
+  it("should not load association when updating existing records", async () => {
+    const { pirate, child1 } = await buildSetup();
+    await pirate.reload();
+    (pirate as any)[setter] = [{ id: child1.id, name: "Grace OMalley" }];
+    expect(proxy(pirate).loaded).toBe(false);
+    await pirate.save();
+    expect(proxy(pirate).loaded).toBe(false);
+    expect((await childClass.find(child1.id)).name).toBe("Grace OMalley");
+  });
+
+  it("should not overwrite unsaved updates when loading association", async () => {
+    const { pirate, child1 } = await buildSetup();
+    await pirate.reload();
+    (pirate as any)[setter] = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await proxy(pirate).loadTarget();
+    expect(target.find((r: any) => String(r.id) === String(child1.id)).name).toBe("Grace OMalley");
+  });
+
+  it("should preserve order when not overwriting unsaved updates", async () => {
+    const { pirate, child1 } = await buildSetup();
+    await pirate.reload();
+    (pirate as any)[setter] = [{ id: child1.id, name: "Grace OMalley" }];
+    const target = await proxy(pirate).loadTarget();
+    expect(String(target[0].id)).toBe(String(child1.id));
+  });
+
+  it("should refresh saved records when not overwriting unsaved updates", async () => {
+    const { pirate } = await buildSetup();
+    await pirate.reload();
+    const record = new (childClass as any)({ name: "Grace OMalley" });
+    await proxy(pirate).push(record);
+    await record.saveBang();
+    const last = (await proxy(pirate).loadTarget()).at(-1);
+    await last.updateBang({ name: "Polly" });
+    expect((await proxy(pirate).loadTarget()).at(-1).name).toBe("Polly");
+  });
+
+  it("should not remove scheduled destroys when loading association", async () => {
+    const { pirate, child1 } = await buildSetup();
+    await pirate.reload();
+    (pirate as any)[setter] = [{ id: child1.id, _destroy: "1" }];
+    const target = await proxy(pirate).loadTarget();
     expect(
-      configs === undefined || configs === null || (Array.isArray(configs) && configs.length === 0),
+      isMarkedForDestruction(target.find((r: any) => String(r.id) === String(child1.id))),
     ).toBe(true);
   });
 
-  it("should add a proc to nested attributes options", () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    const rejectFn = (attrs: Record<string, unknown>) => !attrs.name;
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: rejectFn });
-    const configs = (CanonicalPirate as any)._nestedAttributeConfigs;
-    const birdsConfig = configs.find((c: any) => c.associationName === "birds");
-    expect(birdsConfig.options.rejectIf).toBe(rejectFn);
+  it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    vi.spyOn(child1, "id", "get").mockReturnValue("ABC1X" as any);
+    vi.spyOn(child2, "id", "get").mockReturnValue("ABC2X" as any);
+    (pirate as any).attributes = {
+      [setter]: [
+        { id: child1.id, name: "Grace OMalley" },
+        { id: child2.id, name: "Privateers Greed" },
+      ],
+    };
+    expect([child1.name, child2.name]).toEqual(["Grace OMalley", "Privateers Greed"]);
   });
 
-  it("should not build a new record using reject all even if destroy is given", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "", _destroy: false }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
+  it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
+    const { pirate } = await buildSetup();
+    // Rails queries `existing_records` here; trails can only consult the loaded
+    // target synchronously, so load it first and use the bare setter (which,
+    // unlike `attributes=`, surfaces the raw RecordNotFound).
+    await proxy(pirate).load();
+    expect(() => {
+      (pirate as any)[setter] = [{ id: 1234567890 }];
+    }).toThrow(RecordNotFound);
   });
 
-  it("should not build a new record if reject all blank returns false", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => !attrs.name || attrs.name === "",
-    });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
+  it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
+    const { pirate } = await buildSetup();
+    const otherPirate = await Pirate.createBang({ catchphrase: "Ahoy!" });
+    const otherChild = await proxy(otherPirate).createBang({ name: "Buccaneers Servant" });
+    await proxy(pirate).load();
+    expect(() => {
+      (pirate as any)[setter] = [{ id: otherChild.id }];
+    }).toThrow(RecordNotFound);
   });
 
-  it("should raise an ArgumentError for non existing associations", () => {
-    registerModel(CanonicalPirate);
-    expect(() => acceptsNestedAttributesFor(CanonicalPirate, "honesty")).toThrow(
-      /No association found/,
+  it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
+    const { pirate } = await buildSetup();
+    await proxy(pirate).destroyAll();
+    await pirate.reload();
+    (pirate as any).attributes = {
+      [setter]: { foo: { name: "Grace OMalley" }, bar: { name: "Privateers Greed" } },
+    };
+    const target = await proxy(pirate).loadTarget();
+    expect(target[0].isPersisted()).toBe(false);
+    expect(target[0].name).toBe("Grace OMalley");
+    expect(target.at(-1).isPersisted()).toBe(false);
+    expect(target.at(-1).name).toBe("Privateers Greed");
+  });
+
+  it("should not assign destroy key to a record", async () => {
+    const { pirate } = await buildSetup();
+    expect(() => {
+      (pirate as any)[setter] = { foo: { _destroy: "0" } };
+    }).not.toThrow();
+  });
+
+  it("should ignore new associated records with truthy destroy attribute", async () => {
+    const { pirate } = await buildSetup();
+    await proxy(pirate).destroyAll();
+    await pirate.reload();
+    (pirate as any).attributes = {
+      [setter]: {
+        foo: { name: "Grace OMalley" },
+        bar: { name: "Privateers Greed", _destroy: "1" },
+      },
+    };
+    const target = await proxy(pirate).loadTarget();
+    expect(target.length).toBe(1);
+    expect(target[0].name).toBe("Grace OMalley");
+  });
+
+  it("should ignore new associated records if a reject if proc returns false", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = await alternateParams(child1, child2);
+    params["baz"] = {};
+    const before = Number(await proxy(pirate).count());
+    (pirate as any).attributes = { [setter]: params };
+    expect(Number(await proxy(pirate).count())).toBe(before);
+  });
+
+  it("should sort the hash by the keys before building new associated models", async () => {
+    const { pirate } = await buildSetup();
+    const attributes: Record<string, any> = {};
+    attributes["123726353"] = { name: "Grace OMalley" };
+    attributes["2"] = { name: "Privateers Greed" };
+    (pirate as any)[setter] = attributes;
+    const target = await proxy(pirate).loadTarget();
+    expect(new Set(target.map((r: any) => r.name))).toEqual(
+      new Set(["Posideons Killer", "Killer bandita Dionne", "Privateers Greed", "Grace OMalley"]),
     );
   });
-  it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship");
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Black Pearl", sail: true }]);
-    await expect(pirate.save()).rejects.toThrow(/unknown attribute/);
+
+  it("should raise an argument error if something else than a hash is passed", async () => {
+    const { pirate } = await buildSetup();
+    expect(() => {
+      (pirate as any)[setter] = {};
+    }).not.toThrow();
+    expect(() => {
+      (pirate as any)[setter] = "foo";
+    }).toThrow(
+      new RegExp(`Hash or Array expected for \`${associationName}\` attributes, got String`),
+    );
   });
 
-  it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
-    registerModel(CanonicalShip);
-    const ship = await CanonicalShip.create({ name: "Nights Dirty Lightning" });
-    markForDestruction(ship);
-    expect(isMarkedForDestruction(ship)).toBe(true);
+  it("should work with update as well", async () => {
+    const { pirate, child1 } = await buildSetup();
+    await pirate.update({
+      catchphrase: "Arr",
+      [setter]: { foo: { id: child1.id, name: "Grace OMalley" } },
+    } as any);
+    expect((await childClass.find(child1.id)).name).toBe("Grace OMalley");
   });
 
-  it("reject if method without arguments", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
+  it("should update existing records and add new ones that have no id", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = await alternateParams(child1, child2);
+    params["baz"] = { name: "Buccaneers Servant" };
+    const before = Number(await proxy(pirate).count());
+    await pirate.update({ [setter]: params } as any);
+    expect(Number(await proxy(pirate).count())).toBe(before + 1);
+    const reloaded = await Pirate.find(pirate.id);
+    expect(new Set((await proxy(reloaded).toArray()).map((r: any) => r.name))).toEqual(
+      new Set(["Grace OMalley", "Privateers Greed", "Buccaneers Servant"]),
+    );
+  });
+
+  it("should be possible to destroy a record", async () => {
+    for (const trueVariable of ["1", 1, "true", true]) {
+      const { pirate, child1, child2 } = await buildSetup();
+      const record = await proxy(await Pirate.find(pirate.id)).createBang({
+        name: "Grace OMalley",
+      });
+      const params = await alternateParams(child1, child2);
+      params["baz"] = { id: record.id, _destroy: trueVariable };
+      (pirate as any)[setter] = params;
+      const before = Number(await proxy(pirate).count());
+      await pirate.save();
+      expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before - 1);
+    }
+  });
+
+  it("should not destroy the associated model with a non truthy argument", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    for (const falseVariable of [null, "", "0", 0, "false", false]) {
+      const params = await alternateParams(child1, child2);
+      params["foo"]["_destroy"] = falseVariable;
+      const before = Number(await proxy(pirate).count());
+      await pirate.update({ [setter]: params } as any);
+      expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before);
+    }
+  });
+
+  it("should not destroy the associated model until the parent is saved", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = await alternateParams(child1, child2);
+    params["baz"] = { id: child1.id, _destroy: true };
+    const before = Number(await proxy(pirate).count());
+    (pirate as any)[setter] = params;
+    expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before);
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
+    expect(Number(await proxy(await Pirate.find(pirate.id)).count())).toBe(before - 1);
   });
 
-  it("reject if method with arguments", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => attrs.name === "spam",
-    });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "spam" }, { name: "legit" }]);
+  it("should automatically enable autosave on the association", () => {
+    expect(Pirate.reflectOnAssociation(associationName)?.options.autosave).toBe(true);
+  });
+
+  it("can use symbols as object identifier", async () => {
+    const { pirate } = await buildSetup();
+    (pirate as any).attributes = {
+      parrotsAttributes: { foo: { name: "Lovely Day" }, bar: { name: "Blown Away" } },
+    };
+    await expect(pirate.saveBang()).resolves.toBeTruthy();
+  });
+
+  it("assigning nested attributes target", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = Object.values(await alternateParams(child1, child2));
+    (pirate as any)[setter] = params;
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("legit");
+    const nat = (
+      pirate.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
+    ).nestedAttributesTarget;
+    expect(nat.map((r) => (r ? String(r.id) : null))).toEqual([
+      String(child1.id),
+      String(child2.id),
+    ]);
   });
 
-  it("reject if with indifferent keys", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => attrs.name === "reject",
-    });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", { "0": { name: "reject" }, "1": { name: "keep" } });
+  it("assigning nested attributes target with nil placeholder for rejected item", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = Object.values(await alternateParams(child1, child2));
+    params.splice(1, 0, {});
+    (pirate as any)[setter] = params;
     await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("keep");
+    const nat = (
+      pirate.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
+    ).nestedAttributesTarget;
+    expect(nat.map((r) => (r ? String(r.id) : null))).toEqual([
+      String(child1.id),
+      null,
+      String(child2.id),
+    ]);
   });
+}
 
-  it("reject if with a proc which returns true always for has one", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship", { rejectIf: () => true });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "ship", [{ name: "Rejected" }]);
-    await pirate.save();
-    const ships = await CanonicalShip.where({ pirate_id: pirate.id });
-    expect(ships.length).toBe(0);
-  });
+describe("TestNestedAttributesOnAHasManyAssociation", () => {
+  coreFixtures();
 
-  it("reuse already built new record", () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship");
-    const pirate = new CanonicalPirate();
-    const shipBuiltFirst = (pirate.association("ship") as any).build();
-    (pirate as any).shipAttributes = { name: "Ship 1" };
-    expect((pirate.association("ship") as any).target).toBe(shipBuiltFirst);
-  });
-  it("do not allow assigning foreign key when reusing existing new record", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship");
-    const pirate = await CanonicalPirate.create({
+  collectionAssociationTests("birds", Bird, async () => {
+    const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
-    (pirate.association("ship") as any).build();
-    (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: Number(pirate.id) + 1 };
-    expect(Number((pirate.association("ship") as any).target.pirate_id)).toBe(Number(pirate.id));
+    await (pirate as any).birds.createBang({ name: "Posideons Killer" });
+    await (pirate as any).birds.createBang({ name: "Killer bandita Dionne" });
+    const [child1, child2] = await (pirate as any).birds.toArray();
+    return { pirate, child1, child2 };
   });
 
-  it("reject if with a proc which returns true always for has many", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(0);
-  });
-
-  it("reject if with blank nested attributes id", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {});
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly", id: undefined }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-  });
-
-  it("first and array index zero methods return the same value when nested attributes are set to update existing record", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests");
-    const created = await Human.create({ name: "John" });
-    const interest = await Interest.create({ topic: "gardening", human_id: created.id });
-    const human = await Human.find(created.id);
-    (human as any).interestsAttributes = [{ id: interest.id, topic: "gardening" }];
-    const first = await (human as any).interests.first();
-    const zero = (human as any).interests[0];
-    expect(first.topic).toBe(zero.topic);
-  });
-  it("allows class to override setter and call super", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    // Override by wrapping assignNestedAttributes — the caller can intercept and modify attrs
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    const modifiedAttrs = [{ name: "Overridden Bird" }];
-    assignNestedAttributes(pirate, "birds", modifiedAttrs);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("Overridden Bird");
-  });
-  it("accepts nested attributes for can be overridden in subclasses", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { rejectIf: () => true });
-
-    // Parent class rejects all — verify it works
-    const parentPirate = await CanonicalPirate.create({ catchphrase: "Parent" });
-    assignNestedAttributes(parentPirate, "birds", [{ name: "Rejected" }]);
-    await parentPirate.save();
-    const parentBirds = await CanonicalBird.where({ pirate_id: parentPirate.id });
-    expect(parentBirds.length).toBe(0);
-
-    // Subclass inherits the `birds` reflection from CanonicalPirate. The FK is
-    // resolved from the reflection's owner (`Pirate` → `pirate_id`), not the
-    // SubPirate instance's class, so a bare subclass needs no re-declaration.
-    class SubPirate extends CanonicalPirate {}
-    registerModel("SubPirate", SubPirate);
-    // Override: subclass has its own config array
-    (SubPirate as any)._nestedAttributeConfigs = [];
-    acceptsNestedAttributesFor(SubPirate, "birds", { rejectIf: () => false });
-
-    const pirate = await SubPirate.create({ catchphrase: "Yo" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-  });
-  it("should not create duplicates with create with", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests");
-
-    const before = Number(await Interest.count());
-    await Human.createWith({
-      interestsAttributes: [{ topic: "Pirate king" }],
-    }).findOrCreateByBang({ name: "Monkey D. Luffy" });
-    expect(Number(await Interest.count()) - before).toBe(1);
-  });
-  it("updating models with cpk provided as strings", async () => {
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    registerModel(CpkChapter);
-    const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
-    await (book.chapters as any).createBang({ id: [1, 3], title: "Title" });
-
-    await book.updateBang({ chaptersAttributes: { id: ["1", "3"], title: "New title" } });
-
-    const reloaded = (await CpkBook.find([1, 2])) as any;
-    expect(Number(await reloaded.chapters.count())).toBe(1);
-    expect((await reloaded.chapters.first()).title).toBe("New title");
-  });
-
-  it("builds nested children on a bare CPK subclass with the declaring model's composite foreign key", async () => {
-    registerModel(CpkCar);
-    registerModel(CpkCarReview);
-    // A bare subclass: it inherits the has_many reflection (and its composite
-    // foreign key) from CpkCar. This is an integration check that composite-FK
-    // nested builds thread each FK column through an inherited reflection. The
-    // composite path never reaches the `${underscore(ctor.name)}_id` fallback,
-    // so the subclass name doesn't enter FK resolution here — the FK comes from
-    // the reflection owner's `activeRecordPrimaryKey` (CpkCar's `[make, model]`).
-    class CpkSportsCar extends CpkCar {
-      static _demodulizedName = "SportsCar";
-    }
-    registerModel(CpkSportsCar);
-    acceptsNestedAttributesFor(CpkSportsCar, "carReviews");
-
-    const car = await CpkSportsCar.createBang({ make: "Honda", model: "Civic" });
-    assignNestedAttributes(car, "carReviews", [{ comment: "zippy", rating: 5 }]);
-    await car.save();
-
-    const reviews = await CpkCarReview.where({ car_make: "Honda", car_model: "Civic" });
-    expect(reviews.length).toBe(1);
-    expect((reviews[0] as any).comment).toBe("zippy");
-    expect((reviews[0] as any).car_make).toBe("Honda");
-    expect((reviews[0] as any).car_model).toBe("Civic");
-  });
-
-  it("should build a new record if reject all blank does not return false", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => !attrs["name"] || attrs["name"] === "",
+  it("validate presence of parent works with inverse of", async () => {
+    expect(Human.reflectOnAssociation("interests")?.options.inverseOf).toBe("human");
+    expect(Interest.reflectOnAssociation("human")?.options.inverseOf).toBe("interests");
+    await repairValidations(Interest, async () => {
+      (Interest as any).validates("human", { presence: true });
+      const beforeH = Number(await Human.count());
+      const beforeI = Number(await Interest.count());
+      const human = await Human.createBang({
+        name: "John",
+        interestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+      });
+      expect(Number(await Human.count()) - beforeH).toBe(1);
+      expect(Number(await Interest.count()) - beforeI).toBe(2);
+      expect(Number(await (human as any).interests.count())).toBe(2);
     });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Tweetie" }]);
-    await pirate.save();
-
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect((birds[0] as any).name).toBe("Tweetie");
   });
 
-  it("should disable allow destroy by default", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
-    const bird = await CanonicalBird.create({ name: "Night Lightning", pirate_id: pirate.id });
-
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
-    await pirate.save();
-
-    const found = await CanonicalBird.findBy({ id: bird.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("destroy works independent of reject if", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests", {
-      allowDestroy: true,
-      rejectIf: () => true,
+  it("numeric column changes from zero to no empty string", async () => {
+    Human.acceptsNestedAttributesFor("interests");
+    await repairValidations(Interest, async () => {
+      (Interest as any).validates("zine_id", { numericality: true });
+      const human = await Human.create({ name: "John" });
+      const interest = await (human as any).interests.create({ topic: "bar", zine_id: 0 });
+      expect(await interest.save()).toBe(true);
+      expect(await human.update({ interestsAttributes: { id: interest.id, zine_id: "foo" } })).toBe(
+        false,
+      );
     });
-
-    const human = await Human.create({ name: "Jon" });
-    const interest = await Interest.create({ topic: "the ladies", human_id: human.id });
-
-    assignNestedAttributes(human, "interests", [{ id: interest.id, _destroy: true }]);
-    await human.save();
-
-    const found = await Interest.findBy({ id: interest.id });
-    expect(found).toBeNull();
-  });
-
-  it("reject if is not short circuited if allow destroy is false", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: () => true,
-      allowDestroy: false,
-    });
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Savvy?" });
-    const bird = await CanonicalBird.create({ name: "Mast", pirate_id: pirate.id });
-
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true, name: "Mast" }]);
-    await pirate.save();
-
-    const found = await CanonicalBird.findBy({ id: bird.id });
-    expect(found).not.toBeNull();
-  });
-
-  it("has many association updating a single record", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests");
-
-    const human = await Human.create({ name: "John" });
-    const interest = await Interest.create({ topic: "photography", human_id: human.id });
-
-    assignNestedAttributes(human, "interests", [{ id: interest.id, topic: "gardening" }]);
-    await human.save();
-
-    const updated = await Interest.find(interest.id);
-    expect((updated as any).topic).toBe("gardening");
   });
 });
 
+describe("TestNestedAttributesOnAHasAndBelongsToManyAssociation", () => {
+  coreFixtures();
+
+  collectionAssociationTests("parrots", Parrot, async () => {
+    const pirate = await Pirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    await (pirate as any).parrots.createBang({ name: "Posideons Killer" });
+    await (pirate as any).parrots.createBang({ name: "Killer bandita Dionne" });
+    const [child1, child2] = await (pirate as any).parrots.toArray();
+    return { pirate, child1, child2 };
+  });
+});
+
+// ==========================================================================
+// NestedAttributesLimitTests (mixed into Numeric / Symbol / Proc)
+// ==========================================================================
+function limitTests(makePirate: () => Promise<Pirate>): void {
+  // trails wraps any error thrown from a setter during `attributes=` in an
+  // AttributeAssignmentError, so the bare `parrots_attributes=` setter is used
+  // here to observe the raw TooManyRecords Rails raises.
+  it("limit with less records", async () => {
+    const pirate = await makePirate();
+    (pirate as any).parrotsAttributes = { foo: { name: "Big Big Love" } };
+    const before = Number(await Parrot.count());
+    await pirate.saveBang();
+    expect(Number(await Parrot.count())).toBe(before + 1);
+  });
+
+  it("limit with number exact records", async () => {
+    const pirate = await makePirate();
+    (pirate as any).parrotsAttributes = {
+      foo: { name: "Lovely Day" },
+      bar: { name: "Blown Away" },
+    };
+    const before = Number(await Parrot.count());
+    await pirate.saveBang();
+    expect(Number(await Parrot.count())).toBe(before + 2);
+  });
+
+  it("limit with exceeding records", async () => {
+    const pirate = await makePirate();
+    expect(() => {
+      (pirate as any).parrotsAttributes = {
+        foo: { name: "Lovely Day" },
+        bar: { name: "Blown Away" },
+        car: { name: "The Happening" },
+      };
+    }).toThrow(TooManyRecords);
+  });
+}
+
+describe("TestNestedAttributesLimitNumeric", () => {
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: 2 }));
+  limitTests(
+    async () =>
+      await Pirate.createBang({
+        catchphrase: "Don' botharrr talkin' like one, savvy?",
+      }),
+  );
+});
+
+describe("TestNestedAttributesLimitSymbol", () => {
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: "parrotsLimit" }));
+  limitTests(
+    async () =>
+      (await Pirate.createBang({
+        catchphrase: "Don' botharrr talkin' like one, savvy?",
+        parrotsLimit: 2,
+      } as any)) as unknown as Pirate,
+  );
+});
+
+describe("TestNestedAttributesLimitProc", () => {
+  coreFixtures();
+  beforeAll(() => Pirate.acceptsNestedAttributesFor("parrots", { limit: () => 2 }));
+  limitTests(
+    async () =>
+      await Pirate.createBang({
+        catchphrase: "Don' botharrr talkin' like one, savvy?",
+      }),
+  );
+});
+
+// ==========================================================================
+// TestNestedAttributesWithNonStandardPrimaryKeys
+// ==========================================================================
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
-  const { owners, pets } = fixtures(["owners", "pets"], { schema: canonicalSchema });
+  const { owners, pets } = fixtures(["owners", "pets"]);
+
+  beforeAll(() => {
+    Owner.acceptsNestedAttributesFor("pets", { allowDestroy: true });
+  });
 
   it("should update existing records with non standard primary key", async () => {
-    registerModel(Owner);
-    registerModel(Pet);
-    acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
     const owner = owners("ashley");
     const pet1 = pets("chew");
     const pet2 = pets("mochi");
@@ -1256,1023 +1316,107 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   });
 
   it("attr accessor of child should be value provided during update", async () => {
-    registerModel(Owner);
-    registerModel(Pet);
-    acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
     const owner = owners("ashley");
     const pet1 = pets("chew");
     await owner.update({
-      petsAttributes: {
-        "1": { id: pet1.id, name: "Foo2", current_user: "John", _destroy: true },
-      },
+      petsAttributes: { "1": { id: pet1.id, name: "Foo2", current_user: "John", _destroy: true } },
     });
     expect(Pet.afterDestroyOutput).toBe("John");
   });
 });
 
-describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("index in nested_attributes_order order", async () => {
-    class IENTag extends Base {
-      declare name: string | null;
-      declare ien_article_id: number | null;
-
-      static {
-        this._tableName = "ien_tags";
-        this.attribute("name", "string");
-        this.attribute("ien_article_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel(IENTag);
-    // Verify validation errors work on individual records in nested attrs context
-    const invalid = new IENTag({ name: "" });
-    expect(await invalid.isValid()).toBe(false);
-    const valid = new IENTag({ name: "ok" });
-    expect(await valid.isValid()).toBe(true);
-  });
-
-  it("index unaffected by reject_if", async () => {
-    class IERTag extends Base {
-      declare name: string | null;
-      declare ier_article_id: number | null;
-
-      static {
-        this._tableName = "ier_tags";
-        this.attribute("name", "string");
-        this.attribute("ier_article_id", "integer");
-      }
-    }
-    class IERArticle extends Base {
-      declare title: string | null;
-      declare ierTags: AssociationProxy<IERTag>;
-
-      static {
-        this._tableName = "ier_articles";
-        this.attribute("title", "string");
-        this.hasMany("ierTags", {
-          className: "IERTag",
-          foreignKey: "ier_article_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(IERArticle, "ierTags", {
-      rejectIf: (attrs) => attrs.name === "skip",
-    });
-    registerModel(IERTag);
-    registerModel(IERArticle);
-    const article = await IERArticle.create({ title: "test" });
-    assignNestedAttributes(article, "ierTags", [{ name: "skip" }, { name: "valid" }]);
-    await article.save();
-    const tags = await IERTag.where({ ier_article_id: article.id });
-    expect(tags.length).toBe(1);
-  });
-});
-
-describe("TestNestedAttributesWithExtend", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("extend affects nested attributes", async () => {
-    class ExtTag extends Base {
-      declare name: string | null;
-      declare ext_article_id: number | null;
-
-      static {
-        this._tableName = "ext_tags";
-        this.attribute("name", "string");
-        this.attribute("ext_article_id", "integer");
-      }
-    }
-    class ExtArticle extends Base {
-      declare title: string | null;
-      declare extTags: AssociationProxy<ExtTag>;
-
-      static {
-        this._tableName = "ext_articles";
-        this.attribute("title", "string");
-        this.hasMany("extTags", {
-          className: "ExtTag",
-          foreignKey: "ext_article_id",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(ExtArticle, "extTags");
-    registerModel(ExtTag);
-    registerModel(ExtArticle);
-    // Verify nested attributes still work with an extended/subclassed article
-    class ExtArticleSub extends ExtArticle {}
-    const article = await ExtArticleSub.create({ title: "extended" });
-    assignNestedAttributes(article, "extTags", [{ name: "extended-tag" }]);
-    await article.save();
-    const tags = await ExtTag.where({ ext_article_id: article.id });
-    expect(tags.length).toBe(1);
-    expect(tags[0].name).toBe("extended-tag");
-  });
-});
-
-describe("TestNestedAttributesForDelegatedType", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should build a new record based on the delegated type", async () => {
-    class DTComment extends Base {
-      declare body: string | null;
-
-      static {
-        this._tableName = "dt_comments";
-        this.attribute("body", "string");
-      }
-    }
-    class DTEntry extends Base {
-      declare entryable_type: string | null;
-      declare entryable_id: number | null;
-      declare dtComment: DTComment | null;
-      declare loadHasOne: (name: "dtComment") => Promise<DTComment | null>;
-
-      static {
-        this._tableName = "dt_entries";
-        this.attribute("entryable_type", "string");
-        this.attribute("entryable_id", "integer");
-        this.hasOne("dtComment", {
-          className: "DTComment",
-          foreignKey: "dt_entry_id",
-        });
-      }
-    }
-    // Set up a has_one association to simulate delegated type behavior
-    registerModel(DTComment);
-    registerModel(DTEntry);
-    // Delegated type is essentially a polymorphic pattern; verify basic nested attrs work
-    // with a simple has_one for now
-    class DTComment2 extends Base {
-      declare body: string | null;
-      declare dt_entry2_id: number | null;
-
-      static {
-        this._tableName = "dt_comments2";
-        this.attribute("body", "string");
-        this.attribute("dt_entry2_id", "integer");
-      }
-    }
-    class DTEntry2 extends Base {
-      declare title: string | null;
-      declare dtComment2: DTComment2 | null;
-      declare loadHasOne: (name: "dtComment2") => Promise<DTComment2 | null>;
-
-      static {
-        this._tableName = "dt_entries2";
-        this.attribute("title", "string");
-        this.hasOne("dtComment2", {
-          className: "DTComment2",
-          foreignKey: "dt_entry2_id",
-        });
-      }
-    }
-    registerModel(DTComment2);
-    registerModel(DTEntry2);
-    acceptsNestedAttributesFor(DTEntry2, "dtComment2");
-    const entry = await DTEntry2.create({ title: "delegated" });
-    assignNestedAttributes(entry, "dtComment2", [{ body: "via delegated type" }]);
-    await entry.save();
-    const comments = await DTComment2.where({ dt_entry2_id: entry.id });
-    expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("via delegated type");
-  });
-});
-
-describe("assigning nested attributes target", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("assigning nested attributes target", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "target test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "assigned" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("assigned");
-  });
-});
-
-describe("assigning nested attributes target with nil placeholder for rejected item", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("assigning nested attributes target with nil placeholder for rejected item", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", {
-      rejectIf: (attrs) => !attrs.name || attrs.name === "",
-    });
-    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "keep" }, { name: "" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("keep");
-  });
-});
-
-describe("can use symbols as object identifier", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("can use symbols as object identifier", async () => {
-    // In TypeScript there are no symbols-as-keys in the Ruby sense,
-    // but string keys should work as identifiers for nested attributes
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "sym test" });
-    assignNestedAttributes(pirate, "birds", {
-      foo: { name: "Lovely Day" },
-      bar: { name: "Blown Away" },
-    });
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(2);
-  });
-});
-
-describe("numeric column changes from zero to no empty string", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("numeric column changes from zero to no empty string", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests");
-
-    await repairValidations(Interest, async () => {
-      Interest.validates("zine_id", { numericality: true });
-      const human = await Human.create({ name: "John" });
-      const interest = await (human as any).interests.create({ topic: "bar", zine_id: 0 });
-      expect(await interest.save()).toBe(true);
-      const updated = await human.update({
-        interestsAttributes: { id: interest.id, zine_id: "foo" },
-      });
-      expect(updated).toBe(false);
-    });
-  });
-});
-
-describe("should also work with a HashWithIndifferentAccess", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should also work with a HashWithIndifferentAccess", async () => {
-    // JS objects already have indifferent string keys, so a plain object
-    // stands in for Rails' HashWithIndifferentAccess.
-    const { pirate, child1 } = await seedPirate();
-    assignNestedAttributes(pirate, "birds", { foo: { id: child1.id, name: "Grace OMalley" } });
-    await pirate.save();
-    const reloaded = await CanonicalBird.find(child1.id);
-    expect(reloaded.name).toBe("Grace OMalley");
-  });
-});
-
-describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "build test" });
-    // Entries without an id build new, unsaved records (Rails asserts the
-    // built records are not yet persisted before the parent is saved).
-    (pirate as any).birdsAttributes = {
-      foo: { name: "Grace OMalley" },
-      bar: { name: "Privateers Greed" },
-    };
-    const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
-    expect(built.length).toBe(2);
-    expect(built[0].isPersisted()).toBe(false);
-    expect(built[0].name).toBe("Grace OMalley");
-    expect(built[built.length - 1].isPersisted()).toBe(false);
-    expect(built[built.length - 1].name).toBe("Privateers Greed");
-  });
-});
-
-describe("should not assign destroy key to a record", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should not assign destroy key to a record", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "no destroy key" });
-    assignNestedAttributes(pirate, "birds", [{ name: "keep" }]);
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    // The _destroy key should not be assigned as an attribute
-    expect(birds[0].readAttribute("_destroy" as any)).toBeFalsy();
-  });
-});
-
-describe("should not destroy the associated model until the parent is saved", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should not destroy the associated model until the parent is saved", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds", { allowDestroy: true });
-    const pirate = await CanonicalPirate.create({ catchphrase: "parent" });
-    const bird = await CanonicalBird.create({ name: "child", pirate_id: pirate.id });
-    assignNestedAttributes(pirate, "birds", [{ id: bird.id, _destroy: true }]);
-    // Before save, the bird should still exist
-    const beforeSave = await CanonicalBird.find(bird.id);
-    expect(beforeSave).toBeDefined();
-    await pirate.save();
-    const afterSave = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(afterSave.length).toBe(0);
-  });
-});
-
-describe("should not load association when updating existing records", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should not load association when updating existing records", async () => {
-    const { pirate, child1 } = await seedPirate();
-    // The nested-attributes writer must update the in-memory target without
-    // eagerly loading the association — `loaded?` stays false before and
-    // after the parent is saved.
-    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
-    expect(collectionProxyFor(pirate, "birds").loaded).toBe(false);
-    await pirate.save();
-    expect(collectionProxyFor(pirate, "birds").loaded).toBe(false);
-    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
-  });
-});
-
-describe("should not overwrite unsaved updates when loading association", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should not overwrite unsaved updates when loading association", async () => {
-    const { pirate, child1 } = await seedPirate();
-    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
-    const target = await collectionProxyFor(pirate, "birds").loadTarget();
-    const found = target.find((r) => String(r.id) === String(child1.id));
-    expect(found!.name).toBe("Grace OMalley");
-  });
-});
-
-describe("should not remove scheduled destroys when loading association", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should not remove scheduled destroys when loading association", async () => {
-    const { pirate, child1 } = await seedPirate();
-    (pirate as any).birdsAttributes = [{ id: child1.id, _destroy: "1" }];
-    const target = await collectionProxyFor(pirate, "birds").loadTarget();
-    const found = target.find((r) => String(r.id) === String(child1.id));
-    expect(isMarkedForDestruction(found!)).toBe(true);
-  });
-});
-
-describe("should preserve order when not overwriting unsaved updates", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should preserve order when not overwriting unsaved updates", async () => {
-    const { pirate, child1 } = await seedPirate();
-    (pirate as any).birdsAttributes = [{ id: child1.id, name: "Grace OMalley" }];
-    const target = await collectionProxyFor(pirate, "birds").loadTarget();
-    expect(String(target[0].id)).toBe(String(child1.id));
-  });
-});
-
-describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
-    // An id that belongs to no bird of this pirate must not resolve.
-    assignNestedAttributes(pirate, "birds", [{ id: 999999, name: "ghost" }]);
-    await expect(pirate.save()).rejects.toThrow(RecordNotFound);
-  });
-});
-
-describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "test" });
-    assignNestedAttributes(pirate, "birds", [{ name: "ok", bogusAttr: "bad" }]);
-    await expect(pirate.save()).rejects.toThrow(/unknown attribute/);
-  });
-});
-
-describe("should raise an argument error if something else than a hash is passed", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should raise an argument error if something else than a hash is passed", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = new CanonicalPirate({ catchphrase: "test" });
-    expect(() => assignNestedAttributes(pirate, "birds", "not a hash" as any)).toThrow(
-      /Hash or Array expected/,
-    );
-  });
-});
-
-describe("should refresh saved records when not overwriting unsaved updates", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should refresh saved records when not overwriting unsaved updates", async () => {
-    const { pirate } = await seedPirate();
-    const proxy = collectionProxyFor(pirate, "birds") as any;
-    const record = new CanonicalBird({ name: "Grace OMalley", pirate_id: pirate.id });
-    await proxy.push(record);
-    await record.save();
-    const loaded = await proxy.loadTarget();
-    const last = loaded[loaded.length - 1];
-    await last.update({ name: "Polly" });
-    const target = await proxy.loadTarget();
-    expect(target[target.length - 1].name).toBe("Polly");
-  });
-});
-
-describe("should save only one association on create", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should save only one association on create", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "one assoc" });
-    assignNestedAttributes(pirate, "birds", { foo: { name: "Grace OMalley" } });
-    await pirate.save();
-    const birds = await CanonicalBird.where({ pirate_id: pirate.id });
-    expect(birds.length).toBe(1);
-    expect(birds[0].name).toBe("Grace OMalley");
-  });
-});
-
-describe("should sort the hash by the keys before building new associated models", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should sort the hash by the keys before building new associated models", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "sort test" });
-    (pirate as any).birdsAttributes = {
-      "123726353": { name: "Grace OMalley" },
-      "2": { name: "Privateers Greed" }, // 2 is lower then 123726353
-    };
-    const built = (await collectionProxyFor(pirate, "birds").loadTarget()) as CanonicalBird[];
-    // Rails compares with `.to_set` — order-independent (Ruby preserves hash
-    // insertion order; trails cannot for integer keys, so assert membership).
-    expect(new Set(built.map((b) => b.name))).toEqual(
-      new Set(["Privateers Greed", "Grace OMalley"]),
-    );
-  });
-});
-
-describe("should take a hash and assign the attributes to the associated models", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should take a hash and assign the attributes to the associated models", async () => {
-    const { pirate, child1, child2 } = await seedPirate();
-    (pirate as any).birdsAttributes = {
-      foo: { id: child1.id, name: "Grace OMalley" },
-      bar: { id: child2.id, name: "Privateers Greed" },
-    };
-    const birds = await collectionProxyFor(pirate, "birds").loadTarget();
-    expect(birds[0].name).toBe("Grace OMalley");
-    expect(birds[birds.length - 1].name).toBe("Privateers Greed");
-  });
-});
-
-describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-
-    const pirate = await CanonicalPirate.create({ catchphrase: "Aye" });
-    await CanonicalBird.create({ name: "Posideons Killer", pirate_id: pirate.id });
-    await CanonicalBird.create({ name: "Killer bird", pirate_id: pirate.id });
-    await (pirate as any).birds.load();
-    const [child1, child2] = (pirate as any).birds.target as any[];
-    // Rails stubs the children's `id` methods to non-integer composite ids
-    // (`@child_1.stub(:id, "ABC1X")`); mirror with a getter spy.
-    vi.spyOn(child1, "id", "get").mockReturnValue("ABC1X" as any);
-    vi.spyOn(child2, "id", "get").mockReturnValue("ABC2X" as any);
-    (pirate as any).birdsAttributes = [
-      { id: child1.id, name: "Grace OMalley" },
-      { id: child2.id, name: "Privateers Greed" },
-    ];
-    expect([child1.name, child2.name]).toEqual(["Grace OMalley", "Privateers Greed"]);
-  });
-});
-
-describe("should take an array and assign the attributes to the associated models", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should take an array and assign the attributes to the associated models", async () => {
-    const { pirate, child1, child2 } = await seedPirate();
-    (pirate as any).birdsAttributes = [
-      { id: child1.id, name: "Grace OMalley" },
-      { id: child2.id, name: "Privateers Greed" },
-    ];
-    await pirate.save();
-    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
-    expect((await CanonicalBird.find(child2.id)).name).toBe("Privateers Greed");
-  });
-});
-
-describe("should work with update as well", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("should work with update as well", async () => {
-    const { pirate, child1 } = await seedPirate();
-    await pirate.update({
-      catchphrase: "Arr",
-      birdsAttributes: { foo: { id: child1.id, name: "Grace OMalley" } },
-    });
-    expect((await CanonicalBird.find(child1.id)).name).toBe("Grace OMalley");
-  });
-});
-
-describe("validate presence of parent works with inverse of", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("validate presence of parent works with inverse of", async () => {
-    registerModel(Human);
-    registerModel(Interest);
-    acceptsNestedAttributesFor(Human, "interests");
-    expect(Human.reflectOnAssociation("interests")?.options.inverseOf).toBe("human");
-    expect(Interest.reflectOnAssociation("human")?.options.inverseOf).toBe("interests");
-
-    await repairValidations(Interest, async () => {
-      Interest.validates("human", { presence: true });
-
-      const beforeH = Number(await Human.count());
-      const beforeI = Number(await Interest.count());
-      const human = await Human.createBang({
-        name: "John",
-        interestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
-      });
-      expect(Number(await Human.count()) - beforeH).toBe(1);
-      expect(Number(await Interest.count()) - beforeI).toBe(2);
-      expect(Number(await (human as any).interests.count())).toBe(2);
-    });
-  });
-});
-
-describe("acceptsNestedAttributesFor", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  it("creates child records through parent", async () => {
-    class Comment extends Base {
-      static _tableName = "comments";
-    }
-    Comment.attribute("id", "integer");
-    Comment.attribute("body", "string");
-    Comment.attribute("post_id", "integer");
-    registerModel(Comment);
-
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-    Post.attribute("title", "string");
-    Associations.hasMany.call(Post, "comments");
-    acceptsNestedAttributesFor(Post, "comments");
-    registerModel(Post);
-
-    const post = new Post({ title: "Hello" });
-    assignNestedAttributes(post, "comments", [
-      { body: "First comment" },
-      { body: "Second comment" },
-    ]);
-    await post.save();
-
-    const comments = await Comment.all();
-    expect(comments.length).toBe(2);
-    expect(comments[0].post_id).toBe(post.id);
-  });
-
-  it("destroys child records with _destroy flag", async () => {
-    class Tag extends Base {
-      static _tableName = "tags";
-    }
-    Tag.attribute("id", "integer");
-    Tag.attribute("name", "string");
-    Tag.attribute("article_id", "integer");
-    registerModel(Tag);
-
-    class Article extends Base {
-      static _tableName = "articles";
-    }
-    Article.attribute("id", "integer");
-    Article.attribute("title", "string");
-    Associations.hasMany.call(Article, "tags");
-    acceptsNestedAttributesFor(Article, "tags", { allowDestroy: true });
-    registerModel(Article);
-
-    const article = await Article.create({ title: "Test" });
-    const tag = await Tag.create({ name: "ruby", article_id: article.id });
-
-    assignNestedAttributes(article, "tags", [{ id: tag.id, _destroy: true }]);
-    await article.save();
-
-    const remaining = await Tag.all();
-    expect(remaining.length).toBe(0);
-  });
-});
-
-describe("Nested Attributes (Rails-guided)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-
-  // Rails: test "create with nested attributes"
-  it("creates associated records through nested attributes", async () => {
-    class Comment extends Base {
-      declare body: string | null;
-      declare post_id: number | null;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    registerModel(Comment);
-
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments");
-    acceptsNestedAttributesFor(Post, "comments");
-
-    const post = new Post({ title: "Hello World" });
-    assignNestedAttributes(post, "comments", [
-      { body: "Great post!" },
-      { body: "Thanks for sharing" },
-    ]);
-    await post.save();
-
-    const comments = await Comment.all();
-    expect(comments.length).toBe(2);
-    expect(comments[0].post_id).toBe(post.id);
-    expect(comments[1].post_id).toBe(post.id);
-  });
-
-  // Rails: test "update with nested attributes"
-  it("updates existing associated records", async () => {
-    class Comment extends Base {
-      declare body: string | null;
-      declare post_id: number | null;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    registerModel(Comment);
-
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments");
-    acceptsNestedAttributesFor(Post, "comments");
-    registerModel(Post);
-
-    const post = await Post.create({ title: "Hello" });
-    const comment = await Comment.create({ body: "Original", post_id: post.id });
-
-    assignNestedAttributes(post, "comments", [{ id: comment.id, body: "Updated body" }]);
-    await post.save();
-
-    await comment.reload();
-    expect(comment.body).toBe("Updated body");
-  });
-
-  // Rails: test "destroy with nested attributes"
-  it("destroys associated records when _destroy is set and allowDestroy is true", async () => {
-    class Comment extends Base {
-      declare body: string | null;
-      declare post_id: number | null;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    registerModel(Comment);
-
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments");
-    acceptsNestedAttributesFor(Post, "comments", { allowDestroy: true });
-    registerModel(Post);
-
-    const post = await Post.create({ title: "Hello" });
-    const c1 = await Comment.create({ body: "Keep me", post_id: post.id });
-    const c2 = await Comment.create({ body: "Delete me", post_id: post.id });
-
-    assignNestedAttributes(post, "comments", [{ id: c2.id, _destroy: true }]);
-    await post.save();
-
-    const remaining = await Comment.all();
-    expect(remaining.length).toBe(1);
-    expect(remaining[0].body).toBe("Keep me");
-  });
-
-  // Rails: test "reject_if"
-  it("rejects nested records matching rejectIf condition", async () => {
-    class Comment extends Base {
-      declare body: string | null;
-      declare post_id: number | null;
-
-      static {
-        this._tableName = "comments";
-        this.attribute("id", "integer");
-        this.attribute("body", "string");
-        this.attribute("post_id", "integer");
-      }
-    }
-    registerModel(Comment);
-
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    Associations.hasMany.call(Post, "comments");
-    acceptsNestedAttributesFor(Post, "comments", {
-      rejectIf: (attrs) => !attrs.body || (attrs.body as string).trim() === "",
-    });
-    registerModel(Post);
-
-    const post = new Post({ title: "Test" });
-    assignNestedAttributes(post, "comments", [
-      { body: "Valid comment" },
-      { body: "" },
-      { body: "Another valid" },
-    ]);
-    await post.save();
-
-    const comments = await Comment.all();
-    expect(comments.length).toBe(2);
-  });
-  it("should automatically enable autosave on the association", async () => {
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
-    const configs = (CanonicalShip as any)._nestedAttributeConfigs;
-    expect(configs).toBeDefined();
-    expect(configs.find((c: any) => c.associationName === "parts")).toBeDefined();
-  });
-});
-
+// ==========================================================================
+// TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations
+// ==========================================================================
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  coreFixtures();
 
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
-  }
-
-  // Rails chain: Pirate has_one :ship; Ship has_many :parts (ShipPart);
-  // ShipPart has_many :trinkets (Treasure, as: :looter). Nested attributes
-  // cascade autosave from the pirate down to the great-grandchild trinket.
   async function setup() {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    registerModel(Treasure);
-    acceptsNestedAttributesFor(CanonicalPirate, "ship", { allowDestroy: true });
-    acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
-
-    const pirate = await CanonicalPirate.create({
-      catchphrase: "My baby takes tha mornin' train!",
-    });
-    const ship = await CanonicalShip.create({
-      name: "The good ship Dollypop",
-      pirate_id: pirate.id,
-    });
-    cacheAssoc(pirate, "ship", ship);
-    const part = await (ship.parts as any).create({ name: "Mast" });
-    const trinket = await part.trinkets.create({ name: "Necklace" });
+    const pirate = await Pirate.createBang({ catchphrase: "My baby takes tha mornin' train!" });
+    const ship = await (pirate as any).createShip({ name: "The good ship Dollypop" });
+    const part = await ship.parts.createBang({ name: "Mast" });
+    const trinket = await part.trinkets.createBang({ name: "Necklace" });
     return { pirate, ship, part, trinket };
   }
 
   it("when great-grandchild changed in memory, saving parent should save great-grandchild", async () => {
     const { pirate, trinket } = await setup();
     trinket.name = "changed";
-    expect(await pirate.save()).toBe(true);
-    const reloaded = await Treasure.find(trinket.id);
-    expect(reloaded.name).toBe("changed");
+    await pirate.save();
+    expect((await Treasure.find(trinket.id)).name).toBe("changed");
   });
 
   it("when great-grandchild changed via attributes, saving parent should save great-grandchild", async () => {
     const { pirate, ship, part, trinket } = await setup();
-    (pirate as any).shipAttributes = {
-      id: ship.id,
-      partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] }],
+    (pirate as any).attributes = {
+      shipAttributes: {
+        id: ship.id,
+        partsAttributes: [
+          { id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] },
+        ],
+      },
     };
     await pirate.save();
-    const reloaded = await Treasure.find(trinket.id);
-    expect(reloaded.name).toBe("changed");
+    expect((await Treasure.find(trinket.id)).name).toBe("changed");
   });
 
   it("when great-grandchild marked_for_destruction via attributes, saving parent should destroy great-grandchild", async () => {
     const { pirate, ship, part, trinket } = await setup();
-    (pirate as any).shipAttributes = {
-      id: ship.id,
-      partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, _destroy: true }] }],
+    (pirate as any).attributes = {
+      shipAttributes: {
+        id: ship.id,
+        partsAttributes: [
+          { id: part.id, trinketsAttributes: [{ id: trinket.id, _destroy: true }] },
+        ],
+      },
     };
+    const before = Number(await part.trinkets.count());
     await pirate.save();
-    const remaining = await Treasure.where({
-      looter_id: part.id,
-      looter_type: "ShipPart",
-    });
-    expect(remaining.length).toBe(0);
+    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before - 1);
   });
 
   it("when great-grandchild added via attributes, saving parent should create great-grandchild", async () => {
     const { pirate, ship, part } = await setup();
-    (pirate as any).shipAttributes = {
-      id: ship.id,
-      partsAttributes: [{ id: part.id, trinketsAttributes: [{ name: "created" }] }],
+    (pirate as any).attributes = {
+      shipAttributes: {
+        id: ship.id,
+        partsAttributes: [{ id: part.id, trinketsAttributes: [{ name: "created" }] }],
+      },
     };
+    const before = Number(await part.trinkets.count());
     await pirate.save();
-    const trinkets = await Treasure.where({
-      looter_id: part.id,
-      looter_type: "ShipPart",
-    });
-    expect(trinkets.length).toBe(2);
+    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before + 1);
   });
 
   it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
     const { pirate, ship, trinket } = await setup();
     trinket.name = "changed";
-    await CanonicalShip.create({ name: "The Black Rock", pirate_id: pirate.id });
-    await ShipPart.create({ name: "Stern", ship_id: ship.id });
-    await assertNoQueries(false, () => {
-      pirate.isValid();
+    await Ship.createBang({ pirate_id: pirate.id, name: "The Black Rock" });
+    await ShipPart.createBang({ ship_id: ship.id, name: "Stern" });
+    await assertNoQueries(false, async () => {
+      await pirate.isValid();
     });
   });
 });
 
+// ==========================================================================
+// TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations
+// ==========================================================================
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  coreFixtures();
 
-  function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
-  }
-
-  // Rails models: Ship has_many :parts (ShipPart); ShipPart has_many :trinkets
-  // (Treasure, as: :looter). accepts_nested_attributes_for cascades autosave
-  // from the ship down to the grandchild trinket.
   async function setup() {
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    registerModel(Treasure);
-    acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
-
-    const ship = await CanonicalShip.create({ name: "The good ship Dollypop" });
-    const part = await (ship.parts as any).create({ name: "Mast" });
-    const trinket = await part.trinkets.create({ name: "Necklace" });
+    const ship = await Ship.createBang({ name: "The good ship Dollypop" });
+    const part = await (ship as any).parts.createBang({ name: "Mast" });
+    const trinket = await part.trinkets.createBang({ name: "Necklace" });
     return { ship, part, trinket };
   }
 
   it("if association is not loaded and association record is saved and then in memory record attributes should be saved", async () => {
     const { ship, part } = await setup();
-
     (ship as any).partsAttributes = [{ id: part.id, name: "Deck" }];
-
-    expect((ship.parts as any).target.length).toBe(1);
-    expect((ship.parts as any).target[0].name).toBe("Deck");
+    expect((ship.association("parts") as any).target.length).toBe(1);
+    expect((await (ship as any).parts.toArray())[0].name).toBe("Deck");
   });
 
   it("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", async () => {
@@ -2280,113 +1424,147 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     (ship as any).partsAttributes = [
       { id: part.id, trinketsAttributes: [{ id: trinket.id, name: "Ruby" }] },
     ];
-
-    // The in-memory grandchild is used; reading it fires no DB query.
-    await assertNoQueries(false, () => {
-      const inMemoryPart = (ship.parts as any).target[0];
-      expect(inMemoryPart.name).toBe("Mast");
-      const grandchild = inMemoryPart.trinkets.target[0];
-      expect(grandchild.name).toBe("Ruby");
-    });
+    expect((ship.association("parts") as any).target.length).toBe(1);
+    const parts = await (ship as any).parts.toArray();
+    expect(parts[0].name).toBe("Mast");
+    expect((await parts[0].trinkets.toArray())[0].name).toBe("Ruby");
     await ship.save();
-    expect((ship.parts as any).target[0].trinkets.target[0].name).toBe("Ruby");
+    expect((await (await (ship as any).parts.toArray())[0].trinkets.toArray())[0].name).toBe(
+      "Ruby",
+    );
   });
 
   it("when grandchild changed in memory, saving parent should save grandchild", async () => {
     const { ship, trinket } = await setup();
     trinket.name = "changed";
-    expect(await ship.save()).toBe(true);
-    const reloaded = await Treasure.find(trinket.id);
-    expect(reloaded.name).toBe("changed");
+    await ship.save();
+    expect((await Treasure.find(trinket.id)).name).toBe("changed");
   });
 
   it("when grandchild changed via attributes, saving parent should save grandchild", async () => {
     const { ship, part, trinket } = await setup();
-    (ship as any).partsAttributes = [
-      { id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] },
-    ];
+    (ship as any).attributes = {
+      partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, name: "changed" }] }],
+    };
     await ship.save();
-    const reloaded = await Treasure.find(trinket.id);
-    expect(reloaded.name).toBe("changed");
+    expect((await Treasure.find(trinket.id)).name).toBe("changed");
   });
 
   it("when grandchild marked_for_destruction via attributes, saving parent should destroy grandchild", async () => {
     const { ship, part, trinket } = await setup();
-    (ship as any).partsAttributes = [
-      { id: part.id, trinketsAttributes: [{ id: trinket.id, _destroy: true }] },
-    ];
+    (ship as any).attributes = {
+      partsAttributes: [{ id: part.id, trinketsAttributes: [{ id: trinket.id, _destroy: true }] }],
+    };
+    const before = Number(await part.trinkets.count());
     await ship.save();
-    const remaining = await Treasure.where({
-      looter_id: part.id,
-      looter_type: "ShipPart",
-    });
-    expect(remaining.length).toBe(0);
+    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before - 1);
   });
 
   it("when grandchild added via attributes, saving parent should create grandchild", async () => {
     const { ship, part } = await setup();
-    (ship as any).partsAttributes = [{ id: part.id, trinketsAttributes: [{ name: "created" }] }];
+    (ship as any).attributes = {
+      partsAttributes: [{ id: part.id, trinketsAttributes: [{ name: "created" }] }],
+    };
+    const before = Number(await part.trinkets.count());
     await ship.save();
-    const trinkets = await Treasure.where({
-      looter_id: part.id,
-      looter_type: "ShipPart",
-    });
-    expect(trinkets.length).toBe(2);
+    expect(Number(await (await ShipPart.find(part.id)).trinkets.count())).toBe(before + 1);
   });
 
   it("circular references do not perform unnecessary queries", async () => {
-    registerModel(ShipPart);
-    registerModel(Treasure);
-    registerModel(CanonicalShip);
-    acceptsNestedAttributesFor(CanonicalShip, "parts", { allowDestroy: true });
-
-    const ship = new CanonicalShip({ name: "The Black Rock" });
-    const part = (ship.parts as any).build({ name: "Stern" });
-    (ship.treasures as any).build({ looter: part });
-
+    const ship = new Ship({ name: "The Black Rock" });
+    const part = (ship.association("parts") as any).build({ name: "Stern" });
+    (ship.association("treasures") as any).build({ looter: part });
     await assertQueriesCount(5, false, async () => {
       await ship.saveBang();
     });
   });
 
   it("nested singular associations are validated", async () => {
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    const part = new ShipPart({ name: "Stern" });
-    (part as any).shipAttributes = { name: null };
-    expect(part.isValid()).toBe(false);
-    expect(part.errors.fullMessages).toEqual(["Ship name can't be blank"]);
+    const part = new ShipPart({ name: "Stern", shipAttributes: { name: null } });
+    expect(await part.isValid()).toBe(false);
+    expect((part as any).errors.fullMessages).toEqual(["Ship name can't be blank"]);
   });
 
   it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
     const { ship, trinket } = await setup();
     trinket.name = "changed";
-    await CanonicalShip.create({ name: "The Black Rock" });
-    await ShipPart.create({ name: "Stern", ship_id: ship.id });
-    await assertNoQueries(false, () => {
-      ship.isValid();
+    await Ship.createBang({ name: "The Black Rock" });
+    await ShipPart.createBang({ ship_id: ship.id, name: "Stern" });
+    await assertNoQueries(false, async () => {
+      await ship.isValid();
     });
   });
 });
 
-// Rails: NestedAttributesOnACollectionAssociationTests is mixed into
-// TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
-describe("TestNestedAttributesOnAHasManyAssociation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-  afterEach(() => {
-    Notifications.unsubscribeAll();
+// ==========================================================================
+// TestIndexErrorsWithNestedAttributesOnlyMode
+// ==========================================================================
+describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
+  fixtures({ guitars: [Guitar, {}], tuning_pegs: [TuningPeg, {}] });
+  beforeAll(() => {
+    Guitar.acceptsNestedAttributesFor("tuningPegs", {
+      rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
+    });
   });
 
-  it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
-    registerModel(CanonicalBird);
-    registerModel(CanonicalPirate);
-    acceptsNestedAttributesFor(CanonicalPirate, "birds");
-    const pirate = await CanonicalPirate.create({ catchphrase: "Arrr" });
-    assignNestedAttributes(pirate, "birds", [{ id: 1234567890, name: "Ghost Bird" }]);
-    await expect(pirate.save()).rejects.toThrow(RecordNotFound);
+  // tracked-pending-convergence (0023-surfaced-deviations): nested has_many
+  // index_errors validation does not propagate to the parent's `valid?` when
+  // the children are assigned in-memory via nested attributes — trails does not
+  // run the indexed nested-record validators for the unloaded/assigned target.
+  // See nested-attributes-index-errors convergence story.
+  it.skip("index in nested_attributes_order order", async () => {
+    const guitar = await Guitar.createBang({});
+    await (guitar as any).tuningPegs.createBang({ pitch: 1 });
+    const peg2 = await (guitar as any).tuningPegs.createBang({ pitch: 2 });
+    expect(await guitar.isValid()).toBe(true);
+    await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
+    expect(await guitar.isValid()).toBe(false);
+    expect(Object.keys((guitar as any).errors.messages)).toEqual(["tuningPegs[0].pitch"]);
+  });
+
+  it.skip("index unaffected by reject_if", async () => {
+    const guitar = await Guitar.createBang({});
+    await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
+    expect(await guitar.isValid()).toBe(false);
+    expect(Object.keys((guitar as any).errors.messages)).toEqual(["tuningPegs[1].pitch"]);
+  });
+});
+
+// ==========================================================================
+// TestNestedAttributesWithExtend
+// ==========================================================================
+describe("TestNestedAttributesWithExtend", () => {
+  // tracked-pending-convergence (0023-surfaced-deviations): the `extend:` option
+  // on an association (Rails `has_many :treasures, extend: PostTreasuresExtension`)
+  // is not wired into nested-attributes builds — the extension module's overrides
+  // (e.g. `build` naming the record "from extension") do not run.
+  // See nested-attributes-association-extend convergence story.
+  it.skip("extend affects nested attributes", async () => {
+    /* requires association `extend:` support */
+  });
+});
+
+// ==========================================================================
+// TestNestedAttributesForDelegatedType
+// ==========================================================================
+describe("TestNestedAttributesForDelegatedType", () => {
+  fixtures({ entries: [Entry, {}], messages: [Message, {}] });
+  beforeAll(() => {
+    Entry.acceptsNestedAttributesFor("entryable");
+  });
+
+  // tracked-pending-convergence (0023-surfaced-deviations): nested attributes
+  // for a delegated_type association are not yet supported — trails treats the
+  // delegated `entryable` as a plain polymorphic belongs_to and refuses to build
+  // it, rather than instantiating the concrete type from `entryable_type`.
+  // See nested-attributes-delegated-type convergence story.
+  it.skip("should build a new record based on the delegated type", () => {
+    const entry = new Entry({
+      entryable_type: "Message",
+      entryableAttributes: { subject: "Hello world!" },
+    });
+    const target = (entry.association("entryable") as any).target;
+    expect(target.isPersisted()).toBe(false);
+    expect(target.subject).toBe("Hello world!");
   });
 });

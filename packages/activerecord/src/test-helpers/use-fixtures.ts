@@ -471,6 +471,16 @@ export function useFixtures(
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
     const adapter = getAdapter();
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
+      // Auto-register the (object-map) model, mirroring the by-name path's
+      // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
+      // declaring the set is the opt-in, so no test needs a manual
+      // `registerModel` call for a fixture-backed model. Idempotent. Guarded to
+      // real AR model classes (they inherit Base's static `_modelsByName`), so
+      // the lightweight `{ tableName, ... }` stubs some infra tests pass through
+      // the object-map form are left untouched.
+      if (model !== null && "_modelsByName" in model) {
+        registerModel(model);
+      }
       const result =
         model === null
           ? await defineJoinTableFixtures(adapter, table, data)

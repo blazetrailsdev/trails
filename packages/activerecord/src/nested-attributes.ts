@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import type { CollectionAssociation } from "./associations/collection-association.js";
 import {
   modelRegistry,
   _cacheSingularTarget,
@@ -40,8 +41,11 @@ export function _destroy(this: Base): boolean {
 
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  rejectIf?: (attrs: Record<string, unknown>) => boolean;
-  limit?: number | ((...args: unknown[]) => number);
+  // The owner record is passed as a second argument so method-style predicates
+  // (Rails `reject_if: :some_method`) can consult the owner (e.g. `persisted?`).
+  rejectIf?: (attrs: Record<string, unknown>, record: Base) => boolean;
+  // A string limit names a method/attribute on the owner (Rails `limit: :symbol`).
+  limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
 
@@ -192,8 +196,7 @@ export function assignNestedAttributes(
   const ctor = record.constructor as typeof Base;
   const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
   const config = configs.find((c) => c.associationName === associationName);
-  const rawLimit = config?.options.limit;
-  const resolvedLimit = typeof rawLimit === "function" ? rawLimit() : rawLimit;
+  const resolvedLimit = resolveNestedLimit(config?.options.limit, record);
   if (resolvedLimit !== undefined && attrs.length > resolvedLimit) {
     throw new TooManyRecords(
       `Maximum ${resolvedLimit} records are allowed. ` + `Got ${attrs.length} records instead.`,
@@ -334,7 +337,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       }
 
       // Check rejectIf only for create/update, not destroy
-      if (config.options.rejectIf && config.options.rejectIf(attrs)) {
+      if (config.options.rejectIf && config.options.rejectIf(attrs, record)) {
         continue;
       }
 
@@ -447,7 +450,7 @@ export function callRejectIf(
   const configs: NestedAttributeConfig[] =
     (record.constructor as any)._nestedAttributeConfigs ?? [];
   const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
-  return rejectIf ? rejectIf(attributes) : false;
+  return rejectIf ? rejectIf(attributes, record) : false;
 }
 
 /** @internal */
@@ -506,6 +509,22 @@ export function raiseNestedAttributesRecordNotFoundBang(
     "id",
     recordId,
   );
+}
+
+/** @internal */
+// Resolve a `limit:` option to a number. A string names a method/attribute on
+// the owner (Rails `limit: :parrots_limit`); a function is invoked.
+function resolveNestedLimit(
+  limit: number | string | ((...args: unknown[]) => number) | undefined,
+  record: Base,
+): number | undefined {
+  if (limit === undefined) return undefined;
+  if (typeof limit === "function") return limit();
+  if (typeof limit === "string") {
+    const value = (record as unknown as Record<string, unknown>)[limit];
+    return typeof value === "function" ? (value as () => number).call(record) : Number(value);
+  }
+  return limit;
 }
 
 /** @internal */
@@ -605,6 +624,27 @@ function storePendingNestedAttributes(
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
 
+// Rails reports the offending value's class name (e.g. `got String`); mirror
+// that with the JS constructor name rather than the lowercase `typeof`.
+function nestedTypeName(value: unknown): string {
+  if (value === null) return "NilClass";
+  if (value === undefined) return "undefined";
+  switch (typeof value) {
+    case "boolean":
+      return value ? "TrueClass" : "FalseClass";
+    case "number":
+      return Number.isInteger(value) ? "Integer" : "Float";
+    case "bigint":
+      return "Integer";
+    case "string":
+      return "String";
+    case "symbol":
+      return "Symbol";
+  }
+  // Objects/arrays: JS constructor name aligns with Ruby's (Array, Hash-likes, …).
+  return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
+}
+
 /** @internal */
 export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
@@ -613,7 +653,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 ): void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
     throw new Error(
-      `Hash expected for \`${associationName}\` attributes, got ${typeof attributes}`,
+      `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
     );
   }
 
@@ -685,7 +725,7 @@ export function assignNestedAttributesForCollectionAssociation(
 ): void {
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
     throw new Error(
-      `Hash or Array expected for \`${associationName}\` attributes, got ${typeof attributesCollection}`,
+      `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
     );
   }
   const ctor = record.constructor as typeof Base;
@@ -707,7 +747,7 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  checkRecordLimitBang(config?.options.limit, attrs);
+  checkRecordLimitBang(resolveNestedLimit(config?.options.limit, record), attrs);
 
   // Rails `assign_nested_attributes_for_collection_association` marks matching
   // records for destruction *in memory* at assign time, so validations run
@@ -763,14 +803,31 @@ export function assignNestedAttributesForCollectionAssociation(
   const assocDef = associations.find((a: any) => a.name === associationName);
   const isAutosave = assocDef?.options?.autosave === true;
 
+  // Rails collects the assignment's result records into `nested_attributes_target`
+  // (association's accessor), preserving order and inserting a `nil` placeholder
+  // for a rejected new record (nested_attributes.rb:520-544).
+  //
+  // The `else` (non-autosave existing-record) branch does NOT append to
+  // `nestedTarget`, which would break that 1:1 ordering — but it is unreachable
+  // for any `accepts_nested_attributes_for` collection: `acceptsNestedAttributesFor`
+  // unconditionally sets `assocExists.options.autosave = true` (above), and
+  // `assocDef` is re-read from the live `_associations` array on every call, so
+  // `isAutosave` is always true here. The branch remains only as a guard for a
+  // hypothetical direct caller on a non-autosave collection (which never sets a
+  // nestedAttributesTarget and defers everything to the post-save flush).
+  const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
     if (!hasNestedId(a)) {
       if (!isRejectNewRecord(record, associationName, a)) {
-        collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+        nestedTarget.push(
+          collectionProxyFor(record, associationName).build(assignableNestedAttributes(a)),
+        );
+      } else {
+        nestedTarget.push(null);
       }
     } else if (isAutosave) {
-      populateInMemoryExistingRecord(record, associationName, a);
+      nestedTarget.push(populateInMemoryExistingRecord(record, associationName, a));
     } else {
       deferred.push(a);
     }
@@ -778,6 +835,8 @@ export function assignNestedAttributesForCollectionAssociation(
   if (deferred.length > 0) {
     storePendingNestedAttributes(record, associationName, deferred);
   }
+  (record.association(associationName) as CollectionAssociation).nestedAttributesTarget =
+    nestedTarget;
 }
 
 /**
@@ -812,12 +871,12 @@ function populateInMemoryExistingRecord(
   record: Base,
   associationName: string,
   attrs: Record<string, unknown>,
-): void {
+): Base | null {
   const ctor = record.constructor as typeof Base;
   const associations: any[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === associationName);
   const targetModel = resolveCollectionTargetModel(record, associationName);
-  if (!targetModel || !assocDef) return;
+  if (!targetModel || !assocDef) return null;
 
   // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
   // `existing_records` first — raise RecordNotFound if absent — and only then
@@ -850,9 +909,10 @@ function populateInMemoryExistingRecord(
   // rejected existing record never enters `@target`. Defer the stub's
   // `add_to_target` until after the reject check to avoid leaving a partial
   // (PK-only) stub in the in-memory collection.
-  if (callRejectIf(record, associationName, attrs)) return;
+  if (callRejectIf(record, associationName, attrs)) return null;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
   assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
+  return existing ?? null;
 }
 
 /**

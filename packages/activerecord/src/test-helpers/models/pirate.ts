@@ -52,6 +52,9 @@ export class Pirate extends Base {
   declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
+    // Rails: `attr_accessor :cancel_save_from_callback, :parrots_limit`
+    this.attribute("parrotsLimit", "integer", { virtual: true });
+
     this.belongsTo("parrot", { validate: true });
     this.belongsTo("nonValidatedParrot", { className: "Parrot" });
     this.hasAndBelongsToMany("parrots", {
