@@ -746,6 +746,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     }
   }
 
+  // Live table columns, inspected once and reused below for three purposes: the
+  // composite-PK generation guard (Rails' `has_column?`), virtual-column filtering,
+  // and timestamp auto-stamping. Avoid supportsVirtualColumns() — it requires
+  // databaseVersion to be pre-initialized; isVirtual() returns false for non-virtual
+  // adapters, so calling columns() is always safe.
+  const tableColumns: { name: string; isVirtual(): boolean }[] | null =
+    typeof (adapter as any).columns === "function"
+      ? await (adapter as any).columns(tableName)
+      : null;
+  const tableColumnNames = tableColumns ? new Set(tableColumns.map((c) => c.name)) : null;
+
   // Build rows with resolved IDs and references. Rows that declare `id: N` use it
   // verbatim (Rails parity); rows without one fall back to fixtureId(label).
   // Inheritance column (mirrors Rails' model_metadata.inheritance_column_name):
@@ -932,12 +943,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 
     // Auto-generate any composite primary-key column the row doesn't already
     // supply, mirroring Rails' FixtureSet::TableRow#generate_composite_primary_key:
-    // columns already present (e.g. from a ref()) are kept; the rest come from
-    // composite_identify.
+    // for each key column, `next if column_defined?(column)` where `column_defined?`
+    // is `!has_column?(col) || row.include?(col)`. So a component is generated only
+    // when it is an actual table column AND the row doesn't already carry it —
+    // columns already present (e.g. from a ref()) are kept, and a model-level PK
+    // component with no backing column is skipped rather than inserted.
     if (Array.isArray(pkCol)) {
       const generated = compositeIdentify(label, pkCol);
       for (const keyCol of pkCol) {
-        if (!(keyCol in row)) row[keyCol] = generated[keyCol]!;
+        if (keyCol in row) continue;
+        if (tableColumnNames !== null && !tableColumnNames.has(keyCol)) continue;
+        row[keyCol] = generated[keyCol]!;
       }
     }
 
@@ -949,13 +965,9 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     rows.push(row);
   }
 
-  // Inspect the live table columns once for two adjustments below.
-  // Avoid supportsVirtualColumns() — it requires databaseVersion to be pre-initialized.
-  // isVirtual() returns false for non-virtual adapters, so calling columns() is always safe.
-  if (typeof (adapter as any).columns === "function") {
-    const cols: { name: string; isVirtual(): boolean }[] = await (adapter as any).columns(
-      tableName,
-    );
+  // Two adjustments using the live table columns inspected above.
+  if (tableColumns !== null) {
+    const cols = tableColumns;
 
     // Filter generated (virtual) columns — PG rejects INSERT on those columns.
     // Mirrors Rails: build_fixture_sql rejects schema_cache.columns_hash entries where column.virtual?
@@ -973,7 +985,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     // toys, …) can't seed without this. A Temporal.Instant is used so the adapter's
     // quoting renders an engine-safe datetime literal (no tz offset on MySQL).
     if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
-      const colNames = new Set(cols.map((c) => c.name));
+      const colNames = tableColumnNames!;
       // Mirrors Rails FixtureSet::TableRow#fill_timestamps → model_metadata
       // #timestamp_column_names == all_timestamp_attributes_in_model: the model's
       // *alias-resolved* timestamp columns (e.g. Developer → legacy_updated_at),
