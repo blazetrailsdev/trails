@@ -44,6 +44,18 @@
  * file gated by lint-call-mismatches-wide.ts against call-mismatches-wide-exclude.json,
  * so the narrow 0044 artifact and gate above are left untouched.
  *
+ * Source-hash pinning (RFC 0025): every name-matched pair's normalized Rails
+ * body digest is written to output/body-hashes.json, and the summary reports
+ * pinned/unpinned counts per package (advisory; parity % unchanged). The pin
+ * lifecycle is: port → verify → pin → (Rails bump) → drift report → re-verify
+ * → re-pin. A committed manifest (body-pins.json) opts specific pairs in;
+ * `tsx body-pins.ts --pin <ruby-file>` (or `--pin-all` for the bulk floor)
+ * pins/re-pins them at the current digest, and lint-body-pins.ts (CI gate)
+ * fails on DRIFT (pinned digest ≠ current vendored digest — upstream Rails
+ * changed) and STALE pins (the method was removed/renamed). The digest is
+ * body-only and whitespace/comment-insensitive (extract-ruby-api.rb#body_digest),
+ * so pure formatting churn doesn't fire. See body-pins.ts for the full flow.
+ *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
  * `extend`s), recursively. This catches mixin wiring gaps where the
@@ -62,6 +74,7 @@ import {
   PACKAGE_DIR_OVERRIDES,
   PACKAGES,
   ROOT_DIR,
+  SCRIPT_DIR,
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -262,6 +275,20 @@ interface PackageResult {
   optionKeys: OptionKeyResult;
   literals: LiteralResult;
   calls: CallResult;
+  bodyHashes: BodyHashRecord[];
+}
+
+// Source-hash pinning (RFC 0025): the current normalized Ruby body digest for
+// one name-matched (Ruby, TS) pair. Keyed by (package, rubyFile, rubyName) —
+// the same identity the pin manifest (body-pins.json) uses. Written to
+// output/body-hashes.json; lint-body-pins.ts diffs the committed pins against
+// it to report upstream body drift. Advisory — never affects the parity %.
+interface BodyHashRecord {
+  rubyFile: string;
+  rubyName: string;
+  tsFile: string;
+  tsName: string;
+  digest: string;
 }
 
 interface CallResult {
@@ -1241,6 +1268,7 @@ export function main() {
     const literalMismatches: LiteralMismatch[] = [];
     let callsCompared = 0;
     const callMismatches: CallMismatch[] = [];
+    const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -1282,6 +1310,8 @@ export function main() {
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
+      // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
+      const rubyBodyDigestByName = new Map<string, string>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -1294,6 +1324,9 @@ export function main() {
           }
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
+          }
+          if (rm.bodyDigest && !rubyBodyDigestByName.has(rm.name)) {
+            rubyBodyDigestByName.set(rm.name, rm.bodyDigest);
           }
         }
       }
@@ -1366,10 +1399,21 @@ export function main() {
       // Advisory arity check for one name-matched pair: flag when the Ruby and
       // TS positional-arg ranges don't overlap (see arity.ts). Also drives the
       // option-key check, which shares the same matched (ruby, ts) pairs.
+      // Source-hash pinning (RFC 0025): record the current normalized Ruby body
+      // digest for this matched pair, keyed by (rubyFile, rubyName). The pin
+      // manifest (body-pins.json) opts specific pairs in; lint-body-pins.ts
+      // diffs the pinned digests against this artifact to flag upstream drift.
+      const checkBody = (rubyName: string, tsName: string, tsFile: string) => {
+        const digest = rubyBodyDigestByName.get(rubyName);
+        if (!digest) return;
+        bodyHashRecords.push({ rubyFile, rubyName, tsFile, tsName, digest });
+      };
+
       const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         checkCalls(rubyName, tsName, tsFile);
+        checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
         // match already confirms it exists and arity isn't meaningful here.
@@ -1727,6 +1771,7 @@ export function main() {
         mismatched: callMismatches.length,
         mismatches: callMismatches,
       },
+      bodyHashes: bodyHashRecords,
     });
   }
 
@@ -1838,6 +1883,32 @@ export function main() {
     ),
   );
 
+  // Source-hash pinning artifact (RFC 0025) — the current normalized Ruby body
+  // digest for every name-matched pair, flat across packages. lint-body-pins.ts
+  // diffs the committed pins (body-pins.json) against this to report drift and
+  // stale pins. Always written; not emitted for the privates-only variant
+  // (private-method bodies carry no public-contract obligation, matching the
+  // call-set gate). Parity % is unchanged.
+  if (mode !== "private") {
+    const bodyHashesPath = path.join(OUTPUT_DIR, "body-hashes.json");
+    const bodyHashesFlat = results.flatMap((r) =>
+      r.bodyHashes.map((b) => ({ package: r.package, ...b })),
+    );
+    fs.writeFileSync(
+      bodyHashesPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          note: "Source-hash pinning (RFC 0025). Normalized Ruby body digest per name-matched pair. lint-body-pins.ts diffs body-pins.json against this to detect upstream Rails body drift.",
+          packages: [...new Set(results.map((r) => r.package))].sort(),
+          hashes: bodyHashesFlat,
+        },
+        null,
+        2,
+      ),
+    );
+  }
+
   printReport(
     results,
     showMissing,
@@ -1854,6 +1925,24 @@ export function main() {
 // ---------------------------------------------------------------------------
 // Report
 // ---------------------------------------------------------------------------
+
+// Read the committed body-pin manifest (RFC 0025) and return the set of pinned
+// (package, rubyFile, rubyName) keys. Missing/malformed manifest → empty set
+// (pinning is opt-in; a run without a manifest simply reports every pair as
+// unpinned). Sync fs matches this script's existing IO style.
+function loadPinnedKeys(): Set<string> {
+  const pinsPath = path.join(SCRIPT_DIR, "body-pins.json");
+  try {
+    const pins = JSON.parse(fs.readFileSync(pinsPath, "utf-8")) as Array<{
+      package: string;
+      rubyFile: string;
+      rubyName: string;
+    }>;
+    return new Set(pins.map((p) => `${p.package} ${p.rubyFile} ${p.rubyName}`));
+  } catch {
+    return new Set();
+  }
+}
 
 function printReport(
   results: PackageResult[],
@@ -1890,6 +1979,11 @@ function printReport(
   let grandCallsCompared = 0;
   let grandCallsMismatched = 0;
 
+  // Source-hash pinning (RFC 0025): the set of pinned (package, rubyFile,
+  // rubyName) keys, read from the committed manifest so the summary can report
+  // pinned/unpinned counts per package. Advisory — parity % is unchanged.
+  const pinnedKeys = loadPinnedKeys();
+
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
     grandMatched += pkg.matched;
@@ -1919,8 +2013,16 @@ function printReport(
     const arOk = ar.compared - ar.mismatched;
     const arPct = ar.compared > 0 ? Math.round((arOk / ar.compared) * 1000) / 10 : 0;
     const arityNote = ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%)` : "";
+    const bodyTotal = pkg.bodyHashes.length;
+    const bodyPinned = pkg.bodyHashes.filter((b) =>
+      pinnedKeys.has(`${pkg.package} ${b.rubyFile} ${b.rubyName}`),
+    ).length;
+    const pinsNote =
+      bodyTotal > 0
+        ? `  |  pins: ${bodyPinned}/${bodyTotal} (${bodyTotal - bodyPinned} unpinned)`
+        : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${excludedNote}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${pinsNote}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
 
