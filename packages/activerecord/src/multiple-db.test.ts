@@ -32,16 +32,12 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // (Rails), and `schema: undefined` because the tables are created by
   // `setupSecondPool` (colleges/courses in arunit2, entrants in primary), not
   // sliced from the canonical `TEST_SCHEMA` default.
+  const seedOpts = { useTransactionalTests: false, schema: undefined } as const;
   const { colleges } = fixtures(["colleges"], {
     connection: () => College.connection,
-    useTransactionalTests: false,
-    schema: undefined,
+    ...seedOpts,
   });
-  const { courses } = fixtures(["courses"], {
-    connection: () => Course.connection,
-    useTransactionalTests: false,
-    schema: undefined,
-  });
+  const { courses } = fixtures(["courses"], { connection: () => Course.connection, ...seedOpts });
   const { entrants } = fixtures(
     {
       entrants: [
@@ -53,11 +49,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
         },
       ],
     },
-    {
-      connection: () => Entrant.connection,
-      useTransactionalTests: false,
-      schema: undefined,
-    },
+    { connection: () => Entrant.connection, ...seedOpts },
   );
 
   it("connected", () => {
