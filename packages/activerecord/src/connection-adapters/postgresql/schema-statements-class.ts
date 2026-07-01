@@ -167,7 +167,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       const whereStr = defMatch?.[4];
 
       const include = includeStr
-        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
+        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'))
         : undefined;
       const where = whereStr?.trim();
       const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
@@ -1881,6 +1881,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // else: UUID pk with no column default — seq stays null
     }
 
+    // Mirrors Rails pk_and_sequence_for: a primary key with no owning sequence
+    // yields nil, not `[pk, nil]` (the `if result[1]` guard has no else branch).
+    if (!seq) return null;
     return [pk, seq];
   }
 
