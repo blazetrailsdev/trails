@@ -177,6 +177,16 @@ function constructorToken(ctor: object): number {
   return token;
 }
 
+// Serialize a scalar or composite id into a stable string component. Unlike
+// `JSON.stringify`, this tolerates `bigint` values, which trails' `big_integer`
+// type preserves and which Rails hashes without issue via `id.hash`.
+function serializeIdForHash(id: unknown): string {
+  if (Array.isArray(id)) {
+    return id.map(serializeIdForHash).join(",");
+  }
+  return `${typeof id}:${String(id)}`;
+}
+
 /**
  * Return a value that dedups records the way Ruby's `hash` + `eql?` do: two
  * records of the same class with equal primary-key values share a key, while
@@ -186,7 +196,7 @@ function constructorToken(ctor: object): number {
  */
 export function hash(this: CoreRecord): unknown {
   if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
-    return `${constructorToken(this.constructor)}#${JSON.stringify(this.id)}`;
+    return `${constructorToken(this.constructor)}#${serializeIdForHash(this.id)}`;
   }
   let key = identityHashKeys.get(this);
   if (key === undefined) {
