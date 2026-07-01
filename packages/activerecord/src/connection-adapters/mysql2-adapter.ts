@@ -868,10 +868,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
+  /**
+   * Mirrors Rails' `AbstractMysqlAdapter#begin_db_transaction`:
+   * `internal_execute("BEGIN", allow_retry: true, materialize_transactions:
+   * false)`. The `allow_retry` routes BEGIN through `with_raw_connection`'s
+   * retry loop so a transaction opened on a severed connection reconnects and
+   * re-issues BEGIN (mysql2's own `internalExecute` has no retry loop, so we
+   * wrap it exactly as `beginIsolatedDbTransaction` does). Restoring the stack
+   * on reconnect is a no-op here — this frame isn't materialized until
+   * `super.materializeBang()` runs after this returns.
+   */
   async beginDbTransaction(): Promise<void> {
     await this._ensureClient();
-    await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
-    this._inTransaction = true;
+    await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
+      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+      this._inTransaction = true;
+    });
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
@@ -1304,7 +1316,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override reconnect(): void {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
-    this.disconnectBang();
+    this._activeState = false;
+    this._connectGeneration++;
+    // Mirror Rails' private `Mysql2Adapter#reconnect` (mysql2_adapter.rb:150):
+    // `@raw_connection&.close; @raw_connection = nil; connect`. Crucially it does
+    // NOT run the full `disconnect!` path, which resets the transaction manager
+    // and would discard the (restorable) transaction stack before the inherited
+    // reconnectBang's own resetTransaction({ restore: … }) can swap it back in.
+    // clearCache! / @raw_connection_dirty are reconnectBang's responsibility
+    // (abstract_adapter.rb reconnect!), so they are deliberately not repeated
+    // here — only the raw-handle teardown and _connection reset are.
+    this._connection = null;
+    this._closeRawHandle();
     this._activeState = true;
     // Kick off connection eagerly so verify/ping paths find a live connection
     // promptly. Mirrors Rails' reconnect! which calls connect (not lazy) after
@@ -1324,6 +1347,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // close() can still await the old promise for clean teardown.
     this._connectGeneration++;
     super.disconnectBang();
+    this._closeRawHandle();
+  }
+
+  /**
+   * Tear down the mysql2-specific raw-handle state (transaction flag, statement
+   * pool, driver socket) shared by `disconnectBang` and `reconnect`. Does NOT
+   * touch the transaction manager — callers that need `reset_transaction`
+   * (disconnect!) get it from the base `disconnectBang`; `reconnect` deliberately
+   * preserves the stack for restore.
+   *
+   * @internal
+   */
+  private _closeRawHandle(): void {
     this._inTransaction = false;
     this._stmtPool?.detach();
     this._stmtPool = null;

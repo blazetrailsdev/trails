@@ -1769,7 +1769,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+      await this.internalExecute("BEGIN", "TRANSACTION", {
+        materializeTransactions: false,
+        allowRetry: true,
+      });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1961,6 +1964,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     try {
       await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", {
         materializeTransactions: false,
+        allowRetry: true,
       });
       this._inTransaction = true;
     } catch (error) {
@@ -2007,7 +2011,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+    {
+      materializeTransactions = true,
+      allowRetry = false,
+    }: { materializeTransactions?: boolean; allowRetry?: boolean } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
     if (materializeTransactions) await this.materializeTransactions();
@@ -2025,7 +2032,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
       // loop's `finally dirtyCurrentTransaction()` does not fire on txn-control
       // SQL. The leaf still gains the retry/verify/reconnect loop.
-      this.withRawConnection({ materializeTransactions: false }, async (conn) => {
+      this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
         const client = conn as unknown as pg.Client;
         try {
           const result = await this._runQuery(client, sql, [], { rowMode: "array" });

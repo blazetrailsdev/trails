@@ -823,12 +823,16 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   //     postgresql-adapter.ts:4060-4072), which also makes it non-retryable; the
   //     mysql2 driver's "Can't add new command when connection is in closed
   //     state" is not translated to an ActiveRecord error at all.
-  //   - Reconnect transaction re-materialization
-  //     (RFC 0023 story adapter-reconnect-restore-transaction-rematerialization):
-  //     Rails re-issues BEGIN on the raw connection during
-  //     reconnect!(restore_transactions: true); trails defers it, so the raw
-  //     transaction isn't live post-reconnect (MySQL's savepoint probe catches
-  //     this; PG's _inTransaction proxy masks it).
+  //   - No-bind unprepared SELECT does not materialize a pending lazy
+  //     transaction on PG/MySQL (story thread-collector-preparable-for-
+  //     statement-cache; see transactions.test.ts "unprepared statement
+  //     materializes transaction"): "transaction restores after remote
+  //     disconnection" relies on `Post.count` — a no-bind unprepared read —
+  //     materializing (and thus retryably re-issuing BEGIN) to reconnect,
+  //     exactly as Rails' with_raw_connection does for every query. trails
+  //     skips materialize for such reads, so no BEGIN is issued, the read runs
+  //     on the severed connection, and it is not retried. Un-skip once that
+  //     read-materialization path converges.
   const itBlocked = it.skip;
 
   let connection: DatabaseAdapter;
@@ -874,7 +878,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await rawTransactionOpen(connection)).toBe(false);
   });
 
-  itBlocked("materialized transaction state can be restored after a reconnect", async () => {
+  it("materialized transaction state can be restored after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
     expect(connection.isTransactionOpen()).toBe(true);
     await connection.materializeTransactions();
@@ -904,7 +908,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await rawTransactionOpen(connection)).toBe(false);
   });
 
-  itBlocked("unmaterialized transaction state can be restored after a reconnect", async () => {
+  it("unmaterialized transaction state can be restored after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
     expect(connection.isTransactionOpen()).toBe(true);
     expect(await rawTransactionOpen(connection)).toBe(false);
@@ -1091,26 +1095,37 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(connection.active).toBe(true);
   });
 
-  itBlocked("active transaction is restored after remote disconnection", async () => {
-    expect((await Post.count()) as number).toBeGreaterThan(0);
-    await Post.transaction(async () => {
-      await connection.materializeTransactions();
-      await remoteDisconnect(connection);
+  // Passes on PG; skipped on MySQL/MariaDB, where two separate tracked
+  // divergences block it: (1) mysql2's `verifyBang` keys off the optimistic sync
+  // `active` getter instead of an `active?`-style ping, so it does not detect the
+  // server-side kill and never reconnects (unlike the PG `verifyBang` override);
+  // and (2) the subsequent rollback then hits the mysql2 driver's "Can't add new
+  // command when connection is in closed state", which trails does not translate
+  // to an ActiveRecord error (story adapter-connection-failure-error-
+  // classification). Un-skip on MySQL once those converge.
+  it.skipIf(adapterType !== "postgres")(
+    "active transaction is restored after remote disconnection",
+    async () => {
+      expect((await Post.count()) as number).toBeGreaterThan(0);
+      await Post.transaction(async () => {
+        await connection.materializeTransactions();
+        await remoteDisconnect(connection);
 
-      // Regular queries are not retryable, so the only abstract operation we
-      // can perform here is a direct verify.
-      await connection.verifyBang();
+        // Regular queries are not retryable, so the only abstract operation we
+        // can perform here is a direct verify.
+        await connection.verifyBang();
 
-      await Post.deleteAll();
+        await Post.deleteAll();
 
-      expect(await Post.count()).toBe(0);
-      throw new Rollback();
-    });
+        expect(await Post.count()).toBe(0);
+        throw new Rollback();
+      });
 
-    // The deletion occurred within the outer (rolled-back) transaction, not
-    // directly on the freshly-reestablished connection, so the posts remain:
-    expect((await Post.count()) as number).toBeGreaterThan(0);
-  });
+      // The deletion occurred within the outer (rolled-back) transaction, not
+      // directly on the freshly-reestablished connection, so the posts remain:
+      expect((await Post.count()) as number).toBeGreaterThan(0);
+    },
+  );
 
   itBlocked("dirty transaction cannot be restored after remote disconnection", async () => {
     let invocations = 0;
