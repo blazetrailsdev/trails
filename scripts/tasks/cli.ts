@@ -1158,35 +1158,54 @@ function block(id: string, reason: string): void {
   console.log(`blocked ${id}: ${reason}`);
 }
 
+// Pure guard for the `close` verb, unit-testable without a git repo. Closing is
+// legal from any pre-`done` state; `done` is refused (a shipped story stays
+// shipped — closing it would erase that it shipped) and an unreadable status
+// can't be transitioned. Returns null when the close is legal, else a
+// human-readable rejection. `already closed` is handled by the caller as a
+// clean no-op, not an error, so it is not caught here.
+export function closeError(from: string | null): string | null {
+  if (from === null) return `cannot read current status`;
+  if (from === "done") return `a completed story cannot be closed`;
+  return null;
+}
+
+// Frontmatter edits the `close` verb stamps: the terminal status, the required
+// reason (the way `block` stamps `blocked-by`), and a reset of the claim/
+// assignee/blocked-by a closed story has no business carrying. `pr` is left
+// intact — a closed story may legitimately point at the PR/RFC that superseded
+// it, matching how `block` leaves `pr` untouched.
+export function closeEdits(reason: string): Record<string, string> {
+  return {
+    status: "closed",
+    "closed-reason": JSON.stringify(reason),
+    "blocked-by": "null",
+    claim: "null",
+    assignee: "null",
+  };
+}
+
 // Terminally close a story that will never ship code (superseded / abandoned /
-// won't-do). Analogous to `block`, but terminal: closing REQUIRES a reason
-// (stamped as `closed-reason`, the way `block` stamps `blocked-by`) and clears
-// the claim/assignee/blocked-by a closed story has no business carrying. Any
-// non-`done` state may close directly — this is the sanctioned exit for a
-// superseded story, replacing the old `blocked → ready → done --force` dance.
-// `done` is refused: a completed story is already terminal and closing it would
-// erase that it shipped. The recheck runs inside the mutator (post-`git pull`)
-// so a concurrent flip is never clobbered.
+// won't-do). Analogous to `block`, but terminal and reason-required — the
+// sanctioned exit for a superseded story, replacing the old
+// `blocked → ready → done --force` dance. The status recheck runs inside the
+// mutator (post-`git pull`) so a story a concurrent agent just closed (or
+// completed) is never clobbered.
 function close(id: string, reason: string): void {
   flip(id, `close: ${id} — ${reason}`, RETRY_MSG(id), 4, (file) => {
     const from = statusOf(readFileSync(file, "utf8"));
-    if (from === "done") {
-      console.error(`error: ${id} is done — a completed story cannot be closed`);
-      throw new MutatorEarlyExit(2);
-    }
     if (from === "closed") {
       // A concurrent agent already closed it; the pull brought that back.
       // Re-applying would leave nothing to commit, so bail cleanly.
       console.log(`${id} already closed`);
       throw new MutatorEarlyExit(0);
     }
-    editFrontmatter(file, {
-      status: "closed",
-      "closed-reason": JSON.stringify(reason),
-      "blocked-by": "null",
-      claim: "null",
-      assignee: "null",
-    });
+    const error = closeError(from);
+    if (error !== null) {
+      console.error(`error: ${error} for ${id}`);
+      throw new MutatorEarlyExit(2);
+    }
+    editFrontmatter(file, closeEdits(reason));
   });
   console.log(`closed ${id}: ${reason}`);
 }

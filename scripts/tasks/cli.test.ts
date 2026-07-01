@@ -65,6 +65,8 @@ import {
   rfcStatusError,
   setFrontmatterList,
   resolveTasksDir,
+  closeEdits,
+  closeError,
   isDepResolved,
   statusEdits,
   statusOf,
@@ -612,6 +614,38 @@ describe("statusEdits", () => {
       assignee: "null",
       pr: "null",
     });
+  });
+});
+
+describe("closeError", () => {
+  it("allows closing from any pre-done state", () => {
+    for (const from of ["draft", "ready", "claimed", "in-progress", "blocked"]) {
+      expect(closeError(from)).toBeNull();
+    }
+  });
+
+  it("refuses to close a done story", () => {
+    expect(closeError("done")).toMatch(/completed story cannot be closed/);
+  });
+
+  it("refuses when the current status cannot be read", () => {
+    expect(closeError(null)).toMatch(/cannot read current status/);
+  });
+});
+
+describe("closeEdits", () => {
+  it("stamps the terminal status + reason and clears claim/assignee/blocked-by", () => {
+    expect(closeEdits("superseded by 0042")).toEqual({
+      status: "closed",
+      "closed-reason": '"superseded by 0042"',
+      "blocked-by": "null",
+      claim: "null",
+      assignee: "null",
+    });
+  });
+
+  it("leaves pr untouched (a closed story may cite the superseding PR)", () => {
+    expect(closeEdits("won't do")).not.toHaveProperty("pr");
   });
 });
 
