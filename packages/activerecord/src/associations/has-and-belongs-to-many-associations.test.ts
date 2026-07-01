@@ -861,6 +861,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       group.push(`developers.${c}`);
       group.push(`developers_projects_2.${c}`);
     }
+    // trails selects the HABTM join-table columns in eager loads (Rails does
+    // not), so PG's strict GROUP BY needs them grouped too. Rails' body groups
+    // only developers/developers_projects_2/projects; the extra join aliases
+    // here mirror trails' wider eager SELECT. Deviation:
+    // habtm-eager-load-selects-join-table-columns (RFC 0023).
+    for (const c of ["developer_id", "project_id", "joined_on", "access_level"]) {
+      group.push(`developers_projects.${c}`);
+      group.push(`developers_projects_projects_join.${c}`);
+    }
     for (const c of Project.columnNames()) group.push(`projects.${c}`);
 
     const records = await (Developer as any)
