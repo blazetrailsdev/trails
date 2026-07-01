@@ -215,8 +215,12 @@ describe("EagerSingularizationTest", () => {
   });
 
   it("eager no extra singularization has and belongs to many", async () => {
-    await expect(Crisis.all().includes("messes").toArray()).resolves.toBeDefined();
-    await expect(Mess.all().includes("crises").toArray()).resolves.toBeDefined();
+    await expect(
+      (async () => {
+        await Crisis.all().includes("messes");
+        return Mess.all().includes("crises").toArray();
+      })(),
+    ).resolves.toBeDefined();
   });
 
   it("eager no extra singularization has many through belongs to", async () => {
