@@ -1372,6 +1372,10 @@ export const TEST_SCHEMA: Schema = {
       lock_version: { type: "integer", null: false, default: 0 },
     },
     primaryKey: false,
+    // Rails schema.rb: `t.index :id, unique: true` (schema.rb:1162-1166). On
+    // MySQL/MariaDB this stays a plain unique key (no PK promotion), so the
+    // dumper emits `id: false` — see mysql columns() primary-key reflection.
+    indexes: [{ columns: "id", unique: true }],
   },
 
   // Rails declares `id: false` with `nick` (promoted to PK at the AR layer)

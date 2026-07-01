@@ -478,7 +478,6 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
             character_maximum_length AS char_len,
             numeric_precision AS num_precision,
             numeric_scale AS num_scale,
-            column_key AS col_key,
             collation_name AS collation,
             column_comment AS comment,
             extra AS extra
@@ -497,6 +496,27 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
   // `'Smith'`. Warm it once up front — `getFullVersion()` memoizes the version
   // string, so this is a no-op after the first call.
   await this.getFullVersion();
+
+  // MySQL/MariaDB reports `column_key = 'PRI'` not only for genuine PRIMARY KEY
+  // columns but also for the columns of a UNIQUE index over NOT NULL columns
+  // when the table has no PRIMARY KEY (the "promoted unique" case, e.g.
+  // string_key_objects' `t.index :id, unique: true`). Rails never derives a
+  // per-column primary flag from `column_key`; it resolves the primary key
+  // separately via information_schema (constraint_name/index_name = 'PRIMARY').
+  // Mirror that: only columns belonging to the real PRIMARY index are the
+  // primary key, so a promoted unique index stays a plain unique key and the
+  // dumper emits `id: false` (matching Rails/MySQL).
+  const pkRows = await this.schemaQuery(
+    `SELECT column_name AS name
+       FROM information_schema.statistics
+       WHERE table_schema = COALESCE(?, database())
+       AND table_name = ?
+       AND index_name = 'PRIMARY'`,
+    [schema ?? null, table],
+  );
+  const primaryKeyColumns = new Set(
+    pkRows.map((r) => String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string)),
+  );
 
   return rows.map((r) => {
     const name = String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
@@ -544,7 +564,6 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     });
     const nullable =
       String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !== "NO";
-    const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
     const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
     const extra = extraRaw.toLowerCase();
     // Mirror newColumnFromField's function-default detection (mysql/schema-statements.ts):
@@ -630,7 +649,7 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
         collation: (r.collation ?? r.COLLATION ?? null) as string | null,
         comment: presence((r.comment ?? r.COMMENT) as string | null | undefined) ?? null,
         defaultFunction: defFn,
-        primaryKey: colKey === "PRI",
+        primaryKey: primaryKeyColumns.has(name),
         autoIncrement: extra === "auto_increment",
         // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`).
         // End-anchored (JS `$` without /m ≡ Ruby `\z`): the modifier only ever trails the
