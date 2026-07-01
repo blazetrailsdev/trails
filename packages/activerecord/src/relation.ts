@@ -3819,6 +3819,13 @@ export class Relation<T extends Base> {
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
       if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(joinableSpecs)) {
+        // A composite base PK can't be materialized here — `_materializeLimitedIds`
+        // (Rails' zip/transpose over `Array(primary_key)`) has no composite
+        // support, so it would emit a wrong single-column `"col1,col2"` predicate.
+        // Surface the same explicit NotImplementedError the cache_version path
+        // raises for this shape (tracked by
+        // 0023-surfaced-deviations/composite-pk-distinct-relation-materialization).
+        if (Array.isArray(basePk)) this.applyJoinDependencyForArel();
         // Rails apply_join_dependency, for a limit/offset over a collection
         // reflection, replaces the relation via distinct_relation_for_primary_key
         // (finder_methods.rb:463): execute a query to materialize the limited
