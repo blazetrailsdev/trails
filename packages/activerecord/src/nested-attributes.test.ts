@@ -167,15 +167,71 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method without arguments", async () => {
-    // Rails `reject_if: :new_record?` — the built ship is always a new record,
-    // so the trails-equivalent reject (no record arg available) is "no id given".
-    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: (a) => a["id"] == null });
+    // Rails `reject_if: :new_record?` — the method runs on the owner; a new
+    // (unsaved) pirate rejects the nested ship.
+    acceptsNestedAttributesFor(Pirate, "ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     (pirate as any).shipAttributes = { name: "Black Pearl" };
     const before = Number(await Ship.count());
     await pirate.saveBang();
     expect(Number(await Ship.count())).toBe(before);
     resetShipConfig();
+  });
+
+  it("reject if method with arguments", async () => {
+    // Rails `reject_if: :reject_empty_ships_on_create` —
+    // `attributes.delete("_reject_me_if_new").present? && !persisted?`
+    acceptsNestedAttributesFor(Pirate, "ship", {
+      rejectIf: (attrs, rec) => {
+        const v = attrs["_reject_me_if_new"];
+        return v != null && v !== "" && v !== false && !rec.isPersisted();
+      },
+    });
+
+    const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
+    (pirate as any).shipAttributes = { name: "Red Pearl", _reject_me_if_new: true };
+    let before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before); // not persisted → rejected
+
+    // pirate is now persisted, so reject_empty_ships_on_create returns false
+    (pirate as any).shipAttributes = { name: "Red Pearl", _reject_me_if_new: true };
+    before = Number(await Ship.count());
+    await pirate.saveBang();
+    expect(Number(await Ship.count())).toBe(before + 1);
+    resetShipConfig();
+  });
+
+  it("allows class to override setter and call super", () => {
+    class MeanPirate extends Pirate {}
+    registerModel("MeanPirate", MeanPirate);
+    acceptsNestedAttributesFor(MeanPirate, "parrot");
+    const proto = MeanPirate.prototype as unknown as Record<string, unknown>;
+    const original = Object.getOwnPropertyDescriptor(proto, "parrotAttributes")!.set!;
+    Object.defineProperty(proto, "parrotAttributes", {
+      set(this: unknown, attrs: Record<string, unknown>) {
+        original.call(this, { ...attrs, color: "blue" });
+      },
+      configurable: true,
+    });
+
+    const meanPirate = new MeanPirate();
+    (meanPirate as any).parrotAttributes = { name: "James" };
+    const target = (meanPirate.association("parrot") as any).target;
+    expect(target.readAttribute("name")).toBe("James");
+    expect(target.color).toBe("blue");
+  });
+
+  it("accepts nested attributes for can be overridden in subclasses", () => {
+    acceptsNestedAttributesFor(Pirate, "parrot");
+    class MeanPirate extends Pirate {}
+    registerModel("MeanPirate", MeanPirate);
+    acceptsNestedAttributesFor(MeanPirate, "parrot");
+
+    const meanPirate = new MeanPirate();
+    (meanPirate as any).parrotAttributes = { name: "James" };
+    const target = (meanPirate.association("parrot") as any).target;
+    expect(target.readAttribute("name")).toBe("James");
   });
 
   it("reject if with indifferent keys", async () => {
@@ -1088,6 +1144,33 @@ function collectionAssociationTests(
     };
     await expect(pirate.saveBang()).resolves.toBeTruthy();
   });
+
+  it("assigning nested attributes target", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = Object.values(await alternateParams(child1, child2));
+    (pirate as any)[setter] = params;
+    await pirate.save();
+    const nat = (
+      pirate.association(associationName) as unknown as { nestedAttributesTarget: Base[] }
+    ).nestedAttributesTarget;
+    expect(nat.map((r) => String(r.id))).toEqual([String(child1.id), String(child2.id)]);
+  });
+
+  it("assigning nested attributes target with nil placeholder for rejected item", async () => {
+    const { pirate, child1, child2 } = await buildSetup();
+    const params = Object.values(await alternateParams(child1, child2));
+    params.splice(1, 0, {});
+    (pirate as any)[setter] = params;
+    await pirate.save();
+    const nat = (
+      pirate.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
+    ).nestedAttributesTarget;
+    expect(nat.map((r) => (r ? String(r.id) : null))).toEqual([
+      String(child1.id),
+      null,
+      String(child2.id),
+    ]);
+  });
 }
 
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
@@ -1496,6 +1579,26 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
     await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
     expect(await guitar.isValid()).toBe(false);
     expect(Object.keys((guitar as any).errors.messages)).toEqual(["tuningPegs[1].pitch"]);
+  });
+});
+
+// ==========================================================================
+// TestNestedAttributesWithExtend
+// ==========================================================================
+describe("TestNestedAttributesWithExtend", () => {
+  setupFixtures();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(canonicalSchema);
+  });
+
+  // tracked-pending-convergence (0023-surfaced-deviations): the `extend:` option
+  // on an association (Rails `has_many :treasures, extend: PostTreasuresExtension`)
+  // is not wired into nested-attributes builds — the extension module's overrides
+  // (e.g. `build` naming the record "from extension") do not run.
+  // See nested-attributes-association-extend convergence story.
+  it.skip("extend affects nested attributes", async () => {
+    /* requires association `extend:` support */
   });
 });
 

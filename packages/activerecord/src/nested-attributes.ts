@@ -40,7 +40,9 @@ export function _destroy(this: Base): boolean {
 
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  rejectIf?: (attrs: Record<string, unknown>) => boolean;
+  // The owner record is passed as a second argument so method-style predicates
+  // (Rails `reject_if: :some_method`) can consult the owner (e.g. `persisted?`).
+  rejectIf?: (attrs: Record<string, unknown>, record: Base) => boolean;
   // A string limit names a method/attribute on the owner (Rails `limit: :symbol`).
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
@@ -334,7 +336,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       }
 
       // Check rejectIf only for create/update, not destroy
-      if (config.options.rejectIf && config.options.rejectIf(attrs)) {
+      if (config.options.rejectIf && config.options.rejectIf(attrs, record)) {
         continue;
       }
 
@@ -447,7 +449,7 @@ export function callRejectIf(
   const configs: NestedAttributeConfig[] =
     (record.constructor as any)._nestedAttributeConfigs ?? [];
   const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
-  return rejectIf ? rejectIf(attributes) : false;
+  return rejectIf ? rejectIf(attributes, record) : false;
 }
 
 /** @internal */
@@ -787,14 +789,22 @@ export function assignNestedAttributesForCollectionAssociation(
   const assocDef = associations.find((a: any) => a.name === associationName);
   const isAutosave = assocDef?.options?.autosave === true;
 
+  // Rails collects the assignment's result records into `nested_attributes_target`
+  // (association's accessor), preserving order and inserting a `nil` placeholder
+  // for a rejected new record (nested_attributes.rb:520-544).
+  const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
     if (!hasNestedId(a)) {
       if (!isRejectNewRecord(record, associationName, a)) {
-        collectionProxyFor(record, associationName).build(assignableNestedAttributes(a));
+        nestedTarget.push(
+          collectionProxyFor(record, associationName).build(assignableNestedAttributes(a)),
+        );
+      } else {
+        nestedTarget.push(null);
       }
     } else if (isAutosave) {
-      populateInMemoryExistingRecord(record, associationName, a);
+      nestedTarget.push(populateInMemoryExistingRecord(record, associationName, a));
     } else {
       deferred.push(a);
     }
@@ -802,6 +812,9 @@ export function assignNestedAttributesForCollectionAssociation(
   if (deferred.length > 0) {
     storePendingNestedAttributes(record, associationName, deferred);
   }
+  (
+    record.association(associationName) as unknown as { nestedAttributesTarget: (Base | null)[] }
+  ).nestedAttributesTarget = nestedTarget;
 }
 
 /**
@@ -836,12 +849,12 @@ function populateInMemoryExistingRecord(
   record: Base,
   associationName: string,
   attrs: Record<string, unknown>,
-): void {
+): Base | null {
   const ctor = record.constructor as typeof Base;
   const associations: any[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a: any) => a.name === associationName);
   const targetModel = resolveCollectionTargetModel(record, associationName);
-  if (!targetModel || !assocDef) return;
+  if (!targetModel || !assocDef) return null;
 
   // Rails' ordering (nested_attributes.rb:527→543→528): find the record in
   // `existing_records` first — raise RecordNotFound if absent — and only then
@@ -874,9 +887,10 @@ function populateInMemoryExistingRecord(
   // rejected existing record never enters `@target`. Defer the stub's
   // `add_to_target` until after the reject check to avoid leaving a partial
   // (PK-only) stub in the in-memory collection.
-  if (callRejectIf(record, associationName, attrs)) return;
+  if (callRejectIf(record, associationName, attrs)) return null;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
   assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
+  return existing ?? null;
 }
 
 /**
