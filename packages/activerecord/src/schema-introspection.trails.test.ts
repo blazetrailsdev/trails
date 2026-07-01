@@ -1,3 +1,9 @@
+// Trails-only unit tests for the trails-invented `introspect*` helpers
+// (introspectTables/Columns/Indexes/PrimaryKey/ForeignKeys) and their
+// SchemaStatements fallback path — no 1:1 Rails counterpart exists. The scratch
+// tables these create (`widgets`, `more_testings`) are real Rails migration-test
+// table names (primary_keys_test.rb / migration/compatibility_test.rb), not
+// freshly-invented ones, per the RFC 0048 fidelity contract.
 import { describe, it, expect, afterEach } from "vitest";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
@@ -34,7 +40,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 // per-worker DB; drop them by name so they don't collide with sibling files.
 afterEach(async () => {
   const ctx = new MigrationContext(createTestAdapter());
-  await ctx.dropTable("widgets", "gadgets", "gizmos", "standalone", { ifExists: true });
+  await ctx.dropTable("widgets", "more_testings", { ifExists: true });
 });
 
 describe("introspectTables", () => {
@@ -57,7 +63,7 @@ describe("introspectTables", () => {
     const realAdapter = createTestAdapter();
     const ctx = new MigrationContext(realAdapter);
     await ctx.createTable("widgets", {}, () => {});
-    await ctx.createTable("gadgets", {}, () => {});
+    await ctx.createTable("more_testings", {}, () => {});
 
     // Strip `tables()` so introspectTables routes through SchemaStatements.
     const stripped = withoutMethods(realAdapter, ["tables"]);
@@ -65,7 +71,7 @@ describe("introspectTables", () => {
     const tables = await introspectTables(stripped);
 
     expect(tables).toContain("widgets");
-    expect(tables).toContain("gadgets");
+    expect(tables).toContain("more_testings");
   });
 });
 
@@ -294,7 +300,7 @@ describe("introspectForeignKeys", () => {
   it("returns [] from the SchemaStatements fallback when adapter lacks foreignKeys()", async () => {
     const realAdapter = createTestAdapter();
     const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("gizmos", {}, (t) => {
+    await ctx.createTable("widgets", {}, (t) => {
       t.string("name");
     });
 
@@ -303,7 +309,7 @@ describe("introspectForeignKeys", () => {
     // SchemaStatements.foreignKeys() checks the underlying adapter for
     // .foreignKeys() and returns [] when it's not a function. Our wrapper
     // goes through that same fallback path when the adapter is stripped.
-    const fks = await introspectForeignKeys(stripped, "gizmos");
+    const fks = await introspectForeignKeys(stripped, "widgets");
 
     expect(fks).toEqual([]);
   });
@@ -311,11 +317,11 @@ describe("introspectForeignKeys", () => {
   it("returns [] for a real table with no foreign keys", async () => {
     const realAdapter = createTestAdapter();
     const ctx = new MigrationContext(realAdapter);
-    await ctx.createTable("standalone", {}, (t) => {
+    await ctx.createTable("widgets", {}, (t) => {
       t.string("name");
     });
 
-    const fks = await introspectForeignKeys(realAdapter, "standalone");
+    const fks = await introspectForeignKeys(realAdapter, "widgets");
 
     expect(fks).toEqual([]);
   });

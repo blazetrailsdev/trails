@@ -6716,6 +6716,13 @@ export class Relation<T extends Base> {
       // Omitting this dropped a `readonly()` reflection scope on the preload
       // through/HABTM source path (build_scope skips merging an empty scope).
       this._isReadonly !== true &&
+      // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and
+      // `unscope_values` is a VALUE_METHOD, so a relation carrying only
+      // `unscope(where: ...)` is NOT empty. Omitting this dropped an
+      // `unscope(...)` reflection scope on the preload through/HABTM source path
+      // (build_scope skips merging an empty scope), so a target `default_scope`
+      // the association meant to unscope survived the eager load.
+      this._unscopeValues.length === 0 &&
       !this._isDistinct &&
       this._groupColumns.length === 0 &&
       this._havingClause.isEmpty() &&

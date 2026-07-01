@@ -217,7 +217,7 @@ describe("SchemaDumperAdapterTest", () => {
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("octopuses", {}, (t) => {
+    await ctx.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
     const result = await TopLevelDumper.dump(adapter);
@@ -230,7 +230,7 @@ describe("SchemaDumperAdapterTest", () => {
     // limit must survive the round-trip on the adapter path (not just the
     // in-memory MigrationContext path).
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    await ctx.createTable("codes", {}, (t) => {
+    await ctx.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
     const result = await TopLevelDumper.dump(adapter);
@@ -334,9 +334,9 @@ describe("SchemaDumperAdapterTest", () => {
   afterAll(async () => {
     const cleanupCtx = new MigrationContext(createTestAdapter());
     const o = { ifExists: true } as const;
-    await cleanupCtx.dropTable("codes", o);
+    await cleanupCtx.dropTable("barcodes", o);
     await cleanupCtx.dropTable("horses", o);
-    await cleanupCtx.dropTable("octopuses", o);
+    await cleanupCtx.dropTable("octopi", o);
     await cleanupCtx.dropTable("reminders", o);
     await cleanupCtx.dropTable("testings", o);
   });
