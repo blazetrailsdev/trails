@@ -550,9 +550,12 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
  *   full key tuple. A model that declares a composite `primaryKey` over a table
  *   whose schema PK is a plain `id` (e.g. `CpkOrder`: model `[shop_id, id]`,
  *   table `id`) seeds the schema `id` as single-PK, then additionally fills the
- *   remaining model-PK columns (`shop_id`) from the label — mirroring Rails'
+ *   remaining model-PK columns (`shop_id`) from the label — approximating Rails'
  *   `fill_row_model_attributes`, which keys `composite_identify` on
- *   `model_class.composite_primary_key?` (the model PK, not the table PK).
+ *   `model_class.composite_primary_key?` (the model PK, not the table PK). The
+ *   schema-PK `id` keeps its single-PK `identify(label)` value rather than Rails'
+ *   shifted `identify(label) << index`, to stay consistent with ref() resolution;
+ *   full parity is tracked in RFC 0023 cpk-composite-fixture-ref-resolution.
  * - Timestamps: when the model records timestamps, any existing
  *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
  *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
@@ -868,10 +871,15 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     // Rails fills the MODEL's composite-PK columns from the label via
     // FixtureSet.composite_identify whenever `model_class.composite_primary_key?`
     // — even when the table keeps a single autoincrement `id` (e.g. Cpk::Order:
-    // model `[shop_id, id]`, table `id`). The schema-PK path above only seeds the
-    // schema's own `id`, so generate any remaining model-PK column that the table
-    // has and the row omits (the schema PK column is left as already seeded, so
-    // ref() targets stay consistent). `rows[i]` corresponds to `labels[i]`.
+    // model `[shop_id, id]`, table `id`). We approximate that here for the
+    // non-schema-PK columns only: the schema-PK path above already seeded `id`
+    // as the single-PK `identify(label)`, and we leave it there rather than
+    // adopt Rails' shifted `identify(label) << index`, because ref() targets
+    // resolve to `identify(label)` (composite targets aren't registered for
+    // ref()). So a composite-target FK stays consistent, at the cost of the
+    // shifted `id` value. Full composite_identify parity (shifted `id` + ref()
+    // resolution to a composite target's column) is tracked in RFC 0023
+    // cpk-composite-fixture-ref-resolution. `rows[i]` corresponds to `labels[i]`.
     if (Array.isArray(declaredPk) && typeof pkCol === "string") {
       for (let i = 0; i < rows.length; i++) {
         const generated = compositeIdentify(labels[i] as string, declaredPk);
