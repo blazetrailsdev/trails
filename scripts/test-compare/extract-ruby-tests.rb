@@ -51,22 +51,18 @@ SKIP_PATTERNS = [
   /\/migration\//,  # Migration test infrastructure (not test cases themselves)
 ]
 
-# Assertion methods to track
-ASSERTION_METHODS = %w[
-  assert assert_equal assert_not_equal assert_nil assert_not_nil
-  assert_raises assert_raise assert_nothing_raised
-  assert_match assert_no_match assert_includes assert_not_includes
-  assert_empty assert_not_empty assert_respond_to
-  assert_instance_of assert_kind_of assert_predicate
-  assert_same assert_not_same assert_in_delta assert_in_epsilon
-  assert_operator assert_send assert_difference assert_no_difference
-  assert_changes assert_no_changes assert_deprecated
-  must_equal must_be_nil must_be_like must_be_empty
-  must_include must_respond_to must_be_instance_of
-  must_raise wont_be_nil wont_equal wont_be_empty
-  refute refute_equal refute_nil refute_includes
-  expect
-].freeze
+# Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
+# TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
+# of Rails assertions: the `assert_*`/`refute_*` families incl. custom helpers
+# (assert_queries_count, assert_no_queries, assert_cycle, …) a whitelist kept
+# missing, the `must_*`/`wont_*` spec forms, and `expect`. The `(_|\z)`/`_`
+# anchors keep look-alikes (`asserted`, `assertion`) out.
+def assertion_method?(name)
+  return false unless name
+  name == "expect" ||
+    name.match?(/\A(assert|refute)(_|\z)/) ||
+    name.match?(/\A(must|wont)_/)
+end
 
 # ---- Test gating (adapter / feature conditionals) ----
 #
@@ -298,6 +294,7 @@ class TestExtractor
       line: t[:line],
       style: "def_test",
       assertions: t[:assertions],
+      assertionCount: t[:assertion_count],
     }, nil, body_gate: t[:body_gate])
   end
 
@@ -367,6 +364,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -378,6 +376,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -388,6 +387,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -399,6 +399,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -408,6 +409,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -419,6 +421,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -429,6 +432,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -440,6 +444,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -461,6 +466,7 @@ class TestExtractor
     desc = name.sub(/^test_/, "").tr("_", " ")
     line = extract_line(node)
     assertions = extract_assertions_from_def(node)
+    assertion_count = count_assertions(node)
 
     # Inside a mixin module body: stash, don't emit. Materialized at end of file
     # by flush_collected_modules, with the include-site gate from process_include.
@@ -469,6 +475,7 @@ class TestExtractor
       # retained past collection, so it can't be recomputed at materialization.
       @module_collect << {
         description: desc, line: line, assertions: assertions,
+        assertion_count: assertion_count,
         body_gate: body_skip_gate(node)
       }
       return
@@ -484,6 +491,7 @@ class TestExtractor
       line: line,
       style: "def_test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -858,24 +866,37 @@ class TestExtractor
     assertions.uniq
   end
 
+  # Raw (non-deduped) count of assertion calls in a test body. `assertions`
+  # (above) uniq's to distinct assertion *kinds*; this counts every call, which
+  # is what test:compare's assertion-count comparison needs (exact-count parity
+  # with the Rails counterpart). See extract-ts-core.ts for the TS-side twin.
+  def count_assertions(node)
+    assertions = []
+    find_assertions(node, assertions)
+    assertions.length
+  end
+
   def find_assertions(node, results)
     return unless node.is_a?(Array)
 
     case node[0]
     when :command, :fcall
       name = ident_name(node[1])
-      results << name if name && ASSERTION_METHODS.include?(name)
-    when :method_add_arg
-      if node[1].is_a?(Array) && node[1][0] == :fcall
-        name = ident_name(node[1][1])
-        results << name if name && ASSERTION_METHODS.include?(name)
-      end
-    when :call
-      # method.must_equal etc
+      results << name if assertion_method?(name)
+    when :vcall
+      # bare no-arg call: `assert_auto_incremented`
+      name = ident_name(node[1])
+      results << name if assertion_method?(name)
+    when :call, :command_call
+      # receiver form: `x.must_equal y` / `sql.must_be_like %{…}`
       name = ident_name(node[3]) if node[3]
-      results << name if name && ASSERTION_METHODS.include?(name)
+      results << name if assertion_method?(name)
     end
 
+    # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg, [:fcall,
+    # ...], ...]`; we do NOT match `:method_add_arg` because the recursion below
+    # descends into its `:fcall` child, already recorded above — matching the
+    # wrapper too would double-count (invisible under the uniq'd `assertions`).
     node.each { |child| find_assertions(child, results) if child.is_a?(Array) }
   end
 

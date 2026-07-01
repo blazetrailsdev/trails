@@ -10,6 +10,40 @@ import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
 
+/**
+ * Does a call's callee identifier name it an assertion? The camelCase twin of
+ * the Ruby extractor's `assertion_method?` (extract-ruby-tests.rb) — matched by
+ * PREFIX (not a fixed list) so both sides symmetrically count the full breadth
+ * of Rails assertions: the `assert*`/`refute*` families incl. custom helpers
+ * (`assertQueriesCount`, `assertNoQueries`, `assertCycle`, …), the `must*`/
+ * `wont*` spec forms, the bare `expect(...)` primitive, and trails' own
+ * `expect*` assertion helpers (`expectQuotedColumnInSql`, `expectValueInRow`)
+ * that stand in for a Rails `assert_*` twin. The `[A-Z]|$` anchor keeps
+ * look-alikes (`assertion`, `asserted`, `expected`) out. Only the inner
+ * `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier callee,
+ * so each chain counts once.
+ */
+function isAssertionCallee(name: string): boolean {
+  return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
+}
+
+/** Non-deduplicated count of assertion calls in a test node's subtree. */
+function countAssertions(node: ts.Node): number {
+  let count = 0;
+  const walk = (n: ts.Node) => {
+    if (
+      ts.isCallExpression(n) &&
+      ts.isIdentifier(n.expression) &&
+      isAssertionCallee(n.expression.text)
+    ) {
+      count++;
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return count;
+}
+
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
 // as arg 0 and the title as arg 1, matching the test-helpers/supports.ts API.
@@ -64,6 +98,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       style,
       assertions: [],
+      assertionCount: countAssertions(node),
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });
