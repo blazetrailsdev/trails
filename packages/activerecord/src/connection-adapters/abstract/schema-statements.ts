@@ -1374,7 +1374,7 @@ export class SchemaStatements {
   async indexExists(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options?: { unique?: boolean; name?: string },
+    options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
     const allIndexes = await this.adapterIndexes(tableName);
     // Rails `defined_for?`: the column check only applies when columns are
@@ -1390,6 +1390,10 @@ export class SchemaStatements {
     return allIndexes.some((idx) => {
       if (options?.name && idx.name !== options.name) return false;
       if (options?.unique !== undefined && idx.unique !== options.unique) return false;
+      // Mirrors Rails Index#defined_for? — filter on index validity when given
+      // (used to distinguish a failed CONCURRENTLY index, which is left invalid).
+      if (options?.valid !== undefined && (idx as { valid?: boolean }).valid !== options.valid)
+        return false;
       if (targetCols == null) return true;
       return (
         targetCols.length === idx.columns.length && targetCols.every((c, i) => c === idx.columns[i])

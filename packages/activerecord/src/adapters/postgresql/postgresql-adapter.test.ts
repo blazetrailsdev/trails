@@ -15,12 +15,13 @@
  * Tracked deviations (RFC 0023 surfaced-deviations, story
  * pg-adapter-test-port-surfaced-deviations):
  *   - test_connection_error / test_reconnection_error /
- *     test_reconnect_after_bad_connection_on_check_version /
- *     test_bad_connection / test_bad_connection_to_postgres_database assert on
- *     `error.connection_pool` (NullPool / pool identity). A standalone trails
- *     adapter connects lazily and wraps a `pg.Client`, so those pool-identity
- *     assertions are not applicable; the bodies exercise the equivalent trails
- *     connect / reconnect path and assert the translated error class instead.
+ *     test_reconnect_after_bad_connection_on_check_version / test_bad_connection
+ *     / test_bad_connection_to_postgres_database / test_serial_sequence /
+ *     test_invalid_index assert on `error.connection_pool` (NullPool / pool
+ *     identity). A standalone trails adapter connects lazily and wraps a
+ *     `pg.Client`, so those pool-identity assertions are not applicable; the
+ *     bodies exercise the equivalent trails path and assert the translated error
+ *     class instead.
  *   - test_serial_sequence / test_default_sequence_name use the ambient
  *     `accounts` fixture ("public.accounts_id_seq"). trails adapter tests have
  *     no ambient fixtures, and recreating the shared canonical `accounts` in
@@ -30,7 +31,8 @@
  *   - test_expression_index also asserts
  *     `index_exists?(expr, name: "expression") == true`; trails `indexExists`
  *     returns false for expression indexes. That sub-assertion is deferred
- *     pending an impl fix; the index columns are asserted faithfully.
+ *     pending an impl fix; the index columns are asserted faithfully. See story
+ *     pg-adapter-test-port-surfaced-deviations.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -40,6 +42,7 @@ import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,
+  RecordNotUnique,
   SQLWarning,
   StatementInvalid,
 } from "../../errors.js";
@@ -219,13 +222,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("primary key works tables containing capital letters", async () => {
-      // Deviation: Rails resolves the raw case-sensitive name ("CamelCase");
-      // trails' primaryKey expects a case-sensitive identifier to arrive quoted
-      // (unquoted names fold to lowercase via to_regclass), so the table name is
-      // passed quoted — the capital-letter resolution is still exercised.
       await adapter.exec(`CREATE TABLE "CamelCase" (id serial primary key)`);
       try {
-        expect(await adapter.primaryKey('"CamelCase"')).toBe("id");
+        expect(await adapter.primaryKey("CamelCase")).toBe("id");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS "CamelCase" CASCADE`);
       }
@@ -592,9 +591,29 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("invalid index", async () => {
       await withExampleTable(adapter, async () => {
-        await expect(
-          adapter.addIndex("ex", ["nonexistent_column"], { name: "idx_bad" }),
-        ).rejects.toThrow();
+        await adapter.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
+        let error: unknown;
+        try {
+          await adapter.addIndex("ex", "number", {
+            unique: true,
+            algorithm: "concurrently",
+            name: "invalid_index",
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(RecordNotUnique);
+        expect((error as Error).message).toMatch(/could not create unique index/);
+        // (Rails also asserts error.connection_pool identity — omitted, see header.)
+
+        // A failed CONCURRENTLY unique index is left behind but marked invalid.
+        expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+        expect(
+          await adapter.indexExists("ex", "number", { name: "invalid_index", valid: true }),
+        ).toBe(false);
+        expect(
+          await adapter.indexExists("ex", "number", { name: "invalid_index", valid: false }),
+        ).toBe(true);
       });
     });
 

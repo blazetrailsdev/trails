@@ -1776,8 +1776,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       binds.push(table, schema);
       tableCondition = `t.relname = $1 AND n.nspname = $2`;
     } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
+      // Quote the identifier (mirrors Rails quote(quote_table_name(table))) so a
+      // mixed-case name like "CamelCase" resolves case-sensitively instead of
+      // folding to lowercase via a bare to_regclass.
+      binds.push(table);
+      tableCondition = `t.oid = to_regclass(quote_ident($1))`;
     }
 
     // Order by the column's position within the index key array so
@@ -1876,15 +1879,21 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
               ? { schema: parts[0], name: parts[1] }
               : { schema: tableSchema, name: parts[0] };
         }
-        // else: UUID pk with non-nextval default (e.g. gen_random_uuid()) — seq stays null
       }
-      // else: UUID pk with no column default — seq stays null
     }
 
-    // Mirrors Rails pk_and_sequence_for: a primary key with no owning sequence
-    // yields nil, not `[pk, nil]` (the `if result[1]` guard has no else branch).
-    if (!seq) return null;
-    return [pk, seq];
+    if (seq) return [pk, seq];
+
+    // No owning sequence. Mirrors Rails pk_and_sequence_for: its fallback query
+    // matches `nextval|uuid_generate|gen_random_uuid` defaults, so a uuid-default
+    // pk still returns a row (with a nil sequence) → `[pk, nil]`, whereas a pk
+    // with no such default matches neither query and yields nil (the whole
+    // result). See uuid_test.rb#test_pk_and_sequence_for_with_uuid_primary_key.
+    const defaultExpr = rows[0].default_expr as string | null;
+    if (defaultExpr && /uuid_generate|gen_random_uuid/i.test(defaultExpr)) {
+      return [pk, null];
+    }
+    return null;
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
