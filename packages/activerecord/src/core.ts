@@ -155,6 +155,30 @@ export function isEqual(this: CoreRecord, other: unknown): boolean {
   return primaryKeyValuesEqual(this.id, (other as CoreRecord).id);
 }
 
+// Per-instance identity keys for records without primary-key values present.
+// Mirrors Ruby's `super` (Object#hash): a stable, unique value per object, so
+// two distinct new records never dedup against each other.
+const identityHashKeys = new WeakMap<object, symbol>();
+
+/**
+ * Return a value that dedups records the way Ruby's `hash` + `eql?` do: two
+ * records of the same class with equal primary-key values share a key, while
+ * records without primary-key values present are unique per instance.
+ *
+ * Mirrors: ActiveRecord::Core#hash
+ */
+export function hash(this: CoreRecord): unknown {
+  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
+    return `${this.constructor.name}#${JSON.stringify(this.id)}`;
+  }
+  let key = identityHashKeys.get(this);
+  if (key === undefined) {
+    key = Symbol("record-hash");
+    identityHashKeys.set(this, key);
+  }
+  return key;
+}
+
 /**
  * Compare two primary-key values by value. Composite keys are arrays and must
  * be compared element-wise; scalar keys compare directly.

@@ -141,4 +141,34 @@ describe("CoreTest", () => {
       ),
     ).toBe(false);
   });
+
+  it("composite pk models added to a set", () => {
+    const library = new Set<unknown>();
+    // with primary key present
+    library.add(new CpkBook({ id: [1, 2] }).hash());
+
+    // duplicate
+    library.add(new CpkBook({ id: [1, 3] }).hash());
+    library.add(new CpkBook({ id: [1, 3] }).hash());
+
+    // without primary key being set
+    library.add(new CpkBook({ title: "Book A" }).hash());
+    library.add(new CpkBook({ title: "Book B" }).hash());
+
+    expect(library.size).toBe(4);
+  });
+
+  it("composite pk models hash", () => {
+    expect(new CpkBook({ id: [1, 2] }).hash()).toEqual(new CpkBook({ id: [1, 2] }).hash());
+
+    expect(new CpkBook({ id: [1, 2] }).hash()).not.toEqual(new CpkBook({ id: [1, 3] }).hash());
+    expect(new CpkBook().hash()).not.toEqual(new CpkBook().hash());
+    expect(new CpkBook({ title: "Book A" }).hash()).not.toEqual(
+      new CpkBook({ title: "Book B" }).hash(),
+    );
+    expect(new CpkBook({ author_id: 1 }).hash()).not.toEqual(new CpkBook({ author_id: 1 }).hash());
+    expect(new CpkBook({ author_id: 1, title: "Same title" }).hash()).not.toEqual(
+      new CpkBook({ author_id: 1, title: "Same title" }).hash(),
+    );
+  });
 });
