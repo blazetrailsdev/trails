@@ -42,6 +42,16 @@ tester.run("require-canonical-schema", rule, {
     IMPORT + "export const SCHEMA = { posts: TEST_SCHEMA.posts };\nawait defineSchema(SCHEMA);",
     // Unresolvable identifier (e.g. an imported *_SCHEMA const) is left alone.
     'import { HM_SCHEMA } from "./fixtures.js";\nawait defineSchema(HM_SCHEMA);',
+    // `as const` on the whole canonical arg is unwrapped, still canonical.
+    IMPORT + "await defineSchema(TEST_SCHEMA as const);",
+    // `as const` on a const resolving to all-canonical tables.
+    IMPORT + "const SCHEMA = { posts: TEST_SCHEMA.posts } as const;\nawait defineSchema(SCHEMA);",
+    // `satisfies` on a per-table canonical value is unwrapped.
+    IMPORT + "await defineSchema({ posts: TEST_SCHEMA.posts satisfies object });",
+    // `as const` on the spread of the whole canonical schema.
+    IMPORT + "await defineSchema({ ...(TEST_SCHEMA as const) });",
+    // Angle-bracket assertion on a per-table canonical value is unwrapped.
+    IMPORT + "await defineSchema({ posts: <const>TEST_SCHEMA.posts });",
     // Empty schema has no tables to flag.
     "await defineSchema({});",
     // Not defineSchema.
@@ -103,6 +113,36 @@ tester.run("require-canonical-schema", rule, {
     {
       code: IMPORT + 'await defineSchema({ "1_need_quoting": { name: "string" } });',
       errors: [{ messageId: "inlineTable", data: { table: "1_need_quoting" } }],
+    },
+    // Bespoke schema with a trailing `as const` (the ratchet-evasion this
+    // story closes): the inline table is still flagged.
+    {
+      code:
+        'const TEST_SCHEMA = { topics: { title: "string" } } as const;\n' +
+        "await defineSchema(TEST_SCHEMA);",
+      errors: [{ messageId: "inlineTable", data: { table: "topics" } }],
+    },
+    // `satisfies` on a bespoke whole-schema const is likewise unwrapped.
+    {
+      code:
+        'const SCHEMA = { topics: { title: "string" } } satisfies Record<string, object>;\n' +
+        "await defineSchema(SCHEMA);",
+      errors: [{ messageId: "inlineTable", data: { table: "topics" } }],
+    },
+    // `as const` on an inline per-table value does not launder it.
+    {
+      code: IMPORT + 'await defineSchema({ posts: { title: "string" } as const });',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    // `as const` directly on a bespoke inline whole-arg object.
+    {
+      code: IMPORT + 'await defineSchema({ posts: { title: "string" } } as const);',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    // Angle-bracket assertion does not launder a bespoke inline table either.
+    {
+      code: IMPORT + 'await defineSchema(<const>{ posts: { title: "string" } });',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
     },
     // Multiple inline tables → one report each; canonical ones skipped.
     {
