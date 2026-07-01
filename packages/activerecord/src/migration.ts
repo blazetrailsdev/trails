@@ -2446,7 +2446,7 @@ export class MigrationContext {
     // `extract_schema_qualified_name`; a `my_schema.values` table indexes as
     // `index_values_on_value` (created in `my_schema` via the schema-qualified
     // table), keeping add/remove symmetric.
-    const [schema, nameTable] = this._splitSchemaQualified(table);
+    const [, nameTable] = this._splitSchemaQualified(table);
     const indexName = options?.name ?? `index_${nameTable}_on_${nameParts.join("_and_")}`;
     // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
     const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
@@ -2484,11 +2484,11 @@ export class MigrationContext {
     if (an === "mysql" && comment) sql += ` COMMENT ${this.connection.quote(comment)}`;
     await this.connection.executeMutation(sql);
     if (an === "postgres" && comment) {
-      const qualifiedIndex = schema
-        ? `${this.connection.quoteIdentifier(schema)}.${this.connection.quoteIdentifier(indexName)}`
-        : this.connection.quoteIdentifier(indexName);
+      // Rails emits an unqualified `COMMENT ON INDEX #{quote_column_name(index.name)}`
+      // (postgresql/schema_statements.rb:529-536), relying on search_path
+      // resolution — it never schema-qualifies this statement.
       await this.connection.executeMutation(
-        `COMMENT ON INDEX ${qualifiedIndex} IS ${this.connection.quote(comment)}`,
+        `COMMENT ON INDEX ${this.connection.quoteIdentifier(indexName)} IS ${this.connection.quote(comment)}`,
       );
     }
     if (!this._indexes.has(table)) this._indexes.set(table, []);
