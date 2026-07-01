@@ -233,7 +233,13 @@ export class JoinDependency {
     // `normalizedReflections`) is still joinable by its own name.
     const reflection = _reflectOnAssociation(modelClass, assocName);
     if (reflection) {
-      // Mirrors: ActiveRecord::Associations::JoinDependency#build (join_dependency.rb:232)
+      // Mirrors: ActiveRecord::Associations::JoinDependency#build
+      // (join_dependency.rb:230-231) — `check_validity!` before
+      // `check_eager_loadable!`. `check_validity!` raises
+      // CompositePrimaryKeyMismatchError for a composite PK/FK arity mismatch,
+      // so a mismatched composite collection surfaces that error here rather
+      // than the generic join-key arity error deeper in `joinConstraints`.
+      (reflection as any).checkValidityBang?.();
       (reflection as any).checkEagerLoadableBang?.();
     }
 
