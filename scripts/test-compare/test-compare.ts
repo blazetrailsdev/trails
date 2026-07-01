@@ -35,17 +35,13 @@
  *                 affect the matched/skipped/percent counts. Always emitted to
  *                 the JSON artifact regardless of this flag.
  *   --assertions  Print the assertion-count-mismatch report — matched,
- *                 implemented tests whose trails port has a different number of
- *                 assertion calls than its Rails counterpart. Scoped to the
- *                 activerecord package for now (see ASSERTION_REPORT_PACKAGES);
- *                 other packages never contribute this metric to their summary
- *                 totals or the JSON. Report-only: no CI gate, no exclude.json,
- *                 does not affect any count. Emitted to the JSON artifact
- *                 regardless of this flag. By default the section prints
- *                 per-file mismatch counts; add --missing to expand the
- *                 per-test `rails N vs trails M` detail. Compares assertion
- *                 *counts* only; comparing assertion *expectations* (kinds /
- *                 expected values) is planned follow-up.
+ *                 implemented tests whose trails port has a different assertion-
+ *                 call count than its Rails counterpart. Scoped to activerecord
+ *                 for now (see ASSERTION_REPORT_PACKAGES); other packages never
+ *                 contribute the metric. Report-only: no CI gate, no exclude.json.
+ *                 Prints per-file counts by default; add --missing for per-test
+ *                 `rails N vs trails M` detail. Count-only; comparing assertion
+ *                 *expectations* (kinds / values) is planned follow-up.
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -66,10 +62,9 @@ const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 // Packages the assertion-count comparison is reported for. Scoped to
-// activerecord for now (RFC follow-up may widen it) — both extractors populate
-// `assertionCount` for every package, but we only surface the mismatch metric
-// (summary tokens, `--assertions` section, JSON `assertionMismatches`) here so
-// the advisory number doesn't leak into unrelated packages' totals.
+// activerecord for now (RFC follow-up may widen it): both extractors populate
+// `assertionCount` everywhere, but we only surface the mismatch metric (summary
+// tokens, `--assertions` section, JSON) here so it can't leak into other totals.
 const ASSERTION_REPORT_PACKAGES = new Set(["activerecord"]);
 
 // ---------------------------------------------------------------------------
@@ -162,13 +157,9 @@ interface GateMismatch {
 }
 
 /**
- * A matched, implemented test whose trails port has a different number of
- * assertion *calls* than its Rails counterpart. Informational only — this
- * never gates CI and has no exclude.json baseline.
- *
- * NOTE: this compares assertion *counts* only. Comparing the actual assertion
- * *expectations* (assertion-kind histograms / literal expected values) is
- * planned follow-up, not implemented here.
+ * A matched, implemented test whose trails port has a different assertion-call
+ * count than its Rails counterpart. Informational only (no CI gate, no
+ * exclude.json); count-only, expectation-comparison is planned follow-up.
  */
 interface AssertionMismatch {
   description: string;
@@ -490,11 +481,8 @@ function main() {
       };
 
       // Report-only: compare the raw assertion-call count of a matched pair.
-      // Only for implemented tests — a pending/it.skip stub legitimately has 0
-      // assertions, so skip it. Counts are exact; a difference is informational
-      // (no CI gate, no exclude.json). Comparing the actual assertion
-      // expectations (kinds / expected values) is planned follow-up, not done
-      // here.
+      // Scoped to ASSERTION_REPORT_PACKAGES; pending/it.skip stubs are excluded
+      // by isAssertionCountMismatch (a stub legitimately has 0 assertions).
       const recordAssertion = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
         if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
         const railsCount = rubyTc.assertionCount;
@@ -855,12 +843,9 @@ function main() {
     }
 
     // Assertion count mismatches: matched, implemented tests whose trails port
-    // has a different number of assertion calls than its Rails counterpart.
-    // Report-only (no CI gate, no exclude.json). Shown only with --assertions.
-    //
-    // FUTURE WORK: this compares assertion *counts* only. Comparing the actual
-    // assertion *expectations* (assertion-kind histograms / literal expected
-    // values) is planned follow-up and is NOT implemented here.
+    // has a different assertion-call count than its Rails counterpart. Report-
+    // only (no CI gate, no exclude.json); shown with --assertions. Count-only —
+    // comparing assertion *expectations* (kinds/values) is planned follow-up.
     const filesWithAssertionMismatch = pkg.files.filter(
       (f) => f.assertionMismatches && f.assertionMismatches.length > 0,
     );
@@ -868,23 +853,15 @@ function main() {
       console.log(`  ASSERTION COUNT MISMATCHES (rails vs trails — count only, informational):`);
       console.log(`  ${"-".repeat(86)}`);
       console.log(
-        `  Note: count-only. A difference is often a legitimate port divergence, not a bug —`,
+        `  Report-only (no CI gate, no exclude.json). A difference is often a legitimate`,
       );
-      console.log(`  e.g. Rails wrappers outside the assertion whitelist (assert_no_queries /`);
-      console.log(
-        `  assert_queries_count) read as 0, or trails asserts a different shape. Report-only:`,
-      );
-      console.log(`  no CI gate, no exclude.json.`);
-      console.log(
-        `  FUTURE WORK: compares assertion *counts* only; comparing assertion *expectations*`,
-      );
-      console.log(`  (kinds / expected values) is planned follow-up, not implemented.`);
-      // Per-test lines are verbose (thousands of them); gate them on --missing,
-      // mirroring how the per-file table expands missing-test names only under
-      // --missing. Without it, show just the per-file mismatch counts.
+      console.log(`  port divergence (trails asserts a different shape), not a bug. Count-only;`);
+      console.log(`  comparing assertion *expectations* (kinds/values) is planned follow-up.`);
+      // Per-test lines are verbose (thousands); gate them on --missing, mirroring
+      // how the per-file table expands missing-test names only under --missing.
       console.log(
         showMissing
-          ? `  (per-test detail shown; pass without --missing for per-file counts only)`
+          ? `  (per-test detail; omit --missing for per-file counts only)`
           : `  (per-file counts; pass --missing to expand per-test detail)`,
       );
       console.log(`  ${"-".repeat(86)}`);

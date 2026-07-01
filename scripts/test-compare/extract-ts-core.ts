@@ -10,76 +10,21 @@ import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
 
-// The camelCase twin of the Ruby extractor's ASSERTION_METHODS list
-// (extract-ruby-tests.rb) — kept deliberately in lockstep so both sides count
-// the *same* set of assertion kinds. We intentionally do NOT count Rails
-// custom-helper wrappers that are absent from the Ruby whitelist (e.g.
-// `assert_queries_count` / `assert_no_queries` → `assertQueriesCount` /
-// `assertNoQueries`): counting them on the TS side but not the Ruby side would
-// manufacture false count mismatches. Their nested `expect(...)` calls are
-// still counted symmetrically on both sides.
-const ASSERTION_CALLEES = new Set([
-  "expect",
-  "assert",
-  "assertEqual",
-  "assertNotEqual",
-  "assertNil",
-  "assertNotNil",
-  "assertRaises",
-  "assertRaise",
-  "assertNothingRaised",
-  "assertMatch",
-  "assertNoMatch",
-  "assertIncludes",
-  "assertNotIncludes",
-  "assertEmpty",
-  "assertNotEmpty",
-  "assertRespondTo",
-  "assertInstanceOf",
-  "assertKindOf",
-  "assertPredicate",
-  "assertSame",
-  "assertNotSame",
-  "assertInDelta",
-  "assertInEpsilon",
-  "assertOperator",
-  "assertSend",
-  "assertDifference",
-  "assertNoDifference",
-  "assertChanges",
-  "assertNoChanges",
-  "assertDeprecated",
-  // Minitest spec-style forms. Trails ports these to `expect(...)` rather than
-  // literal `mustEqual`/`wontEqual` helpers, so in practice they never match a
-  // TS callee — but they are kept here so this set is a faithful twin of the
-  // full Ruby ASSERTION_METHODS list (and stays symmetric if such a helper is
-  // ever introduced).
-  "mustEqual",
-  "mustBeNil",
-  "mustBeLike",
-  "mustBeEmpty",
-  "mustInclude",
-  "mustRespondTo",
-  "mustBeInstanceOf",
-  "mustRaise",
-  "wontBeNil",
-  "wontEqual",
-  "wontBeEmpty",
-  "refute",
-  "refuteEqual",
-  "refuteNil",
-  "refuteIncludes",
-]);
-
 /**
- * Does a call's callee identifier name it an assertion? The TS twin of the Ruby
- * extractor's ASSERTION_METHODS list ({@link ASSERTION_CALLEES}). Only the
- * *inner* `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier
- * callee, so each chain counts once — matching how the Ruby side counts one per
- * assertion call.
+ * Does a call's callee identifier name it an assertion? The camelCase twin of
+ * the Ruby extractor's `assertion_method?` (extract-ruby-tests.rb) — matched by
+ * PREFIX (not a fixed list) so both sides symmetrically count the full breadth
+ * of Rails assertions: the `assert*`/`refute*` families incl. custom helpers
+ * (`assertQueriesCount`, `assertNoQueries`, `assertCycle`, …), the `must*`/
+ * `wont*` spec forms, and the `expect(...)` primitive. The `[A-Z]|$` anchor
+ * keeps look-alikes (`assertion`, `asserted`) out. Only the inner `expect(x)`
+ * call in an `expect(x).toEqual(y)` chain has an identifier callee, so each
+ * chain counts once.
  */
 function isAssertionCallee(name: string): boolean {
-  return ASSERTION_CALLEES.has(name);
+  return (
+    name === "expect" || /^(assert|refute)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name)
+  );
 }
 
 /** Non-deduplicated count of assertion calls in a test node's subtree. */

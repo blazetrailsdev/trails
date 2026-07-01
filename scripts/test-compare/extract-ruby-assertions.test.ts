@@ -93,6 +93,31 @@ describe("Ruby extractor assertion-count collection", () => {
     expect(c["paren wrapper with block"]).toBe(2);
   });
 
+  it("counts Rails custom assert helpers via the assert*/refute* prefix", () => {
+    const c = rubyAssertionCounts({
+      "cases/custom_test.rb": `
+        class CustomTest < ActiveSupport::TestCase
+          def test_custom_helpers
+            assert_queries_count(2) { Post.all.to_a }
+            assert_no_queries { cached.first }
+            assert_not_predicate post, :valid?
+            assert_not user.admin?
+          end
+
+          def test_lookalikes_not_counted
+            assertion = build_assertion
+            assertion.run
+            asserted = true
+          end
+        end
+      `,
+    });
+    // assert_queries_count + assert_no_queries + assert_not_predicate + assert_not = 4
+    expect(c["custom helpers"]).toBe(4);
+    // `assertion` / `asserted` are not assertion calls
+    expect(c["lookalikes not counted"]).toBe(0);
+  });
+
   it("counts assertions in it/test-macro bodies", () => {
     const c = rubyAssertionCounts({
       "cases/bar_test.rb": `

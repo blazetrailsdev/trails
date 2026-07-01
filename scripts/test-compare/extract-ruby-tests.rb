@@ -51,22 +51,19 @@ SKIP_PATTERNS = [
   /\/migration\//,  # Migration test infrastructure (not test cases themselves)
 ]
 
-# Assertion methods to track
-ASSERTION_METHODS = %w[
-  assert assert_equal assert_not_equal assert_nil assert_not_nil
-  assert_raises assert_raise assert_nothing_raised
-  assert_match assert_no_match assert_includes assert_not_includes
-  assert_empty assert_not_empty assert_respond_to
-  assert_instance_of assert_kind_of assert_predicate
-  assert_same assert_not_same assert_in_delta assert_in_epsilon
-  assert_operator assert_send assert_difference assert_no_difference
-  assert_changes assert_no_changes assert_deprecated
-  must_equal must_be_nil must_be_like must_be_empty
-  must_include must_respond_to must_be_instance_of
-  must_raise wont_be_nil wont_equal wont_be_empty
-  refute refute_equal refute_nil refute_includes
-  expect
-].freeze
+# Is `name` an assertion call? Matched by PREFIX (not a fixed list) so we count
+# the full breadth of Rails assertions symmetrically with the TS side (see
+# isAssertionCallee in extract-ts-core.ts): the `assert_*`/`refute_*` families
+# incl. Rails' many custom helpers (assert_queries_count, assert_no_queries,
+# assert_not_predicate, assert_cycle, …) a fixed whitelist kept missing, the
+# `must_*`/`wont_*` spec forms, and the `expect` primitive. The `(_|\z)`/`_`
+# anchors keep look-alikes (`asserted`, `assertion`) out.
+def assertion_method?(name)
+  return false unless name
+  name == "expect" ||
+    name.match?(/\A(assert|refute)(_|\z)/) ||
+    name.match?(/\A(must|wont)_/)
+end
 
 # ---- Test gating (adapter / feature conditionals) ----
 #
@@ -886,11 +883,11 @@ class TestExtractor
     case node[0]
     when :command, :fcall
       name = ident_name(node[1])
-      results << name if name && ASSERTION_METHODS.include?(name)
+      results << name if assertion_method?(name)
     when :call
       # method.must_equal etc
       name = ident_name(node[3]) if node[3]
-      results << name if name && ASSERTION_METHODS.include?(name)
+      results << name if assertion_method?(name)
     end
 
     # NOTE: a parenthesized call `assert_equal(a, b)` is `[:method_add_arg,

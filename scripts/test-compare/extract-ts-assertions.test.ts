@@ -44,7 +44,7 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["loop"]).toBe(1);
   });
 
-  it("counts whitelisted assert helpers but not Rails query wrappers absent from the Ruby list", () => {
+  it("counts Rails custom assert helpers (query wrappers) via the assert* prefix", () => {
     const src = `
       it("helpers", () => {
         assertQueriesCount(2, () => {
@@ -53,20 +53,20 @@ describe("TS extractor assertion-count collection", () => {
         assertDifference(() => Post.count, 1, () => {});
       });
     `;
-    // assertQueriesCount is NOT in the Ruby ASSERTION_METHODS whitelist, so it
-    // is not counted; the inner expect + assertDifference = 2.
-    expect(tsAssertionCounts(src)["helpers"]).toBe(2);
+    // assertQueriesCount + inner expect + assertDifference = 3. The prefix rule
+    // counts custom Rails helpers symmetrically with the Ruby side.
+    expect(tsAssertionCounts(src)["helpers"]).toBe(3);
   });
 
-  it("counts refute* helpers that are on the whitelist", () => {
+  it("counts refute* but not expect-prefixed helper names", () => {
     const src = `
       it("mixed", () => {
         expectQuotedColumnInSql(sql);
         refuteEqual(a, b);
       });
     `;
-    // expectQuotedColumnInSql is not on the whitelist (it is not a bare
-    // expect(...) primitive); refuteEqual is. = 1
+    // expectQuotedColumnInSql is not the bare `expect(...)` primitive and does
+    // not match the assert/refute/must/wont prefix; refuteEqual does. = 1
     expect(tsAssertionCounts(src)["mixed"]).toBe(1);
   });
 
@@ -78,30 +78,21 @@ describe("TS extractor assertion-count collection", () => {
         refuteNil(c);
       });
     `;
-    // These mirror Ruby's must_equal/wont_equal/refute_nil so the two sides
-    // count the same assertion-kind set (trails normally ports them to expect()).
+    // Mirror Ruby's must_equal/wont_equal/refute_nil (trails normally ports
+    // these to expect()), so the two sides count the same assertion-kind set.
     expect(tsAssertionCounts(src)["spec forms"]).toBe(3);
   });
 
-  it("reports zero for an assertion-free body", () => {
+  it("ignores assertion look-alikes and non-assertion identifiers", () => {
     const src = `
-      it("no asserts", () => {
-        const x = compute();
+      it("lookalikes", () => {
+        const assertion = build();   // 'assert'+ 'ion' — no boundary
+        assertion.run();
+        asserted();                  // 'assert' + 'ed' — no boundary
+        expectation();               // not the bare expect primitive
+        expect(v).toBe(1);           // the only real assertion
       });
     `;
-    expect(tsAssertionCounts(src)["no asserts"]).toBe(0);
-  });
-
-  it("does not count non-assertion identifiers that merely start similarly", () => {
-    const src = `
-      it("decoys", () => {
-        assemble();
-        expectation();
-        expect(v).toBe(1);
-      });
-    `;
-    // assemble (no match), expectation (matches /^expect[A-Z]/? no — lowercase),
-    // expect(...) = 1
-    expect(tsAssertionCounts(src)["decoys"]).toBe(1);
+    expect(tsAssertionCounts(src)["lookalikes"]).toBe(1);
   });
 });
