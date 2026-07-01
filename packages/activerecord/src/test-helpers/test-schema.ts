@@ -347,8 +347,9 @@ export const TEST_SCHEMA: Schema = {
     comment: "string",
   },
 
-  // Composite PK is configured on the model level; the DB table keeps the
-  // default autoincrement `id` so order rows still get one.
+  // Not a composite primary key on the db level, to get autoincrement behavior
+  // for the `id` column; the composite primary key is configured on the model
+  // level (CpkOrder). Mirrors Rails schema.rb.
   cpk_orders: {
     shop_id: "integer",
     status: "string",

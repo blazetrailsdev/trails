@@ -147,13 +147,18 @@ export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
 }
 
+// A row's resolved primary key: a scalar for single-PK tables, or a per-column
+// map for composite-PK tables (e.g. cpk_orders → { shop_id, id }). A composite
+// entry lets a belongs_to `ref()` resolve to a specific key column of the target.
+type DeclaredKey = number | string | Record<string, number | string>;
+
 // Adapter-scoped registry of declared fixture ids, nested by table so a subsequent
 // defineFixtures() call for the same table fully replaces the prior label set —
 // no leakage of stale labels when the caller reloads a subset. Values are the row's
 // primary-key value (declared PK when the row carries one, else fixtureId(label)).
-const declaredIds = new WeakMap<object, Map<string, Map<string, number | string>>>();
+const declaredIds = new WeakMap<object, Map<string, Map<string, DeclaredKey>>>();
 
-function declaredIdsFor(adapter: object): Map<string, Map<string, number | string>> {
+function declaredIdsFor(adapter: object): Map<string, Map<string, DeclaredKey>> {
   let m = declaredIds.get(adapter);
   if (!m) {
     m = new Map();
@@ -215,9 +220,37 @@ export function resolveFixtureId(
   fixtureName: string,
 ): number | string {
   const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
-  if (declared !== undefined) return declared;
+  // A composite-PK target has no single scalar id; such a ref() must be resolved
+  // via resolveCompositeRefColumn (belongs_to path), so fall through to the CRC
+  // fallback here rather than return the key map.
+  if (declared !== undefined && typeof declared !== "object") return declared;
   const pinned = staticDeclaredIds?.get(tableName)?.get(fixtureName);
   return pinned ?? fixtureId(fixtureName);
+}
+
+/**
+ * Resolves a belongs_to `ref()` to a single key column of a composite-PK target,
+ * honoring the association's `primaryKey` (e.g. `cpk_order_agreements.order_id`
+ * → the referenced order's `id` column). Prefers the loaded target's registered
+ * key map; when the target set hasn't been loaded yet, derives the same value the
+ * target row would generate from its label via `compositeIdentify` — position of
+ * `targetColumn` within `targetPkCols` matters, since `compositeIdentify` shifts
+ * each successive key column (Rails' `composite_identify`).
+ * @internal
+ */
+export function resolveCompositeRefColumn(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  fixtureName: string,
+  targetColumn: string,
+  targetPkCols: readonly string[],
+): number | string {
+  const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
+  if (declared !== undefined && typeof declared === "object") {
+    const v = declared[targetColumn];
+    if (v !== undefined) return v;
+  }
+  return compositeIdentify(fixtureName, targetPkCols)[targetColumn] ?? fixtureId(fixtureName);
 }
 
 /**
@@ -548,8 +581,10 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
  *   from the label via `compositeIdentify`, mirroring Rails'
  *   `generate_composite_primary_key`/`composite_identify`. Reload matches on the
  *   full key tuple. A model that declares a composite `primaryKey` over a table
- *   whose schema PK is a plain `id` (e.g. `CpkOrder`) is seeded as single-PK,
- *   deferring to the schema.
+ *   whose schema PK is a plain serial `id` (e.g. `CpkOrder`: model `["shop_id",
+ *   "id"]`, table `id`) is still seeded from its *model* composite PK — Rails'
+ *   `composite_primary_key?` is model-level — so both key columns are generated
+ *   from the label; the serial `id` sequence is then synced past the explicit ids.
  * - Timestamps: when the model records timestamps, any existing
  *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
  *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
@@ -575,17 +610,24 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   //                key columns come from the fixture row when present (e.g. a
   //                ref()) and are otherwise generated from the label, like single PKs.
   // A model may declare a *composite* `primaryKey` while the test schema keeps a
-  // plain autoincrement `id` (e.g. CpkOrder: model `["shop_id", "id"]`, table `id`);
-  // that mismatch is an intentional, documented pattern, so we defer to the schema's
-  // single id rather than flag it as a contradiction.
+  // plain autoincrement `id` (e.g. CpkOrder: model `["shop_id", "id"]`, table `id`).
+  // Rails' `composite_primary_key?` is model-level, so the fixture loader honors the
+  // model's composite PK — generating every key column from the label via
+  // `compositeIdentify` — even though the DB table stays single-PK for `id`
+  // autoincrement. That serial `id`, not the model tuple, is what needs a sequence
+  // reset after the explicit-id inserts.
   let pkCol: string | string[] | null = declaredPk;
+  let serialResetCol: string | null = null;
   if (typeof (adapter as any).primaryKey === "function") {
     const schemaPk: string | string[] | null = await (adapter as any).primaryKey(tableName);
-    if (schemaPk === null) {
+    if (Array.isArray(declaredPk)) {
+      pkCol = declaredPk;
+      serialResetCol = typeof schemaPk === "string" ? schemaPk : null;
+    } else if (schemaPk === null) {
       pkCol = null;
     } else if (Array.isArray(schemaPk)) {
       pkCol = schemaPk;
-    } else if (!Array.isArray(declaredPk) && declaredPk !== "id" && declaredPk !== schemaPk) {
+    } else if (declaredPk !== "id" && declaredPk !== schemaPk) {
       // The model trusts a custom single PK that the schema contradicts — a real
       // bug. (A plain `id` default just defers to the schema, exactly like Rails'
       // introspected `Base.primary_key`.) Surface it rather than silently writing
@@ -595,6 +637,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       );
     } else {
       pkCol = schemaPk;
+      serialResetCol = schemaPk;
     }
   }
 
@@ -630,10 +673,12 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // entries for labels omitted from a subset reload. The prior entry is captured
   // so we can roll back if the INSERT itself fails — `ref()` resolution must not
   // observe ids for rows that never landed in the database.
-  // Only single-PK tables populate the declared-id registry: a `ref()` resolves to
-  // a single scalar id, so composite-PK tables (whose key is a tuple) are not a
-  // valid `ref()` target and are intentionally left unregistered here.
-  const tableIds = new Map<string, number | string>();
+  // Single-PK tables register a scalar id per label; composite-PK tables register a
+  // per-column key map (each key column taken from the row when a literal, else
+  // generated from the label via compositeIdentify — mirroring the row-build below).
+  // A belongs_to `ref()` into a composite target picks the association's primary-key
+  // column out of that map via resolveCompositeRefColumn.
+  const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
     for (const label of labels) {
       const id = resolveDeclaredPk(
@@ -644,10 +689,62 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       );
       tableIds.set(label, id);
     }
+  } else if (Array.isArray(pkCol)) {
+    for (const label of labels) {
+      const attrs = fixtures[label] as FixtureAttrs;
+      const generated = compositeIdentify(label, pkCol);
+      const keyMap: Record<string, number | string> = {};
+      for (const keyCol of pkCol) {
+        const v = attrs[keyCol];
+        keyMap[keyCol] =
+          (typeof v === "number" && Number.isInteger(v)) || typeof v === "string"
+            ? v
+            : generated[keyCol];
+      }
+      tableIds.set(label, keyMap);
+    }
   }
   const adapterIds = declaredIdsFor(adapter);
   const priorTableIds = adapterIds.get(tableName);
   adapterIds.set(tableName, tableIds);
+
+  // Map each belongs_to FK column to the composite-PK target column its ref()
+  // resolves to (the association's joinPrimaryKey), for targets whose model PK is
+  // composite. `cpk_order_agreements.order_id = ref("cpk_orders", ...)` must land on
+  // the order's `id` column, not a single-column identify(label). Only single-column
+  // FK/PK belongs_to associations to composite targets are recorded; everything else
+  // resolves through the scalar registry.
+  const fkColToCompositeRef = new Map<string, { column: string; pkCols: string[] }>();
+  {
+    const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
+    for (const refl of Object.values(reflections) as {
+      macro?: string;
+      isPolymorphic?: () => boolean;
+      foreignKey?: string | string[];
+      joinPrimaryKey?: string | string[];
+      klass?: { primaryKey?: unknown };
+    }[]) {
+      if (refl.macro !== "belongsTo" || refl.isPolymorphic?.()) continue;
+      // `.klass` computes and validates the target class, throwing NameError when
+      // it isn't registered — a target that can't be resolved simply isn't a
+      // composite ref we can special-case, so fall back to scalar resolution.
+      let targetPk: unknown;
+      let jpk: string | string[] | undefined;
+      try {
+        targetPk = refl.klass?.primaryKey;
+        jpk = refl.joinPrimaryKey;
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(targetPk)) continue;
+      const fk = refl.foreignKey;
+      const fkStr = Array.isArray(fk) ? (fk.length === 1 ? fk[0] : undefined) : fk;
+      const jpkStr = Array.isArray(jpk) ? (jpk.length === 1 ? jpk[0] : undefined) : jpk;
+      if (typeof fkStr === "string" && typeof jpkStr === "string") {
+        fkColToCompositeRef.set(fkStr, { column: jpkStr, pkCols: targetPk as string[] });
+      }
+    }
+  }
 
   // Build rows with resolved IDs and references. Rows that declare `id: N` use it
   // verbatim (Rails parity); rows without one fall back to fixtureId(label).
@@ -745,7 +842,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
               `Use explicit ${poly.typeColumn}/${poly.idColumn} if you need to reference by ID.`,
           );
         }
-        row[col] = resolveFixtureId(adapter, val.tableName, val.fixtureName);
+        const compRef = fkColToCompositeRef.get(col);
+        row[col] = compRef
+          ? resolveCompositeRefColumn(
+              adapter,
+              val.tableName,
+              val.fixtureName,
+              compRef.column,
+              compRef.pkCols,
+            )
+          : resolveFixtureId(adapter, val.tableName, val.fixtureName);
         continue;
       }
 
@@ -957,19 +1063,21 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // `defineSchema`, so it needs the same MAX-sync to avoid colliding with a
   // post-fixtures `create`. Composite (`string[]`) and id-less (`null`) PKs are
   // skipped, and the `if (sequence)` guard no-ops for non-serial PKs.
-  if (adapter.adapterName === "postgres" && typeof pkCol === "string") {
+  if (adapter.adapterName === "postgres" && serialResetCol !== null) {
     // pg_get_serial_sequence takes the column as a bound text value and matches
     // it verbatim (case-sensitive, no quote-stripping); defineSchema stores
-    // every identifier with its exact case, so passing `pkCol` as-is matches
-    // both lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs.
+    // every identifier with its exact case, so passing the column as-is matches
+    // both lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs. For a
+    // composite MODEL PK over a single serial DB `id` (CpkOrder), this syncs that
+    // `id` sequence past the explicit composite-generated ids just inserted.
     const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
       tableName,
-      pkCol,
+      serialResetCol,
     ]);
     const sequence = seqRows[0]?.seq as string | null | undefined;
     if (sequence) {
       const qt = adapter.quoteTableName(tableName);
-      const qc = adapter.quoteColumnName(pkCol);
+      const qc = adapter.quoteColumnName(serialResetCol);
       await adapter.executeMutation(
         `SELECT setval($1, GREATEST(COALESCE(MAX(${qc}), 0), 1), COALESCE(MAX(${qc}), 0) <> 0) FROM ${qt}`,
         [sequence],
