@@ -55,16 +55,13 @@ describe("SchemaDumperTest", () => {
   function dumpCanonicalTable(...tables: string[]): Promise<string> {
     return dumpTableSchema(canonicalSource(), ...tables);
   }
-  // Whether a dumped canonical `companies` index surfaces its descending sort
-  // order. Rails gates this on `supports_index_sort_order?` (PostgreSQL/SQLite
-  // always; MySQL/MariaDB version-gated). trails' PG/SQLite reflect it here, but
-  // the MySQL/MariaDB shared-worker *reconstruct* path (generateSchemaFile →
-  // loadSchema) does not yet round-trip descending order — the direct
-  // `add_index`/dump path does (see the bespoke index tests). Tracked for
-  // convergence in RFC 0048 (mysql-reconstruct-index-sort-order-dump). Until
-  // then the order line is expected only on PG/SQLite.
+  // Rails: `ActiveRecord::Base.lease_connection.supports_index_sort_order?`.
+  // PostgreSQL/SQLite are unconditionally true; MySQL/MariaDB are version-gated
+  // (`abstract-mysql-adapter.ts` — MySQL ≥ 8.0, MariaDB ≥ 10.8). Read the live
+  // predicate off the connection, matching schema_dumper_test.rb's branch.
   function dumpsIndexSortOrder(): boolean {
-    return adapterType !== "mysql";
+    const a = Base.adapter as unknown as { supportsIndexSortOrder?: () => boolean };
+    return typeof a.supportsIndexSortOrder === "function" ? a.supportsIndexSortOrder() : true;
   }
 
   it("schema dump", async () => {
