@@ -1366,6 +1366,10 @@ export const TEST_SCHEMA: Schema = {
       lock_version: { type: "integer", null: false, default: 0 },
     },
     primaryKey: false,
+    // Rails schema.rb:1162-1166 — `t.index :id, unique: true` on the non-PK,
+    // not-null string `id`. This is the exact shape SchemaDumperTest's
+    // "keeps id false when id is false and unique not null column added" covers.
+    indexes: [{ columns: "id", unique: true }],
   },
 
   // Rails declares `id: false` with `nick` (promoted to PK at the AR layer)
