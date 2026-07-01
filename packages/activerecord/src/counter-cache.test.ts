@@ -658,10 +658,9 @@ describe("CounterCacheTest", () => {
   it("reset multiple counters with touch: true", async () => {
     await assertTouching(topic, ["updated_at"], async () => {
       await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
-      // Rails passes `touch: { time: Time.now.utc }`; trails' touch option does
-      // not accept the `{ time: }` form, so use the plain `true` form — the
-      // observable effect (updated_at advanced past the staged time) is identical.
-      await Topic.resetCounters(topic.id, "replies", "uniqueReplies", { touch: true });
+      await Topic.resetCounters(topic.id, "replies", "uniqueReplies", {
+        touch: { time: Temporal.Now.instant() },
+      });
     });
   });
 

@@ -275,13 +275,73 @@ export function touchAttributesWithTime(
   this: TimestampHost,
   ...names: string[]
 ): Record<string, Temporal.Instant> {
-  const time = currentTimeFromProperTimezone();
+  return touchAttributesWithTimeAt.call(this, names);
+}
+
+/**
+ * Mirrors: ActiveRecord::Timestamp#touch_attributes_with_time(*names, time:)
+ *
+ * The keyword-`time:` variant. When `time` is omitted the current time is
+ * used, matching `touch_attributes_with_time`'s `time ||= current_time...`.
+ */
+export function touchAttributesWithTimeAt(
+  this: TimestampHost,
+  names: string[],
+  time?: Temporal.Instant,
+): Record<string, Temporal.Instant> {
+  const resolvedTime = time ?? currentTimeFromProperTimezone();
   const resolved = names.map((n) => this._attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
   const allNames = [...new Set([...updateAttrs, ...resolved])];
   const result: Record<string, Temporal.Instant> = {};
-  for (const name of allNames) result[name] = time;
+  for (const name of allNames) result[name] = resolvedTime;
   return result;
+}
+
+/**
+ * The `touch:` option accepted by counter-cache mutators
+ * (`update_counters` / `reset_counters` / `increment_counter`). Mirrors
+ * Rails, where `touch` may be `true`, a column name, an array of column
+ * names, or a `{ time: }` hash (optionally alongside column names).
+ */
+export type CounterCacheTouchOption =
+  | boolean
+  | string
+  | Array<string | { time?: Temporal.Instant }>
+  | { time?: Temporal.Instant };
+
+/**
+ * Resolve a counter-cache `touch:` option to the timestamp column → time map
+ * to merge into an UPDATE, mirroring the touch branch of Rails'
+ * `Relation#update_counters` (relation.rb):
+ *
+ *   names = touch if touch != true
+ *   names = Array.wrap(names)
+ *   options = names.extract_options!
+ *   touch_attributes_with_time(*names, **options)
+ *
+ * Returns `undefined` when there is nothing to touch — including the
+ * `touch: []` "skip timestamps" signal trails preserves as a no-op.
+ */
+export function counterCacheTouchUpdates(
+  modelClass: TimestampHost,
+  touch: CounterCacheTouchOption,
+): Record<string, Temporal.Instant> | undefined {
+  // `touch: false` never reaches here (callers guard on truthiness); `touch: []`
+  // is an explicit "skip timestamp updates" signal.
+  if (touch === false) return undefined;
+  if (Array.isArray(touch) && touch.length === 0) return undefined;
+  const wrapped: Array<string | { time?: Temporal.Instant }> =
+    touch === true ? [] : Array.isArray(touch) ? touch : [touch];
+  // Mirror Ruby's Array#extract_options!: a trailing plain-object arg is the
+  // `{ time: }` keyword hash, not a column name.
+  let time: Temporal.Instant | undefined;
+  const last = wrapped[wrapped.length - 1];
+  const names =
+    last !== undefined && typeof last === "object"
+      ? ((time = last.time), wrapped.slice(0, -1) as string[])
+      : (wrapped as string[]);
+  return touchAttributesWithTimeAt.call(modelClass, names, time);
 }
 
 export function timestampAttributesForCreateInModel(this: TimestampHost): string[] {

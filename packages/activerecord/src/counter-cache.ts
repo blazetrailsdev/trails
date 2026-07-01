@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
-import { touchAttributesWithTime } from "./timestamp.js";
+import { counterCacheTouchUpdates, type CounterCacheTouchOption } from "./timestamp.js";
 
 /**
  * Counter cache operations for ActiveRecord models.
@@ -24,7 +24,7 @@ export async function incrementCounter(
   counterName: string,
   id: unknown,
   by: number = 1,
-  options?: { touch?: boolean | string | string[] },
+  options?: { touch?: CounterCacheTouchOption },
 ): Promise<number> {
   // Dispatch through `this.updateCounters` (not the local function) so the
   // Locking::Optimistic override — which bumps the lock version — is honored.
@@ -41,7 +41,7 @@ export async function decrementCounter(
   counterName: string,
   id: unknown,
   by: number = 1,
-  options?: { touch?: boolean | string | string[] },
+  options?: { touch?: CounterCacheTouchOption },
 ): Promise<number> {
   return this.updateCounters(id, { [counterName]: -by }, options);
 }
@@ -61,7 +61,7 @@ export async function updateCounters(
   this: typeof Base,
   id: unknown | unknown[],
   counters: Record<string, number>,
-  options?: { touch?: boolean | string | string[] },
+  options?: { touch?: CounterCacheTouchOption },
 ): Promise<number> {
   const relation = this.unscoped().where(buildPkPredicate(this, id));
   return relation.updateCounters(counters, options);
@@ -121,7 +121,7 @@ function buildPkPredicate(
   return attr.eq(id);
 }
 
-type ResetCountersOptions = { touch?: boolean | string | string[] };
+type ResetCountersOptions = { touch?: CounterCacheTouchOption };
 
 /**
  * Reset counter caches by recounting the actual associated records.
@@ -199,12 +199,10 @@ export async function resetCounters(
   }
 
   if (options.touch) {
-    const isEmptyArray = Array.isArray(options.touch) && options.touch.length === 0;
-    if (!isEmptyArray) {
-      const names = options.touch === true ? [] : ([] as string[]).concat(options.touch);
-      const touchUpdates = touchAttributesWithTime.call(this, ...names);
-      Object.assign(updates, touchUpdates);
-    }
+    // Resolve the `touch:` option to timestamp column → time updates, honoring
+    // the `{ time: }` hash form (and combined column names) — see relation.rb.
+    const touchUpdates = counterCacheTouchUpdates(this, options.touch);
+    if (touchUpdates) Object.assign(updates, touchUpdates);
   }
 
   if (Object.keys(updates).length > 0) {
