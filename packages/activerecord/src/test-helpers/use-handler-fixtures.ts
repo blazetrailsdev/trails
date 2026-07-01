@@ -57,13 +57,20 @@ export function useHandlerFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: (WithTransactionalFixturesOptions & UseFixturesOpts) | undefined = undefined,
 ): Record<string, unknown> {
-  const { usesTransaction, invalidateSchemaCache, ...fixtureOpts } = options ?? {};
+  const { usesTransaction, invalidateSchemaCache, useTransactionalTests, ...fixtureOpts } =
+    options ?? {};
 
   setupHandlerSuite();
-  withTransactionalFixtures(() => Base.connection, {
-    usesTransaction,
-    invalidateSchemaCache,
-  });
+  // Rails' `use_transactional_tests = false` (default is true): skip the
+  // savepoint-pinned wrapper so `useFixtures`' per-test delete/reseed commits
+  // real DML, visible across pooled connections. Mirrors the direct-adapter
+  // escape hatch the view/signed-id suites used before converging here.
+  if (useTransactionalTests !== false) {
+    withTransactionalFixtures(() => Base.connection, {
+      usesTransaction,
+      invalidateSchemaCache,
+    });
+  }
 
   return useFixtures(
     fixturesOrNames as FixtureMap,

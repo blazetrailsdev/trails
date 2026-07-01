@@ -197,6 +197,19 @@ export interface WithTransactionalFixturesOptions {
   usesTransaction?: string[];
 
   /**
+   * Mirrors Rails' `self.use_transactional_tests`. Defaults to `true`. When set
+   * to `false`, {@link useHandlerFixtures} / {@link fixtures} skip the
+   * transactional wrapper entirely: fixtures are seeded and deleted per test via
+   * `useFixtures`' own `beforeEach`/`afterEach` (real committed DML, no savepoint
+   * pin), so inserts/updates are visible across pooled connections. Required by
+   * suites Rails marks non-transactional — e.g. DML through database views
+   * (`view_test.rb` `ViewWithoutPrimaryKeyTest`/`UpdateableViewTest`) and
+   * `signed_id_test.rb`. Ignored by {@link withTransactionalFixtures} itself,
+   * which is only invoked on the transactional path.
+   */
+  useTransactionalTests?: boolean;
+
+  /**
    * Optional async hook that runs at the very start of the `beforeAll`
    * registered by this helper — before `pushSkipGlobalReset()`. Used by
    * {@link useTransactionalTests} to co-locate `establishFromTestConfig` and

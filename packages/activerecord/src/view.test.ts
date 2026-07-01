@@ -9,8 +9,7 @@
 import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
@@ -147,9 +146,9 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 // Rails sets `self.use_transactional_tests = false` on this class
 // (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
-  setupFixtures();
-  const { books } = useFixtures(["books", "authors"], () => Base.connection, {
+  const { books } = fixtures(["books", "authors"], {
     schema: canonicalSchema,
+    useTransactionalTests: false,
   });
 
   class Paperback extends Base {
@@ -219,14 +218,15 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 // UpdateableViewTest — MySQL/PG only (SQLite views do not support DML)
 // ---------------------------------------------------------------------------
 // Rails sets `self.use_transactional_tests = false` here because DML through
-// views must commit to be visible across connections. fixtures wraps
-// each test in a savepoint; on MySQL a different pool connection for
-// PrintedBook.last() cannot see the uncommitted row. Mirror Rails by using
-// useFixtures (per-test reload via beforeEach/afterEach, no savepoint) instead.
+// views must commit to be visible across connections. The transactional
+// fixtures path wraps each test in a savepoint; on MySQL a different pool
+// connection for PrintedBook.last() cannot see the uncommitted row. Mirror
+// Rails by passing `useTransactionalTests: false` to fixtures() (per-test
+// delete/reseed via beforeEach/afterEach, committed DML, no savepoint).
 describe("UpdateableViewTest", () => {
-  setupFixtures();
-  const { books } = useFixtures(["books", "authors"], () => Base.connection, {
+  const { books } = fixtures(["books", "authors"], {
     schema: canonicalSchema,
+    useTransactionalTests: false,
   });
 
   class PrintedBook extends Base {
