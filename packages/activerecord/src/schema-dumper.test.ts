@@ -176,6 +176,48 @@ describe("SchemaDumperTest", () => {
     expect(match![1]).toMatch(/id: false/);
     expect(match![2]).toMatch(/t\.string\("id",.*null: false/);
   });
+
+  it("schema dump includes decimal options", async () => {
+    // Rails: dump_all_table_schema([/^[^n]/]) — keep only tables starting with
+    // `n` (numeric_data), then assert the scaled decimal + default round-trips.
+    const output = await standardDump([/^[^n]/]);
+    expect(output).toMatch(/precision: 3,\s+scale: 2,\s+default: "2\.78"/);
+  });
+
+  it("schema dump keeps large precision integer columns as decimal", async () => {
+    // Rails: standard_dump — canonical `numeric_data.atoms_in_universe` is a
+    // precision-55, scale-0 decimal, dumped without a scale option.
+    const output = await standardDump();
+    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
+  });
+
+  it("schema dump includes limit constraint for integer columns", async () => {
+    // Rails: dump_all_table_schema([/^(?!integer_limits)/]) with per-adapter
+    // `limit` expectations for `integer_limits.c_int_1..8`.
+    const output = await standardDump([/^(?!integer_limits)/]);
+    expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
+
+    // c_int_1..4: PostgreSQL rounds limit 1..2 → 2 bytes and drops it for the
+    // 4-byte 3..4; MySQL keeps 1..3 and drops the 4-byte 4; SQLite keeps 1..4.
+    const lowExpectations: RegExp[] =
+      adapterType === "postgres"
+        ? [/c_int_1.*limit: 2/, /c_int_2.*limit: 2/, /"c_int_3"(?!.*limit)/, /"c_int_4"(?!.*limit)/]
+        : adapterType === "mysql"
+          ? [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /"c_int_4"(?!.*limit)/]
+          : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
+    // c_int_5..8: only SQLite keeps them as limited integers; PG/MySQL widen to
+    // a bare bigint.
+    const highExpectations: RegExp[] =
+      adapterType === "sqlite"
+        ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
+        : [
+            /t\.bigint\("c_int_5"\)/,
+            /t\.bigint\("c_int_6"\)/,
+            /t\.bigint\("c_int_7"\)/,
+            /t\.bigint\("c_int_8"\)/,
+          ];
+    for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
+  });
 });
 
 // Deferred-convergence cases: still build ad-hoc, non-canonical tables (indexes
@@ -241,36 +283,6 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("users");
     expect(output).not.toContain("temp_cache");
-  });
-
-  // Deferred: SQLite reflection of a `defineSchema`-materialized table does not
-  // recover decimal precision/scale or integer limit, so these three cannot yet
-  // ride the canonical `numeric_data` / `integer_limits` via `standard_dump`.
-  // They stay on freshly-built ad-hoc tables (whose DDL the dumper reflects
-  // faithfully) until the canonical-materialization gap is closed.
-  it("schema dump includes limit constraint for integer columns", async () => {
-    await ctx.createTable("limits", {}, (t) => {
-      t.integer("small_int", { limit: 2 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("limit: 2");
-  });
-
-  it("schema dump includes decimal options", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("bank_balance", { precision: 10, scale: 2 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("precision: 10");
-    expect(output).toContain("scale: 2");
-  });
-
-  it("schema dump keeps large precision integer columns as decimal", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("atoms_in_universe", { precision: 55 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
   });
 
   // Deferred: Rails' canonical `string_key_objects` is `id: false` +

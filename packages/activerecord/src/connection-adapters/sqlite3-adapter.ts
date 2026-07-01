@@ -1070,17 +1070,28 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // hints are scoped to single-arg forms.
     const paramMatch = /\((\d+)\)/.exec(raw);
     const isDtPrec = /^(datetime|timestamp|time)\b/i.test(raw);
-    const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-    const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let scale: number | null = null;
     const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
     const castType = this.lookupCastType(baseSqlType);
     const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
+    // Decimal/numeric carry `precision`/`scale` in a two-arg `(p,s)` form that
+    // `paramMatch` (single-arg only) skips — `baseSqlType` still holds the full
+    // `DECIMAL(10, 2)`, so the resolved cast type already parsed them. Mirror
+    // Rails' `fetch_type_metadata`, which sources limit/precision/scale straight
+    // off the cast type, so a materialized decimal round-trips through the dumper.
+    if (dslTypeName === "decimal") {
+      precision = castType.precision ?? null;
+      scale = castType.scale ?? null;
+      limit = null;
+    }
     return new SqlTypeMetadata({
       sqlType: baseSqlType,
       type: dslTypeName,
       limit,
       precision,
-      scale: null,
+      scale,
     });
   }
 

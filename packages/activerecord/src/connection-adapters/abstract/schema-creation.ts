@@ -384,7 +384,11 @@ export class SchemaCreation {
         sql = "TEXT";
         break;
       case "integer":
-        sql = "INTEGER";
+        // Rails' `type_to_sql` appends an explicit `limit` as `integer(N)`
+        // (schema_statements.rb:1409). SQLite stores the declared type
+        // verbatim, so reflecting it back recovers the byte-width limit — the
+        // dumper's `limit:` option round-trips only when it is emitted here.
+        sql = options.limit != null ? `INTEGER(${options.limit})` : "INTEGER";
         break;
       case "bigint":
         sql = "BIGINT";
