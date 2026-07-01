@@ -283,7 +283,7 @@ export interface AbstractAdapter {
   indexExists(
     tableName: string,
     columns: string | string[] | null | undefined,
-    options?: { name?: string; unique?: boolean },
+    options?: { name?: string; unique?: boolean; valid?: boolean },
   ): Promise<boolean>;
   tableExists(tableName: string): Promise<boolean>;
   columnExists(tableName: string, columnName: string): Promise<boolean>;
