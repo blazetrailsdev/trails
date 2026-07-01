@@ -233,13 +233,23 @@ export class JoinDependency {
     // `normalizedReflections`) is still joinable by its own name.
     const reflection = _reflectOnAssociation(modelClass, assocName);
     if (reflection) {
-      // Mirrors: ActiveRecord::Associations::JoinDependency#build (join_dependency.rb:232)
+      // Mirrors: ActiveRecord::Associations::JoinDependency#build
+      // (join_dependency.rb:230-231) — `check_validity!` before
+      // `check_eager_loadable!`. `check_validity!` raises
+      // CompositePrimaryKeyMismatchError for a composite PK/FK arity mismatch,
+      // so a mismatched composite collection surfaces that error here rather
+      // than the generic join-key arity error deeper in `joinConstraints`.
+      (reflection as any).checkValidityBang?.();
       (reflection as any).checkEagerLoadableBang?.();
     }
 
     const sourceAlias = options?.fromAlias ?? this._baseAlias;
     const sourcePk = modelClass.primaryKey ?? "id";
-    if (Array.isArray(sourcePk)) return null;
+    // A composite source PK is only usable when a reflection drives the join:
+    // `JoinAssociation#joinConstraints` builds the composite FK↔PK tuple ON
+    // clause (via the reflection's join scope). The inline (no-reflection)
+    // fallback below only emits single-column equality, so it still bails.
+    if (Array.isArray(sourcePk) && !reflection) return null;
 
     const tableIndex = this._nextTableIndex();
     const tableAlias = `t${tableIndex}`;
@@ -296,9 +306,12 @@ export class JoinDependency {
       foreignKey = assocDef.options.as
         ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
         : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
-      if (Array.isArray(foreignKey)) return null;
+      // A composite FK/PK collection JOIN is built by the reflection-driven
+      // `joinConstraints` (composite tuple ON clause). Only the inline fallback,
+      // which emits single-column equality, still bails on a composite key.
+      if (Array.isArray(foreignKey) && !reflection) return null;
       primaryKey = assocDef.options.primaryKey ?? sourcePk;
-      if (Array.isArray(primaryKey)) return null;
+      if (Array.isArray(primaryKey) && !reflection) return null;
     } else {
       return null;
     }
