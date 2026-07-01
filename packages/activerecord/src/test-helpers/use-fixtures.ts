@@ -90,6 +90,20 @@ export interface UseFixturesOpts {
   schema?: Schema;
 }
 
+export interface FixturesConnectionOpts {
+  /**
+   * Caller-supplied connection/adapter thunk. When set, {@link fixtures} /
+   * {@link useHandlerFixtures} seed, clean, and (when transactional) pin fixtures
+   * through this connection instead of the default `() => Base.connection`.
+   *
+   * Mirrors Rails loading a fixture set through a model-specific `connection`
+   * (multi-database suites) or through a suite's own adapter. Composes with
+   * `useTransactionalTests: false`: when non-transactional, the thunk is the raw
+   * seed/clean connection; when transactional, the savepoint wrapper pins it too.
+   */
+  connection?: () => DatabaseAdapter;
+}
+
 /**
  * Resolves fixture-set names through the registry into the `[Model, data]` map shape.
  * Model classes are dynamic-imported (see {@link FixtureRegistryEntry}), so this is async.

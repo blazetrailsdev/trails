@@ -6,7 +6,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -70,13 +70,19 @@ describe("TransactionInstrumentationTest", () => {
     Topic.adapter = sharedAdapter;
     await Topic.loadSchema();
   });
-  // Object-map form (not the `["topics"]` registry form) on purpose: the
-  // registry form requires a `{ schema }` option (use-fixtures-schema rule),
-  // which registers a `beforeAll` that defines the schema before `sharedAdapter`
-  // exists — it's created per-test in `beforeEach` for TM isolation. The
-  // object-map form is exempt from that rule and wires its own schema, which
-  // `freshIsolatedAdapter` already creates per test.
-  const { topics } = useFixtures({ topics: [Topic, topicFixtureData] }, () => sharedAdapter);
+  // Seed the per-test `sharedAdapter` through `fixtures()`' caller-supplied
+  // `connection` knob, non-transactionally (Rails `use_transactional_tests =
+  // false`): an outer transactional-fixtures wrapper would itself materialize
+  // and skew the event counts these tests assert on. `schema: undefined`
+  // suppresses the canonical-schema default — `freshIsolatedAdapter` already
+  // creates `topics` per test, and a `{ schema }`-driven `beforeAll` would run
+  // before `sharedAdapter` exists (it's built per-test in `beforeEach` for TM
+  // isolation). The object-map form keeps the throwaway `Topic` off the
+  // registry, matching Rails' `Class.new`.
+  const { topics } = fixtures(
+    { topics: [Topic, topicFixtureData] },
+    { connection: () => sharedAdapter, useTransactionalTests: false, schema: undefined },
+  );
   afterEach(() => {
     Notifications.unsubscribeAll();
     vi.restoreAllMocks();
