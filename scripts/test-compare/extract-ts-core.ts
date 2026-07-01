@@ -10,6 +10,79 @@ import type { TestFileInfo, TestGate } from "./types.js";
 
 const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
 
+// The camelCase twin of the Ruby extractor's ASSERTION_METHODS list
+// (extract-ruby-tests.rb) — kept deliberately in lockstep so both sides count
+// the *same* set of assertion kinds. We intentionally do NOT count Rails
+// custom-helper wrappers that are absent from the Ruby whitelist (e.g.
+// `assert_queries_count` / `assert_no_queries` → `assertQueriesCount` /
+// `assertNoQueries`): counting them on the TS side but not the Ruby side would
+// manufacture false count mismatches. Their nested `expect(...)` calls are
+// still counted symmetrically on both sides.
+const ASSERTION_CALLEES = new Set([
+  "expect",
+  "assert",
+  "assertEqual",
+  "assertNotEqual",
+  "assertNil",
+  "assertNotNil",
+  "assertRaises",
+  "assertRaise",
+  "assertNothingRaised",
+  "assertMatch",
+  "assertNoMatch",
+  "assertIncludes",
+  "assertNotIncludes",
+  "assertEmpty",
+  "assertNotEmpty",
+  "assertRespondTo",
+  "assertInstanceOf",
+  "assertKindOf",
+  "assertPredicate",
+  "assertSame",
+  "assertNotSame",
+  "assertInDelta",
+  "assertInEpsilon",
+  "assertOperator",
+  "assertSend",
+  "assertDifference",
+  "assertNoDifference",
+  "assertChanges",
+  "assertNoChanges",
+  "assertDeprecated",
+  "refute",
+  "refuteEqual",
+  "refuteNil",
+  "refuteIncludes",
+]);
+
+/**
+ * Does a call's callee identifier name it an assertion? The TS twin of the Ruby
+ * extractor's ASSERTION_METHODS list ({@link ASSERTION_CALLEES}). Only the
+ * *inner* `expect(x)` call in an `expect(x).toEqual(y)` chain has an identifier
+ * callee, so each chain counts once — matching how the Ruby side counts one per
+ * assertion call.
+ */
+function isAssertionCallee(name: string): boolean {
+  return ASSERTION_CALLEES.has(name);
+}
+
+/** Non-deduplicated count of assertion calls in a test node's subtree. */
+function countAssertions(node: ts.Node): number {
+  let count = 0;
+  const walk = (n: ts.Node) => {
+    if (
+      ts.isCallExpression(n) &&
+      ts.isIdentifier(n.expression) &&
+      isAssertionCallee(n.expression.text)
+    ) {
+      count++;
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return count;
+}
+
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
 // as arg 0 and the title as arg 1, matching the test-helpers/supports.ts API.
@@ -64,6 +137,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       style,
       assertions: [],
+      assertionCount: countAssertions(node),
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });

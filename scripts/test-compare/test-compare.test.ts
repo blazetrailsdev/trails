@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { compareFileResults, parseMinExtra, type ConventionFileResult } from "./test-compare.js";
+import {
+  compareFileResults,
+  isAssertionCountMismatch,
+  parseMinExtra,
+  type ConventionFileResult,
+} from "./test-compare.js";
 
 /** Build a ConventionFileResult with only the fields the helpers read. */
 function file(over: Partial<ConventionFileResult>): ConventionFileResult {
@@ -62,5 +67,24 @@ describe("compareFileResults", () => {
     ];
     files.sort((a, b) => compareFileResults(a, b, true));
     expect(files.map((f) => f.rubyFile)).toEqual(["present", "missing-ts"]);
+  });
+});
+
+describe("isAssertionCountMismatch", () => {
+  it("flags differing counts on an implemented pair", () => {
+    expect(isAssertionCountMismatch(3, 2, false)).toBe(true);
+  });
+
+  it("does not flag equal counts", () => {
+    expect(isAssertionCountMismatch(2, 2, false)).toBe(false);
+  });
+
+  it("never flags a pending/it.skip stub (0 assertions is legitimate)", () => {
+    expect(isAssertionCountMismatch(3, 0, true)).toBe(false);
+  });
+
+  it("does not flag when either side's count is unknown", () => {
+    expect(isAssertionCountMismatch(undefined, 2, false)).toBe(false);
+    expect(isAssertionCountMismatch(2, undefined, false)).toBe(false);
   });
 });

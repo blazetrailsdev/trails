@@ -34,6 +34,13 @@
  *                 missing-gate / wrong-gate / over-gated). Advisory: does not
  *                 affect the matched/skipped/percent counts. Always emitted to
  *                 the JSON artifact regardless of this flag.
+ *   --assertions  Print the assertion-count-mismatch report — matched,
+ *                 implemented tests whose trails port has a different number of
+ *                 assertion calls than its Rails counterpart. Report-only: no CI
+ *                 gate, no exclude.json, does not affect any count. Always
+ *                 emitted to the JSON artifact regardless of this flag. Compares
+ *                 assertion *counts* only; comparing assertion *expectations*
+ *                 (kinds / expected values) is planned follow-up.
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -142,6 +149,22 @@ interface GateMismatch {
   tsGate?: TestGate;
 }
 
+/**
+ * A matched, implemented test whose trails port has a different number of
+ * assertion *calls* than its Rails counterpart. Informational only — this
+ * never gates CI and has no exclude.json baseline.
+ *
+ * NOTE: this compares assertion *counts* only. Comparing the actual assertion
+ * *expectations* (assertion-kind histograms / literal expected values) is
+ * planned follow-up, not implemented here.
+ */
+interface AssertionMismatch {
+  description: string;
+  rubyPath: string;
+  railsCount: number;
+  trailsCount: number;
+}
+
 export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
@@ -160,6 +183,7 @@ export interface ConventionFileResult {
   misplacedTests?: MisplacedTest[];
   wrongDescribeTests?: WrongDescribeTest[];
   gateMismatches?: GateMismatch[];
+  assertionMismatches?: AssertionMismatch[];
 }
 
 interface ConventionPackageResult {
@@ -173,6 +197,7 @@ interface ConventionPackageResult {
   totalWrongDescribe: number;
   totalMisplaced: number;
   totalGateMismatch: number;
+  totalAssertionMismatch: number;
   totalExtra: number;
   percent: number;
   files: ConventionFileResult[];
@@ -186,6 +211,7 @@ interface TsTestInfo {
   desc: string; // normalized description
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
+  assertionCount?: number; // raw assertion-call count from the TS extractor
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +233,25 @@ export function parseMinExtra(args: string[]): number {
     throw new Error("--min-extra requires a non-negative number (e.g. --min-extra=5)");
   }
   return n;
+}
+
+/**
+ * Report-only decision: should a matched pair be flagged as an assertion-count
+ * mismatch? True only when both sides have a known count, the test is
+ * implemented (not a pending/it.skip stub — a stub legitimately has 0
+ * assertions), and the raw counts differ. Never gates CI.
+ *
+ * Count-only: this does NOT compare assertion *expectations* (kinds / expected
+ * values) — that is planned follow-up.
+ */
+export function isAssertionCountMismatch(
+  railsCount: number | undefined,
+  trailsCount: number | undefined,
+  pending: boolean,
+): boolean {
+  if (pending) return false;
+  if (railsCount === undefined || trailsCount === undefined) return false;
+  return railsCount !== trailsCount;
 }
 
 /**
@@ -246,6 +291,7 @@ function main() {
   const jsonOutput = args.includes("--json");
   const showIncomplete = args.includes("--incomplete");
   const showGates = args.includes("--gates");
+  const showAssertions = args.includes("--assertions");
   const sortExtra = args.includes("--sort-extra");
   let minExtra = 0;
   try {
@@ -311,7 +357,13 @@ function main() {
         const tc = file.testCases[i];
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
-        tests.push({ path: np, desc: nd, pending: !!tc.pending, gate: tc.gate });
+        tests.push({
+          path: np,
+          desc: nd,
+          pending: !!tc.pending,
+          gate: tc.gate,
+          assertionCount: tc.assertionCount,
+        });
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
 
@@ -375,6 +427,7 @@ function main() {
     let totalWrongDescribe = 0;
     let totalMisplaced = 0;
     let totalGateMismatch = 0;
+    let totalAssertionMismatch = 0;
     let totalExtra = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
@@ -407,6 +460,7 @@ function main() {
       const misplacedTests: MisplacedTest[] = [];
       const wrongDescribeTests: WrongDescribeTest[] = [];
       const gateMismatches: GateMismatch[] = [];
+      const assertionMismatches: AssertionMismatch[] = [];
 
       // Flag a divergence between Rails' gate and our TS gate for a matched
       // pair (advisory — does not affect the matched/skipped counts).
@@ -421,6 +475,25 @@ function main() {
           tsGate: tsInfo.gate,
         });
         totalGateMismatch++;
+      };
+
+      // Report-only: compare the raw assertion-call count of a matched pair.
+      // Only for implemented tests — a pending/it.skip stub legitimately has 0
+      // assertions, so skip it. Counts are exact; a difference is informational
+      // (no CI gate, no exclude.json). Comparing the actual assertion
+      // expectations (kinds / expected values) is planned follow-up, not done
+      // here.
+      const recordAssertion = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        const railsCount = rubyTc.assertionCount;
+        const trailsCount = tsInfo.assertionCount;
+        if (!isAssertionCountMismatch(railsCount, trailsCount, tsInfo.pending)) return;
+        assertionMismatches.push({
+          description: rubyTc.description,
+          rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
+          railsCount: railsCount!,
+          trailsCount: trailsCount!,
+        });
+        totalAssertionMismatch++;
       };
 
       // Pass 1: Path matches (exact ancestor + description match)
@@ -440,6 +513,7 @@ function main() {
             totalMatchedSkipped++;
           }
           recordGate(tc, tsTests[tsIdx]);
+          recordAssertion(tc, tsTests[tsIdx]);
         }
       }
 
@@ -475,6 +549,7 @@ function main() {
                 totalMatchedSkipped++;
               }
               recordGate(tc, tsTests[idx]);
+              recordAssertion(tc, tsTests[idx]);
               break;
             }
           }
@@ -530,6 +605,7 @@ function main() {
             totalMatchedSkipped++;
           }
           recordGate(tc, tsTests[descIdx]);
+          recordAssertion(tc, tsTests[descIdx]);
           wrongDescribeTests.push({
             description: tc.description,
             rubyPath: np,
@@ -618,6 +694,7 @@ function main() {
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
         ...(gateMismatches.length > 0 ? { gateMismatches } : {}),
+        ...(assertionMismatches.length > 0 ? { assertionMismatches } : {}),
       });
     }
 
@@ -637,6 +714,7 @@ function main() {
       totalWrongDescribe,
       totalMisplaced,
       totalGateMismatch,
+      totalAssertionMismatch,
       totalExtra,
       percent,
       files: fileResults,
@@ -662,6 +740,7 @@ function main() {
   let grandWrongDescribe = 0;
   let grandMisplaced = 0;
   let grandGateMismatch = 0;
+  let grandAssertionMismatch = 0;
   let grandExtra = 0;
   let grandFiles = 0;
   let grandMapped = 0;
@@ -673,6 +752,7 @@ function main() {
     grandWrongDescribe += pkg.totalWrongDescribe;
     grandMisplaced += pkg.totalMisplaced;
     grandGateMismatch += pkg.totalGateMismatch;
+    grandAssertionMismatch += pkg.totalAssertionMismatch;
     grandExtra += pkg.totalExtra;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
@@ -683,6 +763,11 @@ function main() {
     if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
     if (pkg.totalGateMismatch > 0) {
       details.push(`${pkg.totalGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
+    }
+    if (pkg.totalAssertionMismatch > 0) {
+      details.push(
+        `${pkg.totalAssertionMismatch} assertion-count-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+      );
     }
     if (pkg.totalExtra > 0) details.push(`${pkg.totalExtra} extra (TS only)`);
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
@@ -756,6 +841,29 @@ function main() {
       console.log("");
     }
 
+    // Assertion count mismatches: matched, implemented tests whose trails port
+    // has a different number of assertion calls than its Rails counterpart.
+    // Report-only (no CI gate, no exclude.json). Shown only with --assertions.
+    //
+    // FUTURE WORK: this compares assertion *counts* only. Comparing the actual
+    // assertion *expectations* (assertion-kind histograms / literal expected
+    // values) is planned follow-up and is NOT implemented here.
+    const filesWithAssertionMismatch = pkg.files.filter(
+      (f) => f.assertionMismatches && f.assertionMismatches.length > 0,
+    );
+    if (showAssertions && filesWithAssertionMismatch.length > 0) {
+      console.log(`  ASSERTION COUNT MISMATCHES (rails vs trails — count only, informational):`);
+      console.log(`  ${"-".repeat(86)}`);
+      for (const f of filesWithAssertionMismatch) {
+        for (const am of f.assertionMismatches!) {
+          console.log(
+            `    ${f.rubyFile} › ${am.description} — rails ${am.railsCount} vs trails ${am.trailsCount}`,
+          );
+        }
+      }
+      console.log("");
+    }
+
     console.log(
       `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Extra".padStart(5)} ${"Tot".padStart(4)}`,
     );
@@ -788,6 +896,11 @@ function main() {
   if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
   if (grandGateMismatch > 0) {
     grandDetails.push(`${grandGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
+  }
+  if (grandAssertionMismatch > 0) {
+    grandDetails.push(
+      `${grandAssertionMismatch} assertion-count-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+    );
   }
   if (grandExtra > 0) grandDetails.push(`${grandExtra} extra (TS only)`);
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";

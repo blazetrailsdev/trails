@@ -56,8 +56,15 @@ export interface TestCaseInfo {
   line: number;
   /** Test definition style */
   style: "it" | "test" | "def_test" | "describe";
-  /** Assertion method names used in the test body */
+  /** Assertion method names used in the test body (deduplicated to distinct kinds) */
   assertions: string[];
+  /**
+   * Raw (non-deduplicated) count of assertion calls in the test body — one per
+   * `expect(...)`/`assert*` call, not per distinct kind. Populated on both the
+   * Ruby and TS extractors so test:compare can compare exact assertion counts
+   * between a matched Rails test and its trails port.
+   */
+  assertionCount?: number;
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**

@@ -298,6 +298,7 @@ class TestExtractor
       line: t[:line],
       style: "def_test",
       assertions: t[:assertions],
+      assertionCount: t[:assertion_count],
     }, nil, body_gate: t[:body_gate])
   end
 
@@ -367,6 +368,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -378,6 +380,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -388,6 +391,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -399,6 +403,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -408,6 +413,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -419,6 +425,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -429,6 +436,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -440,6 +448,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -461,6 +470,7 @@ class TestExtractor
     desc = name.sub(/^test_/, "").tr("_", " ")
     line = extract_line(node)
     assertions = extract_assertions_from_def(node)
+    assertion_count = count_assertions(node)
 
     # Inside a mixin module body: stash, don't emit. Materialized at end of file
     # by flush_collected_modules, with the include-site gate from process_include.
@@ -469,6 +479,7 @@ class TestExtractor
       # retained past collection, so it can't be recomputed at materialization.
       @module_collect << {
         description: desc, line: line, assertions: assertions,
+        assertion_count: assertion_count,
         body_gate: body_skip_gate(node)
       }
       return
@@ -484,6 +495,7 @@ class TestExtractor
       line: line,
       style: "def_test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -856,6 +868,16 @@ class TestExtractor
     assertions = []
     find_assertions(node, assertions)
     assertions.uniq
+  end
+
+  # Raw (non-deduped) count of assertion calls in a test body. `assertions`
+  # (above) uniq's to distinct assertion *kinds*; this counts every call, which
+  # is what test:compare's assertion-count comparison needs (exact-count parity
+  # with the Rails counterpart). See extract-ts-core.ts for the TS-side twin.
+  def count_assertions(node)
+    assertions = []
+    find_assertions(node, assertions)
+    assertions.length
   end
 
   def find_assertions(node, results)
