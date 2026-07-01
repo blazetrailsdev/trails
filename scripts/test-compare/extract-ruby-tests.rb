@@ -887,17 +887,18 @@ class TestExtractor
     when :command, :fcall
       name = ident_name(node[1])
       results << name if name && ASSERTION_METHODS.include?(name)
-    when :method_add_arg
-      if node[1].is_a?(Array) && node[1][0] == :fcall
-        name = ident_name(node[1][1])
-        results << name if name && ASSERTION_METHODS.include?(name)
-      end
     when :call
       # method.must_equal etc
       name = ident_name(node[3]) if node[3]
       results << name if name && ASSERTION_METHODS.include?(name)
     end
 
+    # NOTE: a parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
+    # [:fcall, ...], [:arg_paren, ...]]`. We deliberately do NOT match
+    # `:method_add_arg` here — the recursion below descends into its `:fcall`
+    # child, which the branch above already records. Matching the wrapper too
+    # would count the call twice (harmless under the uniq'd `assertions` set,
+    # but wrong for the raw `assertionCount`).
     node.each { |child| find_assertions(child, results) if child.is_a?(Array) }
   end
 

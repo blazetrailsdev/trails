@@ -68,6 +68,31 @@ describe("Ruby extractor assertion-count collection", () => {
     expect(c["nested block"]).toBe(2);
   });
 
+  it("counts a parenthesized assertion call once, not twice", () => {
+    // Ripper wraps `assert_equal(1, a)` as [:method_add_arg, [:fcall, ...]];
+    // the raw count must not double-count the wrapper + its fcall child.
+    const c = rubyAssertionCounts({
+      "cases/paren_test.rb": `
+        class ParenTest < ActiveSupport::TestCase
+          def test_mixed_paren_and_command
+            assert_equal(1, a)
+            assert_nil b
+            assert(c)
+          end
+
+          def test_paren_wrapper_with_block
+            assert_difference("Post.count") do
+              assert_equal(1, y)
+            end
+          end
+        end
+      `,
+    });
+    expect(c["mixed paren and command"]).toBe(3);
+    // assert_difference wrapper + nested parenthesized assert_equal = 2
+    expect(c["paren wrapper with block"]).toBe(2);
+  });
+
   it("counts assertions in it/test-macro bodies", () => {
     const c = rubyAssertionCounts({
       "cases/bar_test.rb": `
