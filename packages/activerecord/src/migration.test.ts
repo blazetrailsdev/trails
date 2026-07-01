@@ -223,6 +223,7 @@ describe("MigrationTest", () => {
       const adapter = freshAdapter() as DatabaseAdapter & {
         createSchema(name: string): Promise<void>;
         dropSchema(name: string): Promise<void>;
+        indexExists(table: string, column: string): Promise<boolean>;
       };
       await adapter.createSchema("my_schema");
       try {
@@ -234,11 +235,15 @@ describe("MigrationTest", () => {
           t.integer("value");
         });
 
+        // Assert through the adapter's live `index_exists?` (Rails uses
+        // `connection.index_exists?`), not MigrationContext's in-memory
+        // bookkeeping, so a schema-qualified adapter bug can't slip past a
+        // stale-but-correct cache.
         await ctx.addIndex("my_schema.values", "value");
-        expect(ctx.indexExists("my_schema.values", "value")).toBe(true);
+        expect(await adapter.indexExists("my_schema.values", "value")).toBe(true);
 
         await ctx.removeIndex("my_schema.values", { column: "value" });
-        expect(ctx.indexExists("my_schema.values", "value")).toBe(false);
+        expect(await adapter.indexExists("my_schema.values", "value")).toBe(false);
       } finally {
         await adapter.dropSchema("my_schema");
       }
@@ -777,7 +782,9 @@ describe("MigrationTest", () => {
     // Rails migration_a adds `last_name` on `people` with a casted type (:char
     // on PG, :blob elsewhere); migration_b re-adds the same casted type with
     // if_not_exists: true and asserts nothing raised. Ride canonical `people`.
-    const type = adapterType === "postgres" ? "string" : "binary";
+    // trails maps :blob → "binary"; PG resolves "char" via typeToSql's raw-name
+    // fallback, mirroring Rails' :char.
+    const type = adapterType === "postgres" ? "char" : "binary";
     const adapter = await freshAdapterWithPeople();
     await new Migrator(adapter, [
       migrateProxy(100, (m) => m.addColumn("people", "last_name", type)),
