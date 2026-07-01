@@ -4141,7 +4141,7 @@ export class Relation<T extends Base> {
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
     // so optimistic locking (lock_version increment) is applied — mirrors Rails
     // touch_all which calls update_all internally (relation.rb).
-    const touchUpdates = touchAttributesWithTime.call(this._modelClass, names);
+    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, undefined);
     const updates: Record<string, unknown> = {};
     for (const [col, time] of Object.entries(touchUpdates)) {
       updates[col] = new Nodes.Quoted(time);
@@ -6354,7 +6354,7 @@ export class Relation<T extends Base> {
       // hash form; `touch: []` → no names), then touch the update-timestamp
       // columns via touchAttributesWithTime — same call Rails makes.
       const { names, time } = parseCounterCacheTouch(touchOption);
-      const touchUpdates = touchAttributesWithTime.call(this._modelClass, names, time);
+      const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
       for (const [col, t] of Object.entries(touchUpdates)) {
         updates[col] = new Nodes.Quoted(t);
       }

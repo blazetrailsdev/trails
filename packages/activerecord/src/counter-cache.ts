@@ -206,7 +206,7 @@ export async function resetCounters(
     // Mirror Rails counter_cache.rb: parse touch into names + time (`{ time: }`
     // hash form; `touch: []` → no names), then touch via touchAttributesWithTime.
     const { names, time } = parseCounterCacheTouch(options.touch);
-    const touchUpdates = touchAttributesWithTime.call(this, names, time);
+    const touchUpdates = touchAttributesWithTime.call(this, ...names, time);
     Object.assign(updates, touchUpdates);
   }
 

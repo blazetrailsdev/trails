@@ -273,9 +273,14 @@ interface TimestampInstanceHost {
 
 export function touchAttributesWithTime(
   this: TimestampHost,
-  names: string[] = [],
-  time?: Temporal.Instant,
+  // Mirrors Rails' `def touch_attributes_with_time(*names, time: nil)` — the
+  // splatted column names followed by the (nullable) `time` keyword. TS forbids
+  // an *optional* element after a rest element, so `time` is required at the
+  // type level; callers pass `undefined` for the current-time default.
+  ...args: [...names: string[], time: Temporal.Instant | undefined]
 ): Record<string, Temporal.Instant> {
+  const names = args.slice(0, -1) as string[];
+  const time = args[args.length - 1] as Temporal.Instant | undefined;
   const resolvedTime = time ?? currentTimeFromProperTimezone();
   const resolved = names.map((n) => this._attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
