@@ -4260,13 +4260,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string {
-    const normalizedTableName = tableName.replace(/[."]/g, "_");
+    // Rails PostgreSQL#index_name strips the schema qualifier and derives the
+    // name from the bare table (postgresql/schema_statements.rb), so a
+    // `my_schema.values` table indexes as `index_values_on_value` — created in
+    // `my_schema` via the schema-qualified table, keeping add/remove symmetric.
+    const { table } = this.parseSchemaQualifiedName(tableName);
     if (options.column != null) {
       if (options._usesLegacyIndexName) {
         const cols = Array.isArray(options.column) ? options.column : [options.column];
-        return `index_${normalizedTableName}_on_${cols.join("_and_")}`;
+        return `index_${table}_on_${cols.join("_and_")}`;
       }
-      return this.generateIndexName(normalizedTableName, options.column);
+      return this.generateIndexName(table, options.column);
     }
     if (options.name != null) return options.name;
     throw new ArgumentError("You must specify the index name");
