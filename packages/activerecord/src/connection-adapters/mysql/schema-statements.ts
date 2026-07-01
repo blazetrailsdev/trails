@@ -459,6 +459,7 @@ interface IntrospectionHost {
   lookupCastType(sqlType: string): Type;
   getFullVersion(): Promise<string>;
   isMariadb(): boolean;
+  primaryKeys(tableName: string): Promise<string[]>;
 }
 
 /** @internal
@@ -501,22 +502,11 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
   // columns but also for the columns of a UNIQUE index over NOT NULL columns
   // when the table has no PRIMARY KEY (the "promoted unique" case, e.g.
   // string_key_objects' `t.index :id, unique: true`). Rails never derives a
-  // per-column primary flag from `column_key`; it resolves the primary key
-  // separately via information_schema (constraint_name/index_name = 'PRIMARY').
-  // Mirror that: only columns belonging to the real PRIMARY index are the
-  // primary key, so a promoted unique index stays a plain unique key and the
-  // dumper emits `id: false` (matching Rails/MySQL).
-  const pkRows = await this.schemaQuery(
-    `SELECT column_name AS name
-       FROM information_schema.statistics
-       WHERE table_schema = COALESCE(?, database())
-       AND table_name = ?
-       AND index_name = 'PRIMARY'`,
-    [schema ?? null, table],
-  );
-  const primaryKeyColumns = new Set(
-    pkRows.map((r) => String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string)),
-  );
+  // per-column primary flag from `column_key`; it resolves the primary key via
+  // `primary_keys` (key_column_usage, constraint_name = 'PRIMARY'). Mirror that:
+  // only columns in the real PRIMARY key are primary, so a promoted unique index
+  // stays a plain unique key and the dumper emits `id: false` (as Rails/MySQL).
+  const primaryKeyColumns = new Set(await this.primaryKeys(tableName));
 
   return rows.map((r) => {
     const name = String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
