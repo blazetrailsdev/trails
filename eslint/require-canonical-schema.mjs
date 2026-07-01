@@ -78,14 +78,22 @@ function repoRel(filename) {
 const CANONICAL_SOURCE = /(^|\/)test-helpers\/test-schema(\.js)?$/;
 
 /**
- * Peel `as const` / `satisfies T` wrappers off an expression so downstream
- * checks see the underlying node. Without this, `const X = {…} as const` has a
- * `TSAsExpression` init (not an `ObjectExpression`) and any bespoke schema so
- * wrapped evades the ratchet entirely. Applied everywhere an init/value/arg is
- * examined (whole-arg, resolved const init, per-table value, spread argument).
+ * Peel type-assertion wrappers off an expression so downstream checks see the
+ * underlying node. Without this, `const X = {…} as const` has a `TSAsExpression`
+ * init (not an `ObjectExpression`) and any bespoke schema so wrapped evades the
+ * ratchet entirely. Covers all three assertion forms — `x as const`
+ * (`TSAsExpression`), `x satisfies T` (`TSSatisfiesExpression`), and the
+ * angle-bracket `<T>x` (`TSTypeAssertion`) — and nests. Applied everywhere an
+ * init/value/arg is examined (whole-arg, resolved const init, per-table value,
+ * spread argument).
  */
 function unwrapAs(node) {
-  while (node && (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression")) {
+  while (
+    node &&
+    (node.type === "TSAsExpression" ||
+      node.type === "TSSatisfiesExpression" ||
+      node.type === "TSTypeAssertion")
+  ) {
     node = node.expression;
   }
   return node;

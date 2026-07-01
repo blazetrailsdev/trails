@@ -50,6 +50,8 @@ tester.run("require-canonical-schema", rule, {
     IMPORT + "await defineSchema({ posts: TEST_SCHEMA.posts satisfies object });",
     // `as const` on the spread of the whole canonical schema.
     IMPORT + "await defineSchema({ ...(TEST_SCHEMA as const) });",
+    // Angle-bracket assertion on a per-table canonical value is unwrapped.
+    IMPORT + "await defineSchema({ posts: <const>TEST_SCHEMA.posts });",
     // Empty schema has no tables to flag.
     "await defineSchema({});",
     // Not defineSchema.
@@ -135,6 +137,11 @@ tester.run("require-canonical-schema", rule, {
     // `as const` directly on a bespoke inline whole-arg object.
     {
       code: IMPORT + 'await defineSchema({ posts: { title: "string" } } as const);',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    // Angle-bracket assertion does not launder a bespoke inline table either.
+    {
+      code: IMPORT + 'await defineSchema(<const>{ posts: { title: "string" } });',
       errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
     },
     // Multiple inline tables → one report each; canonical ones skipped.
