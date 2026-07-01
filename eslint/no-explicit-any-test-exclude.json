@@ -229,6 +229,7 @@
   "packages/activerecord/src/relation/with.test.ts",
   "packages/activerecord/src/relations.test.ts",
   "packages/activerecord/src/schema-dumper.test.ts",
+  "packages/activerecord/src/schema-dumper.trails.test.ts",
   "packages/activerecord/src/scoping/default-scoping.test.ts",
   "packages/activerecord/src/scoping/named-scoping.test.ts",
   "packages/activerecord/src/scoping/relation-scoping.test.ts",
