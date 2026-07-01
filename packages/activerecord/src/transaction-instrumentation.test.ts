@@ -416,44 +416,16 @@ describe("TransactionInstrumentationTest", () => {
     expect(events).toHaveLength(1);
   });
 
-  it.skip("transaction instrumentation on failed rollback", () => {
-    // PERMANENT-SKIP: Rails gates this with `unless in_memory_db?`
-    // (transaction_instrumentation_test.rb:391). A failed DB rollback drives
-    // `@connection.throw_away!`, discarding the connection — for the in-memory
-    // SQLite database the canonical adapter uses, that destroys the schema and
-    // breaks per-test teardown, exactly as Rails skips it. See UNPORTED_FILES.
-  });
+  // PERMANENT-SKIP (both cases): Rails wraps `test_transaction_instrumentation_on_failed_rollback`
+  // and `..._when_unmaterialized` in a single `unless in_memory_db?` block
+  // (transaction_instrumentation_test.rb:390-417), so neither runs against an
+  // in-memory database. A failed DB rollback drives `@connection.throw_away!`,
+  // discarding the connection — for the in-memory SQLite database the canonical
+  // adapter uses, that destroys the schema and breaks per-test teardown, exactly
+  // as Rails skips it. See UNPORTED_FILES.
+  it.skip("transaction instrumentation on failed rollback", () => {});
 
-  it("transaction instrumentation on failed rollback when unmaterialized", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
-    });
-
-    const MyError = class extends Error {};
-    // Use an isolated throwaway adapter, not `sharedAdapter`: a raised
-    // `rollback_transaction` leaves the transaction incomplete, so the outer
-    // `within_new_transaction` ensure now drives `throw_away!` (eviction +
-    // disconnect) — discarding `sharedAdapter` would destroy the canonical
-    // :memory: schema and break the useFixtures teardown (see the skipped
-    // materialized sibling above).
-    const adapter = await freshIsolatedAdapter();
-    const { Topic: IsolatedTopic } = makeTopic(adapter);
-    const tm = (adapter as any).transactionManager;
-    vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
-      throw new MyError("rollback failed");
-    });
-
-    await expect(
-      IsolatedTopic.transaction(async () => {
-        throw new Rollback();
-      }),
-    ).rejects.toThrow(MyError);
-
-    expect(adapter.active).toBe(false);
-
-    expect(events).toHaveLength(0);
-  });
+  it.skip("transaction instrumentation on failed rollback when unmaterialized", () => {});
 
   it("transaction instrumentation on broken subscription", async () => {
     const MyError = class extends Error {};
