@@ -993,4 +993,299 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toBeInstanceOf(ConnectionNotEstablished);
     });
   });
+
+  describe("lock sharing", () => {
+    // Regression: withRawConnection and the transaction manager must share one
+    // reentrant lock (Rails' single @lock). With separate locks a transaction
+    // (holds the tx lock, then its write wants the raw lock) racing a bare write
+    // (holds the raw lock, then materializeTransactions wants the tx lock)
+    // deadlocks (ABBA) — the hang that routing writes through withRawConnection
+    // surfaced. See abstract-adapter.ts withRawConnection.
+    it("concurrent transaction and bare write do not deadlock", async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "abba" CASCADE');
+      await adapter.exec('CREATE TABLE "abba" ("id" SERIAL PRIMARY KEY, "n" INT)');
+      const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+      // Transaction holds the lock, then (after a gap) writes — needs the raw lock.
+      const inTx = adapter.transaction(async () => {
+        await delay(150);
+        await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (1)`);
+      });
+      // Bare write races into the gap: grabs the raw lock, then materialize wants
+      // the tx lock. Separate locks → ABBA deadlock; one shared lock → serializes.
+      const bare = (async () => {
+        await delay(50);
+        await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (2)`);
+      })();
+      await Promise.all([inTx, bare]);
+      const rows = await adapter.execute(`SELECT COUNT(*)::int AS c FROM "abba"`);
+      expect(rows[0]["c"]).toBe(2);
+      await adapter.exec('DROP TABLE IF EXISTS "abba" CASCADE');
+    });
+  });
+
+  describe("connected?", () => {
+    // Mirrors Rails' `connected?`
+    // (`!(@raw_connection.nil? || @raw_connection.finished?)`): once the
+    // underlying socket is gone, `connected?`/`isConnected()` reports false even
+    // though the adapter has not nulled its handle (no `disconnect!`). Closing
+    // the live pg.Client underneath the adapter is the node-pg analog of a
+    // server-side `pg_terminate_backend` / `PQfinish`.
+    it("connected? is false after the raw connection is finished", async () => {
+      await adapter.exec("SELECT 1");
+      const rawConnection = (adapter as unknown as { _rawConnection: pg.Client | null })
+        ._rawConnection;
+      expect(rawConnection).not.toBeNull();
+      expect(adapter.isConnected()).toBe(true);
+
+      // Finish the socket without going through disconnectBang, so _connection
+      // is still set but the client is `finished?`.
+      await rawConnection!.end();
+
+      expect(adapter.isConnected()).toBe(false);
+    });
+  });
+
+  describe("buildChangeColumnDefinition", () => {
+    it("returns a ChangeColumnDefinition with correct column name and sqlType", () => {
+      const def = adapter.buildChangeColumnDefinition("users", "age", "integer");
+      expect(def.name).toBe("age");
+      expect(def.column.name).toBe("age");
+      // Like Rails, the builder leaves sqlType unset — the visitor computes it
+      // on accept, so the emitted DDL carries the resolved SQL type.
+      expect(adapter.schemaCreation.accept(def)).toContain("TYPE integer");
+    });
+
+    it("reflects using/castAs options on the column definition", () => {
+      const def = adapter.buildChangeColumnDefinition("users", "score", "decimal", {
+        using: "score::decimal",
+      });
+      expect(def.column.options).toMatchObject({ using: "score::decimal" });
+    });
+  });
+
+  describe("buildChangeColumnDefaultDefinition", () => {
+    beforeEach(async () => {
+      await adapter.exec(`
+        CREATE TABLE "bcd_test" (
+          "id" SERIAL PRIMARY KEY,
+          "score" INTEGER DEFAULT 0,
+          "created_at" TIMESTAMP WITHOUT TIME ZONE,
+          "tags" TEXT[]
+        )
+      `);
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "bcd_test" CASCADE`);
+    });
+
+    it("returns a ChangeColumnDefaultDefinition with the new default value and correct types", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("score");
+      expect(def!.default).toBe(42);
+      expect(def!.column.type).toBe("integer");
+      expect(def!.column.sqlType).toBe("integer");
+    });
+
+    it("preserves semantic type and raw sqlType for timestamp column", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition(
+        "bcd_test",
+        "created_at",
+        "NOW()",
+      );
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("created_at");
+      expect(def!.column.type).toBe("datetime");
+      expect(def!.column.sqlType).toMatch(/timestamp/i);
+    });
+
+    it("preserves array column type", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "tags", "{}");
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("tags");
+      expect(def!.column.options.array).toBe(true);
+      expect(def!.column.sqlType).toMatch(/text/i);
+    });
+
+    it("extracts :to from a {from:, to:} change hash", async () => {
+      // Rails' extract_new_default_value only unwraps a {from:, to:} change
+      // hash when BOTH keys are present (abstract/schema_statements.rb:1820);
+      // otherwise the argument is treated as a literal default. (This is an
+      // internal unit test, not a test:compare Rails mirror, so renaming it to
+      // match the Rails-faithful behavior is safe.)
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", {
+        from: 0,
+        to: 99,
+      });
+      expect(def!.default).toBe(99);
+    });
+
+    it("returns undefined when column does not exist", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "nonexistent", 42);
+      expect(def).toBeUndefined();
+    });
+  });
+
+  describe("addColumn datetime precision", () => {
+    beforeEach(async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "dt_prec_test" CASCADE');
+      await adapter.exec(`CREATE TABLE "dt_prec_test" ("id" SERIAL PRIMARY KEY)`);
+    });
+
+    afterEach(async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "dt_prec_test" CASCADE');
+    });
+
+    async function columnSqlType(colName: string): Promise<string> {
+      const rows = await (adapter as any).schemaQuery(
+        `SELECT pg_catalog.format_type(a.atttypid, a.atttypmod) AS sql_type
+         FROM pg_attribute a
+         JOIN pg_class t ON t.oid = a.attrelid
+         WHERE t.relname = 'dt_prec_test' AND a.attname = $1 AND a.attnum > 0`,
+        [colName],
+      );
+      return rows[0]?.sql_type as string;
+    }
+
+    it("addColumn datetime defaults to TIMESTAMP(6)", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime");
+      expect(await columnSqlType("happened_at")).toBe("timestamp(6) without time zone");
+    });
+
+    it("addColumn datetime respects explicit precision", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime", { precision: 0 });
+      expect(await columnSqlType("happened_at")).toBe("timestamp(0) without time zone");
+    });
+
+    it("addColumn datetime null precision omits precision suffix", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime", { precision: null });
+      expect(await columnSqlType("happened_at")).toBe("timestamp without time zone");
+    });
+  });
+});
+
+describe("PostgreSQLAdapter#columnMethodNames", () => {
+  it("appends PG ColumnMethods shorthands to the abstract list", () => {
+    const adapter = Object.create(PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
+    const names = adapter.columnMethodNames();
+    for (const name of [
+      "serial",
+      "bigserial",
+      "bitVarying",
+      "int4range",
+      "int8range",
+      "jsonb",
+      "uuid",
+      "hstore",
+      "citext",
+      "timestamptz",
+      "enum",
+    ]) {
+      expect(names).toContain(name);
+    }
+    // Abstract names still present; native-types `primary_key` is not surfaced.
+    expect(names).toContain("virtual");
+    expect(names).not.toContain("primary_key");
+  });
+});
+
+describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
+  function makeAdapter(): PostgreSQLAdapter {
+    // Create adapter with a dummy config — we'll stub execute before any query runs
+    const adapter = new PostgreSQLAdapter({ host: "stub", port: 0 });
+    return adapter;
+  }
+
+  function stubVersion(adapter: PostgreSQLAdapter, version: number): void {
+    // Bypass _ensureInitialized by directly setting internal state
+    (adapter as any)._initialized = true;
+    (adapter as any)._databaseVersion = version;
+    (adapter as any)._hasOptimizerHints = false;
+  }
+
+  it("always-true predicates return true regardless of version", () => {
+    const adapter = makeAdapter();
+    stubVersion(adapter, 90300);
+    expect(adapter.supportsBulkAlter()).toBe(true);
+    expect(adapter.supportsIndexSortOrder()).toBe(true);
+    expect(adapter.supportsPartialIndex()).toBe(true);
+    expect(adapter.supportsExpressionIndex()).toBe(true);
+    expect(adapter.supportsTransactionIsolation()).toBe(true);
+    expect(adapter.supportsForeignKeys()).toBe(true);
+    expect(adapter.supportsCheckConstraints()).toBe(true);
+    expect(adapter.supportsViews()).toBe(true);
+    expect(adapter.supportsJson()).toBe(true);
+    expect(adapter.supportsComments()).toBe(true);
+    expect(adapter.supportsSavepoints()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
+    expect(adapter.supportsDdlTransactions()).toBe(true);
+    expect(adapter.supportsAdvisoryLocks()).toBe(true);
+    expect(adapter.supportsExplain()).toBe(true);
+    expect(adapter.supportsExtensions()).toBe(true);
+    expect(adapter.supportsMaterializedViews()).toBe(true);
+    expect(adapter.supportsForeignTables()).toBe(true);
+    expect(adapter.supportsCommonTableExpressions()).toBe(true);
+    expect(adapter.supportsLazyTransactions()).toBe(true);
+  });
+
+  it("version-gated predicates respect version thresholds", () => {
+    const adapter = makeAdapter();
+
+    // PG 9.3 — below most version gates
+    stubVersion(adapter, 90300);
+    expect(adapter.supportsInsertOnConflict()).toBe(false);
+    expect(adapter.supportsPgcryptoUuid()).toBe(false);
+    expect(adapter.supportsIdentityColumns()).toBe(false);
+    expect(adapter.supportsPartitionedIndexes()).toBe(false);
+    expect(adapter.supportsVirtualColumns()).toBe(false);
+    expect(adapter.supportsRestartDbTransaction()).toBe(false);
+    expect(adapter.supportsNullsNotDistinct()).toBe(false);
+
+    // PG 9.5 — insert on conflict
+    stubVersion(adapter, 90500);
+    expect(adapter.supportsInsertOnConflict()).toBe(true);
+    expect(adapter.supportsInsertOnDuplicateSkip()).toBe(true);
+    expect(adapter.supportsInsertOnDuplicateUpdate()).toBe(true);
+    expect(adapter.supportsInsertConflictTarget()).toBe(true);
+    expect(adapter.supportsPgcryptoUuid()).toBe(true);
+
+    // PG 10 — identity columns, native partitioning
+    stubVersion(adapter, 100000);
+    expect(adapter.supportsIdentityColumns()).toBe(true);
+    expect(adapter.supportsNativePartitioning()).toBe(true);
+
+    // PG 11 — partitioned indexes, index include
+    stubVersion(adapter, 110000);
+    expect(adapter.supportsPartitionedIndexes()).toBe(true);
+    expect(adapter.supportsIndexInclude()).toBe(true);
+
+    // PG 12 — virtual columns, restart db transaction
+    stubVersion(adapter, 120000);
+    expect(adapter.supportsVirtualColumns()).toBe(true);
+    expect(adapter.supportsRestartDbTransaction()).toBe(true);
+
+    // PG 15 — nulls not distinct
+    stubVersion(adapter, 150000);
+    expect(adapter.supportsNullsNotDistinct()).toBe(true);
+  });
+
+  it("databaseVersion throws before initialization", () => {
+    const adapter = makeAdapter();
+    expect(() => adapter.databaseVersion).toThrow(/not available yet/);
+  });
+
+  it("indexAlgorithms returns concurrently", () => {
+    const adapter = makeAdapter();
+    expect(adapter.indexAlgorithms()).toEqual({ concurrently: "CONCURRENTLY" });
+  });
+
+  it("typeToSql emits TIMESTAMP(n) with explicit precision", () => {
+    const adapter = makeAdapter();
+    expect(adapter.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
+    expect(adapter.typeToSql("datetime", { precision: 0 })).toBe("timestamp(0)");
+    expect(adapter.typeToSql("datetime", { precision: 3 })).toBe("timestamp(3)");
+    // typeToSql itself has no default — addColumn supplies the default
+    expect(adapter.typeToSql("datetime")).toBe("timestamp");
+  });
 });
