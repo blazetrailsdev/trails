@@ -1309,11 +1309,12 @@ export function statusTransitionError(from: string | null, target: StoryStatus):
     : `illegal transition ${from} → ${target} (${from} has no transitions; use the dedicated verb)`;
 }
 
-// Frontmatter edits for a status transition. Unblocking back to ready returns
-// the story to the ready queue for re-claim, so reset it to the unclaimed shape:
-// clear the `blocked-by` the `block` verb stamped AND the claim/assignee/pr it
-// carried in. A blocked story keeps its claim (block doesn't clear it), and
-// claimState reads any non-null `claim` on a ready story as already taken —
+// Frontmatter edits for a status transition. Returning a story to `ready` —
+// whether unblocking (blocked → ready) or reopening (closed → ready) — puts it
+// back in the queue for re-claim, so reset it to the unclaimed shape: clear the
+// `blocked-by`/`closed-reason` the block/close verb stamped AND the
+// claim/assignee/pr. A blocked story keeps its claim (block doesn't clear it),
+// and claimState reads any non-null `claim` on a ready story as already taken —
 // leaving them set would make the readied story unclaimable.
 export function statusEdits(from: string | null, target: StoryStatus): Record<string, string> {
   const edits: Record<string, string> = { status: target };
