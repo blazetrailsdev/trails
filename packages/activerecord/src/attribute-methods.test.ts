@@ -13,71 +13,24 @@ import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
+// Ride the canonical Rails tables this file's models map to (posts / topics are
+// the persisted workhorses; the rest are reflected by in-memory `new()`).
+// Test models add their own extra attributes via `attribute(...)`; those that
+// aren't real canonical columns are simply excluded from INSERTs
+// (`attributesForCreate` filters by `columnNames()`), so they exercise the
+// in-memory attribute path without needing a bespoke table shape.
 const TEST_SCHEMA = {
-  posts: {
-    title: "string",
-    body: "string",
-    published: "boolean",
-    count: "integer",
-    active: "boolean",
-    score: "integer",
-    occurred_at: "date",
-    name: "string",
-    breed: "string",
-    views: "integer",
-  },
-  topics: {
-    title: "string",
-    body: "string",
-    author_name: "string",
-    approved: "boolean",
-    written_on: "date",
-    bonus_time: "datetime",
-    views: "integer",
-    content: "string",
-  },
-  items: {
-    name: "string",
-    count: "integer",
-    code: "string",
-  },
-  people: {
-    name: "string",
-    age: "integer",
-    active: "boolean",
-    email: "string",
-  },
-  users: {
-    name: "string",
-    username: "string",
-    email: "string",
-    department_id: "integer",
-    age: "integer",
-    code: "string",
-    created_at: "datetime",
-    updated_at: "datetime",
-  },
-  products: {
-    name: "string",
-    price_cents: "integer",
-  },
-  events: {
-    name: "string",
-    starts_on: "date",
-    created_at: "datetime",
-    occurred_at: "date",
-  },
-  post_bools: {
-    title: "string",
-    published: "boolean",
-  },
-  animals: {
-    name: "string",
-    breed: "string",
-    type: "string",
-  },
-} as const;
+  posts: canonicalSchema.posts,
+  topics: canonicalSchema.topics,
+  items: canonicalSchema.items,
+  people: canonicalSchema.people,
+  users: canonicalSchema.users,
+  products: canonicalSchema.products,
+  events: canonicalSchema.events,
+  keyboards: canonicalSchema.keyboards,
+};
 
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
@@ -157,6 +110,7 @@ describe("AttributeMethodsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
+        this.attribute("body", "string", { default: "" });
       }
     }
     const p = (await Post.create({ title: "db-read" })) as any;
@@ -258,6 +212,8 @@ describe("AttributeMethodsTest", () => {
     class Post extends Base {
       static {
         this.attribute("active", "boolean");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     const p = await Post.create({ active: false });
@@ -268,6 +224,8 @@ describe("AttributeMethodsTest", () => {
     class Post extends Base {
       static {
         this.attribute("active", "boolean");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     const p = await Post.create({ active: true });
@@ -315,6 +273,10 @@ describe("AttributeMethodsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
+        // canonical `posts.body` is NOT NULL; default it so the many
+        // `create({ title })` sites below satisfy the constraint. `score` is a
+        // synthetic non-column attribute exercised purely in memory.
+        this.attribute("body", "string", { default: "" });
         this.attribute("score", "integer");
       }
     }
@@ -368,8 +330,13 @@ describe("AttributeMethodsTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "sel_test" });
     const result = await Post.select("title").first();
-    // Mirrors: computer[:developer] → assert_raises MissingAttributeError
-    expect(() => (result as any).score).toThrow("missing attribute 'score'");
+    // Mirrors: computer[:developer] → assert_raises MissingAttributeError.
+    // `legacy_comments_count` is a real canonical `posts` column that wasn't in
+    // the SELECT, so reading it raises (the synthetic `score` attribute isn't a
+    // column and so wouldn't).
+    expect(() => (result as any).legacy_comments_count).toThrow(
+      "missing attribute 'legacy_comments_count'",
+    );
     // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
     expect(result?.readAttribute("title")).toBe("sel_test");
     // Mirrors: assert_nothing_raised { computer[:no_column_exists] }
@@ -493,10 +460,13 @@ describe("AttributeMethodsTest", () => {
   });
   it("bulk updates respect access control", async () => {
     const { Post } = makeModel();
+    // `legacy_comments_count` is a real canonical `posts` column (an integer
+    // counter), so the bulk UPDATE has a column to write; the synthetic
+    // `score` attribute isn't persisted (excluded by `attributesForCreate`).
     await Post.create({ title: "bulk" });
-    await Post.where({ title: "bulk" }).updateAll({ score: 5 });
+    await Post.where({ title: "bulk" }).updateAll({ legacy_comments_count: 5 });
     const updated = await Post.findBy({ title: "bulk" });
-    expect(updated?.score).toBe(5);
+    expect(updated?.legacy_comments_count).toBe(5);
   });
   it("#undefine_attribute_methods undefines alias attribute methods", async () => {
     const { Post } = makeModel();
