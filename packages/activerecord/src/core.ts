@@ -899,13 +899,13 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   const id = ids[0];
 
   if (this.compositePrimaryKey && Array.isArray(id)) {
-    // A tuple _list_ is disambiguated from a single tuple by an array
-    // element (PK components are scalars, so an inner array can only be a
-    // nested tuple). This — not `id[0]` — is what lets a nil outer entry
-    // (`find([nil, [1, 2]])`) be recognized as a list and dropped by
-    // `compact`, while a tuple's own nil component (`find([[1, nil]])`)
-    // stays a single tuple.
-    if (id.some((entry) => Array.isArray(entry))) {
+    // Rails `expects_array = ids.first.first.is_a?(Array)`
+    // (finder_methods.rb:494-498): only the *first* element of the arg
+    // decides list-vs-single-tuple. So `find([nil, [1, 2]])` (first element
+    // nil, not an Array) is a single degenerate tuple — the nil is preserved,
+    // NOT dropped as a list entry — while a tuple's own nil component
+    // (`find([[1, nil]])`) also stays a single tuple.
+    if (Array.isArray(id[0])) {
       // Rails `ids = ids.compact.uniq`: drop nil outer entries and fold
       // structurally-equal tuples, so `find([[1, 2], [1, 2]])` collapses to
       // one tuple and returns the single record (wrapped per expects_array).

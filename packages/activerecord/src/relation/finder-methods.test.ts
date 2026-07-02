@@ -163,7 +163,10 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
-  it("find([[1, 2], [1, 2]]) via variadic → uniq'd to a single tuple", () => {
+  it("find([1, 2], [1, 2]) via variadic → uniq'd to a single tuple, unwrapped", () => {
+    // Rails: expects_array = ids.first.first.is_a?(Array) is false for a
+    // variadic call, so the deduped size-1 result is the bare record, not
+    // `[record]` (finder_methods.rb:494-513).
     expect(
       normalizeFindArgs("Order", pk, [
         [1, 2],
@@ -171,7 +174,7 @@ describe("normalizeFindArgs — composite primary key", () => {
       ]),
     ).toEqual({
       ids: [[1, 2]],
-      wantArray: true,
+      wantArray: false,
       tuples: [[1, 2]],
     });
   });

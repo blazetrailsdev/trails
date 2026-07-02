@@ -113,39 +113,40 @@ export function normalizeFindArgs(
   // simple-PK flatten branches below. Composite tuple lists get their own
   // `compact.uniq` (structural equality) — nil _outer_ entries drop, but a
   // tuple's own nil components are preserved (see `compactUniqTuples`).
-  if (rest.length > 0) {
-    if (composite) {
-      if (args.every((x) => !Array.isArray(x))) {
-        // All-scalar collapses to one tuple id — Rails treats
-        // `find(1, 42)` on a 2-arity PK as `[1, 42]`. Arity mismatch
-        // raises below with the whole tuple in the message.
-        ids = [args];
-        wantArray = false;
-      } else {
-        ids = compactUniqTuples(args);
-        wantArray = true;
-      }
+  if (composite) {
+    // Rails composite `find_with_ids` (finder_methods.rb:494-517):
+    //   expects_array = ids.first.first.is_a?(Array)
+    //   ids = ids.first if expects_array
+    //   ids = ids.compact.uniq
+    //   when 1 then expects_array ? [result] : result
+    // `expectsArray` keys off the *first* element of the first arg alone, so
+    // a nil that precedes the tuples (`find([nil, [1, 2]])`) leaves it false
+    // and the arg is a single degenerate tuple — the nil is NOT dropped as a
+    // list entry. The size-1 result is wrapped only when `expectsArray`, so a
+    // variadic duplicate like `find([1, 2], [1, 2])` dedupes to one tuple and
+    // returns the bare record (not `[record]`).
+    const expectsArray = Array.isArray(first) && Array.isArray(first[0]);
+    if (rest.length > 0 && args.every((x) => !Array.isArray(x))) {
+      // trails accommodation (Rails would raise on `1.first`): an all-scalar
+      // variadic call like `find(1, 42)` on a 2-arity PK is the single tuple
+      // `[1, 42]`. Arity mismatch raises below with the whole tuple.
+      ids = [args];
     } else {
-      // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
-      // canonicalize to `[1, 2, 3]`.
-      ids = compactUniqIds(args.flat(Infinity));
-      wantArray = true;
+      ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
     }
+    // `find_some` (size > 1) always returns an array; only a deduped size-1
+    // list stays unwrapped when the caller did not pass a tuple list.
+    wantArray = expectsArray || ids.length !== 1;
+  } else if (rest.length > 0) {
+    // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
+    // canonicalize to `[1, 2, 3]`.
+    ids = compactUniqIds(args.flat(Infinity));
+    wantArray = true;
   } else if (Array.isArray(first)) {
-    if (composite) {
-      if (first.every((x) => !Array.isArray(x))) {
-        ids = [first];
-        wantArray = false;
-      } else {
-        ids = compactUniqTuples(first as unknown[]);
-        wantArray = true;
-      }
-    } else {
-      // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
-      // `find([1, 2])`, matching Rails' `Array#flatten`.
-      ids = compactUniqIds((first as unknown[]).flat(Infinity));
-      wantArray = true;
-    }
+    // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
+    // `find([1, 2])`, matching Rails' `Array#flatten`.
+    ids = compactUniqIds((first as unknown[]).flat(Infinity));
+    wantArray = true;
   } else {
     ids = [first];
     wantArray = false;
