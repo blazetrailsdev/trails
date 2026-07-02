@@ -20,6 +20,7 @@ import type { MigrationProxy } from "./migration.js";
 import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { resetMigratorState } from "./test-helpers/reset-migrator-state.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function makeMigration(
@@ -41,8 +42,9 @@ function makeMigration(
 describe("Migrator trails extensions", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await resetMigratorState(adapter);
   });
 
   it("stores environment after up migration", async () => {
@@ -187,6 +189,10 @@ describe("Migrator trails extensions", () => {
 });
 
 describe("Migrator advisory lock wrapping", () => {
+  beforeEach(async () => {
+    await resetMigratorState(createTestAdapter());
+  });
+
   it("acquires and releases advisory lock when adapter supports it", async () => {
     const adapter = createTestAdapter();
     const lockLog: string[] = [];
