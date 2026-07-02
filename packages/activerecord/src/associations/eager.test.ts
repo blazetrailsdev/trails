@@ -1305,13 +1305,12 @@ describe("EagerAssociationTest", () => {
       // `categories[0]`/`[1]`; we assert the same counts without depending on it.
       const categoryOf = (post: Base, categoryId: unknown): Base =>
         (post.association("categories").target as Base[]).find((c) => c.id === categoryId)!;
-      const categorizationCount = (c: Base): number =>
-        (c.association("categorizations").target as Base[]).length;
+      const categorizationCount = (c: Base): Promise<number> => (c as any).categorizations.length();
 
       // welcome → general (2 categorizations) + technology (1); thinking → general (2).
-      expect(categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
-      expect(categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
-      expect(categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
+      expect(await categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
+      expect(await categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
+      expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
   });
 });
@@ -1638,8 +1637,8 @@ describe("EagerAssociationTest", () => {
     });
     expect(loaded[0].id).toBe(posts("welcome").id);
     expect(loaded[0].readAttribute("author_name")).toBe("David");
-    await assertNoQueries(false, () => {
-      expect((loaded[0].association("comments").target as Base[]).length).toBe(2);
+    await assertNoQueries(false, async () => {
+      expect(await (loaded[0] as any).comments.length()).toBe(2);
     });
   });
 
@@ -1725,8 +1724,8 @@ describe("EagerAssociationTest", () => {
       const loaded = await Post.includes("comments").joins("comments").order("posts.id desc");
       post = loaded[0];
     });
-    await assertNoQueries(false, () => {
-      expect((post!.association("comments").target as Base[]).length).not.toBe(0);
+    await assertNoQueries(false, async () => {
+      expect(await (post! as any).comments.length()).not.toBe(0);
     });
   });
 
@@ -1743,8 +1742,8 @@ describe("EagerAssociationTest", () => {
         .order("posts.id desc");
       post = loaded[0];
     });
-    await assertNoQueries(false, () => {
-      expect((post!.association("comments").target as Base[]).length).not.toBe(0);
+    await assertNoQueries(false, async () => {
+      expect(await (post! as any).comments.length()).not.toBe(0);
       expect(post!.association("author").target as Base).toBeTruthy();
     });
   });
@@ -1858,8 +1857,8 @@ describe("EagerAssociationTest", () => {
   it("loading with multiple associations", async () => {
     const loaded = await Post.all().includes("comments", "author", "categories").order("posts.id");
     const first = loaded[0];
-    expect((first.association("comments").target as Base[]).length).toBe(2);
-    expect((first.association("categories").target as Base[]).length).toBe(2);
+    expect(await (first as any).comments.length()).toBe(2);
+    expect(await (first as any).categories.length()).toBe(2);
     const commentIds = (first.association("comments").target as Base[]).map((c) => c.id);
     expect(commentIds).toContain(comments("greetings").id);
   });
@@ -1930,8 +1929,8 @@ describe("EagerAssociationTest", () => {
         .whereNot({ posts: { title: "Welcome to the weblog" } })
         .last()) as Author;
     });
-    await assertNoQueries(false, () => {
-      expect((author.association("posts").target as Base[]).length).toBe(2);
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).posts.length()).toBe(2);
     });
   });
 
@@ -1948,13 +1947,11 @@ describe("EagerAssociationTest", () => {
       .includes("commentsWithOrderAndConditions", "posts")
       .order("authors.id")
       .first()) as Author;
-    await assertNoQueries(false, () => {
-      expect((author.association("commentsWithOrderAndConditions").target as Base[]).length).toBe(
-        2,
-      );
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).commentsWithOrderAndConditions.length()).toBe(2);
     });
-    await assertNoQueries(false, () => {
-      expect((author.association("posts").target as Base[]).length).toBe(5);
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).posts.length()).toBe(5);
     });
   });
 
@@ -1988,18 +1985,18 @@ describe("EagerAssociationTest", () => {
   it("preconfigured includes with belongs to", async () => {
     const post = await Post.find(posts("welcome").id);
     const author = (await post.association("authorWithPosts").loadTarget()) as Author;
-    await assertNoQueries(false, () => {
-      expect((author.association("posts").target as Base[]).length).toBe(5);
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).posts.length()).toBe(5);
     });
   });
 
   it("preconfigured includes with has many", async () => {
     const david = await Author.find(authors("david").id);
     const loaded = (await david.association("postsWithComments").loadTarget()) as Base[];
-    await assertNoQueries(false, () => {
+    await assertNoQueries(false, async () => {
       expect(loaded.length).toBe(5);
       const one = loaded.find((p) => p.id === posts("welcome").id)!;
-      expect((one.association("comments").target as Base[]).length).toBe(2);
+      expect(await (one as any).comments.length()).toBe(2);
     });
   });
 
@@ -2127,10 +2124,10 @@ describe("EagerAssociationTest", () => {
   it("eager with has many and limit", async () => {
     const loaded = await Post.all().order("posts.id asc").includes("author", "comments").limit(2);
     expect(loaded).toHaveLength(2);
-    const sum = loaded.reduce(
-      (acc, post) => acc + (post.association("comments").target as Base[]).length,
-      0,
-    );
+    let sum = 0;
+    for (const post of loaded) {
+      sum += await (post as any).comments.length();
+    }
     expect(sum).toBe(3);
   });
 
@@ -2247,22 +2244,22 @@ describe("EagerAssociationTest", () => {
     const loaded = await rel.toArray();
     const welcome = loaded.find((p) => p.id === posts("welcome").id)!;
     const thinking = loaded.find((p) => p.id === posts("thinking").id)!;
-    expect(welcome.association("categories").target as Base[]).toHaveLength(2);
-    expect(thinking.association("categories").target as Base[]).toHaveLength(1);
+    expect(await (welcome as any).categories.length()).toBe(2);
+    expect(await (thinking as any).categories.length()).toBe(1);
   });
 
   it("eager association loading with habtm via preload", async () => {
     const loaded = await Post.all().preload("categories").order("posts.id");
     const welcome = loaded.find((p) => p.id === posts("welcome").id)!;
-    expect(welcome.association("categories").target as Base[]).toHaveLength(2);
+    expect(await (welcome as any).categories.length()).toBe(2);
   });
 
   it("eager with has and belongs to many and limit", async () => {
     const loaded = await Post.all().includes("categories").order("posts.id").limit(3);
     expect(loaded).toHaveLength(3);
-    expect(loaded[0].association("categories").target as Base[]).toHaveLength(2);
-    expect(loaded[1].association("categories").target as Base[]).toHaveLength(1);
-    expect(loaded[2].association("categories").target as Base[]).toHaveLength(0);
+    expect(await (loaded[0] as any).categories.length()).toBe(2);
+    expect(await (loaded[1] as any).categories.length()).toBe(1);
+    expect(await (loaded[2] as any).categories.length()).toBe(0);
     const cats0 = loaded[0].association("categories").target as Base[];
     const cats1 = loaded[1].association("categories").target as Base[];
     expect(cats0.some((c) => c.id === categories("technology").id)).toBe(true);
@@ -2271,9 +2268,9 @@ describe("EagerAssociationTest", () => {
 
   it("eager association loading with habtm", async () => {
     const loaded = await Post.all().includes("categories").order("posts.id");
-    expect(loaded[0].association("categories").target as Base[]).toHaveLength(2);
-    expect(loaded[1].association("categories").target as Base[]).toHaveLength(1);
-    expect(loaded[2].association("categories").target as Base[]).toHaveLength(0);
+    expect(await (loaded[0] as any).categories.length()).toBe(2);
+    expect(await (loaded[1] as any).categories.length()).toBe(1);
+    expect(await (loaded[2] as any).categories.length()).toBe(0);
     const cats0 = loaded[0].association("categories").target as Base[];
     const cats1 = loaded[1].association("categories").target as Base[];
     expect(cats0.some((c) => c.id === categories("technology").id)).toBe(true);
@@ -2329,9 +2326,9 @@ describe("EagerAssociationTest", () => {
     const david = await Author.find(authors("david").id);
     const postsList = (await david.association("postsWithCategories").loadTarget()) as Base[];
     const one = postsList.find((p) => Number(p.id) === 1)!;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(false, async () => {
       expect(postsList).toHaveLength(5);
-      expect(one.association("categories").target as Base[]).toHaveLength(2);
+      expect(await (one as any).categories.length()).toBe(2);
     });
   });
 
@@ -2341,10 +2338,10 @@ describe("EagerAssociationTest", () => {
       .association("postsWithCommentsAndCategories")
       .loadTarget()) as Base[];
     const one = postsList.find((p) => Number(p.id) === 1)!;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(false, async () => {
       expect(postsList).toHaveLength(5);
-      expect(one.association("comments").target as Base[]).toHaveLength(2);
-      expect(one.association("categories").target as Base[]).toHaveLength(2);
+      expect(await (one as any).comments.length()).toBe(2);
+      expect(await (one as any).categories.length()).toBe(2);
     });
   });
 });
@@ -2972,10 +2969,10 @@ describe("EagerAssociationTest", () => {
       .includes("comments", "author")
       .order("posts.id")
       .toArray()) as Base[];
-    const commentCount = postsWithComments.reduce(
-      (sum, post) => sum + (post.association("comments").target as Base[]).length,
-      0,
-    );
+    let commentCount = 0;
+    for (const post of postsWithComments) {
+      commentCount += await (post as any).comments.length();
+    }
     expect(commentCount).toBe(2);
     await assertNoQueries(false, () => {
       expect((postsWithAuthor[0].association("author").target as Base).id).toBe(
@@ -3201,11 +3198,13 @@ describe("EagerAssociationTest", () => {
     const authorList = (await Author.includes("verySpecialComments")).sort(
       (a, b) => Number(a.id) - Number(b.id),
     );
-    await assertNoQueries(false, () => {
-      const specialCommentAuthors = authorList.map((author) => [
-        (author as any).name,
-        (author.association("verySpecialComments").target as Base[]).length,
-      ]);
+    await assertNoQueries(false, async () => {
+      const specialCommentAuthors = await Promise.all(
+        authorList.map(async (author) => [
+          (author as any).name,
+          await (author as any).verySpecialComments.length(),
+        ]),
+      );
       expect(specialCommentAuthors).toEqual([
         ["David", 1],
         ["Mary", 0],
@@ -3218,7 +3217,7 @@ describe("EagerAssociationTest", () => {
     const mary = (await Author.includes("uniqueCategorizedPosts")
       .where({ id: authors("mary").id })
       .first()) as Author;
-    expect((mary.association("uniqueCategorizedPosts").target as Base[]).length).toBe(1);
+    expect(await (mary as any).uniqueCategorizedPosts.length()).toBe(1);
     expect(
       (
         await (mary as Author & { uniqueCategorizedPostIds: Promise<unknown[]> })
