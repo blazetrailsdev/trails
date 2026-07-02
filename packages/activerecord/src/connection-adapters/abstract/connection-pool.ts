@@ -655,14 +655,18 @@ export class ConnectionPool implements ReapablePool {
       // Rails re-runs `verify!` here (connection_pool.rb:554) because its
       // `verify!` is synchronous. trails' `verifyBang` is async (a real backend
       // issues a liveness round-trip), so the sync `checkout()` API cannot await
-      // it — firing it and forgetting the promise risked an unhandled rejection
-      // on pool teardown. We therefore do NOT verify on this sync path: every
-      // path that can await already verifies the pinned connection. It is
-      // verified once at pin establishment (`pinConnectionBang` awaits
-      // `verifyBang` before opening the transaction) and re-verified on every
-      // awaitable handout (`checkoutAsync` awaits it below). The sync pinned
-      // checkout only hands back a connection that one of those async paths has
-      // already validated, so the verify is redundant here, not skipped.
+      // it — the previous `fireAndForgetVerify` fired the promise and swallowed a
+      // teardown-race rejection to avoid an unhandled rejection.
+      //
+      // We drop that verify entirely: this branch is only reachable once a pin
+      // exists, and the only way a pin exists is that `pinConnectionBang` already
+      // awaited `verifyBang` (before opening the transaction) — a caller cannot
+      // reach a sync `checkout()` for a pinned pool without first having awaited
+      // that establishment. So the connection handed back here was already
+      // verified on an awaitable path; the sync re-verify is redundant, not
+      // skipped. The one path that *can* re-verify — `checkoutAsync` — still
+      // awaits `verifyBang` below, so a genuine failure there propagates to the
+      // caller exactly as Rails' synchronous `verify!` would.
       return pinned;
     }
     const conn = this._acquireConnection();
