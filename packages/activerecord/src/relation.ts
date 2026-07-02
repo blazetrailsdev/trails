@@ -3566,6 +3566,9 @@ export class Relation<T extends Base> {
     // ActiveRecord instance argument with `if Base === conditions` before any
     // query is built. Detect it via the inherited `_isActiveRecordBase` marker
     // so a model of any class (not just this relation's) is caught.
+    // Rails runs this Base check just *before* `return false if !conditions`;
+    // we run it just after. The branches are mutually exclusive (an AR instance
+    // is never `false`/`null`), so the order is behaviorally identical.
     if (
       typeof conditions === "object" &&
       conditions !== null &&
