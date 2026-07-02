@@ -424,6 +424,9 @@ describe("FinderTest", () => {
   it("find by one attribute bang", async () => {
     expect(idOf(await Topic.findByBang({ title: "The First Topic" }))).toBe(idOf(topics("first")));
     await expect(Topic.findByBang({ title: "The First Topic!" })).rejects.toThrow(RecordNotFound);
+    await expect(Topic.findByBang({ title: "The First Topic!" })).rejects.toThrow(
+      "Couldn't find Topic",
+    );
   });
 
   it("find by one attribute that is an alias", async () => {
