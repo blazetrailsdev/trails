@@ -3558,6 +3558,10 @@ export class Relation<T extends Base> {
     // the `if eager_loading?` branch, so it short-circuits before the
     // eager-load validation below (finder_methods.rb:367-369).
     if (conditions === false || conditions === null) return false;
+    // Rails FinderMethods#exists?: `return false if !conditions || limit_value == 0`
+    // (finder_methods.rb:367). A relation limited to zero rows can never match, so
+    // short-circuit to false without emitting any query.
+    if (this._limitValue === 0) return false;
     // Rails exists? then routes through apply_join_dependency when eager
     // loading, raising EagerLoadPolymorphicError for polymorphic specs.
     this._checkEagerLoadable();
@@ -3608,16 +3612,36 @@ export class Relation<T extends Base> {
       // the limit/offset+non-limitable-collection guard in apply_join_dependency.
       return rel.applyJoinDependencyForArel(false).exists();
     }
-    // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
-    // existence probe that never instantiates records (no after_find /
-    // association loading) and doesn't go through count()'s limit
-    // fast-path, which would otherwise hydrate models.
+    // Mirrors Rails FinderMethods#construct_relation_for_exists
+    // (finder_methods.rb): `if distinct_value && offset_value` keep
+    // distinct/group/having/offset and drop only the order (`except(:order)`);
+    // otherwise strip select/distinct/group/having down to the `SELECT 1 AS one
+    // FROM ... LIMIT 1` existence probe. Either branch limits to 1 and never
+    // instantiates records (no after_find / association loading).
     const table = rel._modelClass.arelTable;
-    const manager = table.project(new Nodes.SqlLiteral("1 AS one"));
-    rel._applyJoinsToManager(manager);
-    rel._applyWheresToManager(manager, table);
-    for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
-    if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
+    const distinctOffset = rel._isDistinct && rel._offsetValue != null;
+    const manager = table.project();
+    if (distinctOffset) {
+      // Keep the relation's own projection (default `posts.*`) so DISTINCT has
+      // columns to dedup on, plus its distinct/group/having; drop the order.
+      const selectCols = rel._selectColumns ?? [];
+      const star = (table as unknown as { star?: Nodes.Node }).star ?? table.get("*");
+      const projection =
+        selectCols.length > 0 ? (rel.arelColumns(selectCols) as Nodes.Node[]) : [star];
+      manager.project(...projection);
+      rel._applyJoinsToManager(manager);
+      rel._applyWheresToManager(manager, table);
+      manager.distinct();
+      for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
+      if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
+      if (rel._offsetValue != null) manager.skip(rel._offsetValue);
+    } else {
+      // except(:select, :distinct, :group, :having) → `1 AS one`; offset survives.
+      manager.project(new Nodes.SqlLiteral("1 AS one"));
+      rel._applyJoinsToManager(manager);
+      rel._applyWheresToManager(manager, table);
+      if (rel._offsetValue != null) manager.skip(rel._offsetValue);
+    }
     manager.take(1);
     // Tag the probe query `<Model> Exists?` — the name Rails passes to its
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
