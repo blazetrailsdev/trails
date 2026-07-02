@@ -112,7 +112,10 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("use a custom encryptor", async () => {
     const adp = await freshAdapter();
-    const EncryptedAuthor1 = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const EncryptedAuthor1 = await makeFreshModel(adp, "authors", {
+      id: "integer",
+      name: "string",
+    });
     EncryptedAuthor1.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
@@ -126,7 +129,10 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   it("support previous contexts", async () => {
     Configurable.config.supportUnencryptedData = true;
     const adp = await freshAdapter();
-    const EncryptedAuthor2 = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const EncryptedAuthor2 = await makeFreshModel(adp, "authors", {
+      id: "integer",
+      name: "string",
+    });
     EncryptedAuthor2.encrypts("name", {
       encryptor: new TestEncryptor({ "2": "3" }),
       previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
@@ -140,7 +146,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const authorReloaded = await EncryptedAuthor2.find(author.id);
     expect(authorReloaded.encryptedAttribute("name")).toBe(true);
     // Write plaintext directly to DB (simulates an unencrypted legacy row).
-    const RawModel = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const RawModel = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
     RawModel._tableName = EncryptedAuthor2._tableName;
     new RawModel();
     const rawRecord = await RawModel.find(author.id);
@@ -325,12 +331,12 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       ];
 
       const adp = await freshAdapter();
-      const Author = await makeFreshModel(adp, { id: "integer", name: "string" });
+      const Author = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
       Author.encrypts("name", { encryptor: currentEncryptor, deterministic: true, fixed: false });
       new Author();
 
       // Insert a row encrypted with the previous scheme directly (legacy row).
-      const Raw = await makeFreshModel(adp, { id: "integer", name: "string" });
+      const Raw = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
       Raw._tableName = Author._tableName;
       new Raw();
       await Raw.create({ name: "alice_prev_cipher" });

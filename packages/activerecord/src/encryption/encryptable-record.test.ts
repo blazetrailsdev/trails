@@ -134,7 +134,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const keyProvider = makeKeyProvider("custom-post-body-key-provider-32b!!");
     // Use makeFreshModel to avoid the idempotency guard that skips re-encrypting
     // an attribute already wrapped with EncryptedAttributeType.
-    const Post = await makeFreshModel(await freshAdapter(), {
+    const Post = await makeFreshModel(await freshAdapter(), "posts", {
       id: "integer",
       title: "string",
       body: "string",
@@ -152,7 +152,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("can configure a custom key on a per-record-class basis through the :key option", async () => {
     const customKey = "a-custom-key-for-author-32bytes!!";
-    const Author = await makeFreshModel(await freshAdapter(), { id: "integer", name: "string" });
+    const Author = await makeFreshModel(await freshAdapter(), "authors", {
+      id: "integer",
+      name: "string",
+    });
     Author.encrypts("name", { key: customKey });
 
     const author = await Author.create({ name: "Stephen King" });
@@ -309,7 +312,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Declare the model BEFORE configuring supportSha1ForNonDeterministicEncryption.
     // Global previous schemes must be resolved lazily (at previousTypes access time),
     // not eagerly at encrypts() call time — mirrors Rails' lazy previous_schemes behavior.
-    const Post = await makeFreshModel(await freshAdapter(), { id: "integer", title: "string" });
+    const Post = await makeFreshModel(await freshAdapter(), "posts", {
+      id: "integer",
+      title: "string",
+    });
     Post.encrypts("title");
 
     configureEncryption({ primaryKey: "the primary key", keyDerivationSalt: "the salt" });
@@ -332,7 +338,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // `attribute("settings", "json")` registers a JSON cast type; `encrypts("settings")`
     // wraps it in EncryptedAttributeType so the serialized JSON string is encrypted.
     const adp = await freshAdapter();
-    const Article = await makeFreshModel(adp, { id: "integer", settings: "json" });
+    const Article = await makeFreshModel(adp, "to_be_linked_users", {
+      id: "integer",
+      settings: "json",
+    });
     Article.encrypts("settings");
     new Article();
 
@@ -532,12 +541,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
 
     const adp = await freshAdapter();
-    const PostSha1 = await makeFreshModel(adp, { id: "integer", title: "string", body: "string" });
+    const PostSha1 = await makeFreshModel(adp, "posts", {
+      id: "integer",
+      title: "string",
+      body: "string",
+    });
     PostSha1.encrypts("title", { keyProvider: keyProviderSha1 });
     new PostSha1();
     await PostSha1.create({ title: "Post 1", body: "body" });
 
-    const PostSha256 = await makeFreshModel(adp, {
+    const PostSha256 = await makeFreshModel(adp, "posts", {
       id: "integer",
       title: "string",
       body: "string",
@@ -663,19 +676,23 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("encrypts normalized data", async () => {
     // Both NormalizedFirst and NormalizedSecond use downcase:true normalization.
+    // Ride the canonical `encrypted_books` string columns `name` and
+    // `original_name` (the fresh model just needs two independently-encryptable
+    // string columns; canonical `logo` is binary, whose text-ciphertext round
+    // trip is a separate, tracked impl gap — see the serialized-binary skip).
     const adp = await freshAdapter();
-    const BookNormalized = await makeFreshModel(adp, {
+    const BookNormalized = await makeFreshModel(adp, "encrypted_books", {
       id: "integer",
       name: "string",
-      logo: "string",
+      original_name: "string",
     });
     BookNormalized.encrypts("name", { deterministic: true, downcase: true });
-    BookNormalized.encrypts("logo", { deterministic: true, downcase: true });
+    BookNormalized.encrypts("original_name", { deterministic: true, downcase: true });
     new BookNormalized();
     const b1 = await BookNormalized.create({ name: "Book" });
     await assertEncryptedAttribute(await BookNormalized.find(b1.id), "name", "book");
-    const b2 = await BookNormalized.create({ logo: "Book" });
-    await assertEncryptedAttribute(await BookNormalized.find(b2.id), "logo", "book");
+    const b2 = await BookNormalized.create({ original_name: "Book" });
+    await assertEncryptedAttribute(await BookNormalized.find(b2.id), "original_name", "book");
   });
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
@@ -747,7 +764,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // The DB column stores ciphertext (text), while the cast type is date.
     // In Rails, encrypted attribute columns are always text in the schema.
     const adp = await freshAdapter();
-    const BookDate = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const BookDate = await makeFreshModel(adp, "encrypted_books", {
+      id: "integer",
+      name: "string",
+    });
     await BookDate.create({ name: "bootstrap" }); // write triggers text column creation
     BookDate.attribute("name", "date"); // override cast type to date (DB stays text)
     BookDate.encrypts("name");
