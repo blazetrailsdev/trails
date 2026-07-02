@@ -39,6 +39,14 @@ describe("assertionValueMismatch", () => {
     ).toBeNull();
   });
 
+  it("distinguishes multisets whose tokens contain spaces (no join-delimiter collision)", () => {
+    // `["s:a b"]` vs `["s:a", "b"]` — a naive join(" ") would read both as
+    // "s:a b" and miss the divergence; the element-wise compare catches it.
+    const deltas = assertionValueMismatch(["assert_equal"], ["s:a b"], ["toEqual"], ["s:a"], false);
+    // Equal count (1 each), both literal, but different tokens → flagged.
+    expect(deltas).toEqual([{ kind: "equal", rails: ["s:a b"], trails: ["s:a"] }]);
+  });
+
   it("skips a kind when either side has a non-literal (null) expected value", () => {
     // Rails equality value is a non-literal (null) → can't statically compare;
     // the pair is not flagged even though trails asserts a concrete literal.
@@ -60,7 +68,7 @@ describe("assertionValueMismatch", () => {
   });
 
   it("ignores non-value-bearing kinds (truthiness has no comparable value)", () => {
-    expect(VALUE_BEARING_KINDS.has("truthy" as never)).toBe(false);
+    expect(VALUE_BEARING_KINDS.has("truthy")).toBe(false);
     expect(assertionValueMismatch(["assert"], [null], ["toBeTruthy"], [null], false)).toBeNull();
   });
 
