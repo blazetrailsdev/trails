@@ -106,7 +106,10 @@ async function stubPostsSchema(): Promise<void> {
       });
     });
   } finally {
-    await setupPool.disconnect();
+    // disconnectAsync (not the sync, drain-discarding disconnect) so an
+    // async-only SQLite driver's close finishes before the pool-under-test
+    // reopens the same ambient DB.
+    await setupPool.disconnectAsync();
   }
 }
 
@@ -118,7 +121,9 @@ async function dropPostsStub(): Promise<void> {
       await connection.dropTable("posts", { ifExists: true });
     });
   } finally {
-    await teardownPool.disconnect();
+    // disconnectAsync so the drop's connection is fully closed before the next
+    // test's makeAmbientPool reopens the same ambient DB.
+    await teardownPool.disconnectAsync();
   }
 }
 
