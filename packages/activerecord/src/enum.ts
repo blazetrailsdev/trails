@@ -1,10 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  ValueType,
-  resetDefaultAttributes as amResetDefaultAttributes,
-} from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 /**
  * Enum definition — maps symbolic names to integer values.
@@ -53,26 +49,38 @@ export function installEnumAttribute(
   attribute: string,
   enumType: EnumType,
 ): void {
-  // Register the EnumType as a user-declared type so it survives schema
-  // reflection / resetColumnInformation (schema-sourced defs get scrubbed and
-  // re-reflected as the plain column type, which would drop the EnumType).
+  // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes` so the
+  // EnumType is layered on top of the column-seeded FromDatabase attribute,
+  // leaving the default on the deserialize path for free (enum.rb:238-247). That
+  // relies on `_default_attributes` re-seeding from `columns_hash` on every
+  // rebuild; trails instead seeds from the cached `_attributeDefinitions` map and
+  // `decorateAttributes` no-ops on a not-yet-reflected column (the def doesn't
+  // exist until schema loads), so a bare-attribute + decorate port drops the
+  // EnumType entirely for models whose enum is declared before first query.
+  // (Empirically regresses type.serialize / find-via-where.) Converging trails'
+  // `_defaultAttributes` onto Rails' column-seed-then-replay is tracked as a
+  // follow-up story. Here we register the type directly — which also matches
+  // Rails' lower-level `attribute(name, type)` form — so it lands in
+  // `_attributeDefinitions` and survives schema reflection / resetColumnInformation
+  // (schema-sourced defs get scrubbed and re-reflected as the plain column type).
   klass.attribute(attribute, enumType);
 
-  // Mark the enum column's default as schema-sourced. In Rails, `attribute(name,
-  // enum_type)` routes through `build_from_user(name, type)`, which changes only
-  // the type and preserves the schema column default — so `new_comment.label`
-  // reflects the DB default (deserialized: 0 -> "default") without a reload.
-  // The flag drives two things: schema reflection re-injects the column default
-  // onto this user-declared def (model-schema.ts), and _defaultAttributes seeds
-  // it via from_database (deserialize) rather than as a user default (cast) —
-  // cast(0) on an EnumType yields null, deserialize(0) yields the "default"
-  // label (attributes.ts).
+  // Mark the enum column's default as schema-sourced so it seeds via
+  // from_database (deserialize) rather than as a user default (cast): cast(0) on
+  // an EnumType yields null, deserialize(0) yields the "default" label. This
+  // recovers what Rails' build_from_user / decorate_attributes gives for free.
+  // The flag is honored on both declaration orderings: when the schema is
+  // already loaded, `attribute()` above merged the column default (0) onto the
+  // def, so `_defaultAttributes` seeds fromDatabase(0) directly (attributes.ts);
+  // when the enum is declared first, schema reflection later re-injects the
+  // column default onto this user-declared def (model-schema.ts). `attribute()`
+  // already invalidated the default-attributes cache, so no extra reset is
+  // needed — the mutation is visible before the next `_defaultAttributes()`.
   const def = klass._attributeDefinitions?.get(attribute) as
     | { defaultFromSchema?: boolean }
     | undefined;
   if (def != null) {
     def.defaultFromSchema = true;
-    amResetDefaultAttributes(klass);
   }
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
