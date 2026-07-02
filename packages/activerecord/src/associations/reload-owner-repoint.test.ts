@@ -9,9 +9,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { association, registerModel } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
@@ -24,10 +22,6 @@ describe("reload — association owner re-point", () => {
     Post.adapter = adapter;
     registerModel(Author);
     registerModel(Post);
-    await defineSchema(adapter, {
-      authors: TEST_SCHEMA.authors,
-      posts: TEST_SCHEMA.posts,
-    });
   });
   withTransactionalFixtures(() => adapter);
 

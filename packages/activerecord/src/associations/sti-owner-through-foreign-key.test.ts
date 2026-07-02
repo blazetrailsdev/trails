@@ -9,9 +9,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reader } from "../test-helpers/models/reader.js";
@@ -25,11 +23,6 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
       klass.adapter = adapter;
       registerModel(klass);
     }
-    await defineSchema(adapter, {
-      posts: TEST_SCHEMA.posts,
-      people: TEST_SCHEMA.people,
-      readers: TEST_SCHEMA.readers,
-    });
   });
   withTransactionalFixtures(() => adapter);
 
