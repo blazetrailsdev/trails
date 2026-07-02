@@ -670,17 +670,32 @@ function respondsToId(value: unknown): value is { id: unknown } {
 
 // Read an aggregate's mapped attribute off a value object. Mirrors Rails'
 // two call shapes in expand_from_hash: the single-mapping branch uses
-// `respond_to? ? public_send : object` (scalar passthrough when the value
-// isn't an aggregate object), while the multi-mapping branch uses
-// `object.try(attr)` (nil when the object is nil). Getters and methods both
-// resolve — a function value is invoked with the object as receiver.
-function extractAggregateAttr(object: unknown, attr: string, tryNil: boolean): unknown {
-  if (object === null || object === undefined) return tryNil ? null : object;
+// `object.respond_to?(attr) ? object.public_send(attr) : object` (scalar
+// passthrough when the value isn't an aggregate object), while the
+// multi-mapping branch uses `object.try!(attr)` — which returns nil only when
+// the *receiver* is nil and RAISES NoMethodError when a non-nil object doesn't
+// respond to `attr` (a broken composed_of mapping is a programmer error, not a
+// silent no-match). Getters and methods both resolve — a function value is
+// invoked with the object as receiver.
+function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): unknown {
+  if (object === null || object === undefined) return tryBang ? null : object;
   if (typeof object === "object" && attr in object) {
     const v = (object as Record<string, unknown>)[attr];
     return typeof v === "function" ? (v as (...a: unknown[]) => unknown).call(object) : v;
   }
-  return tryNil ? null : object;
+  // Multi-mapping (`try!`) surfaces the missing attribute; single-mapping
+  // (`respond_to? ? … : object`) falls back to the scalar passthrough.
+  if (tryBang) {
+    throw new TypeError(
+      `composed_of value ${describeAggregateValue(object)} does not respond to mapped attribute '${attr}'`,
+    );
+  }
+  return object;
+}
+
+function describeAggregateValue(object: unknown): string {
+  const ctor = (object as { constructor?: { name?: string } } | null)?.constructor?.name;
+  return ctor ? `(${ctor})` : String(object);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
