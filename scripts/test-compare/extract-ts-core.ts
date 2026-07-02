@@ -34,13 +34,19 @@ function isAssertionCallee(name: string): boolean {
 const MAX_HELPER_DEPTH = 5;
 
 /**
- * Map of same-file non-assertion helper functions (top-level `function` decls
- * and `const foo = (...) => …` / `= function …`) to their body node, so a test
- * that delegates its assertions to a helper (e.g. `testCopyTable`) has the
- * helper's asserts folded into its count. The Ruby twin collects same-file
- * `def`s (extract-ruby-tests.rb `collect_helper_defs`). Static, name-keyed
- * (last definition wins); receiver calls (`obj.foo()`) and runtime-dispatched
- * helpers are out of scope — a documented static-vs-runtime limitation.
+ * Map of same-file non-assertion helper functions — any `function` declaration
+ * and any `const foo = (...) => …` / `= function …`, at ANY nesting depth (the
+ * walk descends the whole file, not just top-level statements) — to their body
+ * node, so a test that delegates its assertions to a helper (e.g. `testCopyTable`)
+ * has the helper's asserts folded into its count. The Ruby twin collects
+ * same-file `def`s the same way (extract-ruby-tests.rb `collect_helper_defs`).
+ *
+ * Static and name-keyed on a FLAT map (no lexical-scope tracking) — this mirrors
+ * the Ruby side's file-scoped (not per-class) approximation. Consequences:
+ * receiver calls (`obj.foo()`) and runtime-dispatched helpers are out of scope,
+ * and two same-named helpers in different suites collide (last definition wins),
+ * so a call could fold in the wrong body. Acceptable for a report-only count on
+ * real test files, where helper names are effectively file-unique.
  */
 type HelperMap = Map<string, ts.Node>;
 
