@@ -392,6 +392,43 @@ describe("FinderTest", () => {
       IrreversibleOrderError,
     );
   });
+
+  it("exists with large number", async () => {
+    const big = 9223372036854775808n; // 2^63, one past signed-int64 max
+    const negBig = -9223372036854775809n;
+    expect(await Topic.where({ id: [1, big] }).exists()).toBe(true);
+    expect(await Topic.where({ id: new Range(1n, big) }).exists()).toBe(true);
+    expect(await Topic.where({ id: new Range(negBig, big) }).exists()).toBe(true);
+    expect(await Topic.where({ id: new Range(big, 9223372036854775809n) }).exists()).toBe(false);
+    expect(await Topic.where({ id: new Range(-9223372036854775810n, negBig) }).exists()).toBe(
+      false,
+    );
+    expect(await Topic.where({ id: new Range(big, 1n) }).exists()).toBe(false);
+    expect(
+      await Topic.where({ id: 1 })
+        .or(Topic.where({ id: big }))
+        .exists(),
+    ).toBe(true);
+    expect(await Topic.whereNot({ id: big }).exists()).toBe(true);
+
+    // Rails' 3-arg `predicate_builder[:id, val, :gt/:gteq/:lt/:lteq]` builds an
+    // Arel comparison node whose right-hand side is a bind attribute; we stand
+    // it in with the arel gt/gteq/lt/lteq predicates over a QueryAttribute bind
+    // built from the same predicate builder.
+    const id = Topic.arelTable.get("id");
+    const bind = (v: bigint) => Topic.predicateBuilder.buildBindAttribute("id", v);
+    const existsWhere = (node: unknown) => Topic.where(node as any).exists();
+
+    expect(await existsWhere(id.gt(bind(negBig)))).toBe(true);
+    expect(await existsWhere(id.gteq(bind(negBig)))).toBe(true);
+    expect(await existsWhere(id.lt(bind(big)))).toBe(true);
+    expect(await existsWhere(id.lteq(bind(big)))).toBe(true);
+
+    expect(await existsWhere(id.gt(bind(big)))).toBe(false);
+    expect(await existsWhere(id.gteq(bind(big)))).toBe(false);
+    expect(await existsWhere(id.lt(bind(negBig)))).toBe(false);
+    expect(await existsWhere(id.lteq(bind(negBig)))).toBe(false);
+  });
 });
 
 // ==========================================================================
@@ -823,15 +860,6 @@ describe("FinderTest", () => {
     }
     await Topic.create({ title: "hello" });
     expect(await Topic.exists()).toBe(true);
-  });
-
-  it("exists with large number", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(await Topic.exists(9999999)).toBe(false);
   });
 
   it("exists with joins", async () => {

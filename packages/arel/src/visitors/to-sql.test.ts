@@ -78,6 +78,33 @@ describe("the to_sql visitor", () => {
     });
   });
 
+  // A value exposing `isUnboundable()` (out of range for its column) is dropped
+  // from an IN / NOT IN list, mirroring Rails' `visit_Arel_Nodes_In`
+  // `values.delete_if { |v| unboundable?(v) }`.
+  describe("unboundable values in IN / NOT IN lists", () => {
+    const unboundable = { isUnboundable: () => 1 as const };
+
+    it("drops an unboundable value from an IN list", () => {
+      const sql = new Visitors.ToSql().compile(users.get("id").in([1, unboundable]));
+      expect(sql).toBe('"users"."id" IN (1)');
+    });
+
+    it("collapses an all-unboundable IN list to 1=0", () => {
+      const sql = new Visitors.ToSql().compile(users.get("id").in([unboundable, unboundable]));
+      expect(sql).toBe("1=0");
+    });
+
+    it("drops an unboundable value from a NOT IN list", () => {
+      const sql = new Visitors.ToSql().compile(users.get("id").notIn([1, unboundable]));
+      expect(sql).toBe('"users"."id" NOT IN (1)');
+    });
+
+    it("collapses an all-unboundable NOT IN list to 1=1", () => {
+      const sql = new Visitors.ToSql().compile(users.get("id").notIn([unboundable, unboundable]));
+      expect(sql).toBe("1=1");
+    });
+  });
+
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
       const node = users.get("name").doesNotMatch("%chunky%", "\\", true);

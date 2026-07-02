@@ -3,12 +3,17 @@ import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
 import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
-import { RangeHandler } from "./predicate-builder/range-handler.js";
+import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
+
+interface BoundType {
+  cast?(x: unknown): unknown;
+  serialize?(x: unknown): unknown;
+}
 
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
@@ -38,27 +43,97 @@ export class PredicateBuilder {
     this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
-      // Prefer the attribute's own relation typeCaster (covers joined/aliased tables)
-      const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
-      const attrType = (
-        attrRelation as
-          | { typeForAttribute?(n: string): { cast?(x: unknown): unknown } | null }
-          | undefined
-      )?.typeForAttribute?.(attribute.name);
-      if (attrType?.cast) return attrType.cast(v);
-      // Fall back to the predicate builder's table/model context
-      const ctx = this._tableContext as {
-        typeForAttribute?(n: string): { cast?(x: unknown): unknown } | null;
-      } | null;
-      const ctxType = ctx?.typeForAttribute?.(attribute.name);
-      if (ctxType?.cast) return ctxType.cast(v);
-      const arelType = this.table.typeForAttribute(attribute.name) as
-        | { cast?(x: unknown): unknown }
-        | undefined;
-      return arelType?.cast ? arelType.cast(v) : v;
+      // Resolve the type once so sign detection and the cast below agree for
+      // joined/aliased attributes (see resolveBoundType).
+      const type = this.resolveBoundType(attribute);
+      const sentinel = this.unboundableSentinel(attribute.name, v, type);
+      if (sentinel) return sentinel;
+      return type?.cast ? type.cast(v) : v;
     });
     this.basicObjectHandler = new BasicObjectHandler(this);
     this.relationHandler = new RelationHandler();
+  }
+
+  /**
+   * Replaces an out-of-range scalar with an {@link UnboundableBound} sentinel
+   * (leaving in-range values untouched), so the Arel `In` / `NotIn` visitor
+   * drops it from the list — mirroring Rails' `visit_Arel_Nodes_In`
+   * `values.delete_if { |v| unboundable?(v) }`. Used by ArrayHandler's
+   * multi-value `IN` path; the single-value path already routes through a
+   * QueryAttribute bind whose `unboundable?` collapses the equality to `1=0`.
+   */
+  markUnboundable(attribute: Nodes.Attribute, value: unknown): unknown {
+    return (
+      this.unboundableSentinel(attribute.name, value, this.resolveBoundType(attribute)) ?? value
+    );
+  }
+
+  /**
+   * Returns an {@link UnboundableBound} sentinel when `value` is out of range
+   * for `type`, else null. Both the detection and the sign come from a
+   * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
+   * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
+   * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
+   * than a second sign computation) keeps this in lockstep with the
+   * equality/negation single-value paths, and handles non-numeric out-of-range
+   * bounds (e.g. custom types) type-agnostically.
+   *
+   * Callers pass the type from {@link resolveBoundType} (not the narrower
+   * `this.table`-only lookup `buildBindAttribute` uses) so sign detection uses
+   * the same type as the accompanying cast — otherwise a joined/aliased bound
+   * could be detected against the wrong (or identity) type.
+   */
+  private unboundableSentinel(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): UnboundableBound | null {
+    const sign = this.queryAttributeWithType(columnName, value, type).isUnboundable();
+    return sign === false ? null : new UnboundableBound(sign);
+  }
+
+  /**
+   * Builds a QueryAttribute bind for a bound using {@link resolveBoundType}'s
+   * relation/context/table cascade rather than `buildBindAttribute`'s narrower
+   * `this.table`-only lookup. Used by the negation path so a joined/aliased
+   * out-of-range bound is typed correctly (and thus detected as unboundable →
+   * `1=1`) instead of falling through to the identity fallback and silently
+   * binding a raw value the column can't hold.
+   */
+  private bindAttributeFor(attribute: Nodes.Attribute, value: unknown): QueryAttribute {
+    return this.queryAttributeWithType(attribute.name, value, this.resolveBoundType(attribute));
+  }
+
+  private queryAttributeWithType(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): QueryAttribute {
+    const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
+      cast(v: unknown): unknown;
+      serialize(v: unknown): unknown;
+    };
+    return new QueryAttribute(columnName, value, castType);
+  }
+
+  /**
+   * Resolves the column type for a range bound, preferring the attribute's own
+   * relation typeCaster (covers joined/aliased tables), then the predicate
+   * builder's table/model context, then the arel table. Mirrors the cascade
+   * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
+   */
+  private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
+    const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
+    const attrType = (
+      attrRelation as { typeForAttribute?(n: string): BoundType | null } | undefined
+    )?.typeForAttribute?.(attribute.name);
+    if (attrType) return attrType;
+    const ctx = this._tableContext as {
+      typeForAttribute?(n: string): BoundType | null;
+    } | null;
+    const ctxType = ctx?.typeForAttribute?.(attribute.name);
+    if (ctxType) return ctxType;
+    return this.table.typeForAttribute(attribute.name) as BoundType | undefined;
   }
 
   buildFromHash(
@@ -289,7 +364,15 @@ export class PredicateBuilder {
     if (this.isRelation(value)) {
       return this.relationHandler.callNegated(attribute, value);
     }
-    return attribute.notEq(value);
+    // Build a bind attribute (as the positive BasicObjectHandler path does)
+    // rather than passing the raw value: Rails builds negation by inverting a
+    // positively-built predicate, so the RHS is a QueryAttribute bind. This
+    // also lets an out-of-range value report `unboundable?` at the visitor
+    // (`!=` → `1=1`) instead of raising ActiveModelRangeError when bound.
+    // Route through bindAttributeFor so a joined/aliased column is typed via the
+    // full resolveBoundType cascade (an OOR bound typed only on this.table's
+    // identity fallback would neither raise nor collapse to `1=1`).
+    return attribute.notEq(this.bindAttributeFor(attribute, value));
   }
 
   private buildNegatedArray(attribute: Nodes.Attribute, value: unknown[]): Nodes.Node {
@@ -328,7 +411,9 @@ export class PredicateBuilder {
     if (scalarValues.length === 1) {
       parts.push(this.buildNegated(attribute, scalarValues[0]));
     } else if (scalarValues.length > 1) {
-      parts.push(attribute.notIn(scalarValues));
+      // Drop out-of-range values so the NotIn visitor filters them (mirrors
+      // Rails' `visit_Arel_Nodes_NotIn`), matching the positive IN path.
+      parts.push(attribute.notIn(scalarValues.map((v) => this.markUnboundable(attribute, v))));
     }
 
     if (hasNull) {

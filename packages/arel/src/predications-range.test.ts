@@ -61,6 +61,40 @@ describe("Predications range semantics", () => {
       expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
     });
 
+    // A bound value exposing `isUnboundable()` (a QueryAttribute bind whose
+    // value is out of range for its column, or the RangeHandler sentinel)
+    // participates in the open-ended / unboundable decision tree exactly like
+    // ±Infinity, so an out-of-range bound never reaches the visitor as a bind.
+    const unboundable = (sign: 1 | -1) => ({ isUnboundable: () => sign });
+
+    it("unboundable begin (+1) collapses to In([])", () => {
+      const node = id.between({ begin: unboundable(1), end: 3 });
+      expect(node).toBeInstanceOf(Nodes.In);
+      expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
+    });
+
+    it("unboundable end (-1) collapses to In([])", () => {
+      const node = id.between({ begin: 1, end: unboundable(-1) });
+      expect(node).toBeInstanceOf(Nodes.In);
+      expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
+    });
+
+    it("negative-unboundable begin becomes LessThanOrEqual on the real end", () => {
+      const node = id.between({ begin: unboundable(-1), end: 3 });
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
+
+    it("positive-unboundable end becomes GreaterThanOrEqual on the real begin", () => {
+      const node = id.between({ begin: 1, end: unboundable(1) });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
+    it("both bounds unboundable (-1 begin, +1 end) becomes NotIn([])", () => {
+      const node = id.between({ begin: unboundable(-1), end: unboundable(1) });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
+      expect(((node as Nodes.NotIn).right as unknown[]).length).toBe(0);
+    });
+
     it("null..end (open begin) collapses to LessThanOrEqual", () => {
       const node = id.between({ begin: null, end: 3 });
       expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
