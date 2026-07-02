@@ -724,14 +724,20 @@ export class ToSql extends Visitor {
 
   private visitArelNodesHomogeneousIn(node: Nodes.HomogeneousIn, collector: SQLString): SQLString {
     collector.preparable = false;
-    if (node.values.length === 0) {
-      collector.append(node.type === "in" ? "1=0" : "1=1");
-      return collector;
-    }
     this.visit(node.attribute, collector);
     collector.append(node.type === "in" ? " IN (" : " NOT IN (");
-    // Mirrors Rails to_sql.rb: `collector.add_binds(o.casted_values, o.proc_for_binds, &bind_block)`
-    collector.addBinds(node.castedValues, node.procForBinds, this.bindBlock());
+    // Mirrors Rails to_sql.rb:346-351 exactly: branch on the *casted* list, not
+    // the raw values, and emit `quote(nil)` (→ `NULL`) when it is empty. This
+    // matters once every value is filtered out — e.g. an all-out-of-range
+    // multi-value array (`id IN [2^63, 2^63+1]`) whose `castedValues` collapse
+    // to `[]` — so we render `IN (NULL)` rather than the invalid `IN ()` that
+    // `addBinds([])` would produce.
+    const values = node.castedValues;
+    if (values.length === 0) {
+      collector.append(this.quote(null));
+    } else {
+      collector.addBinds(values, node.procForBinds, this.bindBlock());
+    }
     collector.append(")");
     return collector;
   }

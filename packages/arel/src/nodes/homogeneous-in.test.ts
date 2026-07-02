@@ -33,16 +33,31 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       expect(sql).toBe('"users"."id" NOT IN (?, ?)');
     });
 
-    it("compiles empty IN as 1=0", () => {
+    it("compiles empty IN as IN (NULL)", () => {
+      // Mirrors Rails to_sql.rb:347-349 — empty casted_values emits
+      // `quote(nil)` inside the parens, not a `1=0` short-circuit.
       const node = new Nodes.HomogeneousIn([], users.get("id"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("1=0");
+      expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
-    it("compiles empty NOT IN as 1=1", () => {
+    it("compiles empty NOT IN as NOT IN (NULL)", () => {
       const node = new Nodes.HomogeneousIn([], users.get("id"), "notin");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("1=1");
+      expect(sql).toBe('"users"."id" NOT IN (NULL)');
+    });
+
+    it("compiles an all-non-serializable IN as IN (NULL)", () => {
+      // A multi-value array whose values all filter out of castedValues (e.g.
+      // all out-of-range ids) must render `IN (NULL)`, never the invalid `IN ()`.
+      const filteringRelation = {
+        name: "users",
+        typeForAttribute: () => ({ isSerializable: () => false, serialize: (v: unknown) => v }),
+      };
+      const attr = new Nodes.Attribute(filteringRelation as never, "id");
+      const node = new Nodes.HomogeneousIn([1, 2], attr, "in");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
     it("compiles string values", () => {
