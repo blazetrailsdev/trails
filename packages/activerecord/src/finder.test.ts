@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   Base,
   IrreversibleOrderError,
@@ -13,7 +13,6 @@ import {
 } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
@@ -544,9 +543,6 @@ describe("FinderTest", () => {
 describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
 
   it("exists", async () => {
     class Topic extends Base {
@@ -1713,9 +1709,6 @@ describe("FinderTest", () => {
 describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
 
   class Post extends Base {
     static {
@@ -1840,9 +1833,6 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
   // Rails: test_find_by_with_conditions
@@ -1867,9 +1857,6 @@ describe("FinderTest", () => {
 describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
-  });
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {

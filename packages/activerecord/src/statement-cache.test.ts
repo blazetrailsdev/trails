@@ -9,10 +9,8 @@ import { Electron } from "./test-helpers/models/electron.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 registerModel("Book", Book);
 registerModel("Liquid", Liquid);
@@ -24,16 +22,6 @@ setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
-  await defineSchema({
-    authors: TEST_SCHEMA.authors,
-    books: TEST_SCHEMA.books,
-    liquid: TEST_SCHEMA.liquid,
-    molecules: TEST_SCHEMA.molecules,
-    electrons: TEST_SCHEMA.electrons,
-    numeric_data: TEST_SCHEMA.numeric_data,
-    clothing_items: TEST_SCHEMA.clothing_items,
-    birds: TEST_SCHEMA.birds,
-  });
   await Promise.all([
     Book.loadSchema(),
     Liquid.loadSchema(),
