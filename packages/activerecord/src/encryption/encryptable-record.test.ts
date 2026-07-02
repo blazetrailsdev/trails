@@ -392,6 +392,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const light = new TrafficLight();
     // Set via JS property assignment so the storeAccessor setter fires.
     light.color = "red";
+    // Rails passes `long_state: ["green", "red"]`; canonical traffic_lights
+    // requires it (text NOT NULL).
+    light.long_state = ["green", "red"];
     await light.save();
     expect(light.color).toBe("red");
     await assertEncryptedAttribute(light, "state", { color: "red" });
