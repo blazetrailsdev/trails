@@ -1,9 +1,7 @@
 // vendor/rails/activerecord/test/cases/encryption/contexts_test.rb
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -30,16 +28,10 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   let titleCleartext: unknown;
   let titleCiphertext: unknown;
 
-  beforeAll(async () => {
-    // Rails' EncryptedPost (`< Post`, `self.table_name = "posts"`) and EncryptedBook
-    // (`encrypted_books`) both ride canonical tables; contexts_test.rb declares
-    // `fixtures :posts`. Mirror that here.
-    await defineSchema({
-      posts: TEST_SCHEMA.posts,
-      encrypted_books: TEST_SCHEMA.encrypted_books,
-    });
-  });
-
+  // Rails' EncryptedPost (`< Post`, `self.table_name = "posts"`) and EncryptedBook
+  // (`encrypted_books`) both ride canonical tables; contexts_test.rb declares
+  // `fixtures :posts`. Those canonical tables are laid at boot by
+  // loadCanonicalSchema, so no per-suite schema setup is needed.
   beforeEach(async () => {
     configSnapshot = snapshotEncryptionConfig();
     Configurable.config.previousSchemes = [];

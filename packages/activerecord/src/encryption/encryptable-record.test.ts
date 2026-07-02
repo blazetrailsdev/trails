@@ -30,7 +30,6 @@ import {
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { itIfSupports } from "../test-helpers/supports.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -369,7 +368,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Rails' EncryptedFirstTrafficLight (`encrypts :state` declared before
     // `serialize :state, type: Array`) on the canonical `traffic_lights` table.
     const adp = await freshAdapter();
-    await defineSchema(adp, { traffic_lights: canonicalSchema.traffic_lights });
+    // `freshAdapter()` already lays the canonical `traffic_lights` table via
+    // installEncryptionSchema, so no additional schema setup is needed here.
     const EncryptedFirstTrafficLight = class extends Base {
       static {
         this._tableName = "traffic_lights";

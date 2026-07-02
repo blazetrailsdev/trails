@@ -1,19 +1,13 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 setupFixtures();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    topics: TEST_SCHEMA.topics,
-  });
-});
+// The canonical `topics` table is laid at boot by loadCanonicalSchema.
 
 /** An associated child whose validation always fails — stands in for Rails'
  *  `replied_topic.replies` (a topic carrying one invalid reply). */
