@@ -163,6 +163,9 @@ const ENCRYPTION_CANONICAL_TABLES = [
   "encrypted_books",
   "authors",
   "traffic_lights",
+  // `to_be_linked_users` carries a canonical `settings` (text) column, the ride
+  // for makeFreshModel's serialized-attribute callsite (no Rails counterpart).
+  "to_be_linked_users",
 ] as const;
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
@@ -209,24 +212,19 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // ─── Model factories ──────────────────────────────────────────────────────────
 
 /**
- * Creates a fresh model with the given attributes — no pre-applied encryption.
- * Attribute types are passed as strings (e.g. "integer", "string").
- * Use this when you need to apply a specific encryption scheme to an attribute
- * without the idempotency guard blocking a second encrypts() call.
+ * Creates a fresh model class riding an existing canonical `tableName`, with the
+ * given attributes declared explicitly (no DDL). Attribute types are passed as
+ * strings (e.g. "integer", "string"); every declared column must already exist
+ * on the canonical table. Use this when you need to apply a specific encryption
+ * scheme to an attribute without the idempotency guard blocking a second
+ * `encrypts()` call — a fresh class dodges the guard without needing a bespoke
+ * (`fresh_model_N`) table, keeping the suite one-schema clean.
  */
-let _freshModelCounter = 0;
-
 export async function makeFreshModel(
   adapter: DatabaseAdapter,
+  tableName: string,
   attributes: Record<string, string>,
 ): Promise<any> {
-  const tableName = `fresh_model_${++_freshModelCounter}`;
-  const columns: Schema[string] = {};
-  for (const [name, type] of Object.entries(attributes)) {
-    if (name === "id") continue; // defineSchema adds id implicitly
-    (columns as Record<string, string>)[name] = type;
-  }
-  await defineSchema(adapter, { [tableName]: columns } as Schema);
   const klass = class extends Base {
     static {
       this._tableName = tableName;
