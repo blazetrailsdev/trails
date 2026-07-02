@@ -1970,41 +1970,47 @@ describe("FinderTest", () => {
   });
 
   it("find with eager loading collection and ordering by collection primary key", async () => {
-    class Post extends Base {
+    // Ride the canonical posts -> comments -> ratings chain (post_id / comment_id),
+    // but register under file-local names so we never clobber the global
+    // canonical Post/Comment/Rating registrations shared across the worker.
+    class EagerPost extends Base {
       static {
+        this.tableName = "posts";
         this.attribute("title", "string", { default: "" });
         this.attribute("body", "string", { default: "" });
-        this.hasMany("comments", { className: "Comment", foreignKey: "post_id" });
+        this.hasMany("comments", { className: "EagerComment", foreignKey: "post_id" });
       }
     }
-    class Comment extends Base {
+    class EagerComment extends Base {
       static {
+        this.tableName = "comments";
         this.attribute("body", "string", { default: "" });
         this.attribute("post_id", "integer");
-        this.hasMany("ratings", { className: "Rating", foreignKey: "comment_id" });
+        this.hasMany("ratings", { className: "EagerRating", foreignKey: "comment_id" });
       }
     }
-    class Rating extends Base {
+    class EagerRating extends Base {
       static {
+        this.tableName = "ratings";
         this.attribute("value", "integer");
         this.attribute("comment_id", "integer");
       }
     }
-    registerModel("Post", Post);
-    registerModel("Comment", Comment);
-    registerModel("Rating", Rating);
+    registerModel("EagerPost", EagerPost);
+    registerModel("EagerComment", EagerComment);
+    registerModel("EagerRating", EagerRating);
 
-    const p1 = await Post.create({ title: "first" });
-    const p2 = await Post.create({ title: "second" });
-    const c1 = await Comment.create({ body: "c1", post_id: p1.id });
-    const c2 = await Comment.create({ body: "c2", post_id: p2.id });
-    await Rating.create({ value: 1, comment_id: c1.id });
-    await Rating.create({ value: 2, comment_id: c2.id });
+    const p1 = await EagerPost.create({ title: "first" });
+    const p2 = await EagerPost.create({ title: "second" });
+    const c1 = await EagerComment.create({ body: "c1", post_id: p1.id });
+    const c2 = await EagerComment.create({ body: "c2", post_id: p2.id });
+    await EagerRating.create({ value: 1, comment_id: c1.id });
+    await EagerRating.create({ value: 2, comment_id: c2.id });
 
-    const eager = await Post.eagerLoad({ comments: "ratings" })
+    const eager = await EagerPost.eagerLoad({ comments: "ratings" })
       .order("posts.id, ratings.id, comments.id")
       .first();
-    const expected = await Post.first();
+    const expected = await EagerPost.first();
     expect(eager).not.toBeNull();
     expect((eager as any).id).toBe((expected as any).id);
   });
