@@ -262,10 +262,13 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(table);
       const node = builder.buildNegated(table.get("title"), { id: 5 });
       const sql = new Visitors.ToSql().compile(node);
+      // Negation binds the RHS (Rails inverts a positively-built, bound
+      // predicate), so the value rides a QueryAttribute bind rather than being
+      // inlined.
       expect(sql).toContain('"posts"."title" !=');
-      // The whole object is compared, not the dereferenced `5`.
-      expect(sql).not.toMatch(/!=\s*5\b/);
-      expect(sql).toContain('{"id":5}');
+      // The whole object is bound, not the dereferenced `5`.
+      const bound = (node as unknown as { right: { value: { value: unknown } } }).right.value.value;
+      expect(bound).toEqual({ id: 5 });
     });
 
     // Mirror of the positive ArrayHandler convergence on the negated per-element
@@ -382,7 +385,10 @@ describe("PredicateBuilderTest", () => {
       const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
-      expect(sql).toContain("Rails");
+      // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.
+      const bound = (nodes[0] as unknown as { right: { value: { value: unknown } } }).right.value
+        .value;
+      expect(bound).toBe("Rails");
       expect(sql).not.toContain('"posts"."authors"');
       expect(sql).toMatch(/NOT\b|!=|<>/);
     });
