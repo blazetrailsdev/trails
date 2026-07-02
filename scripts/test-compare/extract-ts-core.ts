@@ -27,16 +27,71 @@ function isAssertionCallee(name: string): boolean {
   return /^(assert|refute|expect)([A-Z]|$)/.test(name) || /^(must|wont)[A-Z]/.test(name);
 }
 
-/** Non-deduplicated count of assertion calls in a test node's subtree. */
-function countAssertions(node: ts.Node): number {
+// Depth cap for recursive helper expansion (see countAssertions). Deep enough
+// for real Rails/trails helper chains (`doDumpIndexTestsForSchema` →
+// `doDumpIndexAssertionsForOneIndex`) without risk of runaway recursion; the
+// per-path `visiting` set already breaks cycles, this bounds fan-out depth.
+const MAX_HELPER_DEPTH = 5;
+
+/**
+ * Map of same-file non-assertion helper functions — any `function` declaration
+ * and any `const foo = (...) => …` / `= function …`, at ANY nesting depth (the
+ * walk descends the whole file, not just top-level statements) — to their body
+ * node, so a test that delegates its assertions to a helper (e.g. `testCopyTable`)
+ * has the helper's asserts folded into its count. The Ruby twin collects
+ * same-file `def`s the same way (extract-ruby-tests.rb `collect_helper_defs`).
+ *
+ * Static and name-keyed on a FLAT map (no lexical-scope tracking) — this mirrors
+ * the Ruby side's file-scoped (not per-class) approximation. Consequences:
+ * receiver calls (`obj.foo()`) and runtime-dispatched helpers are out of scope,
+ * and two same-named helpers in different suites collide (last definition wins),
+ * so a call could fold in the wrong body. Acceptable for a report-only count on
+ * real test files, where helper names are effectively file-unique.
+ */
+type HelperMap = Map<string, ts.Node>;
+
+function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
+  const helpers: HelperMap = new Map();
+  const walk = (n: ts.Node) => {
+    if (ts.isFunctionDeclaration(n) && n.name && n.body) {
+      helpers.set(n.name.text, n.body);
+    } else if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) {
+      const init = n.initializer;
+      if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && init.body) {
+        helpers.set(n.name.text, init.body);
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(sourceFile);
+  return helpers;
+}
+
+/**
+ * Non-deduplicated count of assertion calls in a test node's subtree, folding
+ * in calls to same-file non-assertion helpers (recursively, depth-capped, with
+ * a per-path cycle guard). Blocks/callbacks passed to a helper are counted
+ * lexically (they live in the test subtree); the helper's OWN body is expanded
+ * once per call site. Loops/branches are counted statically (as written), not
+ * per runtime iteration — matching the Ruby extractor.
+ */
+function countAssertions(
+  node: ts.Node,
+  helpers: HelperMap,
+  depth = 0,
+  visiting: Set<string> = new Set(),
+): number {
   let count = 0;
   const walk = (n: ts.Node) => {
-    if (
-      ts.isCallExpression(n) &&
-      ts.isIdentifier(n.expression) &&
-      isAssertionCallee(n.expression.text)
-    ) {
-      count++;
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
+      const name = n.expression.text;
+      if (isAssertionCallee(name)) {
+        count++;
+      } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
+        visiting.add(name);
+        count += countAssertions(helpers.get(name)!, helpers, depth + 1, visiting);
+        visiting.delete(name);
+      }
     }
     ts.forEachChild(n, walk);
   };
@@ -63,6 +118,7 @@ const ADAPTER_SUITE_WRAPPERS = new Set([
  */
 export function extractTestsFromSource(content: string, relativePath: string): TestFileInfo {
   const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
+  const helpers = collectHelpers(sourceFile);
 
   const fileInfo: TestFileInfo = {
     file: relativePath,
@@ -98,7 +154,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       style,
       assertions: [],
-      assertionCount: countAssertions(node),
+      assertionCount: countAssertions(node, helpers),
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });

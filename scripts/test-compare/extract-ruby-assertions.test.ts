@@ -110,6 +110,76 @@ describe("Ruby extractor assertion-count collection", () => {
     expect(c["lookalikes not counted"]).toBe(0);
   });
 
+  it("expands same-file helper methods (incl. test_* used as helpers)", () => {
+    const c = rubyAssertionCounts({
+      "cases/copy_test.rb": `
+        class CopyTest < ActiveSupport::TestCase
+          def test_copy_table(from = "customers", to = "customers2")
+            assert_equal row_count(to), row_count(from)
+            assert_equal column_names(to), column_names(from)
+          end
+
+          def test_copy_table_with_binary_column
+            test_copy_table "binaries", "binaries2"
+          end
+        end
+      `,
+    });
+    // Delegating test folds in the helper's 2 asserts (copy_table symmetry trap).
+    expect(c["copy table with binary column"]).toBe(2);
+    // The helper-as-test still counts its own 2 directly.
+    expect(c["copy table"]).toBe(2);
+  });
+
+  it("expands helpers recursively through sub-helpers (depth-capped)", () => {
+    const c = rubyAssertionCounts({
+      "cases/dump_test.rb": `
+        class DumpTest < ActiveSupport::TestCase
+          def do_dump_index_assertions_for_one_index
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def do_dump_index_tests_for_schema
+            assert_predicate top, :present?
+            do_dump_index_assertions_for_one_index
+            do_dump_index_assertions_for_one_index
+          end
+
+          def test_dump_indexes_for_schema_one
+            do_dump_index_tests_for_schema
+          end
+        end
+      `,
+    });
+    // top assert (1) + 2 sub-helper calls × 2 = 5
+    expect(c["dump indexes for schema one"]).toBe(5);
+  });
+
+  it("guards against helper recursion cycles", () => {
+    const c = rubyAssertionCounts({
+      "cases/cycle_test.rb": `
+        class CycleTest < ActiveSupport::TestCase
+          def ping
+            assert_equal 1, a
+            pong
+          end
+
+          def pong
+            assert_equal 2, b
+            ping
+          end
+
+          def test_cyclic
+            ping
+          end
+        end
+      `,
+    });
+    // ping(1) → pong(1) → ping on path (skipped) = 2, no infinite loop
+    expect(c["cyclic"]).toBe(2);
+  });
+
   it("counts assertions in it/test-macro bodies", () => {
     const c = rubyAssertionCounts({
       "cases/bar_test.rb": `
