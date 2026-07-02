@@ -468,7 +468,7 @@ describe("UpdateAllTest", () => {
   it("update all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
     const joinScope = CpkOrder.joins("orderAgreements").where({
-      cpk_order_agreements: { signature: agreement.signature },
+      orderAgreements: { signature: agreement.signature },
     });
     expect(await joinScope.updateAll({ status: "shipped" })).toBe(1);
   });
