@@ -568,7 +568,17 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (isTransactionAware(connection)) {
-        connection.verifyBang();
+        // verifyBang is fired without awaiting (matching Rails' synchronous
+        // verify!, which returns before the transaction opens). trails' verifyBang
+        // is async, so a real backend's liveness query can still be resolving when
+        // the pool is torn down — swallow that rejection so the fire-and-forget
+        // promise doesn't surface as an unhandled rejection.
+        const verified = (
+          connection as unknown as { verifyBang(): void | Promise<void> }
+        ).verifyBang();
+        if (verified && typeof verified.catch === "function") {
+          verified.catch(() => {});
+        }
         await connection.transactionManager.beginTransaction({
           joinable: false,
           _lazy: false,
@@ -643,7 +653,16 @@ export class ConnectionPool implements ReapablePool {
       // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
       // unconditionally, ensure membership in @connections, and return — no
       // checkout_and_verify / QueryCache wiring on the pinned connection.
-      (pinned as unknown as { verifyBang(): void }).verifyBang();
+      // trails' verifyBang is async (Rails' verify! is sync), so this sync
+      // checkout can't await it — the connection is returned before verify
+      // resolves. Swallow any rejection (e.g. the pool was torn down while a
+      // real backend's verify query was still in flight) so the fire-and-forget
+      // promise doesn't surface as an unhandled rejection. The async
+      // checkoutAsync path awaits verifyBang and does propagate.
+      const verified = (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
+      if (verified && typeof verified.catch === "function") {
+        verified.catch(() => {});
+      }
       if (this._connections && !this._connections.includes(pinned)) {
         this._connections.push(pinned);
       }
