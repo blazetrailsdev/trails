@@ -508,6 +508,35 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       expect(book.name).toBe("<untitled>");
     },
   );
+  it("threads the reflected column default so a plaintext default deserializes without decrypting", async () => {
+    // Regression for encrypt-thread-column-default-into-encrypted-type: a
+    // reflection-only encrypted model (no explicit `attribute(..., { default })`)
+    // must pick up the column's schema default via columns_hash and thread it
+    // into the EncryptedAttributeType. With the default threaded, the plaintext
+    // default value round-trips through deserialize (via the `@default == value`
+    // guard) instead of attempting — and failing — to decrypt it when
+    // support_unencrypted_data is off.
+    const adapter = await freshAdapter();
+    const Book = class ReflectionOnlyEncryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true });
+      }
+    } as any;
+    await Book.loadSchema();
+
+    Configurable.config.supportUnencryptedData = false;
+
+    // Persist the plaintext column default (as the DB would when a row is
+    // inserted without a name), bypassing encryption.
+    const book = await withoutEncryption(() => Book.create({}));
+    expect(book.name).toBe("<untitled>");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
   it("can dump and load records that use encryption", async () => {
     // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
     // attribute state (ciphertexts) and reconstructing a new instance via the DB-load
