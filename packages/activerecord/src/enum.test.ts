@@ -56,6 +56,9 @@ describe("EnumTest", () => {
     expect(type.cast(0)).toBe("proposed");
     expect(type.cast(1)).toBe("written");
     expect(type.cast(2)).toBe("published");
+    expect(type.cast("proposed")).toBe("proposed");
+    expect(type.cast("written")).toBe("written");
+    expect(type.cast("published")).toBe("published");
     expect(type.cast("unknown")).toBe("unknown");
   });
 
