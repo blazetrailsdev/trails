@@ -175,7 +175,11 @@ describe("SchemaDumperTest", () => {
     // binary, `numeric_data.numeric_number` (t.numeric) dumps as decimal.
     const output = await standardDump();
     expect(output).toMatch(/t\.binary\("blob_data"\)/);
-    expect(output).toMatch(/t\.decimal\("numeric_number"/);
+    // Rails sources the decimal precision default from native_database_types
+    // (nil on SQLite), so precision-less `t.decimal`/`t.numeric` columns dump
+    // bare — no `precision:` option.
+    expect(output).toMatch(/t\.decimal\("numeric_number"\)/);
+    expect(output).toMatch(/t\.decimal\("decimal_number"\)/);
   });
 
   it("schema dump keeps id column when id is false and id column added", async () => {
