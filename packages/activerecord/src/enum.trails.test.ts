@@ -37,6 +37,22 @@ describe("Enum name conflict detection", () => {
     }).not.toThrow();
   });
 
+  // Rails' second instance-method branch (`method_defined_within?(method_name,
+  // _enum_methods_module)`, enum.rb:383-384) raises when a *different* enum on
+  // the same class already generated a value method with this name.
+  it("raises when a second enum reuses a value method defined by another enum", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", { active: 0, archived: 1 });
+          // `active` also maps here → isActive/activeBang collide with status's.
+          this.enum("state", { active: 0, closed: 1 });
+        }
+      }
+    }).toThrow(/already defined by another enum/);
+  });
+
   // Rails guards `name=` too (`detect_enum_conflict!(name, "#{name}=")`), so an
   // enum named after a framework writer conflicts on the setter.
   it("raises for an enum name whose reader is a framework method", () => {

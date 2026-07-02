@@ -524,6 +524,19 @@ export function _enum(
   // detectNegativeEnumConditionsBang below). Folding negative-scope names back
   // into this set would resurrect the pre-empting ArgumentError.
   const dangerousMethods = dangerousAttributeMethods();
+  // Mirror Rails' `_enum_methods_module`: the second `detect_enum_conflict!`
+  // instance-method branch (enum.rb:383-384) raises "...already defined by
+  // another enum" when a *different* enum on the same class already generated a
+  // value method with this name. `dangerousAttributeMethods()` covers only
+  // framework methods, so we track enum-generated predicate/bang names per class
+  // (copy-on-write off the inherited set) and consult them here. The set is
+  // populated during the generation pass below, so the conflict pass only sees
+  // names from prior `enum()` declarations, never this call's own.
+  const enumMethodsHost = this as unknown as { _enumMethodsModuleNames?: Set<string> };
+  if (!Object.prototype.hasOwnProperty.call(this, "_enumMethodsModuleNames")) {
+    enumMethodsHost._enumMethodsModuleNames = new Set(enumMethodsHost._enumMethodsModuleNames);
+  }
+  const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
   for (const [n] of Object.entries(mapping)) {
@@ -558,16 +571,25 @@ export function _enum(
     // guard against any pre-existing class method.
     if (dangerousMethods.has(predicateName))
       raiseConflictError.call(this, attribute, predicateName);
+    if (enumMethodNames.has(predicateName))
+      raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
     if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+    if (enumMethodNames.has(bangName))
+      raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
     if (fullName in (this as object))
       raiseConflictError.call(this, attribute, fullName, { type: "class" });
     if (notScopeName in (this as object))
       raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      const friendlyBang = `${friendlyName}Bang`;
       if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
-      if (dangerousMethods.has(`${friendlyName}Bang`))
-        raiseConflictError.call(this, attribute, `${friendlyName}Bang`);
+      if (enumMethodNames.has(fp))
+        raiseConflictError.call(this, attribute, fp, { source: "another enum" });
+      if (dangerousMethods.has(friendlyBang))
+        raiseConflictError.call(this, attribute, friendlyBang);
+      if (enumMethodNames.has(friendlyBang))
+        raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
       if (friendlyName in (this as object))
         raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
@@ -656,6 +678,17 @@ export function _enum(
         writable: true,
         configurable: true,
       });
+    }
+
+    // Record the generated instance-method names so a later enum on this class
+    // (or a subclass) that would generate the same predicate/bang raises
+    // "already defined by another enum" — mirroring membership in Rails'
+    // `_enum_methods_module`.
+    enumMethodNames.add(predicateName);
+    enumMethodNames.add(bangName);
+    if (friendlyName !== fullName) {
+      enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
+      enumMethodNames.add(`${friendlyName}Bang`);
     }
   }
 
