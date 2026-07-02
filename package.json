@@ -28,6 +28,8 @@
     "api:calls:reseed": "API_COMPARE_FORCE=1 pnpm api:compare && pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write",
     "api:calls:wide": "pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts",
     "api:calls:wide:reseed": "API_COMPARE_FORCE=1 pnpm api:compare --wide-calls && pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write",
+    "api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
+    "api:pins:all": "API_COMPARE_FORCE=1 pnpm api:compare && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
     "fixtures:adoption:inventory": "pnpm tsx scripts/fixtures-inventory/inventory.ts",
     "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
