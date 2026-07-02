@@ -31,7 +31,7 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
-import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js";
+import { Customer as CanonicalCustomer, Address } from "./test-helpers/models/customer.js";
 import { Author as CanonicalAuthor } from "./test-helpers/models/author.js";
 
 // ==========================================================================
@@ -1076,15 +1076,54 @@ describe("FinderTest", () => {
     await Post.create({ title: "hmt" });
     expect(await Post.exists()).toBe(true);
   });
-  it("exists with aggregate having three mappings", async () => {
+  // "exists with aggregate having three mappings" and its "…with one
+  // difference" sibling live in the fixture-backed FinderTest block below —
+  // they ride the real customers fixture, and declaring fixtures() in this
+  // stub-heavy block would trip test-fixture-parity on every thin stub here.
+  it("include on unloaded relation with mismatched class", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg3" });
-    expect(await Post.exists({ title: "agg3" })).toBe(true);
+    await Post.create({ title: "mis" });
+    const found = await Post.where({ title: "mis" }).first();
+    expect(found).toBeDefined();
   });
-  it("exists with aggregate having three mappings with one difference", async () => {
+  it.skipIf(adapterType === "postgres")(
+    "include on unloaded relation with having referencing aliased select",
+    async () => {
+      const { Post } = makeModel();
+      await Post.create({ title: "alias_sel" });
+      const count = await Post.count();
+      expect(count).toBe(1);
+    },
+  );
+  it("include on unloaded relation with composite primary key", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg3d" });
-    expect(await Post.exists({ title: "nope" })).toBe(false);
+    await Post.create({ title: "cpk_unloaded" });
+    const first = await Post.first();
+    expect(first).toBeDefined();
+  });
+  it("include on loaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "cpk_loaded" });
+    const posts = await Post.all();
+    expect(posts.length).toBe(1);
+  });
+  it("member on unloaded relation with mismatched class", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_unloaded" });
+    const found = await Post.findBy({ title: "mem_unloaded" });
+    expect(found).toBeDefined();
+  });
+  it("member on unloaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_cpk" });
+    const count = await Post.count();
+    expect(count).toBe(1);
+  });
+  it("member on loaded relation with composite primary key", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "mem_cpk_loaded" });
+    const posts = await Post.all();
+    expect(posts.length).toBe(1);
   });
   it("implicit order column is configurable", async () => {
     const { Post } = makeModel();
@@ -2261,5 +2300,54 @@ describe("FinderTest", () => {
     await assertNoQueries(false, async () => {
       expect(await books.member(greatAuthorBook)).toBe(true);
     });
+  });
+});
+
+// Fixture-backed FinderTest cases riding the real `customers` fixture +
+// canonical Customer composed_of mappings (mirrors Rails `fixtures :customers`).
+// Kept in its own describe so declaring fixtures() does not activate
+// test-fixture-parity across the stub-heavy exists/find-by block above.
+describe("FinderTest", () => {
+  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
+  const Customer = CanonicalCustomer;
+
+  it("exists with aggregate having three mappings", async () => {
+    const existingAddress = (
+      customers("david") as InstanceType<typeof Customer> & { address: Address }
+    ).address;
+    expect(await Customer.exists({ address: existingAddress })).toBe(true);
+  });
+
+  it("exists with aggregate having three mappings with one difference", async () => {
+    const existingAddress = (
+      customers("david") as InstanceType<typeof Customer> & { address: Address }
+    ).address;
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street,
+          existingAddress.city,
+          existingAddress.country + "1",
+        ),
+      }),
+    ).toBe(false);
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street,
+          existingAddress.city + "1",
+          existingAddress.country,
+        ),
+      }),
+    ).toBe(false);
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street + "1",
+          existingAddress.city,
+          existingAddress.country,
+        ),
+      }),
+    ).toBe(false);
   });
 });
