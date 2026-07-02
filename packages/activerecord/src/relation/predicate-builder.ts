@@ -88,12 +88,32 @@ export class PredicateBuilder {
     value: unknown,
     type: BoundType | undefined,
   ): UnboundableBound | null {
+    const sign = this.queryAttributeWithType(columnName, value, type).isUnboundable();
+    return sign === false ? null : new UnboundableBound(sign);
+  }
+
+  /**
+   * Builds a QueryAttribute bind for a bound using {@link resolveBoundType}'s
+   * relation/context/table cascade rather than `buildBindAttribute`'s narrower
+   * `this.table`-only lookup. Used by the negation path so a joined/aliased
+   * out-of-range bound is typed correctly (and thus detected as unboundable →
+   * `1=1`) instead of falling through to the identity fallback and silently
+   * binding a raw value the column can't hold.
+   */
+  private bindAttributeFor(attribute: Nodes.Attribute, value: unknown): QueryAttribute {
+    return this.queryAttributeWithType(attribute.name, value, this.resolveBoundType(attribute));
+  }
+
+  private queryAttributeWithType(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): QueryAttribute {
     const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
       cast(v: unknown): unknown;
       serialize(v: unknown): unknown;
     };
-    const sign = new QueryAttribute(columnName, value, castType).isUnboundable();
-    return sign === false ? null : new UnboundableBound(sign);
+    return new QueryAttribute(columnName, value, castType);
   }
 
   /**
@@ -307,7 +327,10 @@ export class PredicateBuilder {
     // positively-built predicate, so the RHS is a QueryAttribute bind. This
     // also lets an out-of-range value report `unboundable?` at the visitor
     // (`!=` → `1=1`) instead of raising ActiveModelRangeError when bound.
-    return attribute.notEq(this.buildBindAttribute(attribute.name, value));
+    // Route through bindAttributeFor so a joined/aliased column is typed via the
+    // full resolveBoundType cascade (an OOR bound typed only on this.table's
+    // identity fallback would neither raise nor collapse to `1=1`).
+    return attribute.notEq(this.bindAttributeFor(attribute, value));
   }
 
   private buildNegatedArray(attribute: Nodes.Attribute, value: unknown[]): Nodes.Node {
