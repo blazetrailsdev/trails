@@ -50,8 +50,8 @@ describe("EnumTest", () => {
   });
 
   // Rails: `type.cast(:unknown)` / `type.cast("unknown")` pass the unknown value
-  // through unchanged; trails' EnumType#cast returns nil for unmapped values.
-  it.skip("type.cast", () => {
+  // through unchanged (`value.presence`).
+  it("type.cast", () => {
     const type = Book.typeForAttribute("status");
     expect(type.cast(0)).toBe("proposed");
     expect(type.cast(1)).toBe("written");
@@ -325,9 +325,11 @@ describe("EnumTest", () => {
     expect((book as any).status).toBeNull();
   });
 
-  // Rails treats `false` as blank → casts to nil; trails' EnumType#assertValidValue
-  // rejects `false` with an ArgumentError instead.
-  it.skip("assign false value to a field defined as not boolean", () => {});
+  // Rails treats `false` as blank → casts to nil.
+  it("assign false value to a field defined as not boolean", () => {
+    (book as any).status = false;
+    expect((book as any).status).toBeNull();
+  });
 
   // Rails: `@book.boolean_status = false` → "disabled" — boolean enum not on Book.
   it.skip("assign false value to a field defined as boolean", () => {});
