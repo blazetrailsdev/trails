@@ -18,7 +18,6 @@ import {
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   makeEncryptedAuthor,
-  makeFreshModel,
   makeKeyProvider,
   withoutEncryption,
 } from "./test-helpers.js";
@@ -112,11 +111,15 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("use a custom encryptor", async () => {
     const adp = await freshAdapter();
-    const EncryptedAuthor1 = await makeFreshModel(adp, "authors", {
-      id: "integer",
-      name: "string",
-    });
-    EncryptedAuthor1.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
+    const EncryptedAuthor1 = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+        this.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
+      }
+    } as any;
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
     expect(author.name).toBe("1");
@@ -129,14 +132,18 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   it("support previous contexts", async () => {
     Configurable.config.supportUnencryptedData = true;
     const adp = await freshAdapter();
-    const EncryptedAuthor2 = await makeFreshModel(adp, "authors", {
-      id: "integer",
-      name: "string",
-    });
-    EncryptedAuthor2.encrypts("name", {
-      encryptor: new TestEncryptor({ "2": "3" }),
-      previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
-    });
+    const EncryptedAuthor2 = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+        this.encrypts("name", {
+          encryptor: new TestEncryptor({ "2": "3" }),
+          previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
+        });
+      }
+    } as any;
     new EncryptedAuthor2();
     const author = await EncryptedAuthor2.create({ name: "2" });
     expect(author.name).toBe("2");
@@ -146,8 +153,14 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const authorReloaded = await EncryptedAuthor2.find(author.id);
     expect(authorReloaded.encryptedAttribute("name")).toBe(true);
     // Write plaintext directly to DB (simulates an unencrypted legacy row).
-    const RawModel = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
-    RawModel._tableName = EncryptedAuthor2._tableName;
+    const RawModel = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    } as any;
     new RawModel();
     const rawRecord = await RawModel.find(author.id);
     await rawRecord.update({ name: "1" });
@@ -331,13 +344,30 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       ];
 
       const adp = await freshAdapter();
-      const Author = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
-      Author.encrypts("name", { encryptor: currentEncryptor, deterministic: true, fixed: false });
+      const Author = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adp;
+          this.encrypts("name", {
+            encryptor: currentEncryptor,
+            deterministic: true,
+            fixed: false,
+          });
+        }
+      } as any;
       new Author();
 
       // Insert a row encrypted with the previous scheme directly (legacy row).
-      const Raw = await makeFreshModel(adp, "authors", { id: "integer", name: "string" });
-      Raw._tableName = Author._tableName;
+      const Raw = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adp;
+        }
+      } as any;
       new Raw();
       await Raw.create({ name: "alice_prev_cipher" });
 

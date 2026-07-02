@@ -17,7 +17,7 @@ import { Configurable } from "./configurable.js";
 import { defaultCompressor, type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { clearDefaultKeyProviderCache } from "./scheme.js";
+import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { DecryptionError, EncryptionError } from "./errors.js";
 import { ValueType, BinaryData } from "@blazetrails/activemodel";
@@ -149,11 +149,8 @@ export const AUTHOR_NAME_LIMIT = 100;
  *   - every `EncryptedBook*` / `UnencryptedBook` variant → `encrypted_books`
  *     (book_encrypted.rb consolidates them all onto one table)
  *   - `EncryptedAuthor` → `authors` (author_encrypted.rb)
- *   - `EncryptedTrafficLightWithStoreState` → `traffic_lights`
- *     (traffic_light_encrypted.rb)
- *
- * plus `to_be_linked_users`, which {@link makeFreshModel}'s serialized-attribute
- * callsite rides for its canonical `settings` (text) column.
+ *   - `EncryptedTrafficLight` / `EncryptedTrafficLightWithStoreState` →
+ *     `traffic_lights` (traffic_light_encrypted.rb)
  *
  * All already exist in the canonical `TEST_SCHEMA` with the Rails schema.rb
  * shape, so the fixtures name only canonical tables/columns. Under one-schema
@@ -166,7 +163,6 @@ const ENCRYPTION_CANONICAL_TABLES = [
   "encrypted_books",
   "authors",
   "traffic_lights",
-  "to_be_linked_users",
 ] as const;
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
@@ -207,29 +203,40 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // ─── Model factories ──────────────────────────────────────────────────────────
 
 /**
- * Creates a fresh model class riding an existing canonical `tableName`, with the
- * given attributes declared explicitly (no DDL). Attribute types are passed as
- * strings (e.g. "integer", "string"); every declared column must already exist
- * on the canonical table. Use this when you need to apply a specific encryption
- * scheme to an attribute without the idempotency guard blocking a second
- * `encrypts()` call — a fresh class dodges the guard without needing a bespoke
- * (`fresh_model_N`) table, keeping the suite one-schema clean.
+ * PlainPost: a `posts` model with no encrypted attributes. Mirrors Rails'
+ * `Class.new(Post)` with nothing encrypted — used to assert `encrypt()` is a
+ * no-op for classes without encryptable attributes.
  */
-export async function makeFreshModel(
-  adapter: DatabaseAdapter,
-  tableName: string,
-  attributes: Record<string, string>,
-): Promise<any> {
-  const klass = class extends Base {
+export function makePlainPost(adapter: DatabaseAdapter) {
+  return class PlainPost extends Base {
     static {
-      this._tableName = tableName;
-      for (const [name, type] of Object.entries(attributes)) {
-        this.attribute(name, type);
-      }
+      this._tableName = "posts";
+      this.attribute("id", "integer");
+      this.attribute("title", "string");
+      this.attribute("body", "string");
       this.adapter = adapter;
     }
   } as any;
-  return klass;
+}
+
+/**
+ * EncryptedAuthor with a caller-supplied previous scheme on `name`. Mirrors
+ * Rails' EncryptedAuthor configured with a previous scheme, used to exercise
+ * decrypting a row written under an older scheme.
+ */
+export function makeEncryptedAuthorWithPreviousSchemes(
+  adapter: DatabaseAdapter,
+  previousSchemes: Scheme[],
+) {
+  return class EncryptedAuthor extends Base {
+    static {
+      this._tableName = "authors";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { previousSchemes });
+    }
+  } as any;
 }
 
 /**
@@ -347,6 +354,31 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
       this.attribute("name", "string");
       this.adapter = adapter;
       this.encrypts("name", { encryptor: _failingEncryptor });
+    }
+  } as any;
+}
+
+/**
+ * EncryptedTrafficLight: `state` is serialized as an Array (like the parent
+ * TrafficLight) and encrypted. Mirrors Rails' traffic_light_encrypted.rb
+ * `EncryptedTrafficLight < TrafficLight { encrypts :state }`. Declares its
+ * attributes explicitly (raw adapter, schema cache not warmed) so the serialize
+ * coder and the create-time timestamp columns are known before encrypts wraps
+ * `state`.
+ */
+export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
+  return class EncryptedTrafficLight extends Base {
+    static {
+      this._tableName = "traffic_lights";
+      this.attribute("id", "integer");
+      this.attribute("state", "string");
+      this.attribute("long_state", "string");
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
+      this.serialize("state", { type: "Array" });
+      this.serialize("long_state", { type: "Array" });
+      this.adapter = adapter;
+      this.encrypts("state");
     }
   } as any;
 }
