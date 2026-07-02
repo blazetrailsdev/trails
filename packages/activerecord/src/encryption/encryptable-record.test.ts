@@ -692,14 +692,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // ciphertext on PG/MariaDB (see the `serialized binary data can be encrypted`
     // skip). Until that impl gap closes we ride only the `name` half; a persisted
     // `logo` ciphertext would trip the record's reload, so it stays omitted.
-    let book = await makeEncryptedBookNormalizedFirst(await freshAdapter()).create({
-      name: "Dune",
-    });
+    // One adapter for both models: they share the canonical `encrypted_books`
+    // table, so re-installing the schema for a second adapter would reset the id
+    // sequence and collide with the first row's PK on PG.
+    const adp = await freshAdapter();
+    let book = await makeEncryptedBookNormalizedFirst(adp).create({ name: "Dune" });
     await assertEncryptedAttribute(book, "name", "dune");
     // TRACKED-PENDING-CONVERGENCE (binary text-ciphertext round-trip):
     // await assertEncryptedAttribute(book, "logo", "dune");
 
-    book = await makeEncryptedBookNormalizedSecond(await freshAdapter()).create({ name: "Dune" });
+    book = await makeEncryptedBookNormalizedSecond(adp).create({ name: "Dune" });
     await assertEncryptedAttribute(book, "name", "dune");
     // await assertEncryptedAttribute(book, "logo", "dune");
   });
