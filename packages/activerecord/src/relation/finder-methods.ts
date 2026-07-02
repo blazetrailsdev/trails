@@ -691,7 +691,6 @@ export const FinderMethods = {
 
 /** @internal */
 export function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
-  if (conditions === false) return rel;
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
   // (or except(:order).limit!(1) when distinct+offset are both set)
   let relation: any;
@@ -704,7 +703,12 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     relation._isDistinct = false;
     relation = relation.select(new Nodes.SqlLiteral("1 AS one")).limit(1);
   }
-  if (conditions === null || conditions === undefined || conditions === true) {
+  // Rails only skips `where!` for `conditions == :none` (our `undefined`
+  // sentinel for "no argument passed"); `null` mirrors Rails' `nil`, which
+  // `exists?` short-circuits to false before ever reaching here. Every other
+  // value — including `true` — falls through to the `case`/`else` PK-lookup
+  // below, matching Rails' `where!(primary_key => conditions) unless conditions == :none`.
+  if (conditions === null || conditions === undefined) {
     return relation;
   }
   if (Array.isArray(conditions)) {
