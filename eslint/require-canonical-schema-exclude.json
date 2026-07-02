@@ -1,5 +1,4 @@
 [
   "packages/activerecord/src/attribute-methods.trails.test.ts",
-  "packages/activerecord/src/encryption.test.ts",
-  "packages/activerecord/src/finder.test.ts"
+  "packages/activerecord/src/encryption.test.ts"
 ]
