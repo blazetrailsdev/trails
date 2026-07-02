@@ -120,12 +120,54 @@ export class PredicateBuilder {
           conditions,
         );
         nodes.push(...assocNodes);
+      } else if (
+        this._tableContext &&
+        typeof this._tableContext.aggregatedWith === "function" &&
+        this._tableContext.aggregatedWith(key)
+      ) {
+        nodes.push(...this.buildFromHashAggregate(key, value, negated));
       } else {
         const attr = this.resolveColumn(key);
         nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
       }
     }
     return nodes;
+  }
+
+  /**
+   * Expand a `composed_of` aggregate value into predicates over its mapped
+   * columns. Mirrors PredicateBuilder#expand_from_hash's `aggregated_with?`
+   * branch: `where(address: Address.new(...))` becomes
+   * `address_street = ? AND address_city = ? AND address_country = ?`.
+   *
+   * @internal
+   */
+  private buildFromHashAggregate(key: string, value: unknown, negated: boolean): Nodes.Node[] {
+    const reflection = this._tableContext.reflectOnAggregation(key);
+    const mapping: [string, string][] = reflection.mapping();
+    // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
+    const values =
+      value === null || value === undefined ? [null] : Array.isArray(value) ? value : [value];
+    if (mapping.length === 1 || values.length === 0) {
+      const [columnName, aggregateAttr] = mapping[0];
+      // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
+      const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
+      return negated
+        ? this.buildNegatedFromHash({ [columnName]: mapped })
+        : this.buildFromHash({ [columnName]: mapped });
+    }
+    // Multi-mapping: one AND-group per object over every mapped column, ORed
+    // together (grouping_queries). Each column is built positively; negation is
+    // applied once at the group level, mirroring expand_from_hash.
+    const queryGroups: Nodes.Node[][] = values.map((object) =>
+      mapping.map(([fieldAttr, aggregateAttr]) =>
+        this.build(
+          this.resolveColumn(fieldAttr),
+          extractAggregateAttr(object, aggregateAttr, true),
+        ),
+      ),
+    );
+    return this.groupingQueries(queryGroups, negated);
   }
 
   /** @internal */
@@ -624,6 +666,21 @@ export class PredicateBuilder {
 // property but is not a plain object literal (those stand in for Ruby Hashes).
 function respondsToId(value: unknown): value is { id: unknown } {
   return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
+}
+
+// Read an aggregate's mapped attribute off a value object. Mirrors Rails'
+// two call shapes in expand_from_hash: the single-mapping branch uses
+// `respond_to? ? public_send : object` (scalar passthrough when the value
+// isn't an aggregate object), while the multi-mapping branch uses
+// `object.try(attr)` (nil when the object is nil). Getters and methods both
+// resolve — a function value is invoked with the object as receiver.
+function extractAggregateAttr(object: unknown, attr: string, tryNil: boolean): unknown {
+  if (object === null || object === undefined) return tryNil ? null : object;
+  if (typeof object === "object" && attr in object) {
+    const v = (object as Record<string, unknown>)[attr];
+    return typeof v === "function" ? (v as (...a: unknown[]) => unknown).call(object) : v;
+  }
+  return tryNil ? null : object;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

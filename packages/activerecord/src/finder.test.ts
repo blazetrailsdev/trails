@@ -31,7 +31,7 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
-import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js";
+import { Customer as CanonicalCustomer, Address } from "./test-helpers/models/customer.js";
 import { Author as CanonicalAuthor } from "./test-helpers/models/author.js";
 
 // ==========================================================================
@@ -400,6 +400,8 @@ describe("FinderTest", () => {
 describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
+  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
+  const Customer = CanonicalCustomer;
   beforeAll(async () => {
     await defineSchema(canonicalSchema);
   });
@@ -1077,14 +1079,42 @@ describe("FinderTest", () => {
     expect(await Post.exists()).toBe(true);
   });
   it("exists with aggregate having three mappings", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "agg3" });
-    expect(await Post.exists({ title: "agg3" })).toBe(true);
+    const existingAddress = (
+      customers("david") as InstanceType<typeof Customer> & { address: Address }
+    ).address;
+    expect(await Customer.exists({ address: existingAddress })).toBe(true);
   });
   it("exists with aggregate having three mappings with one difference", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "agg3d" });
-    expect(await Post.exists({ title: "nope" })).toBe(false);
+    const existingAddress = (
+      customers("david") as InstanceType<typeof Customer> & { address: Address }
+    ).address;
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street,
+          existingAddress.city,
+          existingAddress.country + "1",
+        ),
+      }),
+    ).toBe(false);
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street,
+          existingAddress.city + "1",
+          existingAddress.country,
+        ),
+      }),
+    ).toBe(false);
+    expect(
+      await Customer.exists({
+        address: new Address(
+          existingAddress.street + "1",
+          existingAddress.city,
+          existingAddress.country,
+        ),
+      }),
+    ).toBe(false);
   });
   it("implicit order column is configurable", async () => {
     const { Post } = makeModel();
