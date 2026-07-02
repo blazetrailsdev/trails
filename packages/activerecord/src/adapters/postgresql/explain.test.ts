@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
@@ -16,10 +15,9 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// EXPLAIN tests build their own ad-hoc `ex_*` tables; nothing is
-// expressible as a static defineSchema spec. defineSchema({})
-// marks the file as TM-Phase-5 compliant. The outer transaction wrapping
-// each test rolls back those tables (PG DDL is transactional).
+// EXPLAIN tests build their own ad-hoc `ex_*` tables via raw DDL. The outer
+// transaction wrapping each test rolls back those tables (PG DDL is
+// transactional).
 setupFixtures();
 useHandlerTransactionalFixtures();
 
@@ -27,7 +25,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await defineSchema({});
   });
   afterAll(async () => {
     // The `ex_*`/`op_*` tables are built in-test and rolled back by the

@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
@@ -19,9 +18,9 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// The `virtual_columns` table uses PG generated/virtual columns, which
-// aren't expressible via defineSchema. The table is built inline below;
-// defineSchema({}) marks the file as TM-Phase-5 compliant.
+// The `virtual_columns` table uses PG generated/virtual columns; it is
+// built inline below via `createTable` (mirroring Rails'
+// `@connection.create_table "virtual_columns"`).
 setupFixtures();
 useHandlerTransactionalFixtures();
 
@@ -31,7 +30,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
     await adapter.createTable("virtual_columns", (t) => {
       t.string("name");

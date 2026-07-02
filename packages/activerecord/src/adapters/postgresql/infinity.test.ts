@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
 import { setZone, resetZone } from "@blazetrails/activesupport";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -21,7 +20,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
-    await defineSchema(adapter, {});
     await adapter.exec(`
       CREATE TABLE postgresql_infinities (
         id serial primary key,
