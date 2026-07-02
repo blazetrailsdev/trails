@@ -197,12 +197,6 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
  *
  *    The returned type is `TestDatabaseAdapter` so it satisfies
  *    {@link TransactionalFixturesAdapter} without an extra cast.
- *
- * Caveat: tests that call {@link makeFreshModel} from inside `it()` bodies
- * cannot use pattern (2) on MySQL/MariaDB. `makeFreshModel` runs DDL
- * (`CREATE TABLE`) which auto-commits on MySQL and breaks the outer
- * BEGIN/ROLLBACK wrap — the next `ROLLBACK TO SAVEPOINT` then errors with
- * `SAVEPOINT active_record_1 does not exist`. Keep such tests on pattern (1).
  */
 export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
