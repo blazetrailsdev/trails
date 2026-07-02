@@ -29,6 +29,8 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 
 // ==========================================================================
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +
@@ -457,28 +459,6 @@ describe("FinderTest", () => {
       }
     }
     expect(await Topic.exists()).toBe(false);
-  });
-
-  it("last on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const last = await Topic.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("first on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const first = await Topic.all().offset(1).first();
-    expect(first).not.toBeNull();
   });
 
   it("find by one attribute", async () => {
@@ -2198,6 +2178,82 @@ describe("FinderTest", () => {
     await book.destroy();
     const included = await CpkBook.all().include(book);
     expect(included).toBe(false);
+  });
+});
+
+// ==========================================================================
+// FinderTest — *_on_relation_with_limit_and_offset ride the canonical
+// posts -> comments STI chain (posts(:sti_comments) with 5 comments), matching
+// finder_test.rb:1055-1085. Faithful port of the two tests deferred from
+// faithful-port-finder-test-synthetic-clusters.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { posts } = fixtures(["posts", "comments"], { schema: canonicalSchema });
+  registerModel(CanonicalPost);
+  registerModel(CanonicalComment);
+
+  const rid = (r: unknown) => (r as { id: number }).id;
+  const idOf = (r: unknown) => (r == null ? r : rid(r));
+  const idsOf = (r: unknown) => (r as unknown[]).map((x) => rid(x));
+
+  it("last on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
+
+    expect(idOf((await comments.offset(2)).at(-1))).toEqual(idOf(await comments.offset(2).last()));
+    expect(idsOf((await comments.offset(2)).slice(-2))).toEqual(
+      idsOf(await comments.offset(2).last(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(-3))).toEqual(
+      idsOf(await comments.offset(2).last(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
+  });
+
+  it("first on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
+
+    expect(idOf((await comments.offset(2))[0])).toEqual(idOf(await comments.offset(2).first()));
+    expect(idsOf((await comments.offset(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.offset(2).first(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.offset(2).first(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
   });
 });
 
