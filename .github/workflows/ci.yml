@@ -1177,6 +1177,13 @@ jobs:
         # baseline. Fails on a new mismatch or a stale baseline entry; reseed
         # with `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
+      - name: Body-pins gate
+        # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
+        # Rails body digest drifts from the current vendored source
+        # (output/body-hashes.json, written by the API comparison step above)
+        # or when a pin no longer resolves. Re-pin after re-verifying with
+        # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
+        run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
       - name: API comparison (wide calls)
         # Regenerates the SEPARATE wide call-set artifact
         # (output/call-mismatches-wide.json) over WIDE_SIGNIFICANT_CALLS (all

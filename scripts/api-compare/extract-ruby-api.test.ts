@@ -353,3 +353,101 @@ describe("Ruby extractor umbrella module-config scanning", () => {
     expect(names).not.toContain("error_reporter");
   });
 });
+
+describe("Ruby extractor body digest (source-hash pinning)", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> bodyDigest for the given fixtures.
+  function rubyDigests(fixtures: Record<string, string>): Record<string, string | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "digest-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = m[:bodyDigest]
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("emits a body digest for each method", () => {
+    const d = rubyDigests({
+      "foo.rb": `
+        class Foo
+          def save
+            run_callbacks(:save)
+          end
+        end
+      `,
+    });
+    expect(d["Foo#save"]).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("is unchanged by indentation, blank-line, and comment churn", () => {
+    const base = rubyDigests({
+      "a.rb": `
+        class Foo
+          def save
+            validate!
+            run_callbacks(:save)
+          end
+        end
+      `,
+    });
+    const churned = rubyDigests({
+      "a.rb": `
+        class Foo
+          def save
+                # a leading comment
+                validate!
+
+
+                run_callbacks(:save) # trailing comment
+          end
+        end
+      `,
+    });
+    expect(churned["Foo#save"]).toBe(base["Foo#save"]);
+  });
+
+  it("changes when the body's code changes (drift)", () => {
+    const base = rubyDigests({
+      "a.rb": `
+        class Foo
+          def save
+            run_callbacks(:save)
+          end
+        end
+      `,
+    });
+    const edited = rubyDigests({
+      "a.rb": `
+        class Foo
+          def save
+            run_callbacks(:create)
+          end
+        end
+      `,
+    });
+    expect(edited["Foo#save"]).not.toBe(base["Foo#save"]);
+  });
+});

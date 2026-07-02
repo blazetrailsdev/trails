@@ -51,22 +51,24 @@ SKIP_PATTERNS = [
   /\/migration\//,  # Migration test infrastructure (not test cases themselves)
 ]
 
-# Assertion methods to track
-ASSERTION_METHODS = %w[
-  assert assert_equal assert_not_equal assert_nil assert_not_nil
-  assert_raises assert_raise assert_nothing_raised
-  assert_match assert_no_match assert_includes assert_not_includes
-  assert_empty assert_not_empty assert_respond_to
-  assert_instance_of assert_kind_of assert_predicate
-  assert_same assert_not_same assert_in_delta assert_in_epsilon
-  assert_operator assert_send assert_difference assert_no_difference
-  assert_changes assert_no_changes assert_deprecated
-  must_equal must_be_nil must_be_like must_be_empty
-  must_include must_respond_to must_be_instance_of
-  must_raise wont_be_nil wont_equal wont_be_empty
-  refute refute_equal refute_nil refute_includes
-  expect
-].freeze
+# Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
+# TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
+# of Rails assertions: the `assert_*`/`refute_*` families incl. custom helpers
+# (assert_queries_count, assert_no_queries, assert_cycle, …) a whitelist kept
+# missing, the `must_*`/`wont_*` spec forms, and `expect`. The `(_|\z)`/`_`
+# anchors keep look-alikes (`asserted`, `assertion`) out.
+def assertion_method?(name)
+  return false unless name
+  name == "expect" ||
+    name.match?(/\A(assert|refute)(_|\z)/) ||
+    name.match?(/\A(must|wont)_/)
+end
+
+# Depth cap for recursive helper expansion (see count_assertions). The twin of
+# TS MAX_HELPER_DEPTH (extract-ts-core.ts). Deep enough for real helper chains
+# (`do_dump_index_tests_for_schema` → `do_dump_index_assertions_for_one_index`)
+# without runaway recursion; the per-path `visiting` list already breaks cycles.
+MAX_HELPER_DEPTH = 5
 
 # ---- Test gating (adapter / feature conditionals) ----
 #
@@ -119,6 +121,15 @@ class TestExtractor
     @module_collect = nil
     @module_includes = {}
     @module_def_gates = {}
+
+    # Same-file non-assertion helper `def`s, keyed by name → body node, so a test
+    # that delegates its assertions to a helper (e.g. `test_copy_table`,
+    # `do_dump_index_tests_for_schema`) folds the helper's asserts into its count.
+    # The TS twin collects top-level functions (extract-ts-core.ts collectHelpers).
+    # Pre-collected before walk() so a helper defined below its caller still
+    # resolves. File-scoped (not per-class) — a documented static approximation.
+    @helper_defs = {}
+    collect_helper_defs(sexp)
 
     walk(sexp)
 
@@ -298,6 +309,7 @@ class TestExtractor
       line: t[:line],
       style: "def_test",
       assertions: t[:assertions],
+      assertionCount: t[:assertion_count],
     }, nil, body_gate: t[:body_gate])
   end
 
@@ -367,6 +379,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -378,6 +391,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -388,6 +402,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -399,6 +414,7 @@ class TestExtractor
       line: line,
       style: "it",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -408,6 +424,7 @@ class TestExtractor
 
     line = extract_line(node)
     assertions = extract_assertions_from_block(node)
+    assertion_count = count_assertions(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -419,6 +436,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -429,6 +447,7 @@ class TestExtractor
     line = extract_line(node)
     body_node = outer_node || node
     assertions = extract_assertions_from_node(body_node)
+    assertion_count = count_assertions(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -440,6 +459,7 @@ class TestExtractor
       line: line,
       style: "test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, body_node)
   end
 
@@ -461,6 +481,7 @@ class TestExtractor
     desc = name.sub(/^test_/, "").tr("_", " ")
     line = extract_line(node)
     assertions = extract_assertions_from_def(node)
+    assertion_count = count_assertions(node)
 
     # Inside a mixin module body: stash, don't emit. Materialized at end of file
     # by flush_collected_modules, with the include-site gate from process_include.
@@ -469,6 +490,7 @@ class TestExtractor
       # retained past collection, so it can't be recomputed at materialization.
       @module_collect << {
         description: desc, line: line, assertions: assertions,
+        assertion_count: assertion_count,
         body_gate: body_skip_gate(node)
       }
       return
@@ -484,6 +506,7 @@ class TestExtractor
       line: line,
       style: "def_test",
       assertions: assertions,
+      assertionCount: assertion_count,
     }, node)
   end
 
@@ -858,24 +881,93 @@ class TestExtractor
     assertions.uniq
   end
 
+  # Raw (non-deduped) count of assertion calls in a test body, folding in calls
+  # to same-file non-assertion helpers (recursively, depth-capped, with a
+  # per-path cycle guard). `assertions` (above) uniq's to distinct assertion
+  # *kinds* — direct-only; this counts every call incl. helper-delegated ones,
+  # which is what test:compare's assertion-count comparison needs (exact-count
+  # parity with the Rails counterpart). See extract-ts-core.ts for the TS twin.
+  def count_assertions(node)
+    count_assertions_expanded(node, [], 0)
+  end
+
+  # Recursively count assertion calls, expanding self-calls (fcall/vcall/command,
+  # i.e. implicit `self`) to known same-file helpers. Blocks passed to a helper
+  # are counted lexically (they sit in the test body); the helper's OWN body is
+  # expanded once per call site. `visiting` is the current recursion path (cycle
+  # guard); `depth` is bounded by MAX_HELPER_DEPTH. Loops/`yield` are counted
+  # statically (as written), not per runtime iteration — matching the TS side.
+  def count_assertions_expanded(node, visiting, depth)
+    return 0 unless node.is_a?(Array)
+
+    count = 0
+    name = self_call_name(node)
+    if name
+      if assertion_method?(name)
+        count += 1
+      elsif depth < MAX_HELPER_DEPTH && @helper_defs.key?(name) && !visiting.include?(name)
+        visiting.push(name)
+        count += count_assertions_expanded(@helper_defs[name], visiting, depth + 1)
+        visiting.pop
+      end
+    elsif receiver_call_assertion?(node)
+      # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
+      # (never expanded as helpers, but still counted).
+      count += 1
+    end
+
+    node.each { |child| count += count_assertions_expanded(child, visiting, depth) if child.is_a?(Array) }
+    count
+  end
+
+  # Name of an implicit-`self` call (fcall/vcall/command) at this node, else nil.
+  # These are the only shapes eligible for helper expansion.
+  def self_call_name(node)
+    case node[0]
+    when :command, :fcall, :vcall
+      ident_name(node[1])
+    end
+  end
+
+  # Is this node a receiver-form (`:call`/`:command_call`) assertion call?
+  def receiver_call_assertion?(node)
+    return false unless node[0] == :call || node[0] == :command_call
+    node[3] && assertion_method?(ident_name(node[3]))
+  end
+
+  # Collect every same-file `def name` → body node (node[3] is the bodystmt).
+  # Includes `test_*` methods too: a test method is itself a valid helper when
+  # another test delegates to it (e.g. `test_copy_table`).
+  def collect_helper_defs(node)
+    return unless node.is_a?(Array)
+    if node[0] == :def
+      name = ident_name(node[1])
+      @helper_defs[name] = node[3] if name && node[3]
+    end
+    node.each { |child| collect_helper_defs(child) if child.is_a?(Array) }
+  end
+
   def find_assertions(node, results)
     return unless node.is_a?(Array)
 
     case node[0]
     when :command, :fcall
       name = ident_name(node[1])
-      results << name if name && ASSERTION_METHODS.include?(name)
-    when :method_add_arg
-      if node[1].is_a?(Array) && node[1][0] == :fcall
-        name = ident_name(node[1][1])
-        results << name if name && ASSERTION_METHODS.include?(name)
-      end
-    when :call
-      # method.must_equal etc
+      results << name if assertion_method?(name)
+    when :vcall
+      # bare no-arg call: `assert_auto_incremented`
+      name = ident_name(node[1])
+      results << name if assertion_method?(name)
+    when :call, :command_call
+      # receiver form: `x.must_equal y` / `sql.must_be_like %{…}`
       name = ident_name(node[3]) if node[3]
-      results << name if name && ASSERTION_METHODS.include?(name)
+      results << name if assertion_method?(name)
     end
 
+    # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg, [:fcall,
+    # ...], ...]`; we do NOT match `:method_add_arg` because the recursion below
+    # descends into its `:fcall` child, already recorded above — matching the
+    # wrapper too would double-count (invisible under the uniq'd `assertions`).
     node.each { |child| find_assertions(child, results) if child.is_a?(Array) }
   end
 

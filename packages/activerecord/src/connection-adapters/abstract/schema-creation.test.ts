@@ -60,7 +60,7 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
 
   it("honors precision and scale when both are given", () => {
     expect(new SchemaCreation("sqlite").typeToSql("decimal", { precision: 8, scale: 2 })).toBe(
-      "DECIMAL(8, 2)",
+      "DECIMAL(8,2)",
     );
   });
 });

@@ -171,6 +171,26 @@ def ident_name(node)
   nil
 end
 
+# Normalized body digest for source-hash pinning (RFC 0025). Hashes the def
+# BODY sexp only (not the surrounding class), with scanner-token positions
+# stripped, so the digest is insensitive to indentation, blank lines, and
+# comments (Ripper.sexp already drops comments and whitespace — only the
+# `[lineno, column]` position tuples encode layout). A change to the code the
+# body actually runs changes the digest; pure formatting/comment churn does
+# not. See body-pins.ts / lint-body-pins.ts for the pin lifecycle.
+def strip_sexp_positions(node)
+  return node unless node.is_a?(Array)
+  # Scanner-token position tuple: [Integer, Integer]. Replace with a stable
+  # placeholder so its removal can't collapse two structurally distinct sexps.
+  return :_pos if node.length == 2 && node[0].is_a?(Integer) && node[1].is_a?(Integer)
+  node.map { |child| strip_sexp_positions(child) }
+end
+
+def body_digest(body)
+  return nil if body.nil?
+  Digest::SHA256.hexdigest(strip_sexp_positions(body).inspect)[0, 16]
+end
+
 # Classify a default-value or constant-RHS node as a literal {kind:, value:};
 # {kind: "expr"} for non-literals (calls, refs, lambdas), nil when no node.
 def literal_value(node)
@@ -550,6 +570,8 @@ class ApiExtractor
     method_info[:calls] = calls unless calls.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
+    digest = body_digest(body)
+    method_info[:bodyDigest] = digest if digest
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -599,6 +621,8 @@ class ApiExtractor
     method_info[:calls] = calls unless calls.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
+    digest = body_digest(body)
+    method_info[:bodyDigest] = digest if digest
 
     target[:classMethods] << method_info
 

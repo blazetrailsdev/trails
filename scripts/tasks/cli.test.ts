@@ -65,6 +65,9 @@ import {
   rfcStatusError,
   setFrontmatterList,
   resolveTasksDir,
+  closeEdits,
+  closeError,
+  isDepResolved,
   statusEdits,
   statusOf,
   statusTransitionError,
@@ -97,6 +100,7 @@ function story(over: Partial<StoryEntry>): StoryEntry {
     claim: null,
     assignee: null,
     blocked_by: null,
+    closed_reason: null,
     file_path: "0001-r/stories/x.md",
     ...over,
   };
@@ -143,6 +147,21 @@ describe("ready", () => {
         .map((s) => s.id)
         .sort(),
     ).toEqual(["a", "e"]);
+  });
+
+  it("treats a closed dep as resolved (same as done)", () => {
+    const idx = index([
+      story({ id: "doneDep", status: "done" }),
+      story({ id: "closedDep", status: "closed", closed_reason: '"superseded"' }),
+      story({ id: "a", status: "ready", deps: ["doneDep"] }),
+      story({ id: "b", status: "ready", deps: ["closedDep"] }),
+      story({ id: "c", status: "ready", deps: ["closedDep", "doneDep"] }),
+    ]);
+    expect(
+      ready(idx)
+        .map((s) => s.id)
+        .sort(),
+    ).toEqual(["a", "b", "c"]);
   });
 
   it("excludes ready stories whose own RFC is not active", () => {
@@ -586,6 +605,59 @@ describe("statusEdits", () => {
       pr: "null",
     });
   });
+
+  it("clears closed-reason, claim, assignee, and pr when reopening to ready", () => {
+    expect(statusEdits("closed", "ready")).toEqual({
+      status: "ready",
+      "closed-reason": "null",
+      claim: "null",
+      assignee: "null",
+      pr: "null",
+    });
+  });
+});
+
+describe("closeError", () => {
+  it("allows closing from any pre-done state", () => {
+    for (const from of ["draft", "ready", "claimed", "in-progress", "blocked"]) {
+      expect(closeError(from)).toBeNull();
+    }
+  });
+
+  it("refuses to close a done story", () => {
+    expect(closeError("done")).toMatch(/completed story cannot be closed/);
+  });
+
+  it("refuses when the current status cannot be read", () => {
+    expect(closeError(null)).toMatch(/cannot read current status/);
+  });
+});
+
+describe("closeEdits", () => {
+  it("stamps the terminal status + reason and clears claim/assignee/blocked-by", () => {
+    expect(closeEdits("superseded by 0042")).toEqual({
+      status: "closed",
+      "closed-reason": '"superseded by 0042"',
+      "blocked-by": "null",
+      claim: "null",
+      assignee: "null",
+    });
+  });
+
+  it("leaves pr untouched (a closed story may cite the superseding PR)", () => {
+    expect(closeEdits("won't do")).not.toHaveProperty("pr");
+  });
+});
+
+describe("isDepResolved", () => {
+  it("treats done and closed as resolved, everything else as open", () => {
+    expect(isDepResolved("done")).toBe(true);
+    expect(isDepResolved("closed")).toBe(true);
+    expect(isDepResolved("ready")).toBe(false);
+    expect(isDepResolved("blocked")).toBe(false);
+    expect(isDepResolved(null)).toBe(false);
+    expect(isDepResolved(undefined)).toBe(false);
+  });
 });
 
 describe("statusTransitionError", () => {
@@ -603,6 +675,16 @@ describe("statusTransitionError", () => {
 
   it("allows blocked → ready (the documented unblock path has no dedicated verb)", () => {
     expect(statusTransitionError("blocked", "ready")).toBeNull();
+  });
+
+  it("allows closed → ready (reopen path, mirroring unblock)", () => {
+    expect(statusTransitionError("closed", "ready")).toBeNull();
+  });
+
+  it("redirects status-set to closed at the dedicated close verb", () => {
+    const err = statusTransitionError("draft", "closed");
+    expect(err).toMatch(/won't set status closed/);
+    expect(err).toMatch(/close <id> --reason <text>/);
   });
 
   it("rejects an unrecognized current status instead of throwing", () => {
@@ -1178,7 +1260,9 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(mutatorCalls).toBe(2);
     // Pre-loop: HEAD:main guard (fetch, rev-list) then one checkout per
     // generated file restores them.
-    // First attempt: pull, add, commit, push(throws), reset.
+    // First attempt: pull, add, commit, push(throws). The race branch then
+    // confirms the commit did NOT land (rev-parse HEAD, fetch, rev-parse
+    // origin/main all return "" here, so HEAD !== origin/main) and resets.
     // Second attempt: pull, add, commit, push(ok).
     expect(seen).toEqual([
       "fetch",
@@ -1189,6 +1273,9 @@ describe("commitAndPush (git mutation flow)", () => {
       "add",
       "commit",
       "push",
+      "rev-parse",
+      "fetch",
+      "rev-parse",
       "reset",
       "pull",
       "add",
@@ -1219,6 +1306,50 @@ describe("commitAndPush (git mutation flow)", () => {
     // Two attempts, each: pull, add, commit, push(throws), reset.
     expect(seen.filter((l) => l === "push").length).toBe(2);
     expect(seen.filter((l) => l === "reset").length).toBe(2);
+  });
+
+  // Regression: the tasks repo's `.husky/post-commit` hook auto-pushes `main`
+  // in the background after every commit. That background push races this
+  // explicit push; when the hook's push lands first, origin/main advances to
+  // OUR commit and git then rejects THIS push with "[rejected] ... (fetch
+  // first)" — even though the mutation is already on origin/main. That is a
+  // success, not a lost race: commitAndPush must confirm origin/main == HEAD
+  // and return 0, NOT reset + retry (which the reflog evidence showed wrongly
+  // reporting failure on a landed `priority` flip).
+  it("treats a rejected push as success when our commit already landed on origin/main", () => {
+    const { seen, exit } = setup();
+    const HEAD_SHA = "061e7d5ad3452f6950fbe974e72326ff28b1baed";
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "push") {
+        // The background post-commit push already won the race and put our
+        // commit on origin/main; git rejects this one with stale-info info.
+        throw pushError("! [rejected]        main -> main (fetch first)");
+      }
+      // Both HEAD and origin/main resolve to the same commit — ours landed.
+      if (label === "rev-parse") return HEAD_SHA as never;
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    // No throw: commitAndPush returns normally (the top-level handler exits 0).
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "should not be reached",
+      raceExitCode: 3,
+    });
+    expect(mutatorCalls).toBe(1);
+    // process.exit is never called: no raceExitCode, no exit 1.
+    expect(exit).not.toHaveBeenCalled();
+    // The mutation is confirmed landed via rev-parse HEAD + fetch + rev-parse
+    // origin/main; it must NOT reset the tree or retry the mutation.
+    expect(seen.filter((l) => l === "push").length).toBe(1);
+    expect(seen.filter((l) => l === "reset").length).toBe(0);
+    expect(seen.filter((l) => l === "commit").length).toBe(1);
+    expect(seen.filter((l) => l === "rev-parse").length).toBe(2);
   });
 
   it("surfaces non-race push failures verbatim and exits 1 (no reset, no retry)", () => {

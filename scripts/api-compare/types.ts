@@ -37,6 +37,14 @@ export interface MethodInfo {
   depRefs?: Record<string, string[]>;
   calls?: string[];
   /**
+   * Normalized digest of the Ruby method BODY (source-hash pinning, RFC 0025).
+   * Whitespace/comment-insensitive, body-only; changes when the ported code
+   * changes upstream. Ruby-side only (the TS extractor does not emit it); used
+   * by body-pins.ts / lint-body-pins.ts to detect vendored-Rails body drift on
+   * matched pairs. See extract-ruby-api.rb#body_digest.
+   */
+  bodyDigest?: string;
+  /**
    * True when the method is not part of the public API surface:
    * Ruby `private`/`protected`, TS `private`/`protected`, or
    * TS `#`-prefixed private fields. Consumers should filter these

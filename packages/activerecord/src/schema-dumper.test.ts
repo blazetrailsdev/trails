@@ -55,6 +55,22 @@ describe("SchemaDumperTest", () => {
   function dumpCanonicalTable(...tables: string[]): Promise<string> {
     return dumpTableSchema(canonicalSource(), ...tables);
   }
+  // Whether a dumped canonical `companies` index surfaces its descending sort
+  // order. Rails gates this on `supports_index_sort_order?` (PostgreSQL/SQLite
+  // always; MySQL/MariaDB version-gated). trails' PG/SQLite reflect it here, but
+  // MySQL/MariaDB do NOT round-trip descending order through the shared-worker
+  // reconstruct path (generateSchemaFile → loadSchema → add_index): the CI
+  // MariaDB 11 lane dumps `companies` with no order even though
+  // `supportsIndexSortOrder()` is true there. This was empirically confirmed to
+  // be NOT a cold `_databaseVersion` cache — priming it in `SchemaStatements#addIndex`
+  // did not change the result, because the MySQL order path (MysqlSchemaCreation
+  // → the ungated mysql `addOptionsForIndexColumns`) never consults the version,
+  // and reflection keys off `SHOW KEYS` `Collation = "D"`. Tracked for
+  // convergence in RFC 0048 (mysql-reconstruct-index-sort-order-dump); until then
+  // the order line is expected only on PG/SQLite.
+  function dumpsIndexSortOrder(): boolean {
+    return adapterType !== "mysql";
+  }
 
   it("schema dump", async () => {
     const output = await standardDump();
@@ -176,16 +192,136 @@ describe("SchemaDumperTest", () => {
     expect(match![1]).toMatch(/id: false/);
     expect(match![2]).toMatch(/t\.string\("id",.*null: false/);
   });
+
+  // Helper: grep the lone dumped `addIndex` line for `companies` matching `re`,
+  // mirroring Rails' `dump_table_schema("companies").split(/\n/).grep(...).first`.
+  function companyIndexLine(output: string, re: RegExp): string {
+    return (
+      output.split(/\n/).find((l) => /addIndex\("companies"/.test(l) && re.test(l)) ?? ""
+    ).trim();
+  }
+
+  it("schema dumps index columns in right order", async () => {
+    const output = await dumpCanonicalTable("companies");
+    const line = companyIndexLine(output, /company_index/);
+    // Rails branches on current_adapter? + supports_index_sort_order?: MySQL
+    // keeps the sub-part length map, other adapters drop it; the sort order is
+    // present only where the backend surfaces it (schema_dumper_test.rb:170-183).
+    // `index_parts` emits length before order.
+    const base =
+      'await ctx.addIndex("companies", ["firm_id", "type", "rating"], { name: "company_index"';
+    const lengthPart = adapterType === "mysql" ? ", length: { type: 10 }" : "";
+    const orderPart = dumpsIndexSortOrder() ? ', order: { rating: "desc" }' : "";
+    expect(line).toBe(`${base}${lengthPart}${orderPart} });`);
+  });
+
+  it("schema dumps partial indices", async () => {
+    const output = await dumpCanonicalTable("companies");
+    const line = companyIndexLine(output, /company_partial_index/);
+    // Rails branches on supports_partial_index?; unsupported backends (MySQL)
+    // emit the plain index with no `where:`.
+    const expected = adapterSupports("partial_index")
+      ? 'await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
+      : 'await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index" });';
+    expect(line).toBe(expected);
+  });
+
+  it("schema dumps nulls not distinct", async () => {
+    const output = await dumpCanonicalTable("companies");
+    const line = companyIndexLine(output, /company_nulls_not_distinct/);
+    // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
+    // unsupported backends emit a plain index with no `nullsNotDistinct:`.
+    const expected = adapterSupports("nulls_not_distinct")
+      ? 'await ctx.addIndex("companies", "firm_id", { name: "company_nulls_not_distinct", nullsNotDistinct: true });'
+      : 'await ctx.addIndex("companies", "firm_id", { name: "company_nulls_not_distinct" });';
+    expect(line).toBe(expected);
+  });
+
+  it("schema dumps index sort order", async () => {
+    const output = await dumpCanonicalTable("companies");
+    const line = companyIndexLine(output, /_name_and_rating/);
+    // Rails IndexDefinition#concise_options collapses a uniform order map to a
+    // scalar (`order: :desc`); backends that don't surface sort order here emit a
+    // plain index (schema_dumper_test.rb:203-211).
+    const expected = dumpsIndexSortOrder()
+      ? 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
+      : 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating" });';
+    expect(line).toBe(expected);
+  });
+
+  it("schema dumps index length", async () => {
+    const output = await dumpCanonicalTable("companies");
+    const line = companyIndexLine(output, /_name_and_description/);
+    // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
+    const expected =
+      adapterType === "mysql"
+        ? 'await ctx.addIndex("companies", ["name", "description"], { name: "index_companies_on_name_and_description", length: 10 });'
+        : 'await ctx.addIndex("companies", ["name", "description"], { name: "index_companies_on_name_and_description" });';
+    expect(line).toBe(expected);
+  });
+
+  itIfSupports("expression_index", "schema dump expression indices", async () => {
+    const output = await dumpCanonicalTable("companies");
+    let line = companyIndexLine(output, /company_expression_index/);
+    line = line.replace(/, \{ name: "company_expression_index" \}\);$/, "");
+    if (adapterType === "postgres") {
+      expect(line).toMatch(/CASE.+lower\(\(name\)::text\).+END\) DESC"/i);
+    } else {
+      expect(line).toMatch(/CASE.+lower\(name\).+END\) DESC"/i);
+    }
+  });
+
+  it("schema dump includes decimal options", async () => {
+    // Rails: dump_all_table_schema([/^[^n]/]) — keep only tables starting with
+    // `n` (numeric_data), then assert the scaled decimal + default round-trips.
+    const output = await standardDump([/^[^n]/]);
+    expect(output).toMatch(/precision: 3,\s+scale: 2,\s+default: "2\.78"/);
+  });
+
+  it("schema dump keeps large precision integer columns as decimal", async () => {
+    // Rails: standard_dump — canonical `numeric_data.atoms_in_universe` is a
+    // precision-55, scale-0 decimal, dumped without a scale option.
+    const output = await standardDump();
+    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
+  });
+
+  it("schema dump includes limit constraint for integer columns", async () => {
+    // Rails: dump_all_table_schema([/^(?!integer_limits)/]) with per-adapter
+    // `limit` expectations for `integer_limits.c_int_1..8`.
+    const output = await standardDump([/^(?!integer_limits)/]);
+    expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
+
+    // c_int_1..4: PostgreSQL rounds limit 1..2 → 2 bytes and drops it for the
+    // 4-byte 3..4; MySQL keeps 1..3 and drops the 4-byte 4; SQLite keeps 1..4.
+    const lowExpectations: RegExp[] =
+      adapterType === "postgres"
+        ? [/c_int_1.*limit: 2/, /c_int_2.*limit: 2/, /"c_int_3"(?!.*limit)/, /"c_int_4"(?!.*limit)/]
+        : adapterType === "mysql"
+          ? [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /"c_int_4"(?!.*limit)/]
+          : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
+    // c_int_5..8: only SQLite keeps them as limited integers; PG/MySQL widen to
+    // a bare bigint.
+    const highExpectations: RegExp[] =
+      adapterType === "sqlite"
+        ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
+        : [
+            /t\.bigint\("c_int_5"\)/,
+            /t\.bigint\("c_int_6"\)/,
+            /t\.bigint\("c_int_7"\)/,
+            /t\.bigint\("c_int_8"\)/,
+          ];
+    for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
+  });
 });
 
-// Deferred-convergence cases: still build ad-hoc, non-canonical tables (indexes
-// with sort-order/length options the canonical `TEST_SCHEMA` cannot yet express,
-// adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
-// in `schema.rb`, table-name prefix/suffix migrations, etc.). Kept on the
-// plain per-test reset (no `setupFixtures()`) so their bespoke tables are
-// dropped between tests. Converging these needs the `defineSchema` IndexSpec
-// extension + canonical `companies` indexes + the missing adapter tables —
-// tracked as follow-up stories under RFC 0048.
+// Deferred-convergence cases: still build ad-hoc, non-canonical tables
+// (adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
+// in `schema.rb`, decimal precision/integer limit that SQLite reflection can't
+// recover, table-name prefix/suffix migrations, etc.). Kept on the plain
+// per-test reset (no `setupFixtures()`) so their bespoke tables are dropped
+// between tests. The `companies` index-dump cases have moved to the canonical
+// block above (RFC 0048 IndexSpec extension); the rest await the missing
+// adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(async () => {
@@ -243,36 +379,6 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("temp_cache");
   });
 
-  // Deferred: SQLite reflection of a `defineSchema`-materialized table does not
-  // recover decimal precision/scale or integer limit, so these three cannot yet
-  // ride the canonical `numeric_data` / `integer_limits` via `standard_dump`.
-  // They stay on freshly-built ad-hoc tables (whose DDL the dumper reflects
-  // faithfully) until the canonical-materialization gap is closed.
-  it("schema dump includes limit constraint for integer columns", async () => {
-    await ctx.createTable("limits", {}, (t) => {
-      t.integer("small_int", { limit: 2 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("limit: 2");
-  });
-
-  it("schema dump includes decimal options", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("bank_balance", { precision: 10, scale: 2 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("precision: 10");
-    expect(output).toContain("scale: 2");
-  });
-
-  it("schema dump keeps large precision integer columns as decimal", async () => {
-    await ctx.createTable("numeric_data", {}, (t) => {
-      t.decimal("atoms_in_universe", { precision: 55 });
-    });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
-  });
-
   // Deferred: Rails' canonical `string_key_objects` is `id: false` +
   // `t.string :id, null: false` + `t.index :id, unique: true`
   // (schema.rb:1162-1166). Converging onto that canonical shape needs a trails
@@ -290,90 +396,6 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
-  it("schema dumps index columns in right order", async () => {
-    await ctx.createTable("indexed", {}, (t) => {
-      t.string("a");
-      t.string("b");
-    });
-    await ctx.addIndex("indexed", ["b", "a"], { name: "idx_ba" });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain("idx_ba");
-  });
-
-  // Rails runs this unconditionally and branches the expected dump on
-  // `supports_partial_index?` (schema_dumper_test.rb:185). On backends without
-  // partial-index support (MySQL) the DDL drops the `where` clause, so the dump
-  // emits a plain index.
-  it("schema dumps partial indices", async () => {
-    // Mirrors Rails' dump_table_schema("companies") on the canonical
-    // `company_partial_index` (firm_id, type) WHERE (rating > 10).
-    // force: true mirrors Rails' `create_table :companies` and drops any
-    // canonical `companies` left on the shared file-backed worker DB so the
-    // dump reflects only this test's lone partial index.
-    await ctx.createTable("companies", { force: true }, (t) => {
-      t.string("type");
-      t.integer("firm_id");
-      t.integer("rating");
-    });
-    await ctx.addIndex("companies", ["firm_id", "type"], {
-      name: "company_partial_index",
-      where: "(rating > 10)",
-    });
-    const output = SchemaDumper.dump(ctx);
-    // Rails branches the full expected index line on supports_partial_index?;
-    // unsupported backends (MySQL) emit the plain index with no `where:`.
-    const expected = adapterSupports("partial_index")
-      ? '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index", where: "(rating > 10)" });'
-      : '  await ctx.addIndex("companies", ["firm_id", "type"], { name: "company_partial_index" });';
-    expect(output).toContain(expected);
-  });
-  // Rails runs this unconditionally and branches on `supports_nulls_not_distinct?`
-  // (PostgreSQL ≥ 15 only). Backends without support emit a plain unique index.
-  it("schema dumps nulls not distinct", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("email");
-    });
-    await ctx.addIndex("users", "email", {
-      name: "idx_users_email_unique",
-      unique: true,
-      nullsNotDistinct: true,
-    });
-    const output = SchemaDumper.dump(ctx);
-    // Rails branches on supports_nulls_not_distinct? (PostgreSQL ≥ 15 only);
-    // unsupported backends emit a plain unique index with no `nullsNotDistinct:`.
-    const expected = adapterSupports("nulls_not_distinct")
-      ? '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true, nullsNotDistinct: true });'
-      : '  await ctx.addIndex("users", "email", { name: "idx_users_email_unique", unique: true });';
-    expect(output).toContain(expected);
-  });
-  it("schema dumps index sort order", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.addIndex("users", "name", {
-      name: "idx_users_name_desc",
-      order: { name: "desc" },
-    });
-    const output = SchemaDumper.dump(ctx);
-    // Rails IndexDefinition#concise_options collapses a single-column order to a
-    // scalar (`order: :desc`), not the expanded `order: { name: :desc }` map.
-    expect(output).toContain('order: "desc"');
-  });
-  it("schema dumps index length", async () => {
-    const { adapter: lenAdapter, ctx: lenCtx } = freshCtx();
-    await lenCtx.createTable("companies", { force: true }, (t) => {
-      t.string("name");
-      t.string("description");
-    });
-    await lenCtx.addIndex("companies", ["name", "description"], {
-      name: "index_companies_on_name_and_description",
-      length: 10,
-    });
-    const output = await SchemaDumper.dump(lenAdapter);
-    const line = output.split(/\n/).find((l) => /index_companies_on_name_and_description/.test(l));
-    // Sub-part prefix lengths are MySQL-only; other adapters drop the option.
-    expect(line?.includes("length: 10")).toBe(adapterType === "mysql");
-  });
   itIfSupports("check_constraints", "schema dumps check constraints", async () => {
     const { SchemaStatements } =
       await import("./connection-adapters/abstract/schema-statements.js");
@@ -448,15 +470,6 @@ describe("SchemaDumperTest", () => {
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
     },
   );
-  itIfSupports("expression_index", "schema dump expression indices", async () => {
-    await ctx.createTable("users", {}, (t) => {
-      t.string("email");
-    });
-    await ctx.addIndex("users", "lower(email)", { name: "idx_users_lower_email" });
-    const output = SchemaDumper.dump(ctx);
-    expect(output).toContain('"lower(email)"');
-    expect(output).toContain("idx_users_lower_email");
-  });
   // NOT converted to itIfSupports: Rails gates this by current_adapter?(:Mysql2,
   // :Trilogy) (schema_dumper_test.rb:313, real-MySQL-only, asserts concat_ws
   // backtick output), not by supports_expression_index?. Our body is a PG/SQLite

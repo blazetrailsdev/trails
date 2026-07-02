@@ -50,6 +50,28 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
+  /**
+   * MySQL/MariaDB report `column_key = 'PRI'` not only for genuine PRIMARY KEY
+   * columns but also for a UNIQUE index over NOT NULL columns when the table has
+   * no PRIMARY KEY (the "promoted unique" case, e.g. `string_key_objects`'
+   * `t.index :id, unique: true`), so the per-column `primaryKey` flag over-reports.
+   * Rails resolves the primary key via `@connection.primary_key` (constraint
+   * `'PRIMARY'`), not `column_key`. `primaryKeyOrderCache[tableName]` already holds
+   * that authoritative list (populated by `table()` via `adapter.primaryKeys`), so
+   * trust it: a promoted unique index yields no PK column and the table dumps
+   * `id: false`, matching Rails/MySQL (which keeps the index a plain unique key).
+   * @internal
+   */
+  protected override resolvePrimaryKeyColumns(
+    tableName: string,
+    columns: ColumnInfo[],
+  ): ColumnInfo[] {
+    const order = this.primaryKeyOrderCache[tableName];
+    if (order === undefined) return super.resolvePrimaryKeyColumns(tableName, columns);
+    const byName = new Map(columns.map((c) => [c.name, c]));
+    return order.map((name) => byName.get(name)).filter((c): c is ColumnInfo => c !== undefined);
+  }
+
   /** @internal */
   protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
     if (!this.connection) return {};

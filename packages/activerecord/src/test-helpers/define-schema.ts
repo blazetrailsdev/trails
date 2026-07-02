@@ -63,6 +63,28 @@ export interface IndexSpec {
   unique?: boolean;
   where?: string;
   name?: string;
+  /**
+   * Sort order, mirroring Rails' `t.index order:`. A scalar (`"desc"`) applies
+   * to every column; a per-column map (`{ rating: "desc" }`) targets one. Only
+   * emitted where the adapter supports index sort order (all three do); the
+   * dumper collapses a uniform map back to the scalar Rails form.
+   */
+  order?: string | Record<string, string>;
+  /**
+   * Sub-part prefix length, mirroring Rails' `t.index length:`. Scalar or
+   * per-column map. MySQL-only DDL — other adapters drop the option (matching
+   * Rails' `quoted_columns_for_index`).
+   */
+  length?: number | Record<string, number>;
+  /**
+   * Emit a `NULLS NOT DISTINCT` unique index (Rails `nulls_not_distinct:`).
+   * PostgreSQL ≥ 15 only; unsupported adapters drop the clause.
+   */
+  nullsNotDistinct?: boolean;
+  /** Index access method, mirroring Rails' `t.index using:` (e.g. `"btree"`). */
+  using?: string;
+  /** Index type keyword, mirroring Rails' `t.index type:` (e.g. MySQL `"fulltext"`). */
+  type?: string;
 }
 
 export interface WrappedTableSchema {
@@ -841,10 +863,23 @@ async function _defineSchemaImpl(
       // Rails schema_creation.rb.)
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
       if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
+      // Sub-part prefix length is MySQL-only DDL — the abstract SchemaCreation
+      // visitor emits `col(n)` unconditionally, which is invalid on PG/SQLite
+      // (`no such function`). MySQL has its own visitor that handles length, so
+      // drop it here for the others, mirroring Rails' `quoted_columns_for_index`
+      // (only AbstractMysqlAdapter decorates columns with length). `using`,
+      // `nullsNotDistinct`, and partial `where` are already adapter-gated in the
+      // visitor, so they pass through untouched.
+      const length = adapter.adapterName === "mysql" ? index.length : undefined;
       await ss.addIndex(table, index.columns, {
         unique: index.unique,
         where: index.where,
         name: index.name,
+        order: index.order as Record<string, string> | undefined,
+        length,
+        nullsNotDistinct: index.nullsNotDistinct,
+        using: index.using,
+        type: index.type,
       });
     }
     cache.set(table, newSig);

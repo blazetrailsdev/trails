@@ -2395,6 +2395,23 @@ export class MigrationContext {
     await (this.connection as any).changeColumnComment(table, col, comment);
   }
 
+  /**
+   * Split a possibly schema-qualified name into `[schema, bareName]` via the
+   * adapter's quote-aware parser (Rails `extract_schema_qualified_name`), so a
+   * quoted dotted identifier isn't mis-split. Only PostgreSQL carries
+   * schema-qualified DDL names; other adapters treat the whole string as bare.
+   */
+  private _splitSchemaQualified(name: string): [string | null, string] {
+    const conn = this.connection as {
+      adapterName: string;
+      extractSchemaQualifiedName?: (s: string) => [string | null, string];
+    };
+    if (conn.adapterName === "postgres" && typeof conn.extractSchemaQualifiedName === "function") {
+      return conn.extractSchemaQualifiedName(name);
+    }
+    return [null, name];
+  }
+
   async addIndex(
     table: string,
     columns: string | string[],
@@ -2423,8 +2440,14 @@ export class MigrationContext {
       cols.length === 1 && /\W/.test(cols[0])
         ? [cols[0].match(/\w+/g)?.join("_") ?? cols[0]]
         : cols;
-    const indexName = options?.name ?? `index_${table}_on_${nameParts.join("_and_")}`;
     const an = this._adapterName;
+    // Rails' PostgreSQL `index_name` strips the schema qualifier before deriving
+    // the default name (postgresql/schema_statements.rb), using the quote-aware
+    // `extract_schema_qualified_name`; a `my_schema.values` table indexes as
+    // `index_values_on_value` (created in `my_schema` via the schema-qualified
+    // table), keeping add/remove symmetric.
+    const [, nameTable] = this._splitSchemaQualified(table);
+    const indexName = options?.name ?? `index_${nameTable}_on_${nameParts.join("_and_")}`;
     // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
     const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
     const uniqueStr = !typeStr && unique ? "UNIQUE " : "";
@@ -2461,6 +2484,9 @@ export class MigrationContext {
     if (an === "mysql" && comment) sql += ` COMMENT ${this.connection.quote(comment)}`;
     await this.connection.executeMutation(sql);
     if (an === "postgres" && comment) {
+      // Rails emits an unqualified `COMMENT ON INDEX #{quote_column_name(index.name)}`
+      // (postgresql/schema_statements.rb:529-536), relying on search_path
+      // resolution — it never schema-qualifies this statement.
       await this.connection.executeMutation(
         `COMMENT ON INDEX ${this.connection.quoteIdentifier(indexName)} IS ${this.connection.quote(comment)}`,
       );
@@ -2488,14 +2514,36 @@ export class MigrationContext {
     table: string,
     options: { column?: string | string[]; name?: string },
   ): Promise<void> {
+    // Rails' PostgreSQL `remove_index` derives the default name from the bare
+    // table and re-qualifies the `DROP INDEX` with the table's schema
+    // (postgresql/schema_statements.rb, via PostgreSQL::Name / quoted_scope). It
+    // also splits a schema off an explicit `:name`, using it when the table is
+    // unqualified and raising when the two schemas disagree — mirroring
+    // PostgreSQLAdapter#removeIndex, which this reimplements.
+    const [tableSchema, bareTable] = this._splitSchemaQualified(table);
+    let dropSchema = tableSchema;
     let indexName = options.name;
+    if (indexName != null && this.connection.adapterName === "postgres") {
+      const [nameSchema, nameIdent] = this._splitSchemaQualified(indexName);
+      indexName = nameIdent;
+      if (!tableSchema) dropSchema = nameSchema;
+      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
+        throw new ArgumentError(
+          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
+        );
+      }
+    }
     if (!indexName && options.column) {
       const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${table}_on_${cols.join("_and_")}`;
+      indexName = `index_${bareTable}_on_${cols.join("_and_")}`;
     }
     if (indexName) {
       if (this.connection.adapterName === "mysql") {
         await this.connection.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
+      } else if (dropSchema) {
+        await this.connection.executeMutation(
+          `DROP INDEX ${this.connection.quoteIdentifier(dropSchema)}.${this.connection.quoteIdentifier(indexName)}`,
+        );
       } else {
         await this.connection.executeMutation(`DROP INDEX "${indexName}"`);
       }

@@ -55277,5 +55277,47 @@
     "rubyName": "before_initialize",
     "call": "on_load",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "belongs_to?",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "filter_map",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "foreign_key",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "owner",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "presence",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "through_reflection",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
   }
 ]

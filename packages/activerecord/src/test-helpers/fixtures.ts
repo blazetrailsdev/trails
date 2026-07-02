@@ -10,7 +10,10 @@ import {
   type UseFixturesByNameResult,
   type UseTablelessFixturesResult,
   type UseFixturesOpts,
+  type FixturesConnectionOpts,
 } from "./use-fixtures.js";
+
+type FixturesOptions = WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts;
 
 /**
  * Rails-faithful public surface for declaring fixtures in a test file.
@@ -35,29 +38,38 @@ import {
  * @example  // by registry name
  *   const { authors, posts } = fixtures(["authors", "posts"]);
  *
+ * @example  // non-transactional (Rails `use_transactional_tests = false`)
+ *   const { books } = fixtures(["books", "authors"], { useTransactionalTests: false });
+ *
+ * @example  // seed through a caller-supplied connection/adapter
+ *   const { colleges } = fixtures(["colleges"], {
+ *     connection: () => College.connection,
+ *     useTransactionalTests: false,
+ *   });
+ *
  * @internal
  */
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts,
+  options?: FixturesOptions,
 ): UseFixturesResult<M>;
 export function fixtures<const N extends FixtureName>(
   names: readonly N[],
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts,
+  options?: FixturesOptions,
 ): UseFixturesByNameResult<N>;
 export function fixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts,
+  options?: FixturesOptions,
 ): UseTablelessFixturesResult<T>;
 export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
-  options: (WithTransactionalFixturesOptions & UseFixturesOpts) | undefined = undefined,
+  options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
   // Opting into `fixtures()` IS the opt-in to the canonical schema: converted
   // tests get `TEST_SCHEMA` slice-derivation by default and never pass `schema`
   // themselves. An explicit `schema` still wins for the few sets the canonical
   // schema doesn't yet cover.
-  const withSchema: WithTransactionalFixturesOptions & UseFixturesOpts = {
+  const withSchema: FixturesOptions = {
     schema: TEST_SCHEMA,
     ...options,
   };

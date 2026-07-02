@@ -14,8 +14,7 @@ import { Toy } from "./test-helpers/models/toy.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
@@ -24,8 +23,6 @@ const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
 const MINUTE = 60;
 
 describe("SignedIdTest", () => {
-  setupFixtures();
-
   // Rails: class GetSignedIDInCallback < ActiveRecord::Base ... after_create :set_signed_id
   class GetSignedIDInCallback extends Base {
     static _tableName = "accounts";
@@ -37,7 +34,7 @@ describe("SignedIdTest", () => {
     }
   }
 
-  useFixtures(["accounts", "companies", "toys"], () => Base.connection);
+  fixtures(["accounts", "companies", "toys"]);
 
   beforeAll(async () => {
     registerModel(Account);
