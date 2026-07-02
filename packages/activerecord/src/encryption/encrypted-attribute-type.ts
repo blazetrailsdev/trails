@@ -31,6 +31,12 @@ Configurable.onConfigure(() => {
   _globalPreviousVersion++;
 });
 
+// Mirrors Ruby truthiness for `@default &&`: only `nil` and `false` are falsey.
+// `""`, `0`, etc. are truthy in Ruby, so they still act as a present default.
+function isRubyTruthy(value: unknown): boolean {
+  return value !== null && value !== undefined && value !== false;
+}
+
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is
  * the central piece connecting the encryption system with `encrypts`
@@ -239,7 +245,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     try {
       return this.scheme.withContext(() => {
         if (value === null || value === undefined) return value;
-        if (this._default !== undefined && this._default === value) return value;
+        // Rails' guard is `@default && @default == value` — a plain Ruby
+        // truthiness check, so a falsey default (`nil`/`false`) is treated as
+        // absent and does NOT short-circuit. Match that: only null/undefined/
+        // false are falsey (note `""`/`0` are truthy in Ruby, so they DO guard).
+        if (isRubyTruthy(this._default) && this._default === value) return value;
 
         // Adapters that use JSON/JSONB columns (e.g. PostgreSQL) return the stored value
         // as a parsed JS object rather than a raw string. Re-stringify so the encryptor
