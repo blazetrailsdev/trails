@@ -20,8 +20,10 @@ import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +
 // topics fixtures (RFC 0048 convergence). Ordinal-finder cluster
 // (finder_test.rb take/sole/first/second/third). The remaining clusters
-// (fourth/fifth/*-to-last/last/integer/exists/find-by/conditions) are still
-// bespoke below, tracked for convergence under RFC 0048.
+// (fourth/fifth/*-to-last/last/integer/exists/find-by/conditions) now ride the
+// canonical schema (canonical tables/columns, no bespoke defineSchema shape)
+// but remain thin ad-hoc coverage; faithful porting onto the real finder_test.rb
+// models/fixtures is tracked under RFC 0048.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics } = fixtures(["topics"], { schema: canonicalSchema });
@@ -171,38 +173,6 @@ describe("FinderTest", () => {
   });
 });
 
-const TEST_SCHEMA = {
-  topics: {
-    title: "string",
-    body: "string",
-    author: "string",
-    author_name: "string",
-    approved: "boolean",
-    category: "string",
-    status: "string",
-  },
-  posts: { title: "string", body: "string", author: "string", score: "integer", status: "string" },
-  birds: { name: "string", color: "string" },
-  users: {
-    name: "string",
-    email: "string",
-    age: "integer",
-    active: "boolean",
-    role: "string",
-    score: "integer",
-  },
-  items: {
-    name: "string",
-    color: "string",
-    category: "string",
-    score: "integer",
-    active: "boolean",
-  },
-  fel_posts: { title: "string" },
-  fel_comments: { body: "string", fel_post_id: "integer" },
-  fel_ratings: { value: "integer", fel_comment_id: "integer" },
-} as const;
-
 // ==========================================================================
 // FinderTest — targets finder_test.rb
 // ==========================================================================
@@ -210,7 +180,7 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   it("exists", async () => {
@@ -474,11 +444,11 @@ describe("FinderTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("content", "text");
       }
     }
-    await Topic.create({ title: "a", body: "x" });
-    const found = await Topic.findBy({ title: "a", body: "x" });
+    await Topic.create({ title: "a", content: "x" });
+    const found = await Topic.findBy({ title: "a", content: "x" });
     expect(found).not.toBeNull();
   });
 
@@ -828,10 +798,10 @@ describe("FinderTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("content", "text");
       }
     }
-    await Topic.create({ title: "a", body: "x" });
+    await Topic.create({ title: "a", content: "x" });
     const found = await Topic.findBy({ title: "a" });
     expect(found !== undefined).toBe(true);
   });
@@ -1068,7 +1038,8 @@ describe("FinderTest", () => {
   it("exists with loaded relation having updated owner record", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1079,7 +1050,8 @@ describe("FinderTest", () => {
   it("exists with distinct and offset and select", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "a" });
@@ -1091,7 +1063,8 @@ describe("FinderTest", () => {
   it("member on loaded relation with match", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     const p = await Post.create({ title: "test" });
@@ -1103,7 +1076,8 @@ describe("FinderTest", () => {
   it("member on loaded relation without match", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "existing" });
@@ -1115,7 +1089,8 @@ describe("FinderTest", () => {
   it("find with nil inside set passed for attribute", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1126,28 +1101,33 @@ describe("FinderTest", () => {
   it("find by bang on relation with large number", async () => {
     class Post extends Base {
       static {
-        this.attribute("score", "integer");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
+        this.attribute("author_id", "integer");
       }
     }
-    await Post.create({ score: 1 });
-    await expect(Post.findBy({ score: 9999999999 })).resolves.toBeNull();
+    await Post.create({ author_id: 1 });
+    await expect(Post.findBy({ author_id: 9999999999 })).resolves.toBeNull();
   });
 
   it("find by on attribute that is a reserved word", async () => {
-    class Post extends Base {
+    // `group` is a reserved SQL word and a real topics column, exercising the
+    // adapter's identifier quoting on the finder path.
+    class Topic extends Base {
       static {
-        this.attribute("status", "string");
+        this.attribute("group", "string");
       }
     }
-    await Post.create({ status: "active" });
-    const found = await Post.findBy({ status: "active" });
+    await Topic.create({ group: "active" });
+    const found = await Topic.findBy({ group: "active" });
     expect(found).not.toBeNull();
   });
 
   it("find by one attribute that is an alias", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1158,11 +1138,11 @@ describe("FinderTest", () => {
   it("custom select takes precedence over original value", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
-    await Post.create({ title: "test", score: 5 });
+    await Post.create({ title: "test" });
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
   });
@@ -1170,8 +1150,8 @@ describe("FinderTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     return { Post };
@@ -1380,8 +1360,8 @@ describe("FinderTest", () => {
   });
   it("hash condition find with one condition being aggregate and another not", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "hcmix", author: "bob" });
-    const found = await Post.findBy({ title: "hcmix", author: "bob" });
+    await Post.create({ title: "hcmix", body: "bob" });
+    const found = await Post.findBy({ title: "hcmix", body: "bob" });
     expect(found).toBeDefined();
   });
   it("hash condition find nil with aggregate having one mapping", async () => {
@@ -1832,15 +1812,15 @@ describe("FinderTest", () => {
 
   it("find by two attributes that are both aggregates", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg_both", author: "bob" });
-    const found = await Post.findBy({ title: "agg_both", author: "bob" });
+    await Post.create({ title: "agg_both", body: "bob" });
+    const found = await Post.findBy({ title: "agg_both", body: "bob" });
     expect(found).not.toBeNull();
   });
 
   it("find by two attributes with one being an aggregate", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg_one", author: "alice" });
-    const found = await Post.findBy({ title: "agg_one", author: "alice" });
+    await Post.create({ title: "agg_one", body: "alice" });
+    const found = await Post.findBy({ title: "agg_one", body: "alice" });
     expect(found).not.toBeNull();
   });
 
@@ -1990,43 +1970,41 @@ describe("FinderTest", () => {
   });
 
   it("find with eager loading collection and ordering by collection primary key", async () => {
-    class FelPost extends Base {
+    class Post extends Base {
       static {
-        this.tableName = "fel_posts";
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
+        this.hasMany("comments", { className: "Comment", foreignKey: "post_id" });
       }
     }
-    class FelComment extends Base {
+    class Comment extends Base {
       static {
-        this.tableName = "fel_comments";
-        this.attribute("body", "string");
-        this.attribute("fel_post_id", "integer");
+        this.attribute("body", "string", { default: "" });
+        this.attribute("post_id", "integer");
+        this.hasMany("ratings", { className: "Rating", foreignKey: "comment_id" });
       }
     }
-    class FelRating extends Base {
+    class Rating extends Base {
       static {
-        this.tableName = "fel_ratings";
         this.attribute("value", "integer");
-        this.attribute("fel_comment_id", "integer");
+        this.attribute("comment_id", "integer");
       }
     }
-    FelPost.hasMany("comments", { className: "FelComment", foreignKey: "fel_post_id" });
-    FelComment.hasMany("ratings", { className: "FelRating", foreignKey: "fel_comment_id" });
-    registerModel("FelPost", FelPost);
-    registerModel("FelComment", FelComment);
-    registerModel("FelRating", FelRating);
+    registerModel("Post", Post);
+    registerModel("Comment", Comment);
+    registerModel("Rating", Rating);
 
-    const p1 = await FelPost.create({ title: "first" });
-    const p2 = await FelPost.create({ title: "second" });
-    const c1 = await FelComment.create({ body: "c1", fel_post_id: p1.id });
-    const c2 = await FelComment.create({ body: "c2", fel_post_id: p2.id });
-    await FelRating.create({ value: 1, fel_comment_id: c1.id });
-    await FelRating.create({ value: 2, fel_comment_id: c2.id });
+    const p1 = await Post.create({ title: "first" });
+    const p2 = await Post.create({ title: "second" });
+    const c1 = await Comment.create({ body: "c1", post_id: p1.id });
+    const c2 = await Comment.create({ body: "c2", post_id: p2.id });
+    await Rating.create({ value: 1, comment_id: c1.id });
+    await Rating.create({ value: 2, comment_id: c2.id });
 
-    const eager = await FelPost.eagerLoad({ comments: "ratings" })
-      .order("fel_posts.id, fel_ratings.id, fel_comments.id")
+    const eager = await Post.eagerLoad({ comments: "ratings" })
+      .order("posts.id, ratings.id, comments.id")
       .first();
-    const expected = await FelPost.first();
+    const expected = await Post.first();
     expect(eager).not.toBeNull();
     expect((eager as any).id).toBe((expected as any).id);
   });
@@ -2039,14 +2017,14 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   class Post extends Base {
     static {
       this.tableName = "posts";
-      this.attribute("title", "string");
-      this.attribute("body", "string");
+      this.attribute("title", "string", { default: "" });
+      this.attribute("body", "string", { default: "" });
     }
   }
 
@@ -2210,26 +2188,24 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  class User extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("active", "boolean");
-    }
-  }
   setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
   // Rails: test_find_by_with_conditions
   // Rails: test_find_by_returns_nil
   it("find_by returns nil if the record is missing", async () => {
-    await User.create({ name: "Alice" });
-    const found = await User.findBy({ name: "Nobody" });
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Topic.create({ title: "Alice" });
+    const found = await Topic.findBy({ title: "Nobody" });
     expect(found).toBeNull();
   });
 
@@ -2243,7 +2219,7 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
