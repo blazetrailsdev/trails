@@ -453,25 +453,25 @@ export function _enum(
   };
   const toCamel = (s: string) => camelize(s, false);
 
-  // Whether the enum attribute was explicitly declared with a type via
-  // `attribute(name, type)` before the `enum` call. Rails raises for an enum on
-  // an attribute with no declared type AND no backing DB column; we can only
-  // tell a real column apart from a typeless attribute once the schema has been
-  // reflected, so record the "not explicitly typed" fact now and defer the
-  // check to `typeForAttribute` (post-loadSchema) via `assertEnumTypeDeclared`.
+  // Rails raises for an enum on an attribute with no declared type AND no
+  // backing DB column, but only once the schema is reflected (inside the
+  // `decorate_attributes` block, at `type_for_attribute`). We can't tell a real
+  // column apart from a typeless attribute at `enum` time, so any enum NOT
+  // explicitly typed via `attribute(name, type)` is queued for a deferred check
+  // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
+  // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
   const existingDef = (this as any)._attributeDefinitions?.get(attrName);
   const explicitlyTyped = existingDef?.source === "user" || existingDef?.userProvided === true;
-  const undeclaredHost = this as unknown as { _enumsUndeclared?: Set<string> };
+  const pendingHost = this as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
-    if (!Object.prototype.hasOwnProperty.call(this, "_enumsUndeclared")) {
-      undeclaredHost._enumsUndeclared = new Set(undeclaredHost._enumsUndeclared);
+    if (!Object.prototype.hasOwnProperty.call(this, "_enumsPendingTypeCheck")) {
+      pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
     }
-    undeclaredHost._enumsUndeclared!.add(attrName);
-  } else if (undeclaredHost._enumsUndeclared?.has(attrName)) {
-    // An explicit type now backs the enum — clear any inherited "undeclared"
-    // marker so the type check stays satisfied.
-    undeclaredHost._enumsUndeclared = new Set(undeclaredHost._enumsUndeclared);
-    undeclaredHost._enumsUndeclared.delete(attrName);
+    pendingHost._enumsPendingTypeCheck!.add(attrName);
+  } else if (pendingHost._enumsPendingTypeCheck?.has(attrName)) {
+    // An explicit type now backs the enum — drop any inherited pending marker.
+    pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
+    pendingHost._enumsPendingTypeCheck.delete(attrName);
   }
 
   // Read subtype from _attributeDefinitions directly — never call typeForAttribute()
@@ -767,20 +767,23 @@ export function raiseConflictError(
  * @internal
  */
 export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
-  const undeclared = (klass as unknown as { _enumsUndeclared?: Set<string> })._enumsUndeclared;
-  if (!undeclared || !undeclared.has(name)) return;
-  const verifiedHost = klass as unknown as { _enumsTypeVerified?: Set<string> };
-  if (verifiedHost._enumsTypeVerified?.has(name)) return;
+  const host = klass as unknown as {
+    _enumsPendingTypeCheck?: Set<string>;
+    columnForAttribute(n: string): { type?: unknown };
+  };
+  const pending = host._enumsPendingTypeCheck;
+  if (!pending || !pending.has(name)) return;
   // A backing DB column resolves the subtype (`columnForAttribute` returns the
   // schema column; unknown names yield a NullColumn with `type: null`).
-  const column = (
-    klass as unknown as { columnForAttribute(n: string): { type?: unknown } }
-  ).columnForAttribute(name);
+  const column = host.columnForAttribute(name);
   if (column && column.type != null) {
-    if (!Object.prototype.hasOwnProperty.call(verifiedHost, "_enumsTypeVerified")) {
-      verifiedHost._enumsTypeVerified = new Set(verifiedHost._enumsTypeVerified);
+    // Backed by a real column — clear the marker so we don't re-check on every
+    // subsequent `typeForAttribute` call. Copy-on-write to avoid mutating an
+    // inherited set shared with the parent class.
+    if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
+      host._enumsPendingTypeCheck = new Set(pending);
     }
-    verifiedHost._enumsTypeVerified!.add(name);
+    host._enumsPendingTypeCheck!.delete(name);
     return;
   }
   throw new Error(
