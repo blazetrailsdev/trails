@@ -182,9 +182,15 @@ interface PendingEncryption {
 /**
  * Declare one or more attributes as encrypted on a model class.
  *
- * Like Rails' `decorate_attributes`, this defers the actual type wrapping.
- * Pending encryptions are applied when the attribute definitions are
- * first used (via `applyPendingEncryptions`).
+ * Routes each attribute through the shared `EncryptableRecord.encryptAttribute`
+ * (single declaration path, mirroring Rails' single `encrypts`), passing a
+ * scheme built by `buildScheme` so the legacy `{ encrypt, decrypt }` shim and
+ * defaultEncryptor fallback are preserved on the primary path.
+ *
+ * The actual type wrapping is deferred (Rails' `decorate_attributes` /
+ * PendingDecorator) — `encryptAttribute` records pending encryptions that
+ * `applyPendingEncryptions` applies when the attribute definitions are first
+ * used and re-applies on every `_defaultAttributes` rebuild.
  */
 export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): void {
   let options: EncryptsOptions = {};
@@ -199,48 +205,14 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
   }
 
   const scheme = buildScheme(options);
-
-  if (!Object.prototype.hasOwnProperty.call(klass, "_pendingEncryptions")) {
-    klass._pendingEncryptions = [...(klass._pendingEncryptions ?? [])];
-  }
-
-  // Own-property guard mirrors the `_pendingEncryptions` pattern — a
-  // subclass encrypting a new attribute must not mutate the parent's
-  // (or a sibling's) Set. Matches Rails' `class_attribute` semantics.
-  if (!Object.prototype.hasOwnProperty.call(klass, "_encryptedAttributes")) {
-    klass._encryptedAttributes = new Set<string>(klass._encryptedAttributes ?? []);
-  }
+  // Drop the legacy `encryptor` field so the remaining shape is assignable to
+  // SchemeOptions — the scheme is already built, so `encryptAttribute` only
+  // reads `options.ignoreCase` from here.
+  const { encryptor: _encryptor, ...schemeOptions } = options;
 
   for (const name of names) {
-    klass._pendingEncryptions.push({ name, scheme });
-    klass._encryptedAttributes.add(name);
-    if (Configurable.config.validateColumnSize) {
-      EncryptableRecord.validateColumnSize(klass, name);
-    }
-    if (options.ignoreCase) {
-      _preserveOriginalEncrypted(klass, name, options);
-    }
+    EncryptableRecord.encryptAttribute(klass, name, schemeOptions, scheme);
   }
-
-  if (klass._attributeDefinitions?.size > 0) {
-    applyPendingEncryptions(klass);
-  }
-}
-
-/**
- * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
- * When ignore_case: true, stores the original-cased value in an additional
- * `original_<name>` encrypted attribute, and overrides the reader so reads
- * return the original-cased value rather than the downcased one.
- */
-function _preserveOriginalEncrypted(klass: any, name: string, options: EncryptsOptions): void {
-  const originalAttrName = `original_${name}`;
-
-  // Register the original-case column as encrypted (without ignoreCase/downcase).
-  const { ignoreCase: _ic, downcase: _dc, ...originalOptions } = options;
-  encrypts(klass, originalAttrName, originalOptions);
-
-  EncryptableRecord.overrideAccessorsToPreserveOriginal(klass, name, originalAttrName);
 }
 
 /**
