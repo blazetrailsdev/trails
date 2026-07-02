@@ -9,6 +9,9 @@
  * registry. Relocated verbatim from connection-pool.test.ts (RFC 0043).
  */
 
+import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import {
@@ -20,7 +23,9 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter } from "./test-adapter.js";
+import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type {
@@ -30,10 +35,77 @@ import type {
 import { Result } from "./result.js";
 
 /**
- * Close any SQLite/underlying connections still pinned to the pool
- * before unlinking the DB file. ConnectionPool.disconnect clears pool
- * bookkeeping but doesn't close the adapter's file handle; on Windows
- * that keeps the sqlite file open and rmSync fails.
+ * Build a HashConfig for a pool-under-test cloned from the ambient lane
+ * adapter's configuration (sqlite/postgres/mysql), mirroring Rails
+ * connection_pool_test.rb:20-27 (`ActiveRecord::Base.connection_pool.db_config`
+ * cloned with per-test overrides). Every override the callers pass is
+ * adapter-neutral (pool size, timeouts, cache path, query-cache size), so the
+ * duplicate pool runs against whatever adapter the current lane uses instead of
+ * a hardcoded SQLite file.
+ */
+function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
+  return new HashConfig("test", "primary", {
+    ...ambientPoolConfiguration(),
+    reapingFrequency: null,
+    ...overrides,
+  });
+}
+
+/** Build a pool-under-test from the ambient lane config + adapter factory. */
+function makeAmbientPool(overrides: Record<string, unknown> = {}): ConnectionPool {
+  const dbConfig = makeAmbientDbConfig(overrides);
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: newRawTestAdapter,
+  });
+  return new ConnectionPool(pc);
+}
+
+/**
+ * Run `fn` with a fresh temp directory for on-disk schema-cache fixtures,
+ * cleaning it up afterwards. Async fs only — no temp DB files (pools ride the
+ * ambient worker DB).
+ */
+async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), "trails-schema-cache-"));
+  try {
+    return await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Create the canonical `posts` table (Rails' scratch-table name) in the ambient
+ * lane worker DB so the schema-cache introspection tests have a real, canonical
+ * table to reflect on every adapter. Uses a throwaway lane-native adapter (via
+ * the shared factory) rather than the pool-under-test, so the pool's first
+ * connection adoption — which triggers eager warming — sees the table. Dropped
+ * by the global beforeEach teardown. This file never establishes
+ * `Base.connection`, so the explicit-adapter `defineSchema` form is required.
+ *
+ * Rails' connection_pool_test.rb creates its scratch `posts` table only for
+ * `in_memory_db?` because its real-DB lanes keep schema.rb loaded ambiently.
+ * trails drops every table in the per-test `beforeEach` on ALL lanes (there is
+ * no ambient schema to ride), so the canonical table must be materialized here
+ * regardless of adapter — via the canonical `TEST_SCHEMA.posts`, never an
+ * invented name.
+ */
+async function seedCanonicalPosts(): Promise<void> {
+  const seed = newRawTestAdapter();
+  try {
+    await defineSchema(seed, { posts: TEST_SCHEMA.posts });
+  } finally {
+    const close = (seed as { close?: () => void | Promise<void> }).close;
+    if (typeof close === "function") await close.call(seed);
+  }
+}
+
+/**
+ * Close any underlying connections still pinned to a pool-under-test before
+ * disconnecting it. ConnectionPool.disconnect clears pool bookkeeping but
+ * doesn't close each adapter's backend handle; closing them first releases the
+ * lane-native connection (SQLite file handle / PG / MySQL socket) so the
+ * duplicate pool doesn't leak connections into the shared ambient worker DB.
  */
 async function closePoolConnections(pool: ConnectionPool): Promise<void> {
   for (const conn of pool.connections) {
@@ -44,16 +116,7 @@ async function closePoolConnections(pool: ConnectionPool): Promise<void> {
 }
 
 function makePool(size: number = 5): ConnectionPool {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    pool: size,
-    reapingFrequency: null,
-  });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: newRawTestAdapter,
-  });
-  return new ConnectionPool(pc);
+  return makeAmbientPool({ pool: size });
 }
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
@@ -122,13 +185,13 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
 }
 
+// The transaction-pin / callback tests below drive a hand-written
+// transaction-manager double (no real backend), so the pool config's adapter
+// label is cosmetic — but it is still cloned from the ambient lane config
+// rather than hardcoding SQLite. The double itself reports `adapterName` as
+// "sqlite" because it is a pure in-memory fake, not a lane-native connection.
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  const dbConfig = new HashConfig("test", "primary", {
-    adapter: "sqlite3",
-    database: "test.db",
-    pool: size,
-    reapingFrequency: null,
-  });
+  const dbConfig = makeAmbientDbConfig({ pool: size });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
     adapterFactory: () => new TransactionAwareTestAdapter(),
   });
@@ -225,16 +288,7 @@ it("full pool async checkout timeout", async () => {
 it("reaper flushes idle connections after idle_timeout", () => {
   try {
     vi.useFakeTimers();
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: "test.db",
-      idleTimeout: 1,
-      reapingFrequency: 10,
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: newRawTestAdapter,
-    });
-    const pool = new ConnectionPool(pc);
+    const pool = makeAmbientPool({ idleTimeout: 1, reapingFrequency: 10 });
     const conn = pool.checkout();
     pool.checkin(conn);
     expect(pool.stat().connections).toBe(1);
@@ -451,24 +505,8 @@ describe("ConnectionPool schema cache", () => {
     // fix routes the raw cache through pool.poolConfig.schemaCache,
     // and this test locks that in.
     //
-    // Uses a dedicated fresh adapter to get AbstractAdapter's schemaCache getter.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
     const { SchemaCache } = await import("./connection-adapters/schema-cache.js");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-raw-cache-"));
-    const dbFile = path.join(tmp, "raw.sqlite3");
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
+    const pool = makeAmbientPool();
     try {
       const cache = await pool.withConnection(
         (conn) => (conn as unknown as { schemaCache: unknown }).schemaCache,
@@ -487,7 +525,6 @@ describe("ConnectionPool schema cache", () => {
       expect(pool.poolConfig.schemaCache).toBe(cache);
     } finally {
       await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
@@ -527,8 +564,7 @@ describe("ConnectionPool schema cache", () => {
     tableName: string,
     version: string | number | null,
   ): Promise<void> {
-    const fsSync = await import("node:fs");
-    fsSync.writeFileSync(
+    await writeFile(
       cacheFile,
       JSON.stringify({
         columns: { [tableName]: [realisticColumnJson] },
@@ -545,179 +581,107 @@ describe("ConnectionPool schema cache", () => {
     // on first adoption when ActiveRecord.lazily_load_schema_cache is
     // true. Use version=0 so the version-check (enabled by default)
     // passes against AbstractAdapter's schemaVersion() which returns 0.
-    // Await pool._lazyLoadPromise so we're not timing-dependent.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-lazy-load-"));
-    const dbFile = path.join(tmp, "lazy.sqlite3");
-    const cacheFile = path.join(tmp, "schema_cache.json");
-    await writeCacheFixture(cacheFile, "more_testings", 0);
-
+    // Await pool._lazyLoadPromise so we're not timing-dependent. The cache is
+    // loaded from the on-disk dump (adapter-agnostic), so this rides the
+    // ambient lane adapter without needing a lane-specific table.
     const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
     SchemaReflection.lazilyLoadSchemaCache = true;
 
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: cacheFile,
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        pool.leaseConnection();
+        pool.releaseConnection();
+        await pool._lazyLoadPromise;
+        // BoundSchemaReflection side:
+        expect(pool.schemaCache.isCached("more_testings")).toBe(true);
+        // Adapter-visible raw cache (poolConfig.schemaCache) — after
+        // lazy load the reflection's internal cache is propagated so
+        // adapter.schemaCache consumers see preloaded data without DB.
+        expect(pool.poolConfig.schemaCache).not.toBeNull();
+        expect(pool.poolConfig.schemaCache!.isCached("more_testings")).toBe(true);
+      } finally {
+        SchemaReflection.lazilyLoadSchemaCache = prevLazy;
+        await closePoolConnections(pool);
+      }
     });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
-    try {
-      pool.leaseConnection();
-      pool.releaseConnection();
-      await pool._lazyLoadPromise;
-      // BoundSchemaReflection side:
-      expect(pool.schemaCache.isCached("more_testings")).toBe(true);
-      // Adapter-visible raw cache (poolConfig.schemaCache) — after
-      // lazy load the reflection's internal cache is propagated so
-      // adapter.schemaCache consumers see preloaded data without DB.
-      expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isCached("more_testings")).toBe(true);
-    } finally {
-      SchemaReflection.lazilyLoadSchemaCache = prevLazy;
-      await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
   });
 
   it("rejects a stale schema cache when checkSchemaCacheDumpVersion is enabled", async () => {
     // Cache claims version 42; schemaVersion() returns 0 → mismatch.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-stale-cache-"));
-    const dbFile = path.join(tmp, "stale.sqlite3");
-    const cacheFile = path.join(tmp, "schema_cache.json");
-    await writeCacheFixture(cacheFile, "stale_thing", 42);
-
     const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
     SchemaReflection.lazilyLoadSchemaCache = true;
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: cacheFile,
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "stale_thing", 42);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        pool.leaseConnection();
+        pool.releaseConnection();
+        // Verify lazy-load actually triggered so we're testing the
+        // version-mismatch rejection — not just the absence of a load.
+        expect(pool._lazyLoadPromise).not.toBeNull();
+        await pool._lazyLoadPromise;
+        expect(pool.schemaCache.isCached("stale_thing")).toBe(false);
+      } finally {
+        SchemaReflection.lazilyLoadSchemaCache = prevLazy;
+        vi.restoreAllMocks();
+        await closePoolConnections(pool);
+      }
     });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
-    try {
-      pool.leaseConnection();
-      pool.releaseConnection();
-      // Verify lazy-load actually triggered so we're testing the
-      // version-mismatch rejection — not just the absence of a load.
-      expect(pool._lazyLoadPromise).not.toBeNull();
-      await pool._lazyLoadPromise;
-      expect(pool.schemaCache.isCached("stale_thing")).toBe(false);
-    } finally {
-      SchemaReflection.lazilyLoadSchemaCache = prevLazy;
-      vi.restoreAllMocks();
-      await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
   });
 
   it("does not lazy-load when the flag is off (default)", async () => {
     // Default: no file I/O at first-connection time.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-lazy-"));
-    const dbFile = path.join(tmp, "no_lazy.sqlite3");
-    const cacheFile = path.join(tmp, "schema_cache.json");
-    await writeCacheFixture(cacheFile, "widgets", 0);
     expect(SchemaReflection.lazilyLoadSchemaCache).toBe(false);
 
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: cacheFile,
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "widgets", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        pool.leaseConnection();
+        pool.releaseConnection();
+        // _lazyLoadPromise is null when the flag is off.
+        expect(pool._lazyLoadPromise).toBeNull();
+        expect(pool.schemaCache.isCached("widgets")).toBe(false);
+      } finally {
+        await closePoolConnections(pool);
+      }
     });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
-    try {
-      pool.leaseConnection();
-      pool.releaseConnection();
-      // _lazyLoadPromise is null when the flag is off.
-      expect(pool._lazyLoadPromise).toBeNull();
-      expect(pool.schemaCache.isCached("widgets")).toBe(false);
-    } finally {
-      await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
   });
 
   it("eagerly warms the schema cache by introspection on first connection when enabled", async () => {
     // Production analogue of Rails' schema_cache.addAll(pool) at boot: with
     // no schema_cache.json on disk, eager warming introspects the live DB so
     // a synchronous read sees real columns. Await pool._eagerWarmPromise so
-    // we're not timing-dependent.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-eager-warm-"));
-    const dbFile = path.join(tmp, "eager.sqlite3");
-    const seeded = new BetterSQLite3Adapter(dbFile);
-    try {
-      await seeded.executeMutation(
-        "CREATE TABLE sprockets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
-      );
-    } finally {
-      await seeded.close();
-    }
+    // we're not timing-dependent. Introspects the ambient lane DB's canonical
+    // `posts` table (Rails' scratch-table name) instead of an invented one.
+    await seedCanonicalPosts();
 
     const prevEager = SchemaReflection.eagerLoadSchemaCache;
     SchemaReflection.eagerLoadSchemaCache = true;
 
     // No schemaCachePath: there is no dump file, so only DB introspection
     // can populate the cache.
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: "",
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
+    const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
       pool.leaseConnection();
       pool.releaseConnection();
       expect(pool._eagerWarmPromise).not.toBeNull();
       await pool._eagerWarmPromise;
-      expect(pool.schemaCache.isCached("sprockets")).toBe(true);
+      expect(pool.schemaCache.isCached("posts")).toBe(true);
       // Adapter-visible raw cache is propagated so synchronous consumers
       // (Model.columnNames) see the introspected columns without a DB hit.
       expect(pool.poolConfig.schemaCache).not.toBeNull();
-      expect(pool.poolConfig.schemaCache!.isColumnsHashCached(null, "sprockets")).toBe(true);
+      expect(pool.poolConfig.schemaCache!.isColumnsHashCached(null, "posts")).toBe(true);
     } finally {
       SchemaReflection.eagerLoadSchemaCache = prevEager;
       await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
@@ -725,36 +689,14 @@ describe("ConnectionPool schema cache", () => {
     // Eager subsumes lazy (loadAllBang consults the dump first, then
     // introspects). With both flags on and NO dump file, the lazy path must
     // not suppress the eager introspection — otherwise the cache stays empty.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-both-warm-"));
-    const dbFile = path.join(tmp, "both.sqlite3");
-    const seeded = new BetterSQLite3Adapter(dbFile);
-    try {
-      await seeded.executeMutation("CREATE TABLE sprockets (id INTEGER PRIMARY KEY, label TEXT)");
-    } finally {
-      await seeded.close();
-    }
+    await seedCanonicalPosts();
 
     const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
     const prevEager = SchemaReflection.eagerLoadSchemaCache;
     SchemaReflection.lazilyLoadSchemaCache = true;
     SchemaReflection.eagerLoadSchemaCache = true;
 
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: "",
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
+    const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
       pool.leaseConnection();
       pool.releaseConnection();
@@ -762,55 +704,29 @@ describe("ConnectionPool schema cache", () => {
       expect(pool._lazyLoadPromise).toBeNull();
       expect(pool._eagerWarmPromise).not.toBeNull();
       await pool._eagerWarmPromise;
-      expect(pool.schemaCache.isCached("sprockets")).toBe(true);
+      expect(pool.schemaCache.isCached("posts")).toBe(true);
     } finally {
       SchemaReflection.lazilyLoadSchemaCache = prevLazy;
       SchemaReflection.eagerLoadSchemaCache = prevEager;
       await closePoolConnections(pool);
-      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
   it("does not eagerly warm when the flag is off (default)", async () => {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-eager-"));
-    const dbFile = path.join(tmp, "no_eager.sqlite3");
-    const seeded = new BetterSQLite3Adapter(dbFile);
-    try {
-      await seeded.executeMutation("CREATE TABLE sprockets (id INTEGER PRIMARY KEY)");
-    } finally {
-      await seeded.close();
-    }
+    // Canonical `posts` exists in the ambient lane DB, but with the flag off no
+    // introspection runs, so the cache stays empty. (dropped by the global
+    // beforeEach teardown.)
+    await seedCanonicalPosts();
     expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
 
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
-      schemaCachePath: "",
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
+    const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
       pool.leaseConnection();
       pool.releaseConnection();
       expect(pool._eagerWarmPromise).toBeNull();
-      expect(pool.schemaCache.isCached("sprockets")).toBe(false);
+      expect(pool.schemaCache.isCached("posts")).toBe(false);
     } finally {
       await closePoolConnections(pool);
-      // Explicit teardown for the raw-created `sprockets` table (also removed
-      // with tmp below) to balance require-table-teardown.
-      const cleanup = new BetterSQLite3Adapter(dbFile);
-      await cleanup.executeMutation("DROP TABLE IF EXISTS sprockets");
-      await cleanup.close();
-      fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
@@ -818,48 +734,22 @@ describe("ConnectionPool schema cache", () => {
     // End-to-end Rails path: pool.schema_cache.dump_to(filename)
     // allocates a fresh SchemaCache, addAll(pool) populates it via
     // the pool's withConnection, dumpTo writes the JSON. Covers the
-    // full chain Rails uses for db:schema:cache:dump.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const os = await import("node:os");
-    const { BetterSQLite3Adapter } =
-      await import("./connection-adapters/better-sqlite3-adapter.js");
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-pool-schema-"));
-    const dbFile = path.join(tmp, "pool.sqlite3");
-    const seeded = new BetterSQLite3Adapter(dbFile);
-    try {
-      await seeded.executeMutation(
-        "CREATE TABLE testings (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
-      );
-    } finally {
-      await seeded.close();
-    }
-
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: dbFile,
-      reapingFrequency: null,
+    // full chain Rails uses for db:schema:cache:dump. Dumps the ambient lane
+    // DB's canonical `posts` table (dropped by the global beforeEach teardown).
+    await seedCanonicalPosts();
+    await withCacheDir(async (dir) => {
+      const pool = makeAmbientPool();
+      try {
+        const filename = join(dir, "schema_cache.json");
+        await pool.schemaCache.dumpTo(filename);
+        const parsed = JSON.parse(await readFile(filename, "utf8")) as {
+          columns: Record<string, unknown[]>;
+        };
+        expect(Object.keys(parsed.columns)).toContain("posts");
+      } finally {
+        await closePoolConnections(pool);
+      }
     });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: () => new BetterSQLite3Adapter(dbFile),
-    });
-    const pool = new ConnectionPool(pc);
-    try {
-      const filename = path.join(tmp, "schema_cache.json");
-      await pool.schemaCache.dumpTo(filename);
-      const parsed = JSON.parse(fs.readFileSync(filename, "utf8")) as {
-        columns: Record<string, unknown[]>;
-      };
-      expect(Object.keys(parsed.columns)).toContain("testings");
-    } finally {
-      await closePoolConnections(pool);
-      // Explicit teardown for the raw-created `testings` table (also removed with
-      // tmp below) to balance require-table-teardown.
-      const cleanup = new BetterSQLite3Adapter(dbFile);
-      await cleanup.executeMutation("DROP TABLE IF EXISTS testings");
-      await cleanup.close();
-      fs.rmSync(tmp, { recursive: true, force: true });
-    }
   });
 
   it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", () => {
@@ -870,12 +760,7 @@ describe("ConnectionPool schema cache", () => {
     // '' would silently fall through to db/schema_cache.json,
     // defeating the user's intent.
     for (const blank of ["", "   "]) {
-      const dbConfig = new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-        database: "test.db",
-        reapingFrequency: null,
-        schemaCachePath: blank,
-      });
+      const dbConfig = makeAmbientDbConfig({ schemaCachePath: blank });
       const pc = new PoolConfig(
         new ConnectionDescriptor("primary"),
         dbConfig,
@@ -898,11 +783,7 @@ describe("ConnectionPool schema cache", () => {
     const originalDbDir = DatabaseTasks.dbDir;
     DatabaseTasks.dbDir = "custom_db_dir";
     try {
-      const dbConfig = new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-        database: "test.db",
-        reapingFrequency: null,
-      });
+      const dbConfig = makeAmbientDbConfig();
       const pc = new PoolConfig(
         new ConnectionDescriptor("primary"),
         dbConfig,
@@ -923,12 +804,7 @@ describe("ConnectionPool schema cache", () => {
     // HashConfig's lazySchemaCachePath returns the configured path
     // (or defaultSchemaCachePath fallback), which the reflection
     // remembers for its first on-disk load.
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: "test.db",
-      reapingFrequency: null,
-      schemaCachePath: "db/custom_cache.json",
-    });
+    const dbConfig = makeAmbientDbConfig({ schemaCachePath: "db/custom_cache.json" });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
       adapterFactory: newRawTestAdapter,
     });
@@ -1143,13 +1019,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
   describe("queryCacheMaxSize wiring", () => {
     it("threads dbConfig.queryCache through to the Store's max size", () => {
-      const dbConfig = new HashConfig("test", "primary", {
-        adapter: "sqlite3",
-        database: "test.db",
-        pool: 1,
-        reapingFrequency: null,
-        queryCache: 7,
-      });
+      const dbConfig = makeAmbientDbConfig({ pool: 1, queryCache: 7 });
       const pc = new PoolConfig(
         new ConnectionDescriptor("primary"),
         dbConfig,

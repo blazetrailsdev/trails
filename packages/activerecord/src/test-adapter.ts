@@ -20,6 +20,7 @@ import type { TransactionManager } from "./connection-adapters/abstract/transact
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
+import { ConnectionNotEstablished } from "./errors.js";
 import { getEnv } from "@blazetrails/activesupport";
 
 // process.env.PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
@@ -91,6 +92,27 @@ function _pooledSqliteDatabase(): string {
  */
 export let newRawTestAdapter: () => DatabaseAdapter;
 
+// The raw configuration hash used to establish the ambient pooled test
+// connection (the active CI lane's adapter). Set once at pool boot.
+let _ambientConfiguration: Record<string, unknown> | null = null;
+
+/**
+ * A copy of the configuration hash used to establish the ambient pooled test
+ * connection for the active CI lane. Mirrors Rails'
+ * `ActiveRecord::Base.connection_pool.db_config.configuration_hash`, letting
+ * tests clone the ambient adapter's config (with per-test overrides) instead of
+ * hardcoding `adapter: "sqlite3"`. This is how pool-under-test fixtures build a
+ * duplicate pool that runs against whatever adapter the current lane uses.
+ *
+ * @internal
+ */
+export function ambientPoolConfiguration(): Record<string, unknown> {
+  if (!_ambientConfiguration) {
+    throw new ConnectionNotEstablished("ambient test pool has not been established yet");
+  }
+  return { ..._ambientConfiguration };
+}
+
 function _establishPooledTestPool(): Promise<
   import("./connection-adapters/abstract/connection-pool.js").ConnectionPool
 > {
@@ -144,6 +166,7 @@ function _establishPooledTestPool(): Promise<
     }
 
     newRawTestAdapter = adapterFactory;
+    _ambientConfiguration = configuration;
 
     const handler = new ConnectionHandler();
     _pooledHandler = handler;
