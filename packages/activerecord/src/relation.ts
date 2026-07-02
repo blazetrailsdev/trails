@@ -3613,35 +3613,34 @@ export class Relation<T extends Base> {
       return rel.applyJoinDependencyForArel(false).exists();
     }
     // Mirrors Rails FinderMethods#construct_relation_for_exists
-    // (finder_methods.rb): `if distinct_value && offset_value` keep
-    // distinct/group/having/offset and drop only the order (`except(:order)`);
-    // otherwise strip select/distinct/group/having down to the `SELECT 1 AS one
-    // FROM ... LIMIT 1` existence probe. Either branch limits to 1 and never
-    // instantiates records (no after_find / association loading).
+    // (finder_methods.rb): when `distinct_value && offset_value` keep the
+    // relation's select/distinct/group/having/offset and drop only the order
+    // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
+    // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive,
+    // only select/distinct/order are dropped and the projection becomes
+    // `1 AS one`. Either branch limits to 1 and never instantiates records.
     const table = rel._modelClass.arelTable;
     const distinctOffset = rel._isDistinct && rel._offsetValue != null;
     const manager = table.project();
     if (distinctOffset) {
       // Keep the relation's own projection (default `posts.*`) so DISTINCT has
-      // columns to dedup on, plus its distinct/group/having; drop the order.
+      // columns to dedup on, plus its distinct value; drop only the order.
       const selectCols = rel._selectColumns ?? [];
       const star = (table as unknown as { star?: Nodes.Node }).star ?? table.get("*");
       const projection =
         selectCols.length > 0 ? (rel.arelColumns(selectCols) as Nodes.Node[]) : [star];
       manager.project(...projection);
-      rel._applyJoinsToManager(manager);
-      rel._applyWheresToManager(manager, table);
       manager.distinct();
-      for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
-      if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
-      if (rel._offsetValue != null) manager.skip(rel._offsetValue);
     } else {
-      // except(:select, :distinct, :group, :having) → `1 AS one`; offset survives.
       manager.project(new Nodes.SqlLiteral("1 AS one"));
-      rel._applyJoinsToManager(manager);
-      rel._applyWheresToManager(manager, table);
-      if (rel._offsetValue != null) manager.skip(rel._offsetValue);
     }
+    rel._applyJoinsToManager(manager);
+    rel._applyWheresToManager(manager, table);
+    // group/having survive in BOTH branches (Rails' except never lists them);
+    // only the distinct+offset branch keeps distinct, and neither keeps order.
+    for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
+    if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
+    if (rel._offsetValue != null) manager.skip(rel._offsetValue);
     manager.take(1);
     // Tag the probe query `<Model> Exists?` — the name Rails passes to its
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
