@@ -990,4 +990,51 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
       new Model();
     }).toThrow(/must create an additional column named 'original_name'/);
   });
+
+  // Fail-closed after reflection: when `encrypts(ignoreCase)` is declared at
+  // static-init BEFORE the adapter is connected, `columnNames()` returns [] so
+  // the declaration-time check defers (old fail-open behavior). Once the real
+  // adapter schema is reflected, a genuinely-absent `original_name` column on
+  // `authors` must still raise — matching Rails' fail-closed
+  // preserve_original_encrypted.
+  it("Base.encrypts ignoreCase declared before the adapter connects raises after schema reflection", async () => {
+    const adapter = await freshAdapter();
+    // The raise fires at declaration time when the schema cache is already warm
+    // (columnNames() reflects `authors` immediately) or, when it's cold and
+    // columnNames() defers with [], at reflection time via the post-reflection
+    // hook. Either way a genuinely-absent original_name column is fail-closed —
+    // so wrap the whole declaration + reflection in the rejection assertion.
+    await expect(async () => {
+      const Model = class extends Base {
+        static _tableName = "authors";
+        static {
+          this.encrypts("name", { deterministic: true, ignoreCase: true });
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      } as any;
+      await Model.loadSchema();
+      new Model();
+    }).rejects.toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  // No false positive: `original_name` genuinely exists on `encrypted_books`,
+  // so reflecting the real schema after a before-adapter declaration must NOT
+  // raise, even though the source attribute was declared before the column.
+  it("Base.encrypts ignoreCase does not raise after reflection when original_<name> is present", async () => {
+    const adapter = await freshAdapter();
+    const Model = class extends Base {
+      static _tableName = "encrypted_books";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+        this.adapter = adapter;
+      }
+    } as any;
+    await Model.loadSchema();
+    expect(() => new Model()).not.toThrow();
+  });
 });

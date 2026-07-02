@@ -355,10 +355,24 @@ export class EncryptableRecord {
    */
   static preserveOriginalEncrypted(modelClass: any, name: string): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+    // Record the source attribute so the post-reflection hook
+    // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
+    // can re-run the missing-column check against the authoritative DB column
+    // set — closing the fail-open gap when the adapter isn't connected at
+    // declaration time. Own-property guarded like `_encryptedAttributes` so a
+    // subclass declaring ignoreCase doesn't mutate the parent's Set.
+    if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
+      modelClass._ignoreCasePreservedAttributes = new Set<string>(
+        modelClass._ignoreCasePreservedAttributes ?? [],
+      );
+    }
+    modelClass._ignoreCasePreservedAttributes.add(name);
+
     // Enforce the missing-column requirement against the columns known now.
     // `columnNames()` forces a schema load when an adapter is connected, so the
     // check fires for real models; at Base.encrypts static-init with no adapter
-    // it returns [] and requireOriginalColumnPresent defers (see its doc).
+    // it returns [] and requireOriginalColumnPresent defers (see its doc) — the
+    // post-reflection hook above then catches a genuinely absent column.
     this.requireOriginalColumnPresent(modelClass, name, modelClass.columnNames?.() ?? []);
 
     // Declare original_<name> with a default scheme, mirroring Rails' bare
@@ -394,6 +408,28 @@ export class EncryptableRecord {
     throw new ConfigurationError(
       `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
     );
+  }
+
+  /**
+   * Re-run the `original_<name>` missing-column requirement for every
+   * ignoreCase-preserved attribute against the authoritative column set
+   * reflected from the real adapter schema. Driven from schema reflection
+   * (`applyColumnsHash`), which runs only once the DB columns are known — so
+   * unlike the eager `columnNames()` partial-load path, `reflectedColumnNames`
+   * distinguishes "schema reflected, column absent" (fail-closed, raise) from
+   * "declaration in progress" (never reaches here). Mirrors Rails' fail-closed
+   * `preserve_original_encrypted`, whose `column_names` is always complete.
+   * @internal
+   */
+  static requireOriginalColumnsAfterReflection(
+    modelClass: any,
+    reflectedColumnNames: string[],
+  ): void {
+    const preserved: Set<string> | undefined = modelClass._ignoreCasePreservedAttributes;
+    if (!preserved || preserved.size === 0) return;
+    for (const name of preserved) {
+      this.requireOriginalColumnPresent(modelClass, name, reflectedColumnNames);
+    }
   }
 
   /** @internal */

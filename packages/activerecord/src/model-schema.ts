@@ -1039,6 +1039,14 @@ function applyColumnsHash(
 
   encryptionHooks.applyPendingEncryptions(host);
 
+  // Now the DB column set is authoritative: re-run the ignoreCase
+  // `original_<name>` requirement so a genuinely absent column raises even when
+  // `encrypts(ignoreCase)` was declared before the adapter connected
+  // (fail-closed, matching Rails). The reflected `hash` keys — not the eager
+  // `columnNames()` partial-load path — are the source of truth here.
+  const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
+  encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
+
   // STI: if the subclass previously forked _attributeDefinitions (via
   // attribute()/decorateAttributes()/encrypts()), carry its entries
   // into the shared base map before unifying references — naive
@@ -1066,6 +1074,7 @@ function applyColumnsHash(
     }
     originatingHost._attributeDefinitions = baseDefs;
     encryptionHooks.applyPendingEncryptions(originatingHost);
+    encryptionHooks.requireOriginalColumnsAfterReflection?.(originatingHost, reflectedColumnNames);
   }
 }
 
