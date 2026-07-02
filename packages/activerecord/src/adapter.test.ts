@@ -22,7 +22,6 @@ import {
 } from "./index.js";
 import { Result } from "./result.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
@@ -239,13 +238,9 @@ describe("AdapterTest", () => {
     ],
   });
 
-  // The Event-backed `events` table is not among the fixtures wired above, so
-  // ensure it exists (mirrors schema.rb `t.string :title, limit: 5`). The
-  // sqlite worker DB is seeded with the full canonical schema, so events
-  // already exists there; only the server adapters need the explicit create.
-  beforeAll(async () => {
-    if (adapterType !== "sqlite") await defineSchema({ events: canonicalSchema.events });
-  });
+  // The Event-backed `events` table (schema.rb `t.string :title, limit: 5`)
+  // rides the boot-laid canonical schema on every adapter (RFC 0059 Phase 1
+  // seeds it into each worker/slot DB), so no explicit create is needed here.
 
   // Rails runs this `unless current_adapter?(:PostgreSQLAdapter) ||
   // (current_adapter?(:SQLite3Adapter) && !prepared_statements)` (adapter_test.rb:19) —
@@ -560,12 +555,10 @@ describe("AdapterForeignKeyTest", () => {
       );
       return;
     }
-    // These tables aren't fixture-backed here; create them (mirrors schema.rb)
-    // then add the FK constraint defineSchema can't express.
-    await defineSchema({
-      fk_test_has_pk: canonicalSchema.fk_test_has_pk,
-      fk_test_has_fk: canonicalSchema.fk_test_has_fk,
-    });
+    // `fk_test_has_pk`/`fk_test_has_fk` ride the boot-laid canonical schema
+    // (both integer keys, so the FK types match). schema.rb declares a real
+    // `foreign_key` on them, which our canonical loader can't express, so add
+    // the constraint here via raw DDL and drop it in afterAll.
     await Base.connection.execute(dropFkSql()).catch(() => {});
     await Base.connection.execute(addFkSql());
   });
