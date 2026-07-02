@@ -296,12 +296,27 @@ describe("TS extractor assertion-value collection", () => {
     expect(tsAssertionValues(src)["delegates"]).toEqual(["n:1", "n:2"]);
   });
 
-  it("emits null value for a helper callee kind", () => {
+  it("emits null value for a non-value-bearing helper callee kind", () => {
     const src = `
       it("callee", () => {
         assertQueriesCount(2, () => {});
       });
     `;
+    // assertQueriesCount normalizes to no canonical value-bearing kind → null.
     expect(tsAssertionValues(src)["callee"]).toEqual([null]);
+  });
+
+  it("captures the mapped expected arg for value-bearing helper callees", () => {
+    const src = `
+      it("helpers", () => {
+        assertSame(5, actual);
+        refuteEqual("hi", b);
+        assertIncludes(coll, "member");
+        assertSame(other, actual);
+      });
+    `;
+    // assertSame/refuteEqual take arg 0; the *Includes membership family takes
+    // arg 1 (the member); a non-literal arg 0 → null. Lockstep with 4 kinds.
+    expect(tsAssertionValues(src)["helpers"]).toEqual(["n:5", "s:hi", "s:member", null]);
   });
 });

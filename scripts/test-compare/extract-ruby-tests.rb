@@ -958,10 +958,11 @@ class TestExtractor
   # bumping a counter. Kept in lockstep so assertionKinds.length == assertionCount.
   #
   # `pending_args` threads a parenthesized call's arg node down from its
-  # `:method_add_arg` parent to the inner `:fcall` where the name is recorded, so
-  # `assert_equal(5, foo)` can capture its expected value without moving the
-  # (lockstep-critical) recording site. `:command` form (`assert_equal 5, foo`)
-  # carries its args at node[2] directly.
+  # `:method_add_arg` parent to the inner `:fcall`/`:call` where the name is
+  # recorded, so `assert_equal(5, foo)` / `foo.must_equal(5)` can capture their
+  # expected value without moving the (lockstep-critical) recording site. The
+  # `:command` (`assert_equal 5, foo`) and `:command_call` (`foo.must_equal 5`)
+  # forms carry their args on the node directly (node[2] / node[4]).
   def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args)
     return unless node.is_a?(Array)
 
@@ -980,17 +981,21 @@ class TestExtractor
         visiting.pop
       end
     elsif receiver_call_assertion?(node)
-      # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
-      # (never expanded as helpers, but still recorded). Value capture for these
-      # is out of scope (the expected slot varies with the receiver form).
-      results << ident_name(node[3])
-      values << nil
+      # `x.must_equal y` / `x.must_equal(y)` — receiver-form assertions (never
+      # expanded as helpers, but still recorded). The expected value is the sole
+      # positional argument: `:command_call` carries it at node[4] directly, the
+      # parenthesized `:call` form gets it threaded via `pending_args` from its
+      # `:method_add_arg` parent (mirroring the self-call path).
+      rname = ident_name(node[3])
+      results << rname
+      args = node[0] == :command_call ? node[4] : pending_args
+      values << literal_token(expected_arg(args, rname))
     end
 
-    # Thread a `:method_add_arg`'s arg node (node[2]) to its `:fcall` callee
-    # (node[1]) so the value is available at the recording site, then recurse the
-    # args normally. Every other node recurses its children unchanged.
-    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :fcall
+    # Thread a `:method_add_arg`'s arg node (node[2]) to its `:fcall`/`:call`
+    # callee (node[1]) so the value is available at the recording site, then
+    # recurse the args normally. Every other node recurses its children unchanged.
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && %i[fcall call].include?(node[1][0])
       collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2])
       collect_assertion_kinds_expanded(node[2], results, values, visiting, depth, nil)
     else

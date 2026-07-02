@@ -5,6 +5,8 @@
 
 import * as path from "path";
 import * as ts from "typescript";
+import { normalizeTrailsKind } from "./assertion-kinds.js";
+import { VALUE_BEARING_KINDS } from "./assertion-values.js";
 import { finalizeGate, gateFromGuardExpr, gateFromWrapper, mergeGate } from "./gates.js";
 import type { TestFileInfo, TestGate } from "./types.js";
 
@@ -154,6 +156,22 @@ function literalToken(node: ts.Node | undefined): string | null {
   return null;
 }
 
+/**
+ * Capture the expected-value argument of a bare helper-callee assertion
+ * (`assertSame(a, b)`, `refuteEqual(a, b)`, `assertIncludes(coll, member)`) as a
+ * literal token, or `null` when the callee's canonical kind is not value-bearing
+ * or the expected argument is a non-literal. Mirrors the Ruby side's per-kind
+ * arg-index rule (`expected_arg` / `INCLUDES_ASSERTIONS`): the membership family
+ * (`includes`/`excludes`) checks its second argument (the member), every other
+ * value-bearing kind its first.
+ */
+function helperCalleeValue(name: string, args: readonly ts.Expression[]): string | null {
+  const kind = normalizeTrailsKind(name);
+  if (!kind || !VALUE_BEARING_KINDS.has(kind)) return null;
+  const idx = kind === "includes" || kind === "excludes" ? 1 : 0;
+  return literalToken(args[idx]);
+}
+
 /** Lockstep assertion-kind tokens and their captured literal expected values. */
 interface AssertionKinds {
   kinds: string[];
@@ -170,7 +188,9 @@ interface AssertionKinds {
  *
  * Emits a parallel `values` array (phase 3): the terminal matcher's first
  * argument as a literal token where it is one (`expect(x).toEqual(5)` → `n:5`),
- * else `null`. Helper callees capture no value (we don't parse their args).
+ * else `null`. A value-bearing helper callee (`assertSame`, `refuteEqual`,
+ * `assertIncludes`, …) captures its mapped expected argument via
+ * {@link helperCalleeValue}; other callees push `null`.
  */
 function collectAssertionKinds(
   node: ts.Node,
@@ -195,7 +215,7 @@ function collectAssertionKinds(
           // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
           if (name !== "expect") {
             kinds.push(name);
-            values.push(null);
+            values.push(helperCalleeValue(name, n.arguments));
           }
         } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
           visiting.add(name);

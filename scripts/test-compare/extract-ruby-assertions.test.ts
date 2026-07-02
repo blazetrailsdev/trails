@@ -306,4 +306,23 @@ describe("Ruby extractor assertion-value collection", () => {
     });
     expect(v["delegates"]).toEqual(["n:1", "n:2"]);
   });
+
+  it("captures the literal expected value of receiver-form assertions", () => {
+    const v = rubyAssertionValues({
+      "cases/recv_test.rb": `
+        class RecvTest < ActiveSupport::TestCase
+          def test_recv
+            a.must_equal 5
+            b.must_equal("hi")
+            c.wont_equal :sym
+            d.must_equal other
+          end
+        end
+      `,
+    });
+    // `:command_call` (a.must_equal 5) and parenthesized `:call`
+    // (b.must_equal("hi")) both capture their sole positional arg; a non-literal
+    // receiver arg → null. Length matches the 4 assertionKinds.
+    expect(v["recv"]).toEqual(["n:5", "s:hi", "s:sym", null]);
+  });
 });
