@@ -145,8 +145,10 @@ export class EnumType extends ValueType<string> {
     ) {
       return this._reverseMapping.get(value)!;
     }
-    if (value === null || value === undefined) return null;
-    return null;
+    // Rails: `else value.presence` — an unmapped value passes through unchanged,
+    // except blank values (nil, false, "", whitespace) which become nil.
+    if (isBlank(value)) return null;
+    return value as string;
   }
 
   deserialize(value: unknown): string | null {
@@ -198,10 +200,9 @@ export class EnumType extends ValueType<string> {
 
   assertValidValue(value: unknown): void {
     if (!this._raiseOnInvalidValues) return;
-    // Rails: `unless value.blank? || ...` — a blank value (nil or a
+    // Rails: `unless value.blank? || ...` — a blank value (nil, false, or a
     // whitespace-only string) is always allowed and casts to nil.
-    if (value === null || value === undefined) return;
-    if (typeof value === "string" && isBlank(value)) return;
+    if (isBlank(value)) return;
     if (typeof value === "string" && this._mapping.has(value)) return;
     if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
       return;
