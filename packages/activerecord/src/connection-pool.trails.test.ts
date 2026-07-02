@@ -867,6 +867,12 @@ describe("ConnectionPoolConfiguration query cache", () => {
         // Prime the pool with one idle connection so pinConnectionBang acquires it.
         const seed = pool.checkout();
         pool.checkin(seed);
+        // Stub verifyBang so pinConnectionBang's eager verify (awaited on the
+        // pin path) is a no-op: a real backend would reconnect the checked-in
+        // connection and rebuild its transactionManager, discarding the
+        // throwing double swapped in below. This isolates the beginTransaction
+        // error path under test.
+        vi.spyOn(seed, "verifyBang").mockResolvedValue(undefined);
         // Swap its transactionManager with one that throws on beginTransaction.
         (seed as unknown as { _transactionManager: unknown })._transactionManager = {
           beginTransaction: async () => {
@@ -885,6 +891,29 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
         await withExecutionContext(async () => {
           await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
+          expect(pinnedCount()).toBe(0);
+        });
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+
+    it("propagates a verify failure from pinConnectionBang instead of pinning a dead connection", async () => {
+      // Rails eagerly runs verify! at pin_connection! (connection_pool.rb:336)
+      // and lets a failure raise. pinConnectionBang awaits verifyBang, so a dead
+      // connection aborts the pin: the error propagates, no transaction opens,
+      // and _pinnedCount is left at 0 rather than pinning an unusable connection.
+      const pool = makeAmbientPool({ pool: 1 });
+      try {
+        const seed = pool.checkout();
+        pool.checkin(seed);
+        vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
+
+        const pinnedCount = () =>
+          (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+
+        await withExecutionContext(async () => {
+          await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");
           expect(pinnedCount()).toBe(0);
         });
       } finally {
