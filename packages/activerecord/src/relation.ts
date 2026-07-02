@@ -3565,72 +3565,39 @@ export class Relation<T extends Base> {
     // Rails exists? then routes through apply_join_dependency when eager
     // loading, raising EagerLoadPolymorphicError for polymorphic specs.
     this._checkEagerLoadable();
-    let rel: Relation<T> = this;
-    if (conditions !== undefined) {
-      // Mirrors Rails' FinderMethods#exists? argument handling
-      // (construct_relation_for_exists):
-      //   case conditions
-      //   when Array, Hash → where!(conditions)
-      //   else             → where!(primary_key => conditions)
-      // So strings, numbers, and UUID-shaped PK values all route through
-      // the PK-lookup branch; only Array / Hash become condition specs.
-      if (Array.isArray(conditions)) {
-        // Array form: [sql, ...binds] — delegate to where's string+binds overload.
-        // Reject malformed arrays (empty / non-string head) up front so we
-        // don't fall into where(undefined) which returns a WhereChain and
-        // crashes downstream when we read rel._modelClass.
-        if (conditions.length === 0 || typeof conditions[0] !== "string") {
-          throw new Error(
-            "Relation#exists array conditions must be [sql, ...binds] with a SQL string as the first element",
-          );
-        }
-        rel = this.where(conditions[0], ...(conditions.slice(1) as unknown[]));
-      } else if (typeof conditions === "object" && conditions !== null) {
-        rel = this.where(conditions as Record<string, unknown>);
-      } else {
-        // Primary-key lookup. Honor composite primary keys by routing
-        // through _buildPkWhereNode; Rails' construct_relation_for_exists
-        // reaches the same branch via where(primary_key => conditions).
-        const pk = this._modelClass.primaryKey;
-        if (Array.isArray(pk)) {
-          rel = this.where(this._modelClass._buildPkWhereNode(conditions));
-        } else {
-          rel = this.where({ [pk]: conditions });
-        }
-      }
-    }
-    // Resolve any deferred distinct-PK subquery markers to a literal id list
-    // before compiling the probe (Rails materializes at `.where()`-build time).
-    await rel._materializeDeferredDistinctPkPredicates();
-    if (rel._whereClause.isContradiction()) return false;
     // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
-    // when includes are promoted to a JOIN strategy, re-execute on the join-dependency
-    // relation so the LEFT OUTER JOIN is emitted into the probe query.
-    if (rel._eagerLoadingForSql()) {
-      // Mirrors Rails FinderMethods#exists? (finder_methods.rb:370):
-      // `apply_join_dependency(eager_loading: false)` — hardcoded false skips
-      // the limit/offset+non-limitable-collection guard in apply_join_dependency.
-      return rel.applyJoinDependencyForArel(false).exists();
+    // the eager-load check precedes construct_relation_for_exists, and conditions
+    // thread through to the recursion (`apply_join_dependency(eager_loading: false)
+    // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
+    if (this._eagerLoadingForSql()) {
+      return this.applyJoinDependencyForArel(false).exists(conditions);
     }
     // Mirrors Rails FinderMethods#construct_relation_for_exists
-    // (finder_methods.rb:438): when `distinct_value && offset_value` keep the
-    // relation's select/distinct/group/having/offset and drop only the order
+    // (finder_methods.rb:438): shape the existence probe and apply the argument's
+    // `case conditions` (Array/Hash → where!, else → where!(primary_key =>
+    // conditions)) in one place — `exists?` no longer reimplements that
+    // case-analysis. When `distinct_value && offset_value` keep the relation's
+    // select/distinct/group/having/offset and drop only the order
     // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
-    // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive,
-    // only select/distinct/order are dropped and the projection becomes
-    // `1 AS one`. Conditions are already folded into `rel`'s where clause above,
-    // so pass `true` to skip the helper's own where! step. Building the probe
-    // through the real relation (rather than a hand-rolled manager) reuses the
-    // shared select-list builder — so the distinct+offset branch's default `*`
-    // projection is `ignoredColumns`-aware, matching Rails' `build_select`.
-    const probe: Relation<T> = rel.constructRelationForExists(true);
+    // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive.
+    // `undefined` is our `:none` sentinel, so the helper adds no where!. Building
+    // the probe through the real relation reuses the shared select-list builder,
+    // so the distinct+offset branch's default `*` projection is `ignoredColumns`-
+    // aware, matching Rails' `build_select`.
+    const probe: Relation<T> = this.constructRelationForExists(conditions);
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling the probe (Rails materializes at `.where()`-build time).
+    await probe._materializeDeferredDistinctPkPredicates();
+    // Rails: `return false if relation.where_clause.contradiction?`
+    // (finder_methods.rb:375) — evaluated on the post-construct relation.
+    if (probe._whereClause.isContradiction()) return false;
     // Tag the probe query `<Model> Exists?` — the name Rails passes to its
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
-    const [existsSql, existsBinds] = rel._compileAstWithBinds(probe.toArel().ast);
-    const rows = await rel._withQueryConnection(() =>
-      rel._conn().execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
+    const [existsSql, existsBinds] = this._compileAstWithBinds(probe.toArel().ast);
+    const rows = await this._withQueryConnection(() =>
+      this._conn().execute(existsSql, existsBinds, `${this._modelClass.name} Exists?`),
     );
     // Rails: `select_rows(...).size == 1` — with LIMIT 1 the probe returns at
     // most one row, so a non-empty result means a match.
