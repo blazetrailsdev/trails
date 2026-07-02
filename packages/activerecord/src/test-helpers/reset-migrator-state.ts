@@ -16,7 +16,7 @@ export async function resetMigratorState(adapter: DatabaseAdapter): Promise<void
   await schemaMigration.createTable();
   await schemaMigration.deleteAllVersions();
 
-  const internalMetadata = new InternalMetadata(adapter, { enabled: true });
+  const internalMetadata = new InternalMetadata(adapter);
   await internalMetadata.createTable();
   await internalMetadata.deleteAllEntries();
 }
