@@ -350,7 +350,13 @@ export function enumMethod(
   this: typeof Base,
   attribute: string,
   mapping: Record<string, EnumValue>,
-  options?: { prefix?: boolean | string; suffix?: boolean | string },
+  options?: {
+    prefix?: boolean | string;
+    suffix?: boolean | string;
+    scopes?: boolean;
+    instanceMethods?: boolean;
+    validate?: boolean;
+  },
 ): void {
   _enum.call(this, attribute, mapping, options);
 }
@@ -452,7 +458,14 @@ export function _enum(
   // (`draftBang`), per-value scope + auto `not*` scope, plus friendly-name and
   // original-form variants for labels containing special characters. Rails has
   // no plain in-memory setter, so none is generated.
+  // Positive method names only (predicate / bang / scope). The auto-generated
+  // `not*` scope names are deliberately excluded here: a value literally named
+  // like `notActive` colliding with the `not*` scope of `active` is NOT a hard
+  // conflict \u2014 Rails only *warns* about it (see detectNegativeEnumConditionsBang
+  // below). Mixing the negative-scope names into this set would resurrect the
+  // pre-empting ArgumentError this story removes.
   const definedNames = new Set<string>();
+  const valueMethodNames: string[] = [];
   for (const [n] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
     const capitalizedFullName = camelize(methodName(n));
@@ -461,16 +474,15 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
+    valueMethodNames.push(fullName);
+
     if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
     if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
     if (definedNames.has(fullName))
       raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (definedNames.has(notScopeName))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
     definedNames.add(predicateName);
     definedNames.add(bangName);
     definedNames.add(fullName);
-    definedNames.add(notScopeName);
 
     if (predicateName in (this.prototype as object))
       raiseConflictError.call(this, attribute, predicateName);
@@ -490,6 +502,14 @@ export function _enum(
       if (notFriendlyName in (this as object))
         raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
     }
+  }
+
+  // Rails only warns (never raises) when an enum element's auto-generated
+  // negative scope (`not*`) would clash with a positively-named element, and
+  // skips the check entirely when scopes are disabled.
+  // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`.
+  if (options?.scopes !== false) {
+    detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
   for (const [n, value] of Object.entries(mapping)) {
