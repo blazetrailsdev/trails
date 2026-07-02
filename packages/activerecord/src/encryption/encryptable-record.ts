@@ -227,6 +227,14 @@ export class EncryptableRecord {
       EncryptableRecord.validateColumnSize(modelClass, name);
     }
 
+    // Mirrors Rails encryptable_record.rb:94 —
+    // `preserve_original_encrypted(name) if ignore_case`. Wires the
+    // case-preserving `original_<name>` column when the attribute is declared
+    // with ignoreCase, so reads return the true-cased value.
+    if (options.ignoreCase) {
+      this.preserveOriginalEncrypted(modelClass, name);
+    }
+
     Configurable.encryptedAttributeWasDeclared(modelClass, name);
   }
 

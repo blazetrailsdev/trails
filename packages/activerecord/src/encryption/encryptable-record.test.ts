@@ -785,3 +785,50 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
   });
 });
+
+// Directly exercises the scheme-based EncryptableRecord.encryptAttribute path
+// (distinct from the encryptor-based Base.encrypts path in encryption.ts) to
+// verify it wires preserveOriginalEncrypted for ignoreCase, mirroring Rails'
+// `preserve_original_encrypted(name) if ignore_case` (encryptable_record.rb:94).
+describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  function makeMockModel(columns: string[]) {
+    class MockModel {}
+    return Object.assign(MockModel, {
+      _attributeDefinitions: new Map(),
+      columnNames: () => columns,
+    }) as any;
+  }
+
+  it("wires the case-preserving original_<name> column when ignoreCase is set", () => {
+    const modelClass = makeMockModel(["name", "original_name"]);
+    EncryptableRecord.encrypts(modelClass, "name", { deterministic: true, ignoreCase: true });
+    const encrypted = EncryptableRecord.encryptedAttributes(modelClass);
+    expect(encrypted.has("name")).toBe(true);
+    expect(encrypted.has("original_name")).toBe(true);
+  });
+
+  it("does not wire original_<name> when ignoreCase is absent", () => {
+    const modelClass = makeMockModel(["name"]);
+    EncryptableRecord.encrypts(modelClass, "name", { deterministic: true });
+    expect(EncryptableRecord.encryptedAttributes(modelClass).has("original_name")).toBe(false);
+  });
+
+  it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {
+    Configurable.config.supportUnencryptedData = false;
+    const modelClass = makeMockModel(["name"]);
+    expect(() =>
+      EncryptableRecord.encrypts(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).toThrow(/must create an additional column named 'original_name'/);
+  });
+});
