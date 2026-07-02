@@ -438,8 +438,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsIndexSortOrder(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.8") === true;
-    return this._databaseVersion?.gte("8.0") === true;
+    // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
+    // (abstract_mysql_adapter.rb#supports_index_sort_order?).
+    if (this._mariadb) return this._databaseVersion?.gte("10.8.1") === true;
+    return this._databaseVersion?.gte("8.0.1") === true;
   }
 
   supportsExpressionIndex(): boolean {
