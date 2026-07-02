@@ -10,6 +10,16 @@ package list, and the `declare` / associations / enums / schema reference, see
 
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always use `scripts/start-worktree.sh` to start a worktree.
+- **The Rails source of truth is vendored at `vendor/rails/`** (populated in
+  every worktree by `start-worktree.sh`; refresh with `pnpm vendor:fetch` from
+  the main worktree). Before porting or fixing anything, read the
+  corresponding Rails code and test there — e.g.
+  `vendor/rails/activerecord/lib/active_record/...` and
+  `vendor/rails/activerecord/test/cases/...`. The canonical test schema is
+  `vendor/rails/activerecord/test/schema/schema.rb`, which
+  `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
+  test needs a table or column, check schema.rb first; if it's not there,
+  don't invent it.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
