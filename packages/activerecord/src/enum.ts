@@ -617,10 +617,7 @@ export function _enum(
   // hash form forwards its options (e.g. `{ allowNil: true }`) to the validator.
   if (validate) {
     const validateOptions = typeof validate === "object" ? validate : {};
-    (this as unknown as { validatesInclusionOf: (...a: unknown[]) => void }).validatesInclusionOf(
-      attribute,
-      { in: Object.keys(mapping), ...validateOptions },
-    );
+    this.validatesInclusionOf(attribute, { in: Object.keys(mapping), ...validateOptions });
   }
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses
