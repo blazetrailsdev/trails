@@ -1,12 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  ValueType,
-  IntegerType,
-  BooleanType,
-  StringType,
-} from "@blazetrails/activemodel";
+import { ArgumentError, ValueType, IntegerType, typeRegistry } from "@blazetrails/activemodel";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -34,15 +28,18 @@ function inferSubtype(values: Iterable<EnumValue>): string {
   return "string";
 }
 
-/** Build the ValueType instance backing an enum subtype's cast/serialize. */
+/**
+ * Build the ValueType instance backing an enum subtype's cast/serialize.
+ * Mirrors Rails passing the column's real `Type::Value` into `EnumType.new`:
+ * resolve the declared subtype name through the shared type registry so
+ * float/decimal/datetime/etc. columns delegate to their actual type. Falls
+ * back to IntegerType only for names the registry doesn't know.
+ */
 function subtypeInstance(subtype: string): ValueType<unknown> {
-  switch (subtype) {
-    case "boolean":
-      return new BooleanType();
-    case "string":
-      return new StringType();
-    default:
-      return new IntegerType();
+  try {
+    return typeRegistry.lookup(subtype) as ValueType<unknown>;
+  } catch {
+    return new IntegerType();
   }
 }
 
