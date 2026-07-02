@@ -83,6 +83,69 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["spec forms"]).toBe(3);
   });
 
+  it("expands same-file helper functions into the delegating test's count", () => {
+    const src = `
+      async function testCopyTable(conn, from, to) {
+        expect(await rowCount(conn, to)).toEqual(1);
+        expect(await columnNames(conn, to)).toEqual(cols);
+      }
+      describe("s", () => {
+        it("copy table with binary column", async () => {
+          await testCopyTable(conn, "binaries", "binaries2");
+        });
+      });
+    `;
+    // Body delegates entirely to the helper (0 direct); expansion folds in the
+    // helper's 2 expects. This is the copy_table symmetry trap: the Ruby side
+    // must expand test_copy_table to the same 2, or a false mismatch appears.
+    expect(tsAssertionCounts(src)["copy table with binary column"]).toBe(2);
+  });
+
+  it("counts a block passed to a helper lexically, plus the helper body once", () => {
+    const src = `
+      const testCopyTable = async (conn, from, to, block) => {
+        expect(a).toEqual(1);
+        await block?.();
+      };
+      it("with block", async () => {
+        await testCopyTable(conn, "x", "y", async () => {
+          expect(b).toBeNull();
+        });
+      });
+    `;
+    // helper body expect (1) + lexical block expect (1) = 2
+    expect(tsAssertionCounts(src)["with block"]).toBe(2);
+  });
+
+  it("expands helpers recursively through sub-helpers (depth-capped)", () => {
+    const src = `
+      function doDumpIndexAssertionsForOneIndex() {
+        expect(a).toEqual(1);
+        expect(b).toEqual(2);
+      }
+      function doDumpIndexTestsForSchema() {
+        expect(top).toBeTruthy();
+        doDumpIndexAssertionsForOneIndex();
+        doDumpIndexAssertionsForOneIndex();
+      }
+      it("dump indexes for schema one", () => {
+        doDumpIndexTestsForSchema();
+      });
+    `;
+    // top expect (1) + 2 sub-helper calls × 2 expects = 5
+    expect(tsAssertionCounts(src)["dump indexes for schema one"]).toBe(5);
+  });
+
+  it("guards against helper recursion cycles", () => {
+    const src = `
+      function ping() { expect(a).toEqual(1); pong(); }
+      function pong() { expect(b).toEqual(2); ping(); }
+      it("cyclic", () => { ping(); });
+    `;
+    // ping(1) → pong(1) → ping is on the path (skipped) = 2, no infinite loop
+    expect(tsAssertionCounts(src)["cyclic"]).toBe(2);
+  });
+
   it("ignores assertion look-alikes and non-assertion identifiers", () => {
     const src = `
       it("lookalikes", () => {
