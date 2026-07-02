@@ -2101,6 +2101,12 @@ export class Base extends Model {
     conditions: Record<string, unknown>,
   ) => Promise<InstanceType<T> | null>;
 
+  // Mirrors Rails `Core::ClassMethods#initialize_find_by_cache` — resets the
+  // per-class `@find_by_statement_cache` (bucketed by prepared_statements).
+  declare static initializeFindByCache: typeof _Core.initializeFindByCache;
+  declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
+  declare static _findByStatementCache?: Map<boolean, Map<string, unknown>>;
+
   // Mirrors Rails `find_by!(arg, *args)`: a Hash of conditions or a raw SQL
   // fragment (`Post.find_by!("1 = 0")`) plus optional bind args.
   declare static findByBang: <T extends typeof Base>(
@@ -4563,6 +4569,10 @@ Object.defineProperty(Base, "connection", {
 
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
+extend(Base, {
+  initializeFindByCache: _Core.initializeFindByCache,
+  cachedFindByStatement: _Core.cachedFindByStatement,
+});
 extend(Base, Querying);
 extend(Base, {
   belongsTo: _Associations.belongsTo,
