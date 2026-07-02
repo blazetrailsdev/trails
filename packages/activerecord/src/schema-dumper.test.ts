@@ -175,7 +175,14 @@ describe("SchemaDumperTest", () => {
     // binary, `numeric_data.numeric_number` (t.numeric) dumps as decimal.
     const output = await standardDump();
     expect(output).toMatch(/t\.binary\("blob_data"\)/);
-    expect(output).toMatch(/t\.decimal\("numeric_number"/);
+    // Rails sources the decimal precision default from native_database_types
+    // (nil on SQLite/PostgreSQL), so precision-less `t.decimal`/`t.numeric`
+    // columns dump bare there. MySQL/MariaDB physically materialize a bare
+    // `decimal` as `decimal(10,0)` (SQL-standard default), so it reflects and
+    // dumps with `precision: 10, scale: 0` — matching Rails on MySQL.
+    const decimalTail = adapterType === "mysql" ? ", { precision: 10, scale: 0 })" : ")";
+    expect(output).toContain(`t.decimal("numeric_number"${decimalTail}`);
+    expect(output).toContain(`t.decimal("decimal_number"${decimalTail}`);
   });
 
   it("schema dump keeps id column when id is false and id column added", async () => {
