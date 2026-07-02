@@ -1039,9 +1039,11 @@ describe("FinderTest", () => {
   });
   it("exists passing active record object is not permitted", async () => {
     const { Post } = makeModel();
-    await expect(Post.exists(new Post())).rejects.toThrow(
-      "You are passing an instance of ActiveRecord::Base to `exists?`.",
-    );
+    await expect(Post.exists(new Post())).rejects.toMatchObject({
+      message:
+        "You are passing an instance of ActiveRecord::Base to `exists?`. " +
+        "Please pass the id of the object by calling `.id`.",
+    });
   });
   it("exists does not select columns without alias", async () => {
     const { Post } = makeModel();
