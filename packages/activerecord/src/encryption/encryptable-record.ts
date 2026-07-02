@@ -290,12 +290,13 @@ export class EncryptableRecord {
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
     // Mirrors Rails' `default: columns_hash[name.to_s]&.default` — thread the
-    // column's schema default into the encrypted type so a plaintext default
+    // TRUE DB column default into the encrypted type so a plaintext default
     // deserializes without an attempted decrypt (see EncryptedAttributeType's
-    // `@default && @default == value` guard in decryptAsText). The default is
-    // read from the reflected attribute definition (`defaultValue`, populated
-    // from the column default by schema reflection) rather than `columnsHash()`,
-    // which would warm the shared schema cache and perturb sibling tests.
+    // `@default && @default == value` guard in decryptAsText). The default comes
+    // from a query-free peek of the warm schema cache (columnDefaultFor /
+    // cachedColumnDefaultFor), NOT the reflected def's `defaultValue` (which an
+    // `attribute(name, { default })` override would poison) and NOT `columnsHash()`
+    // (which would warm the shared schema cache and perturb sibling tests).
     if (typeof modelClass.decorateAttributes === "function") {
       const def = modelClass._attributeDefinitions?.get?.(name);
       if (!def) return;
