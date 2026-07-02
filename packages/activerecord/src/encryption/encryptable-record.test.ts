@@ -609,6 +609,34 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const overridingInstance = found!.becomes(OverridingBook);
     expect(overridingInstance.name).toBe("Dune-overridden");
   });
+
+  it("when ignore_case: true is declared before the attributes, the original_<name> reader still decrypts (replay-safe)", async () => {
+    const adapter = await freshAdapter();
+    // Declare `encrypts` BEFORE the attribute definitions exist, so both `name`
+    // and its `original_name` counterpart are buffered and only wrapped when the
+    // defs appear — the replay path. If the original_<name> encrypted type is
+    // lost on that replay (the regression this guards), its reader returns raw
+    // ciphertext instead of the decrypted, case-preserved value.
+    const Book = class extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+      }
+    } as unknown as typeof Base & {
+      create: (a: object) => Promise<any>;
+      find: (id: any) => Promise<any>;
+    };
+
+    const book = await Book.create({ name: "Dune" });
+    await assertEncryptedAttribute(book, "original_name", "Dune");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
   it("binary data can be encrypted", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);

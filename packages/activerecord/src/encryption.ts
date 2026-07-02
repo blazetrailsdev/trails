@@ -19,7 +19,6 @@
  */
 
 import { registerEncryptionHooks } from "./encryption-hooks.js";
-import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
@@ -218,29 +217,23 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
       EncryptableRecord.validateColumnSize(klass, name);
     }
     if (options.ignoreCase) {
-      _preserveOriginalEncrypted(klass, name, options);
+      // Route through the shared scheme-based implementation (Rails
+      // encryptable_record.rb:94 `preserve_original_encrypted(name)`) so the
+      // `original_<name>` wiring lives in one place. Rails declares the
+      // original column with a plain `encrypts` (non-deterministic, no
+      // downcase), and raises when the column is absent without
+      // supportUnencryptedData — both handled by preserveOriginalEncrypted.
+      // Pass this module's pending-decoration `encrypts` so the original
+      // column rides the same replay-safe machinery as the source attribute.
+      EncryptableRecord.preserveOriginalEncrypted(klass, name, (klass, attr) =>
+        encrypts(klass, attr),
+      );
     }
   }
 
   if (klass._attributeDefinitions?.size > 0) {
     applyPendingEncryptions(klass);
   }
-}
-
-/**
- * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
- * When ignore_case: true, stores the original-cased value in an additional
- * `original_<name>` encrypted attribute, and overrides the reader so reads
- * return the original-cased value rather than the downcased one.
- */
-function _preserveOriginalEncrypted(klass: any, name: string, options: EncryptsOptions): void {
-  const originalAttrName = `original_${name}`;
-
-  // Register the original-case column as encrypted (without ignoreCase/downcase).
-  const { ignoreCase: _ic, downcase: _dc, ...originalOptions } = options;
-  encrypts(klass, originalAttrName, originalOptions);
-
-  EncryptableRecord.overrideAccessorsToPreserveOriginal(klass, name, originalAttrName);
 }
 
 /**
@@ -256,24 +249,13 @@ export function applyPendingEncryptions(klass: any): void {
     klass._attributeDefinitions = new Map(klass._attributeDefinitions);
   }
 
+  // Route the actual type wrapping through the shared scheme-based primitive
+  // (mirrors Rails: one EncryptableRecord#encrypts declaration path). On a Base
+  // subclass registerEncryptedType uses the replay-safe decorateAttributes
+  // decorator and skips attributes whose column hasn't been reflected yet — the
+  // persistent _pendingEncryptions buffer re-invokes this once it appears.
   for (const { name, scheme } of pending) {
-    const def = klass._attributeDefinitions.get(name);
-    if (!def) continue;
-    // Guard prevents double-decoration both in _attributeDefinitions and
-    // in the pending queue (decorateAttributes is idempotent here because
-    // the encryptedType guard on _attributeDefinitions prevents re-entry).
-    if (def.type instanceof EncryptedAttributeType) continue;
-    // Route through decorateAttributes so the encryption PendingDecorator
-    // lands in the pending queue in declaration order (after any PendingType),
-    // ensuring _defaultAttributes replays correctly. The decorator returns
-    // null when the type is already an EncryptedAttributeType — the PendingDecorator
-    // replays on every _defaultAttributes rebuild, so it must be idempotent to
-    // avoid double-wrapping when schema reflection pre-populated the type.
-    klass.decorateAttributes([name], (_attrName: string, castType: Type) =>
-      castType instanceof EncryptedAttributeType
-        ? (null as unknown as Type)
-        : new EncryptedAttributeType({ scheme, castType }),
-    );
+    EncryptableRecord.registerEncryptedType(klass, name, scheme);
   }
 
   // Re-run column-size validation after schema reflection so limits learned

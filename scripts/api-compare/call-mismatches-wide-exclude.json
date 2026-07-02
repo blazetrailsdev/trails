@@ -29766,6 +29766,13 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt_attribute",
+    "call": "new",
+    "reason": "Satisfied via EncryptableRecord.registerEncryptedType (PR #4418): encrypt_attribute now delegates the `new EncryptedAttributeType` wrapping to the shared registration primitive so both declaration paths construct the type in one place."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "encrypted_attribute?",
     "call": "attribute_aliases",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -29853,6 +29860,13 @@
     "rubyName": "preserve_original_encrypted",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "preserve_original_encrypted",
+    "call": "encrypts",
+    "reason": "Satisfied via the injected encryptsFn callback (PR #4418): preserve_original_encrypted takes an encryptsFn (defaulting to this.encrypts) so the original_<name> column rides the caller's declaration path; the Base.encrypts path passes the module-level encrypts."
   },
   {
     "package": "activerecord",
