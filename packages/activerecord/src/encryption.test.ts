@@ -45,7 +45,7 @@ beforeAll(async () => {
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -55,17 +55,17 @@ describe("encrypts()", () => {
       }
     }
 
-    const user = await User.create({ original_name: "Alice", name: "123-45-6789" });
+    const book = await Book.create({ original_name: "Alice", name: "123-45-6789" });
     // Reading returns plaintext (decrypted) value
-    expect(user.name).toBe("123-45-6789");
+    expect(book.name).toBe("123-45-6789");
 
     // The serialized value (for DB) should be encrypted
-    const dbValues = user._attributes.valuesForDatabase();
+    const dbValues = book._attributes.valuesForDatabase();
     expect(dbValues.name).not.toBe("123-45-6789");
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -75,8 +75,8 @@ describe("encrypts()", () => {
       }
     }
 
-    const created = await User.create({ original_name: "Alice", name: "my-secret-data" });
-    const loaded = await User.find(created.id);
+    const created = await Book.create({ original_name: "Alice", name: "my-secret-data" });
+    const loaded = await Book.find(created.id);
     expect(loaded.name).toBe("my-secret-data");
   });
 
@@ -85,7 +85,7 @@ describe("encrypts()", () => {
       encrypt: (v: string) => `ENC:${v}`,
       decrypt: (v: string) => v.replace(/^ENC:/, ""),
     };
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -94,15 +94,15 @@ describe("encrypts()", () => {
       }
     }
 
-    const user = await User.create({ name: "abc123" });
-    expect(user.name).toBe("abc123");
+    const book = await Book.create({ name: "abc123" });
+    expect(book.name).toBe("abc123");
     // Serialized value should use custom encryptor
-    const dbValues = user._attributes.valuesForDatabase();
+    const dbValues = book._attributes.valuesForDatabase();
     expect(dbValues.name).toBe("ENC:abc123");
   });
 
   it("wires scheme options (deterministic, downcase) through to the attribute type", async () => {
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -112,15 +112,15 @@ describe("encrypts()", () => {
     }
 
     // Trigger construction so applyPendingEncryptions runs.
-    new User();
-    const def = (User as any)._attributeDefinitions.get("name");
+    new Book();
+    const def = (Book as any)._attributeDefinitions.get("name");
     expect(def.type).toBeInstanceOf(EncryptedAttributeType);
     expect(def.type.deterministic).toBe(true);
     expect(def.type.scheme.downcase).toBe(true);
   });
 
   it("registers encrypted attributes on the class", async () => {
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -129,7 +129,7 @@ describe("encrypts()", () => {
       }
     }
 
-    expect((User as any)._encryptedAttributes.has("name")).toBe(true);
+    expect((Book as any)._encryptedAttributes.has("name")).toBe(true);
   });
 });
 
@@ -150,7 +150,7 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
       { encryptor: new TestEncryptor({ legacy: "legacy_cipher" }) } as any,
     ];
 
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -158,8 +158,8 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
         this.encrypts("name", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
-    new User();
-    const type = (User as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    new Book();
+    const type = (Book as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(1);
 
     // legacy ciphertext falls back to previous scheme
@@ -171,7 +171,7 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
       { encryptor: new TestEncryptor({ det: "det_cipher" }), deterministic: true } as any,
     ];
 
-    class User extends Base {
+    class Book extends Base {
       static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
@@ -179,8 +179,8 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
         this.encrypts("name", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
-    new User();
-    const type = (User as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    new Book();
+    const type = (Book as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     // non-deterministic attribute: deterministic global scheme is incompatible
     expect(type.previousTypes).toHaveLength(0);
   });
