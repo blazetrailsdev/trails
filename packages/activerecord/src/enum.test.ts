@@ -520,14 +520,13 @@ describe("EnumTest", () => {
     expect((tlg as any).isInEnglish()).toBe(true);
   });
 
-  // In-memory `new Book()` does not seed the DB column default (`status` → 0)
-  // through EnumType#cast, so the label isn't applied until the row round-trips.
-  it.skip("uses default value from database on initialization", () => {
+  it("uses default value from database on initialization", () => {
     expect((new Book() as any).isProposed()).toBe(true);
   });
 
-  // Rails: default `cover` ("hard") from the DB — `cover` enum not on Book.
-  it.skip("uses default value from database on initialization when using custom mapping", () => {});
+  it("uses default value from database on initialization when using custom mapping", () => {
+    expect((new Book() as any).isHard()).toBe(true);
+  });
 
   it("data type of Enum type", () => {
     expect(Book.typeForAttribute("status").type()).toBe("integer");
