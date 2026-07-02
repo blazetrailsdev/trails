@@ -365,7 +365,7 @@ export function enumMethod(
     suffix?: boolean | string;
     scopes?: boolean;
     instanceMethods?: boolean;
-    validate?: boolean;
+    validate?: boolean | Record<string, unknown>;
   },
 ): void {
   _enum.call(this, attribute, mapping, options);
@@ -393,7 +393,7 @@ export function _enum(
     suffix?: boolean | string;
     scopes?: boolean;
     instanceMethods?: boolean;
-    validate?: boolean;
+    validate?: boolean | Record<string, unknown>;
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
@@ -459,7 +459,11 @@ export function _enum(
   // Register EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
   // install the label-returning accessor via the shared installEnumAttribute.
-  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
+  // Mirrors Rails `EnumType.new(..., raise_on_invalid_values: !validate)`: with
+  // `validate:` set, an invalid assignment is caught by the inclusion validator
+  // rather than raising on write, so the type must not raise.
+  const validate = options?.validate ?? false;
+  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype, !validate);
   installEnumAttribute(this, attrName, enumType);
 
   // Conflict-detection pass, then the generation pass — both ported from the
@@ -602,6 +606,18 @@ export function _enum(
         configurable: true,
       });
     }
+  }
+
+  // Mirrors Rails:
+  //   if validate
+  //     validate = {} unless Hash === validate
+  //     validates_inclusion_of name, in: enum_values.keys, **validate
+  //   end
+  // A truthy `validate` adds an inclusion validation over the enum labels; a
+  // hash form forwards its options (e.g. `{ allowNil: true }`) to the validator.
+  if (validate) {
+    const validateOptions = typeof validate === "object" ? validate : {};
+    this.validatesInclusionOf(attribute, { in: Object.keys(mapping), ...validateOptions });
   }
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses

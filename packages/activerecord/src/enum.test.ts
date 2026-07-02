@@ -11,7 +11,7 @@
  * Cases the canonical `Book` enum surface cannot yet express are kept under
  * their Rails names and `it.skip`-ped, tracked-pending-convergence under RFC
  * 0023-surfaced-deviations (enum-canonical-book-gaps): frozen `statuses`,
- * `*_before_type_cast` / `*_for_database`, the `validate:` option, and the
+ * `*_before_type_cast` / `*_for_database`, and the
  * conflict-detection / option-validation message surface (the last is covered
  * behaviorally in enum.trails.test.ts). The `cover` string enum, the
  * `boolean_status` boolean enum, and the `last_read` `forgotten: nil` value are
@@ -313,10 +313,47 @@ describe("EnumTest", () => {
     }).toThrow("'unknown' is not a valid status");
   });
 
-  // Rails: `enum :status, [...], validate: true|hash` — the `validate:` option
-  // is not yet wired into the trails enum macro.
-  it.skip("validation with 'validate: true' option", () => {});
-  it.skip("validation with 'validate: hash' option", () => {});
+  it("validation with 'validate: true' option", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"] as any, { validate: true });
+      }
+    }
+
+    let validBook = new K({ status: "proposed" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: "written" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    let invalidBook = new K({ status: null } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+
+    invalidBook = new K({ status: "unknown" } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+  });
+
+  it("validation with 'validate: hash' option", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"] as any, { validate: { allowNil: true } });
+      }
+    }
+
+    let validBook = new K({ status: "proposed" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: "written" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: null } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    const invalidBook = new K({ status: "unknown" } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+  });
 
   // Rails: `Book.where(id:).update_all("status = NULL")` (raw SQL fragment).
   it.skip("NULL values from database should be casted to nil", () => {});
