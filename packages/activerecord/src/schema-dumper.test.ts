@@ -319,11 +319,16 @@ describe("SchemaDumperTest", () => {
 // Deferred-convergence cases: still build ad-hoc, non-canonical tables
 // (adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
 // in `schema.rb`, decimal precision/integer limit that SQLite reflection can't
-// recover, table-name prefix/suffix migrations, etc.). Kept on the plain
-// per-test reset (no `setupFixtures()`) so their bespoke tables are dropped
-// between tests. The `companies` index-dump cases have moved to the canonical
-// block above (RFC 0048 IndexSpec extension); the rest await the missing
-// adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
+// recover, table-name prefix/suffix migrations, etc.). Each builds its own
+// scratch table with `force: true` (drop-then-create) — mirroring how Rails'
+// schema_dumper_test.rb owns and tears down each scratch table. Under
+// `AR_ONE_SCHEMA=1` the per-test reset only truncates the canonical tables and
+// never drops these bespoke ones, so without `force` a table left by an earlier
+// test (or file) on the shared worker DB collides on the next `createTable`
+// ("table already exists"); `force` makes each case self-contained regardless.
+// The `companies` index-dump cases have moved to the canonical block above
+// (RFC 0048 IndexSpec extension); the rest await the missing adapter tables /
+// reflection fixes — tracked as follow-up stories under RFC 0048.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(async () => {
