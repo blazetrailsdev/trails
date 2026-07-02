@@ -11,6 +11,7 @@ import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-
 import { Configurable } from "./configurable.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { encryptionHooks } from "../encryption-hooks.js";
 
 // Memoized SHA1 key provider: PBKDF2 is expensive (65536 iterations), so
 // reuse the same provider as long as primaryKey and keyDerivationSalt haven't
@@ -132,10 +133,7 @@ export class EncryptableRecord {
       }
     }
 
-    if (!modelClass._encryptedAttributes) {
-      modelClass._encryptedAttributes = new Set<string>();
-    }
-
+    // `encryptAttribute` own-property-guards `_encryptedAttributes` itself.
     for (const name of names) {
       this.encryptAttribute(modelClass, name, options);
     }
@@ -184,16 +182,51 @@ export class EncryptableRecord {
     return result;
   }
 
-  /** @internal */
-  static encryptAttribute(modelClass: any, name: string, options: SchemeOptions = {}): void {
+  /**
+   * The single declaration path for encrypted attributes — both `Base.encrypts`
+   * (via encryption.ts#encrypts) and direct callers route through here, mirroring
+   * Rails' single `encrypt_attribute`.
+   *
+   * `prebuiltScheme` lets `Base.encrypts` supply a scheme built by
+   * encryption.ts#buildScheme (which adapts the legacy `{ encrypt, decrypt }`
+   * shim and supplies a defaultEncryptor fallback); direct callers omit it and
+   * get a per-attribute scheme from `schemeFor`.
+   *
+   * @internal
+   */
+  static encryptAttribute(
+    modelClass: any,
+    name: string,
+    options: SchemeOptions = {},
+    prebuiltScheme?: Scheme,
+  ): void {
+    // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
+    // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
+    if (!Object.prototype.hasOwnProperty.call(modelClass, "_encryptedAttributes")) {
+      modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
+    }
     modelClass._encryptedAttributes.add(name);
 
-    // Build the per-attribute scheme (mirrors Rails scheme_for). Each attribute
-    // gets its own scheme so per-attribute options (deterministic, downcase,
-    // previousSchemes) don't leak across declarations.
-    const scheme = schemeFor(options);
+    // Build the per-attribute scheme (mirrors Rails scheme_for) unless the caller
+    // supplied one. Each attribute gets its own scheme so per-attribute options
+    // (deterministic, downcase, previousSchemes) don't leak across declarations.
+    const scheme = prebuiltScheme ?? schemeFor(options);
 
-    this.registerEncryptedType(modelClass, name, scheme);
+    if (typeof modelClass.decorateAttributes === "function") {
+      // Durable path (real model classes): buffer the pending encryption in the
+      // class's own `_pendingEncryptions` and apply it now — and again on every
+      // `_defaultAttributes` rebuild / schema load. This gives the scheme path
+      // its own replay buffer (the RFC 0047 follow-up registerEncryptedType's
+      // doc references), so the encrypted type survives replay even though
+      // `Base.encrypts` declares at static-init before the schema is loaded.
+      this.registerPendingEncryption(modelClass, name, scheme);
+      encryptionHooks.applyPendingEncryptions(modelClass);
+    } else {
+      // Immediate path (plain-object callers without decoration machinery, e.g.
+      // direct `EncryptableRecord.encrypts` tests): register the encrypted type
+      // synchronously so it's readable right after the call.
+      this.registerEncryptedType(modelClass, name, scheme);
+    }
 
     if (Configurable.config.validateColumnSize) {
       EncryptableRecord.validateColumnSize(modelClass, name);
@@ -208,6 +241,19 @@ export class EncryptableRecord {
     }
 
     Configurable.encryptedAttributeWasDeclared(modelClass, name);
+  }
+
+  /**
+   * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
+   * decorates the attribute now and re-decorates on every `_defaultAttributes`
+   * rebuild. Own-property guarded like the encrypted-attribute Set.
+   * @internal
+   */
+  static registerPendingEncryption(modelClass: any, name: string, scheme: Scheme): void {
+    if (!Object.prototype.hasOwnProperty.call(modelClass, "_pendingEncryptions")) {
+      modelClass._pendingEncryptions = [...(modelClass._pendingEncryptions ?? [])];
+    }
+    modelClass._pendingEncryptions.push({ name, scheme });
   }
 
   /**
@@ -226,17 +272,15 @@ export class EncryptableRecord {
    *   when no def exists yet so `loadSchemaFromAdapter` can supply the real
    *   cast type on the next pass.
    *
-   * ASYMMETRY (intentional): the `decorateAttributes` branch skips when the def
-   * is absent and does NOT buffer — it relies on the caller re-invoking it once
-   * the def exists. On the `Base.encrypts` path that retry is guaranteed by the
-   * persistent `_pendingEncryptions` buffer (`applyPendingEncryptions` re-runs on
-   * every `encrypts()` / schema load). The scheme-based `encryptAttribute` entry
-   * has no such buffer, so calling `EncryptableRecord.encryptAttribute` directly
-   * on a real `Base` subclass BEFORE the target attribute is declared would drop
-   * the wrap. All current scheme-path callers use plain mock classes (no
-   * `decorateAttributes`) so they take the direct-set branch; giving the scheme
-   * path its own replay buffer is tracked in follow-up
-   * `encrypt-route-primary-attribute-through-encrypt-attribute` (RFC 0047).
+   * The `decorateAttributes` branch skips when the def is absent and does NOT
+   * buffer here — it relies on a persistent `_pendingEncryptions` buffer being
+   * re-applied once the column is reflected. `encryptAttribute` now maintains
+   * that buffer itself (via `registerPendingEncryption` before it calls
+   * `applyPendingEncryptions`), so the scheme path is replay-safe on its own —
+   * completing the RFC 0047 follow-up
+   * `encrypt-route-primary-attribute-through-encrypt-attribute`. This method is
+   * therefore only invoked from `applyPendingEncryptions` (durable path) or
+   * directly by `encryptAttribute` for plain mock models (immediate path).
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
@@ -283,38 +327,49 @@ export class EncryptableRecord {
    * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
    * Declares the case-preserving `original_<name>` encrypted column and
    * overrides the accessors so reads return the original-cased value.
-   *
-   * `encryptsFn` selects which declaration path registers the original column,
-   * so the `original_<name>` attribute rides the SAME decoration machinery as
-   * its source `name`: the scheme path (default) sets `_attributeDefinitions`
-   * directly, while the `Base.encrypts` path passes its own pending-decoration
-   * `encrypts` so the original column survives `_defaultAttributes` replay.
    * @internal
    */
-  static preserveOriginalEncrypted(
-    modelClass: any,
-    name: string,
-    encryptsFn: (klass: any, attr: string) => void = (klass, attr) => this.encrypts(klass, attr),
-  ): void {
+  static preserveOriginalEncrypted(modelClass: any, name: string): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-    // Mirrors Rails encryptable_record.rb:101–103: raise at declaration time
-    // when the original_<name> column is absent and supportUnencryptedData is
-    // false (which means there's no fallback for reading un-preserved rows).
-    if (!Configurable.config.supportUnencryptedData) {
-      const colNames: string[] = modelClass.columnNames?.() ?? [];
-      // Only assert absence when the schema is actually known. On the
-      // `Base.encrypts` path the declaration runs at static-init before schema
-      // reflection, so `columnNames()` is empty ("unknown", not "absent") — the
-      // missing-column check would misfire. Rails always has columns loaded at
-      // declaration time, so it raises unconditionally.
-      if (colNames.length > 0 && !colNames.includes(originalName)) {
-        throw new ConfigurationError(
-          `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
-        );
-      }
-    }
-    encryptsFn(modelClass, originalName);
+    // Enforce the missing-column requirement against the columns known now.
+    // `columnNames()` forces a schema load when an adapter is connected, so the
+    // check fires for real models; at Base.encrypts static-init with no adapter
+    // it returns [] and requireOriginalColumnPresent defers (see its doc).
+    this.requireOriginalColumnPresent(modelClass, name, modelClass.columnNames?.() ?? []);
+
+    // Declare original_<name> with a default scheme, mirroring Rails' bare
+    // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
+    // Build it through the shared buildScheme so the legacy encryptor shim +
+    // defaultEncryptor fallback apply exactly as they do for the primary
+    // attribute (a bare schemeFor({}) would raise "No encryption key provided"
+    // when no keys are configured). Falls back to schemeFor when the encryption
+    // namespace isn't loaded (pure-direct unit tests, which never serialize).
+    // encryptAttribute's durable branch buffers this in _pendingEncryptions so
+    // the original column rides the same replay-safe machinery as its source.
+    const originalScheme = encryptionHooks.buildScheme?.({}) as Scheme | undefined;
+    this.encryptAttribute(modelClass, originalName, {}, originalScheme);
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
+  }
+
+  /**
+   * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
+   * is absent and `supportUnencryptedData` is false — mirrors Rails
+   * encryptable_record.rb:101–103. Checked at declaration time against the
+   * columns known then. Rails' `column_names` forces a schema load so the set is
+   * always complete; ours can be empty at Base.encrypts static-init (the adapter
+   * isn't connected yet), so an empty list means "unknown" and we defer rather
+   * than raise a false positive — the same fail-open-when-unknown behavior the
+   * scheme-based path shipped with.
+   * @internal
+   */
+  static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
+    if (Configurable.config.supportUnencryptedData) return;
+    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+    // Empty list ⇒ schema not loaded yet: defer rather than raise a false positive.
+    if (colNames.length === 0 || colNames.includes(originalName)) return;
+    throw new ConfigurationError(
+      `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
+    );
   }
 
   /** @internal */

@@ -14,6 +14,14 @@ export interface EncryptionHooks {
 
   applyPendingEncryptions(klass: any): void;
 
+  /**
+   * Build a Scheme from `Base.encrypts` options, adapting the legacy
+   * `{ encrypt, decrypt }` shim and supplying a defaultEncryptor fallback.
+   * Optional: only registered once the encryption namespace is loaded; callers
+   * fall back to `schemeFor` when it's absent.
+   */
+  buildScheme?(options: any): any;
+
   encryptedAttributeQ(klass: any, name: string): boolean;
 
   ciphertextFor(record: any, name: string): unknown;
