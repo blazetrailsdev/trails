@@ -12,6 +12,7 @@ import { argumentError } from "./query-methods.js";
 
 interface BoundType {
   cast?(x: unknown): unknown;
+  serialize?(x: unknown): unknown;
 }
 
 /**
@@ -42,9 +43,11 @@ export class PredicateBuilder {
     this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
-      const sentinel = this.unboundableSentinel(attribute, v);
-      if (sentinel) return sentinel;
+      // Resolve the type once so sign detection and the cast below agree for
+      // joined/aliased attributes (see resolveBoundType).
       const type = this.resolveBoundType(attribute);
+      const sentinel = this.unboundableSentinel(attribute.name, v, type);
+      if (sentinel) return sentinel;
       return type?.cast ? type.cast(v) : v;
     });
     this.basicObjectHandler = new BasicObjectHandler(this);
@@ -60,21 +63,36 @@ export class PredicateBuilder {
    * QueryAttribute bind whose `unboundable?` collapses the equality to `1=0`.
    */
   markUnboundable(attribute: Nodes.Attribute, value: unknown): unknown {
-    return this.unboundableSentinel(attribute, value) ?? value;
+    return (
+      this.unboundableSentinel(attribute.name, value, this.resolveBoundType(attribute)) ?? value
+    );
   }
 
   /**
    * Returns an {@link UnboundableBound} sentinel when `value` is out of range
-   * for the column, else null. Both the detection and the sign come from a
+   * for `type`, else null. Both the detection and the sign come from a
    * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
    * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
    * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
    * than a second sign computation) keeps this in lockstep with the
    * equality/negation single-value paths, and handles non-numeric out-of-range
    * bounds (e.g. custom types) type-agnostically.
+   *
+   * Callers pass the type from {@link resolveBoundType} (not the narrower
+   * `this.table`-only lookup `buildBindAttribute` uses) so sign detection uses
+   * the same type as the accompanying cast — otherwise a joined/aliased bound
+   * could be detected against the wrong (or identity) type.
    */
-  private unboundableSentinel(attribute: Nodes.Attribute, value: unknown): UnboundableBound | null {
-    const sign = this.buildBindAttribute(attribute.name, value).isUnboundable();
+  private unboundableSentinel(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): UnboundableBound | null {
+    const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
+      cast(v: unknown): unknown;
+      serialize(v: unknown): unknown;
+    };
+    const sign = new QueryAttribute(columnName, value, castType).isUnboundable();
     return sign === false ? null : new UnboundableBound(sign);
   }
 
