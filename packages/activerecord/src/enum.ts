@@ -475,7 +475,13 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
+    // Rails feeds both the value method name and its special-char-stripped
+    // friendly alias into detect_negative_enum_conditions! (enum.rb:266-279),
+    // pushing the alias only when it differs and isn't already present.
     valueMethodNames.push(fullName);
+    if (friendlyName !== fullName && !valueMethodNames.includes(friendlyName)) {
+      valueMethodNames.push(friendlyName);
+    }
 
     if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
     if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
