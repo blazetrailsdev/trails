@@ -13,7 +13,6 @@ import {
 import { Notifications } from "@blazetrails/activesupport";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
@@ -1141,10 +1140,6 @@ describe("EagerLoadingTooManyIdsTest", () => {
   // at this scale, so seed via chunked insertAll (no reload) and clean up after.
   const TOTAL = 65536;
   beforeAll(async () => {
-    await defineSchema(
-      { citations: canonicalSchema.citations, books: canonicalSchema.books } as Schema,
-      { dropExisting: true },
-    );
     registerModel(Citation);
     registerModel(Book);
     const rows: { id: number; book2_id: number }[] = [];
@@ -1188,16 +1183,6 @@ describe("EagerLoadingTooManyIdsTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
-  beforeAll(async () => {
-    await defineSchema(
-      {
-        sharded_blogs: canonicalSchema.sharded_blogs,
-        sharded_blog_posts: canonicalSchema.sharded_blog_posts,
-        sharded_comments: canonicalSchema.sharded_comments,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel("ShardedBlog", ShardedBlog);
   registerModel("ShardedBlogPost", ShardedBlogPost);
   registerModel("ShardedComment", ShardedComment);
@@ -1245,26 +1230,10 @@ describe("EagerAssociationTest", () => {
     "categoriesPosts",
     "categorizations",
   ]);
-  // Force-recreate the canonical HABTM tables with `dropExisting` (mirrors
-  // named-scoping.test.ts). The per-worker SQLite DB is shared across files
-  // (`file:trails_test_${VITEST_POOL_ID}?mode=memory&cache=shared`), and sibling
-  // files (e.g. has-many-associations.test.ts) define a `posts` table WITHOUT a
-  // `body` column. The signature cache is primed at worker boot
-  // (template-global-setup.ts), so a plain `defineSchema` would cache-hit and
-  // skip recreation — leaving the fixture seed to hit the wrong columns
-  // (`table posts has no column named body`). `dropExisting` bypasses the cache.
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        categories: canonicalSchema.categories,
-        posts: canonicalSchema.posts,
-        categories_posts: canonicalSchema.categories_posts,
-        categorizations: canonicalSchema.categorizations,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
+  // The canonical HABTM tables (categories/posts/categories_posts/
+  // categorizations) ride the boot-laid canonical schema; any sibling-file shape
+  // drift on the shared per-worker DB is restored per-file by repairWorkerSchema
+  // (test-setup-dy.ts), so no per-block recreation is needed.
   registerModel(Post);
   registerModel(Category);
   registerModel(Categorization);
@@ -1327,22 +1296,9 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   fixtures(["developers", "projects", "developersProjects"]);
-  // Force-recreate the canonical tables with `dropExisting` (mirrors the
-  // EagerAssociationTest block above). Sibling files share the per-worker SQLite
-  // DB and define `developers`/`projects` with different column sets, and the
-  // signature cache is primed at worker boot — a plain `defineSchema` would
-  // cache-hit and skip recreation, leaving the fixture seed to hit stale columns.
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        developers: canonicalSchema.developers,
-        projects: canonicalSchema.projects,
-        developers_projects: canonicalSchema.developers_projects,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
+  // The canonical developers/projects/developers_projects tables ride the
+  // boot-laid canonical schema; per-file repairWorkerSchema (test-setup-dy.ts)
+  // restores any sibling-file shape drift on the shared per-worker DB.
   registerModel(Developer);
   registerModel(Project);
 
@@ -1437,17 +1393,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { developers } = fixtures(["developers", "projects", "developersProjects"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        developers: canonicalSchema.developers,
-        projects: canonicalSchema.projects,
-        developers_projects: canonicalSchema.developers_projects,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Project);
   registerModel(EagerDeveloperWithDefaultScope);
   registerModel(EagerDeveloperWithClassMethodDefaultScope);
@@ -1549,22 +1494,6 @@ describe("EagerAssociationTest", () => {
     "readers",
     "people",
   ]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        taggings: canonicalSchema.taggings,
-        tags: canonicalSchema.tags,
-        author_addresses: canonicalSchema.author_addresses,
-        readers: canonicalSchema.readers,
-        people: canonicalSchema.people,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Post);
   registerModel(Author);
   registerModel(AuthorAddress);
@@ -1828,21 +1757,6 @@ describe("EagerAssociationTest", () => {
     "people",
     "readers",
   ]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categories: canonicalSchema.categories,
-        categories_posts: canonicalSchema.categories_posts,
-        people: canonicalSchema.people,
-        readers: canonicalSchema.readers,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Post);
   registerModel(SpecialPost);
   registerModel(Author);
@@ -2354,16 +2268,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { pets } = fixtures(["owners", "pets"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        owners: canonicalSchema.owners,
-        pets: canonicalSchema.pets,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Pet);
   registerModel(Owner);
 
@@ -2388,16 +2292,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { authors } = fixtures(["authors", "authorFavorites"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        author_favorites: canonicalSchema.author_favorites,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Author);
   registerModel(AuthorFavorite);
 
@@ -2422,10 +2316,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { companies } = fixtures(["companies"]);
-  beforeAll(async () => {
-    // Partial schema: the eager SELECT projects only real `companies` columns.
-    await defineSchema({ companies: canonicalSchema.companies }, { dropExisting: true });
-  });
   registerModel(Company);
   registerModel(Firm);
   registerModel(Client);
@@ -2449,15 +2339,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { accounts } = fixtures(["companies", "accounts"]);
-  beforeAll(async () => {
-    await defineSchema(
-      {
-        companies: canonicalSchema.companies,
-        accounts: canonicalSchema.accounts,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Company);
   registerModel(Firm);
   registerModel(Client);
@@ -2493,12 +2374,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { sponsors, members } = fixtures(["members", "sponsors"]);
-  beforeAll(async () => {
-    await defineSchema(
-      { members: canonicalSchema.members, sponsors: canonicalSchema.sponsors } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Sponsor);
   registerModel(Member);
 
@@ -2523,12 +2398,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { authors } = fixtures(["authors", "essays"]);
-  beforeAll(async () => {
-    await defineSchema(
-      { authors: canonicalSchema.authors, essays: canonicalSchema.essays } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Author);
   registerModel(Essay);
 
@@ -2560,16 +2429,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { posts, taggings } = fixtures(["posts", "tags", "taggings"]);
-  beforeAll(async () => {
-    await defineSchema(
-      {
-        posts: canonicalSchema.posts,
-        tags: canonicalSchema.tags,
-        taggings: canonicalSchema.taggings,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Post);
   registerModel(SpecialPost);
   registerModel(Tag);
@@ -2608,16 +2467,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { jobs, references, people } = fixtures(["jobs", "references", "people"]);
-  beforeAll(async () => {
-    await defineSchema(
-      {
-        jobs: canonicalSchema.jobs,
-        references: canonicalSchema.references,
-        people: canonicalSchema.people,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Job);
   registerModel(Reference);
   registerModel(Person);
@@ -2785,17 +2634,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { authors } = fixtures(["authors", "posts", "comments"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   enableSti(Post);
   enableSti(Comment);
   registerModel(Author);
@@ -2861,17 +2699,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { posts } = fixtures(["authors", "posts", "comments"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Author);
   enableSti(Post);
   registerModel(Post);
@@ -2924,22 +2751,6 @@ describe("EagerAssociationTest", () => {
     "taggings",
     "tags",
   ]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        people: canonicalSchema.people,
-        readers: canonicalSchema.readers,
-        author_favorites: canonicalSchema.author_favorites,
-        taggings: canonicalSchema.taggings,
-        tags: canonicalSchema.tags,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   enableSti(Post);
   registerModel(Author);
   registerModel(Post);
@@ -3072,17 +2883,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { members } = fixtures(["members", "memberships", "clubs"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        members: canonicalSchema.members,
-        memberships: canonicalSchema.memberships,
-        clubs: canonicalSchema.clubs,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Member);
   enableSti(Membership);
   registerModel(Membership);
@@ -3103,16 +2903,6 @@ describe("EagerAssociationTest", () => {
 // ==========================================================================
 describe("EagerAssociationTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        companies: canonicalSchema.companies,
-        accounts: canonicalSchema.accounts,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Company);
   enableSti(Company);
   registerModel(Firm);
@@ -3160,26 +2950,6 @@ describe("EagerAssociationTest", () => {
     "memberships",
     "clubs",
   ]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categories: canonicalSchema.categories,
-        categories_posts: canonicalSchema.categories_posts,
-        categorizations: canonicalSchema.categorizations,
-        developers: canonicalSchema.developers,
-        projects: canonicalSchema.projects,
-        developers_projects: canonicalSchema.developers_projects,
-        members: canonicalSchema.members,
-        memberships: canonicalSchema.memberships,
-        clubs: canonicalSchema.clubs,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Post);
   registerModel(Author);
   enableSti(Comment);
