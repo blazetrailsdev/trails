@@ -15,8 +15,10 @@ import {
   makeEncryptedBookWithSerializedFirstBinary,
   makeEncryptedBookWithSerializedSecondBinary,
   makeEncryptedBookWithCustomCompressor,
+  makeEncryptedTrafficLight,
   makeEncryptedTrafficLightWithStoreState,
-  makeFreshModel,
+  makeEncryptedBookNormalizedFirst,
+  makeEncryptedBookNormalizedSecond,
   makeKeyProvider,
   assertEncryptedAttribute,
   ciphertextFor,
@@ -132,15 +134,21 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("can configure a custom key provider on a per-record-class basis through the :key_provider option", async () => {
     const keyProvider = makeKeyProvider("custom-post-body-key-provider-32b!!");
-    // Use makeFreshModel to avoid the idempotency guard that skips re-encrypting
-    // an attribute already wrapped with EncryptedAttributeType.
-    const Post = await makeFreshModel(await freshAdapter(), "posts", {
-      id: "integer",
-      title: "string",
-      body: "string",
-    });
-    Post.encrypts("title");
-    Post.encrypts("body", { keyProvider });
+    // Fresh anonymous subclass on the canonical `posts` table (Rails'
+    // `Class.new(Post) { encrypts ... }`), which dodges the idempotency guard
+    // that skips re-encrypting an already-wrapped attribute.
+    const adp = await freshAdapter();
+    const Post = class extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+        this.encrypts("title");
+        this.encrypts("body", { keyProvider });
+      }
+    } as any;
 
     const post = await Post.create({ title: "The Starfleet is here!", body: "take cover!" });
     await assertEncryptedAttribute(post, "body", "take cover!");
@@ -152,11 +160,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("can configure a custom key on a per-record-class basis through the :key option", async () => {
     const customKey = "a-custom-key-for-author-32bytes!!";
-    const Author = await makeFreshModel(await freshAdapter(), "authors", {
-      id: "integer",
-      name: "string",
-    });
-    Author.encrypts("name", { key: customKey });
+    const adp = await freshAdapter();
+    const Author = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+        this.encrypts("name", { key: customKey });
+      }
+    } as any;
 
     const author = await Author.create({ name: "Stephen King" });
     await assertEncryptedAttribute(author, "name", "Stephen King");
@@ -312,10 +325,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Declare the model BEFORE configuring supportSha1ForNonDeterministicEncryption.
     // Global previous schemes must be resolved lazily (at previousTypes access time),
     // not eagerly at encrypts() call time — mirrors Rails' lazy previous_schemes behavior.
-    const Post = await makeFreshModel(await freshAdapter(), "posts", {
-      id: "integer",
-      title: "string",
-    });
+    const adp = await freshAdapter();
+    const Post = class extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    } as any;
     Post.encrypts("title");
 
     configureEncryption({ primaryKey: "the primary key", keyDerivationSalt: "the salt" });
@@ -335,27 +353,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts serialized attributes", async () => {
-    // `attribute("settings", "json")` registers a JSON cast type; `encrypts("settings")`
-    // wraps it in EncryptedAttributeType so the serialized JSON string is encrypted.
-    const adp = await freshAdapter();
-    const Article = await makeFreshModel(adp, "to_be_linked_users", {
-      id: "integer",
-      settings: "json",
-    });
-    Article.encrypts("settings");
-    new Article();
+    // Rides EncryptedTrafficLight (traffic_lights, `state` serialized as an
+    // Array then encrypted), mirroring Rails' EncryptedTrafficLight fixture.
+    const states = ["green", "red"];
+    const TrafficLight = makeEncryptedTrafficLight(await freshAdapter());
+    const trafficLight = await TrafficLight.create({ state: states, long_state: states });
 
-    const settings = { theme: "dark", font_size: 16 };
-    const article = await Article.create({ settings });
-
-    // The DB value is a ciphertext, not the raw JSON string.
-    const dbValue = article._attributes.valuesForDatabase()["settings"] as string;
-    expect(typeof dbValue).toBe("string");
-    expect(dbValue).not.toBe(JSON.stringify(settings));
-
-    // Round-trip: the object is decrypted and deserialized on read.
-    const reloaded = await Article.find(article.id);
-    expect(reloaded.settings).toEqual(settings);
+    await assertEncryptedAttribute(trafficLight, "state", states);
   });
 
   it("encrypts serialized attributes where encrypts is declared first", async () => {
@@ -541,22 +545,29 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
 
     const adp = await freshAdapter();
-    const PostSha1 = await makeFreshModel(adp, "posts", {
-      id: "integer",
-      title: "string",
-      body: "string",
-    });
-    PostSha1.encrypts("title", { keyProvider: keyProviderSha1 });
+    const PostSha1 = class extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+        this.encrypts("title", { keyProvider: keyProviderSha1 });
+      }
+    } as any;
     new PostSha1();
     await PostSha1.create({ title: "Post 1", body: "body" });
 
-    const PostSha256 = await makeFreshModel(adp, "posts", {
-      id: "integer",
-      title: "string",
-      body: "string",
-    });
-    PostSha256._tableName = PostSha1._tableName;
-    PostSha256.encrypts("title", { keyProvider: keyProviderSha256 });
+    const PostSha256 = class extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adp;
+        this.encrypts("title", { keyProvider: keyProviderSha256 });
+      }
+    } as any;
     new PostSha256();
 
     const posts = await PostSha256.all();
@@ -598,6 +609,34 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const overridingInstance = found!.becomes(OverridingBook);
     expect(overridingInstance.name).toBe("Dune-overridden");
   });
+
+  it("when ignore_case: true is declared before the attributes, the original_<name> reader still decrypts (replay-safe)", async () => {
+    const adapter = await freshAdapter();
+    // Declare `encrypts` BEFORE the attribute definitions exist, so both `name`
+    // and its `original_name` counterpart are buffered and only wrapped when the
+    // defs appear — the replay path. If the original_<name> encrypted type is
+    // lost on that replay (the regression this guards), its reader returns raw
+    // ciphertext instead of the decrypted, case-preserved value.
+    const Book = class extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+      }
+    } as unknown as typeof Base & {
+      create: (a: object) => Promise<any>;
+      find: (id: any) => Promise<any>;
+    };
+
+    const book = await Book.create({ name: "Dune" });
+    await assertEncryptedAttribute(book, "original_name", "Dune");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
   it("binary data can be encrypted", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
@@ -675,24 +714,24 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts normalized data", async () => {
-    // Both NormalizedFirst and NormalizedSecond use downcase:true normalization.
-    // Ride the canonical `encrypted_books` string columns `name` and
-    // `original_name` (the fresh model just needs two independently-encryptable
-    // string columns; canonical `logo` is binary, whose text-ciphertext round
-    // trip is a separate, tracked impl gap — see the serialized-binary skip).
+    // Rides EncryptedBookNormalizedFirst/Second (encrypted_books, `name` + `logo`),
+    // mirroring Rails. Rails also passes `logo: "DUNE"` and asserts it normalizes
+    // to "dune", but the encrypted binary `logo` column can't round-trip a text
+    // ciphertext on PG/MariaDB (see the `serialized binary data can be encrypted`
+    // skip). Until that impl gap closes we ride only the `name` half; a persisted
+    // `logo` ciphertext would trip the record's reload, so it stays omitted.
+    // One adapter for both models: they share the canonical `encrypted_books`
+    // table, so re-installing the schema for a second adapter would reset the id
+    // sequence and collide with the first row's PK on PG.
     const adp = await freshAdapter();
-    const BookNormalized = await makeFreshModel(adp, "encrypted_books", {
-      id: "integer",
-      name: "string",
-      original_name: "string",
-    });
-    BookNormalized.encrypts("name", { deterministic: true, downcase: true });
-    BookNormalized.encrypts("original_name", { deterministic: true, downcase: true });
-    new BookNormalized();
-    const b1 = await BookNormalized.create({ name: "Book" });
-    await assertEncryptedAttribute(await BookNormalized.find(b1.id), "name", "book");
-    const b2 = await BookNormalized.create({ original_name: "Book" });
-    await assertEncryptedAttribute(await BookNormalized.find(b2.id), "original_name", "book");
+    let book = await makeEncryptedBookNormalizedFirst(adp).create({ name: "Book" });
+    await assertEncryptedAttribute(book, "name", "book");
+    // TRACKED-PENDING-CONVERGENCE (binary text-ciphertext round-trip):
+    // await assertEncryptedAttribute(book, "logo", "book");
+
+    book = await makeEncryptedBookNormalizedSecond(adp).create({ name: "Book" });
+    await assertEncryptedAttribute(book, "name", "book");
+    // await assertEncryptedAttribute(book, "logo", "book");
   });
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
@@ -764,10 +803,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // The DB column stores ciphertext (text), while the cast type is date.
     // In Rails, encrypted attribute columns are always text in the schema.
     const adp = await freshAdapter();
-    const BookDate = await makeFreshModel(adp, "encrypted_books", {
-      id: "integer",
-      name: "string",
-    });
+    const BookDate = class extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    } as any;
     await BookDate.create({ name: "bootstrap" }); // write triggers text column creation
     BookDate.attribute("name", "date"); // override cast type to date (DB stays text)
     BookDate.encrypts("name");
@@ -853,11 +896,12 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   });
 });
 
-// The eager check above defers at Base.encrypts static-init (columnNames() is []
-// before the adapter connects). This exercises the deferred re-check that runs
-// post-schema-load from applyPendingEncryptions, reading columns from the
-// reflected _attributeDefinitions rather than forcing a schema load.
-describe("EncryptableRecord.revalidatePreservedColumns — deferred original_<name> check", () => {
+// The ignore_case original_<name> requirement is checked at declaration time
+// against the columns known then (columnNames() forces a schema load when an
+// adapter is connected). These exercise requireOriginalColumnPresent directly
+// plus the full Base.encrypts → encryptAttribute → preserveOriginalEncrypted
+// wiring end-to-end.
+describe("EncryptableRecord — ignore_case original_<name> column requirement", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
 
   beforeEach(() => {
@@ -870,58 +914,39 @@ describe("EncryptableRecord.revalidatePreservedColumns — deferred original_<na
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // Mirrors the durable-path state after schema reflection: _encryptedAttributes
-  // holds the preserved pair; _attributeDefinitions holds whatever columns
-  // reflection wrote. `defs` maps column name → { virtual? }.
-  function modelAfterSchemaLoad(defs: Record<string, { virtual?: boolean }>) {
-    return {
-      _encryptedAttributes: new Set(["name", "original_name"]),
-      _attributeDefinitions: new Map(
-        Object.entries(defs).map(([name, def]) => [name, { name, ...def }]),
-      ),
-    } as any;
-  }
-
-  it("raises once columns are known and the original_<name> column is missing", () => {
-    const modelClass = modelAfterSchemaLoad({ name: {} });
-    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).toThrow(
-      /must create an additional column named 'original_name'/,
-    );
+  it("raises when columns are known and the original_<name> column is missing", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
+    ).toThrow(/must create an additional column named 'original_name'/);
   });
 
-  it("does not raise when the reflected original_<name> column is present", () => {
-    const modelClass = modelAfterSchemaLoad({ name: {}, original_name: {} });
-    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
+  it("does not raise when the original_<name> column is present", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", [
+        "id",
+        "name",
+        "original_name",
+      ]),
+    ).not.toThrow();
   });
 
-  it("still raises when original_<name> is only a virtual attribute (no backing column)", () => {
-    const modelClass = modelAfterSchemaLoad({ name: {}, original_name: { virtual: true } });
-    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).toThrow(
-      /must create an additional column named 'original_name'/,
-    );
+  it("defers (no raise) when no columns are known (schema not loaded yet)", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", []),
+    ).not.toThrow();
   });
 
-  it("does not require an original_<name> column for plain (non-ignoreCase) encrypted attrs", () => {
-    const modelClass = {
-      _encryptedAttributes: new Set(["email"]),
-      _attributeDefinitions: new Map([["email", { name: "email" }]]),
-    } as any;
-    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
-  });
-
-  it("defers (no raise) while the schema is unloaded and no columns are known", () => {
-    const modelClass = {
-      _encryptedAttributes: new Set(["name", "original_name"]),
-      _attributeDefinitions: new Map(),
-    } as any;
-    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
+  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
+    Configurable.config.supportUnencryptedData = true;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
+    ).not.toThrow();
   });
 
   // End-to-end: a real Base.encrypts(ignoreCase) on the canonical `authors`
-  // table (which has `name` but no `original_name`) must raise once the schema
-  // loads, exercising the full encrypts → encryptAttribute →
-  // applyPendingEncryptions → revalidatePreservedColumns wiring.
-  it("Base.encrypts ignoreCase raises ConfigurationError on schema load when original_<name> is missing", async () => {
+  // table (which has `name` but no `original_name`) must raise, exercising the
+  // full encrypts → encryptAttribute → preserveOriginalEncrypted wiring.
+  it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
     const adapter = await freshAdapter();
     expect(() => {
       const Model = class extends Base {

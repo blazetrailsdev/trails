@@ -3,7 +3,15 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "./index.js";
+import {
+  Base,
+  IrreversibleOrderError,
+  Range,
+  RecordNotFound,
+  registerModel,
+  SoleRecordExceeded,
+} from "./index.js";
+import { sql as arelSql } from "@blazetrails/arel";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
@@ -12,18 +20,28 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import {
+  assertQueriesCount,
+  assertQueriesMatch,
+  assertNoQueries,
+} from "./testing/query-assertions.js";
+import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 
 // ==========================================================================
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +
-// topics fixtures (RFC 0048 convergence). Ordinal-finder cluster
-// (finder_test.rb take/sole/first/second/third). The remaining clusters
-// (fourth/fifth/*-to-last/last/integer/exists/find-by/conditions) now ride the
-// canonical schema (canonical tables/columns, no bespoke defineSchema shape)
-// but remain thin ad-hoc coverage; faithful porting onto the real finder_test.rb
-// models/fixtures is tracked under RFC 0048.
+// topics fixtures (RFC 0048 convergence). The full ordinal/last cluster
+// (take/sole/first/second/third/fourth/fifth/*-to-last/last-bang and the
+// take/first/last-with-integer + irreversible-order tests) is a faithful port
+// against the real topics fixtures. The remaining clusters
+// (exists/find-by/conditions, and the posts/comments STI last/first-on-relation
+// pair) still ride the canonical schema (canonical tables/columns, no bespoke
+// defineSchema shape) but remain thin ad-hoc coverage; faithful porting of
+// those onto the real finder_test.rb models/fixtures is tracked under RFC 0048.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics } = fixtures(["topics"], { schema: canonicalSchema });
@@ -171,6 +189,207 @@ describe("FinderTest", () => {
     await expect(Topic.thirdBang()).rejects.toThrow(RecordNotFound);
     await expect(Topic.thirdBang()).rejects.toThrow("Couldn't find Topic");
   });
+
+  it("fourth", async () => {
+    expect((await Topic.fourth())!.title).toBe(topics("fourth").title);
+  });
+
+  it("fourth with offset", async () => {
+    expect(rid(await Topic.offset(1).fourth())).toBe(rid(topics("fifth")));
+  });
+
+  it("fourth have primary key order by default", async () => {
+    const expected = topics("fourth");
+    await expected.touch();
+    expect(rid(await Topic.fourth())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).fourth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).fourth())).toBe(rid(expected));
+  });
+
+  it("model class responds to fourth bang", async () => {
+    expect(await Topic.fourthBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.fourthBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.fourthBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("fifth", async () => {
+    expect((await Topic.fifth())!.title).toBe(topics("fifth").title);
+  });
+
+  it("fifth with offset", async () => {
+    expect(rid(await Topic.offset(0).fifth())).toBe(rid(topics("fifth")));
+  });
+
+  it("fifth have primary key order by default", async () => {
+    const expected = topics("fifth");
+    await expected.touch();
+    expect(rid(await Topic.fifth())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).fifth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).fifth())).toBe(rid(expected));
+  });
+
+  it("model class responds to fifth bang", async () => {
+    expect(await Topic.fifthBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.fifthBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.fifthBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("second to last", async () => {
+    expect((await Topic.secondToLast())!.title).toBe(topics("fourth").title);
+
+    // test with offset
+    expect(rid(await Topic.offset(1).secondToLast())).toBe(rid(topics("fourth")));
+    expect(rid(await Topic.offset(2).secondToLast())).toBe(rid(topics("fourth")));
+    expect(rid(await Topic.offset(3).secondToLast())).toBe(rid(topics("fourth")));
+    expect(await Topic.offset(4).secondToLast()).toBeNull();
+    expect(await Topic.offset(5).secondToLast()).toBeNull();
+
+    // test with limit
+    expect(await Topic.limit(1).second()).toBeNull();
+    expect(await Topic.limit(1).secondToLast()).toBeNull();
+  });
+
+  it("second to last have primary key order by default", async () => {
+    const expected = topics("fourth");
+    await expected.touch();
+    expect(rid(await Topic.secondToLast())).toBe(rid(expected));
+  });
+
+  it("model class responds to second to last bang", async () => {
+    expect(await Topic.secondToLastBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.secondToLastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.secondToLastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("third to last", async () => {
+    expect((await Topic.thirdToLast())!.title).toBe(topics("third").title);
+
+    // test with offset
+    expect(rid(await Topic.offset(1).thirdToLast())).toBe(rid(topics("third")));
+    expect(rid(await Topic.offset(2).thirdToLast())).toBe(rid(topics("third")));
+    expect(await Topic.offset(3).thirdToLast()).toBeNull();
+    expect(await Topic.offset(4).thirdToLast()).toBeNull();
+    expect(await Topic.offset(5).thirdToLast()).toBeNull();
+
+    // test with limit
+    expect(await Topic.limit(1).third()).toBeNull();
+    expect(await Topic.limit(1).thirdToLast()).toBeNull();
+    expect(await Topic.limit(2).third()).toBeNull();
+    expect(await Topic.limit(2).thirdToLast()).toBeNull();
+  });
+
+  it("third to last have primary key order by default", async () => {
+    const expected = topics("third");
+    await expected.touch();
+    expect(rid(await Topic.thirdToLast())).toBe(rid(expected));
+  });
+
+  it("model class responds to third to last bang", async () => {
+    expect(await Topic.thirdToLastBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.thirdToLastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.thirdToLastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("nth to last with order uses limit", async () => {
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Topic.secondToLast();
+      },
+    );
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.updated_at"))} DESC LIMIT`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Topic.order("updated_at").secondToLast();
+      },
+    );
+  });
+
+  it("last bang present", async () => {
+    const record = await Topic.where("title = 'The Second Topic of the day'").lastBang();
+    expect(rid(record)).toBe(rid(topics("second")));
+  });
+
+  it("last bang missing", async () => {
+    await expect(Topic.where("title = 'This title does not exist'").lastBang()).rejects.toThrow(
+      RecordNotFound,
+    );
+    await expect(Topic.where("title = 'This title does not exist'").lastBang()).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("model class responds to last bang", async () => {
+    expect(rid(await Topic.lastBang())).toBe(rid(topics("fifth")));
+    await Topic.deleteAll();
+    await expect(Topic.lastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.lastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("take and first and last with integer should return an array", async () => {
+    expect(Array.isArray(await Topic.take(5))).toBe(true);
+    expect(Array.isArray(await Topic.first(5))).toBe(true);
+    expect(Array.isArray(await Topic.last(5))).toBe(true);
+  });
+
+  it("take and first and last with integer should use sql limit", async () => {
+    const limitRe = /LIMIT|ROWNUM <=|FETCH FIRST/;
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.take(3);
+    });
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.first(2);
+    });
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.last(5);
+    });
+  });
+
+  it("last with integer and order should keep the order", async () => {
+    const all = await Topic.order("title");
+    const expected = all.slice(-2).map(rid);
+    const got = (await Topic.order("title").last(2)).map(rid);
+    expect(got).toEqual(expected);
+  });
+
+  it("last with integer and order should use sql limit", async () => {
+    const relation = Topic.order("title");
+    await assertQueriesCount(1, false, async () => {
+      await relation.last(5);
+    });
+    expect(relation.isLoaded).toBe(false);
+  });
+
+  it("last with integer and reorder should use sql limit", async () => {
+    const relation = Topic.reorder("title");
+    await assertQueriesCount(1, false, async () => {
+      await relation.last(5);
+    });
+    expect(relation.isLoaded).toBe(false);
+  });
+
+  it("last on loaded relation should not use sql", async () => {
+    const relation = Topic.limit(10);
+    await relation.load();
+    await assertNoQueries(false, async () => {
+      await relation.last();
+      await relation.last(2);
+    });
+  });
+
+  it("last with irreversible order", async () => {
+    await expect(Topic.order(arelSql("coalesce(author_name, title)")).last()).rejects.toThrow(
+      IrreversibleOrderError,
+    );
+  });
 });
 
 // ==========================================================================
@@ -240,182 +459,6 @@ describe("FinderTest", () => {
       }
     }
     expect(await Topic.exists()).toBe(false);
-  });
-
-  it("fourth", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fourth with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 6; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().offset(1).fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fourth have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fifth", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("fifth with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 7; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().offset(1).fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("fifth have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("second to last have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const stl = await Topic.all().secondToLast();
-    expect(stl).not.toBeNull();
-  });
-
-  it("third to last have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const ttl = await Topic.all().thirdToLast();
-    expect(ttl).not.toBeNull();
-  });
-
-  it("last bang present", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().lastBang();
-    expect(record).not.toBeNull();
-  });
-
-  it("last bang missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.all().lastBang()).rejects.toThrow(RecordNotFound);
-    await expect(Topic.all().lastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("take and first and last with integer should return an array", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const takeResult = await Topic.all().take(2);
-    expect(Array.isArray(takeResult)).toBe(true);
-    const firstResult = await Topic.all().first(2);
-    expect(Array.isArray(firstResult)).toBe(true);
-    const lastResult = await Topic.all().last(2);
-    expect(Array.isArray(lastResult)).toBe(true);
-  });
-
-  it("take and first and last with integer should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const takeResult = await Topic.all().take(2);
-    expect((takeResult as any[]).length).toBe(2);
-  });
-
-  it("last with integer and order should keep the order", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const results = await Topic.order("title").last(2);
-    expect(Array.isArray(results)).toBe(true);
-  });
-
-  it("last on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const last = await Topic.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("first on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const first = await Topic.all().offset(1).first();
-    expect(first).not.toBeNull();
   });
 
   it("find by one attribute", async () => {
@@ -654,55 +697,6 @@ describe("FinderTest", () => {
     expect((found as Topic).title).toBe(value);
   });
 
-  it("model class responds to fourth bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().fourthBang).toBe("function");
-    await expect(Topic.all().fourthBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to fifth bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().fifthBang).toBe("function");
-    await expect(Topic.all().fifthBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().lastBang).toBe("function");
-  });
-
-  it("model class responds to second to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().secondToLastBang).toBe("function");
-    await expect(Topic.all().secondToLastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to third to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().thirdToLastBang).toBe("function");
-    await expect(Topic.all().thirdToLastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
   it("unexisting record exception handling", async () => {
     class Topic extends Base {
       static {
@@ -759,39 +753,6 @@ describe("FinderTest", () => {
     await Topic.create({ title: "target" });
     const found = await Topic.where({ title: "target" }).first();
     expect(found).not.toBeNull();
-  });
-
-  it("last with integer and reorder should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const results = await Topic.order("title").last(2);
-    expect(Array.isArray(results)).toBe(true);
-  });
-
-  it("last with integer and order should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const results = await Topic.order("title").last(2);
-    expect((results as any[]).length).toBeLessThanOrEqual(2);
-  });
-
-  it("nth to last with order uses limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const stl = await Topic.all().secondToLast();
-    expect(stl !== undefined).toBe(true);
   });
 
   it("find by two attributes but passing only one", async () => {
@@ -964,21 +925,6 @@ describe("FinderTest", () => {
     }
     const result = await Topic.findBy({ id: 99999999 });
     expect(result).toBeNull();
-  });
-
-  it("last on loaded relation should not use sql", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const rel = Topic.all();
-    await rel.load();
-    expect(rel.isLoaded).toBe(true);
-    const last = await rel.last();
-    expect(last).not.toBeNull();
   });
 
   it("find by and where consistency with active record instance", async () => {
@@ -1715,24 +1661,6 @@ describe("FinderTest", () => {
     await expect(Post.find(99999999)).rejects.toThrow();
   });
 
-  it("second to last", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    await Post.create({ title: "c" });
-    const stl = await Post.all().secondToLast();
-    expect(stl).not.toBeNull();
-  });
-
-  it("third to last", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    await Post.create({ title: "c" });
-    const ttl = await Post.all().thirdToLast();
-    expect(ttl).not.toBeNull();
-  });
-
   it("implicit order for model without primary key", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "no_pk" });
@@ -2052,12 +1980,6 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it("last with irreversible order", async () => {
-    await Post.create({ title: "a" });
-    const last = await Post.all().last();
-    expect(last).not.toBeNull();
-  });
-
   it("first have determined order by default", async () => {
     await Post.create({ title: "a" });
     const first = await Post.first();
@@ -2256,6 +2178,82 @@ describe("FinderTest", () => {
     await book.destroy();
     const included = await CpkBook.all().include(book);
     expect(included).toBe(false);
+  });
+});
+
+// ==========================================================================
+// FinderTest — *_on_relation_with_limit_and_offset ride the canonical
+// posts -> comments STI chain (posts(:sti_comments) with 5 comments), matching
+// finder_test.rb:1055-1085. Faithful port of the two tests deferred from
+// faithful-port-finder-test-synthetic-clusters.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { posts } = fixtures(["posts", "comments"], { schema: canonicalSchema });
+  registerModel(CanonicalPost);
+  registerModel(CanonicalComment);
+
+  const rid = (r: unknown) => (r as { id: number }).id;
+  const idOf = (r: unknown) => (r == null ? r : rid(r));
+  const idsOf = (r: unknown) => (r as unknown[]).map((x) => rid(x));
+
+  it("last on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
+
+    expect(idOf((await comments.offset(2)).at(-1))).toEqual(idOf(await comments.offset(2).last()));
+    expect(idsOf((await comments.offset(2)).slice(-2))).toEqual(
+      idsOf(await comments.offset(2).last(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(-3))).toEqual(
+      idsOf(await comments.offset(2).last(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
+  });
+
+  it("first on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
+
+    expect(idOf((await comments.offset(2))[0])).toEqual(idOf(await comments.offset(2).first()));
+    expect(idsOf((await comments.offset(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.offset(2).first(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.offset(2).first(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
   });
 });
 

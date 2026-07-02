@@ -18,7 +18,7 @@
  * now wired on the canonical `Book` model (EnumType supports string/boolean/nil
  * values).
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
@@ -520,14 +520,13 @@ describe("EnumTest", () => {
     expect((tlg as any).isInEnglish()).toBe(true);
   });
 
-  // In-memory `new Book()` does not seed the DB column default (`status` → 0)
-  // through EnumType#cast, so the label isn't applied until the row round-trips.
-  it.skip("uses default value from database on initialization", () => {
+  it("uses default value from database on initialization", () => {
     expect((new Book() as any).isProposed()).toBe(true);
   });
 
-  // Rails: default `cover` ("hard") from the DB — `cover` enum not on Book.
-  it.skip("uses default value from database on initialization when using custom mapping", () => {});
+  it("uses default value from database on initialization when using custom mapping", () => {
+    expect((new Book() as any).isHard()).toBe(true);
+  });
 
   it("data type of Enum type", () => {
     expect(Book.typeForAttribute("status").type()).toBe("integer");
@@ -636,12 +635,62 @@ describe("EnumTest", () => {
   });
   it.skip("serializable? with large number label", () => {});
 
-  // Rails: logger-warning surface for negative-scope clashes — covered
-  // behaviorally in enum.trails.test.ts (detectNegativeEnumConditionsBang).
-  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {});
-  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {});
+  // Rails routes the clash message through the model logger; trails routes it
+  // through the `setEnumWarn` sink (default `console.warn`). The exact wording
+  // diverges, so we assert on the warning behavior rather than Rails' string.
+  it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { sent: 0, notSent: 1 });
+        }
+      }
+      void K;
+      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { notSent: 0, sent: 1 });
+        }
+      }
+      void K;
+      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // Rails: `boolean_status` / distinct-clash surface not yet expressible.
   it.skip("enum doesn't log a warning if no clashes detected", () => {});
-  it.skip("enum doesn't log a warning if opting out of scopes", () => {});
+
+  it("enum doesn't log a warning if opting out of scopes", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { sent: 0, notSent: 1 }, { scopes: false });
+        }
+      }
+      void K;
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
 
   // Rails: `type_for_attribute` on an enum with an undeclared / explicit type.
   it.skip("raises for attributes with undeclared type", () => {});
