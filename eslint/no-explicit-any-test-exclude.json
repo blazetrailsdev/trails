@@ -160,7 +160,6 @@
   "packages/activerecord/src/delegated-type.test.ts",
   "packages/activerecord/src/dirty.test.ts",
   "packages/activerecord/src/encryption-hooks.test.ts",
-  "packages/activerecord/src/encryption.test.ts",
   "packages/activerecord/src/encryption/concurrency.test.ts",
   "packages/activerecord/src/encryption/configurable.test.ts",
   "packages/activerecord/src/encryption/contexts.test.ts",
