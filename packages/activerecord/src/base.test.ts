@@ -469,14 +469,17 @@ describe("BasicsTest", () => {
   });
 
   it("find by slug", async () => {
+    // Rails: assert_equal Topic.find("1-meowmeow"), Topic.find(1) — the integer
+    // primary key cast strips the non-numeric slug suffix.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    await Topic.create({ title: "slug-test" });
-    const result = await Topic.findBy({ title: "slug-test" });
-    expect(result).not.toBeNull();
+    const t = await Topic.create({ title: "The First Topic" });
+    const bySlug = (await Topic.find(`${t.id}-meowmeow`)) as any;
+    const byId = (await Topic.find(t.id)) as any;
+    expect(bySlug.id).toBe(byId.id);
   });
 
   it("group weirds by from", () => {
@@ -490,14 +493,16 @@ describe("BasicsTest", () => {
   });
 
   it("preserving date objects", async () => {
+    // Rails: assert_kind_of(Date, Topic.find(1).last_read) — a `date` column
+    // round-trips as a Date (Temporal.PlainDate in trails), not a datetime.
     class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const now = new Date();
-    const p = (await Topic.create({ title: "date-test" })) as any;
-    expect(p.id).toBeDefined();
+    const created = await Topic.create({ title: "date-test", last_read: "2004-06-24" });
+    const p = await Topic.find(created.id);
+    expect(p.readAttribute("last_read")).toBeInstanceOf(Temporal.PlainDate);
   });
 
   it("quoted table name after set table name", () => {
