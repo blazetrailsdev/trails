@@ -189,6 +189,12 @@ describe("Migrator trails extensions", () => {
 });
 
 describe("Migrator advisory lock wrapping", () => {
+  // Each `it` here leases its own adapter (with per-test lock stubs), so there is
+  // no shared instance to reset. Under one-schema every lease from
+  // createTestAdapter() is backed by the same canonical worker DB, so clearing
+  // the schema_migrations / internal_metadata rows through any lease clears the
+  // bookkeeping every test's own lease will observe — without this, version "1"
+  // recorded by one test persists and later migrate() calls no-op.
   beforeEach(async () => {
     await resetMigratorState(createTestAdapter());
   });
