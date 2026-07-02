@@ -13,6 +13,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
+import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
 import { EnumType } from "../enum.js";
@@ -341,12 +342,27 @@ function typeCastCalcBind(b: unknown): unknown {
 }
 
 function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
-  const visitor = rel._conn().visitor;
+  const conn = rel._conn() as {
+    visitor?: { compileWithBinds?(ast: unknown): [string, unknown[], boolean, boolean] };
+    toSql(m: unknown): string;
+    preparedStatements?: boolean;
+    bindParamsLength?(): number;
+  };
+  const visitor = conn.visitor;
   if (visitor?.compileWithBinds) {
     const [sql, rawBinds] = visitor.compileWithBinds(manager.ast);
-    return [sql, rawBinds.map(typeCastCalcBind)];
+    const binds = rawBinds.map(typeCastCalcBind);
+    // Mirrors Rails to_sql_and_binds (database_statements.rb:36-38): when the
+    // bind count exceeds the adapter's parameter cap, fall back to an inlined
+    // (unprepared) compile so the driver's variable limit isn't overflowed.
+    // Reachable via multi-value `IN`/`NOT IN` (`HomogeneousIn`) over large id
+    // arrays — see BindParameterTest "too many binds".
+    if (exceedsBindParamsLimit(conn, binds.length)) {
+      return [conn.toSql(manager), []];
+    }
+    return [sql, binds];
   }
-  return [rel._conn().toSql(manager), []];
+  return [conn.toSql(manager), []];
 }
 
 /**

@@ -150,9 +150,11 @@ describe("JoinDependency Arel node construction", () => {
     expect((eq.left as any).name).toBe("owner_id");
 
     // Second child: STI IN-list (Car has descendant ElectricCar, so
-    // type_condition produces an IN over [Car, ElectricCar]).
-    const inNode = and.children[1] as Nodes.In;
-    expect(inNode).toBeInstanceOf(Nodes.In);
+    // type_condition produces an IN over [Car, ElectricCar]). Rails builds this
+    // via `predicate_builder.build(sti_column, sti_names)` (inheritance.rb:326),
+    // whose multi-value array branch is an `Arel::Nodes::HomogeneousIn`.
+    const inNode = and.children[1] as Nodes.HomogeneousIn;
+    expect(inNode).toBeInstanceOf(Nodes.HomogeneousIn);
     expect((inNode.left as any).name).toBe("type");
 
     // The STI predicate is qualified by the join's table — the same Arel table

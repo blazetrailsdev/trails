@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
+import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import {
   ActiveRecordError,
@@ -5335,14 +5336,21 @@ export class Relation<T extends Base> {
     const v = this._arelVisitor();
     const [raw, binds, retryable, preparable] = v.compileWithBinds(node);
     this._lastSelectRetryable = retryable;
-    this._lastSelectBinds = this._typeCastBinds(binds);
-    this._lastSelectPreparable = preparable;
+    // Apply the same over-limit inline fallback the plain SELECT gets: a
+    // union/intersect/except operand can carry a large multi-value `IN`/`NOT IN`
+    // (`HomogeneousIn`) whose binds would otherwise overflow the parameter cap.
+    const compound = this._applyBindLimitFallback(
+      node,
+      raw,
+      this._typeCastBinds(binds),
+      preparable,
+    );
     // The set-operation visitors wrap the compound SELECT in `( ... )` for
     // embedded use (subquery / derived table). As a standalone statement
     // SQLite rejects the leading paren, so strip the single enclosing pair the
     // visitor added (operand-level parens for ORDER/LIMIT/OFFSET sides use no
     // inner space and are preserved).
-    return raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
+    return compound.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
   }
 
   /**
@@ -5792,7 +5800,34 @@ export class Relation<T extends Base> {
     const v = this._arelVisitor();
     const [sql, binds, retryable, preparable] = v.compileWithBinds(manager.ast);
     this._lastSelectRetryable = retryable;
-    this._lastSelectBinds = this._typeCastBinds(binds);
+    return this._applyBindLimitFallback(manager, sql, this._typeCastBinds(binds), preparable);
+  }
+
+  /**
+   * Rails' `to_sql_and_binds` over-limit fallback (`database_statements.rb:36-38`):
+   * when the compiled bind count exceeds the adapter's parameter cap, recompile
+   * inlined (unprepared) via `conn.toSql` so the driver's variable limit isn't
+   * overflowed. Stores `_lastSelectBinds`/`_lastSelectPreparable` and returns the
+   * SQL for either branch. Reachable via a large multi-value `IN`/`NOT IN`
+   * (`HomogeneousIn`), which now carries real binds instead of inlined literals.
+   */
+  private _applyBindLimitFallback(
+    node: unknown,
+    sql: string,
+    castBinds: unknown[],
+    preparable: boolean,
+  ): string {
+    const conn = this._conn() as {
+      toSql(m: unknown): string;
+      preparedStatements?: boolean;
+      bindParamsLength?(): number;
+    };
+    if (exceedsBindParamsLimit(conn, castBinds.length)) {
+      this._lastSelectBinds = [];
+      this._lastSelectPreparable = false;
+      return conn.toSql(node);
+    }
+    this._lastSelectBinds = castBinds;
     this._lastSelectPreparable = preparable;
     return sql;
   }

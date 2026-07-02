@@ -158,13 +158,13 @@ describe("PredicateBuilderTest", () => {
     it("builds IN for arrays", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildFromHash({ id: [1, 2, 3] });
-      expect(compile(node)).toMatch(/IN \(1, 2, 3\)/);
+      expect(compile(node)).toMatch(/IN \(\?, \?, \?\)/);
     });
 
     it("builds IN for Set values (mirrors Rails registering Set => ArrayHandler)", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildFromHash({ id: new Set([1, 2, 3]) });
-      expect(compile(node)).toMatch(/IN \(1, 2, 3\)/);
+      expect(compile(node)).toMatch(/IN \(\?, \?, \?\)/);
     });
 
     it("builds IN for Set values when a custom handler is also registered", () => {
@@ -173,7 +173,7 @@ describe("PredicateBuilderTest", () => {
         call: (attr, _v) => attr.eq(0),
       });
       const [node] = builder.buildFromHash({ id: new Set([4, 5]) });
-      expect(compile(node)).toMatch(/IN \(4, 5\)/);
+      expect(compile(node)).toMatch(/IN \(\?, \?\)/);
     });
 
     it("builds BETWEEN for ranges", () => {
@@ -241,13 +241,13 @@ describe("PredicateBuilderTest", () => {
     it("builds NOT IN for arrays", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildNegatedFromHash({ id: [1, 2, 3] });
-      expect(compile(node)).toMatch(/NOT IN \(1, 2, 3\)/);
+      expect(compile(node)).toMatch(/NOT IN \(\?, \?, \?\)/);
     });
 
     it("builds NOT IN for Set values in negated predicates", () => {
       const builder = new PredicateBuilder(table);
       const [node] = builder.buildNegatedFromHash({ id: new Set([1, 2]) });
-      expect(compile(node)).toMatch(/NOT IN \(1, 2\)/);
+      expect(compile(node)).toMatch(/NOT IN \(\?, \?\)/);
     });
 
     it("builds correct negation for exclusive ranges", () => {

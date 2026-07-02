@@ -42549,13 +42549,6 @@
     "package": "activerecord",
     "tsFile": "relation/predicate-builder/array-handler.ts",
     "rubyName": "call",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder/array-handler.ts",
-    "rubyName": "call",
     "call": "or",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -51538,13 +51531,6 @@
     "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_GreaterThanOrEqual",
     "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_HomogeneousIn",
-    "call": "quote",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

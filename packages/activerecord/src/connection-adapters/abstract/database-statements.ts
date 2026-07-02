@@ -39,6 +39,7 @@ import {
 import type { Quoting } from "./quoting-interface.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
+import { exceedsBindParamsLimit } from "./database-limits.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
 import { queryTransformers } from "../../query-transformers.js";
@@ -267,6 +268,19 @@ export function toSqlAndBinds(
       const castedBinds = extractedBinds.map((b) =>
         b instanceof ModelAttribute ? b.valueForDatabase : b,
       );
+      // Mirrors Rails database_statements.rb:36-38: when the bind count exceeds
+      // the adapter's parameter cap, recompile unprepared so every value inlines
+      // via SubstituteBinds instead of overflowing the driver's variable limit.
+      // Reachable now that multi-value `IN`/`NOT IN` build `HomogeneousIn` (real
+      // binds) rather than an inlined `Arel::Nodes::In` of Quoted literals.
+      if (
+        exceedsBindParamsLimit(
+          this as { preparedStatements?: boolean; bindParamsLength?(): number },
+          castedBinds.length,
+        )
+      ) {
+        return [compileInlined(visitor, node, this), [], false, compiledAllowRetry];
+      }
       return [sql, castedBinds, compiledPreparable, compiledAllowRetry];
     }
     const sql = (node as any).toSql();
