@@ -122,11 +122,20 @@ describe("CoreTest", () => {
     });
   });
 
-  // Rails introspects `@find_by_statement_cache` size via
-  // initialize_find_by_cache. trails exposes no equivalent statement-cache
-  // surface to assert against.
-  // Tracked: 0023-surfaced-deviations/find-by-statement-cache-introspection.
-  it.skip("find by cache does not duplicate entries", () => {});
+  it("find by cache does not duplicate entries", async () => {
+    Topic.initializeFindByCache();
+    const usingPreparedStatements = (Topic.connection as { preparedStatements: boolean })
+      .preparedStatements;
+    const topicFindByCache = Topic._findByStatementCache!.get(usingPreparedStatements)!;
+
+    const before = topicFindByCache.size;
+    await Topic.find(1);
+    expect(topicFindByCache.size).toBe(before + 1);
+
+    const afterFind = topicFindByCache.size;
+    await Topic.findBy({ id: 1 });
+    expect(topicFindByCache.size).toBe(afterFind);
+  });
 
   it("composite pk models equality", () => {
     expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 2] }))).toBe(true);
