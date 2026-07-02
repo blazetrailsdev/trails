@@ -2459,13 +2459,18 @@ export class MigrationContext {
       .map((c) => {
         const isExpr = /\W/.test(c);
         let col = isExpr ? c : this.connection.quoteIdentifier(c);
+        // MySQL sub-part prefix length (`col(n)`) precedes the sort direction,
+        // matching the mysql SchemaCreation visitor (`col(n) DESC`). Length is a
+        // MySQL-only DDL feature; the descending sort order applies on every
+        // adapter that surfaces it, so it must be emitted here for MySQL too —
+        // Rails' companies indexes are `order: :desc` and MySQL/MariaDB persist
+        // that direction (SHOW KEYS `Collation = "D"`).
         if (an === "mysql") {
           const len = lengthFor(c);
           if (len != null) col += `(${len})`;
-        } else {
-          const ord = options?.order?.[c];
-          if (ord) col += ` ${ord.toUpperCase()}`;
         }
+        const ord = options?.order?.[c];
+        if (ord) col += ` ${ord.toUpperCase()}`;
         return col;
       })
       .join(", ");
