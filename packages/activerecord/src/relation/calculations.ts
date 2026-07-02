@@ -13,6 +13,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
+import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
 import { EnumType } from "../enum.js";
@@ -356,8 +357,7 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
     // (unprepared) compile so the driver's variable limit isn't overflowed.
     // Reachable via multi-value `IN`/`NOT IN` (`HomogeneousIn`) over large id
     // arrays — see BindParameterTest "too many binds".
-    const limit = typeof conn.bindParamsLength === "function" ? conn.bindParamsLength() : null;
-    if (conn.preparedStatements && limit != null && binds.length > limit) {
+    if (exceedsBindParamsLimit(conn, binds.length)) {
       return [conn.toSql(manager), []];
     }
     return [sql, binds];
