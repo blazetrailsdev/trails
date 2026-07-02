@@ -124,8 +124,9 @@ describe("CoreTest", () => {
 
   it("find by cache does not duplicate entries", async () => {
     Topic.initializeFindByCache();
-    const usingPreparedStatements = (Topic as any).connection.preparedStatements;
-    const topicFindByCache = (Topic as any)._findByStatementCache.get(usingPreparedStatements);
+    const usingPreparedStatements = (Topic.connection as { preparedStatements: boolean })
+      .preparedStatements;
+    const topicFindByCache = Topic._findByStatementCache!.get(usingPreparedStatements)!;
 
     const before = topicFindByCache.size;
     await Topic.find(1);
