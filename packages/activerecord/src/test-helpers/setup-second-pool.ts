@@ -73,6 +73,13 @@ export async function setupSecondPool(): Promise<void> {
   await ss.dropTable("colleges", { ifExists: true });
   await ss.dropTable("professors", { ifExists: true });
 
-  await defineSchema(arunit2, ARUNIT2_SCHEMA, { dropExisting: true });
-  await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true });
+  // `force: true` so these actually issue DDL under AR_ONE_SCHEMA=1, where a
+  // plain defineSchema is a no-op. The one-schema boot lays the canonical tables
+  // into the MAIN per-worker pool only; the `arunit2` second pool never sees them,
+  // so its (canonical) `colleges`/`courses`/`professors`/`courses_professors` must
+  // be created here. The primary pool re-lays `entrants` cleanly; the canonical
+  // tables this helper dropped from it above are restored by `repairWorkerSchema`
+  // at the next file's boot, so the main pool stays truncate-reset-clean.
+  await defineSchema(arunit2, ARUNIT2_SCHEMA, { dropExisting: true, force: true });
+  await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true, force: true });
 }
