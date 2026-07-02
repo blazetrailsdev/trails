@@ -9,16 +9,7 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Configurable } from "./encryption/configurable.js";
 import { Decryption as DecryptionError } from "./encryption/errors.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
-
-const TEST_SCHEMA = {
-  users: {
-    name: "string",
-    ssn: "string",
-    secret: "string",
-    token: "string",
-    email: "string",
-  },
-} as const;
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 class TestEncryptor implements EncryptorLike {
   constructor(private readonly map: Record<string, string>) {}
@@ -49,42 +40,44 @@ class TestEncryptor implements EncryptorLike {
 setupFixtures();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  await defineSchema(TEST_SCHEMA);
+  await defineSchema({ encrypted_books: canonicalSchema.encrypted_books });
 });
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
+        this.attribute("original_name", "string");
         this.attribute("name", "string");
-        this.attribute("ssn", "string");
-        this.encrypts("ssn");
+        this.encrypts("name");
       }
     }
 
-    const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
+    const user = await User.create({ original_name: "Alice", name: "123-45-6789" });
     // Reading returns plaintext (decrypted) value
-    expect(user.ssn).toBe("123-45-6789");
+    expect(user.name).toBe("123-45-6789");
 
     // The serialized value (for DB) should be encrypted
     const dbValues = user._attributes.valuesForDatabase();
-    expect(dbValues.ssn).not.toBe("123-45-6789");
+    expect(dbValues.name).not.toBe("123-45-6789");
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
+        this.attribute("original_name", "string");
         this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.encrypts("secret");
+        this.encrypts("name");
       }
     }
 
-    const created = await User.create({ name: "Alice", secret: "my-secret-data" });
+    const created = await User.create({ original_name: "Alice", name: "my-secret-data" });
     const loaded = await User.find(created.id);
-    expect(loaded.secret).toBe("my-secret-data");
+    expect(loaded.name).toBe("my-secret-data");
   });
 
   it("supports custom encryptor", async () => {
@@ -93,32 +86,34 @@ describe("encrypts()", () => {
       decrypt: (v: string) => v.replace(/^ENC:/, ""),
     };
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
-        this.attribute("token", "string");
-        this.encrypts("token", { encryptor: customEncryptor });
+        this.attribute("name", "string");
+        this.encrypts("name", { encryptor: customEncryptor });
       }
     }
 
-    const user = await User.create({ token: "abc123" });
-    expect(user.token).toBe("abc123");
+    const user = await User.create({ name: "abc123" });
+    expect(user.name).toBe("abc123");
     // Serialized value should use custom encryptor
     const dbValues = user._attributes.valuesForDatabase();
-    expect(dbValues.token).toBe("ENC:abc123");
+    expect(dbValues.name).toBe("ENC:abc123");
   });
 
   it("wires scheme options (deterministic, downcase) through to the attribute type", async () => {
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
-        this.attribute("email", "string");
-        this.encrypts("email", { deterministic: true, downcase: true });
+        this.attribute("name", "string");
+        this.encrypts("name", { deterministic: true, downcase: true });
       }
     }
 
     // Trigger construction so applyPendingEncryptions runs.
     new User();
-    const def = (User as any)._attributeDefinitions.get("email");
+    const def = (User as any)._attributeDefinitions.get("name");
     expect(def.type).toBeInstanceOf(EncryptedAttributeType);
     expect(def.type.deterministic).toBe(true);
     expect(def.type.scheme.downcase).toBe(true);
@@ -126,14 +121,15 @@ describe("encrypts()", () => {
 
   it("registers encrypted attributes on the class", async () => {
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
-        this.attribute("ssn", "string");
-        this.encrypts("ssn");
+        this.attribute("name", "string");
+        this.encrypts("name");
       }
     }
 
-    expect((User as any)._encryptedAttributes.has("ssn")).toBe(true);
+    expect((User as any)._encryptedAttributes.has("name")).toBe(true);
   });
 });
 
@@ -155,14 +151,15 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
     ];
 
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
-        this.attribute("email", "string");
-        this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
+        this.attribute("name", "string");
+        this.encrypts("name", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
     new User();
-    const type = (User as any)._attributeDefinitions.get("email")?.type as EncryptedAttributeType;
+    const type = (User as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(1);
 
     // legacy ciphertext falls back to previous scheme
@@ -175,14 +172,15 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
     ];
 
     class User extends Base {
+      static _tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
-        this.attribute("email", "string");
-        this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
+        this.attribute("name", "string");
+        this.encrypts("name", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
     new User();
-    const type = (User as any)._attributeDefinitions.get("email")?.type as EncryptedAttributeType;
+    const type = (User as any)._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     // non-deterministic attribute: deterministic global scheme is incompatible
     expect(type.previousTypes).toHaveLength(0);
   });
