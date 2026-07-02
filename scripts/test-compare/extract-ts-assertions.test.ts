@@ -230,3 +230,78 @@ describe("TS extractor assertion-kind collection", () => {
     expect(tsAssertionKinds(src)["copy table"]).toEqual(["toEqual", "toBeNull"]);
   });
 });
+
+/** Index a file's extracted tests by description → assertionValues. */
+function tsAssertionValues(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+  const info = extractTestsFromSource(source, relPath);
+  const out: Record<string, (string | null)[] | undefined> = {};
+  for (const tc of info.testCases) out[tc.description] = tc.assertionValues;
+  return out;
+}
+
+describe("TS extractor assertion-value collection", () => {
+  it("captures literal matcher arguments as tagged tokens, lockstep with kinds", () => {
+    const src = `
+      it("literals", () => {
+        expect(a).toEqual(5);
+        expect(b).toEqual("hi");
+        expect(c).toEqual(true);
+        expect(d).toBeNull();
+      });
+    `;
+    // toBeNull() has no argument → null slot; length matches assertionKinds.
+    expect(tsAssertionValues(src)["literals"]).toEqual(["n:5", "s:hi", "b:true", null]);
+  });
+
+  it("captures negative numeric literals", () => {
+    const src = `
+      it("neg", () => {
+        expect(a).toEqual(-3);
+      });
+    `;
+    expect(tsAssertionValues(src)["neg"]).toEqual(["n:-3"]);
+  });
+
+  it("folds null and undefined matcher args to the x:nil token", () => {
+    const src = `
+      it("nils", () => {
+        expect(a).toEqual(null);
+        expect(b).toEqual(undefined);
+      });
+    `;
+    expect(tsAssertionValues(src)["nils"]).toEqual(["x:nil", "x:nil"]);
+  });
+
+  it("emits null for a non-literal (variable/expression) matcher argument", () => {
+    const src = `
+      it("computed", () => {
+        expect(a).toEqual(expected);
+        expect(b).toEqual(1 + 2);
+        expect(c).toEqual(7);
+      });
+    `;
+    expect(tsAssertionValues(src)["computed"]).toEqual([null, null, "n:7"]);
+  });
+
+  it("captures values through helper expansion in lockstep with kinds", () => {
+    const src = `
+      function checkRow() {
+        expect(a).toEqual(1);
+        expect(b).toEqual(2);
+      }
+      it("delegates", () => {
+        checkRow();
+      });
+    `;
+    expect(tsAssertionValues(src)["delegates"]).toEqual(["n:1", "n:2"]);
+  });
+
+  it("emits null value for a helper callee kind", () => {
+    const src = `
+      it("callee", () => {
+        assertQueriesCount(2, () => {});
+      });
+    `;
+    expect(tsAssertionValues(src)["callee"]).toEqual([null]);
+  });
+});

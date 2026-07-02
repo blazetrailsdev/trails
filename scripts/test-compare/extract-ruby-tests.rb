@@ -311,6 +311,7 @@ class TestExtractor
       assertions: t[:assertions],
       assertionCount: t[:assertion_count],
       assertionKinds: t[:assertion_kinds],
+      assertionValues: t[:assertion_values],
     }, nil, body_gate: t[:body_gate])
   end
 
@@ -379,7 +380,7 @@ class TestExtractor
     return unless desc
 
     line = extract_line(node)
-    assertion_kinds = collect_assertion_kinds(node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -393,6 +394,7 @@ class TestExtractor
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
     }, node)
   end
 
@@ -402,7 +404,7 @@ class TestExtractor
 
     line = extract_line(node)
     body_node = outer_node || node
-    assertion_kinds = collect_assertion_kinds(body_node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -416,6 +418,7 @@ class TestExtractor
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
     }, body_node)
   end
 
@@ -424,7 +427,7 @@ class TestExtractor
     return unless desc
 
     line = extract_line(node)
-    assertion_kinds = collect_assertion_kinds(node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -438,6 +441,7 @@ class TestExtractor
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
     }, node)
   end
 
@@ -447,7 +451,7 @@ class TestExtractor
 
     line = extract_line(node)
     body_node = outer_node || node
-    assertion_kinds = collect_assertion_kinds(body_node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -461,6 +465,7 @@ class TestExtractor
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
     }, body_node)
   end
 
@@ -481,7 +486,7 @@ class TestExtractor
     # Convert test_foo_bar to "foo bar"
     desc = name.sub(/^test_/, "").tr("_", " ")
     line = extract_line(node)
-    assertion_kinds = collect_assertion_kinds(node)
+    assertion_kinds, assertion_values = collect_assertion_kinds(node)
 
     # Inside a mixin module body: stash, don't emit. Materialized at end of file
     # by flush_collected_modules, with the include-site gate from process_include.
@@ -491,6 +496,7 @@ class TestExtractor
       @module_collect << {
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
+        assertion_values: assertion_values,
         body_gate: body_skip_gate(node)
       }
       return
@@ -508,6 +514,7 @@ class TestExtractor
       assertions: assertion_kinds.uniq,
       assertionCount: assertion_kinds.length,
       assertionKinds: assertion_kinds,
+      assertionValues: assertion_values,
     }, node)
   end
 
@@ -933,16 +940,29 @@ class TestExtractor
   # body — one per call, same length as (and same helper expansion / cycle guard
   # / depth cap as) count_assertions. Feeds test:compare's assertion-kind
   # histogram (assertion-kinds.ts); `assertions` is this list deduped.
+  #
+  # Returns `[kinds, values]`: `values` is a lockstep array (one per kind) of the
+  # assertion's literal expected-value token (see literal_token) or nil for a
+  # non-literal argument. Feeds the literal expected-VALUE comparison
+  # (assertion-values.ts). Value capture is additive — it never changes which
+  # kinds are recorded, so count/kind lockstep is untouched.
   def collect_assertion_kinds(node)
     kinds = []
-    collect_assertion_kinds_expanded(node, kinds, [], 0)
-    kinds
+    values = []
+    collect_assertion_kinds_expanded(node, kinds, values, [], 0, nil)
+    [kinds, values]
   end
 
   # Kind-collecting twin of count_assertions_expanded: same self-call / helper /
   # receiver-form handling, but records each assertion's method name instead of
   # bumping a counter. Kept in lockstep so assertionKinds.length == assertionCount.
-  def collect_assertion_kinds_expanded(node, results, visiting, depth)
+  #
+  # `pending_args` threads a parenthesized call's arg node down from its
+  # `:method_add_arg` parent to the inner `:fcall` where the name is recorded, so
+  # `assert_equal(5, foo)` can capture its expected value without moving the
+  # (lockstep-critical) recording site. `:command` form (`assert_equal 5, foo`)
+  # carries its args at node[2] directly.
+  def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args)
     return unless node.is_a?(Array)
 
     name = self_call_name(node)
@@ -952,18 +972,86 @@ class TestExtractor
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.
         results << name
+        args = node[0] == :command ? node[2] : pending_args
+        values << literal_token(expected_arg(args, name))
       elsif depth < MAX_HELPER_DEPTH && @helper_defs.key?(name) && !visiting.include?(name)
         visiting.push(name)
-        collect_assertion_kinds_expanded(@helper_defs[name], results, visiting, depth + 1)
+        collect_assertion_kinds_expanded(@helper_defs[name], results, values, visiting, depth + 1, nil)
         visiting.pop
       end
     elsif receiver_call_assertion?(node)
       # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
-      # (never expanded as helpers, but still recorded).
+      # (never expanded as helpers, but still recorded). Value capture for these
+      # is out of scope (the expected slot varies with the receiver form).
       results << ident_name(node[3])
+      values << nil
     end
 
-    node.each { |child| collect_assertion_kinds_expanded(child, results, visiting, depth) if child.is_a?(Array) }
+    # Thread a `:method_add_arg`'s arg node (node[2]) to its `:fcall` callee
+    # (node[1]) so the value is available at the recording site, then recurse the
+    # args normally. Every other node recurses its children unchanged.
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :fcall
+      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2])
+      collect_assertion_kinds_expanded(node[2], results, values, visiting, depth, nil)
+    else
+      node.each do |child|
+        collect_assertion_kinds_expanded(child, results, values, visiting, depth, nil) if child.is_a?(Array)
+      end
+    end
+  end
+
+  # Assertion method names whose comparable expected value is NOT the first
+  # positional argument. `assert_includes(collection, member)` /
+  # `refute_includes(...)` assert membership — the value is the second arg (the
+  # member), lining up with trails' `expect(collection).toContain(member)`.
+  INCLUDES_ASSERTIONS = %w[
+    assert_includes assert_not_includes refute_includes
+  ].freeze
+
+  # The expected-value argument node for a `name` assertion, from its arg list
+  # node (`:arg_paren` or `:args_add_block`), or nil. Index 0 for most mapped
+  # assertions; index 1 for the `*_includes` membership family.
+  def expected_arg(args_node, name)
+    list = positional_args(args_node)
+    return nil unless list
+    idx = INCLUDES_ASSERTIONS.include?(name) ? 1 : 0
+    list[idx]
+  end
+
+  # Positional argument nodes from an `:arg_paren` / `:args_add_block` wrapper, or
+  # nil when the shape isn't a plain positional list.
+  def positional_args(node)
+    return nil unless node.is_a?(Array)
+    inner = node[0] == :arg_paren ? node[1] : node
+    return nil unless inner.is_a?(Array) && inner[0] == :args_add_block
+    inner[1].is_a?(Array) ? inner[1] : nil
+  end
+
+  # Normalize a literal argument node to a tagged token shared with the TS twin
+  # (extract-ts-core.ts literalToken): `n:<num>` int/float (incl. negative),
+  # `s:<text>` string, `s:<name>` symbol (folded to the string token —
+  # symbol-vs-string is not a fidelity divergence), `b:true`/`b:false`, `x:nil`.
+  # Anything else (variable, method call, array/hash/regex) → nil (non-literal).
+  def literal_token(node)
+    return nil unless node.is_a?(Array)
+    case node[0]
+    when :@int, :@float
+      "n:#{node[1]}"
+    when :unary
+      # `-3` / `-1.5` — unary minus over a numeric leaf; other unaries are non-literal.
+      node[1] == :-@ && node[2].is_a?(Array) && %i[@int @float].include?(node[2][0]) ? "n:-#{node[2][1]}" : nil
+    when :string_literal
+      content = extract_string_content(node)
+      content ? "s:#{content}" : nil
+    when :symbol_literal
+      sym = node[1]
+      sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array) ? "s:#{ident_name(sym[1])}" : nil
+    when :var_ref
+      kw = node[1]
+      if kw.is_a?(Array) && kw[0] == :@kw
+        { "true" => "b:true", "false" => "b:false", "nil" => "x:nil" }[kw[1]]
+      end
+    end
   end
 
   # ---- String extraction helpers ----

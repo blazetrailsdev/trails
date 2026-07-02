@@ -43,9 +43,10 @@
  *                 `rails N vs trails M` detail. The same section also reports
  *                 assertion-KIND divergences — matched pairs whose normalized
  *                 assertion-kind histograms differ (Rails `assert_equal` vs a
- *                 trails `toBeTruthy`), reusing the assertion-kinds.ts mapping.
- *                 Both are report-only; literal expected-value comparison is a
- *                 further planned phase.
+ *                 trails `toBeTruthy`), reusing the assertion-kinds.ts mapping,
+ *                 and literal expected-VALUE divergences (Rails `assert_equal 5`
+ *                 vs a trails `toEqual(4)`) via assertion-values.ts. All three
+ *                 are report-only (no CI gate, no exclude.json).
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -59,6 +60,7 @@ import * as path from "path";
 import type { TestManifest, TestGate } from "./types.js";
 import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
+import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
 import { PACKAGES } from "../api-compare/config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -188,6 +190,20 @@ interface KindMismatch {
   trailsUnmapped: string[];
 }
 
+/**
+ * A matched, implemented pair whose literal assertion EXPECTED VALUES diverge —
+ * both sides make the same kind of assertion the same number of times, but with
+ * different literal constants (Rails `assert_equal 5, foo`, trails
+ * `toEqual(4)`). A fidelity gap the count and kind comparisons can't see.
+ * Informational only; per-kind `deltas` list the diverging literal-token
+ * multisets. See assertion-values.ts for the skip rule and normalization.
+ */
+interface ValueMismatch {
+  description: string;
+  rubyPath: string;
+  deltas: ValueDelta[];
+}
+
 export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
@@ -208,6 +224,7 @@ export interface ConventionFileResult {
   gateMismatches?: GateMismatch[];
   assertionMismatches?: AssertionMismatch[];
   kindMismatches?: KindMismatch[];
+  valueMismatches?: ValueMismatch[];
 }
 
 interface ConventionPackageResult {
@@ -223,6 +240,7 @@ interface ConventionPackageResult {
   totalGateMismatch: number;
   totalAssertionMismatch: number;
   totalKindMismatch: number;
+  totalValueMismatch: number;
   totalExtra: number;
   percent: number;
   files: ConventionFileResult[];
@@ -238,6 +256,7 @@ interface TsTestInfo {
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
   assertionKinds?: string[]; // raw assertion-kind tokens from the TS extractor
+  assertionValues?: (string | null)[]; // literal expected-value tokens (lockstep with kinds)
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +433,7 @@ function main() {
           gate: tc.gate,
           assertionCount: tc.assertionCount,
           assertionKinds: tc.assertionKinds,
+          assertionValues: tc.assertionValues,
         });
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
@@ -480,6 +500,7 @@ function main() {
     let totalGateMismatch = 0;
     let totalAssertionMismatch = 0;
     let totalKindMismatch = 0;
+    let totalValueMismatch = 0;
     let totalExtra = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
@@ -514,6 +535,7 @@ function main() {
       const gateMismatches: GateMismatch[] = [];
       const assertionMismatches: AssertionMismatch[] = [];
       const kindMismatches: KindMismatch[] = [];
+      const valueMismatches: ValueMismatch[] = [];
 
       // Flag a divergence between Rails' gate and our TS gate for a matched
       // pair (advisory — does not affect the matched/skipped counts).
@@ -568,6 +590,29 @@ function main() {
         totalKindMismatch++;
       };
 
+      // Report-only: compare the literal EXPECTED VALUES of a matched pair for
+      // value-bearing kinds where both sides are fully literal (assertion-
+      // values.ts). Surfaces divergences a count/kind match hides (both assert
+      // equality once, but to different constants). Scoped to
+      // ASSERTION_REPORT_PACKAGES; pending stubs and non-literal args skipped.
+      const recordValue = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
+        const deltas = assertionValueMismatch(
+          rubyTc.assertionKinds,
+          rubyTc.assertionValues,
+          tsInfo.assertionKinds,
+          tsInfo.assertionValues,
+          !!tsInfo.pending,
+        );
+        if (!deltas) return;
+        valueMismatches.push({
+          description: rubyTc.description,
+          rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
+          deltas,
+        });
+        totalValueMismatch++;
+      };
+
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
@@ -587,6 +632,7 @@ function main() {
           recordGate(tc, tsTests[tsIdx]);
           recordAssertion(tc, tsTests[tsIdx]);
           recordKind(tc, tsTests[tsIdx]);
+          recordValue(tc, tsTests[tsIdx]);
         }
       }
 
@@ -624,6 +670,7 @@ function main() {
               recordGate(tc, tsTests[idx]);
               recordAssertion(tc, tsTests[idx]);
               recordKind(tc, tsTests[idx]);
+              recordValue(tc, tsTests[idx]);
               break;
             }
           }
@@ -681,6 +728,7 @@ function main() {
           recordGate(tc, tsTests[descIdx]);
           recordAssertion(tc, tsTests[descIdx]);
           recordKind(tc, tsTests[descIdx]);
+          recordValue(tc, tsTests[descIdx]);
           wrongDescribeTests.push({
             description: tc.description,
             rubyPath: np,
@@ -771,6 +819,7 @@ function main() {
         ...(gateMismatches.length > 0 ? { gateMismatches } : {}),
         ...(assertionMismatches.length > 0 ? { assertionMismatches } : {}),
         ...(kindMismatches.length > 0 ? { kindMismatches } : {}),
+        ...(valueMismatches.length > 0 ? { valueMismatches } : {}),
       });
     }
 
@@ -792,6 +841,7 @@ function main() {
       totalGateMismatch,
       totalAssertionMismatch,
       totalKindMismatch,
+      totalValueMismatch,
       totalExtra,
       percent,
       files: fileResults,
@@ -819,6 +869,7 @@ function main() {
   let grandGateMismatch = 0;
   let grandAssertionMismatch = 0;
   let grandKindMismatch = 0;
+  let grandValueMismatch = 0;
   let grandExtra = 0;
   let grandFiles = 0;
   let grandMapped = 0;
@@ -832,6 +883,7 @@ function main() {
     grandGateMismatch += pkg.totalGateMismatch;
     grandAssertionMismatch += pkg.totalAssertionMismatch;
     grandKindMismatch += pkg.totalKindMismatch;
+    grandValueMismatch += pkg.totalValueMismatch;
     grandExtra += pkg.totalExtra;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
@@ -851,6 +903,11 @@ function main() {
     if (pkg.totalKindMismatch > 0) {
       details.push(
         `${pkg.totalKindMismatch} assertion-kind-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+      );
+    }
+    if (pkg.totalValueMismatch > 0) {
+      details.push(
+        `${pkg.totalValueMismatch} assertion-value-mismatch${showAssertions ? "" : " (see --assertions)"}`,
       );
     }
     if (pkg.totalExtra > 0) details.push(`${pkg.totalExtra} extra (TS only)`);
@@ -1010,6 +1067,48 @@ function main() {
       console.log("");
     }
 
+    // Assertion VALUE mismatches: matched, implemented pairs that assert the
+    // same kind the same number of times but with different literal expected
+    // values (Rails `assert_equal 5, foo`, trails `toEqual(4)`). Report-only;
+    // compared only when both sides are fully literal (see assertion-values.ts
+    // for the skip rule and nil↔null / symbol↔string normalization).
+    const filesWithValueMismatch = pkg.files.filter(
+      (f) => f.valueMismatches && f.valueMismatches.length > 0,
+    );
+    if (showAssertions && filesWithValueMismatch.length > 0) {
+      console.log(
+        `  ASSERTION VALUE MISMATCHES (rails vs trails — literal expected values, informational):`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      console.log(`  Report-only (no CI gate). Same kind & count, different literal constants —`);
+      console.log(
+        `  e.g. Rails \`assert_equal 5\` where the port asserts \`toEqual(4)\`. Compared`,
+      );
+      console.log(`  only when both sides are literals (nil↔null / symbol↔string normalized);`);
+      console.log(`  a non-literal expected argument on either side is skipped.`);
+      console.log(
+        showMissing
+          ? `  (per-test detail; omit --missing for per-file counts only)`
+          : `  (per-file counts; pass --missing to expand per-test detail)`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      for (const f of filesWithValueMismatch) {
+        if (showMissing) {
+          for (const vm of f.valueMismatches!) {
+            const deltaStr = vm.deltas
+              .map(
+                (d) => `${d.kind} rails [${d.rails.join(", ")}] vs trails [${d.trails.join(", ")}]`,
+              )
+              .join(", ");
+            console.log(`    ${f.rubyFile} › ${vm.description} — ${deltaStr}`);
+          }
+        } else {
+          console.log(`    ${f.rubyFile} — ${f.valueMismatches!.length} value mismatches`);
+        }
+      }
+      console.log("");
+    }
+
     console.log(
       `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Extra".padStart(5)} ${"Tot".padStart(4)}`,
     );
@@ -1051,6 +1150,11 @@ function main() {
   if (grandKindMismatch > 0) {
     grandDetails.push(
       `${grandKindMismatch} assertion-kind-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+    );
+  }
+  if (grandValueMismatch > 0) {
+    grandDetails.push(
+      `${grandValueMismatch} assertion-value-mismatch${showAssertions ? "" : " (see --assertions)"}`,
     );
   }
   if (grandExtra > 0) grandDetails.push(`${grandExtra} extra (TS only)`);

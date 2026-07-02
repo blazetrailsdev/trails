@@ -74,6 +74,14 @@ export interface TestCaseInfo {
    * length as `assertionCount`; `assertions` is this list deduped.
    */
   assertionKinds?: string[];
+  /**
+   * Literal expected VALUES in lockstep with `assertionKinds` (same length): a
+   * tagged literal token (`n:5`, `s:foo`, `b:true`, `x:nil`) for the assertion's
+   * expected argument where it is a literal, or `null` for a non-literal
+   * (variable/expression) or an assertion with no comparable value. Feeds
+   * test:compare's literal expected-value comparison (assertion-values.ts).
+   */
+  assertionValues?: (string | null)[];
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**
