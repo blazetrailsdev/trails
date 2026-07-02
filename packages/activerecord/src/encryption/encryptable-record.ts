@@ -225,6 +225,18 @@ export class EncryptableRecord {
    *   `_attributeDefinitions` directly, seeding a schema-sourced placeholder
    *   when no def exists yet so `loadSchemaFromAdapter` can supply the real
    *   cast type on the next pass.
+   *
+   * ASYMMETRY (intentional): the `decorateAttributes` branch skips when the def
+   * is absent and does NOT buffer — it relies on the caller re-invoking it once
+   * the def exists. On the `Base.encrypts` path that retry is guaranteed by the
+   * persistent `_pendingEncryptions` buffer (`applyPendingEncryptions` re-runs on
+   * every `encrypts()` / schema load). The scheme-based `encryptAttribute` entry
+   * has no such buffer, so calling `EncryptableRecord.encryptAttribute` directly
+   * on a real `Base` subclass BEFORE the target attribute is declared would drop
+   * the wrap. All current scheme-path callers use plain mock classes (no
+   * `decorateAttributes`) so they take the direct-set branch; giving the scheme
+   * path its own replay buffer is tracked in follow-up
+   * `encrypt-route-primary-attribute-through-encrypt-attribute` (RFC 0047).
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
