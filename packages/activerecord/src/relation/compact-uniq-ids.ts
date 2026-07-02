@@ -27,3 +27,27 @@ export function compactUniqIds(ids: unknown[]): unknown[] {
   }
   return out;
 }
+
+/**
+ * Composite-PK counterpart of {@link compactUniqIds}: Rails applies
+ * `ids = ids.compact.uniq` to the tuple list too. `compact` drops nil
+ * _outer_ entries (a nil element of the tuple list) — nil _components_
+ * inside a kept tuple are preserved. `uniq` is by structural value
+ * equality (Ruby `Array#uniq` uses `eql?`/`hash`), so `[1, 2]` and
+ * `[1, 2]` fold to one even though they are distinct array references;
+ * each component folds via {@link dedupKey} so `[1n, 2]` matches `[1, 2]`.
+ */
+export function compactUniqTuples(tuples: unknown[]): unknown[] {
+  const seen = new Set<string>();
+  const out: unknown[] = [];
+  for (const tuple of tuples) {
+    if (tuple === null || tuple === undefined) continue;
+    const key = Array.isArray(tuple)
+      ? JSON.stringify(tuple.map(dedupKey))
+      : JSON.stringify(dedupKey(tuple));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tuple);
+  }
+  return out;
+}
