@@ -23,9 +23,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
   let adapter: TestDatabaseAdapter;
@@ -60,22 +58,6 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    // The per-worker shared-cache DB is contended: sibling files
-    // (callbacks.test.ts, belongs-to-associations.test.ts) call
-    // `defineSchema({ posts: { title: "string" } })` with no `dropExisting`,
-    // so whichever runs first in the worker leaves a two-column `posts`
-    // missing `author_id`. Our plain `defineSchema` (CREATE IF NOT EXISTS)
-    // would then no-op against that stale shape. `dropExisting` drops
-    // comments → posts → authors and rebuilds the canonical shape.
-    await defineSchema(
-      adapter,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-      },
-      { dropExisting: true },
-    );
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
     CpcComment.adapter = adapter;

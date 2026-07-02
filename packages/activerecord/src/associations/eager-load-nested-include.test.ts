@@ -1,12 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/eager_load_nested_include_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -112,22 +110,6 @@ function sample<T>(arr: T[]): T {
 describe("EagerLoadPolyAssocsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        shape_expressions: canonicalSchema.shape_expressions,
-        circles: canonicalSchema.circles,
-        squares: canonicalSchema.squares,
-        triangles: canonicalSchema.triangles,
-        paint_colors: canonicalSchema.paint_colors,
-        paint_textures: canonicalSchema.paint_textures,
-        non_poly_ones: canonicalSchema.non_poly_ones,
-        non_poly_twos: canonicalSchema.non_poly_twos,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
 
   it("include query", async () => {
     const circles: Circle[] = [];
@@ -179,20 +161,6 @@ describe("EagerLoadPolyAssocsTest", () => {
 
 describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
   fixtures(["categories"]);
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        categorizations: canonicalSchema.categorizations,
-        categories: canonicalSchema.categories,
-        author_favorites: canonicalSchema.author_favorites,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
   registerModel(Author);
   registerModel(Post);
   registerModel(Comment);

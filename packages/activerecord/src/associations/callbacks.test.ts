@@ -6,7 +6,6 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, enableSti, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -52,17 +51,11 @@ function makeAuthorWithCallbacks(callbacks: any) {
   return { Author: CbAuthor, Post };
 }
 
-// Creates the canonical `authors`/`posts` tables on the handler connection.
+// The canonical `authors`/`posts` tables ride the boot-laid schema.
 // Used by the has_many callback describes below.
 function setupAuthorPostSuite(): void {
   setupFixtures();
   withTransactionalFixtures(() => Base.connection);
-  beforeAll(async () => {
-    await defineSchema(Base.connection, {
-      authors: canonicalSchema.authors,
-      posts: canonicalSchema.posts,
-    });
-  });
 }
 
 // ==========================================================================
@@ -546,11 +539,6 @@ describe("AssociationCallbacksTest", () => {
     enableSti(Company);
     registerSubclass(Firm);
     registerSubclass(Client);
-    await defineSchema(Base.connection, {
-      companies: canonicalSchema.companies,
-      // Firm#account is dependent:destroy, so firm.destroy queries `accounts`.
-      accounts: canonicalSchema.accounts,
-    });
   });
 
   it("has many callbacks for destroy on parent", async () => {
@@ -573,14 +561,6 @@ describe("AssociationCallbacksTest", () => {
 describe("AssociationCallbacksTest", () => {
   const { projects, developers } = fixtures(["projects", "developers", "developersProjects"], {
     schema: canonicalSchema,
-  });
-  // The fixture-schema slice only creates the tables the fixtures touch;
-  // creating a Developer autosaves an `audit_logs` row (its `before_create`),
-  // so that table must exist too.
-  beforeAll(async () => {
-    await defineSchema(Base.connection, {
-      audit_logs: canonicalSchema.audit_logs,
-    });
   });
 
   it("has and belongs to many add callback", async () => {

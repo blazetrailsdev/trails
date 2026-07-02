@@ -42,7 +42,6 @@ import {
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
@@ -402,14 +401,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
   beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        companies: TEST_SCHEMA.companies,
-        accounts: TEST_SCHEMA.accounts,
-      } as Schema,
-      { dropExisting: true },
-    );
     await Company.loadSchema();
     await Account.loadSchema();
   });
@@ -470,16 +461,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "developers", "projects", "developersProjects"]);
   beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        companies: TEST_SCHEMA.companies,
-        developers: TEST_SCHEMA.developers,
-        projects: TEST_SCHEMA.projects,
-        developers_projects: TEST_SCHEMA.developers_projects,
-      } as Schema,
-      { dropExisting: true },
-    );
     await Company.loadSchema();
     await Developer.loadSchema();
     await Project.loadSchema();
@@ -648,9 +629,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
   // -- Destroying --
 
   it("destroying", async () => {
@@ -980,7 +958,7 @@ describe("HasManyAssociationsTest", () => {
 
   // -- Counter cache --
   // Migrated to a dedicated `HasManyAssociationsTest` describe at end of file
-  // (B1966c — defineSchema + shared adapter + withTransactionalFixtures).
+  // (B1966c — boot-laid canonical schema + withTransactionalFixtures).
 
   // -- Has many on new record --
 
@@ -997,20 +975,12 @@ describe("HasManyAssociationsTest", () => {
   useHandlerTransactionalFixtures();
   const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        cars: TEST_SCHEMA.cars,
-        bulbs: TEST_SCHEMA.bulbs,
-        companies: TEST_SCHEMA.companies,
-      } as Schema,
-      { dropExisting: true },
-    );
     // A sibling test file may have warmed the shared schema cache for `bulbs`
     // with a default lowercase `id` PK (e.g. base.test.ts / reflection.test.ts
     // declare `bulbs: { car_id }`). Canonical `bulbs` uses `primary_key: "ID"`,
-    // so reset the memoized column/PK information before reflecting the rebuilt
-    // table — otherwise the ids_reader plucks a non-existent `id` column on PG.
+    // so reset the memoized column/PK information before reflecting the
+    // canonical table — otherwise the ids_reader plucks a non-existent `id`
+    // column on PG.
     Car.resetColumnInformation();
     Bulb.resetColumnInformation();
     Company.resetColumnInformation();
@@ -1117,17 +1087,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        companies: TEST_SCHEMA.companies,
-        posts: TEST_SCHEMA.posts,
-        comments: TEST_SCHEMA.comments,
-        cars: TEST_SCHEMA.cars,
-        bulbs: TEST_SCHEMA.bulbs,
-      } as Schema,
-      { dropExisting: true },
-    );
     await Company.loadSchema();
     await HmPost.loadSchema();
     await Comment.loadSchema();
@@ -1208,10 +1167,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // -- Scoped queries --
 
@@ -5531,23 +5486,17 @@ describe("HasManyAssociationsTest", () => {
 });
 
 // Building cluster (adding `<<`, build, create, replace `=`) migrated to a
-// shared describe-level adapter with explicit defineSchema +
+// shared describe-level adapter riding the boot-laid canonical schema +
 // withTransactionalFixtures (Batch B1966e). Tests previously defined Author
 // and Post inside each `it()` block against an inline `freshAdapter()` from
-// the parent describe's `beforeEach`. Hoisting the classes and adapter to
-// `beforeAll` means schema DDL runs once per file and each test runs inside
-// BEGIN/ROLLBACK rather than rebuilding tables.
+// the parent describe's `beforeEach`. Hoisting the classes to `beforeAll`
+// means each test runs inside BEGIN/ROLLBACK against the ambient canonical
+// tables rather than rebuilding them.
 describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
-  beforeAll(async () => {
-    await defineSchema({
-      authors: TEST_SCHEMA.authors,
-      posts: TEST_SCHEMA.posts,
-      cars: TEST_SCHEMA.cars,
-      bulbs: TEST_SCHEMA.bulbs,
-    });
+  beforeAll(() => {
     registerModel(HmAuthor);
     registerModel(HmPost);
     registerModel(HmCar);
@@ -5758,11 +5707,6 @@ describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      { cars: TEST_SCHEMA.cars, bulbs: TEST_SCHEMA.bulbs },
-      { dropExisting: true },
-    );
     registerModel(HmCar);
     registerModel(HmBulb);
     await HmCar.loadSchema();
@@ -5895,12 +5839,6 @@ describe("HasManyAssociationsTest", () => {
     ["companies", "accounts", "topics", "posts", "comments", "taggings", "cars", "bulbs"],
     { schema: TEST_SCHEMA },
   );
-
-  beforeAll(async () => {
-    // Create images table separately — no images fixture file exists,
-    // so it isn't included in the fixtures set above.
-    await defineSchema({ images: TEST_SCHEMA.images });
-  });
 
   beforeAll(() => {
     registerModel(Company);
@@ -6223,9 +6161,7 @@ describe("HasManyAssociationsTest", () => {
     schema: TEST_SCHEMA,
   });
 
-  beforeAll(async () => {
-    // engines table not in fixture registry; create it separately.
-    await defineSchema({ engines: TEST_SCHEMA.engines });
+  beforeAll(() => {
     registerModel(HmCar);
     registerModel(HmEngine);
     registerModel(HmShip);
@@ -6327,9 +6263,6 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // Regression for HasManyAssociation#deleteRecords (the association-layer
   // `delete`, reached only via `record.association(name)` for a non-through
