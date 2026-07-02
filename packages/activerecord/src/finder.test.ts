@@ -432,6 +432,106 @@ describe("FinderTest", () => {
 });
 
 // ==========================================================================
+// FinderTest — faithful ports of the finder_test.rb find/find_by cluster
+// riding the real canonical models + fixtures Rails uses: Topic (topics
+// fixtures) for the scalar find/find_by tests and Cpk::Book (cpk_books
+// fixtures) for the composite-primary-key find cluster. The aggregate-attribute
+// find_by ports (Customer composed_of — find_by_address / find_by_balance...)
+// are deferred pending composed_of hash-condition expansion in the predicate
+// builder; tracked under RFC 0023.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"], {
+    schema: canonicalSchema,
+  });
+  const Topic = CanonicalTopic;
+  registerModel("Topic", Topic);
+  registerModel("Reply", CanonicalReply);
+  const idOf = (r: unknown) => (r as { id: unknown }).id;
+
+  it("find", async () => {
+    expect((await Topic.find(1)).title).toBe(topics("first").title);
+  });
+
+  it("find by one attribute", async () => {
+    expect(idOf(await Topic.findBy({ title: "The First Topic" }))).toBe(idOf(topics("first")));
+    expect(await Topic.findBy({ title: "The First Topic!" })).toBeNull();
+  });
+
+  it("find by one attribute bang", async () => {
+    expect(idOf(await Topic.findByBang({ title: "The First Topic" }))).toBe(idOf(topics("first")));
+    await expect(Topic.findByBang({ title: "The First Topic!" })).rejects.toThrow(RecordNotFound);
+    await expect(Topic.findByBang({ title: "The First Topic!" })).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("find by one attribute that is an alias", async () => {
+    expect(idOf(await Topic.findBy({ heading: "The First Topic" }))).toBe(idOf(topics("first")));
+    expect(await Topic.findBy({ heading: "The First Topic!" })).toBeNull();
+  });
+
+  it("find by two attributes", async () => {
+    expect(idOf(await Topic.findBy({ title: "The First Topic", author_name: "David" }))).toBe(
+      idOf(topics("first")),
+    );
+    expect(await Topic.findBy({ title: "The First Topic", author_name: "Mary" })).toBeNull();
+  });
+
+  it("find by nil attribute", async () => {
+    const topic = await Topic.findBy({ last_read: null });
+    expect(topic).not.toBeNull();
+    expect(topic!.last_read).toBeNull();
+  });
+
+  it("find by nil and not nil attributes", async () => {
+    const topic = await Topic.findBy({ last_read: null, author_name: "Mary" });
+    expect(topic!.author_name).toBe("Mary");
+  });
+
+  it("#find with a single composite primary key", async () => {
+    const book = cpkBooks("cpk_great_author_first_book");
+    expect(idOf(await CpkBook.find(book.id))).toEqual(idOf(book));
+  });
+
+  it("find with a single composite primary key wrapped in an array", async () => {
+    const book = cpkBooks("cpk_great_author_first_book");
+    const result = (await CpkBook.find([book.id])) as unknown[];
+    expect(result.map(idOf)).toEqual([idOf(book)]);
+  });
+
+  it("find with a multiple sets of composite primary key", async () => {
+    const books = [
+      cpkBooks("cpk_great_author_first_book"),
+      cpkBooks("cpk_great_author_second_book"),
+    ];
+    const ids = books.map((b) => b.id) as [unknown, unknown];
+    const result = (await CpkBook.find(...ids)) as unknown[];
+    expect(result.map(idOf)).toEqual(ids);
+  });
+
+  it("find with a multiple sets of composite primary key wrapped in an array", async () => {
+    const books = [
+      cpkBooks("cpk_great_author_first_book"),
+      cpkBooks("cpk_great_author_second_book"),
+    ];
+    const ids = books.map((b) => b.id);
+    const result = (await CpkBook.where({ revision: 1 }).find(ids)) as unknown[];
+    expect(result.map(idOf)).toEqual(ids);
+  });
+
+  it("find with a multiple sets of composite primary key wrapped in an array ordered", async () => {
+    const books = [
+      cpkBooks("cpk_great_author_first_book"),
+      cpkBooks("cpk_great_author_second_book"),
+    ];
+    const ids = books.map((b) => b.id);
+    const result = (await CpkBook.order({ author_id: "asc" }).find(ids)) as unknown[];
+    expect(result.map(idOf)).toEqual(ids);
+  });
+});
+
+// ==========================================================================
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
@@ -498,52 +598,6 @@ describe("FinderTest", () => {
       }
     }
     expect(await Topic.exists()).toBe(false);
-  });
-
-  it("find by one attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "target" });
-    const found = await Topic.findBy({ title: "target" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by one attribute bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "target" });
-    const found = await Topic.findByBang({ title: "target" });
-    expect(found.title).toBe("target");
-  });
-
-  it("find by two attributes", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("content", "text");
-      }
-    }
-    await Topic.create({ title: "a", content: "x" });
-    const found = await Topic.findBy({ title: "a", content: "x" });
-    expect(found).not.toBeNull();
-  });
-
-  it("find by nil attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: null as any });
-    const found = await Topic.findBy({ title: null });
-    // Should find records with null title
-    expect(found !== undefined).toBe(true);
   });
 
   it("count by sql", async () => {
@@ -1021,18 +1075,6 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it("find by one attribute that is an alias", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string", { default: "" });
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    await Post.create({ title: "hello" });
-    const found = await Post.findBy({ title: "hello" });
-    expect(found).not.toBeNull();
-  });
-
   it("custom select takes precedence over original value", async () => {
     class Post extends Base {
       static {
@@ -1378,38 +1420,6 @@ describe("FinderTest", () => {
     const first = await Post.first();
     expect(first).toBeDefined();
   });
-  it("#find with a single composite primary key", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "single_cpk" });
-    const found = await Post.find(p.id!);
-    expect(found).toBeDefined();
-  });
-  it("find with a single composite primary key wrapped in an array", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "cpk_arr" });
-    const results = await Post.where({ id: [p.id] });
-    expect(results.length).toBe(1);
-  });
-  it("find with a multiple sets of composite primary key", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "mcpk_a" });
-    const p2 = await Post.create({ title: "mcpk_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] });
-    expect(results.length).toBe(2);
-  });
-  it("find with a multiple sets of composite primary key wrapped in an array", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "mcpk_wrap" });
-    const results = await Post.where({ id: [p.id] });
-    expect(results.length).toBe(1);
-  });
-  it("find with a multiple sets of composite primary key wrapped in an array ordered", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "mcpk_ord_a" });
-    const p2 = await Post.create({ title: "mcpk_ord_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] }).order("title");
-    expect(results.length).toBe(2);
-  });
   it("#find_by with composite primary key and query caching", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "findby_cpk" });
@@ -1673,13 +1683,6 @@ describe("FinderTest", () => {
     }
     return Topic;
   }
-
-  it("find", async () => {
-    const Topic = makeTopic();
-    const t = await Topic.create({ title: "Hello" });
-    const found = await Topic.find(t.id);
-    expect(found.id).toBe(t.id);
-  });
 
   it("find with hash parameter", async () => {
     const Topic = makeTopic();
@@ -1957,12 +1960,6 @@ describe("FinderTest", () => {
 
   it("find by one attribute bang with blank defined", async () => {
     await expect(Post.findByBang({ title: "nonexistent" })).rejects.toThrow();
-  });
-
-  it("find by nil and not nil attributes", async () => {
-    await Post.create({ title: "has-title" });
-    const results = await Post.where({ title: "has-title" });
-    expect(results.length).toBe(1);
   });
 
   it("select rows", async () => {
