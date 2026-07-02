@@ -916,4 +916,24 @@ describe("EncryptableRecord.revalidatePreservedColumns — deferred original_<na
     } as any;
     expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
   });
+
+  // End-to-end: a real Base.encrypts(ignoreCase) on the canonical `authors`
+  // table (which has `name` but no `original_name`) must raise once the schema
+  // loads, exercising the full encrypts → encryptAttribute →
+  // applyPendingEncryptions → revalidatePreservedColumns wiring.
+  it("Base.encrypts ignoreCase raises ConfigurationError on schema load when original_<name> is missing", async () => {
+    const adapter = await freshAdapter();
+    expect(() => {
+      const Model = class extends Base {
+        static _tableName = "authors";
+        static {
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          this.encrypts("name", { deterministic: true, ignoreCase: true });
+        }
+      } as any;
+      new Model();
+    }).toThrow(/must create an additional column named 'original_name'/);
+  });
 });
