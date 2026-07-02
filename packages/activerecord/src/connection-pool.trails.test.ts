@@ -12,7 +12,7 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import {
   ConnectionPool,
@@ -24,6 +24,7 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type {
@@ -73,57 +74,6 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
     return await fn(dir);
   } finally {
     await rm(dir, { recursive: true, force: true });
-  }
-}
-
-/**
- * Stub the scratch `posts` table so the schema-cache introspection tests have a
- * real table to reflect on. Near-direct translation of Rails
- * connection_pool_test.rb:35-40:
- *
- *   @pool.with_connection do |connection|
- *     connection.create_table :posts do |t|
- *       t.integer :cololumn        # `cololumn` is Rails' own spelling
- *     end
- *   end
- *
- * Created through a **pool connection** (not a raw adapter), like Rails. A
- * short-lived setup pool — Rails likewise builds extra pools from the same
- * PoolConfig throughout the suite — so the pool-under-test's own first adoption
- * still drives the eager-warm path under test.
- *
- * Rails only stubs `posts` for `in_memory_db?` (its real-DB lanes keep schema.rb
- * loaded ambiently); trails drops every table in the per-test `beforeEach` on
- * ALL lanes, so the stub is materialized regardless of adapter. `dropPostsStub`
- * tears it down (also covered by the global `beforeEach`).
- */
-async function stubPostsSchema(): Promise<void> {
-  const setupPool = makeAmbientPool();
-  try {
-    await setupPool.withConnection(async (connection) => {
-      await connection.createTable("posts", (t) => {
-        t.integer("cololumn");
-      });
-    });
-  } finally {
-    // disconnectAsync (not the sync, drain-discarding disconnect) so an
-    // async-only SQLite driver's close finishes before the pool-under-test
-    // reopens the same ambient DB.
-    await setupPool.disconnectAsync();
-  }
-}
-
-/** Drop the scratch `posts` table stubbed by {@link stubPostsSchema}. */
-async function dropPostsStub(): Promise<void> {
-  const teardownPool = makeAmbientPool();
-  try {
-    await teardownPool.withConnection(async (connection) => {
-      await connection.dropTable("posts", { ifExists: true });
-    });
-  } finally {
-    // disconnectAsync so the drop's connection is fully closed before the next
-    // test's makeAmbientPool reopens the same ambient DB.
-    await teardownPool.disconnectAsync();
   }
 }
 
@@ -507,9 +457,15 @@ it("context pin takes priority over fixture pin in unpin", async () => {
 });
 
 describe("ConnectionPool schema cache", () => {
-  // Balances the scratch `posts` table the introspection tests seed via
-  // createTable (mirrors Rails' teardown; also covered by the global beforeEach).
-  afterEach(dropPostsStub);
+  // Rails' ConnectionPoolTests declares `fixtures` and sets
+  // `use_transactional_tests = false` (connection_pool_test.rb:11); its
+  // schema-cache tests then reflect the canonical `posts` table. `fixtures`
+  // opts into the canonical TEST_SCHEMA and — non-transactionally, so the DDL
+  // commits and is visible across the separate pool-under-test connections —
+  // materializes `posts` once per worker, shielded from the global reset. This
+  // is trails' stand-in for Rails' ambiently-loaded schema.rb (Rails only
+  // hand-stubs `posts` in the `in_memory_db?` branch, where no schema exists).
+  fixtures(["posts"], { useTransactionalTests: false });
 
   it("exposes a BoundSchemaReflection via pool.schemaCache", () => {
     // Mirrors Rails ConnectionPool#schema_cache: returns a
@@ -692,7 +648,6 @@ describe("ConnectionPool schema cache", () => {
     // a synchronous read sees real columns. Await pool._eagerWarmPromise so
     // we're not timing-dependent. Introspects the ambient lane DB's canonical
     // `posts` table (Rails' scratch-table name) instead of an invented one.
-    await stubPostsSchema();
 
     const prevEager = SchemaReflection.eagerLoadSchemaCache;
     SchemaReflection.eagerLoadSchemaCache = true;
@@ -720,7 +675,6 @@ describe("ConnectionPool schema cache", () => {
     // Eager subsumes lazy (loadAllBang consults the dump first, then
     // introspects). With both flags on and NO dump file, the lazy path must
     // not suppress the eager introspection — otherwise the cache stays empty.
-    await stubPostsSchema();
 
     const prevLazy = SchemaReflection.lazilyLoadSchemaCache;
     const prevEager = SchemaReflection.eagerLoadSchemaCache;
@@ -747,7 +701,6 @@ describe("ConnectionPool schema cache", () => {
     // Canonical `posts` exists in the ambient lane DB, but with the flag off no
     // introspection runs, so the cache stays empty. (dropped by the global
     // beforeEach teardown.)
-    await stubPostsSchema();
     expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
 
     const pool = makeAmbientPool({ schemaCachePath: "" });
@@ -767,7 +720,6 @@ describe("ConnectionPool schema cache", () => {
     // the pool's withConnection, dumpTo writes the JSON. Covers the
     // full chain Rails uses for db:schema:cache:dump. Dumps the ambient lane
     // DB's canonical `posts` table (dropped by the global beforeEach teardown).
-    await stubPostsSchema();
     await withCacheDir(async (dir) => {
       const pool = makeAmbientPool();
       try {
