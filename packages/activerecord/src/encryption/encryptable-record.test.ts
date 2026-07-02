@@ -537,6 +537,39 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(reloaded.name).toBe("<untitled>");
   });
 
+  it("threads the true column default, not an attribute() override, into the encrypted type", async () => {
+    // Rails threads `default: columns_hash[name.to_s]&.default` — the TRUE DB
+    // column default — not the possibly-overridden `attribute(name, { default })`
+    // value (encryptable_record.rb:91). Here the model overrides `name`'s default
+    // to "OVERRIDE" while the `encrypted_books.name` column default is
+    // "<untitled>", so the two diverge. The encrypted type must carry the COLUMN
+    // default. Observable via the `@default == value` guard: with the column
+    // default threaded, the plaintext "<untitled>" round-trips through deserialize
+    // instead of being (wrongly) treated as ciphertext and failing to decrypt.
+    const adapter = await freshAdapter();
+    const Book = class OverriddenDefaultEncryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.attribute("name", "string", { default: "OVERRIDE" });
+        this.encrypts("name", { deterministic: true });
+      }
+    } as any;
+    await Book.loadSchema();
+
+    const type = Book._attributeDefinitions.get("name").type;
+    expect(type._default).toBe("<untitled>");
+
+    Configurable.config.supportUnencryptedData = false;
+
+    // The DB stores the column default "<untitled>" as plaintext when a row is
+    // inserted without a name; reading it back must round-trip via the threaded
+    // default rather than attempting to decrypt it.
+    const book = await withoutEncryption(() => Book.create({ name: "<untitled>" }));
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
   it("can dump and load records that use encryption", async () => {
     // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
     // attribute state (ciphertexts) and reconstructing a new instance via the DB-load

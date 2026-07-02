@@ -105,6 +105,11 @@ setEncryptingOnlyEncryptorFactory(() => new EncryptingOnlyEncryptor());
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
+// Sentinel distinguishing "column not reflected in the warm cache" from a
+// genuinely-cached `undefined`/`null` column default. Lets columnDefaultFor
+// fall back to the def default only when the schema cache has no answer.
+const NOT_CACHED = Symbol("encryption.columnDefault.notCached");
+
 /**
  * Provides the `encrypts` declaration for model classes, enabling
  * transparent attribute encryption/decryption. This is wired into
@@ -294,16 +299,34 @@ export class EncryptableRecord {
     if (typeof modelClass.decorateAttributes === "function") {
       const def = modelClass._attributeDefinitions?.get?.(name);
       if (!def) return;
-      if (def.type instanceof EncryptedAttributeType) return;
-      const columnDefault = this.columnDefaultFor(def);
-      // The decorator returns null when the type is already encrypted — the
-      // PendingDecorator replays on every _defaultAttributes rebuild, so it
-      // must be idempotent to avoid double-wrapping.
-      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) =>
-        castType instanceof EncryptedAttributeType
-          ? (null as unknown as Type)
-          : new EncryptedAttributeType({ scheme, castType, default: columnDefault }),
-      );
+      // Resolve the default Rails threads: `columns_hash[name].default`. When the
+      // schema cache is warm the peek is authoritative (the TRUE column default,
+      // ignoring any `attribute()` override). Before reflection it isn't cached,
+      // so we fall back to the def default as a provisional value and correct it
+      // on the post-reflection replay.
+      const cached = this.cachedColumnDefaultFor(modelClass, name);
+      const authoritative = cached !== NOT_CACHED;
+      const columnDefault = authoritative ? (cached ?? undefined) : (def.defaultValue ?? undefined);
+      if (def.type instanceof EncryptedAttributeType) {
+        // Already wrapped. Re-wrap only to correct a provisional default once the
+        // authoritative column default is known and differs — otherwise stay put
+        // so the PendingDecorator queue doesn't grow on every replay. The
+        // immediate apply below updates def.type, so the next replay early-returns.
+        if (!authoritative || def.type._default === columnDefault) return;
+      }
+      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) => {
+        if (castType instanceof EncryptedAttributeType) {
+          if (!authoritative || (castType as any)._default === columnDefault) {
+            return null as unknown as Type;
+          }
+          return new EncryptedAttributeType({
+            scheme,
+            castType: castType.castType,
+            default: columnDefault,
+          });
+        }
+        return new EncryptedAttributeType({ scheme, castType, default: columnDefault });
+      });
       return;
     }
 
@@ -318,7 +341,7 @@ export class EncryptableRecord {
     const encryptedType = new EncryptedAttributeType({
       scheme,
       castType,
-      default: this.columnDefaultFor(existingDef),
+      default: this.columnDefaultFor(modelClass, name, existingDef),
     });
 
     // Register directly into _attributeDefinitions (not via attribute()
@@ -336,15 +359,57 @@ export class EncryptableRecord {
   }
 
   /**
-   * Resolve the column's schema default from a reflected attribute definition,
-   * mirroring Rails' `columns_hash[name.to_s]&.default`. Schema reflection
-   * copies the column default onto the def's `defaultValue`, so reading it here
-   * avoids a `columnsHash()` call (which would warm the shared schema cache).
-   * Returns undefined (Rails' nil default) when there is no def or no default.
+   * Resolve the column's schema default, mirroring Rails'
+   * `default: columns_hash[name.to_s]&.default` (encryptable_record.rb:91).
+   *
+   * Rails threads the TRUE DB column default — not the possibly-overridden
+   * `attribute(name, { default: X })` value. When a model declares an
+   * `attribute()` default that differs from the column default, the reflected
+   * def's `defaultValue` holds the override, so reading it would thread the
+   * wrong value into `EncryptedAttributeType`.
+   *
+   * So we first peek the already-warm schema cache (query-free, no
+   * `loadSchema`/`columnsHash` — those warm the shared cache and perturb
+   * sibling encryption tests). If the column is reflected there, its `.default`
+   * is the authoritative DB default. Otherwise (plain mock models, or a def
+   * seen before reflection) we fall back to the def's `defaultValue` — which,
+   * absent an `attribute()` override, already carries the column default.
+   * Returns undefined (Rails' nil default) when neither yields a value.
    * @internal
    */
-  static columnDefaultFor(def: any): unknown {
+  static columnDefaultFor(modelClass: any, name: string, def: any): unknown {
+    const cached = this.cachedColumnDefaultFor(modelClass, name);
+    if (cached !== NOT_CACHED) return cached ?? undefined;
     return def?.defaultValue ?? undefined;
+  }
+
+  /**
+   * Query-free peek of a reflected column's DB default from the raw schema
+   * cache, WITHOUT leasing a connection or calling `loadSchema` (either would
+   * warm the shared cache — see the story's sibling-perturbation note). Resolves
+   * the raw sync `SchemaCache` the same connection-less way
+   * `reset_column_information` does: a directly-assigned `_adapter`, else the
+   * pool config's cache slot. Returns `NOT_CACHED` when the table isn't warm
+   * yet or the column isn't present, so callers fall back to the def default.
+   * @internal
+   */
+  static cachedColumnDefaultFor(modelClass: any, name: string): unknown {
+    try {
+      const table: string | undefined = modelClass?.tableName;
+      if (!table) return NOT_CACHED;
+      const direct = modelClass._adapter as
+        | { schemaCache?: { getCachedColumnsHash?: (t: string) => any } }
+        | undefined;
+      const cache =
+        direct?.schemaCache ?? modelClass.connectionPool?.()?.poolConfig?.schemaCache ?? undefined;
+      if (typeof cache?.getCachedColumnsHash !== "function") return NOT_CACHED;
+      const columns = cache.getCachedColumnsHash(table);
+      const column = columns?.[name];
+      if (!column) return NOT_CACHED;
+      return column.default ?? undefined;
+    } catch {
+      return NOT_CACHED;
+    }
   }
 
   /**
