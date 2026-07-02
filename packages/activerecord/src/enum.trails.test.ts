@@ -53,6 +53,14 @@ describe("Enum name conflict detection", () => {
     }).toThrow(/already defined by another enum/);
   });
 
+  // NOTE: the *cross-class* counterpart — a subclass enum reusing a value method
+  // a parent enum generated, which Rails permits (`_enum_methods_module` is a
+  // per-class, non-inherited class-instance variable, enum.rb:326-332) — is
+  // deliberately not asserted here. The `_enumMethodsModuleNames` set is already
+  // scoped per-class (fresh, not inherited), but the case still raises today via
+  // the pre-existing over-broad `fullName in this` scope pre-check, tracked under
+  // 0050-enum-fidelity/enum-conflict-dangerous-class-method-fidelity.
+
   // Rails guards `name=` too (`detect_enum_conflict!(name, "#{name}=")`), so an
   // enum named after a framework writer conflicts on the setter.
   it("raises for an enum name whose reader is a framework method", () => {

@@ -528,13 +528,20 @@ export function _enum(
   // instance-method branch (enum.rb:383-384) raises "...already defined by
   // another enum" when a *different* enum on the same class already generated a
   // value method with this name. `dangerousAttributeMethods()` covers only
-  // framework methods, so we track enum-generated predicate/bang names per class
-  // (copy-on-write off the inherited set) and consult them here. The set is
-  // populated during the generation pass below, so the conflict pass only sees
-  // names from prior `enum()` declarations, never this call's own.
+  // framework methods, so we track enum-generated predicate/bang names and
+  // consult them here; the set is populated during the generation pass below, so
+  // the conflict pass only sees names from prior `enum()` declarations.
+  //
+  // Crucially the set is per-class and NOT inherited: Rails' `_enum_methods_module`
+  // is a class-instance variable (enum.rb:326-332) that Ruby does not inherit, so
+  // a subclass gets a fresh, empty module on first use — a subclass enum reusing a
+  // *parent* enum's value-method name does not conflict (the child's method just
+  // shadows via MRO). We therefore seed a fresh empty set per class rather than
+  // copying the parent's, while `hasOwnProperty` still lets multiple enums on the
+  // *same* class accumulate into one set.
   const enumMethodsHost = this as unknown as { _enumMethodsModuleNames?: Set<string> };
   if (!Object.prototype.hasOwnProperty.call(this, "_enumMethodsModuleNames")) {
-    enumMethodsHost._enumMethodsModuleNames = new Set(enumMethodsHost._enumMethodsModuleNames);
+    enumMethodsHost._enumMethodsModuleNames = new Set<string>();
   }
   const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
   const definedNames = new Set<string>();
