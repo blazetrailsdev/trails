@@ -165,23 +165,8 @@ const ENCRYPTION_CANONICAL_TABLES = [
   "traffic_lights",
 ] as const;
 
-// Rails rides `EncryptedBookWithSerializedFirstBinary` / `...SecondBinary` on the
-// canonical `encrypted_books.logo` (binary) column. trails cannot yet: those
-// fixtures store a JSON-*text* message (a string, via `_JsonArrayType` + the
-// default MessageSerializer) rather than a binary MessagePack payload, and a
-// string round-tripped through a bytea/BLOB column is returned as raw bytes on
-// PostgreSQL/MariaDB — the serializer then fails with "hash without payload".
-// Ruby dodges this because its String is a byte-string; trails' string-attribute-
-// on-binary-column path does not. Until the encrypted-binary round-trip is
-// fixed these two variants keep a bespoke `text`-backed table (matching the
-// string message). Tracked in `converge-encryption-makefreshmodel-onto-canonical`.
-const ENCRYPTION_SERIALIZED_BINARY_TABLES: Schema = {
-  encrypted_book_with_serialized_first_binaries: { logo: "text" },
-  encrypted_book_with_serialized_second_binaries: { logo: "text" },
-};
-
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
-  const schema: Schema = { ...ENCRYPTION_SERIALIZED_BINARY_TABLES };
+  const schema: Schema = {};
   for (const table of ENCRYPTION_CANONICAL_TABLES) {
     schema[table] = TEST_SCHEMA[table as keyof typeof TEST_SCHEMA];
   }
@@ -426,10 +411,7 @@ export function makeEncryptedBookWithSerializedFirstBinary(adapter: DatabaseAdap
   const jsonArrayType = new _JsonArrayType();
   return class EncryptedBookWithSerializedFirstBinary extends Base {
     static {
-      // Bespoke `text` table (not canonical encrypted_books.logo binary): see
-      // ENCRYPTION_SERIALIZED_BINARY_TABLES — trails can't yet round-trip a
-      // JSON-text encrypted message through a binary column on PG/MariaDB.
-      this._tableName = "encrypted_book_with_serialized_first_binaries";
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "string");
       // Replace string type with JSON-array type via the pending queue so
@@ -451,8 +433,7 @@ export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAda
   const jsonArrayType = new _JsonArrayType();
   return class EncryptedBookWithSerializedSecondBinary extends Base {
     static {
-      // Bespoke `text` table — see EncryptedBookWithSerializedFirstBinary.
-      this._tableName = "encrypted_book_with_serialized_second_binaries";
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "string");
       this.decorateAttributes(["logo"], () => jsonArrayType);
