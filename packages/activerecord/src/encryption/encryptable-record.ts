@@ -240,17 +240,25 @@ export class EncryptableRecord {
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
+    // Mirrors Rails' `default: columns_hash[name.to_s]&.default` — thread the
+    // column's schema default into the encrypted type so a plaintext default
+    // deserializes without an attempted decrypt (see EncryptedAttributeType's
+    // `@default && @default == value` guard in decryptAsText). The default is
+    // read from the reflected attribute definition (`defaultValue`, populated
+    // from the column default by schema reflection) rather than `columnsHash()`,
+    // which would warm the shared schema cache and perturb sibling tests.
     if (typeof modelClass.decorateAttributes === "function") {
       const def = modelClass._attributeDefinitions?.get?.(name);
       if (!def) return;
       if (def.type instanceof EncryptedAttributeType) return;
+      const columnDefault = this.columnDefaultFor(def);
       // The decorator returns null when the type is already encrypted — the
       // PendingDecorator replays on every _defaultAttributes rebuild, so it
       // must be idempotent to avoid double-wrapping.
       modelClass.decorateAttributes([name], (_attrName: string, castType: Type) =>
         castType instanceof EncryptedAttributeType
           ? (null as unknown as Type)
-          : new EncryptedAttributeType({ scheme, castType }),
+          : new EncryptedAttributeType({ scheme, castType, default: columnDefault }),
       );
       return;
     }
@@ -263,7 +271,11 @@ export class EncryptableRecord {
       castType = castType.castType;
     }
 
-    const encryptedType = new EncryptedAttributeType({ scheme, castType });
+    const encryptedType = new EncryptedAttributeType({
+      scheme,
+      castType,
+      default: this.columnDefaultFor(existingDef),
+    });
 
     // Register directly into _attributeDefinitions (not via attribute()
     // which expects a string type name).
@@ -277,6 +289,18 @@ export class EncryptableRecord {
         ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
       });
     }
+  }
+
+  /**
+   * Resolve the column's schema default from a reflected attribute definition,
+   * mirroring Rails' `columns_hash[name.to_s]&.default`. Schema reflection
+   * copies the column default onto the def's `defaultValue`, so reading it here
+   * avoids a `columnsHash()` call (which would warm the shared schema cache).
+   * Returns undefined (Rails' nil default) when there is no def or no default.
+   * @internal
+   */
+  static columnDefaultFor(def: any): unknown {
+    return def?.defaultValue ?? undefined;
   }
 
   /**
