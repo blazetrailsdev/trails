@@ -190,6 +190,21 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
+  it("find([[1n, 2], [1, 2]]) → bigint/number components fold, tuple uniq'd", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1n, 2],
+          [1, 2],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1n, 2]],
+      wantArray: true,
+      tuples: [[1n, 2]],
+    });
+  });
+
   it("find([[1, null], [1, null]]) → nil components preserved, tuple uniq'd", () => {
     expect(
       normalizeFindArgs("Order", pk, [
