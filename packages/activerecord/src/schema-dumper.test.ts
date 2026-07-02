@@ -62,8 +62,9 @@ describe("SchemaDumperTest", () => {
   // the MySQL family — the CI MariaDB 11 lane supports it, so `companies` dumps
   // the descending `order:` exactly as Rails does there.
   function dumpsIndexSortOrder(): boolean {
-    const adapter = Base.adapter as unknown as { supportsIndexSortOrder?(): boolean };
-    return adapter.supportsIndexSortOrder?.() ?? adapterType !== "mysql";
+    return (
+      Base.adapter as unknown as { supportsIndexSortOrder(): boolean }
+    ).supportsIndexSortOrder();
   }
 
   it("schema dump", async () => {
