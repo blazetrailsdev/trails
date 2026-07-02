@@ -19,7 +19,12 @@ package list, and the `declare` / associations / enums / schema reference, see
   `vendor/rails/activerecord/test/schema/schema.rb`, which
   `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
   test needs a table or column, check schema.rb first; if it's not there,
-  don't invent it.
+  don't invent it. Likewise, Rails' test models live in
+  `vendor/rails/activerecord/test/models/` (ours:
+  `packages/activerecord/src/test-helpers/models/`) and its fixture data in
+  `vendor/rails/activerecord/test/fixtures/` (ours:
+  `packages/activerecord/src/test-helpers/fixtures/`) — mirror those too
+  rather than making up models or fixture rows.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
@@ -98,7 +103,7 @@ package list, and the `declare` / associations / enums / schema reference, see
   corresponding Rails test first.
 - **`defineSchema` is canonical-only — no bespoke tables.** In AR tests,
   `defineSchema()` may pass **only** the canonical `TEST_SCHEMA`
-  (`test-helpers/test-schema.js`); never re-declare a table inline or invent a
+  (`test-helpers/test-schema.ts`); never re-declare a table inline or invent a
   free table name. Prefer `useHandlerFixtures` / `setupHandlerSuite` on the
   default canonical tables (and the official models in
   `packages/activerecord/src/test-helpers/models/`) over `defineSchema`. Table,
