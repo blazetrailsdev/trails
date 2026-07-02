@@ -223,8 +223,15 @@ function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node
 
 /** @internal */
 function extractNodeValue(node: unknown): unknown {
+  // Mirrors Rails where_clause.rb:209-215 `extract_node_value`: prefer
+  // `value_before_type_cast` (the raw, un-serialized value). Both Quoted and
+  // Casted alias it to their stored value — so a Casted wrapping an
+  // AdditionalValue (encryption deterministic queries) or any other rich value
+  // is returned intact for scope_for_create, not flattened via
+  // `value_for_database`. This matters now that multi-value arrays build
+  // `HomogeneousIn`, whose `right` is an array of Casted nodes.
   if (node instanceof Nodes.Quoted) return node.value;
-  if (node instanceof Nodes.Casted) return node.valueForDatabase();
+  if (node instanceof Nodes.Casted) return node.valueBeforeTypeCast();
   if (node instanceof Nodes.BindParam) {
     const val = node.value;
     if (val && typeof val === "object" && "value" in val) {

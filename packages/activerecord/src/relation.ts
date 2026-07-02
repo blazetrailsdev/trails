@@ -5792,7 +5792,23 @@ export class Relation<T extends Base> {
     const v = this._arelVisitor();
     const [sql, binds, retryable, preparable] = v.compileWithBinds(manager.ast);
     this._lastSelectRetryable = retryable;
-    this._lastSelectBinds = this._typeCastBinds(binds);
+    const castBinds = this._typeCastBinds(binds);
+    // Mirrors Rails to_sql_and_binds (database_statements.rb:36-38): when the
+    // bind count exceeds the adapter's parameter cap, fall back to an inlined
+    // (unprepared) compile so the driver's variable limit isn't overflowed.
+    // Reachable via a large multi-value `IN`/`NOT IN` (`HomogeneousIn`).
+    const conn = this._conn() as {
+      toSql(m: unknown): string;
+      preparedStatements?: boolean;
+      bindParamsLength?(): number;
+    };
+    const limit = typeof conn.bindParamsLength === "function" ? conn.bindParamsLength() : null;
+    if (conn.preparedStatements && limit != null && castBinds.length > limit) {
+      this._lastSelectBinds = [];
+      this._lastSelectPreparable = false;
+      return conn.toSql(manager);
+    }
+    this._lastSelectBinds = castBinds;
     this._lastSelectPreparable = preparable;
     return sql;
   }
