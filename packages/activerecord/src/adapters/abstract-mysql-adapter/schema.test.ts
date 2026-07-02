@@ -200,7 +200,9 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
       t.string("title", { limit: 250 });
       t.string("author_name");
       t.string("author_email_address");
-      t.datetime("written_on");
+      // MySQL upgrades bare DATETIME to DATETIME(6) (Rails datetime-with-precision),
+      // matching the boot-laid canonical `topics` — pass precision explicitly.
+      t.datetime("written_on", { precision: 6 });
       t.time("bonus_time");
       t.date("last_read");
       t.text("content");
@@ -213,8 +215,8 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
       t.string("parent_title");
       t.string("type");
       t.string("group");
-      t.datetime("created_at", { null: true });
-      t.datetime("updated_at", { null: true });
+      t.datetime("created_at", { null: true, precision: 6 });
+      t.datetime("updated_at", { null: true, precision: 6 });
     });
     try {
       expect(await a.primaryKey("topics")).toBe("id");
