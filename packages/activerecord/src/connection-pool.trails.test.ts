@@ -38,14 +38,18 @@ import { Result } from "./result.js";
  * Build a HashConfig for a pool-under-test cloned from the ambient lane
  * adapter's configuration (sqlite/postgres/mysql), mirroring Rails
  * connection_pool_test.rb:20-27 (`ActiveRecord::Base.connection_pool.db_config`
- * cloned with per-test overrides). Every override the callers pass is
- * adapter-neutral (pool size, timeouts, cache path, query-cache size), so the
- * duplicate pool runs against whatever adapter the current lane uses instead of
- * a hardcoded SQLite file.
+ * cloned, merging `checkout_timeout: 0.2`). Like Rails, the duplicate pool
+ * carries the short `checkoutTimeout` so saturation tests fail fast; callers
+ * that need a different value pass it per checkout. `reapingFrequency: null`
+ * keeps the idle reaper quiet unless a test opts in. Every override the callers
+ * pass is adapter-neutral (pool size, timeouts, cache path, query-cache size),
+ * so the duplicate pool runs against whatever adapter the current lane uses
+ * instead of a hardcoded SQLite file.
  */
 function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("test", "primary", {
     ...ambientPoolConfiguration(),
+    checkoutTimeout: 0.2,
     reapingFrequency: null,
     ...overrides,
   });
