@@ -398,15 +398,22 @@ export class SchemaCreation {
         break;
       case "decimal": {
         // Mirror Rails' `type_to_sql` decimal branch (schema_statements.rb:1390):
-        // `decimal(precision,scale)` when a scale is given, else `decimal(precision)`
-        // — no space after the comma, so `extract_scale`/`extract_precision`
-        // reflect it back byte-for-byte as Rails does.
+        // the precision default is sourced from `native_database_types[:decimal]`,
+        // which carries no `:precision` on SQLite/MySQL/PostgreSQL — so a
+        // precision-less decimal emits a bare `DECIMAL` with no `(N)` clause and
+        // dumps bare, rather than defaulting to `(10)`. When a precision is given,
+        // append `(precision,scale)` / `(precision)` — no space after the comma,
+        // so `extract_scale`/`extract_precision` reflect it back byte-for-byte.
         this.validateDecimalPrecision(options);
-        const precision = options.precision ?? 10;
-        sql =
-          options.scale != null
-            ? `DECIMAL(${precision},${options.scale})`
-            : `DECIMAL(${precision})`;
+        const precision = options.precision;
+        if (precision != null) {
+          sql =
+            options.scale != null
+              ? `DECIMAL(${precision},${options.scale})`
+              : `DECIMAL(${precision})`;
+        } else {
+          sql = "DECIMAL";
+        }
         break;
       }
       case "boolean":
