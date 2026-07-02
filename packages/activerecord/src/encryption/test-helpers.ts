@@ -17,7 +17,7 @@ import { Configurable } from "./configurable.js";
 import { defaultCompressor, type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { clearDefaultKeyProviderCache } from "./scheme.js";
+import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { DecryptionError, EncryptionError } from "./errors.js";
 import { ValueType, BinaryData } from "@blazetrails/activemodel";
@@ -226,7 +226,7 @@ export function makePlainPost(adapter: DatabaseAdapter) {
  */
 export function makeEncryptedAuthorWithPreviousSchemes(
   adapter: DatabaseAdapter,
-  previousSchemes: unknown[],
+  previousSchemes: Scheme[],
 ) {
   return class EncryptedAuthor extends Base {
     static {
@@ -234,7 +234,7 @@ export function makeEncryptedAuthorWithPreviousSchemes(
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
-      this.encrypts("name", { previousSchemes: previousSchemes as never });
+      this.encrypts("name", { previousSchemes });
     }
   } as any;
 }
