@@ -6,7 +6,7 @@ import {
 } from "./context.js";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 import { Configuration as ConfigurationError } from "./errors.js";
-import { LengthValidator } from "@blazetrails/activemodel";
+import { LengthValidator, type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { KeyGenerator } from "./key-generator.js";
@@ -193,35 +193,7 @@ export class EncryptableRecord {
     // previousSchemes) don't leak across declarations.
     const scheme = schemeFor(options);
 
-    // Get existing cast type from attribute definitions if available.
-    // If already encrypted, unwrap to avoid double-encryption.
-    const existingDef = modelClass._attributeDefinitions?.get?.(name);
-    let castType = existingDef?.type;
-    if (castType instanceof EncryptedAttributeType) {
-      castType = castType.castType;
-    }
-
-    const encryptedType = new EncryptedAttributeType({
-      scheme,
-      castType,
-    });
-
-    // Register directly into _attributeDefinitions (not via attribute()
-    // which expects a string type name)
-    if (modelClass._attributeDefinitions?.set) {
-      modelClass._attributeDefinitions.set(name, {
-        name,
-        type: encryptedType,
-        defaultValue: existingDef?.defaultValue ?? null,
-        // When there's no pre-existing def, this encryption placeholder is
-        // waiting for schema reflection to supply the real cast type.
-        // Mark it schema-sourced so loadSchemaFromAdapter can wrap the
-        // adapter-resolved type (applyPendingEncryptions re-runs after).
-        userProvided: existingDef?.userProvided ?? false,
-        source: existingDef?.source ?? "schema",
-        ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
-      });
-    }
+    this.registerEncryptedType(modelClass, name, scheme);
 
     if (Configurable.config.validateColumnSize) {
       EncryptableRecord.validateColumnSize(modelClass, name);
@@ -236,6 +208,63 @@ export class EncryptableRecord {
     }
 
     Configurable.encryptedAttributeWasDeclared(modelClass, name);
+  }
+
+  /**
+   * The single EncryptedAttributeType-wrapping primitive shared by both
+   * declaration paths, so `Base.encrypts` (via `applyPendingEncryptions`) and
+   * the scheme-based `encryptAttribute` register the wrapped type through one
+   * implementation:
+   *
+   * - Models exposing `decorateAttributes` (real Base subclasses driven by the
+   *   `Base.encrypts` → `applyPendingEncryptions` path) get a replay-safe
+   *   PendingDecorator so `_defaultAttributes` re-wraps after schema reflection.
+   *   Skips when the def isn't present yet — the persistent `_pendingEncryptions`
+   *   buffer re-invokes this once the column is reflected — or already encrypted.
+   * - Plain models (the scheme-based / mock-model test path) set
+   *   `_attributeDefinitions` directly, seeding a schema-sourced placeholder
+   *   when no def exists yet so `loadSchemaFromAdapter` can supply the real
+   *   cast type on the next pass.
+   * @internal
+   */
+  static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
+    if (typeof modelClass.decorateAttributes === "function") {
+      const def = modelClass._attributeDefinitions?.get?.(name);
+      if (!def) return;
+      if (def.type instanceof EncryptedAttributeType) return;
+      // The decorator returns null when the type is already encrypted — the
+      // PendingDecorator replays on every _defaultAttributes rebuild, so it
+      // must be idempotent to avoid double-wrapping.
+      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) =>
+        castType instanceof EncryptedAttributeType
+          ? (null as unknown as Type)
+          : new EncryptedAttributeType({ scheme, castType }),
+      );
+      return;
+    }
+
+    // Get existing cast type from attribute definitions if available.
+    // If already encrypted, unwrap to avoid double-encryption.
+    const existingDef = modelClass._attributeDefinitions?.get?.(name);
+    let castType = existingDef?.type;
+    if (castType instanceof EncryptedAttributeType) {
+      castType = castType.castType;
+    }
+
+    const encryptedType = new EncryptedAttributeType({ scheme, castType });
+
+    // Register directly into _attributeDefinitions (not via attribute()
+    // which expects a string type name).
+    if (modelClass._attributeDefinitions?.set) {
+      modelClass._attributeDefinitions.set(name, {
+        name,
+        type: encryptedType,
+        defaultValue: existingDef?.defaultValue ?? null,
+        userProvided: existingDef?.userProvided ?? false,
+        source: existingDef?.source ?? "schema",
+        ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
+      });
+    }
   }
 
   /**
