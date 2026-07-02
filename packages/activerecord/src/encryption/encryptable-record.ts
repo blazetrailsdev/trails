@@ -291,23 +291,67 @@ export class EncryptableRecord {
   /** @internal */
   static preserveOriginalEncrypted(modelClass: any, name: string): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-    // Mirrors Rails encryptable_record.rb:101–103: raise when the original_<name>
-    // column is absent and supportUnencryptedData is false (no fallback for
-    // reading un-preserved rows). Rails' columns_hash forces a schema load; ours
-    // can't at static-init (Base.encrypts runs before the adapter is connected),
-    // so columnNames() returns [] there. Only enforce once columns are actually
-    // known — an empty list means schema isn't loaded yet, so we defer rather
-    // than raise a false positive.
-    const colNames: string[] = modelClass.columnNames?.() ?? [];
-    if (!Configurable.config.supportUnencryptedData && colNames.length > 0) {
-      if (!colNames.includes(originalName)) {
-        throw new ConfigurationError(
-          `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
-        );
+    // Enforce the missing-column requirement eagerly when columns are already
+    // known (direct callers that supply columnNames synchronously). At
+    // Base.encrypts static-init the adapter isn't connected yet so columnNames()
+    // is [] and we defer — requireOriginalColumnPresent re-runs the check from
+    // applyPendingEncryptions once the schema has loaded, so the guard is still
+    // enforced (fail-closed), not silently skipped.
+    this.requireOriginalColumnPresent(modelClass, name, modelClass.columnNames?.() ?? []);
+
+    // Declare original_<name> with a default scheme, mirroring Rails' bare
+    // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
+    // Build it through the shared buildScheme so the legacy encryptor shim +
+    // defaultEncryptor fallback apply exactly as they do for the primary
+    // attribute (a bare schemeFor({}) would raise "No encryption key provided"
+    // when no keys are configured). Falls back to schemeFor when the encryption
+    // namespace isn't loaded (pure-direct unit tests, which never serialize).
+    const originalScheme = encryptionHooks.buildScheme?.({}) as Scheme | undefined;
+    this.encryptAttribute(modelClass, originalName, {}, originalScheme);
+    this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
+  }
+
+  /**
+   * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
+   * is missing and `supportUnencryptedData` is false — mirrors Rails
+   * encryptable_record.rb:101–103. No-op until columns are known: Base.encrypts
+   * runs at static-init before the adapter is connected (columnNames() === []),
+   * so this is re-run post-schema from applyPendingEncryptions once columns load.
+   * @internal
+   */
+  static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
+    if (Configurable.config.supportUnencryptedData) return;
+    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+    // Empty list ⇒ schema not loaded yet: defer rather than raise a false positive.
+    if (colNames.length === 0 || colNames.includes(originalName)) return;
+    throw new ConfigurationError(
+      `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
+    );
+  }
+
+  /**
+   * Re-run the `original_<name>` column requirement for every preserved
+   * (`ignore_case`) attribute now that the schema may have loaded. Called from
+   * applyPendingEncryptions so the check deferred at static-init is enforced
+   * once columns are known. Only preserved pairs (an attribute AND its
+   * `original_<name>` sibling both encrypted) are checked, so plain encrypted
+   * attributes never spuriously require an `original_` column.
+   *
+   * Reads columns from `_attributeDefinitions` (already populated by schema
+   * reflection at this point) rather than `columnNames()` — the latter forces a
+   * schema load, and this runs *inside* one, so calling it would recurse.
+   * @internal
+   */
+  static revalidatePreservedColumns(modelClass: any): void {
+    const defs = modelClass._attributeDefinitions;
+    const colNames: string[] = defs instanceof Map ? [...defs.keys()] : [];
+    const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set<string>();
+    for (const attr of attrs) {
+      const source = this.sourceAttributeFromPreservedAttribute(attr);
+      if (source !== undefined && attrs.has(source)) {
+        this.requireOriginalColumnPresent(modelClass, source, colNames);
       }
     }
-    this.encrypts(modelClass, originalName);
-    this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
 
   /** @internal */

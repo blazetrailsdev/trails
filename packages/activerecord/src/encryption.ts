@@ -258,6 +258,12 @@ export function applyPendingEncryptions(klass: any): void {
     }
   }
 
+  // Re-run the ignore_case `original_<name>` column requirement now that the
+  // schema may have loaded. Base.encrypts declares at static-init (before the
+  // adapter is connected), so the check in preserveOriginalEncrypted is deferred
+  // there; this enforces it fail-closed once columns are known.
+  EncryptableRecord.revalidatePreservedColumns(klass);
+
   // Register the frozen-encryption validator once per class. Own-property check
   // so subclasses that have already snapped their callback chain don't miss it —
   // if a subclass registered callbacks before the parent installed this
@@ -486,6 +492,7 @@ export function resetDefaultContext(): void {
 registerEncryptionHooks({
   encrypts,
   applyPendingEncryptions,
+  buildScheme,
   encryptedAttributeQ,
   ciphertextFor,
   encryptRecord,
