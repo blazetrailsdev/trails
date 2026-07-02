@@ -12,30 +12,6 @@ import { argumentError } from "./query-methods.js";
 
 interface BoundType {
   cast?(x: unknown): unknown;
-  isSerializable?(x: unknown): boolean;
-}
-
-/**
- * Casts a range bound to its column type, but substitutes an
- * {@link UnboundableBound} for a value the type reports as non-serializable
- * (out of range for the column's byte width). Mirrors Rails' RangeHandler
- * wrapping each bound in a QueryAttribute whose `unboundable?` short-circuits
- * `Predications#between`, rather than casting a value that would raise
- * ActiveModelRangeError when bound. In-range bounds pass through `cast`
- * unchanged so ordinary ranges emit identical SQL.
- */
-function castRangeBound(type: BoundType | undefined, v: unknown): unknown {
-  if (type?.isSerializable && !type.isSerializable(v)) {
-    return new UnboundableBound(boundSign(v));
-  }
-  return type?.cast ? type.cast(v) : v;
-}
-
-/** Signed distance from zero for an out-of-range numeric bound (`value <=> 0`). */
-function boundSign(v: unknown): 1 | -1 {
-  if (typeof v === "bigint") return v >= 0n ? 1 : -1;
-  if (typeof v === "number") return v >= 0 ? 1 : -1;
-  return 1;
 }
 
 /**
@@ -66,19 +42,15 @@ export class PredicateBuilder {
     this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
+      const sentinel = this.unboundableSentinel(attribute, v);
+      if (sentinel) return sentinel;
       const type = this.resolveBoundType(attribute);
-      return castRangeBound(type, v);
+      return type?.cast ? type.cast(v) : v;
     });
     this.basicObjectHandler = new BasicObjectHandler(this);
     this.relationHandler = new RelationHandler();
   }
 
-  /**
-   * Resolves the column type for a range bound, preferring the attribute's own
-   * relation typeCaster (covers joined/aliased tables), then the predicate
-   * builder's table/model context, then the arel table. Mirrors the cascade
-   * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
-   */
   /**
    * Replaces an out-of-range scalar with an {@link UnboundableBound} sentinel
    * (leaving in-range values untouched), so the Arel `In` / `NotIn` visitor
@@ -88,13 +60,30 @@ export class PredicateBuilder {
    * QueryAttribute bind whose `unboundable?` collapses the equality to `1=0`.
    */
   markUnboundable(attribute: Nodes.Attribute, value: unknown): unknown {
-    const type = this.resolveBoundType(attribute);
-    if (type?.isSerializable && !type.isSerializable(value)) {
-      return new UnboundableBound(boundSign(value));
-    }
-    return value;
+    return this.unboundableSentinel(attribute, value) ?? value;
   }
 
+  /**
+   * Returns an {@link UnboundableBound} sentinel when `value` is out of range
+   * for the column, else null. Both the detection and the sign come from a
+   * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
+   * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
+   * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
+   * than a second sign computation) keeps this in lockstep with the
+   * equality/negation single-value paths, and handles non-numeric out-of-range
+   * bounds (e.g. custom types) type-agnostically.
+   */
+  private unboundableSentinel(attribute: Nodes.Attribute, value: unknown): UnboundableBound | null {
+    const sign = this.buildBindAttribute(attribute.name, value).isUnboundable();
+    return sign === false ? null : new UnboundableBound(sign);
+  }
+
+  /**
+   * Resolves the column type for a range bound, preferring the attribute's own
+   * relation typeCaster (covers joined/aliased tables), then the predicate
+   * builder's table/model context, then the arel table. Mirrors the cascade
+   * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
+   */
   private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
     const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
     const attrType = (
