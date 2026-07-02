@@ -7,21 +7,15 @@
  * `hasAttribute` alias resolution, and the readonly-attribute raise. Test names
  * are kept verbatim per CLAUDE.md.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, ReadonlyAttributeError } from "./index.js";
+import { describe, it, expect } from "vitest";
+import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Minivan } from "./test-helpers/models/minivan.js";
 
-const TEST_SCHEMA = {
-  items: {
-    name: "string",
-    count: "integer",
-    code: "string",
-  },
-} as const;
+registerModel(Minivan);
 
 /** Internal attribute-method generation surface exercised by these tests. */
 interface Generatable {
@@ -33,9 +27,6 @@ const generatable = (cls: unknown): Generatable => cls as Generatable;
 describe("AttributeMethodsTest (trails)", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   it("defineAttributeMethods cascades to the superclass", async () => {
     class Animal extends Base {
@@ -93,22 +84,16 @@ describe("AttributeMethodsTest (trails)", () => {
     // Rails raises ReadonlyAttributeError on a persisted-record write to an
     // attr_readonly column (readonly_attributes.rb line 49). The test name's
     // "are not updated" wording pre-dates Rails adding the raise; the
-    // attribute isn't updated because the write itself is rejected.
-    class Item extends Base {
-      static {
-        this.attribute("code", "string");
-        this.attribute("name", "string");
-        this.attrReadonly("code");
-      }
-    }
-    const item = await Item.create({ code: "ABC", name: "Widget" });
+    // attribute isn't updated because the write itself is rejected. Minivan
+    // (models/minivan.rb) declares `attr_readonly :color`.
+    const minivan = await Minivan.create({ minivan_id: "mv1", color: "blue", name: "Rebel" });
     expect(() => {
-      item.code = "XYZ";
+      minivan.color = "red";
     }).toThrow(ReadonlyAttributeError);
-    item.name = "Updated";
-    await item.save();
-    const found = await Item.find(item.id);
-    expect(found.code).toBe("ABC");
+    minivan.name = "Updated";
+    await minivan.save();
+    const found = await Minivan.find("mv1");
+    expect(found.color).toBe("blue");
     expect(found.name).toBe("Updated");
   });
 
