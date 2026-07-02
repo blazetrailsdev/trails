@@ -20,6 +20,7 @@ import type { MigrationProxy } from "./migration.js";
 import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { resetMigratorState } from "./test-helpers/reset-migrator-state.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function makeMigration(
@@ -41,8 +42,9 @@ function makeMigration(
 describe("Migrator trails extensions", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await resetMigratorState(adapter);
   });
 
   it("stores environment after up migration", async () => {
@@ -187,6 +189,16 @@ describe("Migrator trails extensions", () => {
 });
 
 describe("Migrator advisory lock wrapping", () => {
+  // Each `it` here leases its own adapter (with per-test lock stubs), so there is
+  // no shared instance to reset. Under one-schema every lease from
+  // createTestAdapter() is backed by the same canonical worker DB, so clearing
+  // the schema_migrations / internal_metadata rows through any lease clears the
+  // bookkeeping every test's own lease will observe — without this, version "1"
+  // recorded by one test persists and later migrate() calls no-op.
+  beforeEach(async () => {
+    await resetMigratorState(createTestAdapter());
+  });
+
   it("acquires and releases advisory lock when adapter supports it", async () => {
     const adapter = createTestAdapter();
     const lockLog: string[] = [];

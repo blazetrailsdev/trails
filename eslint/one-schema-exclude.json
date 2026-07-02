@@ -1,13 +1,7 @@
 [
-  "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",
-  "packages/activerecord/src/migrator.test.ts",
-  "packages/activerecord/src/migrator.trails.test.ts",
-  "packages/activerecord/src/multiple-db.test.ts",
-  "packages/activerecord/src/schema-dumper.test.ts",
   "packages/activerecord/src/test-helpers/define-schema.test.ts",
   "packages/activerecord/src/test-helpers/handler-resolved-adapter.test.ts",
   "packages/activerecord/src/test-helpers/use-fixtures.test.ts",
   "packages/activerecord/src/test-helpers/use-transactional-tests.test.ts",
-  "packages/activerecord/src/test-helpers/with-transactional-fixtures.test.ts",
-  "packages/activerecord/src/transaction-instrumentation.test.ts"
+  "packages/activerecord/src/test-helpers/with-transactional-fixtures.test.ts"
 ]

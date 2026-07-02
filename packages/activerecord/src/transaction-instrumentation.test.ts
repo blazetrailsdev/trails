@@ -34,7 +34,13 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 // `Class.new`.
 async function freshIsolatedAdapter(): Promise<AbstractSQLite3Adapter> {
   const adapter = new BetterSQLite3Adapter(":memory:");
-  await defineSchema(adapter, { topics: canonicalSchema.topics });
+  // `force: true` so the canonical `topics` is actually created on this isolated
+  // per-test adapter under AR_ONE_SCHEMA=1. The one-schema boot lays the canonical
+  // tables into the main per-worker pool only; a secondary/sidecar adapter never
+  // sees them, so the explicit-adapter defineSchema must issue real DDL here.
+  // `force` skips one-schema's canonical-schema assertion, but the shape passed
+  // is `canonicalSchema.topics` by reference, so it cannot drift from canonical.
+  await defineSchema(adapter, { topics: canonicalSchema.topics }, { force: true });
   return adapter;
 }
 

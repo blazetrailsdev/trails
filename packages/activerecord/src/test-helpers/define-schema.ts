@@ -115,9 +115,14 @@ export interface DefineSchemaOpts {
   dropExisting?: boolean;
   /**
    * Force real DDL even under `AR_ONE_SCHEMA=1`. Boot-time builders (the
-   * template-global-setup that lays the canonical schema into the template
-   * DB) set this so the one-schema no-op guard doesn't suppress the very
-   * `CREATE TABLE`s the run depends on. Test files never set it.
+   * template-global-setup that lays the canonical schema into the template DB)
+   * and `repairWorkerSchema` set this so the one-schema no-op guard doesn't
+   * suppress the `CREATE TABLE`s the run depends on. Tests may also set it to
+   * lay the canonical schema into a SECONDARY adapter/pool that the boot layout
+   * never reached (an isolated `:memory:` adapter, or the `arunit2` second
+   * pool) — the boot layout only stamps the MAIN per-worker pool. Never set it
+   * to reshape a canonical table on the main pool: that breaks the one-schema
+   * no-drop invariant (`one-schema.ts`), which is scoped to the main pool.
    * @internal
    */
   force?: boolean;
