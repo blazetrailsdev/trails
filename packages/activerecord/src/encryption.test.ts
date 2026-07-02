@@ -10,6 +10,10 @@ import { Configurable } from "./encryption/configurable.js";
 import { Decryption as DecryptionError } from "./encryption/errors.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import {
+  EncryptedBook,
+  EncryptedBookWithDowncaseName,
+} from "./test-helpers/models/book-encrypted.js";
 
 class TestEncryptor implements EncryptorLike {
   constructor(private readonly map: Record<string, string>) {}
@@ -45,6 +49,10 @@ beforeAll(async () => {
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {
+    // Inline (not the canonical EncryptedBook) because this suite deliberately
+    // omits configureEncryption(); default non-deterministic encryption needs no
+    // key config, whereas EncryptedBook's `deterministic: true` requires a
+    // configured deterministicKey.
     class Book extends Base {
       static _tableName = "encrypted_books";
       static {
@@ -65,6 +73,8 @@ describe("encrypts()", () => {
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
+    // Inline (see the note above): default non-deterministic encryption avoids
+    // EncryptedBook's deterministicKey requirement in a suite without config.
     class Book extends Base {
       static _tableName = "encrypted_books";
       static {
@@ -102,14 +112,9 @@ describe("encrypts()", () => {
   });
 
   it("wires scheme options (deterministic, downcase) through to the attribute type", async () => {
-    class Book extends Base {
-      static _tableName = "encrypted_books";
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.encrypts("name", { deterministic: true, downcase: true });
-      }
-    }
+    // Canonical model: `encrypts :name, deterministic: true, downcase: true`
+    // (vendor/rails/activerecord/test/models/book_encrypted.rb).
+    const Book = EncryptedBookWithDowncaseName;
 
     // Trigger construction so applyPendingEncryptions runs.
     new Book();
@@ -120,16 +125,8 @@ describe("encrypts()", () => {
   });
 
   it("registers encrypted attributes on the class", async () => {
-    class Book extends Base {
-      static _tableName = "encrypted_books";
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.encrypts("name");
-      }
-    }
-
-    expect((Book as any)._encryptedAttributes.has("name")).toBe(true);
+    // Canonical model: `encrypts :name` registers it in _encryptedAttributes.
+    expect((EncryptedBook as any)._encryptedAttributes.has("name")).toBe(true);
   });
 });
 
