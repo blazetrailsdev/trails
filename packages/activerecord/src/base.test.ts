@@ -889,6 +889,9 @@ describe("BasicsTest", () => {
       class Pet extends Base {
         static {
           this.tableName = "pets";
+          // Rails' Pet model sets `self.primary_key = :pet_id`; canonical `pets`
+          // has no `id` column (vendor/rails/.../models/pet.rb).
+          this.primaryKey = "pet_id";
           this.attribute("name", "string");
           this.attribute("created_at", "datetime");
           this.attribute("updated_at", "datetime");
