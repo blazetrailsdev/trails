@@ -27,19 +27,26 @@ import { normalizeRailsKind, normalizeTrailsKind, type CanonicalKind } from "./a
 
 /**
  * Canonical kinds that carry a single, statically comparable literal expected
- * value. Deliberately narrow: equality/identity assertions (Rails first arg,
- * trails matcher arg) and membership (`assert_includes coll, member` — Rails
- * second arg — vs `toContain(member)`). Excluded are kinds whose "value" is
- * typically non-literal or multi-arg (`match`/`inDelta`/`operator`/`length`);
- * they still extract a value where one exists but are never value-compared.
+ * value. Deliberately narrow: equality assertions (Rails first arg, trails
+ * matcher arg) and membership (`assert_includes coll, member` — Rails second
+ * arg — vs `toContain(member)`). Excluded are kinds whose "value" is typically
+ * non-literal or multi-arg (`match`/`inDelta`/`operator`/`length`); they still
+ * extract a value where one exists but are never value-compared.
+ *
+ * `same`/`notSame` are intentionally NOT here despite carrying a first-arg
+ * value on the Rails side: no trails matcher normalizes to them (`toBe` maps to
+ * `equal` by design — see assertion-kinds.ts TRAILS_MAP), so the only trails
+ * path is a helper callee (`assertSame(...)`), for which the extractor captures
+ * no argument (values.push(null) in extract-ts-core.ts collectAssertionKinds).
+ * With the trails side never fully-literal, the skip rule would drop them every
+ * time — so including them would be dead config. Add them back if/when a helper
+ * form learns to parse its expected argument.
  */
 export const VALUE_BEARING_KINDS: ReadonlySet<CanonicalKind> = new Set<CanonicalKind>([
   "equal",
   "notEqual",
   "includes",
   "excludes",
-  "same",
-  "notSame",
 ]);
 
 /** Per-kind literal-value divergence between a matched Rails/trails pair. */
