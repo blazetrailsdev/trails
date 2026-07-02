@@ -972,6 +972,41 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     ).not.toThrow();
   });
 
+  // Post-reflection re-check: `requireOriginalColumnsAfterReflection` iterates
+  // the recorded ignoreCase source attributes and re-runs the requirement
+  // against the authoritative reflected column set. These exercise the new
+  // static deterministically, independent of schema-cache warmth.
+  it("post-reflection re-check raises when a preserved attribute's original_<name> column is absent", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, ["id", "name"]),
+    ).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  it("post-reflection re-check does not raise when the original_<name> column is present", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, [
+        "id",
+        "name",
+        "original_name",
+      ]),
+    ).not.toThrow();
+  });
+
+  it("post-reflection re-check is a no-op when no ignoreCase attributes were preserved", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection({} as any, ["id", "name"]),
+    ).not.toThrow();
+  });
+
+  it("post-reflection re-check defers when the reflected column set is empty (schema not loaded)", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, []),
+    ).not.toThrow();
+  });
+
   // End-to-end: a real Base.encrypts(ignoreCase) on the canonical `authors`
   // table (which has `name` but no `original_name`) must raise, exercising the
   // full encrypts → encryptAttribute → preserveOriginalEncrypted wiring.
@@ -999,21 +1034,24 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
   // preserve_original_encrypted.
   it("Base.encrypts ignoreCase declared before the adapter connects raises after schema reflection", async () => {
     const adapter = await freshAdapter();
-    // The raise fires at declaration time when the schema cache is already warm
-    // (columnNames() reflects `authors` immediately) or, when it's cold and
-    // columnNames() defers with [], at reflection time via the post-reflection
-    // hook. Either way a genuinely-absent original_name column is fail-closed —
-    // so wrap the whole declaration + reflection in the rejection assertion.
+    // Declare while supportUnencryptedData is true so the declaration-time check
+    // defers (regardless of schema-cache warmth), then flip it off and force a
+    // fresh reflection via resetColumnInformation — so ONLY the post-reflection
+    // hook can raise. This deterministically exercises the new fail-closed
+    // wiring on `authors` (which has `name` but no `original_name`).
+    Configurable.config.supportUnencryptedData = true;
+    const Model = class extends Base {
+      static _tableName = "authors";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+      }
+    } as any;
+    Configurable.config.supportUnencryptedData = false;
+    Model.resetColumnInformation();
     await expect(async () => {
-      const Model = class extends Base {
-        static _tableName = "authors";
-        static {
-          this.encrypts("name", { deterministic: true, ignoreCase: true });
-          this.attribute("id", "integer");
-          this.attribute("name", "string");
-          this.adapter = adapter;
-        }
-      } as any;
       await Model.loadSchema();
       new Model();
     }).rejects.toThrow(/must create an additional column named 'original_name'/);
