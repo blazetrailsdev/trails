@@ -55,20 +55,6 @@ export class PredicateBuilder {
   }
 
   /**
-   * Replaces an out-of-range scalar with an {@link UnboundableBound} sentinel
-   * (leaving in-range values untouched), so the Arel `In` / `NotIn` visitor
-   * drops it from the list — mirroring Rails' `visit_Arel_Nodes_In`
-   * `values.delete_if { |v| unboundable?(v) }`. Used by ArrayHandler's
-   * multi-value `IN` path; the single-value path already routes through a
-   * QueryAttribute bind whose `unboundable?` collapses the equality to `1=0`.
-   */
-  markUnboundable(attribute: Nodes.Attribute, value: unknown): unknown {
-    return (
-      this.unboundableSentinel(attribute.name, value, this.resolveBoundType(attribute)) ?? value
-    );
-  }
-
-  /**
    * Returns an {@link UnboundableBound} sentinel when `value` is out of range
    * for `type`, else null. Both the detection and the sign come from a
    * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
@@ -411,9 +397,10 @@ export class PredicateBuilder {
     if (scalarValues.length === 1) {
       parts.push(this.buildNegated(attribute, scalarValues[0]));
     } else if (scalarValues.length > 1) {
-      // Drop out-of-range values so the NotIn visitor filters them (mirrors
-      // Rails' `visit_Arel_Nodes_NotIn`), matching the positive IN path.
-      parts.push(attribute.notIn(scalarValues.map((v) => this.markUnboundable(attribute, v))));
+      // Mirror Rails `ArrayHandler#call` + `.invert`: the multi-value case is a
+      // `HomogeneousIn` node, inverted to `:notin`. Its `castedValues` drops
+      // out-of-range values, matching the positive IN path.
+      parts.push(new Nodes.HomogeneousIn(scalarValues, attribute, "notin"));
     }
 
     if (hasNull) {

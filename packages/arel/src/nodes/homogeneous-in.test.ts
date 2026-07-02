@@ -84,6 +84,38 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     });
   });
 
+  describe("castedValues", () => {
+    // A fake attribute exposing a type_caster with isSerializable + serialize,
+    // mirroring Arel::Attribute#type_caster (an ActiveModel type). castedValues
+    // must consult isSerializable (Rails' `type.serializable?`), NOT a
+    // non-existent `serializable`.
+    const fakeAttr = (typeCaster: unknown): Nodes.Node =>
+      ({ name: "id", typeCaster }) as unknown as Nodes.Node;
+
+    it("drops non-serializable values and serializes the rest", () => {
+      const attr = fakeAttr({
+        isSerializable: (v: unknown) => (v as number) < 100,
+        serialize: (v: unknown) => (v as number) * 10,
+      });
+      const node = new Nodes.HomogeneousIn([1, 250, 3], attr, "in");
+      expect(node.castedValues).toEqual([10, 30]);
+    });
+
+    it("drops values that serialize to null", () => {
+      const attr = fakeAttr({
+        isSerializable: () => true,
+        serialize: (v: unknown) => (v === 2 ? null : v),
+      });
+      const node = new Nodes.HomogeneousIn([1, 2, 3], attr, "in");
+      expect(node.castedValues).toEqual([1, 3]);
+    });
+
+    it("returns raw values when the attribute has no type_caster", () => {
+      const node = new Nodes.HomogeneousIn([1, 2, 3], fakeAttr(undefined), "in");
+      expect(node.castedValues).toEqual([1, 2, 3]);
+    });
+  });
+
   describe("procForBinds", () => {
     it("wraps a value as ActiveModel::Attribute bound to the attribute name", () => {
       const node = new Nodes.HomogeneousIn([1, 2], users.get("id"), "in");
