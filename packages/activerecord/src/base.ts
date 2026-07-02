@@ -1748,7 +1748,7 @@ export class Base extends Model {
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
   // -- Enums (wired via extend() after class body) --
-  static _enums: Map<string, Record<string, number>> = new Map();
+  static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
 
   /**
    * Declare an enum attribute. Maps symbolic names to integer values.
