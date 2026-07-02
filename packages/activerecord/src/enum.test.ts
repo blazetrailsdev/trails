@@ -449,13 +449,45 @@ describe("EnumTest", () => {
     // (assertValidEnumDefinitionValues) rather than against Rails' strings here.
   });
 
-  // Rails: conflict detection on reserved AR method names — message surface is
-  // covered behaviorally in enum.trails.test.ts.
-  it.skip("reserved enum names", () => {});
+  it("reserved enum names", () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written", "published"] as any);
+      }
+    }
+
+    // Each of these generates a method that conflicts with an Active Record
+    // method: `column` → `columns` (class), `logger` / `attributes=` (instance).
+    const conflicts = ["column", "logger", "attributes"];
+    conflicts.forEach((name, i) => {
+      expect(() => (Klass as any).enum(name, [`value_${i}`])).toThrow(
+        new RegExp(`You tried to define an enum named "${name}" on the model`),
+      );
+    });
+  });
   it.skip("reserved enum values", () => {});
   it.skip("reserved enum values for relation", () => {});
   it.skip("can use id as a value with a prefix or suffix", () => {});
-  it.skip("overriding enum method should not raise", () => {});
+  it("overriding enum method should not raise", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        // Rails: `def published!; super; "do publish work..."; end` defined
+        // before the enum, then `def written!` after — both must not raise.
+        publishedBang() {
+          return "do publish work...";
+        }
+        static {
+          this.enum("status", ["proposed", "written", "published"] as any);
+        }
+        writtenBang() {
+          return "do written work...";
+        }
+      }
+      new Klass();
+    }).not.toThrow();
+  });
 
   // Rails: anonymous AR class with `validates_uniqueness_of` / inclusion.
   it.skip("validate uniqueness", () => {});
@@ -499,7 +531,24 @@ describe("EnumTest", () => {
   });
 
   // Rails: `alias_attribute` combined with `enum` on the alias.
-  it.skip("enum with alias_attribute", () => {});
+  it("enum with alias_attribute", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.aliasAttribute("aliased_status", "status");
+        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+      }
+    }
+    registerModel(Klass);
+
+    let record: any = await (Klass as any).proposed().create();
+    expect(record.isProposed()).toBe(true);
+    expect(record.aliased_status).toBe("proposed");
+
+    record = await (Klass as any).find(record.id);
+    expect(record.isProposed()).toBe(true);
+    expect(record.aliased_status).toBe("proposed");
+  });
 
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
@@ -730,6 +779,25 @@ describe("EnumTest", () => {
   });
 
   // Rails: `type_for_attribute` on an enum with an undeclared / explicit type.
-  it.skip("raises for attributes with undeclared type", () => {});
-  it.skip("supports attributes declared with a explicit type", () => {});
+  it("raises for attributes with undeclared type", () => {
+    class Klass extends Book {
+      static {
+        this.enum("typeless_genre", ["adventure", "comic"] as any);
+      }
+    }
+
+    expect(() => (Klass as any).typeForAttribute("typeless_genre")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in/,
+    );
+  });
+  it("supports attributes declared with a explicit type", () => {
+    class Klass extends Book {
+      static {
+        this.attribute("my_genre", "integer");
+        this.enum("my_genre", ["adventure", "comic"] as any);
+      }
+    }
+
+    expect((Klass as any).typeForAttribute("my_genre").type()).toBe("integer");
+  });
 });

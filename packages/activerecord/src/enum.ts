@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType, IntegerType, typeRegistry } from "@blazetrails/activemodel";
+import { dangerousAttributeMethods } from "./attribute-methods.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -400,15 +401,36 @@ export function _enum(
   assertValidEnumDefinitionValues(values);
   assertValidEnumOptions(options ?? {});
 
+  // Rails guards the enum *name* itself against reserved Active Record methods
+  // before generating any value methods: the pluralized mapping accessor
+  // (`name.pluralize`, e.g. `column` → `columns`) as a class method, and the
+  // reader/writer (`name`, `name=`) as instance methods.
+  // Mirrors enum.rb `detect_enum_conflict!(name, name.pluralize, true)` and the
+  // two `detect_enum_conflict!(name, name)` / `"#{name}="` calls.
+  detectEnumConflictBang.call(this, name, pluralize(name), true);
+  detectEnumConflictBang.call(this, name, name);
+
   const attribute = name;
   const mapping = Array.isArray(values)
     ? Object.fromEntries(values.map((v, i) => [v, i]))
     : (values as Record<string, EnumValue>);
 
+  // Resolve an `alias_attribute` target: `enum :aliased_status` on
+  // `alias_attribute :aliased_status, :status` stores through the real `status`
+  // column. Storage, the EnumType, the reader accessor, and the generated
+  // predicate/scope conditions all key off the resolved column so reads and
+  // `where(...)` hit the backing attribute; the value-method *names* still
+  // derive from the enum labels (unaffected by the alias). Mirrors Rails, where
+  // the aliased attribute delegates to its target everywhere.
+  const attrName =
+    (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
+      attribute
+    ] ?? attribute;
+
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
   }
-  this._enums.set(attribute, mapping);
+  this._enums.set(attrName, mapping);
 
   const prefixStr =
     options?.prefix === true
@@ -431,17 +453,34 @@ export function _enum(
   };
   const toCamel = (s: string) => camelize(s, false);
 
-  const attrName = attribute;
+  // Whether the enum attribute was explicitly declared with a type via
+  // `attribute(name, type)` before the `enum` call. Rails raises for an enum on
+  // an attribute with no declared type AND no backing DB column; we can only
+  // tell a real column apart from a typeless attribute once the schema has been
+  // reflected, so record the "not explicitly typed" fact now and defer the
+  // check to `typeForAttribute` (post-loadSchema) via `assertEnumTypeDeclared`.
+  const existingDef = (this as any)._attributeDefinitions?.get(attrName);
+  const explicitlyTyped = existingDef?.source === "user" || existingDef?.userProvided === true;
+  const undeclaredHost = this as unknown as { _enumsUndeclared?: Set<string> };
+  if (!explicitlyTyped) {
+    if (!Object.prototype.hasOwnProperty.call(this, "_enumsUndeclared")) {
+      undeclaredHost._enumsUndeclared = new Set(undeclaredHost._enumsUndeclared);
+    }
+    undeclaredHost._enumsUndeclared!.add(attrName);
+  } else if (undeclaredHost._enumsUndeclared?.has(attrName)) {
+    // An explicit type now backs the enum — clear any inherited "undeclared"
+    // marker so the type check stays satisfied.
+    undeclaredHost._enumsUndeclared = new Set(undeclaredHost._enumsUndeclared);
+    undeclaredHost._enumsUndeclared.delete(attrName);
+  }
 
   // Read subtype from _attributeDefinitions directly — never call typeForAttribute()
   // here, because typeForAttribute() triggers loadSchema(), which sets _schemaLoaded
   // prematurely and blocks the real DB schema reflection from running later.
-  // Mirrors Rails' decorate_attributes block receiving the subtype lazily; we
-  // resolve it now from user-declared defs (e.g. `attribute("status", "string")`)
+  // Resolve it now from user-declared defs (e.g. `attribute("status", "string")`)
   // and fall back to "integer" otherwise.
   let subtype: string;
   try {
-    const existingDef = (this as any)._attributeDefinitions?.get(name);
     const t: string = existingDef?.type?.type?.() ?? "value";
     // No user-declared attribute type yet (schema not reflected): infer the
     // storage subtype from the mapping's value shapes (booleans → boolean,
@@ -479,6 +518,7 @@ export function _enum(
   // is NOT a hard conflict \u2014 Rails only *warns* about it (via
   // detectNegativeEnumConditionsBang below). Folding negative-scope names back
   // into this set would resurrect the pre-empting ArgumentError.
+  const dangerousMethods = dangerousAttributeMethods();
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
   for (const [n] of Object.entries(mapping)) {
@@ -505,17 +545,23 @@ export function _enum(
     definedNames.add(bangName);
     definedNames.add(fullName);
 
-    if (predicateName in (this.prototype as object))
+    // Instance value methods (predicate/bang) only conflict with *dangerous*
+    // Active Record instance methods — a plain user override (`def published!;
+    // super; end`) is allowed and simply wins over the generated method, so we
+    // must not raise merely because the name exists on the prototype.
+    // Mirrors enum.rb's `dangerous_attribute_method?` gate; class scopes still
+    // guard against any pre-existing class method.
+    if (dangerousMethods.has(predicateName))
       raiseConflictError.call(this, attribute, predicateName);
-    if (bangName in (this.prototype as object)) raiseConflictError.call(this, attribute, bangName);
+    if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
     if (fullName in (this as object))
       raiseConflictError.call(this, attribute, fullName, { type: "class" });
     if (notScopeName in (this as object))
       raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (fp in (this.prototype as object)) raiseConflictError.call(this, attribute, fp);
-      if (`${friendlyName}Bang` in (this.prototype as object))
+      if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
+      if (dangerousMethods.has(`${friendlyName}Bang`))
         raiseConflictError.call(this, attribute, `${friendlyName}Bang`);
       if (friendlyName in (this as object))
         raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
@@ -541,23 +587,23 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    this.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
+    this.scope(fullName, (rel: any) => rel.where({ [attrName]: value }));
 
     if (friendlyName !== fullName) {
-      this.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
+      this.scope(friendlyName, (rel: any) => rel.where({ [attrName]: value }));
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
+      this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attrName]: value }));
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
       Object.defineProperty(this.prototype, fp, {
         value: function (this: Base) {
-          return this.readAttribute(attribute) === n;
+          return this.readAttribute(attrName) === n;
         },
         writable: true,
         configurable: true,
       });
       Object.defineProperty(this.prototype, `${friendlyName}Bang`, {
         value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attribute]: value });
+          return this.updateBang({ [attrName]: value });
         },
         writable: true,
         configurable: true,
@@ -567,7 +613,7 @@ export function _enum(
     // Predicate: user.active? → user.isActive()
     Object.defineProperty(this.prototype, predicateName, {
       value: function (this: Base) {
-        return this.readAttribute(attribute) === n;
+        return this.readAttribute(attrName) === n;
       },
       writable: true,
       configurable: true,
@@ -577,14 +623,14 @@ export function _enum(
     // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
     Object.defineProperty(this.prototype, bangName, {
       value: function (this: EnumInstanceHost) {
-        return this.updateBang({ [attribute]: value });
+        return this.updateBang({ [attrName]: value });
       },
       writable: true,
       configurable: true,
     });
 
     // whereNot scope: Model.notDraft()
-    this.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
+    this.scope(notScopeName, (rel: any) => rel.whereNot({ [attrName]: value }));
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
@@ -593,14 +639,14 @@ export function _enum(
     if (/[^\w\x80-\uffff]/.test(originalName)) {
       Object.defineProperty(this.prototype, `is${originalName}`, {
         value: function (this: Base) {
-          return this.readAttribute(attribute) === n;
+          return this.readAttribute(attrName) === n;
         },
         writable: true,
         configurable: true,
       });
       Object.defineProperty(this.prototype, `${originalName}Bang`, {
         value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attribute]: value });
+          return this.updateBang({ [attrName]: value });
         },
         writable: true,
         configurable: true,
@@ -664,9 +710,28 @@ export function detectEnumConflictBang(
   methodName: string,
   _klassMethod = false,
 ): void {
-  // Walk the prototype chain (mirrors Rails method_defined? semantics).
-  const target = _klassMethod ? this : this.prototype;
-  if (methodName in (target as object)) {
+  // Walk the prototype chain (mirrors Rails method_defined? semantics). Rails
+  // splits class vs. instance methods (`dangerous_class_method?` vs.
+  // `dangerous_attribute_method?`); trails hosts some Rails-instance methods
+  // (e.g. `logger`) as statics, so the instance branch also consults the class
+  // object so those reserved names are still caught.
+  if (_klassMethod) {
+    if (methodName in (this as object)) {
+      raiseConflictError.call(this, enumName, methodName, { type: "class" });
+    }
+    return;
+  }
+  // Rails' `dangerous_attribute_method?` only flags methods supplied by the
+  // framework, not user-defined accessors on the model itself (e.g. an
+  // `alias_attribute` reader). So consult the ancestor prototype (Base and up)
+  // and inherited statics rather than this class's own prototype, which also
+  // carries alias readers and previously-generated enum accessors.
+  const ancestorProto = Object.getPrototypeOf(this.prototype);
+  const superclass = Object.getPrototypeOf(this);
+  if (
+    (ancestorProto && methodName in (ancestorProto as object)) ||
+    (superclass && methodName in (superclass as object))
+  ) {
     raiseConflictError.call(this, enumName, methodName);
   }
 }
@@ -689,6 +754,39 @@ export function raiseConflictError(
   throw new ArgumentError(
     `You tried to define an enum named "${enumName}" on the model "${this.name}", but ` +
       `this will generate a ${type} method "${methodName}", which is already defined by ${source}.`,
+  );
+}
+
+/**
+ * Raise if an enum was declared on an attribute that ends up with no declared
+ * type — no backing DB column and no explicit `attribute(name, type)`. Called
+ * lazily from `typeForAttribute` (after `loadSchema`) so the check sees real
+ * columns, mirroring Rails raising inside the `decorate_attributes` block when
+ * `subtype == ActiveModel::Type.default_value`.
+ *
+ * @internal
+ */
+export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
+  const undeclared = (klass as unknown as { _enumsUndeclared?: Set<string> })._enumsUndeclared;
+  if (!undeclared || !undeclared.has(name)) return;
+  const verifiedHost = klass as unknown as { _enumsTypeVerified?: Set<string> };
+  if (verifiedHost._enumsTypeVerified?.has(name)) return;
+  // A backing DB column resolves the subtype (`columnForAttribute` returns the
+  // schema column; unknown names yield a NullColumn with `type: null`).
+  const column = (
+    klass as unknown as { columnForAttribute(n: string): { type?: unknown } }
+  ).columnForAttribute(name);
+  if (column && column.type != null) {
+    if (!Object.prototype.hasOwnProperty.call(verifiedHost, "_enumsTypeVerified")) {
+      verifiedHost._enumsTypeVerified = new Set(verifiedHost._enumsTypeVerified);
+    }
+    verifiedHost._enumsTypeVerified!.add(name);
+    return;
+  }
+  throw new Error(
+    `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
+      " backed by a database column or declared with an explicit type" +
+      " via `attribute`.",
   );
 }
 
