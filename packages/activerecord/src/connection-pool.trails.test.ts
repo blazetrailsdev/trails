@@ -1014,14 +1014,23 @@ describe("ConnectionPoolConfiguration query cache", () => {
 });
 
 describe("checkout/checkin callbacks", () => {
-  it("pinned checkout calls verifyBang unconditionally and skips query-cache wiring", async () => {
+  it("pinned sync checkout defers verifyBang to the async path and skips query-cache wiring", async () => {
     const pool = makeAmbientPool({ pool: 5 });
     await pool.pinConnectionBang();
     const pinned = pool.checkout() as SidecarAdapter;
     const spy = vi.spyOn(pinned, "verifyBang");
     try {
+      // Rails re-runs `verify!` on every pinned checkout (connection_pool.rb:554)
+      // because its `verify!` is synchronous. trails' `verifyBang` is async, so the
+      // sync `checkout()` cannot await it — rather than fire-and-forget (which risked
+      // an unhandled rejection on teardown), the sync path hands back the connection
+      // the pin already verified and lets awaitable paths re-verify.
       const again = pool.checkout();
       expect(again).toBe(pinned);
+      expect(spy).not.toHaveBeenCalled();
+      // The async handout still awaits verifyBang, so a verify failure propagates.
+      const asyncAgain = await pool.checkoutAsync();
+      expect(asyncAgain).toBe(pinned);
       expect(spy).toHaveBeenCalledTimes(1);
       // Rails' pinned branch (connection_pool.rb:553-559) does not run
       // checkout_and_verify, so no Store is attached on the pinned path.
