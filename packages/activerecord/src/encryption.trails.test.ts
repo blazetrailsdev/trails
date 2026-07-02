@@ -1,3 +1,10 @@
+/**
+ * trails-authored smoke tests for the `Base.encrypts()` mixin surface — these
+ * have no verbatim Rails counterpart (invented names, not name-matched to any
+ * `*_test.rb` case). The faithful ports of `ActiveRecord::Encryption` live under
+ * `encryption/` (e.g. `encryption/encryptable-record.test.ts`). They ride the
+ * canonical `encrypted_books` table Rails uses for its own encryption models.
+ */
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
