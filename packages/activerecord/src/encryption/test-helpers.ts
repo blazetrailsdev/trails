@@ -152,19 +152,20 @@ export const AUTHOR_NAME_LIMIT = 100;
  *   - `EncryptedTrafficLightWithStoreState` → `traffic_lights`
  *     (traffic_light_encrypted.rb)
  *
- * All four already exist in the canonical `TEST_SCHEMA` with the Rails
- * schema.rb shape, so the fixtures name only canonical tables/columns. Under
- * one-schema mode the tables are already laid into the worker DB and this
- * `defineSchema` call is a canonical no-op; on the default path it lays the
- * full canonical shape once per lease.
+ * plus `to_be_linked_users`, which {@link makeFreshModel}'s serialized-attribute
+ * callsite rides for its canonical `settings` (text) column.
+ *
+ * All already exist in the canonical `TEST_SCHEMA` with the Rails schema.rb
+ * shape, so the fixtures name only canonical tables/columns. Under one-schema
+ * mode the tables are already laid into the worker DB and this `defineSchema`
+ * call is a canonical no-op; on the default path it lays the full canonical
+ * shape once per lease.
  */
 const ENCRYPTION_CANONICAL_TABLES = [
   "posts",
   "encrypted_books",
   "authors",
   "traffic_lights",
-  // `to_be_linked_users` carries a canonical `settings` (text) column, the ride
-  // for makeFreshModel's serialized-attribute callsite (no Rails counterpart).
   "to_be_linked_users",
 ] as const;
 
