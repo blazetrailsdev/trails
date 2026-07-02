@@ -36,6 +36,7 @@ import {
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import { isBaseInstance } from "./relation/predicate-builder/is-base-instance.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -3569,12 +3570,7 @@ export class Relation<T extends Base> {
     // Rails runs this Base check just *before* `return false if !conditions`;
     // we run it just after. The branches are mutually exclusive (an AR instance
     // is never `false`/`null`), so the order is behaviorally identical.
-    if (
-      typeof conditions === "object" &&
-      conditions !== null &&
-      (conditions as { constructor?: { _isActiveRecordBase?: unknown } }).constructor
-        ?._isActiveRecordBase === true
-    ) {
+    if (isBaseInstance(conditions)) {
       throw new ArgumentError(
         "You are passing an instance of ActiveRecord::Base to `exists?`. " +
           "Please pass the id of the object by calling `.id`.",
