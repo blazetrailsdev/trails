@@ -458,12 +458,13 @@ export function _enum(
   // (`draftBang`), per-value scope + auto `not*` scope, plus friendly-name and
   // original-form variants for labels containing special characters. Rails has
   // no plain in-memory setter, so none is generated.
-  // Positive method names only (predicate / bang / scope). The auto-generated
-  // `not*` scope names are deliberately excluded here: a value literally named
-  // like `notActive` colliding with the `not*` scope of `active` is NOT a hard
-  // conflict \u2014 Rails only *warns* about it (see detectNegativeEnumConditionsBang
-  // below). Mixing the negative-scope names into this set would resurrect the
-  // pre-empting ArgumentError this story removes.
+  //
+  // `definedNames` tracks positive method names only (predicate / bang / scope).
+  // The auto-generated `not*` scope names are deliberately excluded: a value
+  // literally named like `notActive` colliding with the `not*` scope of `active`
+  // is NOT a hard conflict \u2014 Rails only *warns* about it (via
+  // detectNegativeEnumConditionsBang below). Folding negative-scope names back
+  // into this set would resurrect the pre-empting ArgumentError.
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
   for (const [n] of Object.entries(mapping)) {
