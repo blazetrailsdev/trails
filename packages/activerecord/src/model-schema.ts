@@ -924,7 +924,25 @@ function applyColumnsHash(
       continue;
     }
     const existing = host._attributeDefinitions.get(name);
-    if (existing && (existing.userProvided ?? true)) continue;
+    if (existing && (existing.userProvided ?? true)) {
+      // A user-declared type override (e.g. an enum) whose default is meant to
+      // come from the schema column: refresh the column default onto the def so
+      // `_defaultAttributes` can seed it via from_database. The user-declared
+      // type is preserved; only the schema-sourced default is (re)injected.
+      // Mirrors Rails, where the column default lives on the column and enum's
+      // `build_from_user` preserves it.
+      if ((existing as { defaultFromSchema?: boolean }).defaultFromSchema) {
+        const colDefault = (column as { default?: unknown }).default ?? null;
+        const colDefaultFn =
+          (column as { defaultFunction?: string | null }).defaultFunction ?? null;
+        host._attributeDefinitions.set(name, {
+          ...existing,
+          defaultValue: colDefault,
+          ...(colDefaultFn != null ? { defaultFunction: colDefaultFn } : {}),
+        });
+      }
+      continue;
+    }
 
     const castType =
       typeof adapter.lookupCastTypeFromColumn === "function"
