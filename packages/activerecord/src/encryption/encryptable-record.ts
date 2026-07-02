@@ -238,21 +238,41 @@ export class EncryptableRecord {
     Configurable.encryptedAttributeWasDeclared(modelClass, name);
   }
 
-  /** @internal */
-  static preserveOriginalEncrypted(modelClass: any, name: string): void {
+  /**
+   * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
+   * Declares the case-preserving `original_<name>` encrypted column and
+   * overrides the accessors so reads return the original-cased value.
+   *
+   * `encryptsFn` selects which declaration path registers the original column,
+   * so the `original_<name>` attribute rides the SAME decoration machinery as
+   * its source `name`: the scheme path (default) sets `_attributeDefinitions`
+   * directly, while the `Base.encrypts` path passes its own pending-decoration
+   * `encrypts` so the original column survives `_defaultAttributes` replay.
+   * @internal
+   */
+  static preserveOriginalEncrypted(
+    modelClass: any,
+    name: string,
+    encryptsFn: (klass: any, attr: string) => void = (klass, attr) => this.encrypts(klass, attr),
+  ): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
     // Mirrors Rails encryptable_record.rb:101–103: raise at declaration time
     // when the original_<name> column is absent and supportUnencryptedData is
     // false (which means there's no fallback for reading un-preserved rows).
     if (!Configurable.config.supportUnencryptedData) {
       const colNames: string[] = modelClass.columnNames?.() ?? [];
-      if (!colNames.includes(originalName)) {
+      // Only assert absence when the schema is actually known. On the
+      // `Base.encrypts` path the declaration runs at static-init before schema
+      // reflection, so `columnNames()` is empty ("unknown", not "absent") — the
+      // missing-column check would misfire. Rails always has columns loaded at
+      // declaration time, so it raises unconditionally.
+      if (colNames.length > 0 && !colNames.includes(originalName)) {
         throw new ConfigurationError(
           `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
         );
       }
     }
-    this.encrypts(modelClass, originalName);
+    encryptsFn(modelClass, originalName);
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
 
