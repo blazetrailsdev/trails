@@ -78,18 +78,15 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 }
 
 /**
- * Close any underlying connections still pinned to a pool-under-test before
- * disconnecting it. ConnectionPool.disconnect clears pool bookkeeping but
- * doesn't close each adapter's backend handle; closing them first releases the
- * lane-native connection (SQLite file handle / PG / MySQL socket) so the
- * duplicate pool doesn't leak connections into the shared ambient worker DB.
+ * Tear down a pool-under-test, awaiting each adapter's async `driver.close()`
+ * before returning. The sync `disconnect()` discards those drain promises
+ * (Rails-synchronous behavior), so an async-only SQLite driver's handle could
+ * still be closing when the next test's `makeAmbientPool()` reopens the same
+ * ambient DB; `disconnectAsync()` awaits the drains, avoiding that race.
+ * (`conn.close()` would only checkin the connection, not close the driver.)
  */
 async function closePoolConnections(pool: ConnectionPool): Promise<void> {
-  for (const conn of pool.connections) {
-    const close = (conn as { close?: () => void | Promise<void> }).close;
-    if (typeof close === "function") await close.call(conn);
-  }
-  await pool.disconnect();
+  await pool.disconnectAsync();
 }
 
 function makePool(size: number = 5): ConnectionPool {
@@ -698,9 +695,9 @@ describe("ConnectionPool schema cache", () => {
   });
 
   it("does not eagerly warm when the flag is off (default)", async () => {
-    // Canonical `posts` exists in the ambient lane DB, but with the flag off no
-    // introspection runs, so the cache stays empty. (dropped by the global
-    // beforeEach teardown.)
+    // Canonical `posts` exists in the ambient lane DB (via the describe's
+    // fixtures), but with the flag off no introspection runs, so the cache stays
+    // empty.
     expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
 
     const pool = makeAmbientPool({ schemaCachePath: "" });
@@ -719,7 +716,7 @@ describe("ConnectionPool schema cache", () => {
     // allocates a fresh SchemaCache, addAll(pool) populates it via
     // the pool's withConnection, dumpTo writes the JSON. Covers the
     // full chain Rails uses for db:schema:cache:dump. Dumps the ambient lane
-    // DB's canonical `posts` table (dropped by the global beforeEach teardown).
+    // DB's canonical `posts` table (provided by the describe's fixtures).
     await withCacheDir(async (dir) => {
       const pool = makeAmbientPool();
       try {
