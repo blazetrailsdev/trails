@@ -465,8 +465,8 @@ describe("FinderTest", () => {
       cpkBooks("cpk_great_author_first_book"),
       cpkBooks("cpk_great_author_second_book"),
     ];
-    const ids = books.map((b) => b.id);
-    const result = await (CpkBook.find as (...a: unknown[]) => Promise<unknown[]>)(...ids);
+    const ids = books.map((b) => b.id) as [unknown, unknown];
+    const result = (await CpkBook.find(...ids)) as unknown[];
     expect(result.map(idOf)).toEqual(ids);
   });
 
