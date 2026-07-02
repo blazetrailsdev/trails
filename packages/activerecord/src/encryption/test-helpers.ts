@@ -370,10 +370,14 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
       this.attribute("id", "integer");
       this.attribute("state", "json");
       // Canonical `traffic_lights.long_state` is `text NOT NULL`; the parent
-      // Rails TrafficLight serializes it as an Array (traffic_light.rb), so the
-      // fixture carries it too and callers supply a value (Rails passes
-      // `long_state: ["green", "red"]`).
-      this.attribute("long_state", "json");
+      // Rails TrafficLight serializes it as an Array (traffic_light.rb:4), so the
+      // fixture mirrors that with the same serialize/Array coder the canonical
+      // TrafficLight model uses (test-helpers/models/traffic-light.ts) and callers
+      // supply a value (Rails passes `long_state: ["green", "red"]`). This fresh
+      // factory declares its attributes explicitly rather than by schema
+      // reflection, so the column is declared before serialize wraps it.
+      this.attribute("long_state", "string");
+      this.serialize("long_state", { type: "Array" });
       this.adapter = adapter;
       this.encrypts("state");
       // storeAccessorFor delegates to EncryptedAttributeType.accessor() which
