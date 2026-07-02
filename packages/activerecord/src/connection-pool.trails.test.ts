@@ -12,7 +12,7 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import {
   ConnectionPool,
@@ -24,8 +24,6 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type {
@@ -79,25 +77,37 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 }
 
 /**
- * Create the canonical `posts` table (Rails' scratch-table name) in the ambient
- * lane worker DB so the schema-cache introspection tests have a real, canonical
- * table to reflect on every adapter. Uses a throwaway lane-native adapter (via
+ * Create the scratch `posts` table in the ambient lane worker DB so the
+ * schema-cache introspection tests have a real table to reflect on every
+ * adapter. Mirrors Rails connection_pool_test.rb:32-40 verbatim —
+ * `connection.create_table :posts do |t| t.integer :cololumn end` (the
+ * `cololumn` spelling is Rails' own). Uses a throwaway lane-native adapter (via
  * the shared factory) rather than the pool-under-test, so the pool's first
- * connection adoption — which triggers eager warming — sees the table. Dropped
- * by the global beforeEach teardown. This file never establishes
- * `Base.connection`, so the explicit-adapter `defineSchema` form is required.
+ * connection adoption — which triggers eager warming — sees the table.
  *
- * Rails' connection_pool_test.rb creates its scratch `posts` table only for
- * `in_memory_db?` because its real-DB lanes keep schema.rb loaded ambiently.
- * trails drops every table in the per-test `beforeEach` on ALL lanes (there is
- * no ambient schema to ride), so the canonical table must be materialized here
- * regardless of adapter — via the canonical `TEST_SCHEMA.posts`, never an
- * invented name.
+ * Rails only stubs this table for `in_memory_db?` because its real-DB lanes keep
+ * schema.rb loaded ambiently. trails drops every table in the per-test
+ * `beforeEach` on ALL lanes (there is no ambient schema to ride), so the scratch
+ * table is materialized here regardless of adapter. `dropCanonicalPosts` tears
+ * it down (also covered by the global `beforeEach`).
  */
 async function seedCanonicalPosts(): Promise<void> {
   const seed = newRawTestAdapter();
   try {
-    await defineSchema(seed, { posts: TEST_SCHEMA.posts });
+    await seed.createTable("posts", (t) => {
+      t.integer("cololumn");
+    });
+  } finally {
+    const close = (seed as { close?: () => void | Promise<void> }).close;
+    if (typeof close === "function") await close.call(seed);
+  }
+}
+
+/** Drop the scratch `posts` table seeded by {@link seedCanonicalPosts}. */
+async function dropCanonicalPosts(): Promise<void> {
+  const seed = newRawTestAdapter();
+  try {
+    await seed.dropTable("posts", { ifExists: true });
   } finally {
     const close = (seed as { close?: () => void | Promise<void> }).close;
     if (typeof close === "function") await close.call(seed);
@@ -484,6 +494,10 @@ it("context pin takes priority over fixture pin in unpin", async () => {
 });
 
 describe("ConnectionPool schema cache", () => {
+  // Balances the scratch `posts` table the introspection tests seed via
+  // createTable (mirrors Rails' teardown; also covered by the global beforeEach).
+  afterEach(dropCanonicalPosts);
+
   it("exposes a BoundSchemaReflection via pool.schemaCache", () => {
     // Mirrors Rails ConnectionPool#schema_cache: returns a
     // BoundSchemaReflection wrapping the pool's SchemaReflection +
