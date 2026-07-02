@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Base } from "../../index.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -16,13 +15,12 @@ afterAll(() => {
 });
 
 // The `json_test` table uses the PG-specific `JSON` and `JSONB` types,
-// which aren't expressible via defineSchema. The table is created via raw
-// DDL below; defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+// which aren't expressible via createTable's typed builder; the table is
+// created via raw DDL below (mirroring Rails' `@connection.create_table`).
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
     await adapter.exec(`DROP TABLE IF EXISTS "json_test"`);
     await adapter.exec(
       `CREATE TABLE "json_test" ("id" SERIAL PRIMARY KEY, "settings" JSON, "prefs" JSONB, "name" VARCHAR(255))`,

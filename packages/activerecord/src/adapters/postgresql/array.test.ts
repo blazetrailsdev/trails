@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
@@ -20,10 +19,10 @@ afterAll(() => {
 });
 
 // The pg_arrays table uses PG array columns (e.g. integer[],
-// numeric(10,2)[]) which are not expressible via defineSchema. The table
-// is created via raw DDL below; defineSchema({}) marks the file
-// as TM-Phase-5 compliant. The outer per-test transaction rolls back
-// inserts and any addColumn DDL done inside it() bodies.
+// numeric(10,2)[]) which are not expressible via createTable's typed
+// builder; it is created via raw DDL below (mirroring Rails'
+// `@connection.create_table "pg_arrays"`). The outer per-test transaction
+// rolls back inserts and any addColumn DDL done inside it() bodies.
 setupFixtures();
 useHandlerTransactionalFixtures();
 
@@ -31,7 +30,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
     await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
     await adapter.exec(`
