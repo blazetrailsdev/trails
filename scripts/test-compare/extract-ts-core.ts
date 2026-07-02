@@ -129,33 +129,79 @@ function expectChainMatcher(call: ts.CallExpression): string | null {
 }
 
 /**
+ * Normalize a matcher-argument node to a tagged literal token (see
+ * assertion-values.ts for the encoding and its Ruby twin), or `null` when the
+ * argument is a computed expression/variable we can't statically compare.
+ * Handles negative numeric literals (`-3` is a unary-minus over a numeric
+ * literal in the AST) and folds `null`/`undefined` to the `x:nil` token so a TS
+ * `toBeNull()`/`toBeUndefined()` lines up with a Ruby `nil`.
+ */
+function literalToken(node: ts.Node | undefined): string | null {
+  if (!node) return null;
+  if (ts.isNumericLiteral(node)) return `n:${node.text}`;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return `s:${node.text}`;
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return "b:true";
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return "b:false";
+  if (node.kind === ts.SyntaxKind.NullKeyword) return "x:nil";
+  if (ts.isIdentifier(node) && node.text === "undefined") return "x:nil";
+  if (
+    ts.isPrefixUnaryExpression(node) &&
+    node.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(node.operand)
+  ) {
+    return `n:-${node.operand.text}`;
+  }
+  return null;
+}
+
+/** Lockstep assertion-kind tokens and their captured literal expected values. */
+interface AssertionKinds {
+  kinds: string[];
+  /** parallel to `kinds`: a literal token, or `null` for a non-literal/no arg */
+  values: (string | null)[];
+}
+
+/**
  * Raw (non-deduplicated) assertion-kind tokens in a test node's subtree — one
  * per assertion call, aligned with {@link countAssertions} (same recursive
  * same-file helper expansion, depth cap, and per-path cycle guard). An
  * `expect(...)` chain contributes its matcher (`toEqual`, `not:toBeNull`); a
  * bare `assert*`/`refute*`/`expect*` helper callee contributes its own name.
+ *
+ * Emits a parallel `values` array (phase 3): the terminal matcher's first
+ * argument as a literal token where it is one (`expect(x).toEqual(5)` → `n:5`),
+ * else `null`. Helper callees capture no value (we don't parse their args).
  */
 function collectAssertionKinds(
   node: ts.Node,
   helpers: HelperMap,
   depth = 0,
   visiting: Set<string> = new Set(),
-): string[] {
+): AssertionKinds {
   const kinds: string[] = [];
+  const values: (string | null)[] = [];
   const walk = (n: ts.Node) => {
     if (ts.isCallExpression(n)) {
       if (ts.isPropertyAccessExpression(n.expression)) {
         const matcher = expectChainMatcher(n);
-        if (matcher) kinds.push(matcher);
+        if (matcher) {
+          kinds.push(matcher);
+          values.push(literalToken(n.arguments[0]));
+        }
       } else if (ts.isIdentifier(n.expression)) {
         const name = n.expression.text;
         if (isAssertionCallee(name)) {
           // Bare `expect(...)` is recorded via its matcher chain above; a helper
           // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
-          if (name !== "expect") kinds.push(name);
+          if (name !== "expect") {
+            kinds.push(name);
+            values.push(null);
+          }
         } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
           visiting.add(name);
-          kinds.push(...collectAssertionKinds(helpers.get(name)!, helpers, depth + 1, visiting));
+          const sub = collectAssertionKinds(helpers.get(name)!, helpers, depth + 1, visiting);
+          kinds.push(...sub.kinds);
+          values.push(...sub.values);
           visiting.delete(name);
         }
       }
@@ -163,7 +209,7 @@ function collectAssertionKinds(
     ts.forEachChild(n, walk);
   };
   walk(node);
-  return kinds;
+  return { kinds, values };
 }
 
 // Adapter wrappers that take the title as their FIRST argument. The feature
@@ -213,7 +259,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
-    const assertionKinds = collectAssertionKinds(node, helpers);
+    const { kinds: assertionKinds, values: assertionValues } = collectAssertionKinds(node, helpers);
     fileInfo.testCases.push({
       path: [...currentAncestors, title].join(" > "),
       description: title,
@@ -224,6 +270,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       assertions: [...new Set(assertionKinds)],
       assertionCount: countAssertions(node, helpers),
       assertionKinds,
+      assertionValues,
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });
