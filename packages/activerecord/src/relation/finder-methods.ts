@@ -371,22 +371,13 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
-  // Rails: Relation#first returns from the already-loaded records (no re-query),
-  // mirroring find_nth_with_limit's loaded? branch. Ordering was applied at load
-  // time, so records[0]/records[0, n] preserve the implicit PK order.
-  if ((this as any)._loaded) {
-    const records: any[] = (this as any)._records;
-    return n !== undefined ? records.slice(0, n) : (records[0] ?? null);
-  }
-  // Rails: Relation#first → find_nth(0) → find_nth_with_limit(0, 1), which runs
-  // through `ordered_relation` so an orderless relation is ordered by the
-  // implicit order column / primary key. Without this, `first` is non-
-  // deterministic on backends that don't return rows in insertion order (e.g.
-  // MySQL/MariaDB under a populated buffer pool).
-  const rel = orderedRelation(this._clone());
-  rel._limitValue = n ?? 1;
-  const records = await rel.toArray();
-  return n !== undefined ? records : (records[0] ?? null);
+  // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
+  // first → find_nth(0) → find_nth_with_limit(0, 1). find_nth_with_limit reads
+  // the loaded cache when present, otherwise runs an ordered LIMIT query — and
+  // crucially caps `limit` against an existing `limit_value` (`first(3)` on a
+  // `.limit(2)` relation returns 2 rows, not 3).
+  if (n !== undefined) return this.findNthWithLimit(0, n);
+  return (await this.findNthWithLimit(0, 1))[0] ?? null;
 }
 
 export async function performFirstBang(this: FinderRelation): Promise<any> {
@@ -407,12 +398,18 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
-  // Rails: Relation#last returns from the already-loaded records (no re-query)
-  // via find_last's `loaded?` branch — `records.last` / `records.last(n)`.
-  // Ordering was applied at load time, so the tail of the loaded array is the
-  // correct answer, matching `first`'s loaded-cache read.
-  if ((this as any)._loaded) {
-    const records: any[] = (this as any)._records;
+  // Rails: `return find_last(limit) if loaded? || has_limit_or_offset?`. When
+  // the relation is already loaded — or carries a `limit`/`offset` that a
+  // reverse-order query would otherwise discard — Rails materializes the
+  // records and reads the tail in Ruby (`records.last` / `records.last(n)`)
+  // rather than issuing a fresh reversed query. `toArray()` reuses the loaded
+  // cache when present and runs the bounded query otherwise, matching both.
+  if (
+    (this as any)._loaded ||
+    (this as any)._limitValue != null ||
+    (this as any)._offsetValue != null
+  ) {
+    const records: any[] = await (this as any).toArray();
     if (n === undefined) return records[records.length - 1] ?? null;
     // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
     return n === 0 ? [] : records.slice(-n);
