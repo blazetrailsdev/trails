@@ -210,6 +210,16 @@ export class EnumType extends ValueType<string> {
     return this.subtype;
   }
 
+  /**
+   * The underlying value type this enum wraps (Rails' `subtype` Type object).
+   * Calculations unwrap the EnumType to its subtype before casting an aggregate
+   * value (`type = type.subtype if Enum::EnumType === type`), so min/max/sum
+   * return the raw integer (0), not the enum label ("easy").
+   */
+  subtypeType(): ValueType<unknown> {
+    return this._subtypeType;
+  }
+
   // Mirrors Rails EnumType#cast:
   //   if mapping.has_key?(value)   -> value.to_s   (value is a label)
   //   elsif mapping.has_value?(value) -> mapping.key(value)  (return the label)

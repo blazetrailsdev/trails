@@ -15,6 +15,7 @@ import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
+import { EnumType } from "../enum.js";
 import {
   arelColumn,
   buildCteSql,
@@ -117,10 +118,13 @@ function resolveColType(rel: CalculationRelation, column: string | Nodes.Node): 
   // lives on the joined model, keyed by the bare column name.
   const dot = colStr.lastIndexOf(".");
   const bare = dot >= 0 ? colStr.slice(dot + 1) : colStr;
-  return (
+  const resolved =
     pluckCastTypeForKnownColumn(rel, bare) ??
-    (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null)
-  );
+    (lookupCastTypeFromJoinDependencies(rel, bare) as ColumnType | null);
+  // Rails unwraps an EnumType to its subtype before casting an aggregate value
+  // (`type = type.subtype if Enum::EnumType === type`), so min/max/sum return
+  // the raw integer, not the enum label.
+  return resolved instanceof EnumType ? resolved.subtypeType() : resolved;
 }
 
 /**

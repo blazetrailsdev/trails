@@ -1744,22 +1744,17 @@ describe("CalculationsTest", () => {
     // ddd(2/published, 0/easy), tlg(0/proposed default, 0/easy default)
     expect(await Book.sum("status")).toBe(4);
     expect(await Book.sum("difficulty")).toBe(1);
-    // trails deviation: Rails EnumType#deserialize for min/max returns the raw integer
-    // (0, 1), but trails' EnumType#deserialize returns the string key ("easy", "medium").
-    // The correct value is 0/1; tracked as enum-min-max-deserialize convergence.
-    expect(await Book.minimum("difficulty")).toBe("easy");
-    expect(await Book.maximum("difficulty")).toBe("medium");
+    expect(await Book.minimum("difficulty")).toBe(0);
+    expect(await Book.maximum("difficulty")).toBe(1);
     expect(await Book.group("status").sum("status")).toEqual({ proposed: 0, published: 4 });
     expect(await Book.group("status").sum("difficulty")).toEqual({ proposed: 0, published: 1 });
-    // trails deviation: group min/max on enum columns returns string keys ("easy"/"medium")
-    // instead of Rails integers (0/1); same root cause as scalar min/max above.
     expect(await Book.group("status").minimum("difficulty")).toEqual({
-      proposed: "easy",
-      published: "easy",
+      proposed: 0,
+      published: 0,
     });
     expect(await Book.group("status").maximum("difficulty")).toEqual({
-      proposed: "easy",
-      published: "medium",
+      proposed: 0,
+      published: 1,
     });
   });
 
