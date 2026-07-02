@@ -165,11 +165,11 @@ describe("DeleteAllTest", () => {
   it("delete all composite model with join subquery", async () => {
     const agreement = cpkOrderAgreements("order_agreement_three");
     // Rails uses `where(order_agreements: { ... })` — an association-name key it
-    // resolves to the join table. trails' where-hash keys on the actual table name,
-    // so use `cpk_order_agreements` (matches the sibling update-all port); the
-    // predicate shape and Arel join-subquery path are otherwise identical.
+    // resolves to the join table. trails resolves the camelCase association name
+    // `orderAgreements` the same way; the snake-vs-camel association-name spelling
+    // is the only difference (trails' naming convention), not a divergence.
     const joinScope = CpkOrder.joins("orderAgreements").where({
-      cpk_order_agreements: { signature: agreement.signature },
+      orderAgreements: { signature: agreement.signature },
     });
     expect(await joinScope.deleteAll()).toBe(1);
   });
