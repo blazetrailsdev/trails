@@ -29,6 +29,10 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
+import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
+import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js";
+import { Author as CanonicalAuthor } from "./test-helpers/models/author.js";
 
 // ==========================================================================
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +
@@ -459,28 +463,6 @@ describe("FinderTest", () => {
     expect(await Topic.exists()).toBe(false);
   });
 
-  it("last on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const last = await Topic.all().last();
-    expect(last).not.toBeNull();
-  });
-
-  it("first on relation with limit and offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const first = await Topic.all().offset(1).first();
-    expect(first).not.toBeNull();
-  });
-
   it("find by one attribute", async () => {
     class Topic extends Base {
       static {
@@ -866,58 +848,6 @@ describe("FinderTest", () => {
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 
-  it("include on unloaded relation with match", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = (await Topic.create({ title: "match" })) as any;
-    const rel = Topic.all();
-    const included = await rel.include(record);
-    expect(included).toBe(true);
-  });
-
-  it("include on unloaded relation without match", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = (await Topic.create({ title: "exists" })) as any;
-    await record.destroy();
-    const rel = Topic.all();
-    const included = await rel.include(record);
-    expect(included).toBe(false);
-  });
-
-  it("include on loaded relation with match", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = (await Topic.create({ title: "loaded-match" })) as any;
-    const rel = Topic.all();
-    await rel.load();
-    const included = await rel.include(record);
-    expect(included).toBe(true);
-  });
-
-  it("include on loaded relation without match", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const record = (await Topic.create({ title: "no-match" })) as any;
-    await record.destroy();
-    const rel = Topic.all();
-    await rel.load();
-    const included = await rel.include(record);
-    expect(included).toBe(false);
-  });
-
   it("find with large number", async () => {
     class Topic extends Base {
       static {
@@ -1024,32 +954,6 @@ describe("FinderTest", () => {
     await Post.create({ title: "b" });
     const exists = await Post.distinct().offset(1).exists();
     expect(exists).toBe(true);
-  });
-
-  it("member on loaded relation with match", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string", { default: "" });
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    const p = await Post.create({ title: "test" });
-    const arr = await Post.all();
-    const found = arr.find((r: any) => r.id === p.id);
-    expect(found).toBeTruthy();
-  });
-
-  it("member on loaded relation without match", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string", { default: "" });
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    await Post.create({ title: "existing" });
-    const arr = await Post.all();
-    const notFound = arr.find((r: any) => r.id === 99999);
-    expect(notFound).toBeUndefined();
   });
 
   it("find with nil inside set passed for attribute", async () => {
@@ -1181,51 +1085,6 @@ describe("FinderTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "agg3d" });
     expect(await Post.exists({ title: "nope" })).toBe(false);
-  });
-  it("include on unloaded relation with mismatched class", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mis" });
-    const found = await Post.where({ title: "mis" }).first();
-    expect(found).toBeDefined();
-  });
-  it.skipIf(adapterType === "postgres")(
-    "include on unloaded relation with having referencing aliased select",
-    async () => {
-      const { Post } = makeModel();
-      await Post.create({ title: "alias_sel" });
-      const count = await Post.count();
-      expect(count).toBe(1);
-    },
-  );
-  it("include on unloaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "cpk_unloaded" });
-    const first = await Post.first();
-    expect(first).toBeDefined();
-  });
-  it("include on loaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "cpk_loaded" });
-    const posts = await Post.all();
-    expect(posts.length).toBe(1);
-  });
-  it("member on unloaded relation with mismatched class", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_unloaded" });
-    const found = await Post.findBy({ title: "mem_unloaded" });
-    expect(found).toBeDefined();
-  });
-  it("member on unloaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_cpk" });
-    const count = await Post.count();
-    expect(count).toBe(1);
-  });
-  it("member on loaded relation with composite primary key", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_cpk_loaded" });
-    const posts = await Post.all();
-    expect(posts.length).toBe(1);
   });
   it("implicit order column is configurable", async () => {
     const { Post } = makeModel();
@@ -1606,74 +1465,6 @@ describe("FinderTest", () => {
     await Post.create({ title: "no_inst" });
     const result = await Post.exists();
     expect(result).toBe(true);
-  });
-
-  it("include when non AR object passed on unloaded relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "non_ar" });
-    const rel = Post.all();
-    // Passing a non-AR object should return false
-    const included = await rel.include({ id: 99999 } as any);
-    expect(included).toBe(false);
-  });
-
-  it("include when non AR object passed on loaded relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "non_ar_loaded" });
-    const rel = Post.all();
-    await rel.load();
-    const included = await rel.include({ id: 99999 } as any);
-    expect(included).toBe(false);
-  });
-
-  it("member when non AR object passed on unloaded relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_non_ar" });
-    const exists = await Post.where({ id: 99999 } as any).exists();
-    expect(exists).toBe(false);
-  });
-
-  it("member when non AR object passed on loaded relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "mem_non_ar_l" });
-    const records = await Post.all();
-    const found = records.find((r: any) => r.id === 99999);
-    expect(found).toBeUndefined();
-  });
-
-  it("include on unloaded relation with offset", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "inc_off" });
-    await Post.create({ title: "inc_off2" });
-    const rel = Post.all().offset(0);
-    const included = await rel.include(p);
-    expect(included).toBe(true);
-  });
-
-  it("include on unloaded relation with limit", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "inc_lim" });
-    const rel = Post.all().limit(10);
-    const included = await rel.include(p);
-    expect(included).toBe(true);
-  });
-
-  it("member on unloaded relation with offset", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "mem_off" });
-    const exists = await Post.all()
-      .offset(0)
-      .where({ id: p.id } as any)
-      .exists();
-    expect(exists).toBe(true);
-  });
-
-  it("member on unloaded relation with limit", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "mem_lim" });
-    const results = await Post.limit(10);
-    const found = results.find((r: any) => r.id === p.id);
-    expect(found).toBeTruthy();
   });
 
   it("find on relation with large number", async () => {
@@ -2083,17 +1874,6 @@ describe("FinderTest", () => {
     expect(got).not.toContain(id(3));
   });
 
-  it("member on unloaded relation with match", async () => {
-    const p = await Post.create({ title: "member-test" });
-    const exists = await Post.where({ id: p.id } as any).exists();
-    expect(exists).toBe(true);
-  });
-
-  it("member on unloaded relation without match", async () => {
-    const exists = await Post.where({ id: 99999 } as any).exists();
-    expect(exists).toBe(false);
-  });
-
   it("joins dont clobber id", async () => {
     const p = await Post.create({ title: "join-test" });
     expect(p.id).toBeTruthy();
@@ -2183,24 +1963,303 @@ describe("FinderTest", () => {
   });
 });
 
+// ==========================================================================
+// FinderTest — *_on_relation_with_limit_and_offset ride the canonical
+// posts -> comments STI chain (posts(:sti_comments) with 5 comments), matching
+// finder_test.rb:1055-1085. Faithful port of the two tests deferred from
+// faithful-port-finder-test-synthetic-clusters.
+// ==========================================================================
 describe("FinderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  const { posts } = fixtures(["posts", "comments"], { schema: canonicalSchema });
+  registerModel(CanonicalPost);
+  registerModel(CanonicalComment);
 
-  it("include on unloaded relation with composite primary key match", async () => {
-    const book = await CpkBook.create({ author_id: 1, id: 1, title: "cpk-hit" });
-    const included = await CpkBook.all().include(book);
-    expect(included).toBe(true);
+  const rid = (r: unknown) => (r as { id: number }).id;
+  const idOf = (r: unknown) => (r == null ? r : rid(r));
+  const idsOf = (r: unknown) => (r as unknown[]).map((x) => rid(x));
+
+  it("last on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
+
+    expect(idOf((await comments.offset(2)).at(-1))).toEqual(idOf(await comments.offset(2).last()));
+    expect(idsOf((await comments.offset(2)).slice(-2))).toEqual(
+      idsOf(await comments.offset(2).last(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(-3))).toEqual(
+      idsOf(await comments.offset(2).last(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2)).at(-1))).toEqual(idOf(await comments.limit(2).last()));
+    expect(idsOf((await comments.limit(2)).slice(-2))).toEqual(
+      idsOf(await comments.limit(2).last(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(-3))).toEqual(
+      idsOf(await comments.limit(2).last(3)),
+    );
   });
 
-  it("include on unloaded relation with composite primary key without match", async () => {
-    const book = await CpkBook.create({ author_id: 2, id: 2, title: "cpk-miss" });
-    await book.destroy();
-    const included = await CpkBook.all().include(book);
-    expect(included).toBe(false);
+  it("first on relation with limit and offset", async () => {
+    const post = await CanonicalPost.find(posts("sti_comments").id);
+
+    let comments = (post as any).comments.order({ id: "asc" });
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
+
+    expect(idOf((await comments.offset(2))[0])).toEqual(idOf(await comments.offset(2).first()));
+    expect(idsOf((await comments.offset(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.offset(2).first(2)),
+    );
+    expect(idsOf((await comments.offset(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.offset(2).first(3)),
+    );
+
+    comments = comments.offset(1);
+    expect(idOf((await comments.limit(2))[0])).toEqual(idOf(await comments.limit(2).first()));
+    expect(idsOf((await comments.limit(2)).slice(0, 2))).toEqual(
+      idsOf(await comments.limit(2).first(2)),
+    );
+    expect(idsOf((await comments.limit(2)).slice(0, 3))).toEqual(
+      idsOf(await comments.limit(2).first(3)),
+    );
   });
 });
 
 // ==========================================================================
 // FinderTest — targets finder_test.rb (continued)
 // ==========================================================================
+
+// ==========================================================================
+// FinderTest — faithful port of the finder_test.rb include?/member? cluster
+// riding canonical Customer + Cpk::Book + Author models and their real
+// fixtures. `include?`/`member?` (alias) share one implementation, so each
+// Customer/Cpk::Book pair asserts identical behavior.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { customers, cpkBooks, authors, topics } = fixtures(
+    ["customers", "cpkBooks", "cpkAuthors", "topics", "authors", "posts"],
+    { schema: canonicalSchema },
+  );
+  const Customer = CanonicalCustomer;
+  const Author = CanonicalAuthor;
+  registerModel("Customer", Customer);
+  registerModel("Cpk::Book", CpkBook);
+  registerModel("Author", Author);
+
+  const oneLimitRe = /1 AS one.*LIMIT/;
+
+  it("include when non AR object passed on unloaded relation", async () => {
+    await assertNoQueries(false, async () => {
+      expect(await Customer.where({ name: "David" }).include("I'm not an AR object" as never)).toBe(
+        false,
+      );
+    });
+  });
+
+  it("include when non AR object passed on loaded relation", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    await assertNoQueries(false, async () => {
+      expect(await custs.include("I'm not an AR object" as never)).toBe(false);
+    });
+  });
+
+  it("member when non AR object passed on unloaded relation", async () => {
+    await assertNoQueries(false, async () => {
+      expect(await Customer.where({ name: "David" }).member("I'm not an AR object" as never)).toBe(
+        false,
+      );
+    });
+  });
+
+  it("member when non AR object passed on loaded relation", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    await assertNoQueries(false, async () => {
+      expect(await custs.member("I'm not an AR object" as never)).toBe(false);
+    });
+  });
+
+  it("include on unloaded relation with match", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      expect(await Customer.where({ name: "David" }).include(customers("david"))).toBe(true);
+    });
+  });
+
+  it("include on unloaded relation without match", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      expect(await Customer.where({ name: "David" }).include(customers("mary"))).toBe(false);
+    });
+  });
+
+  it("include on unloaded relation with mismatched class", async () => {
+    const topic = topics("first");
+    expect(await Customer.exists(topic.id)).toBe(true);
+
+    await assertNoQueries(false, async () => {
+      expect(await Customer.where({ name: "David" }).include(topic as never)).toBe(false);
+    });
+  });
+
+  it("include on unloaded relation with offset", async () => {
+    // Rails asserts /ORDER BY name ASC/; trails quotes the raw order string, so
+    // match the quoted `"customers"."name"` form the adapter emits.
+    const orderRe = new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("customers.name"))} ASC`);
+    await assertQueriesMatch(orderRe, undefined, false, async () => {
+      expect(await Customer.offset(1).order("name ASC").include(customers("mary"))).toBe(true);
+    });
+  });
+
+  it("include on unloaded relation with limit", async () => {
+    const mary = customers("mary");
+    const barney = customers("barney");
+    const david = customers("david");
+
+    expect(await Customer.order({ id: "desc" }).limit(2).include(david)).toBe(false);
+    expect(await Customer.order({ id: "desc" }).limit(2).include(barney)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).include(mary)).toBe(true);
+  });
+
+  it.skipIf(adapterType === "postgres")(
+    "include on unloaded relation with having referencing aliased select",
+    async () => {
+      const bob = authors("bob");
+      const mary = authors("mary");
+
+      expect(
+        await Author.select("COUNT(*) as total_posts", "authors.*")
+          .joins("posts")
+          .group("id")
+          .having("total_posts > 2")
+          .include(bob),
+      ).toBe(false);
+      expect(
+        await Author.select("COUNT(*) as total_posts", "authors.*")
+          .joins("posts")
+          .group("id")
+          .having("total_posts > 2")
+          .include(mary),
+      ).toBe(true);
+    },
+  );
+
+  it("include on loaded relation with match", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    const david = customers("david");
+
+    await assertNoQueries(false, async () => {
+      expect(await custs.include(david)).toBe(true);
+    });
+  });
+
+  it("include on loaded relation without match", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    const mary = customers("mary");
+
+    await assertNoQueries(false, async () => {
+      expect(await custs.include(mary)).toBe(false);
+    });
+  });
+
+  it("include on unloaded relation with composite primary key", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      const book = cpkBooks("cpk_great_author_first_book");
+      expect(await CpkBook.where({ title: "The first book" }).include(book)).toBe(true);
+    });
+  });
+
+  it("include on loaded relation with composite primary key", async () => {
+    const books = await CpkBook.where({ title: "The first book" }).load();
+    const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
+
+    await assertNoQueries(false, async () => {
+      expect(await books.include(greatAuthorBook)).toBe(true);
+    });
+  });
+
+  it("member on unloaded relation with match", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      expect(await Customer.where({ name: "David" }).member(customers("david"))).toBe(true);
+    });
+  });
+
+  it("member on unloaded relation without match", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      expect(await Customer.where({ name: "David" }).member(customers("mary"))).toBe(false);
+    });
+  });
+
+  it("member on unloaded relation with mismatched class", async () => {
+    const topic = topics("first");
+    expect(await Customer.exists(topic.id)).toBe(true);
+
+    await assertNoQueries(false, async () => {
+      expect(await Customer.where({ name: "David" }).member(topic as never)).toBe(false);
+    });
+  });
+
+  it("member on unloaded relation with offset", async () => {
+    // Rails asserts /ORDER BY name ASC/; trails quotes the raw order string, so
+    // match the quoted `"customers"."name"` form the adapter emits.
+    const orderRe = new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("customers.name"))} ASC`);
+    await assertQueriesMatch(orderRe, undefined, false, async () => {
+      expect(await Customer.offset(1).order("name ASC").member(customers("mary"))).toBe(true);
+    });
+  });
+
+  it("member on unloaded relation with limit", async () => {
+    const mary = customers("mary");
+    const barney = customers("barney");
+    const david = customers("david");
+
+    expect(await Customer.order({ id: "desc" }).limit(2).member(david)).toBe(false);
+    expect(await Customer.order({ id: "desc" }).limit(2).member(barney)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).member(mary)).toBe(true);
+  });
+
+  it("member on loaded relation with match", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    const david = customers("david");
+
+    await assertNoQueries(false, async () => {
+      expect(await custs.member(david)).toBe(true);
+    });
+  });
+
+  it("member on loaded relation without match", async () => {
+    const custs = await Customer.where({ name: "David" }).load();
+    const mary = customers("mary");
+
+    await assertNoQueries(false, async () => {
+      expect(await custs.member(mary)).toBe(false);
+    });
+  });
+
+  it("member on unloaded relation with composite primary key", async () => {
+    await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
+      const book = cpkBooks("cpk_great_author_first_book");
+      expect(await CpkBook.where({ title: "The first book" }).member(book)).toBe(true);
+    });
+  });
+
+  it("member on loaded relation with composite primary key", async () => {
+    const books = await CpkBook.where({ title: "The first book" }).load();
+    const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
+
+    await assertNoQueries(false, async () => {
+      expect(await books.member(greatAuthorBook)).toBe(true);
+    });
+  });
+});

@@ -210,6 +210,16 @@ export class EnumType extends ValueType<string> {
     return this.subtype;
   }
 
+  /**
+   * The underlying value type this enum wraps (Rails' `subtype` Type object).
+   * Calculations unwrap the EnumType to its subtype before casting an aggregate
+   * value (`type = type.subtype if Enum::EnumType === type`), so min/max/sum
+   * return the raw integer (0), not the enum label ("easy").
+   */
+  subtypeType(): ValueType<unknown> {
+    return this._subtypeType;
+  }
+
   // Mirrors Rails EnumType#cast:
   //   if mapping.has_key?(value)   -> value.to_s   (value is a label)
   //   elsif mapping.has_value?(value) -> mapping.key(value)  (return the label)
@@ -350,7 +360,13 @@ export function enumMethod(
   this: typeof Base,
   attribute: string,
   mapping: Record<string, EnumValue>,
-  options?: { prefix?: boolean | string; suffix?: boolean | string },
+  options?: {
+    prefix?: boolean | string;
+    suffix?: boolean | string;
+    scopes?: boolean;
+    instanceMethods?: boolean;
+    validate?: boolean | Record<string, unknown>;
+  },
 ): void {
   _enum.call(this, attribute, mapping, options);
 }
@@ -377,7 +393,7 @@ export function _enum(
     suffix?: boolean | string;
     scopes?: boolean;
     instanceMethods?: boolean;
-    validate?: boolean;
+    validate?: boolean | Record<string, unknown>;
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
@@ -443,7 +459,11 @@ export function _enum(
   // Register EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
   // install the label-returning accessor via the shared installEnumAttribute.
-  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
+  // Mirrors Rails `EnumType.new(..., raise_on_invalid_values: !validate)`: with
+  // `validate:` set, an invalid assignment is caught by the inclusion validator
+  // rather than raising on write, so the type must not raise.
+  const validate = options?.validate ?? false;
+  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype, !validate);
   installEnumAttribute(this, attrName, enumType);
 
   // Conflict-detection pass, then the generation pass — both ported from the
@@ -452,7 +472,15 @@ export function _enum(
   // (`draftBang`), per-value scope + auto `not*` scope, plus friendly-name and
   // original-form variants for labels containing special characters. Rails has
   // no plain in-memory setter, so none is generated.
+  //
+  // `definedNames` tracks positive method names only (predicate / bang / scope).
+  // The auto-generated `not*` scope names are deliberately excluded: a value
+  // literally named like `notActive` colliding with the `not*` scope of `active`
+  // is NOT a hard conflict \u2014 Rails only *warns* about it (via
+  // detectNegativeEnumConditionsBang below). Folding negative-scope names back
+  // into this set would resurrect the pre-empting ArgumentError.
   const definedNames = new Set<string>();
+  const valueMethodNames: string[] = [];
   for (const [n] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
     const capitalizedFullName = camelize(methodName(n));
@@ -461,16 +489,21 @@ export function _enum(
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
+    // Rails feeds both the value method name and its special-char-stripped
+    // friendly alias into detect_negative_enum_conditions! (enum.rb:266-279),
+    // pushing the alias only when it differs and isn't already present.
+    valueMethodNames.push(fullName);
+    if (friendlyName !== fullName && !valueMethodNames.includes(friendlyName)) {
+      valueMethodNames.push(friendlyName);
+    }
+
     if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
     if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
     if (definedNames.has(fullName))
       raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (definedNames.has(notScopeName))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
     definedNames.add(predicateName);
     definedNames.add(bangName);
     definedNames.add(fullName);
-    definedNames.add(notScopeName);
 
     if (predicateName in (this.prototype as object))
       raiseConflictError.call(this, attribute, predicateName);
@@ -490,6 +523,14 @@ export function _enum(
       if (notFriendlyName in (this as object))
         raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
     }
+  }
+
+  // Rails only warns (never raises) when an enum element's auto-generated
+  // negative scope (`not*`) would clash with a positively-named element, and
+  // skips the check entirely when scopes are disabled.
+  // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`.
+  if (options?.scopes !== false) {
+    detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
   for (const [n, value] of Object.entries(mapping)) {
@@ -565,6 +606,18 @@ export function _enum(
         configurable: true,
       });
     }
+  }
+
+  // Mirrors Rails:
+  //   if validate
+  //     validate = {} unless Hash === validate
+  //     validates_inclusion_of name, in: enum_values.keys, **validate
+  //   end
+  // A truthy `validate` adds an inclusion validation over the enum labels; a
+  // hash form forwards its options (e.g. `{ allowNil: true }`) to the validator.
+  if (validate) {
+    const validateOptions = typeof validate === "object" ? validate : {};
+    this.validatesInclusionOf(attribute, { in: Object.keys(mapping), ...validateOptions });
   }
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses

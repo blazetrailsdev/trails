@@ -20,7 +20,7 @@ import {
   _reflectOnAssociation,
   reflectOnAggregation,
 } from "./reflection.js";
-import { compactUniqIds } from "./relation/compact-uniq-ids.js";
+import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
@@ -894,13 +894,39 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
           `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
       );
     }
+    if (this.compositePrimaryKey) {
+      // Rails `expects_array = ids.first.first.is_a?(Array)` is computed on
+      // the *original* vararg list (finder_methods.rb:494-498). For a plain
+      // variadic tuple list like `find([1, 2], [1, 2])`, `ids.first` is the
+      // first tuple `[1, 2]` and its `.first` is a scalar → `expects_array`
+      // is false, so a `compact.uniq` collapse to a single tuple returns the
+      // bare record (`find_one`), not `[record]`. Recursing with the raw
+      // vararg list as one argument would lose that distinction (the callee
+      // sees `id[0]` as an Array and always wraps), so dedupe here and
+      // dispatch to the single-tuple form when it collapses.
+      const expectsArray = Array.isArray((ids[0] as unknown[])[0]);
+      const tuples = compactUniqTuples(ids);
+      if (tuples.length === 1 && !expectsArray) {
+        return (this as any).find(tuples[0]);
+      }
+      return (this as any).find(tuples);
+    }
     return (this as any).find(ids);
   }
   const id = ids[0];
 
   if (this.compositePrimaryKey && Array.isArray(id)) {
-    if (id.length > 0 && Array.isArray(id[0])) {
-      const tuples = id as unknown[][];
+    // Rails `expects_array = ids.first.first.is_a?(Array)`
+    // (finder_methods.rb:494-498): only the *first* element of the arg
+    // decides list-vs-single-tuple. So `find([nil, [1, 2]])` (first element
+    // nil, not an Array) is a single degenerate tuple — the nil is preserved,
+    // NOT dropped as a list entry — while a tuple's own nil component
+    // (`find([[1, nil]])`) also stays a single tuple.
+    if (Array.isArray(id[0])) {
+      // Rails `ids = ids.compact.uniq`: drop nil outer entries and fold
+      // structurally-equal tuples, so `find([[1, 2], [1, 2]])` collapses to
+      // one tuple and returns the single record (wrapped per expects_array).
+      const tuples = compactUniqTuples(id) as unknown[][];
       const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
       const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
       const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();

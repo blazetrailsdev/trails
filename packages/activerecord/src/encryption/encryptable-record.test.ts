@@ -609,6 +609,34 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const overridingInstance = found!.becomes(OverridingBook);
     expect(overridingInstance.name).toBe("Dune-overridden");
   });
+
+  it("when ignore_case: true is declared before the attributes, the original_<name> reader still decrypts (replay-safe)", async () => {
+    const adapter = await freshAdapter();
+    // Declare `encrypts` BEFORE the attribute definitions exist, so both `name`
+    // and its `original_name` counterpart are buffered and only wrapped when the
+    // defs appear — the replay path. If the original_<name> encrypted type is
+    // lost on that replay (the regression this guards), its reader returns raw
+    // ciphertext instead of the decrypted, case-preserved value.
+    const Book = class extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+      }
+    } as unknown as typeof Base & {
+      create: (a: object) => Promise<any>;
+      find: (id: any) => Promise<any>;
+    };
+
+    const book = await Book.create({ name: "Dune" });
+    await assertEncryptedAttribute(book, "original_name", "Dune");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
   it("binary data can be encrypted", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
@@ -865,5 +893,72 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
     expect(() =>
       EncryptableRecord.encrypts(modelClass, "name", { deterministic: true, ignoreCase: true }),
     ).toThrow(/must create an additional column named 'original_name'/);
+  });
+});
+
+// The ignore_case original_<name> requirement is checked at declaration time
+// against the columns known then (columnNames() forces a schema load when an
+// adapter is connected). These exercise requireOriginalColumnPresent directly
+// plus the full Base.encrypts → encryptAttribute → preserveOriginalEncrypted
+// wiring end-to-end.
+describe("EncryptableRecord — ignore_case original_<name> column requirement", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    Configurable.config.supportUnencryptedData = false;
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  it("raises when columns are known and the original_<name> column is missing", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
+    ).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  it("does not raise when the original_<name> column is present", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", [
+        "id",
+        "name",
+        "original_name",
+      ]),
+    ).not.toThrow();
+  });
+
+  it("defers (no raise) when no columns are known (schema not loaded yet)", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", []),
+    ).not.toThrow();
+  });
+
+  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
+    Configurable.config.supportUnencryptedData = true;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
+    ).not.toThrow();
+  });
+
+  // End-to-end: a real Base.encrypts(ignoreCase) on the canonical `authors`
+  // table (which has `name` but no `original_name`) must raise, exercising the
+  // full encrypts → encryptAttribute → preserveOriginalEncrypted wiring.
+  it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
+    const adapter = await freshAdapter();
+    expect(() => {
+      const Model = class extends Base {
+        static _tableName = "authors";
+        static {
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          this.encrypts("name", { deterministic: true, ignoreCase: true });
+        }
+      } as any;
+      new Model();
+    }).toThrow(/must create an additional column named 'original_name'/);
   });
 });

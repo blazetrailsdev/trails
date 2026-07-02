@@ -148,6 +148,81 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
+  it("find([[1, 2], [1, 2]]) → uniq'd to a single tuple", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1, 2],
+          [1, 2],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1, 2]],
+      wantArray: true,
+      tuples: [[1, 2]],
+    });
+  });
+
+  it("find([1, 2], [1, 2]) via variadic → uniq'd to a single tuple, unwrapped", () => {
+    // Rails: expects_array = ids.first.first.is_a?(Array) is false for a
+    // variadic call, so the deduped size-1 result is the bare record, not
+    // `[record]` (finder_methods.rb:494-513).
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [1, 2],
+        [1, 2],
+      ]),
+    ).toEqual({
+      ids: [[1, 2]],
+      wantArray: false,
+      tuples: [[1, 2]],
+    });
+  });
+
+  it("find([[1, 2], null, [3, 4]]) → nil outer entry dropped by compact", () => {
+    expect(normalizeFindArgs("Order", pk, [[[1, 2], null, [3, 4]]])).toEqual({
+      ids: [
+        [1, 2],
+        [3, 4],
+      ],
+      wantArray: true,
+      tuples: [
+        [1, 2],
+        [3, 4],
+      ],
+    });
+  });
+
+  it("find([[1n, 2], [1, 2]]) → bigint/number components fold, tuple uniq'd", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1n, 2],
+          [1, 2],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1n, 2]],
+      wantArray: true,
+      tuples: [[1n, 2]],
+    });
+  });
+
+  it("find([[1, null], [1, null]]) → nil components preserved, tuple uniq'd", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1, null],
+          [1, null],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1, null]],
+      wantArray: true,
+      tuples: [[1, null]],
+    });
+  });
+
   it("find(1) on composite PK → RecordNotFound with arity message", () => {
     try {
       normalizeFindArgs("Order", pk, [1]);

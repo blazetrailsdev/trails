@@ -29857,6 +29857,13 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "preserve_original_encrypted",
+    "call": "encrypts",
+    "reason": "Rails' bare `encrypts original_attribute_name` is realized via `encryptAttribute(originalName, {}, buildScheme({}))` so the original_<name> scheme reuses buildScheme's legacy-encryptor shim + defaultEncryptor fallback; the declaration still happens, just not through the public `encrypts` entry."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "source_attribute_from_preserved_attribute",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -30397,13 +30404,6 @@
     "package": "activerecord",
     "tsFile": "enum.ts",
     "rubyName": "_enum",
-    "call": "detect_negative_enum_conditions!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "_enum",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -30419,13 +30419,6 @@
     "tsFile": "enum.ts",
     "rubyName": "_enum",
     "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "_enum",
-    "call": "validates_inclusion_of",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -38168,13 +38161,6 @@
     "tsFile": "relation.ts",
     "rubyName": "exists?",
     "call": "apply_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exists?",
-    "call": "construct_relation_for_exists",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -55284,5 +55270,12 @@
     "rubyName": "stale_state",
     "call": "through_reflection",
     "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypts",
+    "call": "new",
+    "reason": "encrypt_attribute's `EncryptedAttributeType.new` is emitted from the shared registerEncryptedType primitive (immediate direct-set / durable decorator) after encrypts routes through encryptAttribute - same construction, different TS method."
   }
 ]

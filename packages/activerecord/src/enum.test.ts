@@ -11,14 +11,14 @@
  * Cases the canonical `Book` enum surface cannot yet express are kept under
  * their Rails names and `it.skip`-ped, tracked-pending-convergence under RFC
  * 0023-surfaced-deviations (enum-canonical-book-gaps): frozen `statuses`,
- * `*_before_type_cast` / `*_for_database`, the `validate:` option, and the
+ * `*_before_type_cast` / `*_for_database`, and the
  * conflict-detection / option-validation message surface (the last is covered
  * behaviorally in enum.trails.test.ts). The `cover` string enum, the
  * `boolean_status` boolean enum, and the `last_read` `forgotten: nil` value are
  * now wired on the canonical `Book` model (EnumType supports string/boolean/nil
  * values).
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
@@ -313,10 +313,47 @@ describe("EnumTest", () => {
     }).toThrow("'unknown' is not a valid status");
   });
 
-  // Rails: `enum :status, [...], validate: true|hash` — the `validate:` option
-  // is not yet wired into the trails enum macro.
-  it.skip("validation with 'validate: true' option", () => {});
-  it.skip("validation with 'validate: hash' option", () => {});
+  it("validation with 'validate: true' option", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"] as any, { validate: true });
+      }
+    }
+
+    let validBook = new K({ status: "proposed" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: "written" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    let invalidBook = new K({ status: null } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+
+    invalidBook = new K({ status: "unknown" } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+  });
+
+  it("validation with 'validate: hash' option", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"] as any, { validate: { allowNil: true } });
+      }
+    }
+
+    let validBook = new K({ status: "proposed" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: "written" } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    validBook = new K({ status: null } as any);
+    expect((validBook as any).isValid()).toBe(true);
+
+    const invalidBook = new K({ status: "unknown" } as any);
+    expect((invalidBook as any).isValid()).toBe(false);
+  });
 
   // Rails: `Book.where(id:).update_all("status = NULL")` (raw SQL fragment).
   it.skip("NULL values from database should be casted to nil", () => {});
@@ -635,12 +672,62 @@ describe("EnumTest", () => {
   });
   it.skip("serializable? with large number label", () => {});
 
-  // Rails: logger-warning surface for negative-scope clashes — covered
-  // behaviorally in enum.trails.test.ts (detectNegativeEnumConditionsBang).
-  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {});
-  it.skip("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {});
+  // Rails routes the clash message through the model logger; trails routes it
+  // through the `setEnumWarn` sink (default `console.warn`). The exact wording
+  // diverges, so we assert on the warning behavior rather than Rails' string.
+  it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { sent: 0, notSent: 1 });
+        }
+      }
+      void K;
+      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { notSent: 0, sent: 1 });
+        }
+      }
+      void K;
+      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/negative scope 'notSent'/));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // Rails: `boolean_status` / distinct-clash surface not yet expressible.
   it.skip("enum doesn't log a warning if no clashes detected", () => {});
-  it.skip("enum doesn't log a warning if opting out of scopes", () => {});
+
+  it("enum doesn't log a warning if opting out of scopes", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class K extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", { sent: 0, notSent: 1 }, { scopes: false });
+        }
+      }
+      void K;
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
 
   // Rails: `type_for_attribute` on an enum with an undeclared / explicit type.
   it.skip("raises for attributes with undeclared type", () => {});

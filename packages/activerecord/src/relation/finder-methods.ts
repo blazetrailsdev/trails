@@ -13,7 +13,7 @@ import { pluralize } from "@blazetrails/activesupport";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
-import { compactUniqIds } from "./compact-uniq-ids.js";
+import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -110,41 +110,43 @@ export function normalizeFindArgs(
   // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` BEFORE the
   // `case ids.size` dispatch. So `find([1, 1])` collapses to one id
   // (→ `find_one`) and `find([1, nil])` drops the nil. Applied to the
-  // simple-PK flatten branches below; composite tuple lists are not
-  // compacted/uniq'd (a tuple may legitimately contain nil components).
-  if (rest.length > 0) {
-    if (composite) {
-      if (args.every((x) => !Array.isArray(x))) {
-        // All-scalar collapses to one tuple id — Rails treats
-        // `find(1, 42)` on a 2-arity PK as `[1, 42]`. Arity mismatch
-        // raises below with the whole tuple in the message.
-        ids = [args];
-        wantArray = false;
-      } else {
-        ids = args;
-        wantArray = true;
-      }
+  // simple-PK flatten branches below. Composite tuple lists get their own
+  // `compact.uniq` (structural equality) — nil _outer_ entries drop, but a
+  // tuple's own nil components are preserved (see `compactUniqTuples`).
+  if (composite) {
+    // Rails composite `find_with_ids` (finder_methods.rb:494-517):
+    //   expects_array = ids.first.first.is_a?(Array)
+    //   ids = ids.first if expects_array
+    //   ids = ids.compact.uniq
+    //   when 1 then expects_array ? [result] : result
+    // `expectsArray` keys off the *first* element of the first arg alone, so
+    // a nil that precedes the tuples (`find([nil, [1, 2]])`) leaves it false
+    // and the arg is a single degenerate tuple — the nil is NOT dropped as a
+    // list entry. The size-1 result is wrapped only when `expectsArray`, so a
+    // variadic duplicate like `find([1, 2], [1, 2])` dedupes to one tuple and
+    // returns the bare record (not `[record]`).
+    const expectsArray = Array.isArray(first) && Array.isArray(first[0]);
+    if (rest.length > 0 && args.every((x) => !Array.isArray(x))) {
+      // trails accommodation (Rails would raise on `1.first`): an all-scalar
+      // variadic call like `find(1, 42)` on a 2-arity PK is the single tuple
+      // `[1, 42]`. Arity mismatch raises below with the whole tuple.
+      ids = [args];
     } else {
-      // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
-      // canonicalize to `[1, 2, 3]`.
-      ids = compactUniqIds(args.flat(Infinity));
-      wantArray = true;
+      ids = compactUniqTuples(expectsArray ? (first as unknown[]) : args);
     }
+    // `find_some` (size > 1) always returns an array; only a deduped size-1
+    // list stays unwrapped when the caller did not pass a tuple list.
+    wantArray = expectsArray || ids.length !== 1;
+  } else if (rest.length > 0) {
+    // Simple PK: flatten so mixed inputs like `find([1, 2], 3)`
+    // canonicalize to `[1, 2, 3]`.
+    ids = compactUniqIds(args.flat(Infinity));
+    wantArray = true;
   } else if (Array.isArray(first)) {
-    if (composite) {
-      if (first.every((x) => !Array.isArray(x))) {
-        ids = [first];
-        wantArray = false;
-      } else {
-        ids = first;
-        wantArray = true;
-      }
-    } else {
-      // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
-      // `find([1, 2])`, matching Rails' `Array#flatten`.
-      ids = compactUniqIds((first as unknown[]).flat(Infinity));
-      wantArray = true;
-    }
+    // Simple PK: recursive flatten so `find([[1, 2]])` behaves like
+    // `find([1, 2])`, matching Rails' `Array#flatten`.
+    ids = compactUniqIds((first as unknown[]).flat(Infinity));
+    wantArray = true;
   } else {
     ids = [first];
     wantArray = false;
@@ -371,22 +373,13 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
-  // Rails: Relation#first returns from the already-loaded records (no re-query),
-  // mirroring find_nth_with_limit's loaded? branch. Ordering was applied at load
-  // time, so records[0]/records[0, n] preserve the implicit PK order.
-  if ((this as any)._loaded) {
-    const records: any[] = (this as any)._records;
-    return n !== undefined ? records.slice(0, n) : (records[0] ?? null);
-  }
-  // Rails: Relation#first → find_nth(0) → find_nth_with_limit(0, 1), which runs
-  // through `ordered_relation` so an orderless relation is ordered by the
-  // implicit order column / primary key. Without this, `first` is non-
-  // deterministic on backends that don't return rows in insertion order (e.g.
-  // MySQL/MariaDB under a populated buffer pool).
-  const rel = orderedRelation(this._clone());
-  rel._limitValue = n ?? 1;
-  const records = await rel.toArray();
-  return n !== undefined ? records : (records[0] ?? null);
+  // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
+  // first → find_nth(0) → find_nth_with_limit(0, 1). find_nth_with_limit reads
+  // the loaded cache when present, otherwise runs an ordered LIMIT query — and
+  // crucially caps `limit` against an existing `limit_value` (`first(3)` on a
+  // `.limit(2)` relation returns 2 rows, not 3).
+  if (n !== undefined) return this.findNthWithLimit(0, n);
+  return (await this.findNthWithLimit(0, 1))[0] ?? null;
 }
 
 export async function performFirstBang(this: FinderRelation): Promise<any> {
@@ -407,12 +400,18 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   if (this._isNone) return n !== undefined ? [] : null;
-  // Rails: Relation#last returns from the already-loaded records (no re-query)
-  // via find_last's `loaded?` branch — `records.last` / `records.last(n)`.
-  // Ordering was applied at load time, so the tail of the loaded array is the
-  // correct answer, matching `first`'s loaded-cache read.
-  if ((this as any)._loaded) {
-    const records: any[] = (this as any)._records;
+  // Rails: `return find_last(limit) if loaded? || has_limit_or_offset?`. When
+  // the relation is already loaded — or carries a `limit`/`offset` that a
+  // reverse-order query would otherwise discard — Rails materializes the
+  // records and reads the tail in Ruby (`records.last` / `records.last(n)`)
+  // rather than issuing a fresh reversed query. `toArray()` reuses the loaded
+  // cache when present and runs the bounded query otherwise, matching both.
+  if (
+    (this as any)._loaded ||
+    (this as any)._limitValue != null ||
+    (this as any)._offsetValue != null
+  ) {
+    const records: any[] = await (this as any).toArray();
     if (n === undefined) return records[records.length - 1] ?? null;
     // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
     return n === 0 ? [] : records.slice(-n);
@@ -694,7 +693,6 @@ export const FinderMethods = {
 
 /** @internal */
 export function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
-  if (conditions === false) return rel;
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
   // (or except(:order).limit!(1) when distinct+offset are both set)
   let relation: any;
@@ -707,7 +705,13 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     relation._isDistinct = false;
     relation = relation.select(new Nodes.SqlLiteral("1 AS one")).limit(1);
   }
-  if (conditions === null || conditions === undefined || conditions === true) {
+  // Rails only skips `where!` for `conditions == :none` (our `undefined`
+  // sentinel for "no argument passed"). Every other value — including `true`
+  // and `null` — falls through to the `case`/`else` PK-lookup below, matching
+  // Rails' `where!(primary_key => conditions) unless conditions == :none`.
+  // (`null`/`nil` is unreachable from `exists?`, which short-circuits it to
+  // false before ever calling the helper.)
+  if (conditions === undefined) {
     return relation;
   }
   if (Array.isArray(conditions)) {
@@ -718,7 +722,7 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
   } else if (conditions instanceof Nodes.Node) {
     // Arel node — pass directly rather than wrapping as a PK value.
     relation = relation.where(conditions);
-  } else if (typeof conditions === "object") {
+  } else if (conditions !== null && typeof conditions === "object") {
     // Hash-like: Rails' `when Hash` branch — skip if empty.
     if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
   } else {
