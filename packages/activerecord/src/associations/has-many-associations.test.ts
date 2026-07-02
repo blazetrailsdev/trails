@@ -958,7 +958,7 @@ describe("HasManyAssociationsTest", () => {
 
   // -- Counter cache --
   // Migrated to a dedicated `HasManyAssociationsTest` describe at end of file
-  // (B1966c — defineSchema + shared adapter + withTransactionalFixtures).
+  // (B1966c — boot-laid canonical schema + withTransactionalFixtures).
 
   // -- Has many on new record --
 
@@ -978,8 +978,9 @@ describe("HasManyAssociationsTest", () => {
     // A sibling test file may have warmed the shared schema cache for `bulbs`
     // with a default lowercase `id` PK (e.g. base.test.ts / reflection.test.ts
     // declare `bulbs: { car_id }`). Canonical `bulbs` uses `primary_key: "ID"`,
-    // so reset the memoized column/PK information before reflecting the rebuilt
-    // table — otherwise the ids_reader plucks a non-existent `id` column on PG.
+    // so reset the memoized column/PK information before reflecting the
+    // canonical table — otherwise the ids_reader plucks a non-existent `id`
+    // column on PG.
     Car.resetColumnInformation();
     Bulb.resetColumnInformation();
     Company.resetColumnInformation();
@@ -5485,12 +5486,12 @@ describe("HasManyAssociationsTest", () => {
 });
 
 // Building cluster (adding `<<`, build, create, replace `=`) migrated to a
-// shared describe-level adapter with explicit defineSchema +
+// shared describe-level adapter riding the boot-laid canonical schema +
 // withTransactionalFixtures (Batch B1966e). Tests previously defined Author
 // and Post inside each `it()` block against an inline `freshAdapter()` from
-// the parent describe's `beforeEach`. Hoisting the classes and adapter to
-// `beforeAll` means schema DDL runs once per file and each test runs inside
-// BEGIN/ROLLBACK rather than rebuilding tables.
+// the parent describe's `beforeEach`. Hoisting the classes to `beforeAll`
+// means each test runs inside BEGIN/ROLLBACK against the ambient canonical
+// tables rather than rebuilding them.
 describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
