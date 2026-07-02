@@ -1057,6 +1057,33 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     }).rejects.toThrow(/must create an additional column named 'original_name'/);
   });
 
+  // Reproduces the originally-reported fail-open scenario end-to-end: the
+  // adapter is genuinely not connected when `encrypts(ignoreCase)` runs, so
+  // `columnNames()` returns [] (not because config suppressed the check) and
+  // the declaration-time check defers. Once the adapter connects and the real
+  // `authors` schema reflects, the missing `original_name` column must raise.
+  // The raise lands at reflection when the schema cache is cold, or already at
+  // declaration when a sibling test warmed `authors` into the shared cache
+  // (columnNames() reflects immediately) — either way it is fail-closed, so the
+  // whole declaration + reflection is wrapped in the rejection assertion.
+  it("Base.encrypts ignoreCase with a genuinely-disconnected adapter is fail-closed", async () => {
+    const adapter = await freshAdapter();
+    await expect(async () => {
+      const Model = class extends Base {
+        static _tableName = "authors";
+        static {
+          // No adapter yet: columnNames() === [] here so the check defers.
+          this.encrypts("name", { deterministic: true, ignoreCase: true });
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      } as any;
+      await Model.loadSchema();
+      new Model();
+    }).rejects.toThrow(/must create an additional column named 'original_name'/);
+  });
+
   // No false positive: `original_name` genuinely exists on `encrypted_books`,
   // so reflecting the real schema after a before-adapter declaration must NOT
   // raise, even though the source attribute was declared before the column.

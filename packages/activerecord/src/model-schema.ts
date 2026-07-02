@@ -1074,7 +1074,13 @@ function applyColumnsHash(
     }
     originatingHost._attributeDefinitions = baseDefs;
     encryptionHooks.applyPendingEncryptions(originatingHost);
-    encryptionHooks.requireOriginalColumnsAfterReflection?.(originatingHost, reflectedColumnNames);
+    // Recompute the reflected column set against the subclass's own
+    // `ignoredColumns` — an STI subclass may ignore a different set than its
+    // base, so reusing the base's `reflectedColumnNames` could check against the
+    // wrong ignore-set.
+    const originatingIgnored = new Set(originatingHost._ignoredColumns ?? []);
+    const originatingReflected = Object.keys(hash).filter((n) => !originatingIgnored.has(n));
+    encryptionHooks.requireOriginalColumnsAfterReflection?.(originatingHost, originatingReflected);
   }
 }
 

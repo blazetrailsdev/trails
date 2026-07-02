@@ -425,6 +425,12 @@ export class EncryptableRecord {
     modelClass: any,
     reflectedColumnNames: string[],
   ): void {
+    // Read is intentionally NOT own-property-guarded (unlike the write in
+    // preserveOriginalEncrypted): an STI subclass with no ignoreCase
+    // declarations of its own should still enforce the base's preserved
+    // attributes, so we deliberately resolve the inherited Set via the
+    // prototype chain. Re-running it for both host and originatingHost is
+    // idempotent — requireOriginalColumnPresent yields the same result each pass.
     const preserved: Set<string> | undefined = modelClass._ignoreCasePreservedAttributes;
     if (!preserved || preserved.size === 0) return;
     for (const name of preserved) {
