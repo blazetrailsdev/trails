@@ -568,7 +568,13 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (isTransactionAware(connection)) {
-        connection.verifyBang();
+        // Rails eagerly validates here (connection_pool.rb:336,
+        // `@pinned_connection.verify!`) *before* opening the transaction and
+        // lets a failure raise out of pin_connection!. This method is async, so
+        // unlike the sync checkout() path we can await and propagate that
+        // failure faithfully — a dead connection aborts the pin (the catch
+        // below decrements _pinnedCount and rethrows) rather than being pinned.
+        await connection.verifyBang();
         await connection.transactionManager.beginTransaction({
           joinable: false,
           _lazy: false,
@@ -643,10 +649,10 @@ export class ConnectionPool implements ReapablePool {
       // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
       // unconditionally, ensure membership in @connections, and return — no
       // checkout_and_verify / QueryCache wiring on the pinned connection.
-      (pinned as unknown as { verifyBang(): void }).verifyBang();
       if (this._connections && !this._connections.includes(pinned)) {
         this._connections.push(pinned);
       }
+      fireAndForgetVerify(this, pinned as unknown as { verifyBang(): void | Promise<void> });
       return pinned;
     }
     const conn = this._acquireConnection();
@@ -1367,6 +1373,30 @@ function normalizeQueryCacheConfig(raw: unknown): number | false | null | undefi
   if (raw === "enabled" || raw === true || raw == null) return raw as null | undefined;
   if (typeof raw === "number") return raw;
   return undefined;
+}
+
+/**
+ * Fire `verifyBang()` on an already-pinned connection the way Rails' pinned
+ * `checkout` branch does (connection_pool.rb:554) — synchronously, before
+ * returning it. trails' `verifyBang` is async (a real backend issues a liveness
+ * query) and the sync `checkout()` API can't await it, so the connection is
+ * returned before verification resolves.
+ *
+ * The only rejection we swallow is a teardown race: the pool was
+ * disconnected/discarded (which empties `_connections`) while the verify query
+ * was still in flight, leaving a dangling promise that would otherwise surface
+ * as an unhandled rejection. A genuine verify failure on a *live* pool — the
+ * connection is still tracked in `_connections` — is re-raised rather than
+ * silently handing back a dead connection; the async `checkoutAsync` path awaits
+ * `verifyBang` and propagates directly.
+ */
+function fireAndForgetVerify(pool: Pool, conn: { verifyBang(): void | Promise<void> }): void {
+  const verified = conn.verifyBang();
+  if (!verified || typeof verified.catch !== "function") return;
+  verified.catch((err: unknown) => {
+    const tornDown = !(pool._connections?.includes(conn) ?? false);
+    if (!tornDown) throw err;
+  });
 }
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
