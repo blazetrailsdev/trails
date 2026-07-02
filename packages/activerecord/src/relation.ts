@@ -3613,44 +3613,28 @@ export class Relation<T extends Base> {
       return rel.applyJoinDependencyForArel(false).exists();
     }
     // Mirrors Rails FinderMethods#construct_relation_for_exists
-    // (finder_methods.rb): when `distinct_value && offset_value` keep the
+    // (finder_methods.rb:438): when `distinct_value && offset_value` keep the
     // relation's select/distinct/group/having/offset and drop only the order
     // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
     // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive,
     // only select/distinct/order are dropped and the projection becomes
-    // `1 AS one`. Either branch limits to 1 and never instantiates records.
-    const table = rel._modelClass.arelTable;
-    const distinctOffset = rel._isDistinct && rel._offsetValue != null;
-    const manager = table.project();
-    if (distinctOffset) {
-      // Keep the relation's own projection (default `posts.*`) so DISTINCT has
-      // columns to dedup on, plus its distinct value; drop only the order.
-      const selectCols = rel._selectColumns ?? [];
-      const star = (table as unknown as { star?: Nodes.Node }).star ?? table.get("*");
-      const projection =
-        selectCols.length > 0 ? (rel.arelColumns(selectCols) as Nodes.Node[]) : [star];
-      manager.project(...projection);
-      manager.distinct();
-    } else {
-      manager.project(new Nodes.SqlLiteral("1 AS one"));
-    }
-    rel._applyJoinsToManager(manager);
-    rel._applyWheresToManager(manager, table);
-    // group/having survive in BOTH branches (Rails' except never lists them);
-    // only the distinct+offset branch keeps distinct, and neither keeps order.
-    for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
-    if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
-    if (rel._offsetValue != null) manager.skip(rel._offsetValue);
-    manager.take(1);
+    // `1 AS one`. Conditions are already folded into `rel`'s where clause above,
+    // so pass `true` to skip the helper's own where! step. Building the probe
+    // through the real relation (rather than a hand-rolled manager) reuses the
+    // shared select-list builder — so the distinct+offset branch's default `*`
+    // projection is `ignoredColumns`-aware, matching Rails' `build_select`.
+    const probe: Relation<T> = rel.constructRelationForExists(true);
     // Tag the probe query `<Model> Exists?` — the name Rails passes to its
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
-    const [existsSql, existsBinds] = rel._compileAstWithBinds(manager.ast);
+    const [existsSql, existsBinds] = rel._compileAstWithBinds(probe.toArel().ast);
     const rows = await rel._withQueryConnection(() =>
       rel._conn().execute(existsSql, existsBinds, `${rel._modelClass.name} Exists?`),
     );
-    return rows.length > 0;
+    // Rails: `select_rows(...).size == 1` — with LIMIT 1 the probe returns at
+    // most one row, so a non-empty result means a match.
+    return rows.length === 1;
   }
 
   // -- Async query interface (Rails 7.0+) --
