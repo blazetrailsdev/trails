@@ -133,10 +133,7 @@ export class EncryptableRecord {
       }
     }
 
-    if (!modelClass._encryptedAttributes) {
-      modelClass._encryptedAttributes = new Set<string>();
-    }
-
+    // `encryptAttribute` own-property-guards `_encryptedAttributes` itself.
     for (const name of names) {
       this.encryptAttribute(modelClass, name, options);
     }
