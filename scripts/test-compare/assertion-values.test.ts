@@ -83,6 +83,15 @@ describe("assertionValueMismatch", () => {
     expect(deltas).toEqual([{ kind: "includes", rails: ["s:a"], trails: ["s:b"] }]);
   });
 
+  it("value-compares the same kind now that both sides have a live capture path", () => {
+    // Rails `assert_same 5, x` (self-call, arg 0) vs trails `assertSame(4, x)`
+    // (helper callee, arg 0). Previously same was excluded from VALUE_BEARING_KINDS
+    // because the trails helper captured no value; it now does.
+    expect(VALUE_BEARING_KINDS.has("same")).toBe(true);
+    const deltas = assertionValueMismatch(["assert_same"], ["n:5"], ["assertSame"], ["n:4"], false);
+    expect(deltas).toEqual([{ kind: "same", rails: ["n:5"], trails: ["n:4"] }]);
+  });
+
   it("returns null for a pending stub or missing kind data", () => {
     expect(
       assertionValueMismatch(["assert_equal"], ["n:5"], ["toEqual"], ["n:4"], true),
