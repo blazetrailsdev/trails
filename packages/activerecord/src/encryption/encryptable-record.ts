@@ -132,50 +132,12 @@ export class EncryptableRecord {
       }
     }
 
-    const scheme = schemeFor(options);
-
     if (!modelClass._encryptedAttributes) {
       modelClass._encryptedAttributes = new Set<string>();
     }
 
     for (const name of names) {
-      modelClass._encryptedAttributes.add(name);
-
-      // Get existing cast type from attribute definitions if available.
-      // If already encrypted, unwrap to avoid double-encryption.
-      const existingDef = modelClass._attributeDefinitions?.get?.(name);
-      let castType = existingDef?.type;
-      if (castType instanceof EncryptedAttributeType) {
-        castType = castType.castType;
-      }
-
-      const encryptedType = new EncryptedAttributeType({
-        scheme,
-        castType,
-      });
-
-      // Register directly into _attributeDefinitions (not via attribute()
-      // which expects a string type name)
-      if (modelClass._attributeDefinitions?.set) {
-        modelClass._attributeDefinitions.set(name, {
-          name,
-          type: encryptedType,
-          defaultValue: existingDef?.defaultValue ?? null,
-          // When there's no pre-existing def, this encryption placeholder is
-          // waiting for schema reflection to supply the real cast type.
-          // Mark it schema-sourced so loadSchemaFromAdapter can wrap the
-          // adapter-resolved type (applyPendingEncryptions re-runs after).
-          userProvided: existingDef?.userProvided ?? false,
-          source: existingDef?.source ?? "schema",
-          ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
-        });
-      }
-
-      if (Configurable.config.validateColumnSize) {
-        EncryptableRecord.validateColumnSize(modelClass, name);
-      }
-
-      Configurable.encryptedAttributeWasDeclared(modelClass, name);
+      this.encryptAttribute(modelClass, name, options);
     }
   }
 
@@ -224,7 +186,48 @@ export class EncryptableRecord {
 
   /** @internal */
   static encryptAttribute(modelClass: any, name: string, options: SchemeOptions = {}): void {
-    this.encrypts(modelClass, name, options);
+    modelClass._encryptedAttributes.add(name);
+
+    // Build the per-attribute scheme (mirrors Rails scheme_for). Each attribute
+    // gets its own scheme so per-attribute options (deterministic, downcase,
+    // previousSchemes) don't leak across declarations.
+    const scheme = schemeFor(options);
+
+    // Get existing cast type from attribute definitions if available.
+    // If already encrypted, unwrap to avoid double-encryption.
+    const existingDef = modelClass._attributeDefinitions?.get?.(name);
+    let castType = existingDef?.type;
+    if (castType instanceof EncryptedAttributeType) {
+      castType = castType.castType;
+    }
+
+    const encryptedType = new EncryptedAttributeType({
+      scheme,
+      castType,
+    });
+
+    // Register directly into _attributeDefinitions (not via attribute()
+    // which expects a string type name)
+    if (modelClass._attributeDefinitions?.set) {
+      modelClass._attributeDefinitions.set(name, {
+        name,
+        type: encryptedType,
+        defaultValue: existingDef?.defaultValue ?? null,
+        // When there's no pre-existing def, this encryption placeholder is
+        // waiting for schema reflection to supply the real cast type.
+        // Mark it schema-sourced so loadSchemaFromAdapter can wrap the
+        // adapter-resolved type (applyPendingEncryptions re-runs after).
+        userProvided: existingDef?.userProvided ?? false,
+        source: existingDef?.source ?? "schema",
+        ...(existingDef?.limit != null ? { limit: existingDef.limit } : {}),
+      });
+    }
+
+    if (Configurable.config.validateColumnSize) {
+      EncryptableRecord.validateColumnSize(modelClass, name);
+    }
+
+    Configurable.encryptedAttributeWasDeclared(modelClass, name);
   }
 
   /** @internal */
