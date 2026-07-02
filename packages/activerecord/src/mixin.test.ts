@@ -1,18 +1,11 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("TouchTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      mixins: TEST_SCHEMA.mixins,
-    });
-  });
   afterEach(() => {
     vi.useRealTimers();
   });

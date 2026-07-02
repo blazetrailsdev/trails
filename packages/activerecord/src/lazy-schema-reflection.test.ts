@@ -4,23 +4,15 @@
  * `loadSchema` explicitly. See
  * packages/activerecord-cli/README.md (lazy reflection / ensureSchemaLoaded).
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("lazy async schema reflection", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-
-  beforeAll(async () => {
-    await defineSchema({
-      topics: TEST_SCHEMA.topics,
-    });
-  });
 
   it("find_by without an explicit load_schema", async () => {
     // No `this.attribute(...)` and no explicit `Topic.loadSchema()` —

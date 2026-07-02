@@ -4,12 +4,10 @@
  *
  * Targets: activerecord/test/cases/nested_attributes_with_callbacks_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // Shared callback sink — Rails uses a class variable `@@add_callback_called`
 // captured by the `before_add` procs declared on the associations below.
@@ -78,9 +76,6 @@ registerModel("NwcPirate", NwcPirate);
 describe("NestedAttributesWithCallbacksTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ pirates: canonicalSchema.pirates, birds: canonicalSchema.birds });
-  });
 
   let pirate: any;
   let birds: NwcBird[];

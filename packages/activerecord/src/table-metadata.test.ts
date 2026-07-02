@@ -3,9 +3,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Table } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { TableMetadata } from "./table-metadata.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 class AuditLog extends Base {
   static override _tableName = "audit_logs";
@@ -25,10 +23,6 @@ class AuditRequiredDeveloper extends Base {
 describe("TableMetadataTest", () => {
   setupFixtures();
   beforeAll(async () => {
-    await defineSchema({
-      developers: TEST_SCHEMA.developers,
-      audit_logs: TEST_SCHEMA.audit_logs,
-    });
     await AuditLog.loadSchema();
     await AuditRequiredDeveloper.loadSchema();
   });
