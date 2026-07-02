@@ -13,7 +13,7 @@ import { pluralize } from "@blazetrails/activesupport";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
-import { compactUniqIds } from "./compact-uniq-ids.js";
+import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -110,8 +110,9 @@ export function normalizeFindArgs(
   // Rails `find_with_ids`: `ids = ids.flatten.compact.uniq` BEFORE the
   // `case ids.size` dispatch. So `find([1, 1])` collapses to one id
   // (→ `find_one`) and `find([1, nil])` drops the nil. Applied to the
-  // simple-PK flatten branches below; composite tuple lists are not
-  // compacted/uniq'd (a tuple may legitimately contain nil components).
+  // simple-PK flatten branches below. Composite tuple lists get their own
+  // `compact.uniq` (structural equality) — nil _outer_ entries drop, but a
+  // tuple's own nil components are preserved (see `compactUniqTuples`).
   if (rest.length > 0) {
     if (composite) {
       if (args.every((x) => !Array.isArray(x))) {
@@ -121,7 +122,7 @@ export function normalizeFindArgs(
         ids = [args];
         wantArray = false;
       } else {
-        ids = args;
+        ids = compactUniqTuples(args);
         wantArray = true;
       }
     } else {
@@ -136,7 +137,7 @@ export function normalizeFindArgs(
         ids = [first];
         wantArray = false;
       } else {
-        ids = first;
+        ids = compactUniqTuples(first as unknown[]);
         wantArray = true;
       }
     } else {

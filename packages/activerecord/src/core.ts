@@ -20,7 +20,7 @@ import {
   _reflectOnAssociation,
   reflectOnAggregation,
 } from "./reflection.js";
-import { compactUniqIds } from "./relation/compact-uniq-ids.js";
+import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
@@ -899,8 +899,17 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   const id = ids[0];
 
   if (this.compositePrimaryKey && Array.isArray(id)) {
-    if (id.length > 0 && Array.isArray(id[0])) {
-      const tuples = id as unknown[][];
+    // A tuple _list_ is disambiguated from a single tuple by an array
+    // element (PK components are scalars, so an inner array can only be a
+    // nested tuple). This — not `id[0]` — is what lets a nil outer entry
+    // (`find([nil, [1, 2]])`) be recognized as a list and dropped by
+    // `compact`, while a tuple's own nil component (`find([[1, nil]])`)
+    // stays a single tuple.
+    if (id.some((entry) => Array.isArray(entry))) {
+      // Rails `ids = ids.compact.uniq`: drop nil outer entries and fold
+      // structurally-equal tuples, so `find([[1, 2], [1, 2]])` collapses to
+      // one tuple and returns the single record (wrapped per expects_array).
+      const tuples = compactUniqTuples(id) as unknown[][];
       const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
       const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
       const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();

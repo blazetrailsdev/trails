@@ -49,6 +49,20 @@ describe("nested attributes (trails-only)", () => {
     expect(Number(cols(reloaded).order_id)).toBe(Number(orderId));
   });
 
+  it("find with duplicate composite ids uniqs to a single wrapped record", async () => {
+    await CpkBook.createBang({ author_id: 1, id: 1, title: "Dup" });
+
+    // Rails `find_with_ids` applies `ids.compact.uniq` to the composite tuple
+    // list too, so `find([[1, 1], [1, 1]])` collapses to one tuple and returns
+    // the single record, still wrapped per `expects_array`.
+    const found = (await CpkBook.find([
+      [1, 1],
+      [1, 1],
+    ])) as CpkBook[];
+    expect(found).toHaveLength(1);
+    expect(cols(found[0]).title).toBe("Dup");
+  });
+
   it("increments the target counter cache when the nested belongs_to is created", async () => {
     Categorization.acceptsNestedAttributesFor("category");
 

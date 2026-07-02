@@ -148,6 +148,63 @@ describe("normalizeFindArgs — composite primary key", () => {
     });
   });
 
+  it("find([[1, 2], [1, 2]]) → uniq'd to a single tuple", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1, 2],
+          [1, 2],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1, 2]],
+      wantArray: true,
+      tuples: [[1, 2]],
+    });
+  });
+
+  it("find([[1, 2], [1, 2]]) via variadic → uniq'd to a single tuple", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [1, 2],
+        [1, 2],
+      ]),
+    ).toEqual({
+      ids: [[1, 2]],
+      wantArray: true,
+      tuples: [[1, 2]],
+    });
+  });
+
+  it("find([[1, 2], null, [3, 4]]) → nil outer entry dropped by compact", () => {
+    expect(normalizeFindArgs("Order", pk, [[[1, 2], null, [3, 4]]])).toEqual({
+      ids: [
+        [1, 2],
+        [3, 4],
+      ],
+      wantArray: true,
+      tuples: [
+        [1, 2],
+        [3, 4],
+      ],
+    });
+  });
+
+  it("find([[1, null], [1, null]]) → nil components preserved, tuple uniq'd", () => {
+    expect(
+      normalizeFindArgs("Order", pk, [
+        [
+          [1, null],
+          [1, null],
+        ],
+      ]),
+    ).toEqual({
+      ids: [[1, null]],
+      wantArray: true,
+      tuples: [[1, null]],
+    });
+  });
+
   it("find(1) on composite PK → RecordNotFound with arity message", () => {
     try {
       normalizeFindArgs("Order", pk, [1]);
