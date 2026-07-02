@@ -19,61 +19,14 @@ import { connectedToStack } from "./core.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType } from "@blazetrails/activemodel";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-
-const SCHEMA = {
-  users: {
-    name: "string",
-    age: "integer",
-    active: "boolean",
-    email: "string",
-    created_at: "datetime",
-    updated_at: "datetime",
-  },
-  posts: {
-    title: "string",
-    body: "string",
-    score: "integer",
-    count: "integer",
-    views: "integer",
-    type: "string",
-    internal_flag: "boolean",
-    lock_version: "integer",
-    author_id: "integer",
-  },
-  topics: {
-    title: "string",
-    approved: "boolean",
-    views: "integer",
-    priority: "integer",
-    author_name: "string",
-    written_on: "date",
-    content: "json",
-  },
-  animals: { name: "string", type: "string" },
-  authors: { name: "string" },
-  bulbs: { car_id: "integer" },
-  cars: {},
-  non_raising_posts: { title: "string", body: "string" },
-  readonly_author_posts: { title: "string", author_id: "integer" },
-  weirds: { a$b: "string" },
-  orders: { shop_id: "integer", name: "string" },
-  custom_users: { name: "string" },
-  replies: { title: "string" },
-  counters: { count: "big_integer" },
-  requireds: { name: "string" },
-  pres_tz_topics: { written_on: "datetime", bonus_time: "time" },
-  tz_pets: { name: "string", created_at: "datetime", updated_at: "datetime" },
-  topics_tz: { bonus_time: "time" },
-  dummy_topics: { bonus_time: "time" },
-  trackeds: { name: "string" },
-} satisfies Schema;
 
 // ==========================================================================
 // BasicsTest — targets base_test.rb
@@ -82,7 +35,7 @@ describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -457,13 +410,13 @@ describe("BasicsTest", () => {
   });
 
   it("comparison with different objects in array", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const p1 = (await Post.create({ title: "a" })) as any;
-    const p2 = (await Post.create({ title: "b" })) as any;
+    const p1 = (await Topic.create({ title: "a" })) as any;
+    const p2 = (await Topic.create({ title: "b" })) as any;
     expect(p1.id).not.toBe(p2.id);
   });
 
@@ -480,12 +433,12 @@ describe("BasicsTest", () => {
   });
 
   it("previously new record on destroyed record", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const p = (await Post.create({ title: "destroy me" })) as any;
+    const p = (await Topic.create({ title: "destroy me" })) as any;
     expect(p.isNewRecord()).toBe(false);
     expect(p.isPreviouslyNewRecord()).toBe(true);
     await p.destroy();
@@ -494,36 +447,39 @@ describe("BasicsTest", () => {
   });
 
   it("create after initialize with array param", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const p = (await Post.create({ title: "from array" })) as any;
+    const p = (await Topic.create({ title: "from array" })) as any;
     expect(p.id).toBeDefined();
   });
 
   it("load with condition", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    await Post.create({ title: "match" });
-    await Post.create({ title: "no-match" });
-    const results = await Post.where({ title: "match" });
+    await Topic.create({ title: "match" });
+    await Topic.create({ title: "no-match" });
+    const results = await Topic.where({ title: "match" });
     expect(results.length).toBe(1);
   });
 
   it("find by slug", async () => {
-    class Post extends Base {
+    // Rails: assert_equal Topic.find("1-meowmeow"), Topic.find(1) — the integer
+    // primary key cast strips the non-numeric slug suffix.
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    await Post.create({ title: "slug-test" });
-    const result = await Post.findBy({ title: "slug-test" });
-    expect(result).not.toBeNull();
+    const t = await Topic.create({ title: "The First Topic" });
+    const bySlug = (await Topic.find(`${t.id}-meowmeow`)) as any;
+    const byId = (await Topic.find(t.id)) as any;
+    expect(bySlug.id).toBe(byId.id);
   });
 
   it("group weirds by from", () => {
@@ -537,14 +493,16 @@ describe("BasicsTest", () => {
   });
 
   it("preserving date objects", async () => {
-    class Post extends Base {
+    // Rails: assert_kind_of(Date, Topic.find(1).last_read) — a `date` column
+    // round-trips as a Date (Temporal.PlainDate in trails), not a datetime.
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const now = new Date();
-    const p = (await Post.create({ title: "date-test" })) as any;
-    expect(p.id).toBeDefined();
+    const created = await Topic.create({ title: "date-test", last_read: "2004-06-24" });
+    const p = await Topic.find(created.id);
+    expect(p.readAttribute("last_read")).toBeInstanceOf(Temporal.PlainDate);
   });
 
   it("quoted table name after set table name", () => {
@@ -560,22 +518,22 @@ describe("BasicsTest", () => {
   });
 
   it("create without prepared statement", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const p = (await Post.create({ title: "no-prep" })) as any;
+    const p = (await Topic.create({ title: "no-prep" })) as any;
     expect(p.id).toBeDefined();
   });
 
   it("destroy without prepared statement", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const p = (await Post.create({ title: "destroy-no-prep" })) as any;
+    const p = (await Topic.create({ title: "destroy-no-prep" })) as any;
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
   });
@@ -593,26 +551,26 @@ describe("BasicsTest", () => {
   });
 
   it("equality of relation and array", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    await Post.create({ title: "a" });
-    const arr = await Post.all();
+    await Topic.create({ title: "a" });
+    const arr = await Topic.all();
     expect(Array.isArray(arr)).toBe(true);
     expect(arr.length).toBe(1);
   });
 
   it("find reverse ordered last", async () => {
-    class Post extends Base {
+    class Developer extends Base {
       static {
-        this.attribute("score", "integer");
+        this.attribute("salary", "integer");
       }
     }
-    await Post.create({ score: 10 });
-    await Post.create({ score: 20 });
-    const last = await Post.order("score DESC").last();
+    await Developer.create({ salary: 10 });
+    await Developer.create({ salary: 20 });
+    const last = await Developer.order("developers.salary DESC").last();
     expect(last).not.toBeNull();
   });
 
@@ -628,16 +586,16 @@ describe("BasicsTest", () => {
   });
 
   it("find symbol ordered last", async () => {
-    class Post extends Base {
+    class Developer extends Base {
       static {
-        this.attribute("score", "integer");
+        this.attribute("salary", "integer");
       }
     }
-    await Post.create({ score: 5 });
-    await Post.create({ score: 15 });
-    const last = await Post.order("score").last();
+    await Developer.create({ salary: 5 });
+    await Developer.create({ salary: 15 });
+    const last = await Developer.order("salary").last();
     expect(last).not.toBeNull();
-    expect((last as any).score).toBe(15);
+    expect((last as any).salary).toBe(15);
   });
 
   it("attribute names on table not exists", () => {
@@ -651,13 +609,13 @@ describe("BasicsTest", () => {
   });
 
   it("column types typecast", async () => {
-    class Post extends Base {
+    class Developer extends Base {
       static {
-        this.attribute("count", "integer");
+        this.attribute("salary", "integer");
       }
     }
-    const p = await Post.create({ count: "5" } as any);
-    expect((p as any).count).toBe(5);
+    const p = await Developer.create({ salary: "5" } as any);
+    expect((p as any).salary).toBe(5);
   });
 
   it("typecasting aliases", async () => {
@@ -702,13 +660,13 @@ describe("BasicsTest", () => {
   });
 
   it("ignored columns not included in SELECT", async () => {
-    class Post extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    await Post.create({ title: "hello" });
-    const results = await Post.select("title");
+    await Topic.create({ title: "hello" });
+    const results = await Topic.select("title");
     expect(results.length).toBe(1);
   });
 
@@ -809,7 +767,6 @@ describe("BasicsTest", () => {
   it("preserving time objects", async () => {
     class Topic extends Base {
       static {
-        this.tableName = "pres_tz_topics";
         this.attribute("written_on", "datetime");
         this.attribute("bonus_time", "time");
       }
@@ -848,7 +805,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "pres_tz_topics";
           this.attribute("written_on", "datetime");
         }
       }
@@ -866,7 +822,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "pres_tz_topics";
           this.attribute("written_on", "datetime");
         }
       }
@@ -888,7 +843,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "pres_tz_topics";
           this.attribute("written_on", "datetime");
         }
       }
@@ -913,7 +867,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "pres_tz_topics";
           this.attribute("written_on", "datetime");
         }
       }
@@ -935,7 +888,10 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
       class Pet extends Base {
         static {
-          this.tableName = "tz_pets";
+          this.tableName = "pets";
+          // Rails' Pet model sets `self.primary_key = :pet_id`; canonical `pets`
+          // has no `id` column (vendor/rails/.../models/pet.rb).
+          this.primaryKey = "pet_id";
           this.attribute("name", "string");
           this.attribute("created_at", "datetime");
           this.attribute("updated_at", "datetime");
@@ -972,7 +928,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "topics_tz";
           this.attribute("bonus_time", "time");
         }
       }
@@ -993,7 +948,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "utc" }, () => {
       class Topic extends Base {
         static {
-          this.tableName = "topics_tz";
           this.attribute("bonus_time", "time");
         }
       }
@@ -1046,26 +1000,23 @@ describe("BasicsTest", () => {
   });
   it("find by slug with range", async () => {
     // Rails: Topic.where(id: "1-meowmeow".."2-hello") == Topic.where(id: 1..2)
-    // IntegerType.cast("1-meowmeow") = 1 (parseInt strips non-numeric suffix)
-    // Use an explicitly-typed integer column so the cast is applied to range bounds.
+    // IntegerType.cast("1-meowmeow") = 1 (parseInt strips non-numeric suffix); the
+    // integer-typed primary key applies that cast to the range bounds.
     class Topic extends Base {
       static {
-        this.attribute("priority", "integer");
         this.attribute("title", "string");
       }
     }
-    const t1 = await Topic.create({ title: "first", priority: 1 });
-    const t2 = await Topic.create({ title: "second", priority: 2 });
-    const slugRange = new ArRange(`${t1.priority}-meowmeow`, `${t2.priority}-hello`);
-    const intRange = new ArRange(t1.priority, t2.priority);
-    const bySlug = await Topic.where({ priority: slugRange });
-    const byInt = await Topic.where({ priority: intRange });
+    const t1 = await Topic.create({ title: "first" });
+    const t2 = await Topic.create({ title: "second" });
+    const slugRange = new ArRange(`${t1.id}-meowmeow`, `${t2.id}-hello`);
+    const intRange = new ArRange(t1.id, t2.id);
+    const bySlug = await Topic.where({ id: slugRange });
+    const byInt = await Topic.where({ id: intRange });
     // Both queries must find the two created records (not empty)
     expect(byInt).toHaveLength(2);
     expect(bySlug).toHaveLength(2);
-    expect(bySlug.map((r: any) => r.priority).sort()).toEqual(
-      byInt.map((r: any) => r.priority).sort(),
-    );
+    expect(bySlug.map((r: any) => r.id).sort()).toEqual(byInt.map((r: any) => r.id).sort());
   });
 
   it("equality of relation and collection proxy", async () => {
@@ -1179,6 +1130,7 @@ describe("BasicsTest", () => {
     try {
       class NonRaisingPost extends Base {
         static {
+          this.tableName = "posts";
           this.attribute("title", "string");
           this.attribute("body", "string");
           this.attrReadonly("title");
@@ -1226,7 +1178,9 @@ describe("BasicsTest", () => {
     }
     class ReadonlyAuthorPost extends Base {
       static {
+        this.tableName = "posts";
         this.attribute("title", "string");
+        this.attribute("body", "string");
         this.attribute("author_id", "integer");
         this.attrReadonly("author_id");
       }
@@ -1237,13 +1191,17 @@ describe("BasicsTest", () => {
     const author2 = await Author.create({ name: "Not Alex" });
 
     // Updating non-readonly attributes on a persisted record is fine
-    const post = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });
+    const post = await ReadonlyAuthorPost.create({ title: "Hi", body: "b", author_id: author1.id });
     await post.update({ title: "Hello" });
     const reloaded = await ReadonlyAuthorPost.find(post.id);
     expect(Number(reloaded.readAttribute("author_id"))).toBe(Number(author1.id));
 
     // Attempting to change the readonly FK throws ReadonlyAttributeError
-    const post2 = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });
+    const post2 = await ReadonlyAuthorPost.create({
+      title: "Hi",
+      body: "b",
+      author_id: author1.id,
+    });
     await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
   });
   it("non valid identifier column name", async () => {
@@ -1260,7 +1218,6 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       class Topic extends Base {
         static {
-          this.tableName = "dummy_topics";
           this.attribute("bonus_time", "time");
         }
       }
@@ -1285,7 +1242,7 @@ describe("BasicsTest", () => {
   });
   it("attributes on dummy time with invalid time", async () => {
     class DummyTopic extends Base {
-      static tableName = "dummy_topics";
+      static tableName = "topics";
       static {
         this.attribute("bonus_time", "time");
       }
@@ -1482,17 +1439,17 @@ describe("BasicsTest", () => {
     expect(sql).toContain(quoteColumnName("name"));
   });
   it("quoting arrays", async () => {
-    class Reply extends Base {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const r1 = await Reply.create({ title: "first" });
-    const r2 = await Reply.create({ title: "second" });
-    await Reply.create({ title: "third" });
-    const results = await Reply.where({ id: [r1.id, r2.id] });
+    const r1 = await Topic.create({ title: "first" });
+    const r2 = await Topic.create({ title: "second" });
+    await Topic.create({ title: "third" });
+    const results = await Topic.where({ id: [r1.id, r2.id] });
     expect(results).toHaveLength(2);
-    const emptyResults = await Reply.where({ id: [] });
+    const emptyResults = await Topic.where({ id: [] });
     expect(emptyResults).toHaveLength(0);
   });
   it("dont clear sequence name when setting explicitly", () => {
@@ -1688,18 +1645,16 @@ describe("BasicsTest", () => {
     expect(() => FirstAbstractClass.columnsHash()).toThrow(expectedMessage);
   });
   it("ignored columns have no attribute methods", () => {
-    class User extends Base {
+    class Developer extends Base {
       static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
+        this.ignoredColumns = ["first_name"];
       }
     }
-    expect(User.columnNames()).not.toContain("secret");
-    expect(User.columnNames()).toContain("name");
-    const u = new User();
-    expect("name" in u).toBe(true);
-    expect("secret" in u).toBe(false);
+    expect(Developer.columnNames()).not.toContain("first_name");
+    expect(Developer.columnNames()).toContain("salary");
+    const u = new Developer();
+    expect("salary" in u).toBe(true);
+    expect("first_name" in u).toBe(false);
   });
   it("ignored columns are stored as an array of string", () => {
     class User extends Base {
@@ -1736,22 +1691,22 @@ describe("BasicsTest", () => {
   });
   // Rails base_test.rb: ColumnNamesCachedDeveloper sets ignored_columns and
   // asserts the ignored column is absent from column_names. column_names is
-  // DB-sourced (Rails model_schema.rb), so we ignore *real* `users` columns;
+  // DB-sourced (Rails model_schema.rb), so we ignore *real* `developers` columns;
   // re-assigning ignoredColumns invalidates the cached list. (Converged from an
   // earlier ad-hoc form that ignored virtual attribute()s — RFC 0031.)
   it("when assigning new ignored columns it invalidates cache for column names", () => {
-    class User extends Base {
+    class Developer extends Base {
       static {
-        this._tableName = "users";
+        this._tableName = "developers";
       }
     }
-    expect(User.columnNames()).toContain("email");
-    User.ignoredColumns = ["email"];
-    expect(User.columnNames()).not.toContain("email");
-    expect("email" in User.prototype).toBe(false);
-    User.ignoredColumns = ["email", "created_at"];
-    expect(User.columnNames()).not.toContain("created_at");
-    expect("created_at" in User.prototype).toBe(false);
+    expect(Developer.columnNames()).toContain("first_name");
+    Developer.ignoredColumns = ["first_name"];
+    expect(Developer.columnNames()).not.toContain("first_name");
+    expect("first_name" in Developer.prototype).toBe(false);
+    Developer.ignoredColumns = ["first_name", "salary"];
+    expect(Developer.columnNames()).not.toContain("salary");
+    expect("salary" in Developer.prototype).toBe(false);
   });
   it("column names are quoted when using #from clause and model has ignored columns", () => {
     class User extends Base {
@@ -1765,16 +1720,14 @@ describe("BasicsTest", () => {
     expect(sql).not.toContain("secret");
   });
   it("using table name qualified column names unless having SELECT list explicitly", () => {
-    class User extends Base {
+    class Developer extends Base {
       static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
+        this.ignoredColumns = ["first_name"];
       }
     }
-    const sql = User.all().toSql();
-    expect(sql).not.toContain("secret");
-    expect(sql).toContain("name");
+    const sql = Developer.all().toSql();
+    expect(sql).not.toContain("first_name");
+    expect(sql).toContain("salary");
   });
   it("protected environments by default is an array with production", () => {
     expect(Base.protectedEnvironments).toEqual(["production"]);
@@ -2088,14 +2041,13 @@ describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
 
   class PostInner extends Base {
     static {
-      this.tableName = "posts";
+      this.tableName = "topics";
       this.attribute("title", "string");
-      this.attribute("body", "string");
     }
   }
   const Post = PostInner;
@@ -2134,13 +2086,13 @@ describe("BasicsTest", () => {
   });
 
   it("bignum", async () => {
-    class Counter extends Base {
+    class Company extends Base {
       static {
-        this.attribute("count", "big_integer");
+        this.attribute("rating", "big_integer");
       }
     }
-    const c = await Counter.create({ count: 9007199254740991 });
-    expect(Number(c.count)).toBe(9007199254740991);
+    const c = await Company.create({ rating: 9007199254740991 });
+    expect(Number(c.rating)).toBe(9007199254740991);
   });
 
   it("clear cache when setting table name", () => {
@@ -2212,7 +2164,7 @@ describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
 
   // -- Table name inference --
@@ -2223,20 +2175,20 @@ describe("BasicsTest", () => {
 
   // -- Reload --
   it("reload", async () => {
-    class User extends Base {
+    class Topic extends Base {
       static {
-        this.attribute("name", "string");
+        this.attribute("title", "string");
       }
     }
-    const u = await User.create({ name: "Original" });
+    const u = await Topic.create({ title: "Original" });
     // Directly modify via another instance
-    const u2 = await User.find(u.id);
-    await u2.update({ name: "Modified" });
+    const u2 = await Topic.find(u.id);
+    await u2.update({ title: "Modified" });
 
     // u still has old value
-    expect(u.name).toBe("Original");
+    expect(u.title).toBe("Original");
     await u.reload();
-    expect(u.name).toBe("Modified");
+    expect(u.title).toBe("Modified");
   });
   it("table name guesses with prefixes and suffixes", () => {
     class User extends Base {

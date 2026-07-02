@@ -8,6 +8,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -16,7 +17,7 @@ import { Configurable } from "./configurable.js";
 import { defaultCompressor, type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { clearDefaultKeyProviderCache } from "./scheme.js";
+import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { DecryptionError, EncryptionError } from "./errors.js";
 import { ValueType, BinaryData } from "@blazetrails/activemodel";
@@ -143,48 +144,33 @@ export const AUTHOR_NAME_LIMIT = 100;
 // ─── Test adapter factory ─────────────────────────────────────────────────────
 
 /**
- * Tables used by the makeEncrypted* factories below. Defined once so every
- * encryption test gets the same shared schema after a single
- * `installEncryptionSchema(adapter)` call — no per-file duplication.
+ * The canonical tables the encryption fixtures ride, mirroring Rails exactly:
+ *   - `EncryptedPost` → `posts` (post_encrypted.rb: `self.table_name = "posts"`)
+ *   - every `EncryptedBook*` / `UnencryptedBook` variant → `encrypted_books`
+ *     (book_encrypted.rb consolidates them all onto one table)
+ *   - `EncryptedAuthor` → `authors` (author_encrypted.rb)
+ *   - `EncryptedTrafficLight` / `EncryptedTrafficLightWithStoreState` →
+ *     `traffic_lights` (traffic_light_encrypted.rb)
  *
- * Table names are the AR inflection of each fixture class
- * (e.g. EncryptedBook → encrypted_books). Columns mirror the
- * `this.attribute(...)` calls in each factory; `id` is added by
- * defineSchema's default primary key.
+ * All already exist in the canonical `TEST_SCHEMA` with the Rails schema.rb
+ * shape, so the fixtures name only canonical tables/columns. Under one-schema
+ * mode the tables are already laid into the worker DB and this `defineSchema`
+ * call is a canonical no-op; on the default path it lays the full canonical
+ * shape once per lease.
  */
-const ENCRYPTION_SCHEMA: Schema = {
-  // Columns that hold encrypted ciphertext are declared with limit 1024
-  // (Rails uses `t.string :name, limit: 1024` on the shared encrypted_books
-  // fixture). Default VARCHAR(255) truncates the JSON-wrapped, base64'd
-  // ciphertext on MySQL/MariaDB.
-  encrypted_posts: {
-    title: { type: "string", limit: 1024 },
-    body: { type: "string", limit: 1024 },
-  },
-  // Rails consolidates EncryptedBook, EncryptedBookThatIgnoresCase, and the
-  // other EncryptedBook* variants onto a single `encrypted_books` table.
-  encrypted_books: {
-    name: { type: "string", limit: 1024, default: "<untitled>" },
-    original_name: { type: "string", limit: 1024 },
-    logo: "binary",
-  },
-  // EncryptedAuthor enforces AUTHOR_NAME_LIMIT at the AR attribute layer
-  // (plaintext); the column itself needs room for ciphertext.
-  encrypted_authors: { name: { type: "string", limit: 1024 } },
-  encrypted_book_with_custom_compressors: { name: { type: "string", limit: 1024 } },
-  book_that_will_fail_to_encrypt_names: { name: { type: "string", limit: 1024 } },
-  encrypted_traffic_light_with_store_states: { state: "text" },
-  // Per-class tables remain for variants whose castType for `logo` diverges
-  // from BLOB on SQLite (the serialized variants store JSON text; the
-  // message-pack variant stores raw binary like Rails but isolates its
-  // serializer assertions from the shared table).
-  encrypted_book_with_serialized_first_binaries: { logo: "text" },
-  encrypted_book_with_serialized_second_binaries: { logo: "text" },
-  encrypted_book_with_binary_message_pack_serializeds: { logo: "binary" },
-};
+const ENCRYPTION_CANONICAL_TABLES = [
+  "posts",
+  "encrypted_books",
+  "authors",
+  "traffic_lights",
+] as const;
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
-  await defineSchema(adapter, ENCRYPTION_SCHEMA);
+  const schema: Schema = {};
+  for (const table of ENCRYPTION_CANONICAL_TABLES) {
+    schema[table] = TEST_SCHEMA[table as keyof typeof TEST_SCHEMA];
+  }
+  await defineSchema(adapter, schema);
 }
 
 /**
@@ -207,12 +193,6 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
  *
  *    The returned type is `TestDatabaseAdapter` so it satisfies
  *    {@link TransactionalFixturesAdapter} without an extra cast.
- *
- * Caveat: tests that call {@link makeFreshModel} from inside `it()` bodies
- * cannot use pattern (2) on MySQL/MariaDB. `makeFreshModel` runs DDL
- * (`CREATE TABLE`) which auto-commits on MySQL and breaks the outer
- * BEGIN/ROLLBACK wrap — the next `ROLLBACK TO SAVEPOINT` then errors with
- * `SAVEPOINT active_record_1 does not exist`. Keep such tests on pattern (1).
  */
 export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
@@ -223,34 +203,40 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // ─── Model factories ──────────────────────────────────────────────────────────
 
 /**
- * Creates a fresh model with the given attributes — no pre-applied encryption.
- * Attribute types are passed as strings (e.g. "integer", "string").
- * Use this when you need to apply a specific encryption scheme to an attribute
- * without the idempotency guard blocking a second encrypts() call.
+ * PlainPost: a `posts` model with no encrypted attributes. Mirrors Rails'
+ * `Class.new(Post)` with nothing encrypted — used to assert `encrypt()` is a
+ * no-op for classes without encryptable attributes.
  */
-let _freshModelCounter = 0;
-
-export async function makeFreshModel(
-  adapter: DatabaseAdapter,
-  attributes: Record<string, string>,
-): Promise<any> {
-  const tableName = `fresh_model_${++_freshModelCounter}`;
-  const columns: Schema[string] = {};
-  for (const [name, type] of Object.entries(attributes)) {
-    if (name === "id") continue; // defineSchema adds id implicitly
-    (columns as Record<string, string>)[name] = type;
-  }
-  await defineSchema(adapter, { [tableName]: columns } as Schema);
-  const klass = class extends Base {
+export function makePlainPost(adapter: DatabaseAdapter) {
+  return class PlainPost extends Base {
     static {
-      this._tableName = tableName;
-      for (const [name, type] of Object.entries(attributes)) {
-        this.attribute(name, type);
-      }
+      this._tableName = "posts";
+      this.attribute("id", "integer");
+      this.attribute("title", "string");
+      this.attribute("body", "string");
       this.adapter = adapter;
     }
   } as any;
-  return klass;
+}
+
+/**
+ * EncryptedAuthor with a caller-supplied previous scheme on `name`. Mirrors
+ * Rails' EncryptedAuthor configured with a previous scheme, used to exercise
+ * decrypting a row written under an older scheme.
+ */
+export function makeEncryptedAuthorWithPreviousSchemes(
+  adapter: DatabaseAdapter,
+  previousSchemes: Scheme[],
+) {
+  return class EncryptedAuthor extends Base {
+    static {
+      this._tableName = "authors";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { previousSchemes });
+    }
+  } as any;
 }
 
 /**
@@ -260,6 +246,7 @@ export async function makeFreshModel(
 export function makeEncryptedPost(adapter: DatabaseAdapter) {
   return class EncryptedPost extends Base {
     static {
+      this._tableName = "posts";
       this.attribute("id", "integer");
       this.attribute("title", "string");
       this.attribute("body", "string");
@@ -277,6 +264,7 @@ export function makeEncryptedPost(adapter: DatabaseAdapter) {
 export function makeEncryptedBook(adapter: DatabaseAdapter) {
   return class EncryptedBook extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -313,6 +301,7 @@ export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
 export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
   return class EncryptedAuthor extends Base {
     static {
+      this._tableName = "authors";
       this.attribute("id", "integer");
       this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
       this.adapter = adapter;
@@ -336,6 +325,7 @@ export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) 
   };
   return class EncryptedBookWithCustomCompressor extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
@@ -359,10 +349,36 @@ const _failingEncryptor: Encryptor = {
 export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
   return class BookThatWillFailToEncryptName extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
       this.encrypts("name", { encryptor: _failingEncryptor });
+    }
+  } as any;
+}
+
+/**
+ * EncryptedTrafficLight: `state` is serialized as an Array (like the parent
+ * TrafficLight) and encrypted. Mirrors Rails' traffic_light_encrypted.rb
+ * `EncryptedTrafficLight < TrafficLight { encrypts :state }`. Declares its
+ * attributes explicitly (raw adapter, schema cache not warmed) so the serialize
+ * coder and the create-time timestamp columns are known before encrypts wraps
+ * `state`.
+ */
+export function makeEncryptedTrafficLight(adapter: DatabaseAdapter) {
+  return class EncryptedTrafficLight extends Base {
+    static {
+      this._tableName = "traffic_lights";
+      this.attribute("id", "integer");
+      this.attribute("state", "string");
+      this.attribute("long_state", "string");
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
+      this.serialize("state", { type: "Array" });
+      this.serialize("long_state", { type: "Array" });
+      this.adapter = adapter;
+      this.encrypts("state");
     }
   } as any;
 }
@@ -375,8 +391,18 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
 export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter) {
   return class EncryptedTrafficLightWithStoreState extends Base {
     static {
+      this._tableName = "traffic_lights";
       this.attribute("id", "integer");
       this.attribute("state", "json");
+      // Canonical `traffic_lights.long_state` is `text NOT NULL`; the parent
+      // Rails TrafficLight serializes it as an Array (traffic_light.rb:4), so the
+      // fixture mirrors that with the same serialize/Array coder the canonical
+      // TrafficLight model uses (test-helpers/models/traffic-light.ts) and callers
+      // supply a value (Rails passes `long_state: ["green", "red"]`). This fresh
+      // factory declares its attributes explicitly rather than by schema
+      // reflection, so the column is declared before serialize wraps it.
+      this.attribute("long_state", "string");
+      this.serialize("long_state", { type: "Array" });
       this.adapter = adapter;
       this.encrypts("state");
       // storeAccessorFor delegates to EncryptedAttributeType.accessor() which
@@ -410,6 +436,7 @@ export function makeEncryptedBookWithSerializedFirstBinary(adapter: DatabaseAdap
   const jsonArrayType = new _JsonArrayType();
   return class EncryptedBookWithSerializedFirstBinary extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "string");
       // Replace string type with JSON-array type via the pending queue so
@@ -431,6 +458,7 @@ export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAda
   const jsonArrayType = new _JsonArrayType();
   return class EncryptedBookWithSerializedSecondBinary extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "string");
       this.decorateAttributes(["logo"], () => jsonArrayType);
@@ -448,6 +476,7 @@ export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAda
 export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: DatabaseAdapter) {
   return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "binary");
       this.adapter = adapter;

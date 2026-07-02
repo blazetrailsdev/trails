@@ -102,12 +102,32 @@ export class Book extends Base {
   declare hardToReadBang: () => Promise<true | undefined>;
   declare static hardToRead: () => Relation<Book>;
   declare static notHardToRead: () => Relation<Book>;
+  declare isForgotten: () => boolean;
+  declare forgottenBang: () => Promise<true | undefined>;
+  declare static forgotten: () => Relation<Book>;
+  declare static notForgotten: () => Relation<Book>;
+  declare isHard: () => boolean;
+  declare hardBang: () => Promise<true | undefined>;
+  declare static hard: () => Relation<Book>;
+  declare static notHard: () => Relation<Book>;
+  declare isSoft: () => boolean;
+  declare softBang: () => Promise<true | undefined>;
+  declare static soft: () => Relation<Book>;
+  declare static notSoft: () => Relation<Book>;
+  declare isEnabled: () => boolean;
+  declare enabledBang: () => Promise<true | undefined>;
+  declare static enabled: () => Relation<Book>;
+  declare static notEnabled: () => Relation<Book>;
+  declare isDisabled: () => boolean;
+  declare disabledBang: () => Promise<true | undefined>;
+  declare static disabled: () => Relation<Book>;
+  declare static notDisabled: () => Relation<Book>;
   declare loadBelongsTo: ((name: "author") => Promise<Author | null>) &
     ((name: "formatRecord") => Promise<Base | null>);
   declare loadHasOne: (name: "essay") => Promise<Essay | null>;
   declare author_id: number;
   declare author_visibility: number | null;
-  declare boolean_status: boolean;
+  declare boolean_status: string | null;
   declare cover: string | null;
   declare created_at: Temporal.Instant | Temporal.PlainDateTime;
   declare difficulty: number | null;
@@ -139,16 +159,15 @@ export class Book extends Base {
     this.hasOne("essay");
     this.aliasAttribute("title", "name");
     this.enum("status", { proposed: 0, written: 1, published: 2 });
-    // Rails: { unread: 0, reading: 2, read: 3, forgotten: nil } — null value unsupported by enum()
-    this.enum("last_read", { unread: 0, reading: 2, read: 3 });
+    this.enum("last_read", { unread: 0, reading: 2, read: 3, forgotten: null });
     this.enum("nullable_status", { single: 0, married: 1 });
     this.enum("language", { english: 0, spanish: 1, french: 2 }, { prefix: "in" });
     this.enum("author_visibility", { visible: 0, invisible: 1 }, { prefix: true });
     this.enum("illustrator_visibility", { visible: 0, invisible: 1 }, { prefix: true });
     this.enum("font_size", { small: 0, medium: 1, large: 2 }, { prefix: "with", suffix: true });
     this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
-    // Rails: cover { hard: "hard", soft: "soft" } and boolean_status { enabled: true, disabled: false }
-    // omitted — non-integer enum values not yet supported by enum()
+    this.enum("cover", { hard: "hard", soft: "soft" });
+    this.enum("boolean_status", { enabled: true, disabled: false });
   }
 }
 

@@ -192,3 +192,137 @@ describe("Ruby extractor assertion-count collection", () => {
     expect(c["macro body"]).toBe(2);
   });
 });
+
+// Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)
+// through the real Ripper parser, pinning the tagged-token encoding and the
+// per-assertion expected-argument selection (arg 0, or arg 1 for *_includes).
+describe("Ruby extractor assertion-value collection", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-tests.rb");
+
+  function rubyAssertionValues(
+    fixtures: Record<string, string>,
+  ): Record<string, (string | null)[] | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "assert-rb-val-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = TestExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.test_files.each { |f| f[:testCases].each { |tc| out[tc[:description]] = tc[:assertionValues] } }
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("captures the first positional literal as a tagged token, lockstep with kinds", () => {
+    const v = rubyAssertionValues({
+      "cases/vals_test.rb": `
+        class ValsTest < ActiveSupport::TestCase
+          def test_literals
+            assert_equal 5, a
+            assert_equal "hi", b
+            assert_equal true, c
+            assert_equal :sym, d
+            assert_nil e
+          end
+        end
+      `,
+    });
+    // A symbol folds to the same s: token as a string; assert_nil's arg is a
+    // variable (non-literal) → null. Length matches the 5 assertionKinds.
+    expect(v["literals"]).toEqual(["n:5", "s:hi", "b:true", "s:sym", null]);
+  });
+
+  it("captures negative numeric literals and the parenthesized form", () => {
+    const v = rubyAssertionValues({
+      "cases/paren_test.rb": `
+        class ParenTest < ActiveSupport::TestCase
+          def test_paren
+            assert_equal(-3, a)
+            assert_equal(1.5, b)
+          end
+        end
+      `,
+    });
+    expect(v["paren"]).toEqual(["n:-3", "n:1.5"]);
+  });
+
+  it("captures the membership arg (index 1) for the *_includes family", () => {
+    const v = rubyAssertionValues({
+      "cases/incl_test.rb": `
+        class InclTest < ActiveSupport::TestCase
+          def test_incl
+            assert_includes coll, "member"
+            assert_not_includes other, :sym
+          end
+        end
+      `,
+    });
+    expect(v["incl"]).toEqual(["s:member", "s:sym"]);
+  });
+
+  it("emits null for a non-literal expected argument", () => {
+    const v = rubyAssertionValues({
+      "cases/computed_test.rb": `
+        class ComputedTest < ActiveSupport::TestCase
+          def test_computed
+            assert_equal compute(x), y
+            assert_equal 7, z
+          end
+        end
+      `,
+    });
+    expect(v["computed"]).toEqual([null, "n:7"]);
+  });
+
+  it("captures values through helper expansion in lockstep with kinds", () => {
+    const v = rubyAssertionValues({
+      "cases/helper_test.rb": `
+        class HelperTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def test_delegates
+            check_row
+          end
+        end
+      `,
+    });
+    expect(v["delegates"]).toEqual(["n:1", "n:2"]);
+  });
+
+  it("captures the literal expected value of receiver-form assertions", () => {
+    const v = rubyAssertionValues({
+      "cases/recv_test.rb": `
+        class RecvTest < ActiveSupport::TestCase
+          def test_recv
+            a.must_equal 5
+            b.must_equal("hi")
+            c.wont_equal :sym
+            d.must_equal other
+          end
+        end
+      `,
+    });
+    // `:command_call` (a.must_equal 5) and parenthesized `:call`
+    // (b.must_equal("hi")) both capture their sole positional arg; a non-literal
+    // receiver arg → null. Length matches the 4 assertionKinds.
+    expect(v["recv"]).toEqual(["n:5", "s:hi", "s:sym", null]);
+  });
+});

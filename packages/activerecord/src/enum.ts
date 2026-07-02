@@ -1,6 +1,47 @@
 import type { Base } from "./base.js";
 import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
-import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType, IntegerType, typeRegistry } from "@blazetrails/activemodel";
+
+/** Value a label can map to — matches Rails' hash-value support for enums. */
+type EnumValue = number | string | boolean | null;
+
+/**
+ * Infer the storage subtype from the mapping values (nulls ignored): uniform
+ * numbers mean an integer-backed column, uniform booleans a boolean-backed one,
+ * anything else a string-backed one. Mirrors Rails resolving the subtype from
+ * the underlying attribute type — trails falls back to the mapping shape when
+ * the schema-derived attribute definition isn't available yet.
+ */
+function inferSubtype(values: Iterable<EnumValue>): string {
+  let sawValue = false;
+  let allNumbers = true;
+  let allBooleans = true;
+  for (const v of values) {
+    if (v === null || v === undefined) continue;
+    sawValue = true;
+    if (typeof v !== "number") allNumbers = false;
+    if (typeof v !== "boolean") allBooleans = false;
+  }
+  if (!sawValue) return "integer";
+  if (allNumbers) return "integer";
+  if (allBooleans) return "boolean";
+  return "string";
+}
+
+/**
+ * Build the ValueType instance backing an enum subtype's cast/serialize.
+ * Mirrors Rails passing the column's real `Type::Value` into `EnumType.new`:
+ * resolve the declared subtype name through the shared type registry so
+ * float/decimal/datetime/etc. columns delegate to their actual type. Falls
+ * back to IntegerType only for names the registry doesn't know.
+ */
+function subtypeInstance(subtype: string): ValueType<unknown> {
+  try {
+    return typeRegistry.lookup(subtype) as ValueType<unknown>;
+  } catch {
+    return new IntegerType();
+  }
+}
 
 /**
  * Enum definition — maps symbolic names to integer values.
@@ -23,11 +64,11 @@ const enumTypeCache = new WeakMap<object, EnumType>();
  * types — uniform numbers mean an integer-backed column, anything else a
  * string-backed one.
  */
-export function enumTypeFor(name: string, mapping: Record<string, number | string>): EnumType {
+export function enumTypeFor(name: string, mapping: Record<string, EnumValue>): EnumType {
   const cached = enumTypeCache.get(mapping);
   if (cached) return cached;
   const entries = Object.entries(mapping);
-  const subtype = entries.every(([, v]) => typeof v === "number") ? "integer" : "string";
+  const subtype = inferSubtype(entries.map(([, v]) => v));
   const enumType = new EnumType(name, new Map(entries), subtype);
   enumTypeCache.set(mapping, enumType);
   return enumType;
@@ -49,7 +90,39 @@ export function installEnumAttribute(
   attribute: string,
   enumType: EnumType,
 ): void {
+  // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes` so the
+  // EnumType is layered on top of the column-seeded FromDatabase attribute,
+  // leaving the default on the deserialize path for free (enum.rb:238-247). That
+  // relies on `_default_attributes` re-seeding from `columns_hash` on every
+  // rebuild; trails instead seeds from the cached `_attributeDefinitions` map and
+  // `decorateAttributes` no-ops on a not-yet-reflected column (the def doesn't
+  // exist until schema loads), so a bare-attribute + decorate port drops the
+  // EnumType entirely for models whose enum is declared before first query.
+  // (Empirically regresses type.serialize / find-via-where.) Converging trails'
+  // `_defaultAttributes` onto Rails' column-seed-then-replay is tracked as a
+  // follow-up story. Here we register the type directly — which also matches
+  // Rails' lower-level `attribute(name, type)` form — so it lands in
+  // `_attributeDefinitions` and survives schema reflection / resetColumnInformation
+  // (schema-sourced defs get scrubbed and re-reflected as the plain column type).
   klass.attribute(attribute, enumType);
+
+  // Mark the enum column's default as schema-sourced so it seeds via
+  // from_database (deserialize) rather than as a user default (cast): cast(0) on
+  // an EnumType yields null, deserialize(0) yields the "default" label. This
+  // recovers what Rails' build_from_user / decorate_attributes gives for free.
+  // The flag is honored on both declaration orderings: when the schema is
+  // already loaded, `attribute()` above merged the column default (0) onto the
+  // def, so `_defaultAttributes` seeds fromDatabase(0) directly (attributes.ts);
+  // when the enum is declared first, schema reflection later re-injects the
+  // column default onto this user-declared def (model-schema.ts). `attribute()`
+  // already invalidated the default-attributes cache, so no extra reset is
+  // needed — the mutation is visible before the next `_defaultAttributes()`.
+  const def = klass._attributeDefinitions?.get(attribute) as
+    | { defaultFromSchema?: boolean }
+    | undefined;
+  if (def != null) {
+    def.defaultFromSchema = true;
+  }
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
   // accessor attribute() installed.
@@ -87,7 +160,7 @@ interface EnumInstanceHost {
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
-  valuesInput: string[] | Record<string, string | number>,
+  valuesInput: string[] | Record<string, string | number | boolean | null>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
   _enum.call(modelClass, attribute, valuesInput, options);
@@ -101,21 +174,22 @@ export function defineEnum(
 export class EnumType extends ValueType<string> {
   /** @internal */
   override readonly name: string;
-  private _mapping: ReadonlyMap<string, number | string>;
-  private _reverseMapping: ReadonlyMap<number | string, string>;
+  private _mapping: ReadonlyMap<string, EnumValue>;
+  private _reverseMapping: ReadonlyMap<EnumValue, string>;
   private _raiseOnInvalidValues: boolean;
+  private _subtypeType: ValueType<unknown>;
   readonly subtype: string;
 
   constructor(
     name: string,
-    mapping: ReadonlyMap<string, number | string>,
+    mapping: ReadonlyMap<string, EnumValue>,
     subtype: string,
     raiseOnInvalidValues = true,
   ) {
     super();
     this.name = name;
     this._mapping = mapping;
-    const reverse = new Map<number | string, string>();
+    const reverse = new Map<EnumValue, string>();
     for (const [k, v] of mapping) {
       // Keep the first label for a given value — mirrors Ruby Hash#key, so an
       // aliased value (e.g. aliased_field: "happy") deserializes to the
@@ -125,6 +199,7 @@ export class EnumType extends ValueType<string> {
     this._reverseMapping = reverse;
     this._raiseOnInvalidValues = raiseOnInvalidValues;
     this.subtype = subtype;
+    this._subtypeType = subtypeInstance(subtype);
   }
 
   // Rails' EnumType does `delegate :type, to: :subtype` — callers that
@@ -135,85 +210,68 @@ export class EnumType extends ValueType<string> {
     return this.subtype;
   }
 
+  // Mirrors Rails EnumType#cast:
+  //   if mapping.has_key?(value)   -> value.to_s   (value is a label)
+  //   elsif mapping.has_value?(value) -> mapping.key(value)  (return the label)
+  //   else value.presence
   cast(value: unknown): string | null {
     if (typeof value === "string" && this._mapping.has(value)) {
       return value;
     }
-    if (
-      (typeof value === "number" || typeof value === "string") &&
-      this._reverseMapping.has(value)
-    ) {
-      return this._reverseMapping.get(value)!;
+    if (this._reverseMapping.has(value as EnumValue)) {
+      return this._reverseMapping.get(value as EnumValue)!;
     }
-    if (value === null || value === undefined) return null;
-    return null;
+    // Rails `value.presence` — blank values (nil, false, blank strings) become
+    // nil; anything else passes through unchanged (e.g. the string "true" so a
+    // later `serialize` can type-cast it against the boolean subtype).
+    return isBlank(value) ? null : (value as string);
   }
 
+  // Mirrors Rails: `mapping.key(subtype.deserialize(value))` — coerce the raw
+  // database value through the storage subtype, then reverse-map to the label.
   deserialize(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    const result = this._reverseMapping.get(value as number | string);
-    if (result !== undefined) return result;
-    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
-      const num = Number(value);
-      if (!Number.isNaN(num)) return this._reverseMapping.get(num) ?? null;
-    }
-    return null;
+    const sub = this._subtypeType.deserialize(value) as EnumValue;
+    return this._reverseMapping.get(sub) ?? null;
   }
 
-  serialize(value: unknown): number | string | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "string" && this._mapping.has(value)) {
-      return this._mapping.get(value)!;
-    }
-    if (typeof value === "number" && this._reverseMapping.has(value)) {
-      return value;
-    }
-    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
-      const num = Number(value);
-      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return num;
-    }
-    return null;
+  // Mirrors Rails: `subtype.serialize(mapping.fetch(value, value))` — a label
+  // maps to its stored value, anything else passes through the subtype's cast
+  // (so e.g. the string "true" type-casts to boolean `true` for a query).
+  serialize(value: unknown): number | string | boolean | null {
+    const mapped =
+      typeof value === "string" && this._mapping.has(value) ? this._mapping.get(value)! : value;
+    return this._subtypeType.serialize(mapped) as number | string | boolean | null;
   }
 
   // The in-memory value is the label string; the database value is the mapped
-  // integer/string. Callers that prefer serializeCastValue (e.g. insertAll/
-  // upsertAll bulk paths) must still get the mapping value, not the identity
-  // label — so delegate to serialize rather than inheriting the identity
-  // default from ValueType.
-  serializeCastValue(value: unknown): number | string | null {
+  // integer/string/boolean. Callers that prefer serializeCastValue (e.g.
+  // insertAll/upsertAll bulk paths) must still get the mapping value, not the
+  // identity label — so delegate to serialize rather than inheriting the
+  // identity default from ValueType.
+  serializeCastValue(value: unknown): number | string | boolean | null {
     return this.serialize(value);
   }
 
+  // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
   isSerializable(value: unknown): boolean {
-    if (value === null || value === undefined) return true;
-    if (typeof value === "string" && this._mapping.has(value)) return true;
-    if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
-      return true;
-    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
-      const num = Number(value);
-      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return true;
-    }
-    return false;
+    const mapped =
+      typeof value === "string" && this._mapping.has(value) ? this._mapping.get(value)! : value;
+    return this._subtypeType.isSerializable(mapped);
   }
 
   assertValidValue(value: unknown): void {
     if (!this._raiseOnInvalidValues) return;
-    // Rails: `unless value.blank? || ...` — a blank value (nil or a
-    // whitespace-only string) is always allowed and casts to nil.
-    if (value === null || value === undefined) return;
-    if (typeof value === "string" && isBlank(value)) return;
+    // Rails: `unless value.blank? || mapping.has_key?(value) || mapping.has_value?(value)`
+    // — a blank value (nil, false, or a whitespace-only string) is always
+    // allowed and casts to nil.
+    if (isBlank(value)) return;
     if (typeof value === "string" && this._mapping.has(value)) return;
-    if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
-      return;
-    if (typeof value === "string" && this.subtype === "integer") {
-      const num = Number(value);
-      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return;
-    }
+    if (this._reverseMapping.has(value as EnumValue)) return;
     throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
   }
 
   /** @internal */
-  get mapping(): ReadonlyMap<string, number | string> {
+  get mapping(): ReadonlyMap<string, EnumValue> {
     return this._mapping;
   }
 }
@@ -291,7 +349,7 @@ export class EnumMethods {
 export function enumMethod(
   this: typeof Base,
   attribute: string,
-  mapping: Record<string, number | string>,
+  mapping: Record<string, EnumValue>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
   _enum.call(this, attribute, mapping, options);
@@ -313,7 +371,7 @@ export { enumMethod as enum };
 export function _enum(
   this: typeof import("./base.js").Base,
   name: string,
-  values: string[] | Record<string, string | number>,
+  values: string[] | Record<string, string | number | boolean | null>,
   options?: {
     prefix?: boolean | string;
     suffix?: boolean | string;
@@ -329,7 +387,7 @@ export function _enum(
   const attribute = name;
   const mapping = Array.isArray(values)
     ? Object.fromEntries(values.map((v, i) => [v, i]))
-    : (values as Record<string, number>);
+    : (values as Record<string, EnumValue>);
 
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
@@ -369,7 +427,15 @@ export function _enum(
   try {
     const existingDef = (this as any)._attributeDefinitions?.get(name);
     const t: string = existingDef?.type?.type?.() ?? "value";
-    subtype = t === "value" || /integer/i.test(t) || t === "smallint" ? "integer" : t;
+    // No user-declared attribute type yet (schema not reflected): infer the
+    // storage subtype from the mapping's value shapes (booleans → boolean,
+    // strings → string, numbers → integer).
+    subtype =
+      t === "value"
+        ? inferSubtype(Object.values(mapping))
+        : /integer/i.test(t) || t === "smallint"
+          ? "integer"
+          : t;
   } catch {
     subtype = "integer";
   }
@@ -599,7 +665,7 @@ export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,
   value: unknown,
-): number | string | null {
+): number | string | boolean | null {
   const mapping = modelClass._enums?.get(attribute);
   if (!mapping) return null;
 

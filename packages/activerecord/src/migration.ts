@@ -2455,17 +2455,38 @@ export class MigrationContext {
     const length = options?.length;
     const lengthFor = (c: string): number | undefined =>
       typeof length === "number" ? length : typeof length === "object" ? length[c] : undefined;
+    // Rails gates the sort-order suffix on `supports_index_sort_order?`
+    // (abstract/schema_statements.rb#add_options_for_index_columns, via the
+    // MySQL adapter's `super` call). PostgreSQL/SQLite always support it; MySQL
+    // is version-gated (MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1), so older servers drop
+    // `DESC`/`ASC` from the DDL. The reconstruct path can run on a freshly-leased
+    // connection whose version is still cold (`supportsIndexSortOrder()` reads
+    // `_databaseVersion` synchronously and yields false when unset), so warm it
+    // first for MySQL — otherwise the gate is spuriously false and a genuinely
+    // descending canonical index round-trips ascending.
+    const conn = this.connection as unknown as {
+      getDatabaseVersion?(): Promise<unknown> | unknown;
+      supportsIndexSortOrder?(): boolean;
+    };
+    if (an === "mysql") await conn.getDatabaseVersion?.();
+    const sortOrderSupported =
+      typeof conn.supportsIndexSortOrder === "function" ? conn.supportsIndexSortOrder() : true;
     const colsStr = cols
       .map((c) => {
         const isExpr = /\W/.test(c);
         let col = isExpr ? c : this.connection.quoteIdentifier(c);
+        // MySQL sub-part prefix length (`col(n)`) precedes the sort direction,
+        // matching the mysql SchemaCreation visitor (`col(n) DESC`). Length is a
+        // MySQL-only DDL feature; the sort order applies on every adapter that
+        // surfaces it (`sortOrderSupported`), so it must be emitted for MySQL too —
+        // Rails' companies indexes are `order: :desc` and MySQL/MariaDB persist
+        // that direction (SHOW KEYS `Collation = "D"`).
         if (an === "mysql") {
           const len = lengthFor(c);
           if (len != null) col += `(${len})`;
-        } else {
-          const ord = options?.order?.[c];
-          if (ord) col += ` ${ord.toUpperCase()}`;
         }
+        const ord = options?.order?.[c];
+        if (ord && sortOrderSupported) col += ` ${ord.toUpperCase()}`;
         return col;
       })
       .join(", ");
@@ -2497,10 +2518,12 @@ export class MigrationContext {
       unique,
       name: indexName,
       // Mirror what the DDL above actually persisted: `WHERE` is dropped on
-      // MySQL (no partial-index support) and `NULLS NOT DISTINCT` is Postgres
-      // -only, so the dumped schema matches the real round-trip per adapter.
+      // MySQL (no partial-index support), `NULLS NOT DISTINCT` is Postgres
+      // -only, and the sort order is dropped where the backend doesn't support
+      // it (`sortOrderSupported`), so the dumped schema matches the real
+      // round-trip per adapter.
       where: an !== "mysql" ? options?.where : undefined,
-      orders: options?.order,
+      orders: sortOrderSupported ? options?.order : undefined,
       using: usingStr ? options?.using : undefined,
       type: an === "mysql" ? options?.type : undefined,
       lengths: an === "mysql" ? options?.length : undefined,

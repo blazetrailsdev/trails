@@ -31,6 +31,12 @@ interface AttributeDefinition {
   limit?: number | null;
   /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
   virtual?: boolean;
+  /**
+   * A user-declared type override (e.g. an enum) whose `defaultValue` came from
+   * the schema column, not a user-supplied default. Seeds via from_database in
+   * `_defaultAttributes` so the default is deserialized rather than user-cast.
+   */
+  defaultFromSchema?: boolean;
 }
 
 /**
@@ -179,7 +185,11 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     const attrMap = new Map<string, Attribute>();
     for (const [name, def] of defs) {
       const schemaColumn =
-        (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema";
+        (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema" ||
+        // A user-declared type override (e.g. enum) whose default originated
+        // from the schema column: seed via from_database so the default is
+        // deserialized, not user-cast. Mirrors Rails' build_from_user.
+        def.defaultFromSchema === true;
       if (def.defaultValue != null) {
         if (schemaColumn) {
           attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));

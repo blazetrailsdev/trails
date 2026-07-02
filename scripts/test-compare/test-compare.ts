@@ -40,8 +40,13 @@
  *                 for now (see ASSERTION_REPORT_PACKAGES); other packages never
  *                 contribute the metric. Report-only: no CI gate, no exclude.json.
  *                 Prints per-file counts by default; add --missing for per-test
- *                 `rails N vs trails M` detail. Count-only; comparing assertion
- *                 *expectations* (kinds / values) is planned follow-up.
+ *                 `rails N vs trails M` detail. The same section also reports
+ *                 assertion-KIND divergences — matched pairs whose normalized
+ *                 assertion-kind histograms differ (Rails `assert_equal` vs a
+ *                 trails `toBeTruthy`), reusing the assertion-kinds.ts mapping,
+ *                 and literal expected-VALUE divergences (Rails `assert_equal 5`
+ *                 vs a trails `toEqual(4)`) via assertion-values.ts. All three
+ *                 are report-only (no CI gate, no exclude.json).
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -54,6 +59,8 @@ import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest, TestGate } from "./types.js";
 import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
+import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
+import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
 import { PACKAGES } from "../api-compare/config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -168,6 +175,35 @@ interface AssertionMismatch {
   trailsCount: number;
 }
 
+/**
+ * A matched, implemented pair whose *normalized assertion-kind histograms*
+ * differ — a semantic divergence a raw count match can hide (Rails
+ * `assert_equal` where trails only `toBeTruthy`s). Informational only; the
+ * per-kind deltas are the comparable canonical kinds, `railsUnmapped` /
+ * `trailsUnmapped` list kinds with no cross-side twin (never a divergence).
+ */
+interface KindMismatch {
+  description: string;
+  rubyPath: string;
+  deltas: KindDelta[];
+  railsUnmapped: string[];
+  trailsUnmapped: string[];
+}
+
+/**
+ * A matched, implemented pair whose literal assertion EXPECTED VALUES diverge —
+ * both sides make the same kind of assertion the same number of times, but with
+ * different literal constants (Rails `assert_equal 5, foo`, trails
+ * `toEqual(4)`). A fidelity gap the count and kind comparisons can't see.
+ * Informational only; per-kind `deltas` list the diverging literal-token
+ * multisets. See assertion-values.ts for the skip rule and normalization.
+ */
+interface ValueMismatch {
+  description: string;
+  rubyPath: string;
+  deltas: ValueDelta[];
+}
+
 export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
@@ -187,6 +223,8 @@ export interface ConventionFileResult {
   wrongDescribeTests?: WrongDescribeTest[];
   gateMismatches?: GateMismatch[];
   assertionMismatches?: AssertionMismatch[];
+  kindMismatches?: KindMismatch[];
+  valueMismatches?: ValueMismatch[];
 }
 
 interface ConventionPackageResult {
@@ -201,6 +239,8 @@ interface ConventionPackageResult {
   totalMisplaced: number;
   totalGateMismatch: number;
   totalAssertionMismatch: number;
+  totalKindMismatch: number;
+  totalValueMismatch: number;
   totalExtra: number;
   percent: number;
   files: ConventionFileResult[];
@@ -215,6 +255,8 @@ interface TsTestInfo {
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
+  assertionKinds?: string[]; // raw assertion-kind tokens from the TS extractor
+  assertionValues?: (string | null)[]; // literal expected-value tokens (lockstep with kinds)
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +297,30 @@ export function isAssertionCountMismatch(
   if (pending) return false;
   if (railsCount === undefined || trailsCount === undefined) return false;
   return railsCount !== trailsCount;
+}
+
+/**
+ * Report-only decision: does a matched pair have an assertion-*kind* mismatch?
+ * Returns the per-kind deltas + unmapped tokens when the two sides' normalized
+ * assertion-kind histograms diverge, or `null` when they line up (or when the
+ * pair is a pending stub / either side lacks kind data). Never gates CI.
+ *
+ * Unmapped kinds (no cross-side twin — see assertion-kinds.ts) are reported for
+ * context but never on their own make a pair divergent: absence of a mapping is
+ * "we can't compare this", not "these differ".
+ */
+export function assertionKindMismatch(
+  railsKinds: string[] | undefined,
+  trailsKinds: string[] | undefined,
+  pending: boolean,
+): { deltas: KindDelta[]; railsUnmapped: string[]; trailsUnmapped: string[] } | null {
+  if (pending) return null;
+  if (!railsKinds || !trailsKinds) return null;
+  const rails = buildHistogram(railsKinds, "rails");
+  const trails = buildHistogram(trailsKinds, "trails");
+  const deltas = diffHistograms(rails.histogram, trails.histogram);
+  if (deltas.length === 0) return null;
+  return { deltas, railsUnmapped: rails.unmapped, trailsUnmapped: trails.unmapped };
 }
 
 /**
@@ -366,6 +432,8 @@ function main() {
           pending: !!tc.pending,
           gate: tc.gate,
           assertionCount: tc.assertionCount,
+          assertionKinds: tc.assertionKinds,
+          assertionValues: tc.assertionValues,
         });
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
@@ -431,6 +499,8 @@ function main() {
     let totalMisplaced = 0;
     let totalGateMismatch = 0;
     let totalAssertionMismatch = 0;
+    let totalKindMismatch = 0;
+    let totalValueMismatch = 0;
     let totalExtra = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
@@ -464,6 +534,8 @@ function main() {
       const wrongDescribeTests: WrongDescribeTest[] = [];
       const gateMismatches: GateMismatch[] = [];
       const assertionMismatches: AssertionMismatch[] = [];
+      const kindMismatches: KindMismatch[] = [];
+      const valueMismatches: ValueMismatch[] = [];
 
       // Flag a divergence between Rails' gate and our TS gate for a matched
       // pair (advisory — does not affect the matched/skipped counts).
@@ -497,6 +569,50 @@ function main() {
         totalAssertionMismatch++;
       };
 
+      // Report-only: compare the *normalized assertion-kind histograms* of a
+      // matched pair. Surfaces semantic divergences a count match hides (Rails
+      // asserts equality, trails only truthiness). Scoped to
+      // ASSERTION_REPORT_PACKAGES; pending stubs and pairs missing kind data are
+      // skipped. Unmapped kinds are recorded but never make a pair divergent.
+      const recordKind = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
+        const mismatch = assertionKindMismatch(
+          rubyTc.assertionKinds,
+          tsInfo.assertionKinds,
+          !!tsInfo.pending,
+        );
+        if (!mismatch) return;
+        kindMismatches.push({
+          description: rubyTc.description,
+          rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
+          ...mismatch,
+        });
+        totalKindMismatch++;
+      };
+
+      // Report-only: compare the literal EXPECTED VALUES of a matched pair for
+      // value-bearing kinds where both sides are fully literal (assertion-
+      // values.ts). Surfaces divergences a count/kind match hides (both assert
+      // equality once, but to different constants). Scoped to
+      // ASSERTION_REPORT_PACKAGES; pending stubs and non-literal args skipped.
+      const recordValue = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        if (!ASSERTION_REPORT_PACKAGES.has(pkg)) return;
+        const deltas = assertionValueMismatch(
+          rubyTc.assertionKinds,
+          rubyTc.assertionValues,
+          tsInfo.assertionKinds,
+          tsInfo.assertionValues,
+          !!tsInfo.pending,
+        );
+        if (!deltas) return;
+        valueMismatches.push({
+          description: rubyTc.description,
+          rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
+          deltas,
+        });
+        totalValueMismatch++;
+      };
+
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
@@ -515,6 +631,8 @@ function main() {
           }
           recordGate(tc, tsTests[tsIdx]);
           recordAssertion(tc, tsTests[tsIdx]);
+          recordKind(tc, tsTests[tsIdx]);
+          recordValue(tc, tsTests[tsIdx]);
         }
       }
 
@@ -551,6 +669,8 @@ function main() {
               }
               recordGate(tc, tsTests[idx]);
               recordAssertion(tc, tsTests[idx]);
+              recordKind(tc, tsTests[idx]);
+              recordValue(tc, tsTests[idx]);
               break;
             }
           }
@@ -607,6 +727,8 @@ function main() {
           }
           recordGate(tc, tsTests[descIdx]);
           recordAssertion(tc, tsTests[descIdx]);
+          recordKind(tc, tsTests[descIdx]);
+          recordValue(tc, tsTests[descIdx]);
           wrongDescribeTests.push({
             description: tc.description,
             rubyPath: np,
@@ -696,6 +818,8 @@ function main() {
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
         ...(gateMismatches.length > 0 ? { gateMismatches } : {}),
         ...(assertionMismatches.length > 0 ? { assertionMismatches } : {}),
+        ...(kindMismatches.length > 0 ? { kindMismatches } : {}),
+        ...(valueMismatches.length > 0 ? { valueMismatches } : {}),
       });
     }
 
@@ -716,6 +840,8 @@ function main() {
       totalMisplaced,
       totalGateMismatch,
       totalAssertionMismatch,
+      totalKindMismatch,
+      totalValueMismatch,
       totalExtra,
       percent,
       files: fileResults,
@@ -742,6 +868,8 @@ function main() {
   let grandMisplaced = 0;
   let grandGateMismatch = 0;
   let grandAssertionMismatch = 0;
+  let grandKindMismatch = 0;
+  let grandValueMismatch = 0;
   let grandExtra = 0;
   let grandFiles = 0;
   let grandMapped = 0;
@@ -754,6 +882,8 @@ function main() {
     grandMisplaced += pkg.totalMisplaced;
     grandGateMismatch += pkg.totalGateMismatch;
     grandAssertionMismatch += pkg.totalAssertionMismatch;
+    grandKindMismatch += pkg.totalKindMismatch;
+    grandValueMismatch += pkg.totalValueMismatch;
     grandExtra += pkg.totalExtra;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
@@ -768,6 +898,16 @@ function main() {
     if (pkg.totalAssertionMismatch > 0) {
       details.push(
         `${pkg.totalAssertionMismatch} assertion-count-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+      );
+    }
+    if (pkg.totalKindMismatch > 0) {
+      details.push(
+        `${pkg.totalKindMismatch} assertion-kind-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+      );
+    }
+    if (pkg.totalValueMismatch > 0) {
+      details.push(
+        `${pkg.totalValueMismatch} assertion-value-mismatch${showAssertions ? "" : " (see --assertions)"}`,
       );
     }
     if (pkg.totalExtra > 0) details.push(`${pkg.totalExtra} extra (TS only)`);
@@ -879,6 +1019,96 @@ function main() {
       console.log("");
     }
 
+    // Assertion KIND mismatches: matched, implemented pairs whose normalized
+    // assertion-kind histograms differ (Rails asserts equality, trails only
+    // truthiness). Report-only; a divergence is often a legitimate port choice.
+    // Unmapped kinds (no cross-side twin) are shown but never make a pair
+    // divergent — see assertion-kinds.ts. Comparing literal expected *values* is
+    // a further planned phase.
+    const filesWithKindMismatch = pkg.files.filter(
+      (f) => f.kindMismatches && f.kindMismatches.length > 0,
+    );
+    if (showAssertions && filesWithKindMismatch.length > 0) {
+      console.log(
+        `  ASSERTION KIND MISMATCHES (rails vs trails — normalized kinds, informational):`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      console.log(`  Report-only (no CI gate). Normalized-kind histograms differ — e.g. Rails`);
+      console.log(
+        `  \`assert_equal\` (equal) where the port asserts \`toBeTruthy\` (truthy). Unmapped`,
+      );
+      console.log(
+        `  kinds (no cross-side twin) are listed but never flag a pair. Comparing literal`,
+      );
+      console.log(`  expected *values* is a further planned phase.`);
+      console.log(
+        showMissing
+          ? `  (per-test detail; omit --missing for per-file counts only)`
+          : `  (per-file counts; pass --missing to expand per-test detail)`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      for (const f of filesWithKindMismatch) {
+        if (showMissing) {
+          for (const km of f.kindMismatches!) {
+            const deltaStr = km.deltas
+              .map((d) => `${d.kind} rails ${d.rails} vs trails ${d.trails}`)
+              .join(", ");
+            const unmapped = [
+              ...km.railsUnmapped.map((u) => `rails:${u}`),
+              ...km.trailsUnmapped.map((u) => `trails:${u}`),
+            ];
+            const unmappedStr = unmapped.length > 0 ? `  [unmapped: ${unmapped.join(", ")}]` : "";
+            console.log(`    ${f.rubyFile} › ${km.description} — ${deltaStr}${unmappedStr}`);
+          }
+        } else {
+          console.log(`    ${f.rubyFile} — ${f.kindMismatches!.length} kind mismatches`);
+        }
+      }
+      console.log("");
+    }
+
+    // Assertion VALUE mismatches: matched, implemented pairs that assert the
+    // same kind the same number of times but with different literal expected
+    // values (Rails `assert_equal 5, foo`, trails `toEqual(4)`). Report-only;
+    // compared only when both sides are fully literal (see assertion-values.ts
+    // for the skip rule and nil↔null / symbol↔string normalization).
+    const filesWithValueMismatch = pkg.files.filter(
+      (f) => f.valueMismatches && f.valueMismatches.length > 0,
+    );
+    if (showAssertions && filesWithValueMismatch.length > 0) {
+      console.log(
+        `  ASSERTION VALUE MISMATCHES (rails vs trails — literal expected values, informational):`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      console.log(`  Report-only (no CI gate). Same kind & count, different literal constants —`);
+      console.log(
+        `  e.g. Rails \`assert_equal 5\` where the port asserts \`toEqual(4)\`. Compared`,
+      );
+      console.log(`  only when both sides are literals (nil↔null / symbol↔string normalized);`);
+      console.log(`  a non-literal expected argument on either side is skipped.`);
+      console.log(
+        showMissing
+          ? `  (per-test detail; omit --missing for per-file counts only)`
+          : `  (per-file counts; pass --missing to expand per-test detail)`,
+      );
+      console.log(`  ${"-".repeat(86)}`);
+      for (const f of filesWithValueMismatch) {
+        if (showMissing) {
+          for (const vm of f.valueMismatches!) {
+            const deltaStr = vm.deltas
+              .map(
+                (d) => `${d.kind} rails [${d.rails.join(", ")}] vs trails [${d.trails.join(", ")}]`,
+              )
+              .join(", ");
+            console.log(`    ${f.rubyFile} › ${vm.description} — ${deltaStr}`);
+          }
+        } else {
+          console.log(`    ${f.rubyFile} — ${f.valueMismatches!.length} value mismatches`);
+        }
+      }
+      console.log("");
+    }
+
     console.log(
       `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Extra".padStart(5)} ${"Tot".padStart(4)}`,
     );
@@ -915,6 +1145,16 @@ function main() {
   if (grandAssertionMismatch > 0) {
     grandDetails.push(
       `${grandAssertionMismatch} assertion-count-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+    );
+  }
+  if (grandKindMismatch > 0) {
+    grandDetails.push(
+      `${grandKindMismatch} assertion-kind-mismatch${showAssertions ? "" : " (see --assertions)"}`,
+    );
+  }
+  if (grandValueMismatch > 0) {
+    grandDetails.push(
+      `${grandValueMismatch} assertion-value-mismatch${showAssertions ? "" : " (see --assertions)"}`,
     );
   }
   if (grandExtra > 0) grandDetails.push(`${grandExtra} extra (TS only)`);

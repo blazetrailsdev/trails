@@ -1,7 +1,1 @@
-[
-  "packages/activerecord/src/attribute-methods.test.ts",
-  "packages/activerecord/src/attribute-methods.trails.test.ts",
-  "packages/activerecord/src/base.test.ts",
-  "packages/activerecord/src/encryption.test.ts",
-  "packages/activerecord/src/finder.test.ts"
-]
+[]

@@ -103,7 +103,14 @@ afterEach(async () => {
   const adapter = createTestAdapter();
   const ctx = new MigrationContext(adapter);
   try {
-    await ctx.removeColumn("people", "last_name", { ifExists: true });
+    // Gate the drop on the ADAPTER's live introspection, not `removeColumn`'s
+    // own `ifExists` short-circuit: under AR_ONE_SCHEMA the MigrationContext
+    // column cache is empty (defineSchema is a canonical no-op), so an
+    // `ifExists` check would consult that empty cache, conclude last_name is
+    // absent, skip the drop, and leak the column into the next test.
+    if (await (adapter as any).columnExists("people", "last_name")) {
+      await ctx.removeColumn("people", "last_name");
+    }
   } catch {
     /* column absent / adapter without the column — nothing to strip */
   }
@@ -111,6 +118,15 @@ afterEach(async () => {
     await new SchemaMigration(adapter).deleteAllVersions();
   } catch {
     /* schema_migrations may not exist yet */
+  }
+  try {
+    // ar_internal_metadata is not a canonical table, so the one-schema
+    // truncate-only reset never clears it; the InternalMetadata tests below
+    // each build it fresh and assert on its rows/existence, so drop it between
+    // tests (Rails' teardown does the same) to keep them independent.
+    await ctx.dropTable("ar_internal_metadata", { ifExists: true });
+  } catch {
+    /* nothing to strip */
   }
   (Person as any).resetColumnInformation();
 });
@@ -741,14 +757,23 @@ describe("MigrationTest", () => {
 
   it("create table with indexes and if not exists true", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("things", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.addIndex("things", "name");
-    await ctx.createTable("things", { ifNotExists: true }, (t) => {
-      t.string("name");
-    });
-    expect(ctx.tableExists("things")).toBe(true);
+    // Own the scratch table for the whole test: under AR_ONE_SCHEMA the shared
+    // schema is truncated (not dropped) between tests, so a leaked `things`
+    // would make the first, non-ifNotExists create raise. Clear any leak up
+    // front and drop in the finally so DDL stays confined to this test.
+    await ctx.dropTable("things", { ifExists: true });
+    try {
+      await ctx.createTable("things", {}, (t) => {
+        t.string("name");
+      });
+      await ctx.addIndex("things", "name");
+      await ctx.createTable("things", { ifNotExists: true }, (t) => {
+        t.string("name");
+      });
+      expect(ctx.tableExists("things")).toBe(true);
+    } finally {
+      await ctx.dropTable("things", { ifExists: true });
+    }
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
@@ -1394,27 +1419,33 @@ describe("MigrationTest", () => {
   });
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
-      const { ctx } = freshContext();
-      await ctx.createTable("values", {}, (t) => {
-        t.integer("value");
-      });
-      await ctx.addIndex("values", "value");
-      await ctx.removeIndex("values", { column: "value" });
-      const indexes = ctx.indexes("values");
-      expect(indexes.length).toBe(0);
+      // `values` is a SQL reserved word and a canonical table. Rails' ReservedWords
+      // MigrationTest builds its own `values`; under AR_ONE_SCHEMA we ride the
+      // canonical table instead of reshaping it, exercising the same reserved-word
+      // add_index/remove_index path on an existing canonical column and removing
+      // the index in the test so nothing leaks.
+      const adapter = createTestAdapter();
+      await defineSchema(adapter, { values: TEST_SCHEMA.values });
+      const ctx = new MigrationContext(adapter);
+      await ctx.addIndex("values", "group_id");
+      expect(await (adapter as any).indexExists("values", "group_id")).toBe(true);
+      await ctx.removeIndex("values", { column: "group_id" });
+      expect(await (adapter as any).indexExists("values", "group_id")).toBe(false);
     });
   });
 
   describe("ExplicitlyNamedIndexMigrationTest", () => {
     it("drop index by name", async () => {
-      const { ctx } = freshContext();
-      await ctx.createTable("values", {}, (t) => {
-        t.integer("value");
-      });
-      await ctx.addIndex("values", "value", { name: "a_different_name" });
+      // Ride the canonical `values` table (see the ReservedWords test above):
+      // add an explicitly named index on an existing canonical column, then drop
+      // it by name within the test so the canonical table is never reshaped.
+      const adapter = createTestAdapter();
+      await defineSchema(adapter, { values: TEST_SCHEMA.values });
+      const ctx = new MigrationContext(adapter);
+      await ctx.addIndex("values", "group_id", { name: "a_different_name" });
+      expect(await (adapter as any).indexExists("values", "group_id")).toBe(true);
       await ctx.removeIndex("values", { name: "a_different_name" });
-      const indexes = ctx.indexes("values");
-      expect(indexes.length).toBe(0);
+      expect(await (adapter as any).indexExists("values", "group_id")).toBe(false);
     });
   });
 

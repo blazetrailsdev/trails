@@ -7,7 +7,8 @@ import {
   makeEncryptedPost,
   makeEncryptedBook,
   makeEncryptedBookThatIgnoresCase,
-  makeFreshModel,
+  makePlainPost,
+  makeEncryptedAuthorWithPreviousSchemes,
   makeKeyProvider,
   assertEncryptedAttribute,
   withoutEncryption,
@@ -49,9 +50,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   });
 
   it("encrypt won't fail for classes without attributes to encrypt", async () => {
-    const adapter = await freshAdapter();
-    const PlainPost = await makeFreshModel(adapter, { id: "integer", title: "string" });
-    const post = await PlainPost.create({ title: "hello" });
+    const PlainPost = makePlainPost(await freshAdapter());
+    // Canonical `posts.body` is NOT NULL, so supply it — this class simply has
+    // no *encrypted* attributes, which is what the test exercises.
+    const post = await PlainPost.create({ title: "hello", body: "world" });
     await expect(post.encrypt()).resolves.toBeUndefined();
   });
 
@@ -175,8 +177,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const prevKeyProvider = makeKeyProvider("prev-key-for-encryption-test-32b!!");
     const prevScheme = new Scheme({ keyProvider: prevKeyProvider });
 
-    const Author = await makeFreshModel(await freshAdapter(), { id: "integer", name: "string" });
-    Author.encrypts("name", { previousSchemes: [prevScheme] });
+    const Author = makeEncryptedAuthorWithPreviousSchemes(await freshAdapter(), [prevScheme]);
 
     const author = await Author.create({ name: "david" });
 

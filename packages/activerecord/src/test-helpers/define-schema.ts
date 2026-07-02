@@ -299,15 +299,20 @@ const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
 /** @internal */
 const PG_ONLY_TYPES = new Set<string>(["citext", "hstore", "uuid", "interval", "oid"]);
 
-// MySQL/MariaDB accepts native DATETIME/DATE/TIME columns. AR serializes
+// MySQL/MariaDB accepts native DATETIME/DATE/TIME/JSON columns. AR serializes
 // Temporal.PlainTime values for TIME columns, so time attributes round-trip
 // with the correct type. Without native TIME, an introspected TIME-as-VARCHAR
 // resolves to StringType and multiparameter time assignment yields a raw string
 // (same problem that "date: string" caused before PR #4141 fixed it for DATE).
-// json still uses "string" (VARCHAR); `binary` routes through the native BLOB
-// mapping so encrypted binary attributes round-trip (BinaryData-wrapped
-// ciphertext needs a binary column). PG-only types are deliberately absent:
-// defineSchema throws when one is used against MySQL or SQLite.
+// json maps to the native MySQL JSON column: mysql2 emits `json` via
+// MysqlSchemaCreation#typeToSql and registers `json` -> JsonType in its type
+// map (abstract-mysql-adapter.ts), so introspected canonical json columns
+// (e.g. admin_users.json_options) resolve to JsonType and round-trip on
+// mysql:8 — the same StringType deviation that afflicted DATE/TIME. `binary`
+// routes through the native BLOB mapping so encrypted binary attributes
+// round-trip (BinaryData-wrapped ciphertext needs a binary column). PG-only
+// types are deliberately absent: defineSchema throws when one is used against
+// MySQL or SQLite.
 /** @internal */
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   string: "string",
@@ -321,21 +326,18 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   date: "date",
   time: "time",
   binary: "binary",
-  json: "string",
+  json: "json",
 };
 
 // SQLite has type affinity rules but accepts native datetime/date/time/json
 // type names — they store as TEXT/BLOB under the hood while preserving the
 // declared type for schema reflection (so the type registry resolves to
-// SQLiteDateTimeType/DateType/TimeType/JsonType on load). `binary` inherits
-// from `COLUMN_TYPE_MAP_MYSQL` (BLOB).
+// SQLiteDateTimeType/DateType/TimeType/JsonType on load). datetime/date/time/
+// json all now inherit the native names from COLUMN_TYPE_MAP_MYSQL; `binary`
+// inherits the BLOB mapping likewise.
 /** @internal */
 const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_MYSQL,
-  datetime: "datetime",
-  date: "date",
-  time: "time",
-  json: "json",
 };
 
 /**

@@ -3,7 +3,15 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, Range, RecordNotFound, registerModel, SoleRecordExceeded } from "./index.js";
+import {
+  Base,
+  IrreversibleOrderError,
+  Range,
+  RecordNotFound,
+  registerModel,
+  SoleRecordExceeded,
+} from "./index.js";
+import { sql as arelSql } from "@blazetrails/arel";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
@@ -12,16 +20,26 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import {
+  assertQueriesCount,
+  assertQueriesMatch,
+  assertNoQueries,
+} from "./testing/query-assertions.js";
+import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 // Reply STI subclass + its belongs_to :topic, needed when touching STI Reply
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 
 // ==========================================================================
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +
-// topics fixtures (RFC 0048 convergence). Ordinal-finder cluster
-// (finder_test.rb take/sole/first/second/third). The remaining clusters
-// (fourth/fifth/*-to-last/last/integer/exists/find-by/conditions) are still
-// bespoke below, tracked for convergence under RFC 0048.
+// topics fixtures (RFC 0048 convergence). The full ordinal/last cluster
+// (take/sole/first/second/third/fourth/fifth/*-to-last/last-bang and the
+// take/first/last-with-integer + irreversible-order tests) is a faithful port
+// against the real topics fixtures. The remaining clusters
+// (exists/find-by/conditions, and the posts/comments STI last/first-on-relation
+// pair) still ride the canonical schema (canonical tables/columns, no bespoke
+// defineSchema shape) but remain thin ad-hoc coverage; faithful porting of
+// those onto the real finder_test.rb models/fixtures is tracked under RFC 0048.
 // ==========================================================================
 describe("FinderTest", () => {
   const { topics } = fixtures(["topics"], { schema: canonicalSchema });
@@ -169,39 +187,208 @@ describe("FinderTest", () => {
     await expect(Topic.thirdBang()).rejects.toThrow(RecordNotFound);
     await expect(Topic.thirdBang()).rejects.toThrow("Couldn't find Topic");
   });
-});
 
-const TEST_SCHEMA = {
-  topics: {
-    title: "string",
-    body: "string",
-    author: "string",
-    author_name: "string",
-    approved: "boolean",
-    category: "string",
-    status: "string",
-  },
-  posts: { title: "string", body: "string", author: "string", score: "integer", status: "string" },
-  birds: { name: "string", color: "string" },
-  users: {
-    name: "string",
-    email: "string",
-    age: "integer",
-    active: "boolean",
-    role: "string",
-    score: "integer",
-  },
-  items: {
-    name: "string",
-    color: "string",
-    category: "string",
-    score: "integer",
-    active: "boolean",
-  },
-  fel_posts: { title: "string" },
-  fel_comments: { body: "string", fel_post_id: "integer" },
-  fel_ratings: { value: "integer", fel_comment_id: "integer" },
-} as const;
+  it("fourth", async () => {
+    expect((await Topic.fourth())!.title).toBe(topics("fourth").title);
+  });
+
+  it("fourth with offset", async () => {
+    expect(rid(await Topic.offset(1).fourth())).toBe(rid(topics("fifth")));
+  });
+
+  it("fourth have primary key order by default", async () => {
+    const expected = topics("fourth");
+    await expected.touch();
+    expect(rid(await Topic.fourth())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).fourth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).fourth())).toBe(rid(expected));
+  });
+
+  it("model class responds to fourth bang", async () => {
+    expect(await Topic.fourthBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.fourthBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.fourthBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("fifth", async () => {
+    expect((await Topic.fifth())!.title).toBe(topics("fifth").title);
+  });
+
+  it("fifth with offset", async () => {
+    expect(rid(await Topic.offset(0).fifth())).toBe(rid(topics("fifth")));
+  });
+
+  it("fifth have primary key order by default", async () => {
+    const expected = topics("fifth");
+    await expected.touch();
+    expect(rid(await Topic.fifth())).toBe(rid(expected));
+    expect(rid(await Topic.limit(5).fifth())).toBe(rid(expected));
+    expect(rid(await Topic.order(null as never).fifth())).toBe(rid(expected));
+  });
+
+  it("model class responds to fifth bang", async () => {
+    expect(await Topic.fifthBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.fifthBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.fifthBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("second to last", async () => {
+    expect((await Topic.secondToLast())!.title).toBe(topics("fourth").title);
+
+    // test with offset
+    expect(rid(await Topic.offset(1).secondToLast())).toBe(rid(topics("fourth")));
+    expect(rid(await Topic.offset(2).secondToLast())).toBe(rid(topics("fourth")));
+    expect(rid(await Topic.offset(3).secondToLast())).toBe(rid(topics("fourth")));
+    expect(await Topic.offset(4).secondToLast()).toBeNull();
+    expect(await Topic.offset(5).secondToLast()).toBeNull();
+
+    // test with limit
+    expect(await Topic.limit(1).second()).toBeNull();
+    expect(await Topic.limit(1).secondToLast()).toBeNull();
+  });
+
+  it("second to last have primary key order by default", async () => {
+    const expected = topics("fourth");
+    await expected.touch();
+    expect(rid(await Topic.secondToLast())).toBe(rid(expected));
+  });
+
+  it("model class responds to second to last bang", async () => {
+    expect(await Topic.secondToLastBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.secondToLastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.secondToLastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("third to last", async () => {
+    expect((await Topic.thirdToLast())!.title).toBe(topics("third").title);
+
+    // test with offset
+    expect(rid(await Topic.offset(1).thirdToLast())).toBe(rid(topics("third")));
+    expect(rid(await Topic.offset(2).thirdToLast())).toBe(rid(topics("third")));
+    expect(await Topic.offset(3).thirdToLast()).toBeNull();
+    expect(await Topic.offset(4).thirdToLast()).toBeNull();
+    expect(await Topic.offset(5).thirdToLast()).toBeNull();
+
+    // test with limit
+    expect(await Topic.limit(1).third()).toBeNull();
+    expect(await Topic.limit(1).thirdToLast()).toBeNull();
+    expect(await Topic.limit(2).third()).toBeNull();
+    expect(await Topic.limit(2).thirdToLast()).toBeNull();
+  });
+
+  it("third to last have primary key order by default", async () => {
+    const expected = topics("third");
+    await expected.touch();
+    expect(rid(await Topic.thirdToLast())).toBe(rid(expected));
+  });
+
+  it("model class responds to third to last bang", async () => {
+    expect(await Topic.thirdToLastBang()).toBeTruthy();
+    await Topic.deleteAll();
+    await expect(Topic.thirdToLastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.thirdToLastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("nth to last with order uses limit", async () => {
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Topic.secondToLast();
+      },
+    );
+    await assertQueriesMatch(
+      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.updated_at"))} DESC LIMIT`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Topic.order("updated_at").secondToLast();
+      },
+    );
+  });
+
+  it("last bang present", async () => {
+    const record = await Topic.where("title = 'The Second Topic of the day'").lastBang();
+    expect(rid(record)).toBe(rid(topics("second")));
+  });
+
+  it("last bang missing", async () => {
+    await expect(Topic.where("title = 'This title does not exist'").lastBang()).rejects.toThrow(
+      RecordNotFound,
+    );
+    await expect(Topic.where("title = 'This title does not exist'").lastBang()).rejects.toThrow(
+      "Couldn't find Topic",
+    );
+  });
+
+  it("model class responds to last bang", async () => {
+    expect(rid(await Topic.lastBang())).toBe(rid(topics("fifth")));
+    await Topic.deleteAll();
+    await expect(Topic.lastBang()).rejects.toThrow(RecordNotFound);
+    await expect(Topic.lastBang()).rejects.toThrow("Couldn't find Topic");
+  });
+
+  it("take and first and last with integer should return an array", async () => {
+    expect(Array.isArray(await Topic.take(5))).toBe(true);
+    expect(Array.isArray(await Topic.first(5))).toBe(true);
+    expect(Array.isArray(await Topic.last(5))).toBe(true);
+  });
+
+  it("take and first and last with integer should use sql limit", async () => {
+    const limitRe = /LIMIT|ROWNUM <=|FETCH FIRST/;
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.take(3);
+    });
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.first(2);
+    });
+    await assertQueriesMatch(limitRe, undefined, false, async () => {
+      await Topic.last(5);
+    });
+  });
+
+  it("last with integer and order should keep the order", async () => {
+    const all = await Topic.order("title");
+    const expected = all.slice(-2).map(rid);
+    const got = (await Topic.order("title").last(2)).map(rid);
+    expect(got).toEqual(expected);
+  });
+
+  it("last with integer and order should use sql limit", async () => {
+    const relation = Topic.order("title");
+    await assertQueriesCount(1, false, async () => {
+      await relation.last(5);
+    });
+    expect(relation.isLoaded).toBe(false);
+  });
+
+  it("last with integer and reorder should use sql limit", async () => {
+    const relation = Topic.reorder("title");
+    await assertQueriesCount(1, false, async () => {
+      await relation.last(5);
+    });
+    expect(relation.isLoaded).toBe(false);
+  });
+
+  it("last on loaded relation should not use sql", async () => {
+    const relation = Topic.limit(10);
+    await relation.load();
+    await assertNoQueries(false, async () => {
+      await relation.last();
+      await relation.last(2);
+    });
+  });
+
+  it("last with irreversible order", async () => {
+    await expect(Topic.order(arelSql("coalesce(author_name, title)")).last()).rejects.toThrow(
+      IrreversibleOrderError,
+    );
+  });
+});
 
 // ==========================================================================
 // FinderTest — targets finder_test.rb
@@ -210,7 +397,7 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   it("exists", async () => {
@@ -272,160 +459,6 @@ describe("FinderTest", () => {
     expect(await Topic.exists()).toBe(false);
   });
 
-  it("fourth", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fourth with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 6; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().offset(1).fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fourth have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 4; i++) await Topic.create({ title: String(i) });
-    const fourth = await Topic.all().fourth();
-    expect(fourth).not.toBeNull();
-  });
-
-  it("fifth", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("fifth with offset", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 7; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().offset(1).fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("fifth have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const fifth = await Topic.all().fifth();
-    expect(fifth).not.toBeNull();
-  });
-
-  it("second to last have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const stl = await Topic.all().secondToLast();
-    expect(stl).not.toBeNull();
-  });
-
-  it("third to last have primary key order by default", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const ttl = await Topic.all().thirdToLast();
-    expect(ttl).not.toBeNull();
-  });
-
-  it("last bang present", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const record = await Topic.all().lastBang();
-    expect(record).not.toBeNull();
-  });
-
-  it("last bang missing", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await expect(Topic.all().lastBang()).rejects.toThrow(RecordNotFound);
-    await expect(Topic.all().lastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("take and first and last with integer should return an array", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const takeResult = await Topic.all().take(2);
-    expect(Array.isArray(takeResult)).toBe(true);
-    const firstResult = await Topic.all().first(2);
-    expect(Array.isArray(firstResult)).toBe(true);
-    const lastResult = await Topic.all().last(2);
-    expect(Array.isArray(lastResult)).toBe(true);
-  });
-
-  it("take and first and last with integer should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const takeResult = await Topic.all().take(2);
-    expect((takeResult as any[]).length).toBe(2);
-  });
-
-  it("last with integer and order should keep the order", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    await Topic.create({ title: "c" });
-    const results = await Topic.order("title").last(2);
-    expect(Array.isArray(results)).toBe(true);
-  });
-
   it("last on relation with limit and offset", async () => {
     class Topic extends Base {
       static {
@@ -474,11 +507,11 @@ describe("FinderTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("content", "text");
       }
     }
-    await Topic.create({ title: "a", body: "x" });
-    const found = await Topic.findBy({ title: "a", body: "x" });
+    await Topic.create({ title: "a", content: "x" });
+    const found = await Topic.findBy({ title: "a", content: "x" });
     expect(found).not.toBeNull();
   });
 
@@ -684,55 +717,6 @@ describe("FinderTest", () => {
     expect((found as Topic).title).toBe(value);
   });
 
-  it("model class responds to fourth bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().fourthBang).toBe("function");
-    await expect(Topic.all().fourthBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to fifth bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().fifthBang).toBe("function");
-    await expect(Topic.all().fifthBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().lastBang).toBe("function");
-  });
-
-  it("model class responds to second to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().secondToLastBang).toBe("function");
-    await expect(Topic.all().secondToLastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
-  it("model class responds to third to last bang", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(typeof Topic.all().thirdToLastBang).toBe("function");
-    await expect(Topic.all().thirdToLastBang()).rejects.toThrow("Couldn't find Topic");
-  });
-
   it("unexisting record exception handling", async () => {
     class Topic extends Base {
       static {
@@ -791,47 +775,14 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it("last with integer and reorder should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const results = await Topic.order("title").last(2);
-    expect(Array.isArray(results)).toBe(true);
-  });
-
-  it("last with integer and order should use sql limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const results = await Topic.order("title").last(2);
-    expect((results as any[]).length).toBeLessThanOrEqual(2);
-  });
-
-  it("nth to last with order uses limit", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    for (let i = 0; i < 5; i++) await Topic.create({ title: String(i) });
-    const stl = await Topic.all().secondToLast();
-    expect(stl !== undefined).toBe(true);
-  });
-
   it("find by two attributes but passing only one", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("body", "string");
+        this.attribute("content", "text");
       }
     }
-    await Topic.create({ title: "a", body: "x" });
+    await Topic.create({ title: "a", content: "x" });
     const found = await Topic.findBy({ title: "a" });
     expect(found !== undefined).toBe(true);
   });
@@ -996,21 +947,6 @@ describe("FinderTest", () => {
     expect(result).toBeNull();
   });
 
-  it("last on loaded relation should not use sql", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    await Topic.create({ title: "b" });
-    const rel = Topic.all();
-    await rel.load();
-    expect(rel.isLoaded).toBe(true);
-    const last = await rel.last();
-    expect(last).not.toBeNull();
-  });
-
   it("find by and where consistency with active record instance", async () => {
     class Topic extends Base {
       static {
@@ -1068,7 +1004,8 @@ describe("FinderTest", () => {
   it("exists with loaded relation having updated owner record", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1079,7 +1016,8 @@ describe("FinderTest", () => {
   it("exists with distinct and offset and select", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "a" });
@@ -1091,7 +1029,8 @@ describe("FinderTest", () => {
   it("member on loaded relation with match", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     const p = await Post.create({ title: "test" });
@@ -1103,7 +1042,8 @@ describe("FinderTest", () => {
   it("member on loaded relation without match", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "existing" });
@@ -1115,7 +1055,8 @@ describe("FinderTest", () => {
   it("find with nil inside set passed for attribute", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1126,28 +1067,33 @@ describe("FinderTest", () => {
   it("find by bang on relation with large number", async () => {
     class Post extends Base {
       static {
-        this.attribute("score", "integer");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
+        this.attribute("author_id", "integer");
       }
     }
-    await Post.create({ score: 1 });
-    await expect(Post.findBy({ score: 9999999999 })).resolves.toBeNull();
+    await Post.create({ author_id: 1 });
+    await expect(Post.findBy({ author_id: 9999999999 })).resolves.toBeNull();
   });
 
   it("find by on attribute that is a reserved word", async () => {
-    class Post extends Base {
+    // `group` is a reserved SQL word and a real topics column, exercising the
+    // adapter's identifier quoting on the finder path.
+    class Topic extends Base {
       static {
-        this.attribute("status", "string");
+        this.attribute("group", "string");
       }
     }
-    await Post.create({ status: "active" });
-    const found = await Post.findBy({ status: "active" });
+    await Topic.create({ group: "active" });
+    const found = await Topic.findBy({ group: "active" });
     expect(found).not.toBeNull();
   });
 
   it("find by one attribute that is an alias", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     await Post.create({ title: "hello" });
@@ -1158,11 +1104,11 @@ describe("FinderTest", () => {
   it("custom select takes precedence over original value", async () => {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
-    await Post.create({ title: "test", score: 5 });
+    await Post.create({ title: "test" });
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
   });
@@ -1170,8 +1116,8 @@ describe("FinderTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
       }
     }
     return { Post };
@@ -1380,8 +1326,8 @@ describe("FinderTest", () => {
   });
   it("hash condition find with one condition being aggregate and another not", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "hcmix", author: "bob" });
-    const found = await Post.findBy({ title: "hcmix", author: "bob" });
+    await Post.create({ title: "hcmix", body: "bob" });
+    const found = await Post.findBy({ title: "hcmix", body: "bob" });
     expect(found).toBeDefined();
   });
   it("hash condition find nil with aggregate having one mapping", async () => {
@@ -1735,24 +1681,6 @@ describe("FinderTest", () => {
     await expect(Post.find(99999999)).rejects.toThrow();
   });
 
-  it("second to last", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    await Post.create({ title: "c" });
-    const stl = await Post.all().secondToLast();
-    expect(stl).not.toBeNull();
-  });
-
-  it("third to last", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    await Post.create({ title: "c" });
-    const ttl = await Post.all().thirdToLast();
-    expect(ttl).not.toBeNull();
-  });
-
   it("implicit order for model without primary key", async () => {
     const { Post } = makeModel();
     await Post.create({ title: "no_pk" });
@@ -1832,15 +1760,15 @@ describe("FinderTest", () => {
 
   it("find by two attributes that are both aggregates", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg_both", author: "bob" });
-    const found = await Post.findBy({ title: "agg_both", author: "bob" });
+    await Post.create({ title: "agg_both", body: "bob" });
+    const found = await Post.findBy({ title: "agg_both", body: "bob" });
     expect(found).not.toBeNull();
   });
 
   it("find by two attributes with one being an aggregate", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "agg_one", author: "alice" });
-    const found = await Post.findBy({ title: "agg_one", author: "alice" });
+    await Post.create({ title: "agg_one", body: "alice" });
+    const found = await Post.findBy({ title: "agg_one", body: "alice" });
     expect(found).not.toBeNull();
   });
 
@@ -1990,43 +1918,47 @@ describe("FinderTest", () => {
   });
 
   it("find with eager loading collection and ordering by collection primary key", async () => {
-    class FelPost extends Base {
+    // Ride the canonical posts -> comments -> ratings chain (post_id / comment_id),
+    // but register under file-local names so we never clobber the global
+    // canonical Post/Comment/Rating registrations shared across the worker.
+    class EagerPost extends Base {
       static {
-        this.tableName = "fel_posts";
-        this.attribute("title", "string");
+        this.tableName = "posts";
+        this.attribute("title", "string", { default: "" });
+        this.attribute("body", "string", { default: "" });
+        this.hasMany("comments", { className: "EagerComment", foreignKey: "post_id" });
       }
     }
-    class FelComment extends Base {
+    class EagerComment extends Base {
       static {
-        this.tableName = "fel_comments";
-        this.attribute("body", "string");
-        this.attribute("fel_post_id", "integer");
+        this.tableName = "comments";
+        this.attribute("body", "string", { default: "" });
+        this.attribute("post_id", "integer");
+        this.hasMany("ratings", { className: "EagerRating", foreignKey: "comment_id" });
       }
     }
-    class FelRating extends Base {
+    class EagerRating extends Base {
       static {
-        this.tableName = "fel_ratings";
+        this.tableName = "ratings";
         this.attribute("value", "integer");
-        this.attribute("fel_comment_id", "integer");
+        this.attribute("comment_id", "integer");
       }
     }
-    FelPost.hasMany("comments", { className: "FelComment", foreignKey: "fel_post_id" });
-    FelComment.hasMany("ratings", { className: "FelRating", foreignKey: "fel_comment_id" });
-    registerModel("FelPost", FelPost);
-    registerModel("FelComment", FelComment);
-    registerModel("FelRating", FelRating);
+    registerModel("EagerPost", EagerPost);
+    registerModel("EagerComment", EagerComment);
+    registerModel("EagerRating", EagerRating);
 
-    const p1 = await FelPost.create({ title: "first" });
-    const p2 = await FelPost.create({ title: "second" });
-    const c1 = await FelComment.create({ body: "c1", fel_post_id: p1.id });
-    const c2 = await FelComment.create({ body: "c2", fel_post_id: p2.id });
-    await FelRating.create({ value: 1, fel_comment_id: c1.id });
-    await FelRating.create({ value: 2, fel_comment_id: c2.id });
+    const p1 = await EagerPost.create({ title: "first" });
+    const p2 = await EagerPost.create({ title: "second" });
+    const c1 = await EagerComment.create({ body: "c1", post_id: p1.id });
+    const c2 = await EagerComment.create({ body: "c2", post_id: p2.id });
+    await EagerRating.create({ value: 1, comment_id: c1.id });
+    await EagerRating.create({ value: 2, comment_id: c2.id });
 
-    const eager = await FelPost.eagerLoad({ comments: "ratings" })
-      .order("fel_posts.id, fel_ratings.id, fel_comments.id")
+    const eager = await EagerPost.eagerLoad({ comments: "ratings" })
+      .order("posts.id, ratings.id, comments.id")
       .first();
-    const expected = await FelPost.first();
+    const expected = await EagerPost.first();
     expect(eager).not.toBeNull();
     expect((eager as any).id).toBe((expected as any).id);
   });
@@ -2039,14 +1971,14 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   class Post extends Base {
     static {
       this.tableName = "posts";
-      this.attribute("title", "string");
-      this.attribute("body", "string");
+      this.attribute("title", "string", { default: "" });
+      this.attribute("body", "string", { default: "" });
     }
   }
 
@@ -2066,12 +1998,6 @@ describe("FinderTest", () => {
     await Post.create({ title: "unique-title" });
     const found = await Post.findBy({ title: "unique-title" });
     expect(found).not.toBeNull();
-  });
-
-  it("last with irreversible order", async () => {
-    await Post.create({ title: "a" });
-    const last = await Post.all().last();
-    expect(last).not.toBeNull();
   });
 
   it("first have determined order by default", async () => {
@@ -2210,26 +2136,24 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  class User extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("active", "boolean");
-    }
-  }
   setupFixtures();
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
   // Rails: test_find_by_with_conditions
   // Rails: test_find_by_returns_nil
   it("find_by returns nil if the record is missing", async () => {
-    await User.create({ name: "Alice" });
-    const found = await User.findBy({ name: "Nobody" });
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Topic.create({ title: "Alice" });
+    const found = await Topic.findBy({ title: "Nobody" });
     expect(found).toBeNull();
   });
 
@@ -2243,7 +2167,7 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(canonicalSchema);
   });
 
   it("find_by with non-hash conditions returns the first matching record", async () => {

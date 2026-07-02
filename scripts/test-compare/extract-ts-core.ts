@@ -5,6 +5,8 @@
 
 import * as path from "path";
 import * as ts from "typescript";
+import { normalizeTrailsKind } from "./assertion-kinds.js";
+import { VALUE_BEARING_KINDS } from "./assertion-values.js";
 import { finalizeGate, gateFromGuardExpr, gateFromWrapper, mergeGate } from "./gates.js";
 import type { TestFileInfo, TestGate } from "./types.js";
 
@@ -99,6 +101,137 @@ function countAssertions(
   return count;
 }
 
+/**
+ * The terminal matcher of an `expect(...).matcher(...)` chain, or `null` when
+ * the call isn't such a chain. `expect(x).not.toBeNull()` yields `not:toBeNull`
+ * — the negation is folded into the token so downstream normalization can line
+ * it up with Rails' `assert_not_*`/`refute_*` twin. Walks the chain down to its
+ * base to confirm it bottoms out at an `expect(...)` call.
+ */
+function expectChainMatcher(call: ts.CallExpression): string | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+  const matcher = call.expression.name.text;
+  let negated = false;
+  let cur: ts.Node = call.expression.expression;
+  // Walk the `.not` / `.resolves` / `.rejects` modifiers and nested matcher
+  // calls down to the base receiver.
+  for (;;) {
+    if (ts.isPropertyAccessExpression(cur)) {
+      if (cur.name.text === "not") negated = true;
+      cur = cur.expression;
+    } else if (ts.isCallExpression(cur)) {
+      if (ts.isIdentifier(cur.expression) && cur.expression.text === "expect") {
+        return negated ? `not:${matcher}` : matcher;
+      }
+      cur = cur.expression;
+    } else {
+      return null;
+    }
+  }
+}
+
+/**
+ * Normalize a matcher-argument node to a tagged literal token (see
+ * assertion-values.ts for the encoding and its Ruby twin), or `null` when the
+ * argument is a computed expression/variable we can't statically compare.
+ * Handles negative numeric literals (`-3` is a unary-minus over a numeric
+ * literal in the AST) and folds `null`/`undefined` to the `x:nil` token so a TS
+ * `toBeNull()`/`toBeUndefined()` lines up with a Ruby `nil`.
+ */
+function literalToken(node: ts.Node | undefined): string | null {
+  if (!node) return null;
+  if (ts.isNumericLiteral(node)) return `n:${node.text}`;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return `s:${node.text}`;
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return "b:true";
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return "b:false";
+  if (node.kind === ts.SyntaxKind.NullKeyword) return "x:nil";
+  if (ts.isIdentifier(node) && node.text === "undefined") return "x:nil";
+  if (
+    ts.isPrefixUnaryExpression(node) &&
+    node.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(node.operand)
+  ) {
+    return `n:-${node.operand.text}`;
+  }
+  return null;
+}
+
+/**
+ * Capture the expected-value argument of a bare helper-callee assertion
+ * (`assertSame(a, b)`, `refuteEqual(a, b)`, `assertIncludes(coll, member)`) as a
+ * literal token, or `null` when the callee's canonical kind is not value-bearing
+ * or the expected argument is a non-literal. Mirrors the Ruby side's per-kind
+ * arg-index rule (`expected_arg` / `INCLUDES_ASSERTIONS`): the membership family
+ * (`includes`/`excludes`) checks its second argument (the member), every other
+ * value-bearing kind its first.
+ */
+function helperCalleeValue(name: string, args: readonly ts.Expression[]): string | null {
+  const kind = normalizeTrailsKind(name);
+  if (!kind || !VALUE_BEARING_KINDS.has(kind)) return null;
+  const idx = kind === "includes" || kind === "excludes" ? 1 : 0;
+  return literalToken(args[idx]);
+}
+
+/** Lockstep assertion-kind tokens and their captured literal expected values. */
+interface AssertionKinds {
+  kinds: string[];
+  /** parallel to `kinds`: a literal token, or `null` for a non-literal/no arg */
+  values: (string | null)[];
+}
+
+/**
+ * Raw (non-deduplicated) assertion-kind tokens in a test node's subtree — one
+ * per assertion call, aligned with {@link countAssertions} (same recursive
+ * same-file helper expansion, depth cap, and per-path cycle guard). An
+ * `expect(...)` chain contributes its matcher (`toEqual`, `not:toBeNull`); a
+ * bare `assert*`/`refute*`/`expect*` helper callee contributes its own name.
+ *
+ * Emits a parallel `values` array (phase 3): the terminal matcher's first
+ * argument as a literal token where it is one (`expect(x).toEqual(5)` → `n:5`),
+ * else `null`. A value-bearing helper callee (`assertSame`, `refuteEqual`,
+ * `assertIncludes`, …) captures its mapped expected argument via
+ * {@link helperCalleeValue}; other callees push `null`.
+ */
+function collectAssertionKinds(
+  node: ts.Node,
+  helpers: HelperMap,
+  depth = 0,
+  visiting: Set<string> = new Set(),
+): AssertionKinds {
+  const kinds: string[] = [];
+  const values: (string | null)[] = [];
+  const walk = (n: ts.Node) => {
+    if (ts.isCallExpression(n)) {
+      if (ts.isPropertyAccessExpression(n.expression)) {
+        const matcher = expectChainMatcher(n);
+        if (matcher) {
+          kinds.push(matcher);
+          values.push(literalToken(n.arguments[0]));
+        }
+      } else if (ts.isIdentifier(n.expression)) {
+        const name = n.expression.text;
+        if (isAssertionCallee(name)) {
+          // Bare `expect(...)` is recorded via its matcher chain above; a helper
+          // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
+          if (name !== "expect") {
+            kinds.push(name);
+            values.push(helperCalleeValue(name, n.arguments));
+          }
+        } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
+          visiting.add(name);
+          const sub = collectAssertionKinds(helpers.get(name)!, helpers, depth + 1, visiting);
+          kinds.push(...sub.kinds);
+          values.push(...sub.values);
+          visiting.delete(name);
+        }
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return { kinds, values };
+}
+
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
 // as arg 0 and the title as arg 1, matching the test-helpers/supports.ts API.
@@ -146,6 +279,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
+    const { kinds: assertionKinds, values: assertionValues } = collectAssertionKinds(node, helpers);
     fileInfo.testCases.push({
       path: [...currentAncestors, title].join(" > "),
       description: title,
@@ -153,8 +287,10 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       file: relativePath,
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       style,
-      assertions: [],
+      assertions: [...new Set(assertionKinds)],
       assertionCount: countAssertions(node, helpers),
+      assertionKinds,
+      assertionValues,
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });

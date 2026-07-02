@@ -159,3 +159,164 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["lookalikes"]).toBe(1);
   });
 });
+
+/** Index a file's extracted tests by description → assertionKinds. */
+function tsAssertionKinds(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+  const info = extractTestsFromSource(source, relPath);
+  const out: Record<string, string[] | undefined> = {};
+  for (const tc of info.testCases) out[tc.description] = tc.assertionKinds;
+  return out;
+}
+
+describe("TS extractor assertion-kind collection", () => {
+  it("records the terminal matcher of each expect(...) chain", () => {
+    const src = `
+      it("matchers", () => {
+        expect(a).toEqual(1);
+        expect(b).toBeNull();
+      });
+    `;
+    expect(tsAssertionKinds(src)["matchers"]).toEqual(["toEqual", "toBeNull"]);
+  });
+
+  it("folds a .not chain into a not: token", () => {
+    const src = `
+      it("negated", () => {
+        expect(a).not.toBeNull();
+        expect(b).not.toEqual(2);
+      });
+    `;
+    expect(tsAssertionKinds(src)["negated"]).toEqual(["not:toBeNull", "not:toEqual"]);
+  });
+
+  it("does not dedup repeated matchers (raw histogram input)", () => {
+    const src = `
+      it("repeats", () => {
+        expect(a).toEqual(1);
+        expect(b).toEqual(2);
+      });
+    `;
+    expect(tsAssertionKinds(src)["repeats"]).toEqual(["toEqual", "toEqual"]);
+  });
+
+  it("records a helper callee by its own name", () => {
+    const src = `
+      it("helpers", () => {
+        assertQueriesCount(2, () => {
+          expect(rows).toHaveLength(2);
+        });
+        refuteEqual(a, b);
+      });
+    `;
+    expect(tsAssertionKinds(src)["helpers"]).toEqual([
+      "assertQueriesCount",
+      "toHaveLength",
+      "refuteEqual",
+    ]);
+  });
+
+  it("expands same-file helper bodies into the delegating test's kinds", () => {
+    const src = `
+      function testCopyTable(conn, to) {
+        expect(rowCount(conn, to)).toEqual(1);
+        expect(columnNames(conn, to)).toBeNull();
+      }
+      it("copy table", () => {
+        testCopyTable(conn, "binaries2");
+      });
+    `;
+    // Symmetric with assertionCount's helper expansion: the delegating test's
+    // kinds fold in the helper body's matchers so the histogram is comparable.
+    expect(tsAssertionKinds(src)["copy table"]).toEqual(["toEqual", "toBeNull"]);
+  });
+});
+
+/** Index a file's extracted tests by description → assertionValues. */
+function tsAssertionValues(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+  const info = extractTestsFromSource(source, relPath);
+  const out: Record<string, (string | null)[] | undefined> = {};
+  for (const tc of info.testCases) out[tc.description] = tc.assertionValues;
+  return out;
+}
+
+describe("TS extractor assertion-value collection", () => {
+  it("captures literal matcher arguments as tagged tokens, lockstep with kinds", () => {
+    const src = `
+      it("literals", () => {
+        expect(a).toEqual(5);
+        expect(b).toEqual("hi");
+        expect(c).toEqual(true);
+        expect(d).toBeNull();
+      });
+    `;
+    // toBeNull() has no argument → null slot; length matches assertionKinds.
+    expect(tsAssertionValues(src)["literals"]).toEqual(["n:5", "s:hi", "b:true", null]);
+  });
+
+  it("captures negative numeric literals", () => {
+    const src = `
+      it("neg", () => {
+        expect(a).toEqual(-3);
+      });
+    `;
+    expect(tsAssertionValues(src)["neg"]).toEqual(["n:-3"]);
+  });
+
+  it("folds null and undefined matcher args to the x:nil token", () => {
+    const src = `
+      it("nils", () => {
+        expect(a).toEqual(null);
+        expect(b).toEqual(undefined);
+      });
+    `;
+    expect(tsAssertionValues(src)["nils"]).toEqual(["x:nil", "x:nil"]);
+  });
+
+  it("emits null for a non-literal (variable/expression) matcher argument", () => {
+    const src = `
+      it("computed", () => {
+        expect(a).toEqual(expected);
+        expect(b).toEqual(1 + 2);
+        expect(c).toEqual(7);
+      });
+    `;
+    expect(tsAssertionValues(src)["computed"]).toEqual([null, null, "n:7"]);
+  });
+
+  it("captures values through helper expansion in lockstep with kinds", () => {
+    const src = `
+      function checkRow() {
+        expect(a).toEqual(1);
+        expect(b).toEqual(2);
+      }
+      it("delegates", () => {
+        checkRow();
+      });
+    `;
+    expect(tsAssertionValues(src)["delegates"]).toEqual(["n:1", "n:2"]);
+  });
+
+  it("emits null value for a non-value-bearing helper callee kind", () => {
+    const src = `
+      it("callee", () => {
+        assertQueriesCount(2, () => {});
+      });
+    `;
+    // assertQueriesCount normalizes to no canonical value-bearing kind → null.
+    expect(tsAssertionValues(src)["callee"]).toEqual([null]);
+  });
+
+  it("captures the mapped expected arg for value-bearing helper callees", () => {
+    const src = `
+      it("helpers", () => {
+        assertSame(5, actual);
+        refuteEqual("hi", b);
+        assertIncludes(coll, "member");
+        assertSame(other, actual);
+      });
+    `;
+    // assertSame/refuteEqual take arg 0; the *Includes membership family takes
+    // arg 1 (the member); a non-literal arg 0 → null. Lockstep with 4 kinds.
+    expect(tsAssertionValues(src)["helpers"]).toEqual(["n:5", "s:hi", "s:member", null]);
+  });
+});
