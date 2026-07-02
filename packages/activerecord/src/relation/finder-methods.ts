@@ -693,7 +693,6 @@ export const FinderMethods = {
 
 /** @internal */
 export function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
-  if (conditions === false) return rel;
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
   // (or except(:order).limit!(1) when distinct+offset are both set)
   let relation: any;
@@ -706,7 +705,13 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     relation._isDistinct = false;
     relation = relation.select(new Nodes.SqlLiteral("1 AS one")).limit(1);
   }
-  if (conditions === null || conditions === undefined || conditions === true) {
+  // Rails only skips `where!` for `conditions == :none` (our `undefined`
+  // sentinel for "no argument passed"). Every other value — including `true`
+  // and `null` — falls through to the `case`/`else` PK-lookup below, matching
+  // Rails' `where!(primary_key => conditions) unless conditions == :none`.
+  // (`null`/`nil` is unreachable from `exists?`, which short-circuits it to
+  // false before ever calling the helper.)
+  if (conditions === undefined) {
     return relation;
   }
   if (Array.isArray(conditions)) {
@@ -717,7 +722,7 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
   } else if (conditions instanceof Nodes.Node) {
     // Arel node — pass directly rather than wrapping as a PK value.
     relation = relation.where(conditions);
-  } else if (typeof conditions === "object") {
+  } else if (conditions !== null && typeof conditions === "object") {
     // Hash-like: Rails' `when Hash` branch — skip if empty.
     if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
   } else {
