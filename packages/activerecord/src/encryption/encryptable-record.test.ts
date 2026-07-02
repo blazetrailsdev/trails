@@ -696,14 +696,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // table, so re-installing the schema for a second adapter would reset the id
     // sequence and collide with the first row's PK on PG.
     const adp = await freshAdapter();
-    let book = await makeEncryptedBookNormalizedFirst(adp).create({ name: "Dune" });
-    await assertEncryptedAttribute(book, "name", "dune");
+    let book = await makeEncryptedBookNormalizedFirst(adp).create({ name: "Book" });
+    await assertEncryptedAttribute(book, "name", "book");
     // TRACKED-PENDING-CONVERGENCE (binary text-ciphertext round-trip):
-    // await assertEncryptedAttribute(book, "logo", "dune");
+    // await assertEncryptedAttribute(book, "logo", "book");
 
-    book = await makeEncryptedBookNormalizedSecond(adp).create({ name: "Dune" });
-    await assertEncryptedAttribute(book, "name", "dune");
-    // await assertEncryptedAttribute(book, "logo", "dune");
+    book = await makeEncryptedBookNormalizedSecond(adp).create({ name: "Book" });
+    await assertEncryptedAttribute(book, "name", "book");
+    // await assertEncryptedAttribute(book, "logo", "book");
   });
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
