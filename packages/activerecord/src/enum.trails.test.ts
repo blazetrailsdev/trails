@@ -12,6 +12,45 @@ import {
   setEnumWarn,
 } from "./enum.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "./index.js";
+
+describe("Enum name conflict detection", () => {
+  // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
+  // which only flags names in `Base.instance_methods` — NOT user methods on the
+  // model or an intermediate ancestor. An enum named after such a user method
+  // must not raise (regression guard for the curated-set gate replacing the old
+  // prototype-chain walk).
+  it("does not treat a user method on an ancestor class as a conflict", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      status() {
+        return "user method";
+      }
+    }
+    expect(() => {
+      class Child extends Parent {
+        static {
+          this.enum("status", { proposed: 0, written: 1 });
+        }
+      }
+      new Child();
+    }).not.toThrow();
+  });
+
+  // Rails guards `name=` too (`detect_enum_conflict!(name, "#{name}=")`), so an
+  // enum named after a framework writer conflicts on the setter.
+  it("raises for an enum name whose reader is a framework method", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("attributes", { a: 0, b: 1 });
+        }
+      }
+      new Klass();
+    }).toThrow(/enum named "attributes"/);
+  });
+});
 
 describe("Enum private validators", () => {
   afterEach(() => vi.restoreAllMocks());

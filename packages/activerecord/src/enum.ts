@@ -406,9 +406,10 @@ export function _enum(
   // (`name.pluralize`, e.g. `column` → `columns`) as a class method, and the
   // reader/writer (`name`, `name=`) as instance methods.
   // Mirrors enum.rb `detect_enum_conflict!(name, name.pluralize, true)` and the
-  // two `detect_enum_conflict!(name, name)` / `"#{name}="` calls.
+  // two `detect_enum_conflict!(name, name)` / `detect_enum_conflict!(name, "#{name}=")` calls.
   detectEnumConflictBang.call(this, name, pluralize(name), true);
   detectEnumConflictBang.call(this, name, name);
+  detectEnumConflictBang.call(this, name, `${name}=`);
 
   const attribute = name;
   const mapping = Array.isArray(values)
@@ -422,6 +423,10 @@ export function _enum(
   // `where(...)` hit the backing attribute; the value-method *names* still
   // derive from the enum labels (unaffected by the alias). Mirrors Rails, where
   // the aliased attribute delegates to its target everywhere.
+  // NOTE: the alias is resolved eagerly here, so `alias_attribute` must be
+  // declared before `enum` (the order Rails' own test uses). Declaring the enum
+  // first would key everything off the un-aliased name; that ordering isn't
+  // exercised by Rails' suite and is intentionally not supported.
   const attrName =
     (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
       attribute
@@ -710,28 +715,23 @@ export function detectEnumConflictBang(
   methodName: string,
   _klassMethod = false,
 ): void {
-  // Walk the prototype chain (mirrors Rails method_defined? semantics). Rails
-  // splits class vs. instance methods (`dangerous_class_method?` vs.
-  // `dangerous_attribute_method?`); trails hosts some Rails-instance methods
-  // (e.g. `logger`) as statics, so the instance branch also consults the class
-  // object so those reserved names are still caught.
+  // Rails splits the two: a class method is dangerous per `dangerous_class_method?`
+  // (a fixed set plus anything `Base` — not a subclass — responds to), an
+  // instance method per `dangerous_attribute_method?` (membership in the
+  // precomputed `Base.instance_methods` set). The instance branch consults that
+  // single curated set rather than walking the model's prototype chain, so a
+  // user override or an `alias_attribute` reader on the model (or an ancestor)
+  // is NOT treated as a conflict — only genuine framework methods are.
   if (_klassMethod) {
+    // `columns` etc. live on `Base` and are inherited, so a subclass carries
+    // them; user statics on the model that shadow nothing on Base are the rare
+    // false-positive noted for the pre-existing class-method path.
     if (methodName in (this as object)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
     return;
   }
-  // Rails' `dangerous_attribute_method?` only flags methods supplied by the
-  // framework, not user-defined accessors on the model itself (e.g. an
-  // `alias_attribute` reader). So consult the ancestor prototype (Base and up)
-  // and inherited statics rather than this class's own prototype, which also
-  // carries alias readers and previously-generated enum accessors.
-  const ancestorProto = Object.getPrototypeOf(this.prototype);
-  const superclass = Object.getPrototypeOf(this);
-  if (
-    (ancestorProto && methodName in (ancestorProto as object)) ||
-    (superclass && methodName in (superclass as object))
-  ) {
+  if (dangerousAttributeMethods().has(methodName)) {
     raiseConflictError.call(this, enumName, methodName);
   }
 }
