@@ -57,6 +57,51 @@ describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast t
   });
 });
 
+describe("EncryptedAttributeType#decryptAsText — plaintext-default short-circuit guard", () => {
+  // Rails' guard is `@default && @default == value` (encrypted_attribute_type.rb:87),
+  // a plain Ruby truthiness check. A falsey column default (`nil`/`false`) is
+  // treated as ABSENT and does NOT short-circuit, so the stored value is decrypted.
+  function typeWithDefault(defaultValue: unknown) {
+    const decrypt = vi.fn((v: unknown) => `decrypted:${String(v)}`);
+    const encryptor = {
+      encrypt: (v: unknown) => `encrypted:${String(v)}`,
+      decrypt,
+      isEncrypted: () => true,
+      isBinary: () => false,
+    };
+    const scheme = new Scheme({ encryptor });
+    const type = new EncryptedAttributeType({ scheme, default: defaultValue });
+    return { type, decrypt };
+  }
+
+  it("short-circuits when a truthy default equals the stored value", () => {
+    const { type, decrypt } = typeWithDefault("<untitled>");
+    expect(type.deserialize("<untitled>")).toBe("<untitled>");
+    expect(decrypt).not.toHaveBeenCalled();
+  });
+
+  it("does not short-circuit an empty-string default on a non-empty stored value", () => {
+    const { type, decrypt } = typeWithDefault("");
+    expect(type.deserialize("stored")).toBe("decrypted:stored");
+    expect(decrypt).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not short-circuit a falsey false default even when it equals the stored value", () => {
+    // `false && false == false` is falsey in Ruby, so a `false` default is
+    // treated as absent and the value goes down the decrypt path.
+    const { type, decrypt } = typeWithDefault(false);
+    expect(type.deserialize(false)).toBe("decrypted:false");
+    expect(decrypt).toHaveBeenCalledTimes(1);
+  });
+
+  it("short-circuits an empty-string default that equals an empty stored value", () => {
+    // `"" && "" == ""` → `"" && true` is truthy in Ruby: `""` is a present default.
+    const { type, decrypt } = typeWithDefault("");
+    expect(type.deserialize("")).toBe("");
+    expect(decrypt).not.toHaveBeenCalled();
+  });
+});
+
 describe("EncryptedAttributeType — delegations to scheme", () => {
   it("delegates key_provider, downcase?, previous_schemes, fixed? to the scheme", () => {
     const keyProvider = { encryptionKeys: () => [], decryptionKeys: () => [] };
