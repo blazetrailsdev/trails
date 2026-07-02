@@ -706,8 +706,11 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
         this.attribute("approved", "boolean");
-        this.attribute("written_on", "date");
-        this.attribute("bonus_time", "datetime");
+        // Rails schema.rb: `t.datetime :written_on` / `t.time :bonus_time`
+        // (topics table). Match the canonical column types now that this file
+        // rides the real `topics` table.
+        this.attribute("written_on", "datetime");
+        this.attribute("bonus_time", "time");
       }
     }
     return Topic;
