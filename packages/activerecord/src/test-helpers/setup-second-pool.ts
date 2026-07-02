@@ -73,13 +73,19 @@ export async function setupSecondPool(): Promise<void> {
   await ss.dropTable("colleges", { ifExists: true });
   await ss.dropTable("professors", { ifExists: true });
 
-  // `force: true` so these actually issue DDL under AR_ONE_SCHEMA=1, where a
-  // plain defineSchema is a no-op. The one-schema boot lays the canonical tables
-  // into the MAIN per-worker pool only; the `arunit2` second pool never sees them,
-  // so its (canonical) `colleges`/`courses`/`professors`/`courses_professors` must
-  // be created here. The primary pool re-lays `entrants` cleanly; the canonical
-  // tables this helper dropped from it above are restored by `repairWorkerSchema`
-  // at the next file's boot, so the main pool stays truncate-reset-clean.
+  // `force: true` on the arunit2 pool ONLY: the one-schema boot lays the
+  // canonical tables into the MAIN per-worker pool, so the `arunit2` second pool
+  // never sees them and its (canonical) `colleges`/`courses`/`professors`/
+  // `courses_professors` must be created here with real DDL. The primary pool is
+  // left to the no-op branch: `entrants` is already canonical and present, so no
+  // DROP/CREATE on the main pool — preserving the one-schema no-drop invariant.
+  // The canonical tables dropped from the primary pool above are restored by
+  // `repairWorkerSchema` at the next file's boot.
+  //
+  // `force` bypasses one-schema's `assertCanonicalSchema`; `ARUNIT2_SCHEMA` is a
+  // verbatim subset of canonical `colleges`/`courses`/`professors`/
+  // `courses_professors` (test-schema.ts), so it stays canonical by construction
+  // — keep it in lockstep with TEST_SCHEMA if either side changes.
   await defineSchema(arunit2, ARUNIT2_SCHEMA, { dropExisting: true, force: true });
-  await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true, force: true });
+  await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true });
 }

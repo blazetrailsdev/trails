@@ -38,6 +38,8 @@ async function freshIsolatedAdapter(): Promise<AbstractSQLite3Adapter> {
   // per-test adapter under AR_ONE_SCHEMA=1. The one-schema boot lays the canonical
   // tables into the main per-worker pool only; a secondary/sidecar adapter never
   // sees them, so the explicit-adapter defineSchema must issue real DDL here.
+  // `force` skips one-schema's canonical-schema assertion, but the shape passed
+  // is `canonicalSchema.topics` by reference, so it cannot drift from canonical.
   await defineSchema(adapter, { topics: canonicalSchema.topics }, { force: true });
   return adapter;
 }
