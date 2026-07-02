@@ -10,11 +10,13 @@
  *
  * Cases the canonical `Book` enum surface cannot yet express are kept under
  * their Rails names and `it.skip`-ped, tracked-pending-convergence under RFC
- * 0023-surfaced-deviations (enum-canonical-book-gaps): the `cover` string enum,
- * the `boolean_status` boolean enum, the `last_read` `forgotten: nil` value,
- * frozen `statuses`, `*_before_type_cast` / `*_for_database`, the `validate:`
- * option, and the conflict-detection / option-validation message surface
- * (the last is covered behaviorally in enum.trails.test.ts).
+ * 0023-surfaced-deviations (enum-canonical-book-gaps): frozen `statuses`,
+ * `*_before_type_cast` / `*_for_database`, the `validate:` option, and the
+ * conflict-detection / option-validation message surface (the last is covered
+ * behaviorally in enum.trails.test.ts). The `cover` string enum, the
+ * `boolean_status` boolean enum, and the `last_read` `forgotten: nil` value are
+ * now wired on the canonical `Book` model (EnumType supports string/boolean/nil
+ * values).
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
@@ -151,8 +153,15 @@ describe("EnumTest", () => {
   // Rails uses 64-bit out-of-range labels and beginless/endless ranges.
   it.skip("find via where with large number", () => {});
 
-  // Rails: `Book.enabled.create!` / `boolean_status` / `cover` enums.
-  it.skip("find via where should be type casted", () => {});
+  it("find via where should be type casted", async () => {
+    const created = await (Book as any).enabled().create();
+    expect(created.isEnabled()).toBe(true);
+
+    const enabled = String((Book as any).boolean_statuses.enabled);
+    expect((await Book.where({ boolean_status: enabled }).last())?.id).toBe(created.id);
+    expect((await Book.where({ cover: "soft" }).first())?.id).toBe(books("awdr").id);
+    expect((await Book.whereNot({ cover: "hard" }).first())?.id).toBe(books("awdr").id);
+  });
 
   it("build from scope", () => {
     expect((Book as any).written().build().isWritten()).toBe(true);
@@ -312,16 +321,19 @@ describe("EnumTest", () => {
   // Rails: `Book.where(id:).update_all("status = NULL")` (raw SQL fragment).
   it.skip("NULL values from database should be casted to nil", () => {});
 
-  // Rails: `books(:ddd).last_read == "forgotten"` — `forgotten: nil` not on Book.
-  it.skip("deserialize nil value to enum which defines nil value to hash", () => {});
+  it("deserialize nil value to enum which defines nil value to hash", () => {
+    expect((books("ddd") as any).last_read).toBe("forgotten");
+  });
 
   it("assign nil value", () => {
     (book as any).status = null;
     expect((book as any).status).toBeNull();
   });
 
-  // Rails: `@book.last_read = nil` → "forgotten" — `forgotten: nil` not on Book.
-  it.skip("assign nil value to enum which defines nil value to hash", () => {});
+  it("assign nil value to enum which defines nil value to hash", () => {
+    (book as any).last_read = null;
+    expect((book as any).last_read).toBe("forgotten");
+  });
 
   it("assign empty string value", () => {
     (book as any).status = "";
@@ -334,8 +346,10 @@ describe("EnumTest", () => {
     expect((book as any).status).toBeNull();
   });
 
-  // Rails: `@book.boolean_status = false` → "disabled" — boolean enum not on Book.
-  it.skip("assign false value to a field defined as boolean", () => {});
+  it("assign false value to a field defined as boolean", () => {
+    (book as any).boolean_status = false;
+    expect((book as any).boolean_status).toBe("disabled");
+  });
 
   it("assign long empty string value", () => {
     (book as any).status = "   ";
@@ -601,7 +615,25 @@ describe("EnumTest", () => {
   it.skip("capital characters for enum names", () => {});
   it.skip("unicode characters for enum names", () => {});
   it.skip("mangling collision for enum names", () => {});
-  it.skip("deserialize enum value to original hash key", () => {});
+
+  // Rails keys the hash with `Struct.new(:to_s).new("proposed")` objects and
+  // asserts `book.status` returns the original key. JS object keys stringify, so
+  // the trails-idiom equivalent is a plain string label key — `cast` returns the
+  // original key (label) via the reverse mapping, matching Rails' `mapping.key`.
+  it("deserialize enum value to original hash key", async () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer");
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    registerModel(K);
+    const b = await K.create({ status: 0 });
+    expect((b as any).status).toBe("proposed");
+    expect((b as any).isProposed()).toBe(true);
+    expect((b as any).isWritten()).toBe(false);
+  });
   it.skip("serializable? with large number label", () => {});
 
   // Rails: logger-warning surface for negative-scope clashes — covered
