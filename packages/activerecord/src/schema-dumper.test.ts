@@ -57,19 +57,14 @@ describe("SchemaDumperTest", () => {
   }
   // Whether a dumped canonical `companies` index surfaces its descending sort
   // order. Rails gates this on `supports_index_sort_order?` (PostgreSQL/SQLite
-  // always; MySQL/MariaDB version-gated). trails' PG/SQLite reflect it here, but
-  // MySQL/MariaDB do NOT round-trip descending order through the shared-worker
-  // reconstruct path (generateSchemaFile → loadSchema → add_index): the CI
-  // MariaDB 11 lane dumps `companies` with no order even though
-  // `supportsIndexSortOrder()` is true there. This was empirically confirmed to
-  // be NOT a cold `_databaseVersion` cache — priming it in `SchemaStatements#addIndex`
-  // did not change the result, because the MySQL order path (MysqlSchemaCreation
-  // → the ungated mysql `addOptionsForIndexColumns`) never consults the version,
-  // and reflection keys off `SHOW KEYS` `Collation = "D"`. Tracked for
-  // convergence in RFC 0048 (mysql-reconstruct-index-sort-order-dump); until then
-  // the order line is expected only on PG/SQLite.
+  // always; MySQL/MariaDB version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1). We
+  // mirror that by consulting the live adapter flag rather than blanket-excluding
+  // the MySQL family — the CI MariaDB 11 lane supports it, so `companies` dumps
+  // the descending `order:` exactly as Rails does there.
   function dumpsIndexSortOrder(): boolean {
-    return adapterType !== "mysql";
+    return (
+      Base.adapter as unknown as { supportsIndexSortOrder(): boolean }
+    ).supportsIndexSortOrder();
   }
 
   it("schema dump", async () => {
