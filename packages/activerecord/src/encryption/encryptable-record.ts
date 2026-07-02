@@ -337,14 +337,24 @@ export class EncryptableRecord {
    * `original_<name>` sibling both encrypted) are checked, so plain encrypted
    * attributes never spuriously require an `original_` column.
    *
-   * Reads columns from `_attributeDefinitions` (already populated by schema
-   * reflection at this point) rather than `columnNames()` — the latter forces a
-   * schema load, and this runs *inside* one, so calling it would recurse.
+   * Reads columns from `_attributeDefinitions` (into which schema reflection
+   * writes every DB column as a non-virtual `source: "schema"` def — see
+   * model-schema.ts applyColumnsHash) rather than `columnNames()`, which forces
+   * a schema load and would recurse since this runs *inside* one. Virtual and
+   * ignored defs are filtered out to mirror `columnNames()` exactly, so a
+   * virtual `attribute("original_<name>")` with no backing column does NOT
+   * satisfy the guard.
    * @internal
    */
   static revalidatePreservedColumns(modelClass: any): void {
     const defs = modelClass._attributeDefinitions;
-    const colNames: string[] = defs instanceof Map ? [...defs.keys()] : [];
+    if (!(defs instanceof Map)) return;
+    const ignored = new Set<string>(modelClass.ignoredColumns ?? []);
+    const colNames: string[] = [];
+    for (const [name, def] of defs) {
+      if (ignored.has(name) || def?.virtual) continue;
+      colNames.push(name);
+    }
     const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set<string>();
     for (const attr of attrs) {
       const source = this.sourceAttributeFromPreservedAttribute(attr);

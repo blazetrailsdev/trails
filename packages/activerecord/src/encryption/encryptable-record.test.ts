@@ -852,3 +852,68 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
     ).toThrow(/must create an additional column named 'original_name'/);
   });
 });
+
+// The eager check above defers at Base.encrypts static-init (columnNames() is []
+// before the adapter connects). This exercises the deferred re-check that runs
+// post-schema-load from applyPendingEncryptions, reading columns from the
+// reflected _attributeDefinitions rather than forcing a schema load.
+describe("EncryptableRecord.revalidatePreservedColumns — deferred original_<name> check", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    Configurable.config.supportUnencryptedData = false;
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  // Mirrors the durable-path state after schema reflection: _encryptedAttributes
+  // holds the preserved pair; _attributeDefinitions holds whatever columns
+  // reflection wrote. `defs` maps column name → { virtual? }.
+  function modelAfterSchemaLoad(defs: Record<string, { virtual?: boolean }>) {
+    return {
+      _encryptedAttributes: new Set(["name", "original_name"]),
+      _attributeDefinitions: new Map(
+        Object.entries(defs).map(([name, def]) => [name, { name, ...def }]),
+      ),
+    } as any;
+  }
+
+  it("raises once columns are known and the original_<name> column is missing", () => {
+    const modelClass = modelAfterSchemaLoad({ name: {} });
+    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).toThrow(
+      /must create an additional column named 'original_name'/,
+    );
+  });
+
+  it("does not raise when the reflected original_<name> column is present", () => {
+    const modelClass = modelAfterSchemaLoad({ name: {}, original_name: {} });
+    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
+  });
+
+  it("still raises when original_<name> is only a virtual attribute (no backing column)", () => {
+    const modelClass = modelAfterSchemaLoad({ name: {}, original_name: { virtual: true } });
+    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).toThrow(
+      /must create an additional column named 'original_name'/,
+    );
+  });
+
+  it("does not require an original_<name> column for plain (non-ignoreCase) encrypted attrs", () => {
+    const modelClass = {
+      _encryptedAttributes: new Set(["email"]),
+      _attributeDefinitions: new Map([["email", { name: "email" }]]),
+    } as any;
+    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
+  });
+
+  it("defers (no raise) while the schema is unloaded and no columns are known", () => {
+    const modelClass = {
+      _encryptedAttributes: new Set(["name", "original_name"]),
+      _attributeDefinitions: new Map(),
+    } as any;
+    expect(() => EncryptableRecord.revalidatePreservedColumns(modelClass)).not.toThrow();
+  });
+});
