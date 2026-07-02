@@ -192,7 +192,7 @@ export class EnumType extends ValueType<string> {
     // Rails `value.presence` — blank values (nil, false, blank strings) become
     // nil; anything else passes through unchanged (e.g. the string "true" so a
     // later `serialize` can type-cast it against the boolean subtype).
-    return isBlankEnumValue(value) ? null : (value as string);
+    return isBlank(value) ? null : (value as string);
   }
 
   // Mirrors Rails: `mapping.key(subtype.deserialize(value))` — coerce the raw
@@ -232,7 +232,7 @@ export class EnumType extends ValueType<string> {
     // Rails: `unless value.blank? || mapping.has_key?(value) || mapping.has_value?(value)`
     // — a blank value (nil, false, or a whitespace-only string) is always
     // allowed and casts to nil.
-    if (isBlankEnumValue(value)) return;
+    if (isBlank(value)) return;
     if (typeof value === "string" && this._mapping.has(value)) return;
     if (this._reverseMapping.has(value as EnumValue)) return;
     throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
@@ -720,17 +720,6 @@ export function assertValidEnumDefinitionValues(
   }
 
   throw new ArgumentError("Enum values must be either a non-empty hash or an array.");
-}
-
-/**
- * Mirror Ruby `Object#blank?` for the values an enum accepts: nil, false, and
- * whitespace-only strings are blank (so they cast to nil / skip validation).
- * `0` is NOT blank — a zero-mapped label stays valid.
- */
-function isBlankEnumValue(value: unknown): boolean {
-  if (value === null || value === undefined || value === false) return true;
-  if (typeof value === "string") return isBlank(value);
-  return false;
 }
 
 /** True for plain JS objects (Object.prototype or null proto), matching Ruby Hash semantics. */
