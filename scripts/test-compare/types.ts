@@ -65,6 +65,15 @@ export interface TestCaseInfo {
    * between a matched Rails test and its trails port.
    */
   assertionCount?: number;
+  /**
+   * Raw (non-deduplicated) assertion-kind tokens in the test body — the Ruby
+   * assertion method name (`assert_equal`) or, on the TS side, the terminal
+   * matcher of an `expect(...)` chain (`toEqual`, `not:toBeNull`) / a trails
+   * `assert*`/`expect*` helper callee. Feeds test:compare's assertion-kind
+   * histogram comparison (see scripts/test-compare/assertion-kinds.ts). Same
+   * length as `assertionCount`; `assertions` is this list deduped.
+   */
+  assertionKinds?: string[];
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**

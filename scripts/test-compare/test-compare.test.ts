@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
   parseMinExtra,
@@ -86,5 +87,38 @@ describe("isAssertionCountMismatch", () => {
   it("does not flag when either side's count is unknown", () => {
     expect(isAssertionCountMismatch(undefined, 2, false)).toBe(false);
     expect(isAssertionCountMismatch(2, undefined, false)).toBe(false);
+  });
+});
+
+describe("assertionKindMismatch", () => {
+  it("flags a kind divergence (Rails equality, trails truthiness)", () => {
+    const m = assertionKindMismatch(["assert_equal"], ["toBeTruthy"], false);
+    expect(m).toEqual({
+      deltas: [
+        { kind: "equal", rails: 1, trails: 0 },
+        { kind: "truthy", rails: 0, trails: 1 },
+      ],
+      railsUnmapped: [],
+      trailsUnmapped: [],
+    });
+  });
+
+  it("does not flag when normalized kinds line up despite different names", () => {
+    // assert_equal ~ toBe (equal), assert_nil ~ toBeNull (nil).
+    expect(assertionKindMismatch(["assert_equal", "assert_nil"], ["toBe", "toBeNull"], false)).toBe(
+      null,
+    );
+  });
+
+  it("reports unmapped kinds but does not flag on them alone", () => {
+    // Both sides' only assertion is unmapped → no mapped divergence → null,
+    // even though the raw kinds differ.
+    expect(assertionKindMismatch(["assert_cycle"], ["toHaveBeenCalled"], false)).toBe(null);
+  });
+
+  it("never flags a pending stub or a pair missing kind data", () => {
+    expect(assertionKindMismatch(["assert_equal"], ["toBeTruthy"], true)).toBe(null);
+    expect(assertionKindMismatch(undefined, ["toBeTruthy"], false)).toBe(null);
+    expect(assertionKindMismatch(["assert_equal"], undefined, false)).toBe(null);
   });
 });
