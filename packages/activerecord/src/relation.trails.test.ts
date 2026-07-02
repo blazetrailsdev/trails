@@ -14,7 +14,6 @@ import { registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -48,7 +47,26 @@ describe("isBlank / isPresent", () => {
     SampleRecord.attribute("id", "integer");
     SampleRecord.attribute("name", "string");
     SampleRecord.adapter = adapter;
-    await defineSchema(adapter, { developers: canonicalSchema.developers });
+    // Fresh (non-boot-pool) adapter, so the canonical `developers` table isn't
+    // laid down — create it here, mirroring schema.rb's `create_table :developers`.
+    // Torn down by the describe's `afterAll(resetTestAdapterState)`, which drops
+    // every table this suite wrote on the shared test adapter.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await (
+      adapter as unknown as {
+        createTable(name: string, opts: object, fn: (t: any) => void): Promise<void>;
+      }
+    ).createTable("developers", { force: true }, (t: any) => {
+      t.string("name");
+      t.string("first_name");
+      t.integer("salary", { default: 70000 });
+      t.integer("firm_id");
+      t.integer("mentor_id");
+      t.datetime("legacy_created_at");
+      t.datetime("legacy_updated_at");
+      t.datetime("legacy_created_on");
+      t.datetime("legacy_updated_on");
+    });
 
     expect(await SampleRecord.all().isBlank()).toBe(true);
     expect(await SampleRecord.all().isPresent()).toBe(false);
