@@ -310,6 +310,7 @@ class TestExtractor
       style: "def_test",
       assertions: t[:assertions],
       assertionCount: t[:assertion_count],
+      assertionKinds: t[:assertion_kinds],
     }, nil, body_gate: t[:body_gate])
   end
 
@@ -378,8 +379,7 @@ class TestExtractor
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_block(node)
-    assertion_count = count_assertions(node)
+    assertion_kinds = collect_assertion_kinds(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -390,8 +390,9 @@ class TestExtractor
       file: @current_file,
       line: line,
       style: "it",
-      assertions: assertions,
-      assertionCount: assertion_count,
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
     }, node)
   end
 
@@ -401,8 +402,7 @@ class TestExtractor
 
     line = extract_line(node)
     body_node = outer_node || node
-    assertions = extract_assertions_from_node(body_node)
-    assertion_count = count_assertions(body_node)
+    assertion_kinds = collect_assertion_kinds(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -413,8 +413,9 @@ class TestExtractor
       file: @current_file,
       line: line,
       style: "it",
-      assertions: assertions,
-      assertionCount: assertion_count,
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
     }, body_node)
   end
 
@@ -423,8 +424,7 @@ class TestExtractor
     return unless desc
 
     line = extract_line(node)
-    assertions = extract_assertions_from_block(node)
-    assertion_count = count_assertions(node)
+    assertion_kinds = collect_assertion_kinds(node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -435,8 +435,9 @@ class TestExtractor
       file: @current_file,
       line: line,
       style: "test",
-      assertions: assertions,
-      assertionCount: assertion_count,
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
     }, node)
   end
 
@@ -446,8 +447,7 @@ class TestExtractor
 
     line = extract_line(node)
     body_node = outer_node || node
-    assertions = extract_assertions_from_node(body_node)
-    assertion_count = count_assertions(body_node)
+    assertion_kinds = collect_assertion_kinds(body_node)
 
     path = (@describe_stack + [desc]).join(" > ")
 
@@ -458,8 +458,9 @@ class TestExtractor
       file: @current_file,
       line: line,
       style: "test",
-      assertions: assertions,
-      assertionCount: assertion_count,
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
     }, body_node)
   end
 
@@ -480,8 +481,7 @@ class TestExtractor
     # Convert test_foo_bar to "foo bar"
     desc = name.sub(/^test_/, "").tr("_", " ")
     line = extract_line(node)
-    assertions = extract_assertions_from_def(node)
-    assertion_count = count_assertions(node)
+    assertion_kinds = collect_assertion_kinds(node)
 
     # Inside a mixin module body: stash, don't emit. Materialized at end of file
     # by flush_collected_modules, with the include-site gate from process_include.
@@ -489,8 +489,8 @@ class TestExtractor
       # Capture the in-body `skip … if/unless` gate now — the raw sexp isn't
       # retained past collection, so it can't be recomputed at materialization.
       @module_collect << {
-        description: desc, line: line, assertions: assertions,
-        assertion_count: assertion_count,
+        description: desc, line: line, assertions: assertion_kinds.uniq,
+        assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         body_gate: body_skip_gate(node)
       }
       return
@@ -505,8 +505,9 @@ class TestExtractor
       file: @current_file,
       line: line,
       style: "def_test",
-      assertions: assertions,
-      assertionCount: assertion_count,
+      assertions: assertion_kinds.uniq,
+      assertionCount: assertion_kinds.length,
+      assertionKinds: assertion_kinds,
     }, node)
   end
 
@@ -863,28 +864,9 @@ class TestExtractor
 
   # ---- Assertion extraction ----
 
-  def extract_assertions_from_block(node)
-    assertions = []
-    find_assertions(node, assertions)
-    assertions.uniq
-  end
-
-  def extract_assertions_from_node(node)
-    assertions = []
-    find_assertions(node, assertions)
-    assertions.uniq
-  end
-
-  def extract_assertions_from_def(node)
-    assertions = []
-    find_assertions(node, assertions)
-    assertions.uniq
-  end
-
   # Raw (non-deduped) count of assertion calls in a test body, folding in calls
   # to same-file non-assertion helpers (recursively, depth-capped, with a
-  # per-path cycle guard). `assertions` (above) uniq's to distinct assertion
-  # *kinds* — direct-only; this counts every call incl. helper-delegated ones,
+  # per-path cycle guard). This counts every call incl. helper-delegated ones,
   # which is what test:compare's assertion-count comparison needs (exact-count
   # parity with the Rails counterpart). See extract-ts-core.ts for the TS twin.
   def count_assertions(node)
@@ -947,28 +929,41 @@ class TestExtractor
     node.each { |child| collect_helper_defs(child) if child.is_a?(Array) }
   end
 
-  def find_assertions(node, results)
+  # Raw (non-deduped) list of assertion *kind* tokens (method names) in a test
+  # body — one per call, same length as (and same helper expansion / cycle guard
+  # / depth cap as) count_assertions. Feeds test:compare's assertion-kind
+  # histogram (assertion-kinds.ts); `assertions` is this list deduped.
+  def collect_assertion_kinds(node)
+    kinds = []
+    collect_assertion_kinds_expanded(node, kinds, [], 0)
+    kinds
+  end
+
+  # Kind-collecting twin of count_assertions_expanded: same self-call / helper /
+  # receiver-form handling, but records each assertion's method name instead of
+  # bumping a counter. Kept in lockstep so assertionKinds.length == assertionCount.
+  def collect_assertion_kinds_expanded(node, results, visiting, depth)
     return unless node.is_a?(Array)
 
-    case node[0]
-    when :command, :fcall
-      name = ident_name(node[1])
-      results << name if assertion_method?(name)
-    when :vcall
-      # bare no-arg call: `assert_auto_incremented`
-      name = ident_name(node[1])
-      results << name if assertion_method?(name)
-    when :call, :command_call
-      # receiver form: `x.must_equal y` / `sql.must_be_like %{…}`
-      name = ident_name(node[3]) if node[3]
-      results << name if assertion_method?(name)
+    name = self_call_name(node)
+    if name
+      if assertion_method?(name)
+        # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
+        # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
+        # recursion below descends into it — so the wrapper is not double-counted.
+        results << name
+      elsif depth < MAX_HELPER_DEPTH && @helper_defs.key?(name) && !visiting.include?(name)
+        visiting.push(name)
+        collect_assertion_kinds_expanded(@helper_defs[name], results, visiting, depth + 1)
+        visiting.pop
+      end
+    elsif receiver_call_assertion?(node)
+      # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
+      # (never expanded as helpers, but still recorded).
+      results << ident_name(node[3])
     end
 
-    # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg, [:fcall,
-    # ...], ...]`; we do NOT match `:method_add_arg` because the recursion below
-    # descends into its `:fcall` child, already recorded above — matching the
-    # wrapper too would double-count (invisible under the uniq'd `assertions`).
-    node.each { |child| find_assertions(child, results) if child.is_a?(Array) }
+    node.each { |child| collect_assertion_kinds_expanded(child, results, visiting, depth) if child.is_a?(Array) }
   end
 
   # ---- String extraction helpers ----

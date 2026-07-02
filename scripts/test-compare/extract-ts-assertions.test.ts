@@ -159,3 +159,74 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["lookalikes"]).toBe(1);
   });
 });
+
+/** Index a file's extracted tests by description → assertionKinds. */
+function tsAssertionKinds(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+  const info = extractTestsFromSource(source, relPath);
+  const out: Record<string, string[] | undefined> = {};
+  for (const tc of info.testCases) out[tc.description] = tc.assertionKinds;
+  return out;
+}
+
+describe("TS extractor assertion-kind collection", () => {
+  it("records the terminal matcher of each expect(...) chain", () => {
+    const src = `
+      it("matchers", () => {
+        expect(a).toEqual(1);
+        expect(b).toBeNull();
+      });
+    `;
+    expect(tsAssertionKinds(src)["matchers"]).toEqual(["toEqual", "toBeNull"]);
+  });
+
+  it("folds a .not chain into a not: token", () => {
+    const src = `
+      it("negated", () => {
+        expect(a).not.toBeNull();
+        expect(b).not.toEqual(2);
+      });
+    `;
+    expect(tsAssertionKinds(src)["negated"]).toEqual(["not:toBeNull", "not:toEqual"]);
+  });
+
+  it("does not dedup repeated matchers (raw histogram input)", () => {
+    const src = `
+      it("repeats", () => {
+        expect(a).toEqual(1);
+        expect(b).toEqual(2);
+      });
+    `;
+    expect(tsAssertionKinds(src)["repeats"]).toEqual(["toEqual", "toEqual"]);
+  });
+
+  it("records a helper callee by its own name", () => {
+    const src = `
+      it("helpers", () => {
+        assertQueriesCount(2, () => {
+          expect(rows).toHaveLength(2);
+        });
+        refuteEqual(a, b);
+      });
+    `;
+    expect(tsAssertionKinds(src)["helpers"]).toEqual([
+      "assertQueriesCount",
+      "toHaveLength",
+      "refuteEqual",
+    ]);
+  });
+
+  it("expands same-file helper bodies into the delegating test's kinds", () => {
+    const src = `
+      function testCopyTable(conn, to) {
+        expect(rowCount(conn, to)).toEqual(1);
+        expect(columnNames(conn, to)).toBeNull();
+      }
+      it("copy table", () => {
+        testCopyTable(conn, "binaries2");
+      });
+    `;
+    // Symmetric with assertionCount's helper expansion: the delegating test's
+    // kinds fold in the helper body's matchers so the histogram is comparable.
+    expect(tsAssertionKinds(src)["copy table"]).toEqual(["toEqual", "toBeNull"]);
+  });
+});

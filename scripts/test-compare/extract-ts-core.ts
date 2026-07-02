@@ -99,6 +99,73 @@ function countAssertions(
   return count;
 }
 
+/**
+ * The terminal matcher of an `expect(...).matcher(...)` chain, or `null` when
+ * the call isn't such a chain. `expect(x).not.toBeNull()` yields `not:toBeNull`
+ * — the negation is folded into the token so downstream normalization can line
+ * it up with Rails' `assert_not_*`/`refute_*` twin. Walks the chain down to its
+ * base to confirm it bottoms out at an `expect(...)` call.
+ */
+function expectChainMatcher(call: ts.CallExpression): string | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+  const matcher = call.expression.name.text;
+  let negated = false;
+  let cur: ts.Node = call.expression.expression;
+  // Walk the `.not` / `.resolves` / `.rejects` modifiers and nested matcher
+  // calls down to the base receiver.
+  for (;;) {
+    if (ts.isPropertyAccessExpression(cur)) {
+      if (cur.name.text === "not") negated = true;
+      cur = cur.expression;
+    } else if (ts.isCallExpression(cur)) {
+      if (ts.isIdentifier(cur.expression) && cur.expression.text === "expect") {
+        return negated ? `not:${matcher}` : matcher;
+      }
+      cur = cur.expression;
+    } else {
+      return null;
+    }
+  }
+}
+
+/**
+ * Raw (non-deduplicated) assertion-kind tokens in a test node's subtree — one
+ * per assertion call, aligned with {@link countAssertions} (same recursive
+ * same-file helper expansion, depth cap, and per-path cycle guard). An
+ * `expect(...)` chain contributes its matcher (`toEqual`, `not:toBeNull`); a
+ * bare `assert*`/`refute*`/`expect*` helper callee contributes its own name.
+ */
+function collectAssertionKinds(
+  node: ts.Node,
+  helpers: HelperMap,
+  depth = 0,
+  visiting: Set<string> = new Set(),
+): string[] {
+  const kinds: string[] = [];
+  const walk = (n: ts.Node) => {
+    if (ts.isCallExpression(n)) {
+      if (ts.isPropertyAccessExpression(n.expression)) {
+        const matcher = expectChainMatcher(n);
+        if (matcher) kinds.push(matcher);
+      } else if (ts.isIdentifier(n.expression)) {
+        const name = n.expression.text;
+        if (isAssertionCallee(name)) {
+          // Bare `expect(...)` is recorded via its matcher chain above; a helper
+          // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
+          if (name !== "expect") kinds.push(name);
+        } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
+          visiting.add(name);
+          kinds.push(...collectAssertionKinds(helpers.get(name)!, helpers, depth + 1, visiting));
+          visiting.delete(name);
+        }
+      }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return kinds;
+}
+
 // Adapter wrappers that take the title as their FIRST argument. The feature
 // wrappers (`describeIfSupports`/`itIfSupports`) instead take the feature key
 // as arg 0 and the title as arg 1, matching the test-helpers/supports.ts API.
@@ -146,6 +213,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
+    const assertionKinds = collectAssertionKinds(node, helpers);
     fileInfo.testCases.push({
       path: [...currentAncestors, title].join(" > "),
       description: title,
@@ -153,8 +221,9 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       file: relativePath,
       line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
       style,
-      assertions: [],
+      assertions: [...new Set(assertionKinds)],
       assertionCount: countAssertions(node, helpers),
+      assertionKinds,
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });
