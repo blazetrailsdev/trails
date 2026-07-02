@@ -1305,13 +1305,12 @@ describe("EagerAssociationTest", () => {
       // `categories[0]`/`[1]`; we assert the same counts without depending on it.
       const categoryOf = (post: Base, categoryId: unknown): Base =>
         (post.association("categories").target as Base[]).find((c) => c.id === categoryId)!;
-      const categorizationCount = (c: Base): number =>
-        (c.association("categorizations").target as Base[]).length;
+      const categorizationCount = (c: Base): Promise<number> => (c as any).categorizations.length();
 
       // welcome → general (2 categorizations) + technology (1); thinking → general (2).
-      expect(categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
-      expect(categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
-      expect(categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
+      expect(await categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
+      expect(await categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
+      expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
   });
 });
