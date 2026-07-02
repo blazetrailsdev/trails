@@ -79,6 +79,22 @@ export class PredicateBuilder {
    * builder's table/model context, then the arel table. Mirrors the cascade
    * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
    */
+  /**
+   * Replaces an out-of-range scalar with an {@link UnboundableBound} sentinel
+   * (leaving in-range values untouched), so the Arel `In` / `NotIn` visitor
+   * drops it from the list — mirroring Rails' `visit_Arel_Nodes_In`
+   * `values.delete_if { |v| unboundable?(v) }`. Used by ArrayHandler's
+   * multi-value `IN` path; the single-value path already routes through a
+   * QueryAttribute bind whose `unboundable?` collapses the equality to `1=0`.
+   */
+  markUnboundable(attribute: Nodes.Attribute, value: unknown): unknown {
+    const type = this.resolveBoundType(attribute);
+    if (type?.isSerializable && !type.isSerializable(value)) {
+      return new UnboundableBound(boundSign(value));
+    }
+    return value;
+  }
+
   private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
     const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
     const attrType = (
@@ -323,7 +339,9 @@ export class PredicateBuilder {
     if (scalarValues.length === 1) {
       parts.push(this.buildNegated(attribute, scalarValues[0]));
     } else if (scalarValues.length > 1) {
-      parts.push(attribute.notIn(scalarValues));
+      // Drop out-of-range values so the NotIn visitor filters them (mirrors
+      // Rails' `visit_Arel_Nodes_NotIn`), matching the positive IN path.
+      parts.push(attribute.notIn(scalarValues.map((v) => this.markUnboundable(attribute, v))));
     }
 
     if (hasNull) {

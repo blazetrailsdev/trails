@@ -72,7 +72,13 @@ export class ArrayHandler {
     } else if (scalarValues.length === 1) {
       valuesPredicate = this.predicateBuilder.build(attribute, scalarValues[0]);
     } else {
-      valuesPredicate = attribute.in(scalarValues);
+      // Mirror Rails' `visit_Arel_Nodes_In` dropping unboundable values: swap
+      // any out-of-range scalar for an UnboundableBound sentinel so the In
+      // visitor filters it (`[1, 2^63]` → `IN (1)`) instead of inlining a value
+      // the column can't hold. In-range values pass through untouched.
+      valuesPredicate = attribute.in(
+        scalarValues.map((v) => this.predicateBuilder.markUnboundable(attribute, v)),
+      );
     }
 
     if (hasNull) {
