@@ -1031,10 +1031,11 @@ export class AssociationScope {
         );
       }
     }
-    // associations = eager_load_values | includes_values → OuterJoin
+    // associations = eager_load_values | includes_values → OuterJoin. Rails'
+    // `|` unions with dedup, so an association named in BOTH eager_load and
+    // includes yields a single JoinDependency entry (not a double join).
     const associations = [
-      ...(item._eagerLoadAssociations ?? []),
-      ...(item._includesAssociations ?? []),
+      ...new Set([...(item._eagerLoadAssociations ?? []), ...(item._includesAssociations ?? [])]),
     ];
     if (associations.length > 0) {
       target._leftOuterJoinDeps.push(
