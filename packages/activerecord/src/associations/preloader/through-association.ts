@@ -23,7 +23,7 @@ export class ThroughAssociation extends Association {
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
   private _reflectionWherePartition:
-    | { throughPredicates: Nodes.Node[]; sourceScope: any }
+    | { throughPredicates: Nodes.Node[]; sourcePredicates: Nodes.Node[]; sourceScope: any }
     | undefined;
 
   constructor(
@@ -394,12 +394,37 @@ export class ThroughAssociation extends Association {
       // JOIN branch's intent without a single-query JOIN. Without this split a
       // through-table condition lands on the source query as
       // `no such column: <through_table>.<col>`.
-      const { throughPredicates } = this._partitionReflectionWhere();
+      const { throughPredicates, sourcePredicates } = this._partitionReflectionWhere();
       if (throughPredicates.length > 0) {
         scope._whereClause = new WhereClause([
           ...scope._whereClause.predicates,
           ...throughPredicates,
         ]);
+      }
+
+      // For a has_one through, the through preloader materializes only the
+      // FIRST through record per owner (Preloader::Association#load_records keeps
+      // one row for a non-collection). A source-table condition deferred to the
+      // source-preloader stage can then filter out that lone record's target,
+      // nilling the has_one even though a different through record's target would
+      // match — and which row is "first" depends on unstable PG/MariaDB ordering.
+      // Rails avoids this by JOINing the source reflection onto the through query
+      // and copying the reflection scope's WHERE (through_association.rb
+      // `through_scope`), so the source condition constrains which through row
+      // wins. Mirror that with a joins()+where on the source reflection, but only
+      // for a scalar (has_one) through — a has_many through collects every
+      // matching target at the source stage, so the extra JOIN would only risk
+      // fanning out through rows.
+      const isCollection = (this.reflection as any).isCollection?.() ?? false;
+      if (!isCollection && sourcePredicates.length > 0) {
+        const sourceRefl = this._sourceReflection;
+        if (sourceRefl) {
+          scope = scope.joins(sourceRefl.name);
+          scope._whereClause = new WhereClause([
+            ...scope._whereClause.predicates,
+            ...sourcePredicates,
+          ]);
+        }
       }
     }
 
@@ -417,29 +442,43 @@ export class ThroughAssociation extends Association {
    * (preloader/through_association.rb:117) without the single-query JOIN.
    * @internal
    */
-  private _partitionReflectionWhere(): { throughPredicates: Nodes.Node[]; sourceScope: any } {
+  private _partitionReflectionWhere(): {
+    throughPredicates: Nodes.Node[];
+    sourcePredicates: Nodes.Node[];
+    sourceScope: any;
+  } {
     if (this._reflectionWherePartition !== undefined) return this._reflectionWherePartition;
 
     const reflScope = this._reflectionScope ?? null;
-    let result: { throughPredicates: Nodes.Node[]; sourceScope: any } = {
+    let result: {
+      throughPredicates: Nodes.Node[];
+      sourcePredicates: Nodes.Node[];
+      sourceScope: any;
+    } = {
       throughPredicates: [],
+      sourcePredicates: [],
       sourceScope: reflScope,
     };
 
     const wc = reflScope?._whereClause;
     const throughTable = this._throughTableName();
-    if (reflScope != null && wc != null && !wc.isEmpty() && throughTable != null) {
+    if (reflScope != null && wc != null && !wc.isEmpty()) {
       const throughPredicates: Nodes.Node[] = [];
       const sourcePredicates: Nodes.Node[] = [];
       for (const pred of wc.predicates) {
-        if (predicateReferencesTable(pred, throughTable)) throughPredicates.push(pred);
+        if (throughTable != null && predicateReferencesTable(pred, throughTable))
+          throughPredicates.push(pred);
         else sourcePredicates.push(pred);
       }
+      // Only re-scope the source preloader when a through predicate is peeled off
+      // — otherwise leave the full reflection scope so the source stage keeps
+      // applying every (source-table) condition exactly as before.
+      let sourceScope = reflScope;
       if (throughPredicates.length > 0) {
-        const sourceScope = reflScope._clone();
+        sourceScope = reflScope._clone();
         sourceScope._whereClause = new WhereClause(sourcePredicates);
-        result = { throughPredicates, sourceScope };
       }
+      result = { throughPredicates, sourcePredicates, sourceScope };
     }
 
     this._reflectionWherePartition = result;
