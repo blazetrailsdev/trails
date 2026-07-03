@@ -1,16 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   createPooledTestAdapter,
-  createSidecarTestAdapter,
-  createTestAdapter,
   _resetPooledTestAdapterForTests,
   type SidecarAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
+import { Base } from "../base.js";
+import { establishFromTestConfig } from "./test-database-config.js";
 import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
+
+// Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
+// than the divergent sidecar `_pool`. Rails has no sidecar test pool;
+// `establishFromTestConfig` is idempotent so this returns `Base.connection`.
+async function primaryAdapter(): Promise<TestDatabaseAdapter> {
+  await establishFromTestConfig();
+  return Base.connection;
+}
 
 interface AdapterWithExec {
   exec(sql: string): Promise<void>;
@@ -31,7 +39,8 @@ describe("withTransactionalFixtures", () => {
   const a = (): AdapterWithExec => adapter as unknown as AdapterWithExec;
 
   beforeAll(async () => {
-    adapter = await createTestAdapter();
+    adapter = await primaryAdapter();
+    await a().exec(`DROP TABLE IF EXISTS fixture_users`);
     await a().exec(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
@@ -52,8 +61,7 @@ describe("withTransactionalFixtures", () => {
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {
-    const tm = ((await createSidecarTestAdapter()).adapter as unknown as TmHandle)
-      .transactionManager;
+    const tm = ((await primaryAdapter()) as unknown as TmHandle).transactionManager;
     await tm.beginTransaction({});
     await a().exec(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
     await tm.commitTransaction();
@@ -257,8 +265,8 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
-    const { adapter: sidecarA } = await createSidecarTestAdapter();
-    const { adapter: sidecarB } = await createSidecarTestAdapter();
+    const sidecarA = (await primaryAdapter()) as unknown as SidecarAdapter;
+    const sidecarB = (await primaryAdapter()) as unknown as SidecarAdapter;
 
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
@@ -314,7 +322,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", async () => {
-    const { adapter } = await createSidecarTestAdapter();
+    const adapter = (await primaryAdapter()) as unknown as SidecarAdapter;
     // Pool-leased adapters return NullTransaction (not null) when no transaction
     // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
     expect(adapter.openTransactions).toBe(0);

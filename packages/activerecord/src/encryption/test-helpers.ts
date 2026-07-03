@@ -6,7 +6,8 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { establishFromTestConfig } from "../test-helpers/test-database-config.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Base } from "../index.js";
@@ -195,7 +196,13 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
  *    {@link TransactionalFixturesAdapter} without an extra cast.
  */
 export async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = await createTestAdapter();
+  // Resolve the adapter from the primary, schema-loaded pool (`Base.connection`)
+  // rather than the divergent sidecar `_pool`. Rails wires encryption tests off
+  // the primary connection; there is no sidecar pool. `establishFromTestConfig`
+  // is idempotent, so the first caller boots the primary pool and later callers
+  // reuse it.
+  await establishFromTestConfig();
+  const adapter = Base.connection;
   await installEncryptionSchema(adapter);
   return adapter;
 }
