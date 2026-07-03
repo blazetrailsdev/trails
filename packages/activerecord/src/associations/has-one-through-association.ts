@@ -240,10 +240,36 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * Persists ONLY the join-model side of the through — the deferred analog of
+   * Rails' assignment-time `create_through_record`
+   * (has_one_through_association.rb:15-42): build/update/destroy the join row
+   * via `createThroughRecord`. It does NOT save the end record; that is the
+   * `record.save` arm of Rails' `save_has_one_association`
+   * (autosave_association.rb:503), which `autosaveHasOne` runs separately after
+   * calling this (skipping only the through's foreign-key write, per
+   * autosave_association.rb:489).
+   *
+   * `autosaveHasOne` calls this for every loaded through association during the
+   * owner's save, replacing the post-commit `flushPendingReplaces` deferral for
+   * the sync `build`/`create`-on-persisted-owner path: those queue
+   * `_pendingReplace` in `replace`/`constructThroughRecordInMemory` (no `await`
+   * is possible from the sync builder), and this flushes it inside the save. The
+   * awaitable `writer` already persists on assignment (clearing the marker), so
+   * this no-ops there; it also no-ops for a merely-cached target (no marker),
+   * matching Rails, which creates the join only on assignment.
+   */
+  async persistThroughRecord(): Promise<void> {
+    await this.persistReplace();
+  }
+
+  /**
    * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation — deferred DB flush.
    *
-   * Called by autosave after owner.save(). Calls createThroughRecord which
-   * creates/updates/destroys the join-model record as needed.
+   * Runs `createThroughRecord`, which creates/updates/destroys the join-model
+   * record as needed. Reached two ways: the awaitable `writer` calls it inline
+   * on assignment to a persisted owner (immediate persist), and
+   * `persistThroughRecord` calls it from `autosaveHasOne` during the owner's
+   * save for the sync `build`/`create` path that could not `await`.
    */
   async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;

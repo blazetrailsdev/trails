@@ -289,6 +289,15 @@ export function validOptions(): string[] {
   return ["autosave"];
 }
 
+// Post-commit flush for association instances that still queue a deferred
+// `_pendingReplace` — collection associations (has_many / HABTM,
+// CollectionAssociation#persistReplace). Neither singular has_one path relies on
+// this any more: the direct has_one converged onto
+// `autosaveHasOne` -> `removeDisplaced`, and has_one *through* onto
+// `autosaveHasOne` -> `persistThroughRecord` (Rails' `save_has_one_association`
+// through arm), both of which run during the save and clear their markers, so by
+// the time this runs post-commit those singular markers are already null and the
+// loop skips them.
 export async function flushPendingReplaces(record: Base): Promise<void> {
   const instances: Map<string, unknown> = (record as any)._associationInstances;
   if (!instances?.values) return;
@@ -481,6 +490,24 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     await inst.removeDisplaced();
   }
 
+  // Rails `save_has_one_association`'s `through_reflection` arm persists the
+  // join side of a has_one *through* (build/update/destroy via
+  // `createThroughRecord`) — the analog of Rails' assignment-time
+  // `create_through_record`, deferred here to the owner's save. This is
+  // autosave-option-independent (Rails creates the join in `replace` regardless
+  // of `:autosave`) and only acts when an assignment queued `_pendingReplace`,
+  // so it runs unconditionally: it no-ops for a merely-cached target, and it
+  // must precede the `!child` early return so the nil-target destroy arm runs.
+  // An awaited `writer` on a persisted owner already persisted (clearing the
+  // marker), so this no-ops there; the sync `build`/`create` path leaves the
+  // marker for this callback to flush. Control then FALLS THROUGH to the shared
+  // body below — which, per Rails (autosave_association.rb:489), skips only the
+  // foreign-key write for through, but still runs the end-record
+  // `marked_for_destruction` and (autosave-gated) `record.save` arms.
+  if (typeof inst?.persistThroughRecord === "function") {
+    await inst.persistThroughRecord();
+  }
+
   const child = inst?.target;
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
@@ -490,11 +517,11 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // is either `true` or `undefined`/nil.
   const autosave = assoc.options.autosave;
 
-  // HasOneThroughAssociation persists via its own deferred `persistReplace`
-  // (join-model build/save through `createThroughRecord`), flushed after commit
-  // by `flushPendingReplaces`; its autosave target is the END record, which has
-  // no direct foreign key, so the base save below would be wrong. Defer to it.
-  if (inst?._pendingReplace) return true;
+  // NOTE: the join side of a has_one *through* was already persisted above by
+  // `persistThroughRecord` (which consumes the association's `_pendingReplace`),
+  // so control falls through here to run the shared end-record arms — the FK
+  // write is skipped for through further down (Rails autosave_association.rb:489)
+  // while `marked_for_destruction`/`record.save` still apply.
 
   // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
   // Must precede the marked_for_destruction branch (Rails:482) so an
@@ -532,45 +559,72 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     ? is_recordChanged(reflection, childRecord, pkForChangeCheck)
     : childRecord.isNewRecord();
   if ((autosave && changedForSave) || recordChanged) {
-    // reflection.foreignKey resolves queryConstraints-derived FK columns;
-    // fall back to the raw option or the default scalar FK.
-    const foreignKey: string | string[] =
-      (reflection && reflection.foreignKey != null ? reflection.foreignKey : null) ??
-      assoc.options.foreignKey ??
-      `${underscore(ctor.name)}_id`;
-    // Mirrors Rails compute_primary_key (autosave_association.rb:576-587).
-    // Use the reflection (when available) so the normalized queryConstraints option
-    // (array FKs are moved there by the reflection constructor) is visible to branch 2.
-    const explicitPk = assoc.options.primaryKey;
-    let primaryKey: string | string[];
-    if (explicitPk) {
-      primaryKey = explicitPk;
-    } else {
-      const candidatePk = computePrimaryKey.call(
-        record as unknown as AutosaveAssociationHost,
-        reflection ?? assoc,
-      );
-      // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
-      // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
-      // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
-      // so CPK models with explicit composite FKs still pair correctly.
-      primaryKey =
-        !Array.isArray(candidatePk) && Array.isArray(foreignKey) ? ctor.primaryKey : candidatePk;
-    }
-    // Mirrors Rails composite_primary_key? collapse (autosave_association.rb:582-585):
-    // collapse only when the PK array IS the class composite primary key (not a QC-derived
-    // list). QC branch returns early before reaching composite_primary_key? in Rails,
-    // so we gate on Array.isArray(ctor.primaryKey) — QC models typically keep scalar PK.
-    if (
-      !explicitPk &&
-      Array.isArray(ctor.primaryKey) &&
-      Array.isArray(primaryKey) &&
-      !Array.isArray(foreignKey)
-    ) {
-      if (primaryKey.includes("id")) primaryKey = "id";
-    }
-    if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-      if (primaryKey.length !== foreignKey.length) {
+    // Rails save_has_one_association:489 — `unless reflection.through_reflection`.
+    // A has_one *through* never writes a foreign key onto the end record (its
+    // owner-linkage lives on the join row, persisted above via
+    // `persistThroughRecord`); it also skips `set_inverse_instance`. Both are
+    // guarded here, while the `record.save` arm below still runs for through
+    // (gated by the same `(autosave && changed) || _record_changed?` condition),
+    // so an `autosave: true` through re-saves a mutated end record.
+    if (!reflection?.throughReflection) {
+      // reflection.foreignKey resolves queryConstraints-derived FK columns;
+      // fall back to the raw option or the default scalar FK.
+      const foreignKey: string | string[] =
+        (reflection && reflection.foreignKey != null ? reflection.foreignKey : null) ??
+        assoc.options.foreignKey ??
+        `${underscore(ctor.name)}_id`;
+      // Mirrors Rails compute_primary_key (autosave_association.rb:576-587).
+      // Use the reflection (when available) so the normalized queryConstraints option
+      // (array FKs are moved there by the reflection constructor) is visible to branch 2.
+      const explicitPk = assoc.options.primaryKey;
+      let primaryKey: string | string[];
+      if (explicitPk) {
+        primaryKey = explicitPk;
+      } else {
+        const candidatePk = computePrimaryKey.call(
+          record as unknown as AutosaveAssociationHost,
+          reflection ?? assoc,
+        );
+        // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
+        // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
+        // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
+        // so CPK models with explicit composite FKs still pair correctly.
+        primaryKey =
+          !Array.isArray(candidatePk) && Array.isArray(foreignKey) ? ctor.primaryKey : candidatePk;
+      }
+      // Mirrors Rails composite_primary_key? collapse (autosave_association.rb:582-585):
+      // collapse only when the PK array IS the class composite primary key (not a QC-derived
+      // list). QC branch returns early before reaching composite_primary_key? in Rails,
+      // so we gate on Array.isArray(ctor.primaryKey) — QC models typically keep scalar PK.
+      if (
+        !explicitPk &&
+        Array.isArray(ctor.primaryKey) &&
+        Array.isArray(primaryKey) &&
+        !Array.isArray(foreignKey)
+      ) {
+        if (primaryKey.includes("id")) primaryKey = "id";
+      }
+      if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
+        if (primaryKey.length !== foreignKey.length) {
+          // Route through the reflection's canonical checkValidityBang (Rails'
+          // single raise site) so the error carries the Rails-faithful message.
+          routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
+          // No reflection resolvable — minimal trails-only fallback guard.
+          throw new CompositePrimaryKeyMismatchError({
+            activeRecord: (record.constructor as typeof Base).name,
+            name: assoc.name,
+            primaryKey,
+            foreignKey,
+          });
+        }
+        primaryKey.forEach((pk: string, i: number) => {
+          const pkValue = record._readAttribute(pk);
+          if (pkValue != null) childRecord._writeAttribute(foreignKey[i], pkValue);
+        });
+      } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
+        const pkValue = record._readAttribute(primaryKey);
+        if (pkValue != null) childRecord._writeAttribute(foreignKey, pkValue);
+      } else {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
         routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
@@ -582,28 +636,10 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
           foreignKey,
         });
       }
-      primaryKey.forEach((pk: string, i: number) => {
-        const pkValue = record._readAttribute(pk);
-        if (pkValue != null) childRecord._writeAttribute(foreignKey[i], pkValue);
-      });
-    } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-      const pkValue = record._readAttribute(primaryKey);
-      if (pkValue != null) childRecord._writeAttribute(foreignKey, pkValue);
-    } else {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message.
-      routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: (record.constructor as typeof Base).name,
-        name: assoc.name,
-        primaryKey,
-        foreignKey,
-      });
+      // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
+      // after FK assignment, before save (autosave_association.rb:497).
+      inst?.setInverseInstance?.(childRecord);
     }
-    // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
-    // after FK assignment, before save (autosave_association.rb:497).
-    inst?.setInverseInstance?.(childRecord);
 
     // Rails save_has_one_association:500-501 — skip the save when the inverse
     // belongs_to is currently autosaving (prevents mutual-save infinite loops).
