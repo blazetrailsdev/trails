@@ -431,18 +431,18 @@ export class ThroughAssociation extends Association {
         const copyable = [...throughPredicates, ...sourcePredicates].filter(
           (pred) => !predicateReferencesForeignTable(pred, allowed),
         );
-        const needsSourceJoin =
-          sourceTable != null &&
-          copyable.some((pred) => predicateReferencesTable(pred, sourceTable));
-        if (needsSourceJoin) {
-          const sourceRefl = this._sourceReflection;
-          // leftOuterJoins (not an inner join) mirrors Rails' includes!/references!
-          // LEFT OUTER JOIN: it never drops a through row for a null source, so a
-          // mixed OR predicate can still select a through row via its through-table
-          // arm while the WHERE filters the source arm.
-          if (sourceRefl) scope = scope.leftOuterJoins(sourceRefl.name);
-        }
         if (copyable.length > 0) {
+          // Rails' branch unconditionally includes!/references! the source
+          // reflection whenever it copies the where_clause — the join is not
+          // gated on any predicate referencing the source table. Add it whenever
+          // we copy predicates so an UNQUALIFIED source condition (e.g.
+          // `where("name = ?")`) resolves against the joined source rather than
+          // binding to the through table. leftOuterJoins (not an inner join)
+          // mirrors Rails' LEFT OUTER JOIN: it never drops a through row for a
+          // null source, so a mixed OR predicate can still select a through row
+          // via its through-table arm while the WHERE filters the source arm.
+          const sourceRefl = this._sourceReflection;
+          if (sourceRefl) scope = scope.leftOuterJoins(sourceRefl.name);
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...copyable]);
         }
       }
