@@ -14,7 +14,6 @@ import { registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -48,7 +47,27 @@ describe("isBlank / isPresent", () => {
     SampleRecord.attribute("id", "integer");
     SampleRecord.attribute("name", "string");
     SampleRecord.adapter = adapter;
-    await defineSchema(adapter, { developers: canonicalSchema.developers });
+    // `developers` is canonical (schema.rb `create_table :developers`) and
+    // boot-laid on the primary worker DB, but this suite stubs
+    // `AR_NO_AUTO_SCHEMA` and drives a connection leased from the sidecar test
+    // `_pool` (createTestAdapter), which doesn't carry that boot-laid schema, so
+    // create the table explicitly here. `force: true` makes it idempotent when
+    // the sidecar DB happens to already hold it. Dropped by name in `afterAll`.
+    await (
+      adapter as unknown as {
+        createTable(name: string, opts: object, fn: (t: any) => void): Promise<void>;
+      }
+    ).createTable("developers", { force: true }, (t: any) => {
+      t.string("name");
+      t.string("first_name");
+      t.integer("salary", { default: 70000 });
+      t.integer("firm_id");
+      t.integer("mentor_id");
+      t.datetime("legacy_created_at");
+      t.datetime("legacy_updated_at");
+      t.datetime("legacy_created_on");
+      t.datetime("legacy_updated_on");
+    });
 
     expect(await SampleRecord.all().isBlank()).toBe(true);
     expect(await SampleRecord.all().isPresent()).toBe(false);
@@ -61,8 +80,15 @@ describe("isBlank / isPresent", () => {
   // Drop tables/rows this describe wrote on the shared adapter so the
   // following transactional-fixture describe (RelationTest) doesn't inherit
   // them — its withTransactionalFixtures pushes the global-reset opt-out
-  // before any cleanup would otherwise run.
+  // before any cleanup would otherwise run. Drop the `developers` table this
+  // suite created by name (so a sibling file's differently-shaped `developers`
+  // can't collide under parallel forks), then reset the shared adapter state.
   afterAll(async () => {
+    await (
+      createTestAdapter() as unknown as {
+        dropTable(name: string, opts?: object): Promise<void>;
+      }
+    ).dropTable("developers", { ifExists: true });
     await resetTestAdapterState();
   });
 });

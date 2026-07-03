@@ -3,34 +3,17 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/order_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
-import { Base } from "../base.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import type { Schema } from "../test-helpers/define-schema.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("OrderTest", () => {
   const { authors } = fixtures(["authors", "authorAddresses"]);
-  // Force-recreate the canonical tables with `dropExisting` (mirrors
-  // named-scoping.test.ts). The per-worker SQLite DB is shared across files
-  // and sibling files define `books`/`authors` with different column sets;
-  // the signature cache is primed at worker boot, so a plain `defineSchema`
-  // would cache-hit and skip recreation.
-  beforeAll(async () => {
-    await defineSchema(
-      Base.connection,
-      {
-        authors: canonicalSchema.authors,
-        author_addresses: canonicalSchema.author_addresses,
-        books: canonicalSchema.books,
-      } as Schema,
-      { dropExisting: true },
-    );
-  });
+  // `authors`/`author_addresses`/`books` ride the boot-laid canonical schema
+  // (RFC 0059 Phase 1); per-file `repairWorkerSchema` restores any sibling
+  // drift, so no defensive recreate is needed here.
   registerModel(Author);
   registerModel(Book);
 

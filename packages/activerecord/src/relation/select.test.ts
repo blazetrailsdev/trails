@@ -3,13 +3,12 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/select_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -46,17 +45,9 @@ describe("SelectTest", () => {
       "select with invalid nested field",
     ],
   });
-  // Shield against the shared-worker `posts` collision: sibling files that
-  // physically replace `posts` with a title-only shape survive into this suite
-  // because the canonical preload keeps signatures cache-warm (a plain
-  // defineSchema is a no-op). `dropExisting` rebuilds `posts`/`comments` from
-  // the canonical schema verbatim so fixture seeding finds the `body` column.
-  beforeAll(async () => {
-    await defineSchema(
-      { posts: canonicalSchema.posts, comments: canonicalSchema.comments },
-      { dropExisting: true },
-    );
-  });
+  // `posts`/`comments` ride the boot-laid canonical schema (RFC 0059 Phase 1);
+  // per-file `repairWorkerSchema` restores any sibling shape drift before this
+  // suite runs, so no defensive recreate is needed.
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
   it("select with nil argument", () => {
