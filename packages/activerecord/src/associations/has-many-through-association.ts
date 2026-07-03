@@ -305,6 +305,33 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
     };
     const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
+
+    // Rails (has_many_through_association.rb:159-162): when the SOURCE belongs_to
+    // (on the join model, pointing at the target) declares its own counter_cache,
+    // decrement it on the TARGET class for every method except `:destroy` — whose
+    // per-record destroy callbacks already maintain it. Unreachable by the
+    // canonical test models (no source belongs_to carries a counter_cache), but
+    // ported for Rails fidelity rather than dropped.
+    const sourceRefl = (
+      ownRefl as
+        | {
+            sourceReflection?: {
+              options?: { counterCache?: unknown };
+              counterCacheColumn?: () => string | null;
+            };
+          }
+        | undefined
+    )?.sourceReflection;
+    if (method !== "destroy" && sourceRefl?.options?.counterCache) {
+      const counter = sourceRefl.counterCacheColumn?.();
+      if (counter) {
+        await (this.klass as unknown as typeof Base).decrementCounter(
+          counter,
+          records.map((r) => (r as { id?: unknown }).id),
+        );
+      }
+    }
+
     const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
     if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
       await updateThroughCounterCache(this.owner, throughRefl, -count);
