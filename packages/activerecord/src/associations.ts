@@ -813,6 +813,26 @@ export function _routeThroughViaAssociationScope(
 }
 
 /**
+ * The owner-adjacent step of a through chain. Rails orders `reflection.chain`
+ * target→owner, so the LAST element carries the owner's key column in its
+ * `joinForeignKey` — the column the null-FK short-circuit must read to decide
+ * whether the owner is loadable. For a simple (chain-length-2) through that's
+ * the through_reflection; for a nested-through-through the through_reflection
+ * is itself a through whose `joinForeignKey` delegates to its own source (a
+ * column NOT on the owner), so only `chain.last` reads the right owner column.
+ * @internal
+ */
+export function _ownerChainReflection(reflection: any): any {
+  const chain = reflection?.chain;
+  return (
+    (Array.isArray(chain) && chain.length ? chain[chain.length - 1] : null) ??
+    reflection?.throughReflection ??
+    reflection ??
+    null
+  );
+}
+
+/**
  * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
  * but for `disable_joins: true` through associations — runs the chain
  * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
@@ -1588,17 +1608,9 @@ export async function loadHasOne(
   const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-PK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
-  // side activeRecordPrimaryKey for hasOne. For through reflections,
-  // joinForeignKey delegates to the SOURCE reflection (whose FK is on
-  // the through table, not the owner). The relevant owner-side column
-  // is on chain.last (Rails orders the chain target→owner); for a
-  // nested-through-through only chain.last reads the owner column.
-  const ownerChain = (reflection as any)?.chain;
-  const reflForOwnerFk =
-    (Array.isArray(ownerChain) && ownerChain.length ? ownerChain[ownerChain.length - 1] : null) ??
-    reflection?.throughReflection ??
-    reflection ??
-    null;
+  // side activeRecordPrimaryKey for hasOne. For through reflections the
+  // owner-side column is on `_ownerChainReflection` (chain.last).
+  const reflForOwnerFk = _ownerChainReflection(reflection);
   const pkCheckCols = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -1902,18 +1914,9 @@ export async function loadHasMany(
   const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-FK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
-  // side activeRecordPrimaryKey for hasMany. For through reflections,
-  // joinForeignKey delegates to the SOURCE reflection (whose FK is on
-  // the through table, not the owner) — wrong column. The relevant
-  // owner-side column is on chain.last (Rails orders the chain
-  // target→owner); for a nested-through-through the through_reflection
-  // is itself a through, so only chain.last reads the owner column.
-  const ownerChain = (reflection as any)?.chain;
-  const reflForOwnerFk =
-    (Array.isArray(ownerChain) && ownerChain.length ? ownerChain[ownerChain.length - 1] : null) ??
-    reflection?.throughReflection ??
-    reflection ??
-    null;
+  // side activeRecordPrimaryKey for hasMany. For through reflections the
+  // owner-side column is on `_ownerChainReflection` (chain.last).
+  const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -2297,18 +2300,9 @@ export function buildThroughJoinScope(
   const ctor = record.constructor as typeof Base;
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (!reflection) return null;
-  // Null-FK short-circuit on the owner-side column. The owner-adjacent step is
-  // the LAST reflection in `reflection.chain` (Rails orders the chain
-  // target→owner), whose `joinForeignKey` is the owner's key column. For a
-  // simple (chain-length-2) through that's the through_reflection; for a
-  // nested-through-through the through_reflection is itself a through whose
-  // `joinForeignKey` delegates to its own source (a column NOT on the owner),
-  // so `chain.last` is required to read the right owner column.
-  const chain = (reflection as any).chain;
-  const reflForOwnerFk =
-    (Array.isArray(chain) && chain.length ? chain[chain.length - 1] : null) ??
-    (reflection as any).throughReflection ??
-    reflection;
+  // Null-FK short-circuit on the owner-side column (chain.last's
+  // joinForeignKey — see `_ownerChainReflection`), mirroring loadHasMany.
+  const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCols = Array.isArray(reflForOwnerFk.joinForeignKey)
     ? reflForOwnerFk.joinForeignKey
     : [reflForOwnerFk.joinForeignKey];
