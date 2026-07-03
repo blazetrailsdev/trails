@@ -1732,10 +1732,26 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("mark for destruction is ignored without autosave true", async () => {
-    const { Pirate, Ship } = makeModels();
-    (Pirate as any)._associations = (Pirate as any)._associations.filter(
-      (a: any) => a.name !== "ship",
-    );
+    // Declare the has_one with autosave:false once (as Rails' `Pirate has_one
+    // :ship` is declared without autosave), rather than re-declaring over an
+    // autosave:true association: Rails' callback closes over the reflection at
+    // registration time and never re-registers (define_non_cyclic_method's
+    // `method_defined?` guard), so a re-declaration would not take effect.
+    class Pirate extends Base {
+      static {
+        this._tableName = "pirates";
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class Ship extends Base {
+      static {
+        this._tableName = "ships";
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+      }
+    }
+    registerModel("Pirate", Pirate);
+    registerModel("Ship", Ship);
     Associations.hasOne.call(Pirate, "ship", { autosave: false });
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
