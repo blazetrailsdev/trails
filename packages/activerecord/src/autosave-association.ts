@@ -483,20 +483,13 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // while nil/true still persists a NEW/changed child via the `_record_changed?`
   // leg (:487).
   //
-  // Read the option from the LIVE reflection (`_reflectOnAssociation`) rather
-  // than the closure `assoc` passed at callback-registration time: the callback
-  // is registered once (guarded by `autosaveAssociatedRecordsFor_*` on the
-  // prototype), so a later re-declaration of the same association — e.g. to
-  // change `autosave` — would not re-register the callback and the closure
-  // reflection would be stale. The live reflection is Rails' single source of
-  // truth for `reflection.options[:autosave]`.
-  const ctor = record.constructor as typeof Base;
-  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
-  // When the live reflection resolves, it is authoritative — even if its
-  // `autosave` is nil — so a re-declaration that *removes* the option isn't
-  // masked by the stale closure. Fall back to the closure only when no live
-  // reflection exists (e.g. a synthetic assoc built directly by a caller).
-  const autosave = reflection ? reflection.options?.autosave : assoc.options.autosave;
+  // Read the option from the `reflection` closed over at registration time
+  // (forwarded here as `assoc.options`), mirroring Rails: the callback closes
+  // over the `reflection` param of `add_autosave_association_callbacks`
+  // (autosave_association.rb:200) and `define_non_cyclic_method` guards
+  // re-registration (:160 `return if method_defined?`), so a later
+  // re-declaration is NOT picked up — Rails keeps the original reflection.
+  const autosave = assoc.options.autosave;
 
   // Reconcile with the writer-path `_pendingReplace`/`persistReplace` machinery:
   // a queued replace is flushed after commit (`flushPendingReplaces`) and owns
@@ -534,6 +527,8 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // returned above), so a NEW child persists whether or not autosave is set.
   // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
   // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
+  const ctor = record.constructor as typeof Base;
+  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
   const pkSpec = reflection
     ? computePrimaryKey.call(record as unknown as AutosaveAssociationHost, reflection)
     : (ctor.primaryKey ?? "id");
