@@ -302,12 +302,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     const ctor = this.owner.constructor as {
       _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
     };
-    const sourceReflection = ctor._reflectOnAssociation?.(this.reflection.name);
-    const throughReflection = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
-    if (throughReflection?.isCollection?.() && updateThroughCounter(throughReflection, method)) {
-      await updateThroughCounterCache(this.owner, throughReflection, -count);
+    const sourceRefl = ctor._reflectOnAssociation?.(this.reflection.name);
+    const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
+    if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
+      await updateThroughCounterCache(this.owner, throughRefl, -count);
     } else {
-      await updateThroughCounterCache(this.owner, sourceReflection, -count);
+      await updateThroughCounterCache(this.owner, sourceRefl, -count);
     }
 
     return count;
@@ -611,11 +611,6 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
   const fk = throughAssoc.reflection?.foreignKey;
   if (!fk) return true;
   return !!(assoc.owner as any).readAttribute?.(fk as string);
-}
-
-/** @internal */
-function isUpdateThroughCounter(assoc: HasManyThroughAssociation, method: string): boolean {
-  return method !== "destroy" && (assoc as any)._isUpdateThroughCounter?.(method) !== false;
 }
 
 /**
