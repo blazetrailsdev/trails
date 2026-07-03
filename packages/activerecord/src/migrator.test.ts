@@ -11,7 +11,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
 // trails equivalents live under test-helpers/migrations.
@@ -51,9 +51,9 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 }
 
 describe("MigratorTest", () => {
-  // Rails' setup rides `ActiveRecord::Base.connection_pool`; `setupFixtures()`
+  // Rails' setup rides `ActiveRecord::Base.connection_pool`; `fixtures({})`
   // establishes the primary schema-loaded pool so `Base.connection` resolves.
-  setupFixtures();
+  fixtures({});
 
   let adapter: DatabaseAdapter;
 

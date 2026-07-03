@@ -23,7 +23,7 @@ import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 function makeMigration(
   version: string,
@@ -45,9 +45,9 @@ function makeMigration(
 // test pool. Hoisted to file scope (not nested in the first describe) so every
 // describe in the file — including "Migrator advisory lock wrapping" below —
 // resolves `Base.connection` regardless of declaration/run order.
-setupFixtures();
+fixtures({});
 
-// `setupFixtures()` shields the schema_migrations / ar_internal_metadata tables
+// `fixtures({})` shields the schema_migrations / ar_internal_metadata tables
 // from the global reset, so clear them before every test to keep each case's
 // version + environment state fresh (mirrors Rails' setup/teardown, which
 // deletes all versions around every test). File-scoped because the advisory-lock

@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { adapterType } from "./test-adapter.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { MigrationContext } from "./migration.js";
 import {
   introspectTables,
@@ -40,7 +40,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 
 // Ride the primary schema-loaded pool (`Base.connection`) instead of the
 // sidecar test pool.
-setupFixtures();
+fixtures({});
 
 // The tables these tests create via MigrationContext leak into the shared
 // per-worker DB; drop them by name so they don't collide with sibling files.

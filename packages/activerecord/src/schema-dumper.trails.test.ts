@@ -9,7 +9,7 @@ import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
 import { Base } from "./base.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("SchemaDumper trails-only cases", () => {
@@ -187,7 +187,7 @@ describe("SchemaDumper trails-only cases", () => {
 describe("SchemaDumperAdapterTest", () => {
   // Ride the primary schema-loaded pool (`Base.connection`) instead of the
   // sidecar test pool.
-  setupFixtures();
+  fixtures({});
 
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
@@ -336,7 +336,7 @@ describe("SchemaDumperAdapterTest", () => {
 
   // Drop the real tables these adapter-backed tests create on the shared
   // per-worker DB so they don't collide with sibling files under parallel forks.
-  // `setupFixtures()` disables the global per-test reset, so drop them per test
+  // `fixtures({})` disables the global per-test reset, so drop them per test
   // (not just in afterAll) to keep the shared-DB exposure window one test wide.
   afterEach(async () => {
     const cleanupCtx = new MigrationContext(Base.connection);

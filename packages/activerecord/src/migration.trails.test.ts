@@ -16,14 +16,14 @@ import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("MigrationTest", () => {
   // Ride the primary schema-loaded pool (`Base.connection`); `newRawTestAdapter`
   // supplies the *distinct* adapter objects the override-routing identity checks
   // need (Rails builds a second connection from the primary config rather than
   // leasing a standing sidecar pool).
-  setupFixtures();
+  fixtures({});
 
   it("migration.connection returns _connectionOverride when set", async () => {
     class M extends Migration {
@@ -75,7 +75,7 @@ describe("MigrationTest", () => {
 
   it("migration context with async migration() proxy", async () => {
     const adapter = Base.connection;
-    // schema_migrations is shielded from the global reset by `setupFixtures()`,
+    // schema_migrations is shielded from the global reset by `fixtures({})`,
     // so start from a clean versions table to assert currentVersion === 1.
     await new SchemaMigration(adapter).dropTable();
     const migrations: MigrationProxy[] = [
