@@ -751,6 +751,26 @@ describe("extractFromProgram — extend() detection", () => {
     expect(info.classes["base.ts:Base"].extends).toContain("Querying");
   });
 
+  it("detects extend() calls nested inside a module-level helper function", () => {
+    // The extend pass shares the whole-file walk with include(), so a call
+    // applied from a deferred-mixin helper (rather than a top-level statement)
+    // must still be attributed to the host.
+    const info = extractFromFiles("/p", {
+      "querying.ts": `export class Querying { all(): void {} }`,
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import { Base } from "./base.js";
+        import { Querying } from "./querying.js";
+        function ensureMixinsApplied() {
+          extend(Base, Querying);
+        }
+        ensureMixinsApplied();
+      `,
+    });
+    expect(info.classes["base.ts:Base"].extends).toContain("Querying");
+  });
+
   it("resolves property-access mod arg by harvesting the declaration's methods directly", () => {
     const info = extractFromFiles("/p", {
       "translation.ts": `
