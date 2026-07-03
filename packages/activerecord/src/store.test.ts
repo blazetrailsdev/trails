@@ -251,15 +251,15 @@ describe("StoreTest", () => {
 
   it("convert store attributes from Hash to HashWithIndifferentAccess saving the data and access attributes indifferently", async () => {
     const user = adminUsers("jamis");
-    // trails: Rails YAML loads :symbol as a Ruby Symbol → HWIA normalizes to "symbol".
-    // Our JSON fixture stores it as ":symbol" (JS-YAML-parsed literal), so the HWIA
-    // key is ":symbol" not "symbol". Tracked: hwia-symbol-key-normalization.
-    expect((user.settings as HashWithIndifferentAccess).get(":symbol")).toBe("symbol");
+    // Rails YAML loads :symbol as a Ruby Symbol → HWIA normalizes it to "symbol"
+    // via Symbol#to_s. Our fixture stores the already-normalized "symbol" key, so
+    // the HWIA key matches Rails' runtime key.
+    expect((user.settings as HashWithIndifferentAccess).get("symbol")).toBe("symbol");
     expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
 
     (user as any).height = "low";
-    expect((user.settings as HashWithIndifferentAccess).get(":symbol")).toBe("symbol");
+    expect((user.settings as HashWithIndifferentAccess).get("symbol")).toBe("symbol");
     expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
   });

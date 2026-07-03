@@ -9,6 +9,9 @@ export const adminUsersFixtureData = {
   jamis: {
     name: "Jamis",
     account_id: ref("admin_accounts", "signals37"),
-    settings: { ":symbol": "symbol", string: "string" },
+    // Rails YAML loads the `:symbol` key as a Ruby Symbol; HashWithIndifferentAccess
+    // then normalizes it to the plain string "symbol" via Symbol#to_s. We mirror that
+    // runtime key here rather than the YAML-literal ":symbol".
+    settings: { symbol: "symbol", string: "string" },
   },
 };
