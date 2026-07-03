@@ -35,6 +35,17 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
 
+  /**
+   * Set only when `constructThroughRecordInMemory` built a fresh join record on
+   * a persisted owner whose pre-existing join row was UNLOADED (the else-branch
+   * reconcile). It tells `persistReplace` to `reset()` the through proxy so its
+   * `loadTarget` re-reads the join row from the DB — the freshly-built in-memory
+   * record would otherwise mask an existing row and duplicate it. The already-
+   * loaded reconcile (#4481) leaves this false so `persistReplace` keeps using
+   * the proxy's memoized target (no forced re-query, no discarded mutations).
+   */
+  private _pendingUnloadedThroughReconcile = false;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
@@ -42,6 +53,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   override reset(): void {
     super.reset();
     this._pendingReplace = null;
+    this._pendingUnloadedThroughReconcile = false;
   }
 
   /**
@@ -174,19 +186,24 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * after `build`/assignment, and lets owner autosave persist the built
    * through record plus its source on the owner's next `save`.
    *
-   * We only read the through proxy's in-memory `target`, never `loadTarget`
+   * We only read the through proxy's in-memory `target` here, never `loadTarget`
    * (async). When that target is present and *persisted* — a persisted owner
    * that already has a loaded join row (e.g. `create_current_membership!` then
    * `build_club`) — we reconcile as Rails' `load_target` + `update` arm does:
    * `assign_attributes` in memory and defer the join-row `update` to
-   * `createThroughRecord`, rather than building a duplicate. When there is no
-   * loaded target we `build`. This is exact for a new owner (no PK → Rails
-   * could not query either) and for the fresh `build`/`create` cases (no
-   * pre-existing join row). The one remaining divergence is `build`/`create` on
-   * a *persisted* owner whose pre-existing join row is *unloaded*: Rails'
-   * `load_target` would query and reconcile it, whereas we build a fresh one —
-   * reconciling that would require a synchronous DB read this write path cannot
-   * make, and it is not exercised by Rails' suite.
+   * `createThroughRecord`, rather than building a duplicate.
+   *
+   * When there is no in-memory target we still `build` (so `owner.through` is
+   * present and `new_record?` immediately). For a *new* owner that is exact —
+   * no PK, so Rails' `load_target` could not query either. For a *persisted*
+   * owner the through proxy may hide an UNLOADED pre-existing join row we cannot
+   * see synchronously; Rails' `load_target` would query and `update` it. So we
+   * additionally queue this association's own deferred `createThroughRecord`
+   * (via `_pendingReplace`) and suppress the through proxy's autosave of the
+   * just-built row — `persistReplace` then resets the proxy, re-reads the join
+   * row from the DB, and reconciles (update existing / create when absent),
+   * never inserting a duplicate. This makes `build`/`create` on a persisted
+   * owner faithful whether the pre-existing join row was loaded or not.
    * @internal
    */
   private constructThroughRecordInMemory(record: Base, save: boolean): void {
@@ -200,6 +217,16 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     if (throughRecord) {
       if ((throughRecord as any).isNewRecord?.()) {
         (throughRecord as any).assignAttributes?.(attrs);
+        // On a persisted owner, a prior build of an UNLOADED join row queued
+        // this association's deferred reconcile (`_pendingReplace`, else-branch
+        // below). `persistReplace` resets the through proxy and rebuilds attrs
+        // from `pending.record`, so the freshly-assigned in-memory through
+        // record is discarded — we must re-point the pending record at the
+        // latest source too, or a repeated `build`/`create` before save would
+        // silently revert to the earlier one (last build must win, as in Rails'
+        // synchronous `through_record.update`). A *new* owner never queues this
+        // (it persists via the through proxy), so the guard leaves it untouched.
+        if (this._pendingReplace) this._pendingReplace.record = record;
       } else {
         // Persisted owner already has a (loaded) join row: Rails'
         // create_through_record runs `through_record.update(attributes)` on it
@@ -230,12 +257,43 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         }
       }
     } else {
-      // Build the join record in memory on the through proxy. The through proxy
-      // is itself an association whose own autosave callback persists this built
-      // record (cascading to its belongs_to source, e.g. an unsaved `club`) on
-      // the owner's next save — no queue on the through proxy is needed now that
-      // the general has_one autosave path persists lone built join records.
+      // Build the join record in memory on the through proxy so the owner's
+      // through reads (`member.currentMembership`) present it synchronously,
+      // matching Rails after `build`. For a *new* owner the built record's own
+      // has_one autosave persists it (cascading to its belongs_to source, e.g.
+      // an unsaved `club`) — no DB row can pre-exist. For a *persisted* owner the
+      // through proxy may hide an UNLOADED pre-existing join row we cannot see on
+      // this sync path: Rails' create_through_record calls `through_proxy.
+      // load_target` first and `update`s that row rather than inserting a
+      // duplicate. So queue this association's own deferred `createThroughRecord`,
+      // whose `persistReplace` resets the through proxy and re-reads the join row
+      // from the DB, then reconciles (update existing / create when absent).
       throughProxy.build?.(attrs);
+      if (!((this.owner as any).isNewRecord?.() ?? true)) {
+        if (this._pendingReplace) {
+          this._pendingReplace.record = record;
+        } else {
+          this._pendingReplace = { record, previousTarget: null };
+        }
+        // The just-built in-memory join record masks any UNLOADED pre-existing
+        // DB row, so `persistReplace` must reset the proxy and re-read from the
+        // DB. Only this branch needs that — the already-loaded reconcile keeps
+        // the proxy's memoized target intact.
+        this._pendingUnloadedThroughReconcile = true;
+        // Suppress the general has_one autosave from independently persisting the
+        // just-built join row (which would double-write against the existing DB
+        // row): a truthy `_pendingReplace` marker on the through proxy makes
+        // `autosaveHasOne` skip it. The through proxy is a plain has_one with no
+        // `persistReplace`, so `flushPendingReplaces` never invokes the marker —
+        // our `persistReplace` is the sole persister, regardless of the order
+        // `flushPendingReplaces` visits associations.
+        const tp = throughProxy as {
+          _pendingReplace?: { record: Base | null; previousTarget: Base | null } | null;
+        };
+        if (tp._pendingReplace == null) {
+          tp._pendingReplace = { record: null, previousTarget: null };
+        }
+      }
     }
   }
 
@@ -247,13 +305,41 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
-    if (!pending) return;
     // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
     // The new awaitable `writer` (inherited from HasOneAssociation) makes this
     // path reachable concurrently (`await writer(a); await writer(b)`); without
     // the early clear a second `replace` would mutate the shared `_pendingReplace`
     // object still captured by reference in this call's `pending`.
     this._pendingReplace = null;
+    // Only when we built a fresh in-memory join record over an UNLOADED
+    // pre-existing row (else-branch reconcile): reset the through proxy so
+    // `createThroughRecord`'s `loadTarget` re-reads the join row from the DB
+    // instead of returning the just-built record — otherwise it would mask the
+    // existing row and insert a duplicate. Rails does this read via
+    // `through_proxy.load_target`; we defer that async read to here. The already-
+    // loaded reconcile (#4481) leaves the flag false so the proxy's memoized
+    // target (and any independent in-memory mutations on it) survives, matching
+    // Rails' `load_target` returning the same object on an already-loaded proxy.
+    //
+    // We also clear the suppression sentinel we set on the through proxy's
+    // duck-typed `_pendingReplace`: the base `HasOneAssociation#reset` clears
+    // only `_displacedRecord` (it never declares `_pendingReplace`, having
+    // converged onto `_displacedRecord` + `autosaveHasOne`), so without this the
+    // sentinel would linger and permanently make `autosaveHasOne` skip the
+    // proxy — silently dropping any *later* independent write to
+    // `owner.currentMembership` on this same instance. Runs before the `!pending`
+    // early return so a reverted build (which nulls `this._pendingReplace`) can't
+    // strand the sentinel either.
+    if (this._pendingUnloadedThroughReconcile) {
+      this._pendingUnloadedThroughReconcile = false;
+      const tp = throughAssociation(this) as {
+        reset?: () => void;
+        _pendingReplace?: unknown;
+      } | null;
+      tp?.reset?.();
+      if (tp) tp._pendingReplace = null;
+    }
+    if (!pending) return;
     await transaction(this, async () => {
       await createThroughRecord(this, pending.record, true);
     });

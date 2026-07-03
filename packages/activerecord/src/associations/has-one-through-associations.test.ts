@@ -232,6 +232,117 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
+  it("building with a loaded join row preserves unrelated in-memory changes on it", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const membership = await (newMember.association("currentMembership") as any).create();
+    // An unrelated in-memory mutation on the *loaded* join row must survive the
+    // build reconcile: Rails' `load_target` returns the same memoized object and
+    // merges the FK attrs onto it, so the dirty `favorite` is saved too. (A
+    // forced through-proxy reset would re-read a fresh row and drop it.)
+    membership.writeAttribute("favorite", true);
+    const newClub = (newMember.association("club") as any).build();
+    expect(await newMember.save()).toBe(true);
+    const reloaded = await Membership.find(membership.id);
+    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
+    expect(reloaded.readAttribute("favorite")).toBe(true);
+  });
+
+  it("building works with has one through belongs to with unloaded existing join row", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const oldClub = await Club.create({ name: "Old Club" });
+    (newMember.association("club") as any).writer(oldClub);
+    await newMember.save();
+    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
+
+    // Re-fetch the member so the through (currentMembership) join row is
+    // UNLOADED. Rails' create_through_record calls through_proxy.load_target,
+    // which queries the DB and `update`s the existing row rather than inserting
+    // a duplicate.
+    const refetched = await Member.find(newMember.id);
+    const newClub = (refetched.association("club") as any).build();
+
+    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
+    const before = await countForMember();
+    expect(await refetched.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect(newClub.isPersisted()).toBe(true);
+    const reloaded = await Membership.find(membershipId);
+    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
+  });
+
+  it("unloaded reconcile does not permanently disable the through association autosave", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await newMember.save();
+
+    const refetched = await Member.find(newMember.id);
+    (refetched.association("club") as any).build(); // unloaded reconcile → sets the sentinel
+    expect(await refetched.save()).toBe(true);
+
+    // The suppression sentinel set on the through proxy during the reconcile must
+    // be cleared afterward: a later independent write to `currentMembership` on
+    // the SAME instance must still autosave, not be silently skipped forever.
+    const laterClub = await Club.create({ name: "Later Club" });
+    const newMembership = (refetched.association("currentMembership") as any).build({
+      club: laterClub,
+    });
+    expect(await refetched.save()).toBe(true);
+    expect(newMembership.isPersisted()).toBe(true);
+  });
+
+  it("creating works with has one through belongs to with unloaded existing join row", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    const oldClub = await Club.create({ name: "Old Club" });
+    (newMember.association("club") as any).writer(oldClub);
+    await newMember.save();
+    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
+
+    // The async `create` path (unlike `build`) is exercised here on a re-fetched
+    // owner whose through join row is UNLOADED: it must reconcile the existing
+    // row, not insert a duplicate.
+    const refetched = await Member.find(newMember.id);
+    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
+    const before = await countForMember();
+    const newClub = await (refetched.association("club") as any).create({ name: "New Club" });
+    expect(await refetched.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect((await readHasOne(refetched, "club"))?.id).toBe(newClub.id);
+    const reloaded = await Membership.find(membershipId);
+    expect(Number(reloaded.club_id)).toBe(Number(newClub.id));
+  });
+
+  it("building with unloaded existing join row reconciles regardless of through-proxy access order", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await newMember.save();
+
+    // Registering (without loading) the through proxy before the build makes
+    // `flushPendingReplaces` reach it before the has_one_through association.
+    // The reconcile must still update the single existing row, not double-write.
+    const refetched = await Member.find(newMember.id);
+    refetched.association("currentMembership");
+    const newClub = (refetched.association("club") as any).build();
+    const countForMember = () => Membership.where({ member_id: refetched.id }).count();
+    const before = await countForMember();
+    expect(await refetched.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect(newClub.isPersisted()).toBe(true);
+  });
+
+  it("repeated build on unloaded existing join row keeps the last club", async () => {
+    const newMember = await Member.create({ name: "Joe" });
+    (newMember.association("club") as any).writer(await Club.create({ name: "Old Club" }));
+    await newMember.save();
+    const membershipId = (await readHasOne(newMember, "currentMembership")).id;
+
+    const refetched = await Member.find(newMember.id);
+    (refetched.association("club") as any).build({ name: "First" });
+    const finalClub = (refetched.association("club") as any).build({ name: "Final" });
+    expect(await refetched.save()).toBe(true);
+    const reloaded = await Membership.find(membershipId);
+    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
+  });
+
   it("creating multiple associations creates through record", async () => {
     const memberType = await MemberType.create({});
     await Member.create({});
