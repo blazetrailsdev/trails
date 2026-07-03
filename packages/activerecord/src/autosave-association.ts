@@ -474,10 +474,26 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
 
-  // Rails: `autosave = reflection.options[:autosave]`. `autosave === false` opts
-  // the association out entirely (filtered at registration), so here `autosave`
-  // is either `true` or `undefined`/nil.
-  const autosave = assoc.options.autosave;
+  // Rails: `autosave = reflection.options[:autosave]`. The callback is
+  // registered unconditionally (autosave_association.rb:199-200), so `autosave`
+  // may be `true`, `undefined`/nil, or `false` here. The `autosave != false`
+  // decision lives in this method (autosave_association.rb:484), not at
+  // registration: `false` skips the destroy branch (:482, gated on `autosave &&`)
+  // AND the entire FK-assignment/save block (:484 `elsif autosave != false`),
+  // while nil/true still persists a NEW/changed child via the `_record_changed?`
+  // leg (:487).
+  //
+  // Read the option from the LIVE reflection (`_reflectOnAssociation`) rather
+  // than the closure `assoc` passed at callback-registration time: the callback
+  // is registered once (guarded by `autosaveAssociatedRecordsFor_*` on the
+  // prototype), so a later re-declaration of the same association — e.g. to
+  // change `autosave` — would not re-register the callback and the closure
+  // reflection would be stale. The live reflection is Rails' single source of
+  // truth for `reflection.options[:autosave]`.
+  const liveReflection = (
+    record.constructor as typeof Base & { _reflectOnAssociation?: any }
+  )._reflectOnAssociation?.(assoc.name);
+  const autosave = liveReflection?.options?.autosave ?? assoc.options.autosave;
 
   // Reconcile with the writer-path `_pendingReplace`/`persistReplace` machinery:
   // a queued replace is flushed after commit (`flushPendingReplaces`) and owns
@@ -501,6 +517,12 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     await childRecord.destroy();
     return true;
   }
+  // Rails save_has_one_association:484 — `elsif autosave != false`. An explicit
+  // `autosave: false` opts the association out of persistence entirely: no FK
+  // assignment, no `_record_changed?` save. Registered unconditionally above
+  // (matching Rails autosave_association.rb:199-200), the option is honored here
+  // in-method rather than at callback registration.
+  if (autosave === false) return true;
   // Rails save_has_one_association:487 — gate via
   // `(autosave && record.changed_for_autosave?) || _record_changed?(reflection, record, pk)`.
   // The first leg only fires when the autosave option is enabled; the
@@ -1254,25 +1276,21 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
   } else if (isHasOne) {
-    const hasOneName = reflection.name;
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {
       return saveHasOneAssociation.call(this, reflection);
     });
     // Mirrors Rails: `save_has_one_association` is registered for after_create
-    // and after_update UNCONDITIONALLY (autosave_association.rb
+    // and after_update UNCONDITIONALLY (autosave_association.rb:199-200,
     // `add_autosave_association_callbacks`, `elsif reflection.has_one?` — no
-    // autosave-option gate). `autosave: false` opts the association out (Rails
-    // `elsif autosave != false`); the option's true-form only governs re-saving
-    // already-persisted children. A NEW child is always persisted on owner.save
-    // via `_record_changed?` → `new_record?`, matching Rails.
+    // autosave-option gate). The `autosave != false` decision lives INSIDE
+    // `autosaveHasOne` (Rails autosave_association.rb:484), not here. Registering
+    // unconditionally keeps a nil/true-autosave NEW/changed child's persistence
+    // in-save (via the `_record_changed?` → `new_record?` leg) rather than
+    // deferring it to the post-commit `flushPendingReplaces` net.
     afterCreate(model, async (record: any) => {
-      const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
-      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
     afterUpdate(model, async (record: any) => {
-      const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
-      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
   } else {
