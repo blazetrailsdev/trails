@@ -1547,11 +1547,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // belongsTo-without-sourceType): fall back to the loader.
       // Disable-joins diverged case also falls through here — the
       // generic Relation.prototype.count path below honors the
-      // proxy's in-place mutations.
+      // proxy's in-place mutations. A persisted nested-through-source
+      // shape IS COUNT-able via `_buildThroughScope`'s JOIN, so it stays
+      // on the scope().count() fast path below rather than the loader.
+      const nestedSourceRoutable =
+        !this._record.isNewRecord() && _isNestedThroughSourceRoutable(refl);
       if (
         !this._assocDef.options.disableJoins &&
         !_canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
-        !(!this._record.isNewRecord() && _isNestedThroughSourceRoutable(refl))
+        !nestedSourceRoutable
       ) {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
@@ -3474,7 +3478,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _isNestedThroughSourceRoutable(refl)
     ) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
-      if (joinRel) return joinRel;
+      // null FK → empty, mirroring the sibling routing block above; do NOT fall
+      // through to the IN-subquery below, which can't walk a nested source.
+      return joinRel ?? (this.model as any).all().none();
     }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);

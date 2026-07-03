@@ -1822,14 +1822,17 @@ export async function loadHasMany(
       return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
     }
     if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
-      // An unpersisted owner resolves its through step from the in-memory
-      // association target (e.g. `post.author = mary` before save), which the
-      // SQL JOIN cannot see — keep those on the 2-step loader.
-      if (!record.isNewRecord() && _isNestedThroughSourceRoutable(reflEarly)) {
-        const rel = buildThroughJoinScope(record, assocName, options);
-        return rel ? ((await rel.toArray()) as Base[]) : [];
+      // Nested-through whose SOURCE is itself a through reflection falls through
+      // into the JOIN-based AssociationScope path below (which flattens the
+      // whole `reflection.chain`), sharing its inverse-wiring and null-FK
+      // short-circuit. An unpersisted owner resolves its through step from the
+      // in-memory association target (e.g. `post.author = mary` before save),
+      // which the SQL JOIN cannot see — keep those on the 2-step loader.
+      const nestedSourceRoutable =
+        !record.isNewRecord() && _isNestedThroughSourceRoutable(reflEarly);
+      if (!nestedSourceRoutable) {
+        return loadHasManyThrough(record, assocName, options);
       }
-      return loadHasManyThrough(record, assocName, options);
     }
     // Fall through into the AssociationScope path below.
   }
