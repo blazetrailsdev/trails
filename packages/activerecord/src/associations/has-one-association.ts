@@ -50,9 +50,20 @@ export class HasOneAssociation extends SingularAssociation {
   queueWrite(record: Base | null): void {
     const displaced = this.target;
     this.replace(record);
+    if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) return;
+    // Reverting to the record already queued for removal cancels the removal
+    // (`owner.x = other; owner.x = original`).
+    if (this._displacedRecord && sameRecord(record, this._displacedRecord)) {
+      this._displacedRecord = null;
+      return;
+    }
+    // Only a *persisted* displaced record has a row/foreign key to nullify. A
+    // transient in-memory target has none and must not clobber an
+    // already-recorded persisted displacement — `owner.x = newA; owner.x = newB`
+    // still has to nullify the original persisted row, not the un-saved `newA`.
     if (
-      (this.owner as { isPersisted?: () => boolean }).isPersisted?.() &&
       displaced &&
+      (displaced as { isPersisted?: () => boolean }).isPersisted?.() &&
       !(displaced as { isDestroyed?: () => boolean }).isDestroyed?.() &&
       !sameRecord(displaced, record)
     ) {
@@ -71,8 +82,16 @@ export class HasOneAssociation extends SingularAssociation {
    */
   override writer(record: Base | null): void | Promise<void> {
     const displaced = this.target;
+    // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
+    // gate: only touch the DB when the assignment actually changes something, so
+    // a no-op re-assignment (e.g. `writer(null)` with no target) opens no
+    // transaction.
+    const changed =
+      !sameRecord(displaced, record) ||
+      (typeof (record as any)?.hasChangesToSave === "function" &&
+        (record as any).hasChangesToSave());
     this.replace(record);
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+    if (changed && (this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       return this.persistImmediate(record, displaced);
     }
   }
