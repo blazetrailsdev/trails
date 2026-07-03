@@ -7,6 +7,7 @@ import type {
   ColumnSpec,
   AnyPrimitiveColumnSpec,
   PrimitiveColumnSpec,
+  IndexSpec,
 } from "./define-schema.js";
 import {
   COLUMN_TYPE_MAP_PG,
@@ -424,6 +425,13 @@ async function defineSchemaIndexes(
 // flags are only ever set truthy (never explicit `false`) so the generator's
 // truthy `if (index.unique)` omission and define-schema's always-passed
 // `unique: index.unique` normalize identically.
+const PARITY_INDEXES: IndexSpec[] = [
+  { columns: "title", unique: true, name: "idx_probe_title", where: "rating > 0" },
+  { columns: ["title", "rating"], order: { rating: "desc" }, length: { title: 10 } },
+  { columns: "rating", length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
+  { columns: "(lower(external_id))" },
+];
+const PARITY_EXPRESSION_INDEX = "(lower(external_id))";
 const INDEX_PARITY_SCHEMA: Schema = {
   parity_probe: {
     columns: {
@@ -432,12 +440,7 @@ const INDEX_PARITY_SCHEMA: Schema = {
       body: "text",
       external_id: "string",
     },
-    indexes: [
-      { columns: "title", unique: true, name: "idx_probe_title", where: "rating > 0" },
-      { columns: ["title", "rating"], order: { rating: "desc" }, length: { title: 10 } },
-      { columns: "rating", length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
-      { columns: "(lower(external_id))" },
-    ],
+    indexes: PARITY_INDEXES,
   },
 };
 
@@ -451,6 +454,10 @@ describe("generateSchemaFile / define-schema.ts index-gating parity", () => {
         generatorIndexes(INDEX_PARITY_SCHEMA, adapter),
         defineSchemaIndexes(INDEX_PARITY_SCHEMA, adapter, true),
       ]);
+      // All four indexes survive on PG/SQLite (expression kept). Pin the count
+      // so the equality below can't pass vacuously if the schema wrapper stops
+      // being recognized and both sides silently record zero indexes.
+      expect(gen).toHaveLength(PARITY_INDEXES.length);
       expect(normalizeRecorded(gen)).toBe(normalizeRecorded(def));
     });
   }
@@ -464,11 +471,14 @@ describe("generateSchemaFile / define-schema.ts index-gating parity", () => {
       generatorIndexes(INDEX_PARITY_SCHEMA, "mysql"),
       defineSchemaIndexes(INDEX_PARITY_SCHEMA, "mysql", false),
     ]);
+    // Only the expression index is dropped, so the other three survive — pin
+    // the count so the equality can't pass vacuously.
+    expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
     expect(normalizeRecorded(gen)).toBe(normalizeRecorded(def));
     // Length survives on MySQL (both keep it) and the expression index is
     // dropped by both — pin those two gates explicitly.
     expect(gen.some((r) => r.options.length !== undefined)).toBe(true);
-    expect(gen.some((r) => r.columns === "(lower(external_id))")).toBe(false);
+    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
   });
 
   it("drops sub-part index length: for non-MySQL adapters (both emitters)", async () => {
@@ -498,8 +508,8 @@ describe("generateSchemaFile / define-schema.ts index-gating parity", () => {
     const gen = await generatorIndexes(INDEX_PARITY_SCHEMA, "mysql");
     const defMysql8 = await defineSchemaIndexes(INDEX_PARITY_SCHEMA, "mysql", true);
     // Generator: coarse mysql skip → no expression index.
-    expect(gen.some((r) => r.columns === "(lower(external_id))")).toBe(false);
+    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
     // define-schema on MySQL 8 (supportsExpressionIndex true): keeps it.
-    expect(defMysql8.some((r) => r.columns === "(lower(external_id))")).toBe(true);
+    expect(defMysql8.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(true);
   });
 });
