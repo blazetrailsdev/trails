@@ -30,6 +30,34 @@ export const included = Symbol.for("@blazetrails/activesupport:included");
 export const extended = Symbol.for("@blazetrails/activesupport:extended");
 
 /**
+ * Per-prototype registry of method keys installed by a previous `include()`.
+ *
+ * Ruby's `include A; include B` places B higher in the ancestry than A, so a
+ * method B defines wins over the same method in A — but neither wins over a
+ * method defined directly in the class body. A raw `hasOwnProperty` check on
+ * the prototype can't tell those two cases apart (both are own properties), so
+ * we track which own keys arrived via `include()`. A collision on a tracked key
+ * is an earlier mixin and gets replaced (last-included wins); a collision on an
+ * untracked key is a class-body method and is preserved.
+ */
+const includedKeys = Symbol.for("@blazetrails/activesupport:includedKeys");
+
+function trackedKeys(proto: object): Set<string> {
+  let set = (proto as any)[includedKeys] as Set<string> | undefined;
+  if (!Object.prototype.hasOwnProperty.call(proto, includedKeys)) {
+    // Own the set per prototype so subclasses don't share a parent's registry.
+    set = new Set<string>();
+    Object.defineProperty(proto, includedKeys, {
+      value: set,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+  return set!;
+}
+
+/**
  * Shared between `Included<>` and `Extended<>`: filter `M` down to its
  * callable string-keyed properties and strip the `this` parameter from
  * each signature.
@@ -65,6 +93,7 @@ export type Included<M extends object> = CallableMethods<M>;
 
 export function include(klass: AnyClass, mod: Module | AnyClass): void {
   const descriptors: PropertyDescriptorMap = {};
+  const installed = trackedKeys(klass.prototype);
 
   // When `mod` is a class (has a prototype with own descriptors), read
   // descriptors directly — this preserves accessor properties (Ruby's
@@ -80,23 +109,38 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
       const existing = Object.getOwnPropertyDescriptor(klass.prototype, key);
       if (!existing) {
         descriptors[key] = modDesc;
+        installed.add(key);
         continue;
       }
-      // Accessor pairs: preserve the existing half, fill in whichever the
-      // including class didn't define. Ruby's include supplies only the
-      // missing methods, but in TS `get`/`set` share a single property
-      // name — re-apply the whole pair so both halves end up live.
+      const existingIsMixin = installed.has(key);
+      // Accessor pairs: in TS `get`/`set` share one property name, but Ruby
+      // treats a getter (`key`) and setter (`key=`) as two independent methods,
+      // each resolved by ancestry on its own. So merge the pair, letting the
+      // half from whichever descriptor is higher in the ancestry win and the
+      // other fill in a half it doesn't define. An earlier-included mixin
+      // (tracked) sits below the later `mod`; the class body (untracked) sits
+      // above every mixin.
       const isAccessorPair =
         ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
       if (isAccessorPair) {
+        const higher = existingIsMixin ? modDesc : existing;
+        const lower = existingIsMixin ? existing : modDesc;
         descriptors[key] = {
-          get: existing.get ?? modDesc.get,
-          set: existing.set ?? modDesc.set,
+          get: higher.get ?? lower.get,
+          set: higher.set ?? lower.set,
           configurable: true,
-          enumerable: existing.enumerable ?? modDesc.enumerable ?? false,
+          enumerable: higher.enumerable ?? lower.enumerable ?? false,
         };
+        // A half still owned by the class body keeps class-body precedence, so
+        // only track the key when both halves are mixin-supplied.
+        if (existingIsMixin) installed.add(key);
+      } else if (existingIsMixin) {
+        // Value (method) collision with an earlier-included mixin: Ruby puts the
+        // later module higher in the ancestry, so the later include wins.
+        descriptors[key] = modDesc;
       }
-      // Value (method) collision: Ruby's include doesn't replace — leave it.
+      // Otherwise the existing key is a class-body method — Ruby's include never
+      // replaces it, so leave it untouched.
     }
   } else {
     for (const key of Object.keys(mod as Module)) {
@@ -104,8 +148,13 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
       // Ruby's include copies only instance methods — skip non-function values
       // and Ruby-style constants (uppercase first char mirrors Ruby constant naming).
       if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
-      // Ruby's include doesn't replace methods already defined on the class
-      if (Object.prototype.hasOwnProperty.call(klass.prototype, key)) continue;
+      // A collision with a class-body method is never replaced (Ruby keeps the
+      // class body); a collision with an earlier-included mixin is replaced
+      // (Ruby's later include wins). Untracked own key === class body.
+      if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
+        continue;
+      }
+      installed.add(key);
       descriptors[key] = {
         value,
         writable: true,

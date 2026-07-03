@@ -4755,15 +4755,14 @@ include(Base, {
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
+// TouchLater is included after Timestamp, so include()'s last-included-wins
+// ancestry lets TouchLater#touch (deferred-attr merge) override Timestamp#touch,
+// and Aggregations#reload (below) override Persistence#reload — no manual
+// prototype patching needed. Mirrors Ruby's include ordering.
 include(Base, TouchLater.InstanceMethods);
-// TouchLater#touch must override Timestamp#touch (include() won't replace): it
-// merges any deferred touch_later attrs into the immediate touch, mirroring
-// Ruby's ancestry where TouchLater is included after Timestamp.
-(Base.prototype as any).touch = TouchLater.touch;
 include(Base, _Aggregations.InstanceMethods);
-// Aggregations#reload must override Persistence#reload (include() won't replace).
-(Base.prototype as any).reload = _Aggregations.reload;
-// Compose the initialize_dup chain. Ruby builds it via module super-calls
+// Compose the initialize_dup chain. This stays hand-wired (not a last-wins
+// override) because Ruby builds it via module super-calls
 // (Core → Aggregations → Locking::Optimistic → Timestamp); trails has no super
 // chain across mixins, so invoke each module's hook explicitly in that order.
 (Base.prototype as any).initializeDup = function (this: Base, other: unknown): void {

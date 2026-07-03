@@ -27,6 +27,40 @@ describe("include", () => {
     expect(new User().greet()).toBe("original");
   });
 
+  it("later include wins over an earlier mixin, but class body beats both", () => {
+    // Ruby's `include A; include B` puts B higher in the ancestry, so a method
+    // both define resolves to B (last-included wins). Neither replaces a method
+    // defined directly in the class body.
+    class User {
+      classBody() {
+        return "class-body";
+      }
+    }
+    const A = {
+      shared() {
+        return "A";
+      },
+      classBody() {
+        return "A-classBody";
+      },
+    };
+    const B = {
+      shared() {
+        return "B";
+      },
+      classBody() {
+        return "B-classBody";
+      },
+    };
+    include(User, A);
+    include(User, B);
+
+    // Later mixin (B) wins over the earlier one (A).
+    expect((new User() as any).shared()).toBe("B");
+    // A method defined in the class body beats every included mixin.
+    expect(new User().classBody()).toBe("class-body");
+  });
+
   it("fires the included callback after methods are copied", () => {
     const order: string[] = [];
     class User {}
@@ -134,6 +168,65 @@ describe("include", () => {
       expect(h.data.key).toBe(7);
       // Host's getter wins; mod's getter never runs.
       expect((h as any).key).toBe(7);
+    });
+
+    it("later class module wins a plain-method collision, class body still beats both", () => {
+      class Host {
+        classBody(): string {
+          return "class-body";
+        }
+      }
+      class A {
+        shared(): string {
+          return "A";
+        }
+        classBody(): string {
+          return "A-classBody";
+        }
+      }
+      class B {
+        shared(): string {
+          return "B";
+        }
+        classBody(): string {
+          return "B-classBody";
+        }
+      }
+      include(Host, A);
+      include(Host, B);
+      // Later class module (B) wins over the earlier one (A).
+      expect((new Host() as any).shared()).toBe("B");
+      // The class body still beats every included module.
+      expect(new Host().classBody()).toBe("class-body");
+    });
+
+    it("later class module's accessor half wins over an earlier mixin's", () => {
+      class Host {
+        data: Record<string, unknown> = {};
+      }
+      class A {
+        get key(): unknown {
+          return "A-getter";
+        }
+        set key(v: unknown) {
+          (this as unknown as Host).data.key = `A:${v}`;
+        }
+      }
+      class B {
+        // B only redefines the getter; Ruby keeps A's setter (higher for `key=`
+        // is A, since B doesn't define it), while B's getter wins for `key`.
+        get key(): unknown {
+          return "B-getter";
+        }
+      }
+      include(Host, A);
+      include(Host, B);
+      const h = new Host();
+      // Later mixin (B) supplies the getter.
+      expect((h as any).key).toBe("B-getter");
+      // A's setter survives because B never redefined it.
+      (h as any).key = 1;
+      expect(h.data.key).toBe("A:1");
     });
 
     it("skips the class constructor", () => {
