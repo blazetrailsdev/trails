@@ -8,7 +8,9 @@
  * Mirrors: ActiveRecord::Calculations
  */
 
-import { Nodes, Table, SelectManager } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager, sql as arelSql } from "@blazetrails/arel";
+import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
+import type { AliasTracker } from "../associations/alias-tracker.js";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
@@ -23,6 +25,31 @@ import {
   buildJoinDependencies,
   QueryMethodBangs,
 } from "./query-methods.js";
+
+/**
+ * Seed the eager-load JoinDependency's AliasTracker with the relation's manual
+ * join nodes (`_joinValues`), mirroring Rails `build_joins`'
+ * `alias_tracker(leading_joins + join_nodes, aliases)` (query_methods.rb:1891).
+ * The live count/aggregate eager path emits the JoinDependency separately from
+ * the user-supplied joins, so without seeding, a self-referential eager join
+ * (e.g. `Person.eager_load(:agents)`) would claim the same `agents_people`
+ * alias a user string/arel join already references as `agents_people_2`. Seeding
+ * counts those tables up front so the eager join is aliased `agents_people_2`,
+ * matching Rails. Returns `undefined` when there are no manual joins, preserving
+ * the JoinDependency's own base-table-only tracker for the common case.
+ *
+ * @internal
+ */
+function eagerJoinAliasTracker(rel: any): AliasTracker | undefined {
+  const joinValues: unknown[] = rel._joinValues ?? [];
+  if (joinValues.length === 0) return undefined;
+  const joinNodes: Nodes.Join[] = joinValues.map((v) =>
+    typeof v === "string"
+      ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join)
+      : (v as Nodes.Join),
+  );
+  return buildMergedJoinAliasTracker(rel, joinNodes);
+}
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -411,7 +438,11 @@ async function singleAggregate(
   const allEagerSa = [...new Set([...eagerSa, ...includesSa, ...promotedSa])];
   if (allEagerSa.length > 0) {
     const jd = QueryMethodBangs.constructJoinDependency.call(anyRelSa, allEagerSa, Nodes.OuterJoin);
-    for (const node of jd.joinConstraints([], undefined, anyRelSa._aliasableReferences()))
+    for (const node of jd.joinConstraints(
+      [],
+      eagerJoinAliasTracker(anyRelSa),
+      anyRelSa._aliasableReferences(),
+    ))
       manager.appendJoinNode(node);
   }
   rel._applyJoinsToManager(manager);
@@ -688,35 +719,13 @@ export async function performCount(
     if (allEager.length > 0) {
       const pk = this._modelClass.primaryKey;
       if (!Array.isArray(pk)) {
-        // Collect tables already covered by explicit _joinValues. For those,
-        // skip the JD LEFT OUTER JOIN (the explicit join already links the table)
-        // to avoid duplicate table references that cause "ambiguous column name".
-        const explicitJoinTables = new Set<string>();
-        for (const v of (anyRel._joinValues as (string | any)[] | undefined) ?? []) {
-          if (typeof v === "string") {
-            const m = v.match(/JOIN\s+(?:"([^"]+)"|`([^`]+)`|(\w+))/i);
-            if (m) explicitJoinTables.add(m[1] ?? m[2] ?? m[3] ?? "");
-          } else if (v?.left) {
-            const n: string | undefined = typeof v.left.name === "string" ? v.left.name : undefined;
-            if (n) explicitJoinTables.add(n);
-          }
-        }
-        // Only build JD for specs whose target table is NOT already in explicit joins.
-        // Specs already explicitly joined only need DISTINCT (not an extra LEFT JOIN).
-        const specsForJd: string[] = [];
-        for (const spec of allEager) {
-          if (typeof spec !== "string") {
-            specsForJd.push(spec as string);
-            continue;
-          }
-          let tname: string | undefined;
-          try {
-            tname = (this._modelClass as any)._reflectOnAssociation?.(spec)?.tableName;
-          } catch {
-            // reflection.klass may throw when model not yet registered
-          }
-          if (!tname || !explicitJoinTables.has(tname)) specsForJd.push(spec);
-        }
+        // Rails apply_join_dependency always builds the eager LEFT OUTER JOIN for
+        // every eager spec; the shared AliasTracker (seeded with the manual join
+        // nodes via `eagerJoinAliasTracker`) re-aliases a JD join onto a table a
+        // user string/arel join already touches (e.g. a self-referential
+        // `eager_load(:agents)` becomes `agents_people_2`), so there is no
+        // duplicate-table ambiguity to guard against here.
+        const specsForJd: string[] = allEager;
         const table = this._modelClass.arelTable;
         if (this._limitValue !== null || this._offsetValue !== null) {
           // Rails finder_methods.rb apply_join_dependency: with a limit/offset on an
@@ -736,7 +745,11 @@ export async function performCount(
               specsForJd,
               Nodes.OuterJoin,
             );
-            for (const node of jd.joinConstraints([], undefined, anyRel._aliasableReferences()))
+            for (const node of jd.joinConstraints(
+              [],
+              eagerJoinAliasTracker(anyRel),
+              anyRel._aliasableReferences(),
+            ))
               idSubquery.appendJoinNode(node);
           }
           this._applyJoinsToManager(idSubquery);
@@ -768,7 +781,7 @@ export async function performCount(
             );
             for (const node of jdOuter.joinConstraints(
               [],
-              undefined,
+              eagerJoinAliasTracker(anyRel),
               anyRel._aliasableReferences(),
             ))
               countManager.appendJoinNode(node);
@@ -803,7 +816,11 @@ export async function performCount(
             specsForJd,
             Nodes.OuterJoin,
           );
-          for (const node of jd.joinConstraints([], undefined, anyRel._aliasableReferences()))
+          for (const node of jd.joinConstraints(
+            [],
+            eagerJoinAliasTracker(anyRel),
+            anyRel._aliasableReferences(),
+          ))
             manager.appendJoinNode(node);
         }
         this._applyJoinsToManager(manager);

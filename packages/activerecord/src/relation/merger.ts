@@ -104,7 +104,20 @@ export class Merger {
     const clauses: Array<{ type: string; table: string; on: string; quoted?: boolean }> =
       this.other._joinClauses ?? [];
     if (clauses.length > 0) rel._joinClauses.push(...clauses);
-    if (this.other._joinValues?.length > 0) rel._joinValues.push(...this.other._joinValues);
+    // Rails merge_joins unions with `relation.joins_values |= other.joins_values`
+    // (merger.rb:121), so an identical Arel join node already present is not
+    // re-emitted. Merging a relation into itself (a self-merge that shares the
+    // same join node) would otherwise duplicate the join and make its columns
+    // ambiguous. Dedup structurally via the Arel node's `eql` (falling back to
+    // reference/`===` for strings and nodes without it).
+    for (const v of (this.other._joinValues ?? []) as unknown[]) {
+      const dup = (rel._joinValues as unknown[]).some((existing) =>
+        typeof (v as any)?.eql === "function" && v?.constructor === (existing as any)?.constructor
+          ? (v as any).eql(existing)
+          : v === existing,
+      );
+      if (!dup) rel._joinValues.push(v);
+    }
     // Rails merge_joins (merger.rb): when other.klass == relation.klass the
     // association names union directly into joins_values; otherwise Merger builds
     // a single InnerJoin JoinDependency against other.klass and stashes it. We
