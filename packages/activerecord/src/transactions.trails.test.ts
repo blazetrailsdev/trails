@@ -333,7 +333,7 @@ describe("SchemaAdapter TM delegation", () => {
   // `EachTest > findEach yields each record` case in batches.test.ts which
   // expects an empty items table). Clean up unconditionally after all tests here.
   afterAll(async () => {
-    const a = createTestAdapter();
+    const a = await createTestAdapter();
     await a.executeMutation("DELETE FROM items");
   });
 
@@ -354,7 +354,7 @@ describe("SchemaAdapter TM delegation", () => {
     // signature cache stays isolated across tests in this describe; spy on
     // the shared real adapter via the sidecar — that's what the wrapper's
     // withinNewTransaction routes to and what TM dispatches against.
-    const testAdapter = createTestAdapter();
+    const testAdapter = await createTestAdapter();
     // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
     // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
@@ -363,7 +363,7 @@ describe("SchemaAdapter TM delegation", () => {
     await testAdapter.createTable("items", { force: true }, (t) => {
       t.column("name", "string");
     });
-    const { adapter: realAdapter } = createSidecarTestAdapter();
+    const { adapter: realAdapter } = await createSidecarTestAdapter();
     const spy = vi.spyOn(realAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
@@ -382,7 +382,7 @@ describe("SchemaAdapter TM delegation", () => {
     const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
-    const testAdapter = createTestAdapter();
+    const testAdapter = await createTestAdapter();
     // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
     // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
@@ -429,7 +429,7 @@ describe("SchemaAdapter TM delegation", () => {
     // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
     // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
-    const testAdapter = createTestAdapter();
+    const testAdapter = await createTestAdapter();
     // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
     // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
@@ -493,7 +493,7 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
-    const testAdapter = createTestAdapter();
+    const testAdapter = await createTestAdapter();
     // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
     // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the

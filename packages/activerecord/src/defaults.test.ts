@@ -70,7 +70,7 @@ describe("DefaultTest", () => {
 // table (postgresql_specific_schema.rb / sqlite_specific_schema.rb).
 describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
   it("multiline default text", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.text("multiline_default", { default: "--- []\n\n" });
@@ -97,7 +97,7 @@ describe("DefaultNumbersTest", () => {
   let DefaultNumber: typeof Base;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_numbers", { force: true }, (t: any) => {
       t.integer("positive_integer", { default: 7 });
@@ -140,7 +140,7 @@ describe("DefaultStringsTest", () => {
   let DefaultString: typeof Base;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_strings", { force: true }, (t: any) => {
       t.string("string_col", { default: "Smith" });
@@ -175,7 +175,7 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   let DefaultBinary: typeof Base;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_binaries", { force: true }, (t: any) => {
       t.binary("varbinary_col", { null: false, limit: 64, default: "varbinary_default" });
@@ -224,7 +224,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   let DefaultText: typeof Base;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_texts", { force: true }, (t: any) => {
       t.text("text_col", { default: "Smith" });
@@ -260,7 +260,7 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "random() * 100" });
@@ -320,7 +320,7 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("datetime_defaults", { force: true }, (t: any) => {
       t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
@@ -534,7 +534,7 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "ABS(RANDOM())" });

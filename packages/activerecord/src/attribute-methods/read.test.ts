@@ -55,8 +55,8 @@ describe("ReadTest", () => {
     expect(Klass.attributeMethodsGenerated()).toBe(true);
   });
 
-  it("_read_attribute returns value for existing attribute", () => {
-    createSidecarTestAdapter();
+  it("_read_attribute returns value for existing attribute", async () => {
+    await createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -66,8 +66,8 @@ describe("ReadTest", () => {
     expect(p._readAttribute("title")).toBe("hello");
   });
 
-  it("_read_attribute returns null for unset attribute", () => {
-    createSidecarTestAdapter();
+  it("_read_attribute returns null for unset attribute", async () => {
+    await createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -77,8 +77,8 @@ describe("ReadTest", () => {
     expect(p._readAttribute("title")).toBeNull();
   });
 
-  it("_read_attribute does not apply alias resolution", () => {
-    createSidecarTestAdapter();
+  it("_read_attribute does not apply alias resolution", async () => {
+    await createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("body", "string");

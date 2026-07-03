@@ -42,8 +42,8 @@ describe("JoinDependency#addAssociationSpec", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Post, Comment, Author, Tag]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];

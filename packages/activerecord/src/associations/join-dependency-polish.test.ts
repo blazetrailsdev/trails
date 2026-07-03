@@ -19,8 +19,8 @@ describe("JoinBase.table", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     (Post as any).adapter = adapter;
     (Post as any)._associations = [];
     registerModel(Post);
@@ -57,8 +57,8 @@ describe("joinType propagation in joinConstraints", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Post, Comment]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];

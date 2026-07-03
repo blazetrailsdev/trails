@@ -23,8 +23,8 @@ describe("DateTimePrecisionTest", () => {
   // `create_table(:foos, force: true)` for the precision under test and the
   // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
   // here rather than seeding a placeholder into the canonical schema.
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
   });
   afterEach(async () => {

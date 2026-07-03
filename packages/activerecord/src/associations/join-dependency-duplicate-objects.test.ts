@@ -13,7 +13,7 @@ import { JoinDependency } from "./join-dependency.js";
 // so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
 // is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
-  let adapter: ReturnType<typeof createTestAdapter>;
+  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
 
   class Comment extends Base {
     static {
@@ -37,8 +37,8 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Comment, Post, Reader]) {
       m.adapter = adapter;
       m._associations = [];

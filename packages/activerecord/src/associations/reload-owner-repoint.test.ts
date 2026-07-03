@@ -17,7 +17,7 @@ describe("reload — association owner re-point", () => {
   let adapter: TestDatabaseAdapter;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     Author.adapter = adapter;
     Post.adapter = adapter;
     registerModel(Author);

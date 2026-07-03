@@ -8,11 +8,11 @@ import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 describe("CommentTest", () => {
-  let adapter: ReturnType<typeof createTestAdapter>;
+  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("commenteds", { comment: "A table with comment", force: true }, (t) => {
       t.string("name", { comment: "Comment should help clarify the column purpose" });

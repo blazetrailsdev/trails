@@ -19,15 +19,15 @@ afterAll(() => {
 });
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  return await createTestAdapter();
 }
 
 describe("ActiveRecordSchemaTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   afterEach(async () => {

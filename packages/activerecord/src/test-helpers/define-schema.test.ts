@@ -12,8 +12,8 @@ import { dropAllTables } from "./drop-all-tables.js";
 
 let adapter: DatabaseAdapter;
 
-beforeEach(() => {
-  adapter = createTestAdapter();
+beforeEach(async () => {
+  adapter = await createTestAdapter();
 });
 
 afterAll(async () => {
@@ -384,7 +384,7 @@ describe("defineSchema", () => {
     // `adapterKnownTables` detect the drop and force DDL re-execution
     // without the explicit clear, masking the bug.
     it("re-runs DDL after the table is dropped underneath the cache (per-adapter clear)", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = { widgets: { name: "string" as ColumnSpec } };
       await defineSchema(raw, spec);
       await dropAllTables(raw);
@@ -398,7 +398,7 @@ describe("defineSchema", () => {
     });
 
     it("no-arg form rebinds the WeakMap so the next defineSchema re-runs DDL", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = { gizmos: { name: "string" as ColumnSpec } };
       await defineSchema(raw, spec);
       await dropAllTables(raw);
@@ -416,7 +416,7 @@ describe("defineSchema", () => {
     // it actually dropped, leaving entries for untouched tables intact so the
     // next defineSchema(sameSpec) is a cache hit (no Path-C re-drop).
     it("removes only the named entries, preserving cache hits for the rest", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = {
         widgets: { name: "string" as ColumnSpec },
         gadgets: { name: "string" as ColumnSpec },
@@ -436,8 +436,8 @@ describe("defineSchema", () => {
       expect(ddl.some((sql) => /gadgets/i.test(sql))).toBe(false);
     });
 
-    it("is a no-op when the adapter has no cache yet", () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+    it("is a no-op when the adapter has no cache yet", async () => {
+      const { adapter: raw } = await createSidecarTestAdapter();
       expect(() => clearAppliedSchemaSignaturesForTables(raw, ["widgets"])).not.toThrow();
     });
   });
@@ -448,7 +448,7 @@ describe("defineSchema", () => {
     // defineSchema must not throw "table already exists". Simulated by
     // clearing the cache after the first call without dropping the table.
     it("does not throw when the table already exists and the cache was cleared", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = { sprockets: { name: "string" as ColumnSpec } };
       await defineSchema(raw, spec);
       // Simulate File B: cache is gone, but the table is still in the DB.
@@ -464,7 +464,7 @@ describe("defineSchema", () => {
     // short-circuit, but its dataSourceExists guard must still recreate any
     // table that a prior file's reset dropped from the shared worker file.
     it("makes defineSchema a no-op when the seeded table already exists", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = { widgets: { name: "string" as ColumnSpec } };
       // Simulate the cloned template: the table exists in the DB, but the
       // signature cache is empty (fresh module load in a new worker file).
@@ -482,7 +482,7 @@ describe("defineSchema", () => {
     });
 
     it("still recreates a seeded table that was dropped from the DB", async () => {
-      const { adapter: raw } = createSidecarTestAdapter();
+      const { adapter: raw } = await createSidecarTestAdapter();
       const spec = { sprooms: { name: "string" as ColumnSpec } };
       await defineSchema(raw, spec);
       // A prior file's reset dropped the table, but the seed (optimistically)

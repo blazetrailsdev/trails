@@ -513,16 +513,21 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Test-infra-only synchronous lease. The Rails-named `leaseConnection` /
-   * `checkout` are now async (they await per-checkout `verifyBang` — see
-   * {@link checkout}), but the test adapter factories in `test-adapter.ts`
-   * (`createTestAdapter`, `createSidecarTestAdapter`) are invoked from dozens of
-   * synchronous test call sites. This mirrors the pre-async sync lease: it
-   * establishes/returns the lease connection *without* the async per-checkout
-   * verify (`checkoutAndVerify` still runs on a fresh non-pinned checkout, as
-   * the old sync `checkout()` did). NOT part of the Rails surface — do not use
-   * on production/query paths; those go through async `leaseConnection` /
-   * `withConnection`.
+   * Synchronous lease for the genuinely-sync accessors that cannot await. The
+   * Rails-named `leaseConnection` / `checkout` are now async (they await
+   * per-checkout `verifyBang` — see {@link checkout}), so the handful of
+   * synchronous accessors that mirror Rails' sync `lease_connection` —
+   * `Migration#connection`'s bare-migration fallback (base.ts `_arConfig`,
+   * `DatabaseTasks.migrationConnection`) and the deprecated sync `.connection`
+   * getter (connection-handling.ts) — route through this instead. It mirrors
+   * the pre-async sync lease: it establishes/returns the lease connection
+   * *without* the async per-checkout verify (`checkoutAndVerify` still runs on a
+   * fresh non-pinned checkout, as the old sync `checkout()` did). The test
+   * adapter factories no longer use this — they `await` the async
+   * `leaseConnection`. NOT part of the Rails surface — do not use on
+   * production/query paths; those go through async `leaseConnection` /
+   * `withConnection`. The lost self-heal on the deprecated `.connection` getter
+   * is tracked by `connection-pool-pinned-sync-checkout-per-checkout-verify`.
    *
    * @internal
    */
