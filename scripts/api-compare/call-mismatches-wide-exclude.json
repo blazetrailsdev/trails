@@ -16367,6 +16367,41 @@
   },
   {
     "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "through_reflection",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "belongs_to?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "foreign_key",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "owner",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "all?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "aliases",
     "call": "column_names",
