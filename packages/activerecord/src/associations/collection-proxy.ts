@@ -2305,7 +2305,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const throughName = this._assocDef.options.through!;
     const throughAssoc = associations.find((a: any) => a.name === throughName);
     if (!throughAssoc) return false;
-    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    // Rails reads `reflection.source_reflection.name` — the *actual* source
+    // association name, which for a collection source (e.g. `has_many :comments
+    // through: :posts`, source `Post#comments`) is plural. `singularize` would
+    // mis-guess `comment`, so prefer the resolved source reflection.
+    const sourceRefl = ctor._reflectOnAssociation?.(this._assocName)?.sourceReflection as
+      | { name?: string }
+      | undefined;
+    const sourceName =
+      sourceRefl?.name ?? this._assocDef.options.source ?? singularize(this._assocName);
     const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
     if (!sources) return false;
     for (const joinRecord of sources) {

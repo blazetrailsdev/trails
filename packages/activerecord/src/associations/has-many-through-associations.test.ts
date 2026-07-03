@@ -672,7 +672,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((await (post as any).singlePeople.toArray()).map((p: any) => p.id)).toContain(person.id);
   });
 
-  it.skip("build then remove then save", async () => {
+  it("build then remove then save", async () => {
     const post = await Post.find(posts("thinking").id);
     await (post as any).people.build({ first_name: "Bob" });
     const ted = await (post as any).people.build({ first_name: "Ted" });
@@ -1516,20 +1516,18 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(newSubscriber.name).toBe("Marcelo Giorgi");
   });
 
-  it.skip("include method in association through should return true for instance added with build", async () => {
+  it("include method in association through should return true for instance added with build", async () => {
     const person = new Person();
     const ref = await (person as any).references.build();
     const job = await ref.buildJob();
-    const jobs2 = await (person as any).jobs.toArray();
-    expect(jobs2.map((j: any) => j.id)).toContain(job.id);
+    expect(await (person as any).jobs.isInclude(job)).toBe(true);
   });
 
-  it.skip("include method in association through should return true for instance added with nested builds", async () => {
+  it("include method in association through should return true for instance added with nested builds", async () => {
     const author = new Author({ name: "Test" });
     const post = await (author as any).posts.build({ title: "t", body: "b" });
     const comment = await post.comments.build({ body: "c" });
-    const authorComments = await (author as any).comments.toArray();
-    expect(authorComments.map((c: any) => c.id)).toContain(comment.id);
+    expect(await (author as any).comments.isInclude(comment)).toBe(true);
   });
 
   it("through association readonly should be false", async () => {
@@ -1789,7 +1787,7 @@ describe("HasManyThroughAssociationsTest", () => {
     }
   });
 
-  it.skip("assign array to new record builds join records", async () => {
+  it("assign array to new record builds join records", async () => {
     const firstAuthor = await Author.first();
     const c = new Category({ name: "Fishing", authors: [firstAuthor] });
     expect(await (c as any).categorizations.size()).toBe(1);

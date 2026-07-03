@@ -8,7 +8,7 @@ import {
 import { compositeQueryConstraintsList } from "../persistence.js";
 import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
-import { resolveAssocClass } from "../associations.js";
+import { resolveAssocClass, association as collectionProxyFor } from "../associations.js";
 import {
   sourceReflection,
   staleStateImpl as throughStaleState,
@@ -398,18 +398,14 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
   const sourceRefl = refl?.sourceReflection;
-  const proxy = throughAssociation(assoc) as {
-    build?: (attrs: Record<string, unknown>) => Base;
-    isLoaded?: () => boolean;
-    target?: Base | null;
-  } | null;
+  const proxy = throughProxy(assoc);
   if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
 
   // When the through is a singular (has_one/belongs_to) association that's already
   // loaded, reuse the existing through record. For singular throughs there is only
   // one possible join row, so the loaded target is always the right one — building
   // a fresh record would wire FK on the new target to null instead of the real PK.
-  const existingTarget = proxy.isLoaded?.() ? proxy.target : undefined;
+  const existingTarget = proxy.loaded ? proxy.target : undefined;
   if (existingTarget && !Array.isArray(existingTarget)) {
     cache.set(record, existingTarget);
     return existingTarget;
@@ -631,23 +627,36 @@ function distribution(_assoc: HasManyThroughAssociation, array: Base[]): Map<Bas
 function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
   const throughName = assoc.reflection.options.through;
   if (!throughName) return [];
-  const throughAssoc = (assoc.owner as any).association?.(throughName);
-  if (!throughAssoc) return [];
+  const proxy = throughProxy(assoc);
+  if (!proxy) return [];
 
-  // Use constructJoinAttributes to get the FK → PK map for this record,
-  // then filter the through-association's in-memory target by those constraints.
+  // Mirrors Rails `through_records_for`: filter the through target by
+  // `construct_join_attributes(record)`, comparing each key with
+  // `c.public_send(key) == value`. `construct_join_attributes` returns either a
+  // `{ foreign_key => pk_value }` column map or (composite / single-PK branch)
+  // a `{ source_reflection_name => record }` association map — the latter is how
+  // an in-memory-built join row (whose FK is still nil until the target is
+  // saved) is matched by the source *record*, not its yet-unset FK column.
   const joinAttrs = constructJoinAttributes(assoc, record);
-  const candidates: Base[] = Array.isArray(throughAssoc.target)
-    ? throughAssoc.target
-    : throughAssoc.target
-      ? [throughAssoc.target]
+  const candidates: Base[] = Array.isArray(proxy.target)
+    ? proxy.target
+    : proxy.target
+      ? [proxy.target]
       : [];
   return candidates.filter((c) =>
-    Object.entries(joinAttrs).every(([fk, val]) => {
+    Object.entries(joinAttrs).every(([key, val]) => {
+      // Rails' `c.public_send(key)`: an association-name key reads the join
+      // row's association target (identity match on the built record), a column
+      // key reads the attribute value.
+      const joinRefl = (c.constructor as any)._reflectOnAssociation?.(key);
+      if (joinRefl) {
+        const target = (c as any).association?.(key)?.target;
+        return Array.isArray(target) ? target.includes(val as Base) : target === val;
+      }
       const actual =
         typeof (c as any).readAttribute === "function"
-          ? (c as any).readAttribute(fk)
-          : (c as any)[fk];
+          ? (c as any).readAttribute(key)
+          : (c as any)[key];
       // A BigInt PK (int8 default under PG bigserial) and a number FK of equal
       // value must match here as Ruby's `Integer ==` does.
       return associationKeysEqual(actual, val);
@@ -657,21 +666,25 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
 
 /** @internal */
 function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[]): Promise<void> {
-  // Mirrors Rails delete_through_records: remove through join-model records.
+  // Mirrors Rails `delete_through_records`: prune the matching join rows from
+  // the through target, then evict the per-record `@through_records` cache so a
+  // built-then-removed target is not re-associated when the owner is saved.
   const throughName = assoc.reflection.options.through;
   if (!throughName) return Promise.resolve();
-  const throughAssoc = (assoc.owner as any).association?.(throughName);
-  if (!throughAssoc) return Promise.resolve();
+  const proxy = throughProxy(assoc);
+  const cache = throughRecordsCache(assoc);
+  if (!proxy) return Promise.resolve();
   for (const record of records) {
     const toDelete = throughRecordsFor(assoc, record);
-    if (Array.isArray(throughAssoc.target)) {
+    if (Array.isArray(proxy.target)) {
       for (const r of toDelete) {
-        const idx = (throughAssoc.target as Base[]).indexOf(r);
-        if (idx !== -1) (throughAssoc.target as Base[]).splice(idx, 1);
+        const idx = proxy.target.indexOf(r);
+        if (idx !== -1) proxy.target.splice(idx, 1);
       }
-    } else if (toDelete.length > 0 && throughAssoc.target === toDelete[0]) {
-      throughAssoc.target = null;
+    } else if (toDelete.length > 0 && proxy.target === toDelete[0]) {
+      (proxy as { target?: Base | null }).target = null;
     }
+    cache.delete(record);
   }
   return Promise.resolve();
 }
@@ -739,6 +752,57 @@ function throughAssociation(assoc: HasManyThroughAssociation): unknown {
   return (assoc.owner as unknown as { association?: (n: string) => unknown }).association?.(
     tr.name,
   );
+}
+
+/**
+ * The user-facing `CollectionProxy` for the join model — the *canonical*
+ * in-memory target store for a has_many (RFC 0022: the `HasManyAssociation`
+ * mirror in `_associationInstances` is a stale secondary copy). Through-record
+ * build / include / delete must operate on this proxy so a join row built in
+ * memory (before the owner is saved) is visible to `owner.readers.size()`,
+ * autosave (`_loadedAssociation` prefers `proxy.target`), and the delete path
+ * alike.
+ *
+ * @internal
+ */
+interface ThroughTargetStore {
+  build?: (attrs: Record<string, unknown>) => Base;
+  loaded?: boolean;
+  target?: Base[] | Base | null;
+}
+
+function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | null {
+  const tr = throughReflection(assoc) as {
+    name?: string;
+    isCollection?: () => boolean;
+    macro?: string;
+  } | null;
+  if (!tr?.name) return null;
+  const isCollection = tr.isCollection?.() ?? tr.macro === "hasMany";
+  // A collection through (has_many) keeps its canonical in-memory target on the
+  // user-facing CollectionProxy (RFC 0022); build / include / delete must use
+  // it. A singular through (has_many :posts through: a belongs_to/has_one
+  // :author) has no collection proxy — read the OO holder, exposing the same
+  // `build`/`loaded`/`target` surface so the singular-reuse branch still fires.
+  if (isCollection) {
+    return collectionProxyFor(assoc.owner, tr.name) as unknown as ThroughTargetStore;
+  }
+  const oo = (assoc.owner as unknown as { association?: (n: string) => any }).association?.(
+    tr.name,
+  );
+  if (!oo) return null;
+  return {
+    build: typeof oo.build === "function" ? oo.build.bind(oo) : undefined,
+    get loaded() {
+      return oo.isLoaded?.() ?? false;
+    },
+    get target() {
+      return oo.target;
+    },
+    set target(v: Base[] | Base | null) {
+      oo.target = v;
+    },
+  };
 }
 
 /**
