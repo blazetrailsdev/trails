@@ -518,9 +518,9 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
   // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql"`
   // skip, so on a live MySQL 8 (supportsExpressionIndex true) it keeps the
   // expression index — matching canonical-schema.ts's `emitTableIndexes`, which
-  // uses the same runtime check. (Previously a tracked residual: the two
-  // diverged because the generator had no DB version. Closed by PR #4471's
-  // follow-up threading the capability flag into `generateSchemaFile`.)
+  // uses the same runtime check. (Previously the PR #4471 tracked residual: the
+  // two diverged because the generator had no DB version. Closed by threading
+  // the capability flag from the caller into `generateSchemaFile`.)
   it("emits the same addIndex calls as canonical-schema.ts on mysql 8 (expression index kept)", async () => {
     const [gen, canonMysql8] = await Promise.all([
       generatorIndexes(GENERATOR_SCHEMA, "mysql", true),
