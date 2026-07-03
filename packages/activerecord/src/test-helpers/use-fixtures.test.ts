@@ -11,8 +11,6 @@ import {
   defineJoinTableFixtures,
   isFixtureRef,
 } from "./define-fixtures.js";
-import { defineSchema } from "./define-schema.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { setupFixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
@@ -39,23 +37,6 @@ async function resolvePrimaryModel(entry: {
   registerModel(models);
   return models[0];
 }
-
-const TYPE_CONTRACT_SCHEMA = {
-  topics: { title: "string" },
-  posts: { body: "string" },
-} as const;
-
-// The type-contract describe below declares `Topic extends Base` and
-// `Post extends Base` with stubbed `findBy`, so test bodies never hit the
-// DB. The Phase 5 audit (scripts/audit-define-schema.ts) nevertheless
-// flags any file with `extends Base` that doesn't call `defineSchema`,
-// so prime a real adapter once at module load. The schema isn't actually
-// consumed by the current tests but documents the table shape these
-// stub-backed models would map to under AR_NO_AUTO_SCHEMA=1.
-beforeAll(async () => {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TYPE_CONTRACT_SCHEMA);
-});
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -97,6 +78,18 @@ async function setupScopedEncryption(): Promise<() => void> {
   configureEncryption();
   return () => restoreEncryptionConfig(snapshot);
 }
+
+// Shield the WHOLE file from the global `resetTestAdapterState()` beforeEach
+// (test-setup-ar.ts), which drops every table on `Base.connection` — the
+// boot-laid canonical worker DB. The real-seeding describes below each shield
+// themselves (their `useHandlerTransactionalFixtures` push/pops the skip), but
+// the mock-adapter describes above them do NOT: their tests trigger the reset
+// and wipe the canonical tables before any seeding describe's `beforeAll` runs.
+// The removed `defineSchema(TEST_SCHEMA)` beforeAll blocks used to paper over
+// this by recreating the tables after the wipe; a single file-level shield
+// keeps the boot-laid schema intact instead, so every seeding describe rides it
+// directly (transactional fixtures roll back their per-test writes).
+setupFixtures();
 
 // --- useFixtures ---
 
@@ -256,9 +249,6 @@ describe("useFixtures type contract", () => {
 describe("useFixtures by registry name", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // author_addresses listed first: authors.author_address_id ref() resolves to its
   // declared ids, so the target set must load before its dependent.
@@ -317,9 +307,6 @@ describe("useFixtures by registry name", () => {
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // categories + posts declare explicit ids, so they load BEFORE the join set —
   // categoriesPosts' category_id/post_id ref()s then resolve to those declared ids.
@@ -360,9 +347,6 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 describe("useFixtures seeds a single-row HABTM join table", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   const { people, treasures, peoplesTreasures } = useFixtures(
     ["people", "treasures", "peoplesTreasures"],
@@ -381,9 +365,6 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 describe("useFixtures vertices and edges", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // vertices must load before edges so edge ref()s resolve to declared vertex ids.
   const { vertices, edges } = useFixtures(["vertices", "edges"], () => Base.adapter);
@@ -408,7 +389,7 @@ describe("useFixtures { schema } auto-derivation", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
-  // No manual `beforeAll(() => defineSchema(...))`: passing the full TEST_SCHEMA lets
+  // No manual schema-priming beforeAll: passing the full TEST_SCHEMA lets
   // useFixtures create just the tables these sets touch (authorAddresses → posts).
   const { authors } = useFixtures(["authorAddresses", "authors", "posts"], () => Base.adapter, {
     schema: TEST_SCHEMA,
@@ -450,9 +431,6 @@ describe("deriveFixtureSchema", () => {
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // people.michael declares neither created_at nor updated_at, but both columns
   // are NOT NULL — defineFixtures must fill them with the current time, mirroring
@@ -476,9 +454,6 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
 describe("useFixtures with a string primary key", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // Subscriber sets `self.primary_key = "nick"` (a string column). The fixture
   // row declares `nick: "alterself"`; resolveDeclaredPk must use that string
@@ -505,9 +480,6 @@ describe("useFixtures with a string primary key", () => {
 describe("useFixtures reconciles the PK column against the schema", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // Bulb declares no `primary_key`, so the model defaults to `id`, but the
   // `bulbs` table's PK column is `ID` (schema.rb: `primary_key: "ID"`). The
@@ -550,9 +522,6 @@ describe("useFixtures reconciles the PK column against the schema", () => {
 describe("useFixtures seeds composite-primary-key tables", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // CpkOrder declares a composite model PK (`["shop_id", "id"]`) while the test
   // schema keeps a plain autoincrement `id`; Rails' composite_primary_key? is
@@ -603,9 +572,6 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 describe("useFixtures resolves STI subclasses on standalone load", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // parrots.yml rows carry a custom inheritance column (`parrot_sti_class`)
   // pointing at LiveParrot/DeadParrot. Loading the base `parrots` set must
@@ -762,7 +728,6 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     restoreEncryption = await setupScopedEncryption();
-    await defineSchema(TEST_SCHEMA);
   });
   afterAll(() => {
     restoreEncryption?.();
@@ -800,7 +765,6 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     restoreEncryption = await setupScopedEncryption();
-    await defineSchema(TEST_SCHEMA);
   });
   afterAll(() => {
     restoreEncryption?.();
