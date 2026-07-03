@@ -148,20 +148,14 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await readHasOne(newMember, "club")).not.toBeNull();
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
-  // has_one_through `create` does not route through createThroughRecord — the
-  // target is built with a bogus id and no join record is persisted.
-  it.skip("association create constructor creates through record", async () => {
+  it("association create constructor creates through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
     await (newMember.association("club") as any).create();
     expect(await readHasOne(newMember, "currentMembership")).not.toBeNull();
     expect(await readHasOne(newMember, "club")).not.toBeNull();
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
-  // has_one_through `build` sets the target but never builds/persists the join
-  // (through) record, so `current_membership` stays nil even after save.
-  it.skip("creating association builds through record", async () => {
+  it("creating association builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
     const newClub = (newMember.association("club") as any).build();
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
@@ -173,10 +167,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(tgt(newMember, "currentMembership").isPersisted()).toBe(true);
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
-  // has_one_through `build` sets the target but never builds/persists the join
-  // (through) record, so `current_membership` stays nil even after save.
-  it.skip("association build constructor builds through record", async () => {
+  it("association build constructor builds through record", async () => {
     const newMember = await Member.create({ name: "Chris" });
     const newClub = (newMember.association("club") as any).build();
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
@@ -188,10 +179,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(tgt(newMember, "currentMembership").isPersisted()).toBe(true);
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
-  // Assigning a has_one_through target on a new owner does not build the join
-  // record in memory (`current_membership` is nil before save).
-  it.skip("creating association builds through record for new", async () => {
+  it("creating association builds through record for new", async () => {
     const newMember = new Member({ name: "Jane" });
     (newMember.association("club") as any).writer(clubs("moustache_club"));
     expect(tgt(newMember, "currentMembership")).toBeTruthy();
@@ -217,9 +205,31 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("currentMembership") as any).create();
+    const membership = await (newMember.association("currentMembership") as any).create();
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
+
+    // Rebuilding before save must re-point the deferred reconcile at the
+    // latest club (Rails runs `through_record.update` synchronously every
+    // call, so the last build wins) — not persist the first one on save.
+    const finalClub = (newMember.association("club") as any).build();
+    expect(newMember.association("club").target).toBe(finalClub);
+
+    // Rails' create_through_record reconciles against the persisted join row
+    // (`through_record.update(attributes)`) instead of building a duplicate: on
+    // save the existing membership is updated to point at the new club, no
+    // second membership row is inserted. Count is scoped to this member so a
+    // parallel fork's Membership rows can't perturb the delta (global-count
+    // shared-DB flake, cf. member_details, PR #4480).
+    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
+    const before = await countForMember();
+    expect(await newMember.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect(finalClub.isPersisted()).toBe(true);
+    const reloaded = await Membership.find(membership.id);
+    // club_id round-trips as BigInt on PG/MariaDB but finalClub.id is a number;
+    // compare numerically rather than by Object.is identity.
+    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("creating multiple associations creates through record", async () => {
@@ -234,11 +244,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(tgt(memberDetailWithTwoAssociations, "member").isNewRecord()).toBe(false);
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
-  // On a new owner, saving a has_one_through assignment creates the join record
-  // but does not autosave the target (club.id stays nil), so both parent ids are
-  // not set.
-  it.skip("creating association sets both parent ids for new", async () => {
+  it("creating association sets both parent ids for new", async () => {
     const member = new Member({ name: "Sean Griffin" });
     const club = new Club({ name: "Da Club" });
     (member.association("club") as any).writer(club);
@@ -315,7 +321,7 @@ describe("HasOneThroughAssociationsTest", () => {
     });
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
+  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
   // the source-table-condition arm (hairyClub) passes on SQLite but preloads nil on
   // PG/MariaDB — eager-loading a has_one_through with a WHERE on the *source* table
   // fails to match across the through join on those adapters.
@@ -428,15 +434,27 @@ describe("HasOneThroughAssociationsTest", () => {
     // runtime equivalent.
   });
 
+  // Rails' `assert_difference "MemberDetail.count", 1` runs serially in a txn;
+  // trails runs parallel forks against a shared DB, so a global count races
+  // against concurrent member_details fixture reloads. Scope the delta to this
+  // member — the invariant Rails asserts (exactly one new join row for the
+  // member) — which still catches a genuine double-write for this member.
+  const memberDetailCount = async (member: any): Promise<number> =>
+    (await MemberDetail.where({ member_id: member.id }).count()) as number;
+
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");
     const organization = organizations("nsa");
-    const before = (await MemberDetail.count()) as number;
+    const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    // `writer` on a persisted owner returns the immediate-persist `persistReplace`
+    // promise (has-one-association.ts:52-57); it MUST be awaited (per its JSDoc)
+    // or the floating write races member.save()'s own has_one autosave — the
+    // exact double-write the `_pendingReplace` skip guard is meant to prevent.
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     const orgMembers = (await organization.association("members").loadTarget()) as any[];
     expect(orgMembers.some((m: any) => m.id === member.id)).toBe(true);
@@ -455,21 +473,21 @@ describe("HasOneThroughAssociationsTest", () => {
       return (o.association("members").target as any[]).some((m: any) => m.id === member.id);
     };
 
-    let before = (await MemberDetail.count()) as number;
+    let before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(true);
     expect(await includesMember(newOrganization)).toBe(false);
 
-    before = (await MemberDetail.count()) as number;
-    (member.association("organization") as any).writer(newOrganization);
+    before = await memberDetailCount(member);
+    await (member.association("organization") as any).writer(newOrganization);
     await member.save();
-    expect((await MemberDetail.count()) as number).toBe(before);
+    expect(await memberDetailCount(member)).toBe(before);
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(false);
@@ -511,7 +529,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await (await Club.all().includes("sponsoredMember").find(club.id)).save();
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps):
+  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
   // passes on SQLite but fails on PG/MariaDB — `member.save()` does not persist the
   // lone has_one `memberDetail` child there (its `member_id` is never written), so
   // the `member_type` through resolves to nil. A cross-adapter has_one autosave gap.
@@ -600,11 +618,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect((await readHasOne(minivan, "dashboard"))?.id).toBe(dashboards("second").id);
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps): after a
-  // has_one_through belongs_to loads a nil target, `_staleState` is null and the
-  // reader's stale-reload branch is guarded by `_staleState != null`, so setting
-  // the through FK does not reload the (previously nil) target.
-  it.skip("has one through belongs to setting belongs to foreign key after nil target loaded", async () => {
+  it("has one through belongs to setting belongs to foreign key after nil target loaded", async () => {
     const minivan = new Minivan();
     await readHasOne(minivan, "dashboard");
     const proxy = minivan.association("dashboard");
@@ -673,10 +687,7 @@ describe("HasOneThroughAssociationsTest", () => {
     }
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-write-side-and-nil-stale-gaps): a
-  // has_one_through read on an unpersisted owner whose through belongs_to target
-  // is persisted does not resolve via the in-memory through record.
-  it.skip("loading cpk association with unpersisted owner", async () => {
+  it("loading cpk association with unpersisted owner", async () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const book = new CpkBookWithOrderAgreements({ id: [1, 2], order });
     const orderAgreement = await CpkOrderAgreement.create({ order });

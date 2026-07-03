@@ -190,22 +190,28 @@ export class ConnectionHandler {
     });
   }
 
-  clearReloadableConnectionsBang(role?: string | null): void {
+  async clearReloadableConnectionsBang(role?: string | null): Promise<void> {
+    const draining: Array<Promise<void>> = [];
     this.eachConnectionPool(role, (pool) => {
-      pool.clearReloadableConnectionsBang();
+      draining.push(pool.clearReloadableConnectionsBang());
     });
+    await Promise.all(draining);
   }
 
-  clearAllConnectionsBang(role?: string | null): void {
+  async clearAllConnectionsBang(role?: string | null): Promise<void> {
+    const draining: Array<Promise<void>> = [];
     this.eachConnectionPool(role, (pool) => {
-      pool.disconnectBang();
+      draining.push(pool.disconnectBang());
     });
+    await Promise.all(draining);
   }
 
-  flushIdleConnectionsBang(role?: string | null): void {
+  async flushIdleConnectionsBang(role?: string | null): Promise<void> {
+    const draining: Array<Promise<void>> = [];
     this.eachConnectionPool(role, (pool) => {
-      pool.flushBang();
+      draining.push(pool.flushBang());
     });
+    await Promise.all(draining);
   }
 
   retrieveConnection(
@@ -280,8 +286,8 @@ export class ConnectionHandler {
   }
 
   /** @deprecated Use clearAllConnectionsBang */
-  clearAllConnections(): void {
-    this.clearAllConnectionsBang();
+  async clearAllConnections(): Promise<void> {
+    await this.clearAllConnectionsBang();
   }
 
   /** @internal */
@@ -317,7 +323,11 @@ export class ConnectionHandler {
   ): DatabaseConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
-      poolConfig.disconnect();
+      // Rails' `remove_connection_pool` is synchronous; trails' `disconnect`
+      // returns a Promise (async `driver.close()`). The pool is already dropped
+      // from the manager, so let the drain settle in the background rather than
+      // forcing this sync API (and its `removeConnectionPool` callers) async.
+      void poolConfig.disconnect();
       return poolConfig.dbConfig;
     }
     return undefined;

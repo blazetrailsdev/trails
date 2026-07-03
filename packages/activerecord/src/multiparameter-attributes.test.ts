@@ -6,7 +6,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -14,24 +13,13 @@ import { Topic } from "./test-helpers/models/topic.js";
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
 describe("MultiParameterAttributeTest", () => {
-  // fixtures wires setupFixtures + withTransactionalFixtures + defineSchema.
-  // The defineSchema call warms the pool's schema cache for topics so the synchronous
-  // loadSchema path (triggered by new Topic() inside tests) finds the date/time column
-  // types correctly on all adapters including MariaDB. Mirrors date.test.ts.
+  // fixtures wires setupFixtures + withTransactionalFixtures and warms the pool's
+  // schema cache for topics so the synchronous loadSchema path (triggered by
+  // new Topic() inside tests) finds the date/time column types correctly on all
+  // adapters including MariaDB. Mirrors date.test.ts.
   fixtures(["topics"], { schema: TEST_SCHEMA });
 
-  // Force-recreate the canonical `topics` table to its full shape first. Under
-  // vitest's per-file module isolation the signature/schema caches reset to
-  // canonical each file, so `fixtures`' own `{ schema }` `defineSchema`
-  // sees a cache-hit and skips the repair — leaving a reduced `topics` shape
-  // (`attribute-methods.test.ts` / `finder.test.ts` both declare a bespoke
-  // `topics` with NO `last_read` column) that a sibling file co-scheduled earlier
-  // in the same fork wrote to the shared worker DB. The `last_read(Ni)`
-  // multiparameter cases below then fail with a missing `last_read` column.
-  // `dropExisting` drops + recreates `topics` unconditionally. Mirrors
-  // date.test.ts.
   beforeAll(async () => {
-    await defineSchema({ topics: TEST_SCHEMA.topics }, { dropExisting: true });
     // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.
     // Without this, the sync loadSchema path runs before the cache is applied to the
     // model class and marks _schemaLoaded=true with empty _attributeDefinitions.

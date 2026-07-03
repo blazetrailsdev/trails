@@ -234,7 +234,13 @@ export class Association {
   associationScope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    if (this._staleState != null && this.isStaleTarget()) this.resetScope();
+    // Same relaxed staleness rule as `loadTarget` — reset the cached scope
+    // when the target went stale, including the nil-target-then-FK-set case
+    // (`_staleState == null && target == null`), so the reload re-derives the
+    // scope from the now-populated foreign key.
+    if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
+      this.resetScope();
+    }
     if (this._cachedScope === undefined) {
       const ctor = this.owner.constructor as typeof Base & {
         _reflectOnAssociation?: (n: string) => unknown;
@@ -373,12 +379,24 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
   async loadTarget(): Promise<Base | Base[] | null> {
-    // Mirrors Rails' guard `(@stale_state && stale_target?) || find_target?`
-    // (association.rb:190). The `@stale_state &&` factor uses Ruby truthiness
-    // (nil/false falsy; `0`/`""` truthy) — here `!= null`, not `Boolean()`.
-    // The stale and find-target branches are mutually exclusive (`stale_target?`
-    // requires loaded, `find_target?` requires not-loaded), so they split cleanly.
-    if (this._staleState != null && this.isStaleTarget()) {
+    // Corresponds to Rails' guard `(@stale_state && stale_target?) ||
+    // find_target?` (association.rb:190). Rails relies on
+    // `SingularAssociation#reader` resetting a stale association *before*
+    // `load_target` runs (reset clears `@stale_state` to nil, so it's
+    // `find_target?` that fires post-reset — the `@stale_state &&` factor is
+    // moot on that path). trails' reader does not reset-before-load, so
+    // `loadTarget` must itself reload a stale target. We relax Rails'
+    // `@stale_state != null` factor for exactly one extra case: a target that
+    // is currently *nil* (`this.target == null`). A has_one_through belongs_to
+    // whose through FK was nil at load time captures `_staleState == null`;
+    // setting the FK afterward (`minivan.speedometer_id = …`) must reload even
+    // though the prior stale state was null — and reloading a nil target
+    // discards nothing. We must NOT reload when there is a real in-memory
+    // target with a null prior stale state (e.g. a nested-attributes-built
+    // record assigned before its owner FK was set): that would clobber the
+    // unsaved build. The stale and find-target branches stay mutually exclusive
+    // (`stale_target?` requires loaded, `find_target?` requires not-loaded).
+    if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
       // Rails `find_target` always issues a query; skip the in-memory
       // `doFindTarget` cache so a stale target is actually re-fetched.
       await this._findTarget();

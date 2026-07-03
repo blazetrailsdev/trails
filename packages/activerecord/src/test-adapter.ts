@@ -214,9 +214,12 @@ export type TestDatabaseAdapter = DatabaseAdapter;
  * Create a fresh pool-leased adapter for testing. Phase 7 removed the lazy
  * auto-schema machinery; F5 removed the TestAdapterFixtures wrapper — the
  * raw pool-leased DatabaseAdapter is returned directly.
+ *
+ * Async because it awaits the Rails-named {@link ConnectionPool#leaseConnection}
+ * (which awaits the per-checkout `verifyBang`); callers must `await`.
  */
-export function createTestAdapter(): TestDatabaseAdapter {
-  return _pool.leaseConnectionSync();
+export async function createTestAdapter(): Promise<TestDatabaseAdapter> {
+  return _pool.leaseConnection();
 }
 
 /**
@@ -241,14 +244,15 @@ export type SidecarAdapter = DatabaseAdapter & {
  * Returns a pool-leased {@link DatabaseAdapter}. Callers can issue DB ops
  * on `adapter` directly (no delegation overhead).
  *
- * The pool is already initialized at module boot, so this call is synchronous.
+ * Async because it awaits the Rails-named {@link ConnectionPool#leaseConnection}
+ * (which awaits the per-checkout `verifyBang`); callers must `await`.
  *
  * @internal
  */
-export function createSidecarTestAdapter(): {
+export async function createSidecarTestAdapter(): Promise<{
   adapter: SidecarAdapter;
-} {
-  const adapter = _pool.leaseConnectionSync() as SidecarAdapter;
+}> {
+  const adapter = (await _pool.leaseConnection()) as SidecarAdapter;
   return { adapter };
 }
 
@@ -268,16 +272,17 @@ export async function createPooledTestAdapter(): Promise<{
   pool: import("./connection-adapters/abstract/connection-pool.js").ConnectionPool;
 }> {
   const pool = await _establishPooledTestPool();
-  const adapter = pool.leaseConnectionSync() as SidecarAdapter;
+  const adapter = (await pool.leaseConnection()) as SidecarAdapter;
   return { adapter, pool };
 }
 
 /** @internal — for the smoke test only. */
 export function _resetPooledTestAdapterForTests(): void {
   if (_pooledHandler) {
-    try {
-      _pooledHandler.clearAllConnectionsBang();
-    } catch {}
+    // clearAllConnectionsBang is async: its synchronous teardown runs here, but
+    // catch the returned promise so a drain rejection stays best-effort rather
+    // than surfacing as an unhandled rejection during test teardown.
+    _pooledHandler.clearAllConnectionsBang().catch(() => {});
   }
   _pooledHandler = null;
   _pooledPoolPromise = null;

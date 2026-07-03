@@ -187,8 +187,8 @@ describe("SchemaDumperAdapterTest", () => {
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
   });
 
@@ -332,7 +332,7 @@ describe("SchemaDumperAdapterTest", () => {
   // Drop the real tables these adapter-backed tests create on the shared
   // per-worker DB so they don't collide with sibling files under parallel forks.
   afterAll(async () => {
-    const cleanupCtx = new MigrationContext(createTestAdapter());
+    const cleanupCtx = new MigrationContext(await createTestAdapter());
     const o = { ifExists: true } as const;
     await cleanupCtx.dropTable("barcodes", o);
     await cleanupCtx.dropTable("horses", o);

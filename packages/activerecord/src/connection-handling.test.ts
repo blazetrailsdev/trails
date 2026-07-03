@@ -38,7 +38,7 @@ describe("ConnectionHandlingTest", () => {
 
   afterEach(async () => {
     connectedToStack().length = 0;
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     setPermanentConnectionCheckout(true);
   });
 
@@ -604,7 +604,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 describe("AbstractAdapter#isPreventingWrites stack matching", () => {
   afterEach(async () => {
     connectedToStack().length = 0;
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   });
 
   it("Base.connectedTo preventing writes applies globally to unrelated pools", async () => {
@@ -718,7 +718,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     // — clearing connections alone leaves a stale primary registry behind.
     (DatabaseConfigurations as any).current = prevCurrentConfigs;
     (Base as any).configurations = prevBaseConfigs;
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     delete (Base as any)._connectionSpecificationName;
   });
 
@@ -852,7 +852,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
   });
 
   afterEach(async () => {
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     Base.connectionSpecificationName = "Base";
   });
 
@@ -876,7 +876,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
 
 describe("establish_connection accepts a DatabaseConfig", () => {
   afterEach(async () => {
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   });
 
   // Mirrors Rails `establish_connection(db_config)` (the faithful
@@ -909,7 +909,7 @@ describe("loadConfigFile resolves config/database.* against Trails.root", () => 
 
   afterEach(async () => {
     setTrailsRoot(null);
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 

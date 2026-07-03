@@ -1,16 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("TypesTest", () => {
   setupFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: TEST_SCHEMA.posts });
-  });
-
   it("attributes which are invalid for database can still be reassigned", async () => {
     const TypeWhichCannotGoToTheDatabase = class extends ValueType {
       override serialize(): unknown {

@@ -5,10 +5,11 @@ import {
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
-import { queryConstraintsList } from "../persistence.js";
+import { compositeQueryConstraintsList } from "../persistence.js";
 import {
   sourceReflection,
   staleStateImpl as throughStaleState,
+  throughForeignKeyPresent,
   throughTargetScope,
 } from "./through-association.js";
 
@@ -57,6 +58,20 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * Mirrors Rails' `ThroughAssociation#foreign_key_present?` — a
+   * has_*_through is loadable for a *new* owner only when the through is a
+   * `belongsTo` and every through foreign-key column is set on the owner
+   * (e.g. an unpersisted `Cpk::BookWithOrderAgreements` whose `order` FK is
+   * populated from an in-memory persisted order). Without this override the
+   * base `foreignKeyPresent()` returns false, so `find_target?` refuses to
+   * query and the reader nils out.
+   * @internal
+   */
+  protected override foreignKeyPresent(): boolean {
+    return throughForeignKeyPresent(this);
+  }
+
+  /**
    * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#replace
    *
    * Dispatches through createThroughRecord instead of setting a direct FK.
@@ -64,82 +79,136 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const assigningAnother = !sameRecord(this.target, record);
-    // When assigning nil to an unloaded association, the through record may
-    // still exist in the DB. Schedule the pending replace so persistReplace
-    // loads the through proxy and destroys it when present — matching Rails'
-    // create_through_record(nil) which calls through_proxy.load_target first.
-    const mightNeedDelete = record === null && !this.isLoaded();
-    if (assigningAnother || mightNeedDelete || (record as any)?.hasChangesToSave?.()) {
-      if (save) {
-        // Store pending regardless of owner.isPersisted() — for new owners,
-        // persistReplace runs after owner.save() when owner is now persisted.
-        if (this._pendingReplace) {
-          const wasAssignedAnother = !sameRecord(
-            this._pendingReplace.previousTarget,
-            this._pendingReplace.record,
-          );
-          if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
-            this._pendingReplace = null;
+    // Rails' `create_through_record` build/assign arms (`owner.new_record? ||
+    // !save`) construct the join record in memory — no DB query. We run those
+    // synchronously here and persist the built through via its own has_one
+    // save on the owner's next `save` (`constructThroughRecordInMemory`), so
+    // we must NOT also queue a deferred `createThroughRecord` on this
+    // (has_one_through) association — that would double-write the join row.
+    const inMemory = record != null && ((this.owner as any).isNewRecord?.() || !save);
+    if (!inMemory) {
+      const assigningAnother = !sameRecord(this.target, record);
+      // When assigning nil to an unloaded association, the through record may
+      // still exist in the DB. Schedule the pending replace so persistReplace
+      // loads the through proxy and destroys it when present — matching Rails'
+      // create_through_record(nil) which calls through_proxy.load_target first.
+      const mightNeedDelete = record === null && !this.isLoaded();
+      if (assigningAnother || mightNeedDelete || (record as any)?.hasChangesToSave?.()) {
+        if (save) {
+          if (this._pendingReplace) {
+            const wasAssignedAnother = !sameRecord(
+              this._pendingReplace.previousTarget,
+              this._pendingReplace.record,
+            );
+            if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
+              this._pendingReplace = null;
+            } else {
+              this._pendingReplace.record = record;
+            }
           } else {
-            this._pendingReplace.record = record;
+            this._pendingReplace = { record, previousTarget: this.target };
           }
-        } else {
-          this._pendingReplace = { record, previousTarget: this.target };
         }
       }
     }
     this.target = record;
     this.loadedBang();
-    if (record) this.eagerBuildThroughForNewOwner(record);
+    if (record) this.constructThroughRecordInMemory(record, save);
   }
 
   /**
    * Rails' `create_through_record` builds the join record synchronously
    * inside `replace`. We otherwise defer that DB work to `persistReplace`
-   * (TS writers are sync, DB ops async). But when the owner is a *new*
-   * record and the through is a `belongsTo`, the join op is a pure
-   * in-memory `build` — no query — so we can run it eagerly here, matching
-   * Rails. This makes `owner.through` a `new_record?` immediately after
-   * assignment (e.g. `MemberDetail.new(member_type: t).member`).
+   * (TS writers are sync, DB ops async). But two of Rails' arms are pure
+   * in-memory `build`/`assign_attributes` — no query — so we run them
+   * eagerly here, matching Rails' `create_through_record`:
    *
-   * Scoped to belongsTo throughs only: hasOne/hasMany throughs keep the
-   * deferred create path so their save semantics stay untouched. The
-   * through macro is read off the resolved reflection (same registry as
-   * `throughReflection`/`ensureMutable`) rather than the per-class
-   * `_associations` array, so it survives class inheritance and stays
-   * consistent with the rest of this file.
+   *   - `owner.new_record? || !save` → `through_proxy.build(attributes)`
+   *     (the `!save` arm covers `build`/`create` on a *persisted* owner:
+   *     `member.association(:club).build` / `create_club`).
+   *   - an already-loaded *new* through record → `assign_attributes`.
+   *
+   * The persisted-through `update` and existing-through `create` arms are DB
+   * writes and stay on the deferred `persistReplace` → `createThroughRecord`
+   * path. This makes `owner.through` present (and `new_record?`) immediately
+   * after `build`/assignment, and lets owner autosave persist the built
+   * through record plus its source on the owner's next `save`.
+   *
+   * We only read the through proxy's in-memory `target`, never `loadTarget`
+   * (async). When that target is present and *persisted* — a persisted owner
+   * that already has a loaded join row (e.g. `create_current_membership!` then
+   * `build_club`) — we reconcile as Rails' `load_target` + `update` arm does:
+   * `assign_attributes` in memory and defer the join-row `update` to
+   * `createThroughRecord`, rather than building a duplicate. When there is no
+   * loaded target we `build`. This is exact for a new owner (no PK → Rails
+   * could not query either) and for the fresh `build`/`create` cases (no
+   * pre-existing join row). The one remaining divergence is `build`/`create` on
+   * a *persisted* owner whose pre-existing join row is *unloaded*: Rails'
+   * `load_target` would query and reconcile it, whereas we build a fresh one —
+   * reconciling that would require a synchronous DB read this write path cannot
+   * make, and it is not exercised by Rails' suite.
    * @internal
    */
-  private eagerBuildThroughForNewOwner(record: Base): void {
-    if (!(this.owner as any).isNewRecord?.()) return;
-    const tr = throughReflection(this) as {
-      macro?: string;
-      isBelongsTo?: () => boolean;
-    } | null;
-    const throughIsBelongsTo = tr?.isBelongsTo?.() ?? tr?.macro === "belongsTo";
-    if (!throughIsBelongsTo) return;
+  private constructThroughRecordInMemory(record: Base, save: boolean): void {
+    if (!((this.owner as any).isNewRecord?.() || !save)) return;
 
     ensureNotNested(this);
     const throughProxy = throughAssociation(this);
     if (!throughProxy) return;
     const attrs = constructJoinAttributes(this, record);
-    // For a new owner the through has no PK, so `load_target` (Rails) could
-    // not run a query — reading the in-memory `target` is equivalent and
-    // avoids the async hop. This equivalence relies on the isNewRecord gate
-    // above; loosening it would require `loadTarget()` to avoid a stale read.
-    const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
+    let throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
-      // Only the new-record arm runs synchronously here. A *persisted*
-      // through on a new owner is Rails' `through_record.update(attributes)`
-      // — that's a DB write, so we intentionally leave it to the deferred
-      // `persistReplace` → `createThroughRecord` path (which `update`s a
-      // loaded persisted through), consistent with this file's async model.
       if ((throughRecord as any).isNewRecord?.()) {
         (throughRecord as any).assignAttributes?.(attrs);
+      } else {
+        // Persisted owner already has a (loaded) join row: Rails'
+        // create_through_record runs `through_record.update(attributes)` on it
+        // rather than building a duplicate. We assign the new source in memory
+        // now (so the has_one_through source reads through immediately, e.g.
+        // `member.club == new_club` after `build_club`) and queue this
+        // association's own deferred `createThroughRecord`, which re-loads the
+        // persisted join row and `update`s it on the owner's next save. That
+        // deferred path — not the through proxy's `_pendingReplace` below —
+        // owns the persistence here, so the built/new-record autosave arm is
+        // skipped (throughRecord is not new) and no duplicate join is written.
+        (throughRecord as any).assignAttributes?.(attrs);
+        // Repeated build/create before save must re-point `record` at the
+        // latest source (mirrors the `_pendingReplace.record = record`
+        // reassignment in `replace()`): Rails runs `through_record.update`
+        // synchronously every call, so the last build wins. Leaving a stale
+        // `record` here would make the deferred `createThroughRecord`
+        // reconstruct attrs from an earlier club and silently revert the
+        // in-memory assignment on save.
+        // `previousTarget` is unread on this path: HasOneThroughAssociation's
+        // persistReplace consumes only `pending.record` (the base class's
+        // displaced-record nullify logic doesn't apply — the join row is
+        // reconciled via `update`, not replaced), so `null` is inert here.
+        if (this._pendingReplace) {
+          this._pendingReplace.record = record;
+        } else {
+          this._pendingReplace = { record, previousTarget: null };
+        }
       }
     } else {
-      throughProxy.build?.(attrs);
+      throughRecord = throughProxy.build?.(attrs) ?? null;
+    }
+    // A has_one_through's autosave target is the END record, and its
+    // persistence routes through `createThroughRecord` (join-model build/save),
+    // not the base `save_has_one_association` save. We reproduce Rails'
+    // through-side has_one autosave by queueing the built/assigned join record
+    // on the through association's own pending replace, which
+    // `flushPendingReplaces` runs on the owner's next save (cascading to the
+    // join record's belongs_to source, e.g. an unsaved `club`). The base
+    // `autosaveHasOne` defers to this queued replace rather than double-saving.
+    if (
+      throughRecord &&
+      (throughRecord as any).isNewRecord?.() &&
+      !(throughProxy as { _pendingReplace?: unknown })._pendingReplace
+    ) {
+      (throughProxy as { _pendingReplace?: unknown })._pendingReplace = {
+        record: throughRecord,
+        previousTarget: null,
+      };
     }
   }
 
@@ -296,15 +365,18 @@ function constructJoinAttributes(
     sourceRefl.primaryKey ??
     "id";
   const pkArr: string[] = Array.isArray(assocPk) ? assocPk : [assocPk];
-  // compositeQueryConstraintsList falls back to the PK for simple string PKs, which would
-  // incorrectly trigger the "pass object" branch. queryConstraintsList returns null for
-  // simple single-PK models (avoiding that branch) and the composite PK for CPK models.
-  const queryConstraints: string[] | null = reflKlass ? queryConstraintsList.call(reflKlass) : null;
-  const compositeConstraints: string[] = queryConstraints ?? [];
+  // Mirrors Rails' `Array(association_primary_key) == reflection.klass.composite_query_constraints_list`.
+  // For a single-PK join model this is `["id"] == ["id"]` → true, so the join
+  // is expressed in association-form (`{ club: record }`) rather than by raw
+  // FK value. That form carries the (possibly unsaved) source record itself, so
+  // owner autosave cascades to persist it — the FK-value form would stamp a nil
+  // id for a new source record.
+  const compositeConstraints: string[] = reflKlass
+    ? compositeQueryConstraintsList.call(reflKlass)
+    : [];
 
   let joinAttributes: Record<string, unknown>;
   if (
-    queryConstraints &&
     pkArr.length === compositeConstraints.length &&
     pkArr.every((k: string, i: number) => k === compositeConstraints[i]) &&
     !refl.options?.sourceType

@@ -1,19 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, afterAll, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTime } from "./date-time.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 setupFixtures();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ tasks: TEST_SCHEMA.tasks });
-});
-
 describe("DateTimeTest", () => {
   afterAll(() => {
     vi.unstubAllEnvs();

@@ -2305,7 +2305,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const throughName = this._assocDef.options.through!;
     const throughAssoc = associations.find((a: any) => a.name === throughName);
     if (!throughAssoc) return false;
-    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    // Rails reads `reflection.source_reflection.name` — the *actual* source
+    // association name, which for a collection source (e.g. `has_many :comments
+    // through: :posts`, source `Post#comments`) is plural. `singularize` would
+    // mis-guess `comment`, so prefer the resolved source reflection.
+    const sourceRefl = ctor._reflectOnAssociation?.(this._assocName)?.sourceReflection as
+      | { name?: string }
+      | undefined;
+    const sourceName =
+      sourceRefl?.name ?? this._assocDef.options.source ?? singularize(this._assocName);
     const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
     if (!sources) return false;
     for (const joinRecord of sources) {
@@ -2526,6 +2534,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       conditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
     }
     return (throughModel as any).where(conditions).deleteAll();
+  }
+
+  private async _nullifyThroughAll(): Promise<number> {
+    const assoc = this._record.association(this._assocName) as unknown as {
+      loadTarget: () => Promise<Base[]>;
+      deleteRecords: (records: Base[], method: string) => Promise<number>;
+    };
+    const target = await assoc.loadTarget();
+    if (target.length === 0) return 0;
+    return assoc.deleteRecords(target, "nullify");
   }
 
   /**
@@ -3749,7 +3767,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       // Nullify: set-based SQL update to null FKs (no per-record callbacks)
       if (this._isThrough) {
-        count = await this._deleteThroughAllSql();
+        // Rails `delete_or_nullify_all_records(:nullify)` → `delete_records`
+        // (has_many_through_association.rb:136-175) UPDATEs the source FK on the
+        // join rows to NULL — it does NOT delete them — and decrements the
+        // owner's counter caches. Delegate to the association layer (as `clear`
+        // does) so nullify semantics and counters are handled in one place,
+        // rather than `_deleteThroughAllSql`, which would DELETE the join rows.
+        count = await this._nullifyThroughAll();
       } else {
         const nullUpdates = this._buildNullifyUpdates();
         if (diverged) {

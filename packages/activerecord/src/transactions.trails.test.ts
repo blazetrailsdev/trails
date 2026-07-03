@@ -12,9 +12,7 @@ import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest
 import { Base, transaction } from "./index.js";
 import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -78,7 +76,32 @@ describe("TransactionTest", () => {
   setupFixtures();
 
   beforeAll(async () => {
-    await defineSchema({ topics: canonicalSchema.topics });
+    // Re-lay the canonical `topics` on the handler connection (drop-and-recreate,
+    // mirroring schema.rb's `create_table :topics`) so this file's signature
+    // cache is primed and a bespoke `topics` left behind by a sibling file can't
+    // shadow the CanonicalTopic model's shape. `topics` is boot-owned canonical,
+    // so it is not torn down (the boot schema owns/restores its shape).
+
+    await Base.connection.createTable("topics", { force: true }, (t) => {
+      t.string("title", { limit: 250 });
+      t.string("author_name");
+      t.string("author_email_address");
+      t.datetime("written_on");
+      t.time("bonus_time");
+      t.date("last_read");
+      t.text("content");
+      t.text("important");
+      t.binary("binary_content");
+      t.boolean("approved", { default: true });
+      t.integer("replies_count", { default: 0 });
+      t.integer("unique_replies_count", { default: 0 });
+      t.integer("parent_id");
+      t.string("parent_title");
+      t.string("type");
+      t.string("group");
+      t.timestamps({ null: true });
+      t.index(["author_name", "title"]);
+    });
   });
 
   describe("after_failure_actions on PreparedStatementCacheExpired", () => {
@@ -304,13 +327,13 @@ describe("SchemaAdapter TM delegation", () => {
 
   // These tests create rows in the shared `items` table (via createTestAdapter →
   // shared pool) outside of any transactional rollback guard. In PG, adapters
-  // pointing at the same database share the defineSchema signature cache, so a
-  // later file's defineSchema(TEST_SCHEMA) is a cache hit and does NOT drop the
+  // pointing at the same database share the create-table signature cache, so a
+  // later file's canonical schema load is a cache hit and does NOT drop the
   // table — leaving these rows visible to tests in other files (e.g. the
   // `EachTest > findEach yields each record` case in batches.test.ts which
   // expects an empty items table). Clean up unconditionally after all tests here.
   afterAll(async () => {
-    const a = createTestAdapter();
+    const a = await createTestAdapter();
     await a.executeMutation("DELETE FROM items");
   });
 
@@ -331,9 +354,16 @@ describe("SchemaAdapter TM delegation", () => {
     // signature cache stays isolated across tests in this describe; spy on
     // the shared real adapter via the sidecar — that's what the wrapper's
     // withinNewTransaction routes to and what TM dispatches against.
-    const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: canonicalSchema.items });
-    const { adapter: realAdapter } = createSidecarTestAdapter();
+    const testAdapter = await createTestAdapter();
+    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    // `items` is a boot-owned canonical table, so it is not torn down here (the
+    // describe's afterAll clears rows; the boot schema owns/restores the shape).
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await testAdapter.createTable("items", { force: true }, (t) => {
+      t.column("name", "string");
+    });
+    const { adapter: realAdapter } = await createSidecarTestAdapter();
     const spy = vi.spyOn(realAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
@@ -352,8 +382,15 @@ describe("SchemaAdapter TM delegation", () => {
     const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
-    const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: canonicalSchema.items });
+    const testAdapter = await createTestAdapter();
+    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    // `items` is a boot-owned canonical table, so it is not torn down here (the
+    // describe's afterAll clears rows; the boot schema owns/restores the shape).
+
+    await testAdapter.createTable("items", { force: true }, (t) => {
+      t.column("name", "string");
+    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -392,8 +429,15 @@ describe("SchemaAdapter TM delegation", () => {
     // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
     // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
-    const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: canonicalSchema.items });
+    const testAdapter = await createTestAdapter();
+    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    // `items` is a boot-owned canonical table, so it is not torn down here (the
+    // describe's afterAll clears rows; the boot schema owns/restores the shape).
+
+    await testAdapter.createTable("items", { force: true }, (t) => {
+      t.column("name", "string");
+    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -449,8 +493,15 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
-    const testAdapter = createTestAdapter();
-    await defineSchema(testAdapter, { items: canonicalSchema.items });
+    const testAdapter = await createTestAdapter();
+    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    // `items` is a boot-owned canonical table, so it is not torn down here (the
+    // describe's afterAll clears rows; the boot schema owns/restores the shape).
+
+    await testAdapter.createTable("items", { force: true }, (t) => {
+      t.column("name", "string");
+    });
     class Item extends Base {
       static {
         this.attribute("id", "integer");

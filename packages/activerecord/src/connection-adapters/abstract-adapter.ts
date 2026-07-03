@@ -597,6 +597,12 @@ export class AbstractAdapter implements Quoting {
   static dbWarningsIgnore: (string | RegExp)[] = [];
 
   constructor() {
+    // The module-level `include(...)` / callback / query-cache wiring is applied
+    // lazily on first construction rather than at module-evaluation time. This
+    // avoids a TDZ crash when the adapter graph is imported from a non-runtime
+    // entry point (e.g. `test-helpers/define-schema` → SchemaStatements) that
+    // re-enters this module mid-cycle before the mixin classes have initialized.
+    ensureAbstractAdapterMixinsApplied();
     // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
     this._visitor = this.arelVisitor();
   }
@@ -2409,78 +2415,95 @@ export class AbstractAdapter implements Quoting {
   }
 }
 
-// Rails: `include DatabaseStatements` inside the class body.
-include(AbstractAdapter, DatabaseStatements);
-// Rails: `include SchemaStatements` inside the class body.
-include(AbstractAdapter, SchemaStatements);
-// Rails: `include Quoting` inside the class body.
-include(AbstractAdapter, QuotingMixin);
-// Rails: `include QueryCache` inside the class body.
-include(AbstractAdapter, QueryCacheMixin);
-// Rails: `QueryCache.included` runs `set_callback :checkin, :after, :unset_query_cache!`
-// (query_cache.rb:17). We have no `included` hook, so register it here at the
-// include site instead.
-AbstractAdapter.setCallback("checkin", "after", function () {
-  (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
-});
-// Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
-// (abstract_adapter.rb:53), registered after the QueryCache include — so as an
-// `:after` callback (run in reverse registration order) it fires *before*
-// unset_query_cache!.
-AbstractAdapter.setCallback("checkin", "after", function () {
-  this.enableLazyTransactionsBang();
-});
-// Rails: `include Savepoints` inside the class body.
-include(AbstractAdapter, SavepointsMixin);
-// Rails: `include DatabaseLimits` inside the class body.
-include(AbstractAdapter, {
-  maxIdentifierLength,
-  tableNameLength,
-  tableAliasLength,
-  indexNameLength,
-  bindParamsLength,
-});
+// Whether the module-level mixin wiring below has been applied yet. Applying it
+// eagerly at module-evaluation time re-references the mixin classes
+// (SchemaStatements, DatabaseStatements, …) which, on a circular import edge
+// (define-schema → SchemaStatements → schema-dumper → base → abstract-adapter),
+// are still in their temporal dead zone — crashing with a ReferenceError. We
+// therefore defer the whole block into a function run once, lazily, from the
+// first AbstractAdapter construction, by which point every module has finished
+// evaluating. Instance methods only matter on instances, so first-construction
+// is early enough.
+let abstractAdapterMixinsApplied = false;
 
-// Rails' `QueryCache#select_all` overrides the base `select_all` and calls
-// `super` for the uncached path (query_cache.rb:236). The base `selectAll`
-// was just mixed in from DatabaseStatements above; capture it and reinstall a
-// cache-aware wrapper that delegates back to it. We do this here, after the
-// includes, rather than letting `include()` carry a `selectAll` — `include()`
-// never replaces a method the class already has, so the wrapping must be
-// explicit. Concrete adapters don't override `selectAll` (only `execQuery` /
-// `execute`), so every adapter shares this cached entry point.
-{
-  const baseSelectAll = AbstractAdapter.prototype.selectAll;
-  Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
-    value: makeCachedSelectAll(baseSelectAll as never),
-    writable: true,
-    configurable: true,
-    enumerable: false,
+/** @internal Applies the abstract-adapter mixin/callback/query-cache wiring once. */
+function ensureAbstractAdapterMixinsApplied(): void {
+  if (abstractAdapterMixinsApplied) return;
+  abstractAdapterMixinsApplied = true;
+
+  // Rails: `include DatabaseStatements` inside the class body.
+  include(AbstractAdapter, DatabaseStatements);
+  // Rails: `include SchemaStatements` inside the class body.
+  include(AbstractAdapter, SchemaStatements);
+  // Rails: `include Quoting` inside the class body.
+  include(AbstractAdapter, QuotingMixin);
+  // Rails: `include QueryCache` inside the class body.
+  include(AbstractAdapter, QueryCacheMixin);
+  // Rails: `QueryCache.included` runs `set_callback :checkin, :after, :unset_query_cache!`
+  // (query_cache.rb:17). We have no `included` hook, so register it here at the
+  // include site instead.
+  AbstractAdapter.setCallback("checkin", "after", function () {
+    (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
   });
-}
+  // Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
+  // (abstract_adapter.rb:53), registered after the QueryCache include — so as an
+  // `:after` callback (run in reverse registration order) it fires *before*
+  // unset_query_cache!.
+  AbstractAdapter.setCallback("checkin", "after", function () {
+    this.enableLazyTransactionsBang();
+  });
+  // Rails: `include Savepoints` inside the class body.
+  include(AbstractAdapter, SavepointsMixin);
+  // Rails: `include DatabaseLimits` inside the class body.
+  include(AbstractAdapter, {
+    maxIdentifierLength,
+    tableNameLength,
+    tableAliasLength,
+    indexNameLength,
+    bindParamsLength,
+  });
 
-// Rails: `QueryCache.included` runs `dirties_query_cache base, :exec_query,
-// :execute, :create, :insert, :update, :delete, ...` (query_cache.rb:13).
-// trails' writes don't funnel through `execQuery` (that's the read path); they
-// go through the `exec{Insert,Update,Delete}` / `create`/`insert`/`update`/`delete`
-// methods mixed in from DatabaseStatements, plus rollback paths. Wrapping
-// those clears the cache on every write while leaving reads untouched.
-// `create` is Rails' `alias create insert`; Rails lists it explicitly in the
-// dirties set, so we register it alongside `insert` for parity even though it
-// delegates there.
-dirtiesQueryCache(
-  AbstractAdapter,
-  "execInsert",
-  "execUpdate",
-  "execDelete",
-  "execInsertAll",
-  "create",
-  "insert",
-  "update",
-  "delete",
-  "truncate",
-  "truncateTables",
-  "rollbackDbTransaction",
-  "rollbackToSavepoint",
-  "restartDbTransaction",
-);
+  // Rails' `QueryCache#select_all` overrides the base `select_all` and calls
+  // `super` for the uncached path (query_cache.rb:236). The base `selectAll`
+  // was just mixed in from DatabaseStatements above; capture it and reinstall a
+  // cache-aware wrapper that delegates back to it. We do this here, after the
+  // includes, rather than letting `include()` carry a `selectAll` — `include()`
+  // never replaces a method the class already has, so the wrapping must be
+  // explicit. Concrete adapters don't override `selectAll` (only `execQuery` /
+  // `execute`), so every adapter shares this cached entry point.
+  {
+    const baseSelectAll = AbstractAdapter.prototype.selectAll;
+    Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
+      value: makeCachedSelectAll(baseSelectAll as never),
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+
+  // Rails: `QueryCache.included` runs `dirties_query_cache base, :exec_query,
+  // :execute, :create, :insert, :update, :delete, ...` (query_cache.rb:13).
+  // trails' writes don't funnel through `execQuery` (that's the read path); they
+  // go through the `exec{Insert,Update,Delete}` / `create`/`insert`/`update`/`delete`
+  // methods mixed in from DatabaseStatements, plus rollback paths. Wrapping
+  // those clears the cache on every write while leaving reads untouched.
+  // `create` is Rails' `alias create insert`; Rails lists it explicitly in the
+  // dirties set, so we register it alongside `insert` for parity even though it
+  // delegates there.
+  dirtiesQueryCache(
+    AbstractAdapter,
+    "execInsert",
+    "execUpdate",
+    "execDelete",
+    "execInsertAll",
+    "create",
+    "insert",
+    "update",
+    "delete",
+    "truncate",
+    "truncateTables",
+    "rollbackDbTransaction",
+    "rollbackToSavepoint",
+    "restartDbTransaction",
+  );
+}

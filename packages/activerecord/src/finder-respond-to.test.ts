@@ -1,17 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 let Topic: typeof Base;
 setupFixtures();
 useHandlerTransactionalFixtures();
 
-beforeAll(async () => {
-  await defineSchema({ topics: TEST_SCHEMA.topics });
-});
 // Recreate the model per test so a test that mutates the class (adds an
 // attribute, primes a finder cache, etc.) can't leak into later tests.
 beforeEach(() => {

@@ -44,8 +44,8 @@ import {
   MYSQL_TEST_URL,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
-function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
-  const adapter = createTestAdapter();
+async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
+  const adapter = await createTestAdapter();
   const ctx = new MigrationContext(adapter);
   return { adapter, ctx };
 }
@@ -57,7 +57,7 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
 // shape (a subset of the canonical TEST_SCHEMA — never a fabricated shape);
 // on the template lanes this is a cache-hit no-op.
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const adapter = await createTestAdapter();
   await defineSchema(adapter, { people: TEST_SCHEMA.people });
   return adapter;
 }
@@ -100,7 +100,7 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
 // people-migration tests add back off the shared canonical `people` table and
 // clears recorded versions — so sibling files see the pristine canonical shape.
 afterEach(async () => {
-  const adapter = createTestAdapter();
+  const adapter = await createTestAdapter();
   const ctx = new MigrationContext(adapter);
   try {
     // Gate the drop on the ADAPTER's live introspection, not `removeColumn`'s
@@ -135,7 +135,7 @@ afterEach(async () => {
 // does too); they leak into the shared per-worker DB, so drop each by name —
 // mirroring Rails' teardown — to avoid collisions with sibling files.
 afterAll(async () => {
-  const { ctx } = freshContext();
+  const { ctx } = await freshContext();
   const o = { ifExists: true } as const;
   await ctx.dropTable("big_numbers", o);
   await ctx.dropTable("binary_testings", o);
@@ -211,7 +211,7 @@ describe("MigrationTest", () => {
   });
 
   it("rename table with prefix and suffix", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
     await ctx.createTable("pre_old_suf", {}, (t) => {
@@ -240,7 +240,7 @@ describe("MigrationTest", () => {
       // PG-only, mirrors migration_test.rb: create a dedicated `my_schema`
       // Postgres schema and drive add/remove index on `my_schema.values`,
       // dropping the schema in the ensure — no canonical table involved.
-      const adapter = freshAdapter() as DatabaseAdapter & {
+      const adapter = (await freshAdapter()) as DatabaseAdapter & {
         createSchema(name: string): Promise<void>;
         dropSchema(name: string): Promise<void>;
         indexExists(table: string, column: string): Promise<boolean>;
@@ -276,8 +276,8 @@ describe("MigrationTest", () => {
 // ==========================================================================
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  return await createTestAdapter();
 }
 
 // ==========================================================================
@@ -285,15 +285,15 @@ function freshAdapter(): DatabaseAdapter {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople()/freshContext() isolation — adding setupFixtures() here
+// freshAdapterWithPeople()/await freshContext() isolation — adding setupFixtures() here
 // would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
 // MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
 // depend on. Same structural reason as transaction-instrumentation.test.ts.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("migration version matches component version", () => {
@@ -303,7 +303,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises if already exists", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     try {
       await ctx.createTable("testings", { force: true }, (t) => {
         t.string("foo");
@@ -340,7 +340,7 @@ describe("MigrationTest", () => {
     // `big_numbers` with decimal columns carrying explicit precision/scale, then
     // a BigNumber row is persisted and read back to assert the per-adapter
     // value/type semantics (the part the old columnsHash() stub dropped).
-    const { adapter, ctx } = freshContext();
+    const { adapter, ctx } = await freshContext();
     await ctx.dropTable("big_numbers", { ifExists: true });
     // GiveMeBigNumbers.up
     await ctx.createTable("big_numbers", {}, (t) => {
@@ -436,7 +436,7 @@ describe("MigrationTest", () => {
 
   it("instance based migration up", async () => {
     const migration = new MockMigration();
-    (migration as any).adapter = freshAdapter();
+    (migration as any).adapter = await freshAdapter();
     expect(migration.wentUp).toBe(false);
     expect(migration.wentDown).toBe(false);
 
@@ -447,7 +447,7 @@ describe("MigrationTest", () => {
 
   it("instance based migration down", async () => {
     const migration = new MockMigration();
-    (migration as any).adapter = freshAdapter();
+    (migration as any).adapter = await freshAdapter();
     expect(migration.wentUp).toBe(false);
     expect(migration.wentDown).toBe(false);
 
@@ -456,8 +456,8 @@ describe("MigrationTest", () => {
     expect(migration.wentDown).toBe(true);
   });
 
-  it("schema migrations table name", () => {
-    const { adapter } = freshContext();
+  it("schema migrations table name", async () => {
+    const { adapter } = await freshContext();
     const schemaMigration = new SchemaMigration(adapter);
     const originalTableName = Base.schemaMigrationsTableName;
     const savedPrefix = Base.tableNamePrefix;
@@ -486,7 +486,7 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     const error = await ctx
       .createTable("test_integer_limits", { force: true }, (t) => {
@@ -502,7 +502,7 @@ describe("MigrationTest", () => {
     // Rails creates `binary_testings` with a `t.column "data", :binary,
     // null: false` and asserts the persisted column's default is nil. Drive the
     // live create_table path and introspect the column.
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     await ctx.dropTable("binary_testings", { ifExists: true });
     await ctx.createTable("binary_testings", {}, (t) => {
       t.column("data", "binary", { null: false });
@@ -593,7 +593,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration context with default schema migration", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -624,7 +624,7 @@ describe("MigrationTest", () => {
   });
 
   it("migrator versions", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -688,7 +688,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration detection without schema migration table", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -702,7 +702,7 @@ describe("MigrationTest", () => {
   });
 
   it("any migrations", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const withMigrations = new Migrator(adapter, [
       {
         version: "1",
@@ -717,7 +717,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration version", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "20131219224947",
@@ -732,7 +732,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with if not exists true", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     await ctx.createTable("things", {}, (t) => {
       t.string("name");
     });
@@ -743,20 +743,20 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises for long table names", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     const longName = "a".repeat(65);
     await expect(ctx.createTable(longName, {})).rejects.toThrow(/too long/);
   });
 
   it("create table with force and if not exists", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     await expect(ctx.createTable("things", { force: true, ifNotExists: true })).rejects.toThrow(
       /cannot be used simultaneously/i,
     );
   });
 
   it("create table with indexes and if not exists true", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     // Own the scratch table for the whole test: under AR_ONE_SCHEMA the shared
     // schema is truncated (not dropped) between tests, so a leaked `things`
     // would make the first, non-ifNotExists create raise. Clear any leak up
@@ -777,7 +777,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
-    const { ctx } = freshContext();
+    const { ctx } = await freshContext();
     expect(ctx.tableExists("nonexistent")).toBe(false);
     await ctx.createTable("nonexistent", { force: true }, (t) => {
       t.string("name");
@@ -857,7 +857,7 @@ describe("MigrationTest", () => {
   });
 
   it("filtering migrations", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const ran: string[] = [];
     const migrations: MigrationProxy[] = [
       {
@@ -889,7 +889,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "100",
@@ -913,7 +913,7 @@ describe("MigrationTest", () => {
     "ddl_transactions",
     "migrator one up with exception and rollback using run",
     async () => {
-      const adapter = createTestAdapter();
+      const adapter = await createTestAdapter();
       const migrations: MigrationProxy[] = [
         {
           version: "100",
@@ -934,7 +934,7 @@ describe("MigrationTest", () => {
   );
 
   itIfSupports("ddl_transactions", "migration without transaction", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     let columnAdded = false;
 
     class MigWithoutTx extends Migration {
@@ -974,7 +974,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata table name", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const internalMetadata = new InternalMetadata(adapter);
     const originalTableName = Base.internalMetadataTableName;
@@ -998,7 +998,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when migration fails", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1022,7 +1022,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when other data exists", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1040,7 +1040,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata not used when not enabled", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
 
     const im = new InternalMetadata(adapter, { enabled: false });
@@ -1062,7 +1062,7 @@ describe("MigrationTest", () => {
   });
 
   it("inserting a new entry into internal metadata", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1071,7 +1071,7 @@ describe("MigrationTest", () => {
   });
 
   it("updating an existing entry into internal metadata", async () => {
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
@@ -1085,7 +1085,7 @@ describe("MigrationTest", () => {
     // invalidated after DDL rollback. Our tableExists() queries live (no cache),
     // so we verify the idempotent commit path instead — the underlying invariant
     // (no stale cache blocking re-creation) holds trivially in our implementation.
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
 
@@ -1120,7 +1120,7 @@ describe("MigrationTest", () => {
     // tableExists() queries live (no schema cache), so create_table is always
     // re-entrant across transactions. Verify that successive createTable() +
     // createVersion() pairs work correctly — the IF NOT EXISTS guard is idempotent.
-    const { adapter } = freshContext();
+    const { adapter } = await freshContext();
     const sm = new SchemaMigration(adapter);
 
     // First transaction: create + write + commit
@@ -1156,7 +1156,7 @@ describe("MigrationTest", () => {
   });
 
   it("add drop table with prefix and suffix", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const savedPrefix = Base.tableNamePrefix;
     const savedSuffix = Base.tableNameSuffix;
     Base.tableNamePrefix = "prefix_";
@@ -1208,7 +1208,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with query", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("people_src", {}, (t) => {
       t.integer("person_id");
@@ -1234,7 +1234,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with query from relation", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("people_src2", {}, (t) => {
       t.integer("person_id");
@@ -1256,7 +1256,7 @@ describe("MigrationTest", () => {
   it.skipIf(adapterType !== "sqlite")(
     "allows sqlite3 rollback on invalid column type",
     async () => {
-      const adapter = freshAdapter();
+      const adapter = await freshAdapter();
       const ctx = new MigrationContext(adapter);
       await ctx.createTable("something", { force: true }, (t) => {
         t.integer("number");
@@ -1273,7 +1273,7 @@ describe("MigrationTest", () => {
   );
 
   itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
-    const { adapter: realAdapter } = createSidecarTestAdapter();
+    const { adapter: realAdapter } = await createSidecarTestAdapter();
     const migrator = new Migrator(realAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
@@ -1289,7 +1289,7 @@ describe("MigrationTest", () => {
 
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
     // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
-    const testAdapter = createTestAdapter();
+    const testAdapter = await createTestAdapter();
     const migrator = new Migrator(testAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     // Must fit in a signed 63-bit integer
@@ -1344,7 +1344,7 @@ describe("MigrationTest", () => {
       // the adapter's single persistent pg.Client (no separate pinned
       // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
       // the same session is the closure proof.
-      const { adapter: realAdapter } = createSidecarTestAdapter();
+      const { adapter: realAdapter } = await createSidecarTestAdapter();
       const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
       const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
       try {
@@ -1378,7 +1378,7 @@ describe("MigrationTest", () => {
   );
 
   it.skipIf(adapterType === "sqlite")("out of range text limit should raise", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     const error = await ctx
       .createTable("test_text_limits", { force: true }, (t) => {
@@ -1391,7 +1391,7 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     const error = await ctx
       .createTable("test_binary_limits", { force: true }, (t) => {
@@ -1404,7 +1404,7 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType !== "mysql")("invalid text size should raise", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const ctx = new MigrationContext(adapter);
     const error = await ctx
       .createTable("test_text_sizes", { force: true }, (t) => {
@@ -1424,7 +1424,7 @@ describe("MigrationTest", () => {
       // canonical table instead of reshaping it, exercising the same reserved-word
       // add_index/remove_index path on an existing canonical column and removing
       // the index in the test so nothing leaks.
-      const adapter = createTestAdapter();
+      const adapter = await createTestAdapter();
       await defineSchema(adapter, { values: TEST_SCHEMA.values });
       const ctx = new MigrationContext(adapter);
       await ctx.addIndex("values", "group_id");
@@ -1439,7 +1439,7 @@ describe("MigrationTest", () => {
       // Ride the canonical `values` table (see the ReservedWords test above):
       // add an explicitly named index on an existing canonical column, then drop
       // it by name within the test so the canonical table is never reshaped.
-      const adapter = createTestAdapter();
+      const adapter = await createTestAdapter();
       await defineSchema(adapter, { values: TEST_SCHEMA.values });
       const ctx = new MigrationContext(adapter);
       await ctx.addIndex("values", "group_id", { name: "a_different_name" });
@@ -1452,8 +1452,8 @@ describe("MigrationTest", () => {
   describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     // Helper for bulk alter table tests — fresh adapter per test via beforeEach
     let bulkAdapter: DatabaseAdapter;
-    beforeEach(() => {
-      bulkAdapter = freshAdapter();
+    beforeEach(async () => {
+      bulkAdapter = await freshAdapter();
     });
     function makeBulkMig(m: Migration): Migration {
       (m as any).adapter = bulkAdapter;
@@ -1690,7 +1690,7 @@ describe("MigrationTest", () => {
 
   describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
     it("bulk revert", async () => {
-      const rvAdapter = freshAdapter();
+      const rvAdapter = await freshAdapter();
       function makeRvMig(m: Migration): Migration {
         (m as any).adapter = rvAdapter;
         return m;
@@ -1900,7 +1900,7 @@ describe("MigrationTest", () => {
     });
 
     it("check pending with stdlib logger", async () => {
-      const cpAdapter = freshAdapter();
+      const cpAdapter = await freshAdapter();
       class CPM1 extends Migration {
         static version = "001";
         async change() {
@@ -1930,7 +1930,7 @@ describe("MigrationTest", () => {
         expect(new LongV().version).toBe("123456789012345");
       });
 
-      it("migration raises if timestamp is future date", () => {
+      it("migration raises if timestamp is future date", async () => {
         const savedValidate = Migrator.validateMigrationTimestamps;
         try {
           Migrator.validateMigrationTimestamps = true;
@@ -1940,9 +1940,10 @@ describe("MigrationTest", () => {
             static version = ts;
             async change() {}
           }
+          const futureAdapter = await createTestAdapter();
           expect(
             () =>
-              new Migrator(createTestAdapter(), [
+              new Migrator(futureAdapter, [
                 { name: "test_migration", version: ts, migration: () => new FutureM() },
               ]),
           ).toThrow(/Invalid timestamp/);
@@ -2149,7 +2150,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 
 // Connection-fallback tests need a live Base connection pool (Rails leases the
 // migration connection from ActiveRecord::Base), so they run under
-// setupFixtures rather than the freshAdapter()-per-test MigrationTest block.
+// setupFixtures rather than the await freshAdapter()-per-test MigrationTest block.
 describe("MigrationTest", () => {
   setupFixtures();
 

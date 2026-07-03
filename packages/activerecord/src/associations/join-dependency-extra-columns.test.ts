@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency extra columns in instantiate", () => {
-  let adapter: ReturnType<typeof createTestAdapter>;
+  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
 
   class Post extends Base {
     static {
@@ -22,8 +22,8 @@ describe("JoinDependency extra columns in instantiate", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Post, Comment]) {
       m.adapter = adapter;
       m._associations = [];

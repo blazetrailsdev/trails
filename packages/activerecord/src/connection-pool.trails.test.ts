@@ -76,14 +76,13 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 
 /**
  * Tear down a pool-under-test, awaiting each adapter's async `driver.close()`
- * before returning. The sync `disconnect()` discards those drain promises
- * (Rails-synchronous behavior), so an async-only SQLite driver's handle could
- * still be closing when the next test's `makeAmbientPool()` reopens the same
- * ambient DB; `disconnectAsync()` awaits the drains, avoiding that race.
+ * before returning. `disconnect()` awaits those drain promises, so an
+ * async-only SQLite driver's handle is fully closed before the next test's
+ * `makeAmbientPool()` reopens the same ambient DB, avoiding a race.
  * (`conn.close()` would only checkin the connection, not close the driver.)
  */
 async function closePoolConnections(pool: ConnectionPool): Promise<void> {
-  await pool.disconnectAsync();
+  await pool.disconnect();
 }
 
 function makePool(size: number = 5): ConnectionPool {
@@ -213,7 +212,7 @@ it("disconnect calls disconnectBang on each pooled connection", async () => {
   (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
   (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
 
   expect(spy1).toHaveBeenCalled();
   expect(spy2).toHaveBeenCalled();
@@ -228,7 +227,7 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(stat.busy).toBe(0);
   expect(stat.idle).toBe(1);
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
   // After disconnect, the pool is fully drained.
   expect(pool.stat().connections).toBe(0);
 });
@@ -247,7 +246,7 @@ it("clearReloadableConnections only disconnects reloadable adapters", async () =
   (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
   (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
 
-  pool.clearReloadableConnectionsBang();
+  await pool.clearReloadableConnectionsBang();
 
   expect(spy1).toHaveBeenCalled();
   expect(spy2).not.toHaveBeenCalled();

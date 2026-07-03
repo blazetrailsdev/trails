@@ -7,6 +7,7 @@ import type {
   ColumnSpec,
   AnyPrimitiveColumnSpec,
   PrimitiveColumnSpec,
+  IndexSpec,
 } from "./define-schema.js";
 import {
   COLUMN_TYPE_MAP_PG,
@@ -14,6 +15,9 @@ import {
   COLUMN_TYPE_MAP_SQLITE,
   serialIdType,
 } from "./define-schema.js";
+import { emitTableIndexes } from "./canonical-schema.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { AddIndexOptions } from "../connection-adapters/abstract/schema-definitions.js";
 
 const MINI_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -326,5 +330,206 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
         );
       }
     }
+  });
+});
+
+// PARITY GUARD — schema-file-generator.ts hand-mirrors the schema.rb index
+// option gating (schema-file-generator.ts:178-204) that the canonical loader
+// applies in canonical-schema.ts's exported `emitTableIndexes`. A one-sided edit
+// reintroduces the silent-drift class PR #4461 fixed for the per-adapter TYPE map
+// — see the type-map parity guard above (PR #4464), which deliberately scoped out
+// this index-gating surface.
+//
+// The parity partner is `canonical-schema.ts`, NOT `define-schema.ts`: RFC 0059
+// phase 4 (retire-defineschema-and-one-schema-apparatus) DELETES define-schema,
+// so anchoring here would die with the DSL. Both `schema-file-generator.ts` and
+// `canonical-schema.ts` outlive that retirement, and both hand-mirror the same
+// schema.rb gating — so this guard drives BOTH through a recording adapter and
+// asserts they issue the same `addIndex(columns, options)` calls:
+//
+//   - `length:` sub-part prefix is MySQL-only DDL, dropped for non-MySQL in both.
+//   - unique/where/name/order/nullsNotDistinct/using/type pass through verbatim.
+//   - expression indexes (`"(lower(x))"`) gate per adapter — the KNOWN residual
+//     below, since the generator has no DB version.
+type RecordedIndex = { columns: string | string[]; options: Record<string, unknown> };
+
+// A recording context capturing every `addIndex` with the exact options object
+// the emitter passed. `createTable` runs the column callback against a no-op
+// table builder (columns aren't under test here); `dropTable` is the only other
+// surface the generated module touches.
+function makeIndexRecorder(): { recorded: RecordedIndex[]; ctx: Record<string, unknown> } {
+  const recorded: RecordedIndex[] = [];
+  const noopTable = { column: () => {} };
+  const ctx: Record<string, unknown> = {
+    dropTable: async () => {},
+    createTable: async (_name: string, _opts: unknown, cb?: (t: typeof noopTable) => void) => {
+      cb?.(noopTable);
+    },
+    addIndex: async (
+      _table: string,
+      columns: string | string[],
+      options: Record<string, unknown>,
+    ) => {
+      recorded.push({ columns, options });
+    },
+  };
+  return { recorded, ctx };
+}
+
+// Strip `undefined` values (canonical-schema.ts passes every option key,
+// undefined where absent; the generator omits absent keys) so the two normalize
+// equal.
+function normalizeIndexOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(options)) if (v !== undefined) out[k] = v;
+  return out;
+}
+
+function normalizeRecorded(recorded: RecordedIndex[]): string {
+  return JSON.stringify(
+    recorded.map((r) => ({ columns: r.columns, options: normalizeIndexOptions(r.options) })),
+  );
+}
+
+// Drive the GENERATOR: emit the schema file, dynamic-import it (the real
+// loadSchema path — DatabaseTasks.loadSchema imports the same file:// URL), and
+// run its default export against the recorder.
+async function generatorIndexes(
+  schema: Schema,
+  adapter: string,
+  supportsExpressionIndex?: boolean,
+): Promise<RecordedIndex[]> {
+  const filePath = await generateSchemaFile(schema, adapter, supportsExpressionIndex);
+  const path = await getPathAsync();
+  const href = path.pathToFileURL!(filePath).href;
+  const mod = (await import(href)) as { default: (ctx: unknown) => Promise<void> };
+  const { recorded, ctx } = makeIndexRecorder();
+  await mod.default(ctx);
+  const fs = await getFsAsync();
+  fs.unlinkSync(filePath);
+  return recorded;
+}
+
+// Drive the CANONICAL loader's shared `emitTableIndexes` (the real code
+// canonical-schema.ts's boot path runs) against the recorder and a fake
+// pool-less adapter. `supportsExpressionIndex` mimics the live DB capability the
+// runtime check reads (MySQL ≥ 8.0.13 / SQLite ≥ 3.9 true, MariaDB false);
+// `getDatabaseVersion` is awaited first by the real gate.
+async function canonicalIndexes(
+  indexes: Parameters<typeof emitTableIndexes>[3],
+  adapter: string,
+  supportsExpressionIndex: boolean,
+): Promise<RecordedIndex[]> {
+  const { recorded, ctx } = makeIndexRecorder();
+  const ss = ctx as unknown as {
+    addIndex(table: string, columns: string | string[], options: AddIndexOptions): Promise<void>;
+  };
+  const fakeAdapter = {
+    adapterName: adapter,
+    supportsExpressionIndex: () => supportsExpressionIndex,
+    getDatabaseVersion: async () => {},
+  } as unknown as AbstractAdapter;
+  await emitTableIndexes(ss, fakeAdapter, "parity_probe", indexes);
+  return recorded;
+}
+
+// One table's indexes exercising every option plus an expression index, in
+// canonical-schema.ts's `{ columns, opts }` shape. Boolean flags are only ever
+// set truthy (never explicit `false`) so the generator's truthy
+// `if (index.unique)` omission and the loader's always-passed `unique: opts.unique`
+// normalize identically. `GENERATOR_SCHEMA` flattens the same specs into the
+// generator's `IndexSpec` input.
+const PARITY_INDEXES: Parameters<typeof emitTableIndexes>[3] = [
+  { columns: "title", opts: { unique: true, name: "idx_probe_title", where: "rating > 0" } },
+  { columns: ["title", "rating"], opts: { order: { rating: "desc" }, length: { title: 10 } } },
+  {
+    columns: "rating",
+    opts: { length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
+  },
+  { columns: "(lower(external_id))", opts: {} },
+];
+const PARITY_EXPRESSION_INDEX = "(lower(external_id))";
+const GENERATOR_INDEXES: IndexSpec[] = PARITY_INDEXES.map((i) => ({
+  columns: i.columns,
+  ...i.opts,
+}));
+const GENERATOR_SCHEMA: Schema = {
+  parity_probe: {
+    columns: {
+      title: "string",
+      rating: "integer",
+      body: "text",
+      external_id: "string",
+    },
+    indexes: GENERATOR_INDEXES,
+  },
+};
+
+describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
+  // On PG/SQLite the generator keeps expression indexes (its coarse skip is
+  // MySQL-only) and the loader keeps them when the adapter supports them — so
+  // drive `emitTableIndexes` with `supportsExpressionIndex: true` to match.
+  for (const adapter of ["postgres", "sqlite"] as const) {
+    it(`emits the same addIndex calls as canonical-schema.ts on ${adapter}`, async () => {
+      const [gen, canon] = await Promise.all([
+        generatorIndexes(GENERATOR_SCHEMA, adapter),
+        canonicalIndexes(PARITY_INDEXES, adapter, true),
+      ]);
+      // All four indexes survive on PG/SQLite (expression kept). Pin the count
+      // so the equality below can't pass vacuously if the schema wrapper stops
+      // being recognized and both sides silently record zero indexes.
+      expect(gen).toHaveLength(PARITY_INDEXES.length);
+      expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
+    });
+  }
+
+  // On MySQL the generator drops every expression index unconditionally; the
+  // MariaDB reality (no expression-index support) makes the loader drop it too,
+  // so the deterministic surface — length gating + pass-through options — stays
+  // in lockstep. (The MySQL-8 divergence is the tracked residual below.)
+  it("emits the same addIndex calls as canonical-schema.ts on mysql (MariaDB, no expression index)", async () => {
+    const [gen, canon] = await Promise.all([
+      generatorIndexes(GENERATOR_SCHEMA, "mysql"),
+      canonicalIndexes(PARITY_INDEXES, "mysql", false),
+    ]);
+    // Only the expression index is dropped, so the other three survive — pin
+    // the count so the equality can't pass vacuously.
+    expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
+    expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
+    // Length survives on MySQL (both keep it) and the expression index is
+    // dropped by both — pin those two gates explicitly.
+    expect(gen.some((r) => r.options.length !== undefined)).toBe(true);
+    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
+  });
+
+  it("drops sub-part index length: for non-MySQL adapters (both emitters)", async () => {
+    for (const adapter of ["postgres", "sqlite"] as const) {
+      const [gen, canon] = await Promise.all([
+        generatorIndexes(GENERATOR_SCHEMA, adapter),
+        canonicalIndexes(PARITY_INDEXES, adapter, true),
+      ]);
+      expect(gen.every((r) => r.options.length === undefined)).toBe(true);
+      expect(canon.every((r) => normalizeIndexOptions(r.options).length === undefined)).toBe(true);
+    }
+  });
+
+  // Expression-index gating parity on MySQL 8. The generator now threads the
+  // caller-resolved `supportsExpressionIndex` capability (MySQL >= 8.0.13,
+  // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql"`
+  // skip, so on a live MySQL 8 (supportsExpressionIndex true) it keeps the
+  // expression index — matching canonical-schema.ts's `emitTableIndexes`, which
+  // uses the same runtime check. (Previously the PR #4471 tracked residual: the
+  // two diverged because the generator had no DB version. Closed by threading
+  // the capability flag from the caller into `generateSchemaFile`.)
+  it("emits the same addIndex calls as canonical-schema.ts on mysql 8 (expression index kept)", async () => {
+    const [gen, canonMysql8] = await Promise.all([
+      generatorIndexes(GENERATOR_SCHEMA, "mysql", true),
+      canonicalIndexes(PARITY_INDEXES, "mysql", true),
+    ]);
+    // All four indexes survive on MySQL 8 (expression kept). Pin the count so
+    // the equality below can't pass vacuously.
+    expect(gen).toHaveLength(PARITY_INDEXES.length);
+    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(true);
+    expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canonMysql8));
   });
 });

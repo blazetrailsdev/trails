@@ -10,7 +10,6 @@ import {
 import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
-import { defineSchema } from "./define-schema.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 
 interface AdapterWithExec {
@@ -32,7 +31,7 @@ describe("withTransactionalFixtures", () => {
   const a = (): AdapterWithExec => adapter as unknown as AdapterWithExec;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     await a().exec(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
@@ -53,7 +52,8 @@ describe("withTransactionalFixtures", () => {
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {
-    const tm = (createSidecarTestAdapter().adapter as unknown as TmHandle).transactionManager;
+    const tm = ((await createSidecarTestAdapter()).adapter as unknown as TmHandle)
+      .transactionManager;
     await tm.beginTransaction({});
     await a().exec(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
     await tm.commitTransaction();
@@ -78,7 +78,7 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
-    await defineSchema(adapter, { cache_inval_users: { name: "string" } });
+    await adapter.createTable("cache_inval_users", (t) => t.string("name"));
   });
 
   afterAll(async () => {
@@ -108,80 +108,6 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
   });
 });
 
-// Parallel to schemaCache: defineSchema maintains its own per-adapter
-// signature WeakMap so repeated `defineSchema(adapter, sameSpec)` is a
-// no-op. If a test runs `defineSchema(...)` inside an `it()` body, the
-// rolled-back table at the DB would otherwise be paired with a stale
-// signature entry — the next test's `defineSchema` would think the table
-// still exists and skip recreating it.
-describe("withTransactionalFixtures (defineSchema signature cache invalidation)", () => {
-  let adapter: AbstractSQLite3Adapter;
-
-  beforeAll(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
-  });
-
-  afterAll(async () => {
-    await adapter.close();
-  });
-
-  withTransactionalFixtures(() => adapter);
-
-  it("defineSchema inside a test populates the signature cache", async () => {
-    await defineSchema(adapter, { defsig_table: { name: "string" } });
-    const cols = await adapter.columns("defsig_table");
-    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
-  });
-
-  it("next test re-runs defineSchema and the rolled-back table is recreated", async () => {
-    // If the signature cache hadn't been cleared, `defineSchema` would
-    // short-circuit on the cached signature without recreating the
-    // table. On SQLite `adapter.columns()` against a missing table
-    // raises StatementInvalid (Rails `table_structure` raises when the
-    // PRAGMA yields no rows), so the bug would surface as a throw here.
-    await defineSchema(adapter, { defsig_table: { name: "string" } });
-    const cols = await adapter.columns("defsig_table");
-    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
-  });
-});
-
-// The signature-cache invalidation must NOT discard entries created
-// outside the rolled-back test transaction (e.g. tables registered in
-// `beforeAll`). For raw adapters, defineSchema treats a missing
-// signature as "table doesn't exist" — wiping the whole map would cause
-// a follow-up `defineSchema(adapter, sameSpec)` to CREATE TABLE over
-// the still-existing beforeAll table and fail.
-describe("withTransactionalFixtures (preserves beforeAll signatures across rollback)", () => {
-  let adapter: AbstractSQLite3Adapter;
-
-  beforeAll(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
-    // Outer-transaction table — must survive rollback in afterEach.
-    await defineSchema(adapter, { outer_table: { name: "string" } });
-  });
-
-  afterAll(async () => {
-    await adapter.close();
-  });
-
-  withTransactionalFixtures(() => adapter);
-
-  it("test adds an inner table via defineSchema", async () => {
-    await defineSchema(adapter, {
-      outer_table: { name: "string" },
-      inner_table: { label: "string" },
-    });
-  });
-
-  it("next test re-calls defineSchema with the same beforeAll spec — must be a no-op", async () => {
-    // If the signature cache were fully wiped, this call would treat
-    // outer_table as new and try to CREATE TABLE over the live table.
-    await defineSchema(adapter, { outer_table: { name: "string" } });
-    const cols = await adapter.columns("outer_table");
-    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
-  });
-});
-
 // Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
 // raw DatabaseAdapter directly instead of going through createTestAdapter().
 // The helper must accept that shape — `transactionManager` lives on the
@@ -193,7 +119,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
-    await defineSchema(adapter, { raw_fixture_users: { name: "string" } });
+    await adapter.createTable("raw_fixture_users", (t) => t.string("name"));
   });
 
   afterAll(async () => {
@@ -222,10 +148,8 @@ describe("withTransactionalFixtures (per-table re-reflection preserves untouched
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
-    await defineSchema(adapter, {
-      pertable_touched: { name: "string" },
-      pertable_untouched: { name: "string" },
-    });
+    await adapter.createTable("pertable_touched", (t) => t.string("name"));
+    await adapter.createTable("pertable_untouched", (t) => t.string("name"));
   });
 
   afterAll(async () => {
@@ -260,7 +184,7 @@ describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
-    await defineSchema(adapter, { opt_out_cache_users: { name: "string" } });
+    await adapter.createTable("opt_out_cache_users", (t) => t.string("name"));
   });
 
   afterAll(async () => {
@@ -333,8 +257,8 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
-    const { adapter: sidecarA } = createSidecarTestAdapter();
-    const { adapter: sidecarB } = createSidecarTestAdapter();
+    const { adapter: sidecarA } = await createSidecarTestAdapter();
+    const { adapter: sidecarB } = await createSidecarTestAdapter();
 
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
@@ -389,8 +313,8 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
   });
 
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
-  it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
-    const { adapter } = createSidecarTestAdapter();
+  it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", async () => {
+    const { adapter } = await createSidecarTestAdapter();
     // Pool-leased adapters return NullTransaction (not null) when no transaction
     // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
     expect(adapter.openTransactions).toBe(0);

@@ -264,7 +264,7 @@ describe("TestDatabasesTest", () => {
   });
 
   it("createAndMigrate runs migrations on all adapters", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const log: string[] = [];
     const migrations: MigrationProxy[] = [
       {
@@ -284,7 +284,11 @@ describe("TestDatabasesTest", () => {
   });
 
   it("eachDatabase iterates all adapters", async () => {
-    const adapters = [createTestAdapter(), createTestAdapter(), createTestAdapter()];
+    const adapters = [
+      await createTestAdapter(),
+      await createTestAdapter(),
+      await createTestAdapter(),
+    ];
     const visited: number[] = [];
 
     await eachDatabase(adapters, async (_adapter, index) => {

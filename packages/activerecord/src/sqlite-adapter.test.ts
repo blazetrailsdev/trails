@@ -250,12 +250,12 @@ describe("SQLite adapter driver binding", () => {
     const rows = await conn.execute("SELECT name FROM pool_t");
     expect(rows).toEqual([{ name: "pooled" }]);
     await conn.internalExecute("DROP TABLE IF EXISTS pool_t", "SCHEMA");
-    pool.disconnectBang();
+    await pool.disconnectBang();
   });
 
-  it("pool disconnectAsync drains an in-flight async-only close before resolving", async () => {
+  it("pool disconnect drains an in-flight async-only close before resolving", async () => {
     // Pool teardown with an async-only driver: disconnectBang() fires
-    // driver.close() but can't await it (sync void contract). disconnectAsync
+    // driver.close() but can't await it (sync void contract). disconnect()
     // must drain the per-adapter _closingDriver so the handle is fully closed
     // before a subsequent re-open of the same DB races the prior handle.
     let closed = false;
@@ -295,16 +295,16 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("DROP TABLE IF EXISTS drain_t", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS drain_t", "SCHEMA");
 
-    const draining = pool.disconnectAsync();
+    const draining = pool.disconnect();
     expect(closed).toBe(false);
     resolveClose!();
     await draining;
     expect(closed).toBe(true);
   });
 
-  it("pool disconnectAsync no-ops to a resolved promise for a sync driver", async () => {
+  it("pool disconnect no-ops to a resolved promise for a sync driver", async () => {
     // better-sqlite3 closes synchronously inside disconnectBang(); the drain
-    // contributes nothing and disconnectAsync still resolves.
+    // contributes nothing and disconnect() still resolves.
     const dbConfig = new HashConfig("test", "primary", { adapter: "sqlite3" });
     const poolConfig = new PoolConfig(
       new ConnectionDescriptor("primary"),
@@ -323,7 +323,7 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("CREATE TABLE sync_drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_drain_t", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_drain_t", "SCHEMA");
-    await expect(pool.disconnectAsync()).resolves.toBeUndefined();
+    await expect(pool.disconnect()).resolves.toBeUndefined();
     expect(conn.active).toBe(false);
   });
 
@@ -369,7 +369,7 @@ describe("SQLite adapter driver binding", () => {
       { adapterFactory },
     );
 
-  it("pool clearReloadableConnectionsAsync drains an in-flight async-only close", async () => {
+  it("pool clearReloadableConnections drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const poolConfig = makePoolConfig(
       () =>
@@ -388,14 +388,14 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("DROP TABLE IF EXISTS reload_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
 
-    const draining = pool.clearReloadableConnectionsAsync();
+    const draining = pool.clearReloadableConnections();
     expect(isClosed()).toBe(false);
     release();
     await draining;
     expect(isClosed()).toBe(true);
   });
 
-  it("pool flushBangAsync drains an in-flight async-only close", async () => {
+  it("pool flushBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
       makePoolConfig(
@@ -407,14 +407,14 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("DROP TABLE IF EXISTS flush_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
 
-    const draining = pool.flushBangAsync();
+    const draining = pool.flushBang();
     expect(isClosed()).toBe(false);
     release();
     await draining;
     expect(isClosed()).toBe(true);
   });
 
-  it("pool discardBangAsync drains an in-flight async-only close", async () => {
+  it("pool discardBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
       makePoolConfig(
@@ -425,11 +425,11 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
     // Rails' discard! abandons the handle without closing; fire the async close
-    // directly on the still-pooled adapter so discardBangAsync has an in-flight
+    // directly on the still-pooled adapter so discardBang has an in-flight
     // close to drain before it drops the pool's references.
     conn.disconnectBang();
 
-    const draining = pool.discardBangAsync();
+    const draining = pool.discardBang();
     expect(isClosed()).toBe(false);
     release();
     await draining;
@@ -485,9 +485,9 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("CREATE TABLE sync_seam_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_seam_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
-    await expect(pool.flushBangAsync()).resolves.toBeUndefined();
-    await expect(pool.clearReloadableConnectionsAsync()).resolves.toBeUndefined();
-    await expect(pool.discardBangAsync()).resolves.toBeUndefined();
+    await expect(pool.flushBang()).resolves.toBeUndefined();
+    await expect(pool.clearReloadableConnections()).resolves.toBeUndefined();
+    await expect(pool.discardBang()).resolves.toBeUndefined();
     await expect(pool.drainPendingCloses()).resolves.toBeUndefined();
   });
 

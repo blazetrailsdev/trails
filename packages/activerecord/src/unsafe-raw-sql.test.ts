@@ -2,11 +2,11 @@
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { UnknownAttributeReference, registerModel } from "./index.js";
+import { Base, UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -23,13 +23,10 @@ describe("UnsafeRawSqlTest", () => {
   // Shield against the shared-worker `posts` collision: sibling files that
   // physically replace `posts` with a title-only shape survive into this suite
   // because the canonical preload keeps signatures cache-warm (a plain
-  // defineSchema is a no-op). `dropExisting` rebuilds `posts`/`comments` from
-  // the canonical schema verbatim so fixture seeding finds the `body` column.
+  // schema load is a no-op). Drop + recreate `posts`/`comments` from the
+  // canonical schema verbatim so fixture seeding finds the `body` column.
   beforeAll(async () => {
-    await defineSchema(
-      { posts: canonicalSchema.posts, comments: canonicalSchema.comments },
-      { dropExisting: true },
-    );
+    await rebuildCanonicalTables(Base.connection, ["posts", "comments"]);
   });
 
   it("order: allows string column name", async () => {

@@ -37,9 +37,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
   // This double has no real raw connection; report active so checkout's
   // verify! is a no-op (mirroring Rails, where the pinned connection is
-  // active and verify! returns without reconnecting).
+  // active and verify! returns without reconnecting). Backed by a mutable
+  // field so a test can simulate the connection dying mid-session.
+  activeFlag = true;
   override get active(): boolean {
-    return true;
+    return this.activeFlag;
   }
   readonly inTransaction = false;
 
@@ -113,7 +115,7 @@ it("checkout after close", async () => {
   expect(conn).toBeTruthy();
   pool.releaseConnection();
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
 
   // After disconnect, leaseConnection creates a fresh connection
   const conn2 = await pool.leaseConnection();
@@ -194,7 +196,7 @@ it("reap and active", async () => {
   pool.reap();
   // In single-threaded JS, no connections have dead owners, so reap is a no-op
   expect(pool.connections.length).toBe(count);
-  pool.disconnect();
+  await pool.disconnect();
 });
 
 it("idle timeout configuration", async () => {
@@ -216,7 +218,7 @@ it("idle timeout configuration", async () => {
   const keepConn = await keepPool.checkout();
   keepPool.checkin(keepConn);
   expect(keepPool.stat().connections).toBe(1);
-  keepPool.flush();
+  await keepPool.flush();
   expect(keepPool.stat().connections).toBe(1);
 
   // Small idleTimeout: flush() with no args removes expired idle connections
@@ -240,11 +242,11 @@ it("idle timeout configuration", async () => {
     flushPool.checkin(flushConn);
     expect(flushPool.stat().connections).toBe(1);
     // Not yet expired
-    flushPool.flush();
+    await flushPool.flush();
     expect(flushPool.stat().connections).toBe(1);
     // Advance past the 1-second idleTimeout
     vi.advanceTimersByTime(2000);
-    flushPool.flush();
+    await flushPool.flush();
     expect(flushPool.stat().connections).toBe(0);
   } finally {
     vi.useRealTimers();
@@ -265,7 +267,7 @@ it("disable flush", async () => {
   const conn = await pool.checkout();
   pool.checkin(conn);
   // flush is a no-op when idleTimeout is null
-  pool.flush();
+  await pool.flush();
   expect(pool.stat().connections).toBe(1);
 });
 
@@ -276,10 +278,10 @@ it("flush", async () => {
   expect(pool.stat().connections).toBe(1);
   expect(pool.stat().idle).toBe(1);
   // Flush with high idle threshold — nothing removed
-  pool.flush(9999);
+  await pool.flush(9999);
   expect(pool.stat().connections).toBe(1);
   // Flush with 0 threshold — removes all idle
-  pool.flush(0);
+  await pool.flush(0);
   expect(pool.stat().connections).toBe(0);
 });
 
@@ -290,7 +292,7 @@ it("flush bang", async () => {
   pool.checkin(c1);
   pool.checkin(c2);
   expect(pool.stat().idle).toBe(2);
-  pool.flushBang();
+  await pool.flushBang();
   expect(pool.stat().connections).toBe(0);
   expect(pool.stat().idle).toBe(0);
 });
@@ -336,7 +338,7 @@ it("automatic reconnect restores after disconnect", async () => {
   expect(await pool.leaseConnection()).toBeTruthy();
   pool.releaseConnection();
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
   // With automaticReconnect=true (default), new connections are created
   expect(await pool.leaseConnection()).toBeTruthy();
   pool.releaseConnection();
@@ -344,7 +346,7 @@ it("automatic reconnect restores after disconnect", async () => {
 
 it("automatic reconnect can be disabled", async () => {
   const pool = makePool();
-  pool.disconnectBang();
+  await pool.disconnectBang();
   pool.automaticReconnect = false;
 
   await expect(pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
@@ -388,7 +390,7 @@ it("connection notification is called", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
 
@@ -408,7 +410,7 @@ it("connection notification is called for shard", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
 
@@ -528,6 +530,42 @@ it("pin connection nesting", async () => {
   // Second unpin rolls back the outer transaction and checks in
   await pool.unpinConnectionBang();
   expect(conn1.transactionManager.openTransactions).toBe(0);
+});
+
+it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
+  // Rails re-runs verify! on every pinned checkout (connection_pool.rb:554), and
+  // verify! self-heals via reconnect!(restore_transactions: true) when the
+  // connection is no longer active? (abstract_adapter.rb:759). trails' checkout()
+  // is async and awaits the async verifyBang on every pinned handout, so this
+  // must hold for a *subsequent* (non-establishment) checkout too — not just the
+  // immediate one after pinConnectionBang — when the connection drops mid-session.
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+
+  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
+  const verify = vi.spyOn(conn, "verifyBang");
+  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
+    conn.activeFlag = true;
+  });
+
+  // Establishment already happened above; the connection is still healthy, so a
+  // re-checkout here verifies but does NOT reconnect.
+  expect(await pool.checkout()).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(reconnect).not.toHaveBeenCalled();
+
+  // Now the pinned connection dies mid-session. The *next* (subsequent, non-
+  // establishment) pinned checkout must await verifyBang and self-heal.
+  conn.activeFlag = false;
+  const again = (await pool.checkout()) as TransactionAwareTestAdapter;
+  expect(again).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
+  expect(again.active).toBe(true);
+
+  verify.mockRestore();
+  reconnect.mockRestore();
+  await pool.unpinConnectionBang();
 });
 
 it("inspect does not show secrets", async () => {

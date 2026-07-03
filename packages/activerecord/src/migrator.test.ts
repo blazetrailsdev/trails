@@ -11,7 +11,6 @@ import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
-import { resetMigratorState } from "./test-helpers/reset-migrator-state.js";
 
 // MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
 // trails equivalents live under test-helpers/migrations.
@@ -69,8 +68,7 @@ describe("MigratorTest", () => {
   }
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
-    await resetMigratorState(adapter);
+    adapter = await createTestAdapter();
   });
 
   it("migrator with duplicate names", () => {

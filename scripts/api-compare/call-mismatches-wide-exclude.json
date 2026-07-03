@@ -16367,6 +16367,41 @@
   },
   {
     "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "through_reflection",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "belongs_to?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "foreign_key",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "owner",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "all?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "aliases",
     "call": "column_names",
@@ -19854,34 +19889,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "cacheable_query",
-    "call": "compile",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "cacheable_query",
-    "call": "partial_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "cacheable_query",
-    "call": "prepared_statements",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "cacheable_query",
-    "call": "query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "case_insensitive_comparison",
     "call": "can_perform_case_insensitive_comparison_for?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -19947,55 +19954,6 @@
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "disconnect!",
     "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_delete",
-    "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_delete",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "sql_for_insert",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_query",
-    "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_update",
-    "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_update",
-    "call": "internal_execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -20192,41 +20150,6 @@
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "sanitize_as_sql_comment",
     "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "arel_from_relation",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "prepared_statements",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "to_sql_and_binds",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_value",
-    "call": "single_value_from_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -21173,6 +21096,27 @@
     "rubyName": "disconnect",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "with_exclusively_acquired_all_connections",
+    "reason": "RFC 0023 async split: disconnect delegates its synchronous teardown to the private _disconnect helper (so the async wrapper can await the drains), which is where withExclusivelyAcquiredAllConnections is invoked; attribution artifact of the sync-helper/async-wrapper split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "disconnect!",
+    "reason": "RFC 0023 async split: the per-connection conn.disconnect! (disconnectBang) loop lives in the private _disconnect helper that disconnect delegates to; attribution artifact of the sync-helper/async-wrapper split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "clear",
+    "reason": "RFC 0023 async split: the pool-state clears (_available/_checkedOut/_leases) live in the private _disconnect helper that disconnect delegates to; attribution artifact of the sync-helper/async-wrapper split."
   },
   {
     "package": "activerecord",
@@ -55270,5 +55214,152 @@
     "rubyName": "migration_connection",
     "call": "lease_connection",
     "reason": "migrationConnection (sync) routes through `leaseConnectionSync`; Rails-named `leaseConnection` is async in trails (converge-connection-pool-checkout-lease-async) and cannot be awaited from this sync accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "disconnect!",
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction — including `conn.disconnectBang()` — to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "delete",
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); the idle-connection removal (`_connections.splice` / `_lastCheckinAt.delete`, Rails' `@connections.delete`) lives in the private `_flush` core it delegates to. Same behavior, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "disconnect!",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear — including `conn.disconnectBang()` — to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "clear",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); the `_available.clear()` / lease-clearing lives in the private `_clearReloadableConnections` core it delegates to. Same behavior, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "with_exclusively_acquired_all_connections",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); the `withExclusivelyAcquiredAllConnections` critical section lives in the private `_clearReloadableConnections` core it delegates to. Same call, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "cacheable_query",
+    "call": "compile",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "cacheable_query",
+    "call": "partial_query",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "cacheable_query",
+    "call": "prepared_statements",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "cacheable_query",
+    "call": "query",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_delete",
+    "call": "affected_rows",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_delete",
+    "call": "internal_execute",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_insert",
+    "call": "internal_exec_query",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_insert",
+    "call": "sql_for_insert",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_query",
+    "call": "internal_exec_query",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_update",
+    "call": "affected_rows",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "exec_update",
+    "call": "internal_execute",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_all",
+    "call": "arel_from_relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_all",
+    "call": "prepared_statements",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_all",
+    "call": "select",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_all",
+    "call": "to_sql_and_binds",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_value",
+    "call": "single_value_from_rows",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

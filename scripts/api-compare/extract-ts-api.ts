@@ -703,12 +703,19 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     }
   }
 
-  // Include-detection pass: every top-level `include(Host, Mod)` call
-  // (from `@blazetrails/activesupport`) is recorded as `Host.extends +=
-  // Mod`, so compare.ts's existing `getInherited` walker folds Mod's
-  // methods into Host's TS surface. Without this the host class's file
-  // looks empty of the mixed-in methods even when Rails reports them
-  // as part of the host's effective surface (see arel #814).
+  // Include-detection pass: every `include(Host, Mod)` call (from
+  // `@blazetrails/activesupport`) is recorded as `Host.extends += Mod`,
+  // so compare.ts's existing `getInherited` walker folds Mod's methods
+  // into Host's TS surface. Without this the host class's file looks
+  // empty of the mixed-in methods even when Rails reports them as part
+  // of the host's effective surface (see arel #814).
+  //
+  // We walk the whole file (not just top-level expression statements):
+  // some hosts apply their `include`s from inside a module-level helper
+  // (e.g. `ensureAbstractAdapterMixinsApplied()` in abstract-adapter.ts,
+  // added in PR #4458 to break a module-eval TDZ cycle). Those calls are
+  // nested inside a function body but still describe the host's static
+  // mixin surface, so they must be attributed too.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
@@ -731,11 +738,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     });
     if (!importsInclude) continue;
 
-    ts.forEachChild(sourceFile, (n) => {
-      if (!ts.isExpressionStatement(n)) return;
-      const call = n.expression;
-      if (!ts.isCallExpression(call)) return;
-      if (!ts.isIdentifier(call.expression) || call.expression.text !== "include") return;
+    forEachCallNamed(sourceFile, "include", (call) => {
       if (call.arguments.length < 2) return;
       const [hostArg, modArg] = call.arguments;
       if (!ts.isIdentifier(hostArg)) return;
@@ -870,11 +873,7 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     });
     if (!importsExtend) continue;
 
-    ts.forEachChild(sourceFile, (n) => {
-      if (!ts.isExpressionStatement(n)) return;
-      const call = n.expression;
-      if (!ts.isCallExpression(call)) return;
-      if (!ts.isIdentifier(call.expression) || call.expression.text !== "extend") return;
+    forEachCallNamed(sourceFile, "extend", (call) => {
       if (call.arguments.length < 2) return;
       const [hostArg, modArg] = call.arguments;
       if (!ts.isIdentifier(hostArg)) return;
@@ -990,6 +989,27 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
   }
 
   return info;
+}
+
+/**
+ * Recursively visit every `name(...)` call expression under `root` where the
+ * callee is a bare identifier equal to `name`. Used by the include/extend
+ * detection passes so calls nested inside a module-level helper function
+ * (not just top-level expression statements) are still attributed to the host
+ * class — see the include-detection pass for the abstract-adapter.ts case.
+ */
+function forEachCallNamed(
+  root: ts.Node,
+  name: string,
+  visit: (call: ts.CallExpression) => void,
+): void {
+  const walk = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === name) {
+      visit(n);
+    }
+    ts.forEachChild(n, walk);
+  };
+  ts.forEachChild(root, walk);
 }
 
 /**

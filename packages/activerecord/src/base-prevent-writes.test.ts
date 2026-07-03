@@ -1,9 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -16,10 +14,6 @@ describe("BasePreventWritesTest", () => {
       this.attribute("name", "string");
     }
   }
-
-  beforeAll(async () => {
-    await defineSchema({ birds: TEST_SCHEMA.birds }, { dropExisting: true });
-  });
 
   it("creating a record raises if preventing writes", async () => {
     const error = await Base.whilePreventingWrites(async () => {

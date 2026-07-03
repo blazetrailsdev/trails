@@ -24,8 +24,8 @@ describe("Relation#unscope — full Rails key coverage", () => {
     }
   }
 
-  beforeEach(() => {
-    ({ adapter } = createSidecarTestAdapter());
+  beforeEach(async () => {
+    ({ adapter } = await createSidecarTestAdapter());
     UscAuthor.adapter = adapter;
     UscPost.adapter = adapter;
     registerModel("UscAuthor", UscAuthor);

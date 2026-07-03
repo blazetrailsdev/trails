@@ -936,7 +936,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasOne("account", { autosave: true, foreignKey: "firm_id" });
+        // Mirrors Rails' Firm `has_one :account, foreign_key: "firm_id",
+        // validate: true` (test/models/company.rb:78) — validate but NOT
+        // autosave. A new child still persists on owner.save via the
+        // unconditionally-registered has_one autosave callback.
+        this.hasOne("account", { foreignKey: "firm_id", validate: true });
       }
     }
     class Account extends Base {

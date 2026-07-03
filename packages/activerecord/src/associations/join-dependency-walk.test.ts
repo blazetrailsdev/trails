@@ -41,8 +41,8 @@ describe("JoinDependency walk() deduplication", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Post, Comment, Author, Like]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];

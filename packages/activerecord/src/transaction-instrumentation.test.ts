@@ -5,10 +5,8 @@ import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 
@@ -34,13 +32,31 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 // `Class.new`.
 async function freshIsolatedAdapter(): Promise<AbstractSQLite3Adapter> {
   const adapter = new BetterSQLite3Adapter(":memory:");
-  // `force: true` so the canonical `topics` is actually created on this isolated
-  // per-test adapter under AR_ONE_SCHEMA=1. The one-schema boot lays the canonical
-  // tables into the main per-worker pool only; a secondary/sidecar adapter never
-  // sees them, so the explicit-adapter defineSchema must issue real DDL here.
-  // `force` skips one-schema's canonical-schema assertion, but the shape passed
-  // is `canonicalSchema.topics` by reference, so it cannot drift from canonical.
-  await defineSchema(adapter, { topics: canonicalSchema.topics }, { force: true });
+  // The boot canonical loader does not run on this fresh in-memory adapter, so
+  // lay `topics` explicitly, mirroring schema.rb's `create_table :topics`.
+  // The adapter owns a private `:memory:` DB that is discarded on close(), so
+  // there is nothing to tear down.
+  // eslint-disable-next-line blazetrails/require-table-teardown
+  await adapter.createTable("topics", { force: true }, (t) => {
+    t.string("title", { limit: 250 });
+    t.string("author_name");
+    t.string("author_email_address");
+    t.datetime("written_on");
+    t.time("bonus_time");
+    t.date("last_read");
+    t.text("content");
+    t.text("important");
+    t.binary("binary_content");
+    t.boolean("approved", { default: true });
+    t.integer("replies_count", { default: 0 });
+    t.integer("unique_replies_count", { default: 0 });
+    t.integer("parent_id");
+    t.string("parent_title");
+    t.string("type");
+    t.string("group");
+    t.timestamps({ null: true });
+    t.index(["author_name", "title"]);
+  });
   return adapter;
 }
 

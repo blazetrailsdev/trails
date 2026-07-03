@@ -2,13 +2,11 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -23,10 +21,6 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 describe("virtual attribute reconciliation warms the schema cache", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ posts: TEST_SCHEMA.posts });
-  });
-
   it("populates the shared schema cache when reconciling on a cold cache", async () => {
     class Post extends Base {
       static {

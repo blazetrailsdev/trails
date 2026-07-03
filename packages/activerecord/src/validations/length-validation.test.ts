@@ -8,8 +8,6 @@ import "../index.js";
 import { registerModel, association } from "../associations.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 
@@ -22,12 +20,11 @@ describe("LengthValidationTest", () => {
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    await defineSchema({ owners: TEST_SCHEMA.owners, pets: TEST_SCHEMA.pets });
     registerModel("Owner", Owner);
     registerModel("Pet", Pet);
   });
 
-  // `defineSchema` builds a single named PK (`owner_id` / `pet_id`) as a
+  // The canonical schema builds a single named PK (`owner_id` / `pet_id`) as a
   // composite-style PK constraint, not an AUTO_INCREMENT column (only the
   // default `id` PK auto-increments). SQLite masks this — an INTEGER PRIMARY
   // KEY auto-fills via rowid — but MySQL/Postgres reject an INSERT that omits

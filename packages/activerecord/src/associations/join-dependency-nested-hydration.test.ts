@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency nested hydration", () => {
-  let adapter: ReturnType<typeof createTestAdapter>;
+  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
 
   // prettier-ignore
   class Author extends Base {
@@ -20,8 +20,8 @@ describe("JoinDependency nested hydration", () => {
     static { this.attribute("id", "integer"); this.attribute("title", "string"); }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Author, Comment, Post]) {
       m.adapter = adapter;
       m._associations = [];
