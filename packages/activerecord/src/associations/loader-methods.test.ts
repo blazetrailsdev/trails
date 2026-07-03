@@ -12,15 +12,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { MigrationContext } from "../migration.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   // Ride `Base.connection` (single-pool test model) rather than a sidecar
-  // `_pool` lease. The `lo_*` tables are genuinely bespoke (no canonical
-  // equivalent), so they're still laid via MigrationContext and dropped in
-  // afterAll — but on the primary boot connection.
-  setupFixtures();
+  // `_pool` lease. `fixtures({})` establishes the handler and per-test
+  // transactional rollback (no seed rows). The `lo_*` tables are genuinely
+  // bespoke (no canonical equivalent), so they're still laid via
+  // MigrationContext and dropped in afterAll — but on the primary boot
+  // connection.
+  fixtures({});
   let adapter: typeof Base.connection;
   let ctx: MigrationContext;
 
@@ -77,8 +78,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   afterAll(async () => {
     await ctx.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
-  useHandlerTransactionalFixtures();
-
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });
     await author.save();

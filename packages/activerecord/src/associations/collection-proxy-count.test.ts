@@ -22,14 +22,14 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
   // Ride the boot-laid canonical `authors` / `posts` / `comments` on
   // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
-  // lease. Transactional fixtures roll back per test.
-  setupFixtures();
+  // lease. `fixtures({})` establishes the handler and per-test transactional
+  // rollback (no seed rows) — the tests create their own data.
+  fixtures({});
   let adapter: typeof Base.connection;
 
   // Lightweight local models backed by the canonical `authors` / `posts` /
@@ -76,8 +76,6 @@ describe("CollectionProxy#count — non-through fast path", () => {
       foreignKey: "author_id",
     });
   });
-  useHandlerTransactionalFixtures();
-
   afterEach(() => Notifications.unsubscribeAll());
 
   it("issues a SELECT COUNT(*) and does not load individual rows", async () => {

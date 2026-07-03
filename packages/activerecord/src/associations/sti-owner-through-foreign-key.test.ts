@@ -8,8 +8,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reader } from "../test-helpers/models/reader.js";
@@ -17,8 +16,9 @@ import { Reader } from "../test-helpers/models/reader.js";
 describe("STI owner has_many :through — declaring-class owner FK", () => {
   // Ride the boot-laid canonical `posts` / `people` / `readers` on
   // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
-  // lease.
-  setupFixtures();
+  // lease. `fixtures({})` establishes the handler and per-test transactional
+  // rollback (no seed rows).
+  fixtures({});
   let adapter: typeof Base.connection;
 
   beforeAll(() => {
@@ -28,7 +28,6 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
       registerModel(klass);
     }
   });
-  useHandlerTransactionalFixtures();
 
   it("creates the join row with the base-class owner FK (post_id, not special_post_id)", async () => {
     const post = await SpecialPost.create({ title: "sti", body: "b", type: "SpecialPost" });
