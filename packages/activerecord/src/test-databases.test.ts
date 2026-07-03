@@ -4,7 +4,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
 // supplied stubbed configs. Mirrors the production shape — production code
@@ -25,7 +25,7 @@ afterAll(() => {
 });
 
 describe("TestDatabasesTest", () => {
-  setupHandlerSuite();
+  fixtures({});
   let priorCurrent: DatabaseConfigurations | null;
   beforeEach(() => {
     priorCurrent = DatabaseConfigurations.current;

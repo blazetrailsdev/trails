@@ -11,8 +11,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { setupFixtures, fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -323,8 +322,10 @@ describe("SchemaAdapter TM delegation", () => {
   // ActiveRecord::TestCase, which has an established base connection before the
   // body calls lease_connection). This is a separate top-level describe from
   // TransactionTest, so bootstrap the handler here rather than depending on a
-  // sibling describe having run first.
-  setupHandlerSuite();
+  // sibling describe having run first. Non-transactional: these tests commit
+  // rows to `items` and clean up in afterAll (Rails `use_transactional_tests`
+  // is not in play here).
+  fixtures({}, { useTransactionalTests: false });
   // Tests here spy on `Base.connection`; without local restore, spies leak
   // into the next test in this file.
   afterEach(() => {

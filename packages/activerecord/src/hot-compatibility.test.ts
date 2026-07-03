@@ -6,7 +6,7 @@ import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Rails' `get_prepared_statement_cache(connection)` reaches into
 // `@statements.@cache[Process.pid]`. The trails PG adapter owns a single
@@ -19,7 +19,8 @@ function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
 }
 
 describe("HotCompatibilityTest", () => {
-  setupHandlerSuite();
+  // Rails `use_transactional_tests = false`: tests build/drop tables per test.
+  fixtures({}, { useTransactionalTests: false });
   // Rails' setup builds the table + model fresh per test (use_transactional_tests
   // = false). We mirror that with a helper that creates the table and a model
   // bound to a fresh adapter, returning both so the test can drive remove_column
