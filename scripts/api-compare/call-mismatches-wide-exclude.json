@@ -16236,6 +16236,13 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
+    "call": "persisted?",
+    "reason": "Rails `replace` gates persistence with `save &&= owner.persisted?` (has_one_association.rb:62); trails converged has_one onto the autosave path so `replace` is purely in-memory and the `owner.persisted?` gate moved to `queueWrite`/`writer`/`persistImmediate`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "replace",
     "call": "reflection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

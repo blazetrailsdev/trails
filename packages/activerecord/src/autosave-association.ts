@@ -470,6 +470,17 @@ async function _insertCollectionRecordFallback(
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
+
+  // A deferred (non-awaitable) assignment to a persisted owner
+  // (`owner.account = b` via the property setter / mass-assignment) records the
+  // displaced record so this single autosave path — not a parallel
+  // `persistReplace` — nullifies/destroys it, mirroring the `remove_target!`
+  // Rails runs synchronously inside `HasOneAssociation#replace`. Runs before the
+  // `!child` bail so assigning nil (`owner.account = null`) still removes it.
+  if (typeof inst?.removeDisplaced === "function" && inst?._displacedRecord) {
+    await inst.removeDisplaced();
+  }
+
   const child = inst?.target;
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
@@ -479,12 +490,10 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // is either `true` or `undefined`/nil.
   const autosave = assoc.options.autosave;
 
-  // Reconcile with the writer-path `_pendingReplace`/`persistReplace` machinery:
-  // a queued replace is flushed after commit (`flushPendingReplaces`) and owns
-  // the FK re-derivation plus dependent removal of the displaced record. Skip
-  // here so the child isn't saved twice. The build_/create_ paths queue nothing
-  // (they call `replace(record, false)`), so this callback remains their sole
-  // persistence path — matching Rails' `save_has_one_association`.
+  // HasOneThroughAssociation persists via its own deferred `persistReplace`
+  // (join-model build/save through `createThroughRecord`), flushed after commit
+  // by `flushPendingReplaces`; its autosave target is the END record, which has
+  // no direct foreign key, so the base save below would be wrong. Defer to it.
   if (inst?._pendingReplace) return true;
 
   // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
