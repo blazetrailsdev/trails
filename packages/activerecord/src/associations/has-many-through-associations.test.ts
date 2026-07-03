@@ -825,7 +825,7 @@ describe("HasManyThroughAssociationsTest", () => {
     }
   });
 
-  it.skip("delete through belongs to with dependent delete all", async () => {
+  it("delete through belongs to with dependent delete all", async () => {
     Reference.makeComments = true;
     try {
       const person = await Person.find(people("michael").id);
@@ -922,7 +922,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((await Post.find(posts("welcome").id)).tags_count).toBe(Number(tagsCountBefore) - 1);
   });
 
-  it.skip("update counter caches on delete with dependent destroy", async () => {
+  it("update counter caches on delete with dependent destroy", async () => {
     const post = await Post.find(posts("welcome").id);
     const tag = await (post as any).tags.create({ name: "doomed" });
     await post.updateColumns({ tags_with_destroy_count: await (post as any).tags.count() });
@@ -948,7 +948,7 @@ describe("HasManyThroughAssociationsTest", () => {
     );
   });
 
-  it.skip("update counter caches on replace association", async () => {
+  it("update counter caches on replace association", async () => {
     const post = await Post.find(posts("welcome").id);
     const tag = await (post as any).tags.create({ name: "doomed" });
     await tag.taggedPosts.push(await Post.find(posts("thinking").id));
@@ -959,7 +959,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(post.tags_count).toBe(await (post as any).taggings.count());
   });
 
-  it.skip("update counter caches on destroy", async () => {
+  it("update counter caches on destroy", async () => {
     const post = await Post.find(posts("welcome").id);
     const tag = await (post as any).tags.create({ name: "doomed" });
 
