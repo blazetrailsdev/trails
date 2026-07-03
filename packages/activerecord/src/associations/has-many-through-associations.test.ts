@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
  */
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
 import { association } from "../associations.js";
@@ -236,6 +236,15 @@ describe("HasManyThroughAssociationsTest", () => {
     CpkChapter,
     SpecialCategorization,
   ]);
+
+  // Mirrors HasManyThroughAssociationsTest#setup: dummy records to force column
+  // loads so query counts are clean. The dummy Person also occupies people.id 4,
+  // so records created within a test land past the fixture id range — notably
+  // clear of the deliberately dangling readers(:bob_welcome) row (person_id: 4).
+  beforeEach(async () => {
+    await Person.create({ first_name: "gummy" });
+    await Reader.create({ person_id: 0, post_id: 0 });
+  });
 
   it("has many through create record", async () => {
     const book = await Book.find(books("awdr").id);
@@ -1827,9 +1836,9 @@ describe("HasManyThroughAssociationsTest", () => {
     }
   });
 
-  it.skip("preloading empty through association via joins", async () => {
+  it("preloading empty through association via joins", async () => {
     const readerId = readers("michael_welcome").id;
-    const person = await Person.create({ first_name: "Gaga" });
+    const person = await Person.createBang({ first_name: "Gaga" });
     const loaded = await Person.where({ id: person.id })
       .where(`readers.id = ${readerId} or 1=1`)
       .references("readers")
