@@ -8,6 +8,7 @@ import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 async function freshCtx(): Promise<{ adapter: TestDatabaseAdapter; ctx: MigrationContext }> {
@@ -329,6 +330,16 @@ describe("SchemaDumperTest", () => {
   beforeEach(async () => {
     const f = await freshCtx();
     ctx = f.ctx;
+    // These cases build bespoke tables and dump the whole schema; the global
+    // truncate-reset leaves the ~330 canonical tables in place (only clearing
+    // rows), which would make each full-schema dump introspect all of them and
+    // blow the per-test timeout. Drop to an empty DB so the dumps stay cheap and
+    // deterministic (the old drop-all reset contract these cases were written
+    // against). Carpet-bomb is intentional here: the tables to remove are the
+    // boot-laid canonical set this file did NOT create, so dropTable("…") of
+    // owned tables cannot express it.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await dropAllTables(f.adapter);
   });
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
@@ -915,6 +926,10 @@ describe("SchemaDumperDefaultsTest", () => {
     const f = await freshCtx();
     ctx = f.ctx;
     adapter = f.adapter;
+    // See SchemaDumperTest beforeEach: drop to an empty DB so full-schema dumps
+    // don't introspect the ~330 canonical tables the truncate-reset preserves.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await dropAllTables(f.adapter);
   });
 
   it("schema dump defaults with universally supported types", async () => {
