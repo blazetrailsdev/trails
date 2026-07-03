@@ -170,6 +170,65 @@ describe("include", () => {
       expect((h as any).key).toBe(7);
     });
 
+    it("later class module wins a plain-method collision, class body still beats both", () => {
+      class Host {
+        classBody(): string {
+          return "class-body";
+        }
+      }
+      class A {
+        shared(): string {
+          return "A";
+        }
+        classBody(): string {
+          return "A-classBody";
+        }
+      }
+      class B {
+        shared(): string {
+          return "B";
+        }
+        classBody(): string {
+          return "B-classBody";
+        }
+      }
+      include(Host, A);
+      include(Host, B);
+      // Later class module (B) wins over the earlier one (A).
+      expect((new Host() as any).shared()).toBe("B");
+      // The class body still beats every included module.
+      expect(new Host().classBody()).toBe("class-body");
+    });
+
+    it("later class module's accessor half wins over an earlier mixin's", () => {
+      class Host {
+        data: Record<string, unknown> = {};
+      }
+      class A {
+        get key(): unknown {
+          return "A-getter";
+        }
+        set key(v: unknown) {
+          (this as unknown as Host).data.key = `A:${v}`;
+        }
+      }
+      class B {
+        // B only redefines the getter; Ruby keeps A's setter (higher for `key=`
+        // is A, since B doesn't define it), while B's getter wins for `key`.
+        get key(): unknown {
+          return "B-getter";
+        }
+      }
+      include(Host, A);
+      include(Host, B);
+      const h = new Host();
+      // Later mixin (B) supplies the getter.
+      expect((h as any).key).toBe("B-getter");
+      // A's setter survives because B never redefined it.
+      (h as any).key = 1;
+      expect(h.data.key).toBe("A:1");
+    });
+
     it("skips the class constructor", () => {
       class Host {}
       class Mod {

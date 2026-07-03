@@ -112,20 +112,29 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
         installed.add(key);
         continue;
       }
-      // Accessor pairs: preserve the existing half, fill in whichever the
-      // including class didn't define. Ruby's include supplies only the
-      // missing methods, but in TS `get`/`set` share a single property
-      // name — re-apply the whole pair so both halves end up live.
+      const existingIsMixin = installed.has(key);
+      // Accessor pairs: in TS `get`/`set` share one property name, but Ruby
+      // treats a getter (`key`) and setter (`key=`) as two independent methods,
+      // each resolved by ancestry on its own. So merge the pair, letting the
+      // half from whichever descriptor is higher in the ancestry win and the
+      // other fill in a half it doesn't define. An earlier-included mixin
+      // (tracked) sits below the later `mod`; the class body (untracked) sits
+      // above every mixin.
       const isAccessorPair =
         ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
       if (isAccessorPair) {
+        const higher = existingIsMixin ? modDesc : existing;
+        const lower = existingIsMixin ? existing : modDesc;
         descriptors[key] = {
-          get: existing.get ?? modDesc.get,
-          set: existing.set ?? modDesc.set,
+          get: higher.get ?? lower.get,
+          set: higher.set ?? lower.set,
           configurable: true,
-          enumerable: existing.enumerable ?? modDesc.enumerable ?? false,
+          enumerable: higher.enumerable ?? lower.enumerable ?? false,
         };
-      } else if (installed.has(key)) {
+        // A half still owned by the class body keeps class-body precedence, so
+        // only track the key when both halves are mixin-supplied.
+        if (existingIsMixin) installed.add(key);
+      } else if (existingIsMixin) {
         // Value (method) collision with an earlier-included mixin: Ruby puts the
         // later module higher in the ancestry, so the later include wins.
         descriptors[key] = modDesc;
