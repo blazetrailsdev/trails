@@ -79,13 +79,16 @@ async function setupScopedEncryption(): Promise<() => void> {
   return () => restoreEncryptionConfig(snapshot);
 }
 
-// Shield the whole file from the global `resetTestAdapterState()` beforeEach
+// Shield the WHOLE file from the global `resetTestAdapterState()` beforeEach
 // (test-setup-ar.ts), which drops every table on `Base.connection` — the
-// boot-laid canonical worker DB. The mock-adapter describes below don't touch
-// that connection, but their tests would still trigger the reset and wipe the
-// canonical tables the later real-seeding describes ride. Shielding file-wide
-// keeps the boot-laid schema intact so those describes seed against it directly
-// (the per-describe `useHandlerTransactionalFixtures` rolls back their writes).
+// boot-laid canonical worker DB. The real-seeding describes below each shield
+// themselves (their `useHandlerTransactionalFixtures` push/pops the skip), but
+// the mock-adapter describes above them do NOT: their tests trigger the reset
+// and wipe the canonical tables before any seeding describe's `beforeAll` runs.
+// The removed `defineSchema(TEST_SCHEMA)` beforeAll blocks used to paper over
+// this by recreating the tables after the wipe; a single file-level shield
+// keeps the boot-laid schema intact instead, so every seeding describe rides it
+// directly (transactional fixtures roll back their per-test writes).
 setupFixtures();
 
 // --- useFixtures ---
