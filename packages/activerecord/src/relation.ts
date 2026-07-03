@@ -630,6 +630,13 @@ export class Relation<T extends Base> {
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(node: Nodes.Node): Relation<T>;
   /**
+   * Sanitized-conditions array form: `where(["name = ?", x])` /
+   * `where(["name = :name", { name: x }])` / `where(["name = '%s'", x])`.
+   * A single array argument routes through `buildWhereClause`, matching Rails'
+   * `sanitize_sql(array)`; the two-argument composite form below is distinct.
+   */
+  where(conditions: unknown[]): Relation<T>;
+  /**
    * Composite-key form: `where(['c1', 'c2'], [[v11, v12], [v21, v22]])`
    * compiles to `(c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22)`.
    * The Rails analog is `where({['c1', 'c2'] => [[v11, v12], ...]})` —
@@ -641,23 +648,27 @@ export class Relation<T extends Base> {
    */
   where(cols: string[], tuples: unknown[][]): Relation<T>;
   where(
-    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | null,
+    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
     if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
-    // Composite-key form: array of column names + array of tuples.
-    if (Array.isArray(conditionsOrSql) && conditionsOrSql.every((c) => typeof c === "string")) {
-      // Fast-fail on malformed call: must have exactly one extra
-      // argument that is an array of tuples. Without this guard, a
-      // stray `where(['a','b'])` would fall through to whereBang and
-      // treat the array as a record (numeric keys), producing
-      // nonsense.
+    // Composite-key form: array of column names + array of tuples. It is
+    // always a two-argument call (`where(cols, tuples)`), so it is
+    // disambiguated from Rails' sanitized-array conditions form
+    // (`where(["name = ?", x])`, a single array argument) by the presence of
+    // the extra `tuples` argument. A single all-strings array falls through
+    // to `buildWhereClause`, which unwraps `[head, ...tail]` and sanitizes.
+    if (
+      Array.isArray(conditionsOrSql) &&
+      rest.length > 0 &&
+      conditionsOrSql.every((c) => typeof c === "string")
+    ) {
       if (rest.length !== 1 || !Array.isArray(rest[0])) {
         throw argumentError(
           "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const cols = conditionsOrSql;
+      const cols = conditionsOrSql as string[];
       const tuples = rest[0] as unknown[][];
       const node = this.predicateBuilder.buildComposite(cols, tuples);
       if (node === null) return this._clone().noneBang();

@@ -2208,6 +2208,7 @@ export class Base extends Model {
     sql: string,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
     cols: string[],
@@ -2215,26 +2216,33 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string | string[],
+    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[],
     ...rest: unknown[]
   ): Relation<InstanceType<T>> {
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
     }
-    if (Array.isArray(conditionsOrSql) && conditionsOrSql.every((c) => typeof c === "string")) {
-      // Fast-fail: composite-key form requires exactly one extra
-      // argument that is an array of tuples. Without this, a stray
-      // `Model.where(['a','b'])` would fall through to the hash path
-      // and treat the array as a record (numeric keys), producing
-      // nonsense.
+    // Composite-key form (`where(cols, tuples)`) is a two-argument call, so it
+    // is disambiguated from Rails' sanitized-array conditions form
+    // (`where(["name = ?", x])`, a single array argument) by argument count. A
+    // single all-strings array falls through to `Relation#where`, which routes
+    // it to `buildWhereClause` for sanitization / BoundSqlLiteral handling.
+    if (
+      Array.isArray(conditionsOrSql) &&
+      rest.length > 0 &&
+      conditionsOrSql.every((c) => typeof c === "string")
+    ) {
       if (rest.length !== 1 || !Array.isArray(rest[0])) {
         throw argumentError(
           `${(this as { name?: string }).name ?? "Model"}.where(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
         );
       }
-      return this.all().where(conditionsOrSql, rest[0] as unknown[][]);
+      return this.all().where(conditionsOrSql as string[], rest[0] as unknown[][]);
     }
-    return this.all().where(conditionsOrSql as Record<string, unknown>);
+    if (Array.isArray(conditionsOrSql)) {
+      return this.all().where(conditionsOrSql as unknown[]);
+    }
+    return this.all().where(conditionsOrSql);
   }
 
   static whereNot<T extends typeof Base>(

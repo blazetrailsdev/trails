@@ -36,7 +36,7 @@ import {
   Company as CanonicalCompany,
   Firm as CanonicalFirm,
 } from "./test-helpers/models/company.js";
-import { StatementInvalid } from "./index.js";
+import { PreparedStatementInvalid, StatementInvalid } from "./index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "./test-helpers/protected-params.js";
 import { withTimezoneConfig } from "./test-helper.js";
@@ -1961,15 +1961,11 @@ describe("FinderTest", () => {
 // time-interpolation cluster onto canonical Topic + Comment + Company/Firm +
 // Post models and their real fixtures (RFC 0023 surfaced-deviations).
 //
-// The array-conditions form (`where(["name = ?", x])`) tests
-// (test_condition_interpolation, test_condition_array_interpolation,
-// test_bind_variables(+_with_quotes), test_named_bind_variables(+_with_quotes),
-// and the two `["written_on = ?", ...]` time variants) are deliberately NOT
-// ported here: trails' public `where` shadows the sanitized-array form with the
-// composite-key `where(cols, tuples)` extension when every array element is a
-// String, so `where(["name = ?", "37signals"])` raises ArgumentError instead of
-// sanitizing. That deviation is tracked under RFC 0023
-// (finder-array-conditions-composite-ambiguity). The aggregate `where(balance:
+// The array-conditions form (`where(["name = ?", x])`) is disambiguated from
+// the composite-key `where(cols, tuples)` extension by argument count: a single
+// all-strings array is Rails' sanitized-conditions form and routes through
+// `buildWhereClause` (RFC 0023 finder-array-conditions-composite-ambiguity).
+// The aggregate `where(balance:
 // Money.new(...))` tests need composedOf where-clause expansion (unsupported;
 // tracked under RFC 0023 converge-where-composed-of-aggregate-expansion), and
 // test_find_on_hash_conditions_with_open_ended_range needs the arel unboundable
@@ -2154,6 +2150,91 @@ describe("FinderTest", () => {
       const found = await Topic.where({
         written_on: (topic as { written_on: unknown }).written_on,
       }).first();
+      expect((found as { id: number }).id).toBe((topic as { id: number }).id);
+    });
+  });
+
+  // Rails: assert_kind_of Time — the mapped time column deserializes to a
+  // Temporal Instant/PlainDateTime rather than a bare truthy value.
+  const isTime = (v: unknown) =>
+    v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
+
+  it("condition interpolation", async () => {
+    expect(await Company.where("name = '%s'", "37signals").first()).toBeInstanceOf(CanonicalFirm);
+    expect(await Company.where(["name = '%s'", "37signals!"]).first()).toBeNull();
+    expect(await Company.where(["name = '%s'", "37signals!' OR 1=1"]).first()).toBeNull();
+    const topic = await Topic.where(["id = %d", 1]).first();
+    expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
+  });
+
+  it("condition array interpolation", async () => {
+    expect(await Company.where(["name = '%s'", "37signals"]).first()).toBeInstanceOf(CanonicalFirm);
+    expect(await Company.where(["name = '%s'", "37signals!"]).first()).toBeNull();
+    expect(await Company.where(["name = '%s'", "37signals!' OR 1=1"]).first()).toBeNull();
+    const topic = await Topic.where(["id = %d", 1]).first();
+    expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
+  });
+
+  it("bind variables", async () => {
+    expect(await Company.where(["name = ?", "37signals"]).first()).toBeInstanceOf(CanonicalFirm);
+    expect(await Company.where(["name = ?", "37signals!"]).first()).toBeNull();
+    expect(await Company.where(["name = ?", "37signals!' OR 1=1"]).first()).toBeNull();
+    const topic = await Topic.where(["id = ?", 1]).first();
+    expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
+    // trails validates bind arity eagerly when the BoundSqlLiteral is built
+    // (at `where`), where Rails defers to statement execution; both raise
+    // PreparedStatementInvalid.
+    expect(() => Company.where(["id=? AND name = ?", 2])).toThrow(PreparedStatementInvalid);
+    expect(() => Company.where(["id=?", 2, 3, 4])).toThrow(PreparedStatementInvalid);
+  });
+
+  it("bind variables with quotes", async () => {
+    await Company.create({ name: "37signals' go'es against" });
+    expect(await Company.where(["name = ?", "37signals' go'es against"]).first()).toBeTruthy();
+  });
+
+  it("named bind variables with quotes", async () => {
+    await Company.create({ name: "37signals' go'es against" });
+    expect(
+      await Company.where(["name = :name", { name: "37signals' go'es against" }]).first(),
+    ).toBeTruthy();
+  });
+
+  it("named bind variables", async () => {
+    expect(await Company.where(["name = :name", { name: "37signals" }]).first()).toBeInstanceOf(
+      CanonicalFirm,
+    );
+    expect(await Company.where(["name = :name", { name: "37signals!" }]).first()).toBeNull();
+    expect(
+      await Company.where(["name = :name", { name: "37signals!' OR 1=1" }]).first(),
+    ).toBeNull();
+    const topic = await Topic.where(["id = :id", { id: 1 }]).first();
+    expect(isTime((topic as { written_on: unknown }).written_on)).toBe(true);
+  });
+
+  // Rails wraps these in with_env_tz("America/New_York") + with_timezone_config
+  // and passes topic.written_on.getutc / .getlocal. trails has no with_env_tz
+  // helper, and written_on is a zone-agnostic Temporal.Instant, so the getutc /
+  // getlocal conversions collapse to the instant itself; withTimezoneConfig
+  // preserves the default-timezone intent.
+  it("condition utc time interpolation with default timezone local", async () => {
+    await withTimezoneConfig({ default: "local" }, async () => {
+      const topic = await Topic.first();
+      const found = await Topic.where([
+        "written_on = ?",
+        (topic as { written_on: unknown }).written_on,
+      ]).first();
+      expect((found as { id: number }).id).toBe((topic as { id: number }).id);
+    });
+  });
+
+  it("condition local time interpolation with default timezone utc", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      const topic = await Topic.first();
+      const found = await Topic.where([
+        "written_on = ?",
+        (topic as { written_on: unknown }).written_on,
+      ]).first();
       expect((found as { id: number }).id).toBe((topic as { id: number }).id);
     });
   });

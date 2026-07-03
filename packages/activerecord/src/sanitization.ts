@@ -63,13 +63,21 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement;
   }
 
-  // %s format string support (e.g., "name='%s' and id='%s'") — Rails:
+  // Format-string support (e.g., "name = '%s'", "id = %d") — Rails:
   //   statement % values.collect { |v| connection.quote_string(v.to_s) }
-  const formatStringCount = (statement.match(/%s/g) ?? []).length;
-  if (formatStringCount > 0) {
-    raiseIfBindArityMismatch(statement, formatStringCount, binds.length);
+  // Ruby's Kernel#format applies after each value is quoted to a string, so
+  // `%d` coerces the quoted string back to an integer. We support the `%s`
+  // (quoted string) and `%d`/`%i` (integer) specifiers that appear in
+  // conditions fragments.
+  const specifiers = statement.match(/%[sdi]/g) ?? [];
+  if (specifiers.length > 0) {
+    raiseIfBindArityMismatch(statement, specifiers.length, binds.length);
     const values = [...binds];
-    return statement.replace(/%s/g, () => quoter.quoteString(String(values.shift() ?? "")));
+    return statement.replace(/%[sdi]/g, (spec) => {
+      const value = values.shift();
+      if (spec === "%s") return quoter.quoteString(String(value ?? ""));
+      return String(parseInt(String(value), 10));
+    });
   }
 
   raiseIfBindArityMismatch(statement, 0, binds.length);
