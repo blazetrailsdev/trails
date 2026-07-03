@@ -10,7 +10,7 @@ import { describe, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
@@ -42,14 +42,11 @@ async function dropView(name: string): Promise<void> {
 // repair — leaving whatever reduced `books` shape (no `cover`/`status`) a sibling
 // handler-suite file co-scheduled earlier in the same fork left in the shared
 // worker DB. The `CREATE VIEW … SELECT cover, status FROM books` below then fails
-// with "Unknown column" on MySQL. `dropExisting` drops + recreates
-// unconditionally. Register this AFTER the fixtures hook so it runs last and wins,
-// and BEFORE the view-creating `beforeAll` so the columns the view references exist.
+// with "Unknown column" on MySQL. This drops + recreates unconditionally.
+// Register this AFTER the fixtures hook so it runs last and wins, and BEFORE the
+// view-creating `beforeAll` so the columns the view references exist.
 async function rebuildBooksTables(): Promise<void> {
-  await defineSchema(
-    { authors: canonicalSchema.authors, books: canonicalSchema.books },
-    { dropExisting: true },
-  );
+  await rebuildCanonicalTables(Base.connection, ["authors", "books"]);
 }
 
 // ---------------------------------------------------------------------------

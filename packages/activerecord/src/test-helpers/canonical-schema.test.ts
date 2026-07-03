@@ -3,7 +3,7 @@ import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { defineSchema } from "./define-schema.js";
-import { loadCanonicalSchema } from "./canonical-schema.js";
+import { loadCanonicalSchema, rebuildCanonicalTables } from "./canonical-schema.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 
 // Phase-1 invariant (RFC 0059): `loadCanonicalSchema` must lay down byte-for-byte
@@ -47,6 +47,39 @@ describe("loadCanonicalSchema", () => {
     } finally {
       await viaDefineSchema.close();
       await viaLoader.close();
+    }
+  });
+});
+
+describe("rebuildCanonicalTables", () => {
+  test("drops + recreates a named subset to its canonical shape", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    try {
+      await loadCanonicalSchema(adapter);
+      const canonical = await dumpSchema(adapter);
+
+      // Simulate a sibling file drifting `topics` to a reduced shape on the
+      // shared DB, then rebuild it back to canonical.
+      await adapter.executeMutation("DROP TABLE topics");
+      await adapter.executeMutation("CREATE TABLE topics (id integer PRIMARY KEY, title varchar)");
+      expect(await dumpSchema(adapter)).not.toBe(canonical);
+
+      await rebuildCanonicalTables(adapter, ["topics"]);
+      expect(await dumpSchema(adapter)).toBe(canonical);
+    } finally {
+      await (adapter as unknown as BetterSQLite3Adapter).close();
+    }
+  });
+
+  test("throws on an unknown canonical table name", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    try {
+      await loadCanonicalSchema(adapter);
+      await expect(rebuildCanonicalTables(adapter, ["topics", "not_a_real_table"])).rejects.toThrow(
+        /unknown canonical table\(s\): not_a_real_table/,
+      );
+    } finally {
+      await (adapter as unknown as BetterSQLite3Adapter).close();
     }
   });
 });

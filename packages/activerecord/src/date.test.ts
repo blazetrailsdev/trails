@@ -3,7 +3,8 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { Base } from "./base.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -24,11 +25,11 @@ describe("DateTest", () => {
   // `topics` with NO `last_read` column) that a sibling handler-suite file
   // co-scheduled earlier in the same fork wrote to the shared worker DB. The
   // date cases below `Topic.create({ last_read })` then fail with a missing
-  // `last_read` column — the documented PG flake. `dropExisting` drops +
-  // recreates `topics` unconditionally so the column is always present.
+  // `last_read` column — the documented PG flake. `rebuildCanonicalTables`
+  // drops + recreates `topics` unconditionally so the column is always present.
   // Registered after `fixtures` so this `beforeAll` runs last and wins.
   beforeAll(async () => {
-    await defineSchema({ topics: canonicalSchema.topics }, { dropExisting: true });
+    await rebuildCanonicalTables(Base.connection, ["topics"]);
     // Eagerly resolve the `last_read` date type (Rails loads schema at boot). The
     // `assign valid dates` case below builds `Topic.new` synchronously, so without
     // a warmed type registry the multiparameter assembler can't see `last_read` is

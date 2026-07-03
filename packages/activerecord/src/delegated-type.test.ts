@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vites
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
@@ -49,23 +49,20 @@ describe("DelegatedTypeTest", () => {
   beforeAll(async () => {
     // Force-recreate every canonical table this suite touches. The worker's
     // canonical schema preload keeps signatures cache-warm, so a plain
-    // `defineSchema` (including the fixtures' own `{ schema }` derivation) is a
+    // schema load (including the fixtures' own `{ schema }` derivation) is a
     // no-op — meaning a sibling file that physically replaced `posts` with a
     // reduced shape (e.g. `posts: { title }`, no `body`) would survive into this
-    // suite and break fixture seeding. `dropExisting` bypasses the cache and
-    // rebuilds them verbatim. Covers the fixture tables (`comments`/`accounts`/
-    // `posts`) plus the setup-built `entries`/`messages`/`recipients`.
-    await defineSchema(
-      {
-        comments: canonicalSchema.comments,
-        accounts: canonicalSchema.accounts,
-        posts: canonicalSchema.posts,
-        entries: canonicalSchema.entries,
-        messages: canonicalSchema.messages,
-        recipients: canonicalSchema.recipients,
-      },
-      { dropExisting: true },
-    );
+    // suite and break fixture seeding. Drop + recreate them verbatim. Covers the
+    // fixture tables (`comments`/`accounts`/`posts`) plus the setup-built
+    // `entries`/`messages`/`recipients`.
+    await rebuildCanonicalTables(Base.connection, [
+      "comments",
+      "accounts",
+      "posts",
+      "entries",
+      "messages",
+      "recipients",
+    ]);
   });
 
   let entryWithMessage: Base;

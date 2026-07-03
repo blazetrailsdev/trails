@@ -13,7 +13,7 @@ import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -86,19 +86,15 @@ describe("BindParameterTest", () => {
     // A sibling file (e.g. coders/json.test.ts's SerializedTopic) physically
     // replaces `topics` with a bespoke shape lacking `author_name`. The worker's
     // canonical-schema preload keeps the signature cache warm, so the fixtures'
-    // own `defineSchema` is a no-op and the bespoke table survives into this
-    // suite — its fixture load then fails with "table topics has no column named
-    // author_name". `dropExisting` bypasses the cache and rebuilds the canonical
-    // shape verbatim (mirrors the shield in locking.test.ts / dirty.test.ts).
-    await defineSchema(
-      {
-        topics: canonicalSchema.topics,
-        authors: canonicalSchema.authors,
-        author_addresses: canonicalSchema.author_addresses,
-        posts: canonicalSchema.posts,
-      },
-      { dropExisting: true },
-    );
+    // own load then fails with "table topics has no column named author_name".
+    // Drop + recreate the canonical shape verbatim (mirrors the shield in
+    // locking.test.ts / dirty.test.ts).
+    await rebuildCanonicalTables(Base.connection, [
+      "topics",
+      "authors",
+      "author_addresses",
+      "posts",
+    ]);
     registerModel(Author);
     registerModel(Post);
   });

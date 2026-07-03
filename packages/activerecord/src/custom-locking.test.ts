@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { adapterType } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { Base } from "./base.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -16,7 +17,7 @@ describe("CustomLockingTest", () => {
   useHandlerTransactionalFixtures();
   const { people } = fixtures(["people"], { schema: canonicalSchema });
   beforeAll(async () => {
-    await defineSchema({ people: canonicalSchema.people }, { dropExisting: true });
+    await rebuildCanonicalTables(Base.connection, ["people"]);
   });
 
   it.skipIf(adapterType !== "mysql")("custom lock", async () => {
