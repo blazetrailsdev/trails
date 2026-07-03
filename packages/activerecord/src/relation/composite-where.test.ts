@@ -182,6 +182,19 @@ describe("Relation#where — composite-key form", () => {
     expect(sql).toMatch(/NOT \(author_id = 1\)/);
   });
 
+  it("whereNot(mixed-type cols, tuples) routes to sanitize (symmetric with where), not a bogus composite", () => {
+    // The composite form requires an all-strings column list, kept symmetric
+    // with `where`. A non-string element means it is NOT composite cols, so it
+    // routes to the sanitized-conditions path (which surfaces a bind-arity
+    // error) rather than building a predicate off a coerced `5` column.
+    expect(() => (CpkBook as any).all().whereNot(["author_id", 5], [[1, 2]])).toThrow(
+      /wrong number of bind variables/,
+    );
+    expect(() => (CpkBook as any).whereNot(["author_id", 5], [[1, 2]])).toThrow(
+      /wrong number of bind variables/,
+    );
+  });
+
   it("where([], tuples) is the composite form and raises on the empty column list, not a silent no-op", () => {
     // The blank short-circuit (`where([])`) applies only to the single-argument
     // call; a supplied tuples arg keeps this on the composite path.

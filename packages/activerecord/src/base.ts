@@ -2240,6 +2240,11 @@ export class Base extends Model {
       return this.all().where(conditionsOrSql as string[], rest[0] as unknown[][]);
     }
     if (Array.isArray(conditionsOrSql)) {
+      // A single array argument is the sanitized-conditions form. Any extra
+      // positional `rest` is intentionally dropped, mirroring Rails'
+      // `build_where_clause`, whose `opts, *rest = opts` overwrites `rest` with
+      // the array tail and discards the originally-passed args
+      // (query_methods.rb:1616-1618).
       return this.all().where(conditionsOrSql as unknown[]);
     }
     return this.all().where(conditionsOrSql);
@@ -2263,8 +2268,14 @@ export class Base extends Model {
     // Rails' `where.not` mirrors `where` — a single array argument is the
     // sanitized-conditions form (`where.not(["name = ?", x])`, query_methods.rb:28)
     // built via `build_where_clause(...).invert`; the composite-key form is the
-    // two-argument `whereNot(cols, tuples)`. Disambiguate by argument count.
-    if (Array.isArray(conditions) && tuples !== undefined) {
+    // two-argument `whereNot(cols, tuples)`. Disambiguate by argument count, and
+    // require the column list to be all strings (symmetric with `where`) so a
+    // mixed-type array routes to the sanitized-conditions path.
+    if (
+      Array.isArray(conditions) &&
+      tuples !== undefined &&
+      conditions.every((c) => typeof c === "string")
+    ) {
       if (!Array.isArray(tuples)) {
         throw argumentError(
           `${(this as { name?: string }).name ?? "Model"}.whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
@@ -2273,6 +2284,8 @@ export class Base extends Model {
       return this.all().whereNot(conditions as string[], tuples);
     }
     if (Array.isArray(conditions)) {
+      // Single-array sanitized-conditions form; any extra positional arg is
+      // dropped, matching Rails' `build_where_clause` overwrite (as in `where`).
       return this.all().whereNot(conditions as unknown[]);
     }
     return this.all().whereNot(conditions);

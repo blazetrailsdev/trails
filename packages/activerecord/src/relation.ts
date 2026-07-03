@@ -1102,10 +1102,17 @@ export class Relation<T extends Base> {
     for (const t of referencesFromConditions(conditions)) {
       if (!rel._referencesValues.includes(t)) rel._referencesValues.push(t);
     }
-    if (Array.isArray(conditions) && tuples !== undefined) {
+    if (
+      Array.isArray(conditions) &&
+      tuples !== undefined &&
+      conditions.every((c) => typeof c === "string")
+    ) {
       // Composite-key form: `whereNot(cols, tuples)`. Present only when the
-      // second (tuples) argument is supplied; a single array argument is the
-      // sanitized-conditions form handled below.
+      // second (tuples) argument is supplied AND the column list is all
+      // strings — kept symmetric with `where`'s composite guard so a
+      // mixed-type array (`whereNot(["a", 5], ...)`) routes to the
+      // sanitized-conditions path below instead of building a bogus
+      // predicate off a non-string column name.
       if (!Array.isArray(tuples)) {
         throw argumentError(
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
