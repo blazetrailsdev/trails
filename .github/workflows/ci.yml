@@ -915,7 +915,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40 # TEMP(truncate-based-global-reset): diagnose PG/MariaDB slowdown; revert before merge
     services:
       # tmpfs: the data dir is mounted in RAM so Postgres' per-DDL fsync
       # traffic (WAL flushes + checkpoints) never hits disk. This suite is
@@ -1048,7 +1048,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40 # TEMP(truncate-based-global-reset): diagnose PG/MariaDB slowdown; revert before merge
     services:
       mariadb:
         image: mariadb:11
