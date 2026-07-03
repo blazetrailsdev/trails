@@ -161,14 +161,14 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     } else {
       throughRecord = throughProxy.build?.(attrs) ?? null;
     }
-    // trails gates the unconditional has_one autosave callback on
-    // `options.autosave` (autosave-association.ts), so a join record with no
-    // pending replace would never be written on owner.save. Rails persists it
-    // via the through's has_one autosave (`save_has_one_association`); we
-    // reproduce that by queueing the built/assigned join record on the through
-    // association's own pending replace, which `flushPendingReplaces` runs on
-    // the owner's next save (cascading to the join record's belongs_to source,
-    // e.g. an unsaved `club`).
+    // A has_one_through's autosave target is the END record, and its
+    // persistence routes through `createThroughRecord` (join-model build/save),
+    // not the base `save_has_one_association` save. We reproduce Rails'
+    // through-side has_one autosave by queueing the built/assigned join record
+    // on the through association's own pending replace, which
+    // `flushPendingReplaces` runs on the owner's next save (cascading to the
+    // join record's belongs_to source, e.g. an unsaved `club`). The base
+    // `autosaveHasOne` defers to this queued replace rather than double-saving.
     if (
       throughRecord &&
       (throughRecord as any).isNewRecord?.() &&

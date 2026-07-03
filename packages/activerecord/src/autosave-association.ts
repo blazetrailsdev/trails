@@ -474,12 +474,27 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
 
+  // Rails: `autosave = reflection.options[:autosave]`. `autosave === false` opts
+  // the association out entirely (filtered at registration), so here `autosave`
+  // is either `true` or `undefined`/nil.
+  const autosave = assoc.options.autosave;
+
+  // Reconcile with the writer-path `_pendingReplace`/`persistReplace` machinery:
+  // a queued replace is flushed after commit (`flushPendingReplaces`) and owns
+  // the FK re-derivation plus dependent removal of the displaced record. Skip
+  // here so the child isn't saved twice. The build_/create_ paths queue nothing
+  // (they call `replace(record, false)`), so this callback remains their sole
+  // persistence path — matching Rails' `save_has_one_association`.
+  if (inst?._pendingReplace) return true;
+
   // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
   // Must precede the marked_for_destruction branch (Rails:482) so an
   // already-destroyed child isn't re-destroyed.
   if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
     return true;
-  if (isMarkedForDestruction(childRecord)) {
+  // Rails: `if autosave && record.marked_for_destruction?` — only destroy the
+  // child when the autosave option is enabled.
+  if (autosave && isMarkedForDestruction(childRecord)) {
     // Rails save_has_one_association:482-483 — `record.destroy` runs
     // unconditionally; even a new_record? child runs the destroy callback
     // chain, dependent cascades, and freeze (only the DB DELETE is skipped).
@@ -488,9 +503,9 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   }
   // Rails save_has_one_association:487 — gate via
   // `(autosave && record.changed_for_autosave?) || _record_changed?(reflection, record, pk)`.
-  // autosave is always true on this path (gated in autosaveAssociation), so the
-  // first leg reduces to `record.changed_for_autosave?` and we add Rails'
-  // _record_changed? (FK / inverse-polymorphic / will-save-change) leg too.
+  // The first leg only fires when the autosave option is enabled; the
+  // _record_changed? leg (FK / inverse-polymorphic / will-save-change /
+  // new_record?) always applies, so a NEW child persists regardless of autosave.
   const ctor = record.constructor as typeof Base;
   const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
   // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
@@ -507,7 +522,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   const recordChanged = reflection
     ? is_recordChanged(reflection, childRecord, pkForChangeCheck)
     : childRecord.isNewRecord();
-  if (changedForSave || recordChanged) {
+  if ((autosave && changedForSave) || recordChanged) {
     // reflection.foreignKey resolves queryConstraints-derived FK columns;
     // fall back to the raw option or the default scalar FK.
     const foreignKey: string | string[] =
@@ -594,15 +609,18 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     )
       return true;
 
-    // Rails: record.save(validate: !autosave). autosaveHasOne only runs
-    // for autosave-enabled reflections (gated in autosaveAssociation), so
-    // !autosave is always false → validate: false.
-    const saved = await childRecord.save({ validate: false });
+    // Rails: `record.save(validate: !autosave)`. With autosave enabled the
+    // child was already validated in the owner's validation phase, so
+    // validate: false; with autosave nil it is validated here at save time.
+    const saved = await childRecord.save({ validate: !autosave });
     if (!saved) {
-      // Rails save_has_one_association just `raise ActiveRecord::Rollback`
-      // on failure — it adds no owner error. Child validation errors were
-      // already imported during the validation phase (association_valid?).
-      return false;
+      // Rails: `raise ActiveRecord::Rollback if !saved && autosave` — a failed
+      // save only rolls the owner back when the autosave option is enabled (and
+      // adds no owner error; child validation errors were already imported
+      // during the validation phase). trails surfaces that rollback by returning
+      // false, which makes the after_create/after_update callback throw
+      // RecordInvalid. With autosave nil there is no rollback, so return true.
+      return !autosave;
     }
   }
   return true;
@@ -1240,14 +1258,21 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {
       return saveHasOneAssociation.call(this, reflection);
     });
+    // Mirrors Rails: `save_has_one_association` is registered for after_create
+    // and after_update UNCONDITIONALLY (autosave_association.rb
+    // `add_autosave_association_callbacks`, `elsif reflection.has_one?` — no
+    // autosave-option gate). `autosave: false` opts the association out (Rails
+    // `elsif autosave != false`); the option's true-form only governs re-saving
+    // already-persisted children. A NEW child is always persisted on owner.save
+    // via `_record_changed?` → `new_record?`, matching Rails.
     afterCreate(model, async (record: any) => {
       const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
-      if (!assocDef?.options?.autosave) return;
+      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
     afterUpdate(model, async (record: any) => {
       const assocDef = record.constructor._associations?.find((a: any) => a.name === hasOneName);
-      if (!assocDef?.options?.autosave) return;
+      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
   } else {
