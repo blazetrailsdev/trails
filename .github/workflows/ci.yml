@@ -759,8 +759,29 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      # DDL profiler (measurement) — this branch only. The head_ref expression
+      # resolves to "" on every other branch/PR/main, so the profiler is a
+      # dormant no-op there; on this branch it emits per-worker DDL-timing JSON
+      # (see packages/activerecord/src/test-helpers/ddl-profile.ts, PR #3904).
+      # The profiler never fails a test (best-effort dumps), so it can't gate.
       - run: pnpm vitest run packages/activerecord/
+        env:
+          DDL_PROFILE: ${{ github.head_ref == 'ddl-profile-ci-run-085775' && '1' || '' }}
+          DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
       - run: pnpm vitest run packages/activerecord-cli
+      - name: DDL profile aggregate (measurement)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        continue-on-error: true
+        run: |
+          node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/aggregate-sqlite.txt"
+      - name: Upload DDL profile (sqlite)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddl-profile-sqlite
+          path: ${{ runner.temp }}/ddlprof
+          if-no-files-found: warn
 
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
@@ -961,14 +982,32 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      # DDL profiler (measurement) — this branch only; no-op elsewhere. Postgres
+      # is a DDL-dominated lane (teardown DROP TABLE dominates), so its
+      # DROP-count/ms aggregate is a headline signal. See the sqlite lane.
       - run: pnpm vitest run packages/activerecord/
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
+          DDL_PROFILE: ${{ github.head_ref == 'ddl-profile-ci-run-085775' && '1' || '' }}
+          DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
       - run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+      - name: DDL profile aggregate (measurement)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        continue-on-error: true
+        run: |
+          node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/aggregate-postgres.txt"
+      - name: Upload DDL profile (postgres)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddl-profile-postgres
+          path: ${{ runner.temp }}/ddlprof
+          if-no-files-found: warn
 
   mysql-tests:
     name: Active Record MySQL Tests
@@ -1075,14 +1114,32 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      # DDL profiler (measurement) — this branch only; no-op elsewhere. MariaDB
+      # is the other DDL-dominated lane, so its DROP-count/ms aggregate is a
+      # headline signal. See the sqlite lane.
       - run: pnpm vitest run packages/activerecord/
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
+          DDL_PROFILE: ${{ github.head_ref == 'ddl-profile-ci-run-085775' && '1' || '' }}
+          DDL_PROFILE_OUT_DIR: ${{ runner.temp }}/ddlprof
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
+      - name: DDL profile aggregate (measurement)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        continue-on-error: true
+        run: |
+          node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/aggregate-maria.txt"
+      - name: Upload DDL profile (maria)
+        if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddl-profile-maria
+          path: ${{ runner.temp }}/ddlprof
+          if-no-files-found: warn
 
   website:
     name: Website
