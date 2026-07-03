@@ -7,6 +7,7 @@ import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
+import { constructJoinDependency } from "../relation/query-methods.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -912,6 +913,25 @@ export class AssociationScope {
    */
   protected _pushScopeIntoRelation(scope: unknown, evaluated: unknown): unknown {
     if (!evaluated) return scope;
+    // Rails add_constraints' chain.reverse_each folds each item's joins /
+    // left_outer_joins and eager-load-as-join into the main scope when the
+    // item's `where(...)` referenced a joined table (`!item.references_values
+    // .empty?` → `scope.merge! item.only(:joins, :left_outer_joins)` +
+    // `scope.joins! item.construct_join_dependency(eager_load|includes,
+    // OuterJoin)`, association_scope.rb:138-146). A through scope such as
+    // `-> { where("comments.id" => nil).includes(:comments) }` relies on this
+    // to actually JOIN comments; without it the WHERE references a missing
+    // table. `all_includes` does NOT yield for chain entries (ReflectionProxy),
+    // so includes_values themselves are not carried forward — only the join is.
+    this._mergeReferencedJoins(scope, evaluated);
+    // Rails: `scope.unscope!(*item.unscope_values)` runs BEFORE the item's own
+    // where clause is appended, so a `unscope(where: :skimmer)` chain entry
+    // strips the target's default-scope predicate without dropping the item's
+    // additions. Apply the item's recorded unscope directives to the main scope.
+    const evalUnscope = (evaluated as { _unscopeValues?: unknown[] })._unscopeValues ?? [];
+    if (evalUnscope.length > 0) {
+      (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...evalUnscope);
+    }
     const evalWhere = (evaluated as { _whereClause?: { predicates?: unknown[] } })._whereClause;
     const evalPredicates = evalWhere?.predicates ?? [];
     const evalOrders = (evaluated as { _orderClauses?: unknown[] })._orderClauses ?? [];
@@ -944,6 +964,70 @@ export class AssociationScope {
       merged._rawOrderClauses = Array.from(new Set([...evalRawOrders, ...existingRaw]));
     }
     return merged;
+  }
+
+  /**
+   * Fold a chain entry's joins / left_outer_joins and any referenced
+   * eager-load associations into the main scope as real JOINs. Mirrors the
+   * `elsif !item.references_values.empty?` branch of Rails' add_constraints
+   * (association_scope.rb:138-146):
+   *
+   *   scope.merge! item.only(:joins, :left_outer_joins)
+   *   associations = item.eager_load_values | item.includes_values
+   *   scope.joins! item.construct_join_dependency(associations, OuterJoin)
+   *
+   * The entry's klass differs from the scope's target klass, so the joins are
+   * built as JoinDependencies against the ENTRY (`constructJoinDependency.call
+   * (evaluated, ...)`) and stashed in the cross-klass join-dep stores the
+   * relation already emits — the same mechanism Relation::Merger uses.
+   */
+  private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
+    const item = evaluated as {
+      _referencesValues?: string[];
+      _joinValues?: unknown[];
+      _joinClauses?: unknown[];
+      _namedInnerJoins?: unknown[];
+      _leftOuterJoinsValues?: unknown[];
+      _includesAssociations?: unknown[];
+      _eagerLoadAssociations?: unknown[];
+      _modelClass?: typeof Base;
+    };
+    const refs = item._referencesValues ?? [];
+    if (refs.length === 0) return;
+    const target = scope as {
+      _joinValues: unknown[];
+      _joinClauses: unknown[];
+      _namedInnerJoinDeps: unknown[];
+      _leftOuterJoinDeps: unknown[];
+      _modelClass?: typeof Base;
+    };
+    // item.only(:joins, :left_outer_joins) — carry raw SQL / Arel join nodes
+    // straight across, and build cross-klass JoinDependencies for named
+    // association joins (mirrors Merger#merge_joins / #merge_outer_joins).
+    for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
+    for (const jv of item._joinValues ?? []) target._joinValues.push(jv);
+    const namedInner = item._namedInnerJoins ?? [];
+    if (namedInner.length > 0) {
+      target._namedInnerJoinDeps.push(
+        constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
+      );
+    }
+    const namedLeft = item._leftOuterJoinsValues ?? [];
+    if (namedLeft.length > 0) {
+      target._leftOuterJoinDeps.push(
+        constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
+      );
+    }
+    // associations = eager_load_values | includes_values → OuterJoin
+    const associations = [
+      ...(item._eagerLoadAssociations ?? []),
+      ...(item._includesAssociations ?? []),
+    ];
+    if (associations.length > 0) {
+      target._leftOuterJoinDeps.push(
+        constructJoinDependency.call(item as never, associations as never, Nodes.OuterJoin),
+      );
+    }
   }
 }
 

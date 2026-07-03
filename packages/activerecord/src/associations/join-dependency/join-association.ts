@@ -189,7 +189,14 @@ export class JoinAssociation extends JoinPart {
         // output, always proper Arel join nodes (raw-SQL strings become
         // `Nodes.StringJoin`, association-name join sources become real join
         // nodes). `arel()` builds the manager off the scope's join values.
-        const sources: Nodes.Node[] = scope?.arel ? (scope.arel().joinSources as Nodes.Node[]) : [];
+        // Rails builds the scope's own join sources with the OUTER alias tracker
+        // (`join_scope.arel(alias_tracker.aliases)`, join_dependency.rb) so a scope
+        // `joins(:post)` that re-joins a table already claimed by the through chain
+        // (e.g. `comments_for_first_author` re-joining `posts`) is re-aliased
+        // instead of emitting a duplicate `posts` that yields ambiguous columns.
+        const sources: Nodes.Node[] = scope?.arel
+          ? (scope.arel(aliasTracker).joinSources as Nodes.Node[])
+          : [];
         // `this.joinSources` accumulates flat across the chain (consumed by the
         // single-step `has_one`/`has_many` path, whose chain is length 1). The
         // through path instead reads `joinSourcesByJoin`, which buckets each
