@@ -136,10 +136,14 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * We only read the through proxy's in-memory `target`, never `loadTarget`
    * (async): when the through has no loaded target we `build`. This is exact
-   * for a new owner (no PK → Rails could not query either) and for the
-   * fresh `build`/`create` cases the tests exercise (no pre-existing join
-   * row loaded); a persisted owner with an unloaded pre-existing join row
-   * still reconciles on the deferred path.
+   * for a new owner (no PK → Rails could not query either) and for the fresh
+   * `build`/`create` cases the tests exercise (no pre-existing join row). The
+   * one divergence is `build`/`create` on a *persisted* owner that already has
+   * an *unloaded* join row: Rails' `load_target` would find and
+   * `assign_attributes`/`update` it, whereas we build a fresh one. Reconciling
+   * that would require a synchronous DB read this write path cannot make; it is
+   * an unusual shape (building a through for an owner that already has one) and
+   * is not exercised by Rails' suite.
    * @internal
    */
   private constructThroughRecordInMemory(record: Base, save: boolean): void {
