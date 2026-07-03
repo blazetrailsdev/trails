@@ -369,7 +369,7 @@ describe("SQLite adapter driver binding", () => {
       { adapterFactory },
     );
 
-  it("pool clearReloadableConnectionsAsync drains an in-flight async-only close", async () => {
+  it("pool clearReloadableConnections drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const poolConfig = makePoolConfig(
       () =>
@@ -388,14 +388,14 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("DROP TABLE IF EXISTS reload_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
 
-    const draining = pool.clearReloadableConnectionsAsync();
+    const draining = pool.clearReloadableConnections();
     expect(isClosed()).toBe(false);
     release();
     await draining;
     expect(isClosed()).toBe(true);
   });
 
-  it("pool flushBangAsync drains an in-flight async-only close", async () => {
+  it("pool flushBang drains an in-flight async-only close", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     const pool = new ConnectionPool(
       makePoolConfig(
@@ -407,7 +407,7 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("DROP TABLE IF EXISTS flush_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
 
-    const draining = pool.flushBangAsync();
+    const draining = pool.flushBang();
     expect(isClosed()).toBe(false);
     release();
     await draining;
@@ -485,8 +485,8 @@ describe("SQLite adapter driver binding", () => {
     await conn.internalExecute("CREATE TABLE sync_seam_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_seam_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
-    await expect(pool.flushBangAsync()).resolves.toBeUndefined();
-    await expect(pool.clearReloadableConnectionsAsync()).resolves.toBeUndefined();
+    await expect(pool.flushBang()).resolves.toBeUndefined();
+    await expect(pool.clearReloadableConnections()).resolves.toBeUndefined();
     await expect(pool.discardBangAsync()).resolves.toBeUndefined();
     await expect(pool.drainPendingCloses()).resolves.toBeUndefined();
   });

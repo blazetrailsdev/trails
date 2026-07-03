@@ -247,7 +247,7 @@ it("clearReloadableConnections only disconnects reloadable adapters", async () =
   (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
   (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
 
-  pool.clearReloadableConnectionsBang();
+  await pool.clearReloadableConnectionsBang();
 
   expect(spy1).toHaveBeenCalled();
   expect(spy2).not.toHaveBeenCalled();

@@ -14,7 +14,7 @@
 
 export interface ReapablePool {
   reap?(): void;
-  flush?(): void;
+  flush?(): Promise<void>;
   isDiscarded?(): boolean;
 }
 
@@ -93,7 +93,9 @@ export class Reaper {
         const p = ref.deref();
         if (p) {
           p.reap?.();
-          p.flush?.();
+          // Reaper runs on an unref'd timer; the async flush drains idle
+          // adapters' `driver.close()` best-effort — nothing awaits the reaper.
+          void p.flush?.();
         }
       }
     }, frequency * 1000);

@@ -961,16 +961,24 @@ export class ConnectionPool implements ReapablePool {
     await Promise.all(this.discardBangDraining());
   }
 
-  clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): void {
-    this._clearReloadableConnections(raiseOnAcquisitionTimeout);
+  /**
+   * Converges Rails' `ConnectionPool#clear_reloadable_connections`: clears
+   * reloadable connections synchronously, then awaits each reloaded adapter's
+   * in-flight async `driver.close()` before resolving, so an async-only driver's
+   * handle is fully closed before the caller re-opens the same DB. Resolves
+   * immediately for sync drivers. The `Promise` return is an intentional,
+   * documented divergence from Rails' synchronous `clear_reloadable_connections`
+   * (forced by promise-returning `driver.close()`), NOT a regression to revert.
+   */
+  async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
+    await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
   }
 
   /**
-   * Synchronous reload-clear shared by `clearReloadableConnections` and its
-   * async variant. Returns the pending async-close drains surfaced by reloadable
-   * adapters whose `driver.close()` (fired by `disconnectBang` below) is
-   * promise-returning. The sync API ignores them (Rails-synchronous);
-   * `clearReloadableConnectionsAsync` awaits them.
+   * Synchronous reload-clear shared by the awaitable `clearReloadableConnections`
+   * and its `Bang` alias. Returns the pending async-close drains surfaced by
+   * reloadable adapters whose `driver.close()` (fired by `disconnectBang` below)
+   * is promise-returning, for the public method to await.
    */
   private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
@@ -1009,21 +1017,8 @@ export class ConnectionPool implements ReapablePool {
     return draining;
   }
 
-  /**
-   * Async-draining variant of `clearReloadableConnections`: clears
-   * synchronously, then awaits each reloaded adapter's in-flight async close
-   * before resolving. Resolves immediately for sync drivers.
-   */
-  async clearReloadableConnectionsAsync(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
-  }
-
-  clearReloadableConnectionsBang(): void {
-    this.clearReloadableConnections(false);
-  }
-
-  async clearReloadableConnectionsBangAsync(): Promise<void> {
-    await this.clearReloadableConnectionsAsync(false);
+  async clearReloadableConnectionsBang(): Promise<void> {
+    await this.clearReloadableConnections(false);
   }
 
   reap(): void {
@@ -1032,15 +1027,24 @@ export class ConnectionPool implements ReapablePool {
     // JS is single-threaded so there are no dead-owner connections to recover.
   }
 
-  flush(minimumIdle?: number | null): void {
-    this._flush(minimumIdle);
+  /**
+   * Converges Rails' `ConnectionPool#flush`: evicts idle connections
+   * synchronously, then awaits each evicted adapter's in-flight async
+   * `driver.close()` before resolving, so an async-only driver's handle is fully
+   * closed before the caller re-opens the same DB. Resolves immediately for sync
+   * drivers. The `Promise` return is an intentional, documented divergence from
+   * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
+   * NOT a regression to revert.
+   */
+  async flush(minimumIdle?: number | null): Promise<void> {
+    await Promise.all(this._flush(minimumIdle));
   }
 
   /**
-   * Synchronous flush shared by `flush`/`flushAsync`. Returns the pending
-   * async-close drains surfaced by flushed adapters whose `driver.close()`
-   * (fired by `disconnectBang` below) is promise-returning. `flush` ignores them
-   * (Rails-synchronous); `flushAsync` awaits them.
+   * Synchronous flush shared by the awaitable `flush` and `flushBang`. Returns
+   * the pending async-close drains surfaced by flushed adapters whose
+   * `driver.close()` (fired by `disconnectBang` below) is promise-returning, for
+   * the public method to await.
    */
   private _flush(minimumIdle?: number | null): Array<Promise<void>> {
     if (minimumIdle === undefined) minimumIdle = this._idleTimeout;
@@ -1075,23 +1079,9 @@ export class ConnectionPool implements ReapablePool {
     return draining;
   }
 
-  /**
-   * Async-draining variant of `flush`: evicts idle connections synchronously,
-   * then awaits each one's in-flight async close before resolving. Resolves
-   * immediately for sync drivers.
-   */
-  async flushAsync(minimumIdle?: number | null): Promise<void> {
-    await Promise.all(this._flush(minimumIdle));
-  }
-
-  flushBang(): void {
+  async flushBang(): Promise<void> {
     this.reap();
-    this.flush(-1);
-  }
-
-  async flushBangAsync(): Promise<void> {
-    this.reap();
-    await this.flushAsync(-1);
+    await this.flush(-1);
   }
 
   /**
