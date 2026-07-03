@@ -426,8 +426,12 @@ describe("AssociationCallbacksTest", () => {
     const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
     expect((await proxy.toArray()).length).toBe(1);
-    await proxy.delete(p);
+    // Rails passes the bare id to `destroy` (not `delete`): the abortable
+    // before_remove loop shares remove_records with delete, so an abort leaves
+    // the record (and its DB row) in place.
+    await proxy.destroy(p.id);
     expect((await proxy.toArray()).length).toBe(1);
+    expect(await (Post as any).exists(p.id)).toBe(true);
   });
 
   it("before_remove abort halts the whole removal, not just the current record", async () => {

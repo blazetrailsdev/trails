@@ -319,6 +319,16 @@ describe("HasManyAssociationsTest", () => {
     await firstFirm.clientsOfFirm.reload();
     expect(await firstFirm.clientsOfFirm.size()).toBe(1);
   });
+
+  it("destroy returns the removed records", async () => {
+    // Rails CollectionProxy#destroy returns `@association.destroy(*records)`,
+    // i.e. the removed records (collection_association.rb:385-396). An aborted
+    // before_remove returns none.
+    const firstFirm = companies("first_firm") as any;
+    const first = await firstFirm.clientsOfFirm.first();
+    const removed = await firstFirm.clientsOfFirm.destroy(first);
+    expect(removed.map((r: any) => r.id)).toEqual([first.id]);
+  });
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
@@ -464,6 +474,24 @@ describe("HasManyAssociationsTest", () => {
     // The has_many counter (taggings_with_destroy_count) differs from the
     // belongs_to inverse's (tags_count), so inverse_updates_counter_cache? is
     // false and the destroy must still decrement it.
+    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
+
+  // Same Rails behavior again, routed through CollectionProxy#destroy
+  // (`proxy.destroy(record)`) rather than `delete`. Rails' destroy calls
+  // delete_or_destroy(records, :destroy), sharing remove_records with delete, so
+  // the counter-cache decrement (gated on inverse_updates_counter_cache?) fires
+  // here too. Verbatim Rails name (one Rails test, three trails code paths).
+  it("deleting updates counter cache with dependent destroy", async () => {
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_destroy_count: startCount });
+
+    const first = (await post.taggingsWithDestroy.first())!;
+    await post.taggingsWithDestroy.destroy(first);
+
+    await post.reload();
     expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
@@ -6040,6 +6068,46 @@ describe("HasManyAssociationsTest", () => {
     expect((error as any).record).toBeInstanceOf(PostWithErrorDestroying2);
     // Suppress unused-variable warning; post was created to trigger the association destroy.
     void post;
+  });
+
+  it("collection destroy uses destroy bang and rolls back the batch on failure", async () => {
+    // Rails CollectionProxy#destroy runs `records.each(&:destroy!)` inside
+    // delete_or_destroy's transaction, so a child that can't be destroyed raises
+    // RecordNotDestroyed and rolls back the whole batch — an earlier, already
+    // destroyed sibling is restored.
+    class HaltingComment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("body", "string");
+        this.beforeDestroy(function (this: any) {
+          if (this._readAttribute("body") === "keep") throwAbort();
+        });
+      }
+    }
+    class PostWithHaltingComments extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.hasMany("haltingComments", {
+          className: "HaltingComment",
+          foreignKey: "post_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel(PostWithHaltingComments);
+    registerModel(HaltingComment);
+    const post = await PostWithHaltingComments.create({ title: "T", body: "b" });
+    const first = await HaltingComment.create({ post_id: post.id, body: "removable" });
+    const second = await HaltingComment.create({ post_id: post.id, body: "keep" });
+
+    const { RecordNotDestroyed: RND } = await import("../index.js");
+    await expect((post as any).haltingComments.destroy(first, second)).rejects.toBeInstanceOf(RND);
+
+    // Rolled back: the removable sibling destroyed before the halt is restored.
+    expect(await HaltingComment.exists(first.id)).toBe(true);
+    expect(await HaltingComment.exists(second.id)).toBe(true);
   });
 
   it("has many preloading with duplicate records", async () => {
