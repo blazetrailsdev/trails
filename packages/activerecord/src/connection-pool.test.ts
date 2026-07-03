@@ -37,9 +37,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
   // This double has no real raw connection; report active so checkout's
   // verify! is a no-op (mirroring Rails, where the pinned connection is
-  // active and verify! returns without reconnecting).
+  // active and verify! returns without reconnecting). Backed by a mutable
+  // field so a test can simulate the connection dying mid-session.
+  activeFlag = true;
   override get active(): boolean {
-    return true;
+    return this.activeFlag;
   }
   readonly inTransaction = false;
 
@@ -528,6 +530,42 @@ it("pin connection nesting", async () => {
   // Second unpin rolls back the outer transaction and checks in
   await pool.unpinConnectionBang();
   expect(conn1.transactionManager.openTransactions).toBe(0);
+});
+
+it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
+  // Rails re-runs verify! on every pinned checkout (connection_pool.rb:554), and
+  // verify! self-heals via reconnect!(restore_transactions: true) when the
+  // connection is no longer active? (abstract_adapter.rb:759). trails' checkout()
+  // is async and awaits the async verifyBang on every pinned handout, so this
+  // must hold for a *subsequent* (non-establishment) checkout too — not just the
+  // immediate one after pinConnectionBang — when the connection drops mid-session.
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+
+  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
+  const verify = vi.spyOn(conn, "verifyBang");
+  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
+    conn.activeFlag = true;
+  });
+
+  // Establishment already happened above; the connection is still healthy, so a
+  // re-checkout here verifies but does NOT reconnect.
+  expect(await pool.checkout()).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(reconnect).not.toHaveBeenCalled();
+
+  // Now the pinned connection dies mid-session. The *next* (subsequent, non-
+  // establishment) pinned checkout must await verifyBang and self-heal.
+  conn.activeFlag = false;
+  const again = (await pool.checkout()) as TransactionAwareTestAdapter;
+  expect(again).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
+  expect(again.active).toBe(true);
+
+  verify.mockRestore();
+  reconnect.mockRestore();
+  await pool.unpinConnectionBang();
 });
 
 it("inspect does not show secrets", async () => {
