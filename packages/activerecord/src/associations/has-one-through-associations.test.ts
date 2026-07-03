@@ -205,9 +205,31 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("currentMembership") as any).create();
+    const membership = await (newMember.association("currentMembership") as any).create();
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
+
+    // Rebuilding before save must re-point the deferred reconcile at the
+    // latest club (Rails runs `through_record.update` synchronously every
+    // call, so the last build wins) — not persist the first one on save.
+    const finalClub = (newMember.association("club") as any).build();
+    expect(newMember.association("club").target).toBe(finalClub);
+
+    // Rails' create_through_record reconciles against the persisted join row
+    // (`through_record.update(attributes)`) instead of building a duplicate: on
+    // save the existing membership is updated to point at the new club, no
+    // second membership row is inserted. Count is scoped to this member so a
+    // parallel fork's Membership rows can't perturb the delta (global-count
+    // shared-DB flake, cf. member_details, PR #4480).
+    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
+    const before = await countForMember();
+    expect(await newMember.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect(finalClub.isPersisted()).toBe(true);
+    const reloaded = await Membership.find(membership.id);
+    // club_id round-trips as BigInt on PG/MariaDB but finalClub.id is a number;
+    // compare numerically rather than by Object.is identity.
+    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("creating multiple associations creates through record", async () => {
