@@ -27,7 +27,7 @@ PR #4468 added a trails-local guard: `LoaderQuery._joinModelDiscriminator`
 appends the anonymous `HABTM_*` class name to the batch key. Rails has **no**
 such discriminator, yet
 `test_eager_with_multiple_associations_with_same_table_has_many_and_habtm`
-(`vendor/rails/activerecord/test/cases/associations/eager_test.rb:1027`) passes.
+(`vendor/rails/activerecord/test/cases/associations/eager_test.rb:1028`) passes.
 Why?
 
 ## Method
