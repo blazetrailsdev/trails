@@ -76,7 +76,15 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement.replace(/%[sdi]/g, (spec) => {
       const value = values.shift();
       if (spec === "%s") return quoter.quoteString(String(value ?? ""));
-      return String(parseInt(String(value), 10));
+      // Ruby's `"%d" % "abc"` raises (Integer() rejects the value); mirror that
+      // rather than emitting a literal `NaN` into the SQL.
+      const int = parseInt(String(value), 10);
+      if (Number.isNaN(int)) {
+        throw new PreparedStatementInvalid(
+          `invalid value for %d bind variable (${String(value)}) in: ${statement}`,
+        );
+      }
+      return String(int);
     });
   }
 
