@@ -2669,7 +2669,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
-  async destroy(...records: Array<T | number | string | bigint>): Promise<void> {
+  async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
     // Through (incl. HABTM): delegate to the association-layer destroy, exactly
     // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
     // has_many :through that runs HasManyThroughAssociation#delete_records
@@ -2686,7 +2686,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       };
       const removed = await assoc.destroy(...(records as Base[]));
       this._removeFromTarget(removed);
-      return;
+      return removed;
     }
     // Mirror Rails CollectionAssociation#destroy → delete_or_destroy
     // (collection_association.rb:387-389): coerce Integer/String args to records
@@ -2713,6 +2713,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // after_remove callbacks form one unit — all run inside the transaction when
     // there are persisted records, so before_remove side-effects participate in
     // rollback, exactly as the `delete` path above.
+    // `removed` stays undefined when before_remove aborts, so destroy returns
+    // undefined (Rails `catch(:abort) ... || return` yields nil); on success it
+    // holds the removed records (remove_records ends with `records.each { ... }`,
+    // whose value is `records`), mirroring CollectionProxy#destroy's return.
+    let removed: Base[] | undefined;
     const run = async () => {
       // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
       // return`: if any record's before_remove halts, the entire operation
@@ -2722,10 +2727,29 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           return;
         }
       }
-      // Rails: delete_records(existing_records, :destroy) if existing_records.any?
-      // — only persisted records have a DB row to destroy.
+      // Rails delete_records(existing_records, :destroy): `records.each(&:destroy!)`
+      // (has_many_association.rb) — destroyBang, so a child's before_destroy abort
+      // raises RecordNotDestroyed and rolls the enclosing transaction back rather
+      // than silently pruning the association. Only persisted records have a row.
       for (const record of persistedRecords) {
-        await record.destroy();
+        await (record as any).destroyBang();
+      }
+      // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
+      // The child destroy callbacks decrement the owner's counter through the
+      // belongs_to inverse only when that inverse points at THIS reflection's
+      // counter column; otherwise decrement here — identical to the `delete`
+      // path's :destroy branch.
+      if (persistedRecords.length > 0) {
+        const reflection = (
+          this._record.constructor as typeof Base & {
+            _reflectOnAssociation?: (
+              n: string,
+            ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
+          }
+        )._reflectOnAssociation?.(this._assocName);
+        if (!reflection?.inverseWhichUpdatesCounterCache?.()) {
+          await this._decrementCounterCache(persistedRecords.length);
+        }
       }
       // Remove from target first, then fire after_remove for all records
       // (Rails prunes @target before the after_remove loop).
@@ -2733,6 +2757,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       for (const record of modelRecords) {
         fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
       }
+      removed = modelRecords as Base[];
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
     // there are persisted records, so a mid-batch raise rolls back the batch.
@@ -2741,6 +2766,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await run();
     }
+    return removed;
   }
 
   /**

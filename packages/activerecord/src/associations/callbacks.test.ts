@@ -427,8 +427,9 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     expect((await proxy.toArray()).length).toBe(1);
     // Rails calls `.destroy(post.id)` here; before_remove aborting must halt the
-    // whole destroy batch, leaving the record in place (nothing destroyed).
-    await proxy.destroy(p.id);
+    // whole destroy batch, leaving the record in place (nothing destroyed) and
+    // returning nil/undefined.
+    expect(await proxy.destroy(p.id)).toBeUndefined();
     expect((await proxy.toArray()).length).toBe(1);
     expect(await (Post as any).exists(p.id)).toBe(true);
   });
@@ -559,7 +560,9 @@ describe("AssociationCallbacksTest", () => {
     const firm = await Firm.create({ name: "Firm" });
     const client = await firm.clients.create({ name: "Client" });
     firm.log.length = 0;
-    await firm.clients.destroy(client);
+    // Rails CollectionProxy#destroy returns the removed records on success.
+    const removed = await firm.clients.destroy(client);
+    expect(removed?.map((r: any) => r.id)).toEqual([client.id]);
     expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
     expect(await Client.exists(client.id)).toBe(false);
   });
