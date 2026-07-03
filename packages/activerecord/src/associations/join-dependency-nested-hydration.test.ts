@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency nested hydration", () => {
-  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
 
   // prettier-ignore
   class Author extends Base {
@@ -20,10 +23,8 @@ describe("JoinDependency nested hydration", () => {
     static { this.attribute("id", "integer"); this.attribute("title", "string"); }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
     for (const m of [Author, Comment, Post]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

@@ -8,22 +8,20 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { association, registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("reload — association owner re-point", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride the boot-laid canonical `authors` / `posts` on `Base.connection`
+  // (single-pool test model) rather than a sidecar `_pool` lease. `fixtures({})`
+  // establishes the handler and per-test transactional rollback (no seed rows).
+  fixtures({});
 
-  beforeAll(async () => {
-    adapter = await createTestAdapter();
-    Author.adapter = adapter;
-    Post.adapter = adapter;
+  beforeAll(() => {
     registerModel(Author);
     registerModel(Post);
   });
-  withTransactionalFixtures(() => adapter);
 
   it("exposes a reassignable owner on CollectionProxy", async () => {
     const first = await Author.create({ name: "first" });

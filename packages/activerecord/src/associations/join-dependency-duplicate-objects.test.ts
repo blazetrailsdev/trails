@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 // Row-level proof of the unified parent-key accessor (`_nodeKey`): a join that
@@ -13,7 +13,10 @@ import { JoinDependency } from "./join-dependency.js";
 // so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
 // is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
-  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
 
   class Comment extends Base {
     static {
@@ -37,10 +40,8 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
     for (const m of [Comment, Post, Reader]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

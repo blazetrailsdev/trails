@@ -9,12 +9,15 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { clearReflectionsCache } from "../reflection.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency#addAssociationSpec", () => {
-  let adapter: any;
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
 
   class Post extends Base {
     static {
@@ -42,10 +45,8 @@ describe("JoinDependency#addAssociationSpec", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
     for (const m of [Post, Comment, Author, Tag]) {
-      (m as any).adapter = adapter;
       (m as any)._associations = [];
       (m as any)._reflections = {};
       clearReflectionsCache(m);

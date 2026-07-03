@@ -11,12 +11,17 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { MigrationContext } from "../migration.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride `Base.connection` (single-pool test model) rather than a sidecar
+  // `_pool` lease. `fixtures({})` establishes the handler and per-test
+  // transactional rollback (no seed rows). The `lo_*` tables are genuinely
+  // bespoke (no canonical equivalent), so they're still laid via
+  // MigrationContext and dropped in afterAll — but on the primary boot
+  // connection.
+  fixtures({});
   let ctx: MigrationContext;
 
   class LoAuthor extends Base {
@@ -49,8 +54,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
   beforeAll(async () => {
-    adapter = await createTestAdapter();
-    ctx = new MigrationContext(adapter);
+    ctx = new MigrationContext(Base.connection);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");
     });
@@ -62,9 +66,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
       t.string("bio");
       t.integer("lo_author_id");
     });
-    LoAuthor.adapter = adapter;
-    LoPost.adapter = adapter;
-    LoProfile.adapter = adapter;
     registerModel(LoAuthor);
     registerModel(LoPost);
     registerModel(LoProfile);
@@ -72,8 +73,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   afterAll(async () => {
     await ctx.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });
     await author.save();

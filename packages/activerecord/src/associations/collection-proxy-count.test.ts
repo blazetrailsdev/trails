@@ -22,11 +22,14 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride the boot-laid canonical `authors` / `posts` / `comments` on
+  // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
+  // lease. `fixtures({})` establishes the handler and per-test transactional
+  // rollback (no seed rows) — the tests create their own data.
+  fixtures({});
 
   // Lightweight local models backed by the canonical `authors` / `posts` /
   // `comments` tables (Author has_many posts, Post has_many comments). Keeping
@@ -56,11 +59,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     }
   }
 
-  beforeAll(async () => {
-    adapter = await createTestAdapter();
-    CpcAuthor.adapter = adapter;
-    CpcPost.adapter = adapter;
-    CpcComment.adapter = adapter;
+  beforeAll(() => {
     registerModel("CpcAuthor", CpcAuthor);
     registerModel("CpcPost", CpcPost);
     registerModel("CpcComment", CpcComment);
@@ -72,8 +71,6 @@ describe("CollectionProxy#count — non-through fast path", () => {
       foreignKey: "author_id",
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   afterEach(() => Notifications.unsubscribeAll());
 
   it("issues a SELECT COUNT(*) and does not load individual rows", async () => {
