@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes, Table } from "@blazetrails/arel";
@@ -19,7 +19,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  fixtures({});
 
   class JdtAuthor extends Base {
     static {

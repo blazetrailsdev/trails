@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 // Row-level proof of the unified parent-key accessor (`_nodeKey`): a join that
@@ -16,7 +16,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  fixtures({});
 
   class Comment extends Base {
     static {
@@ -26,9 +26,12 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     }
   }
 
+  // Canonical `posts` column order (schema.rb): id, author_id, title — so `title`
+  // sits at the third hydration slot, matching the schema `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
+      this.attribute("author_id", "integer");
       this.attribute("title", "string");
     }
   }
@@ -55,8 +58,8 @@ describe("JoinDependency dedupes duplicate join rows", () => {
 
     // Same parent, same child, repeated join rows — must dedupe to one comment.
     const rows = [
-      { t0_r0: 1, t0_r1: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
-      { t0_r0: 1, t0_r1: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
+      { t0_r0: 1, t0_r2: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
+      { t0_r0: 1, t0_r2: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -74,8 +77,8 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     // Two distinct parents share one post which has one comment; the post and the
     // comment must each be a single shared instance, exactly deduped.
     const rows = [
-      { t0_r0: 1, t0_r1: 5, t1_r0: 5, t1_r1: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
-      { t0_r0: 2, t0_r1: 5, t1_r0: 5, t1_r1: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
+      { t0_r0: 1, t0_r1: 5, t1_r0: 5, t1_r2: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
+      { t0_r0: 2, t0_r1: 5, t1_r0: 5, t1_r2: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);

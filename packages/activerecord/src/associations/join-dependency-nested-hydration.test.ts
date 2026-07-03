@@ -1,26 +1,34 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency nested hydration", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  fixtures({});
 
+  // Canonical column order (schema.rb) drives the `tN_rN` hydration offsets so
+  // the hand-built rows survive the schema cache `fixtures({})` warms: `authors`
+  // is (id, name); `comments` is (id, post_id, body, …, author_id) with author_id
+  // at slot 8; `posts` is (id, author_id, title).
   // prettier-ignore
   class Author extends Base {
     static { this.attribute("id", "integer"); this.attribute("name", "string"); }
   }
   // prettier-ignore
   class Comment extends Base {
-    static { this.attribute("id", "integer"); this.attribute("body", "string"); this.attribute("post_id", "integer"); this.attribute("author_id", "integer"); }
+    static {
+      this.attribute("id", "integer"); this.attribute("post_id", "integer"); this.attribute("body", "string");
+      this.attribute("type", "string"); this.attribute("label", "integer"); this.attribute("tags_count", "integer");
+      this.attribute("children_count", "integer"); this.attribute("parent_id", "integer"); this.attribute("author_id", "integer");
+    }
   }
   // prettier-ignore
   class Post extends Base {
-    static { this.attribute("id", "integer"); this.attribute("title", "string"); }
+    static { this.attribute("id", "integer"); this.attribute("author_id", "integer"); this.attribute("title", "string"); }
   }
 
   beforeEach(() => {
@@ -38,8 +46,8 @@ describe("JoinDependency nested hydration", () => {
 
     // prettier-ignore
     const rows = [
-      { t0_r0: 1, t0_r1: "Post A", t1_r0: 10, t1_r1: "Comment 1", t1_r2: 1, t1_r3: 42, t2_r0: 42, t2_r1: "Alice" },
-      { t0_r0: 1, t0_r1: "Post A", t1_r0: 11, t1_r1: "Comment 2", t1_r2: 1, t1_r3: 42, t2_r0: 42, t2_r1: "Alice" },
+      { t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "Comment 1", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
+      { t0_r0: 1, t0_r2: "Post A", t1_r0: 11, t1_r1: 1, t1_r2: "Comment 2", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -72,8 +80,8 @@ describe("JoinDependency nested hydration", () => {
 
     // prettier-ignore
     const rows = [
-      { t0_r0: 1, t0_r1: "Post A", t1_r0: 10, t1_r1: "C1", t1_r2: 1, t1_r3: 42, t2_r0: 42, t2_r1: "Alice" },
-      { t0_r0: 2, t0_r1: "Post B", t1_r0: 20, t1_r1: "C2", t1_r2: 2, t1_r3: 42, t2_r0: 42, t2_r1: "Alice" },
+      { t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "C1", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
+      { t0_r0: 2, t0_r2: "Post B", t1_r0: 20, t1_r1: 2, t1_r2: "C2", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -87,7 +95,7 @@ describe("JoinDependency nested hydration", () => {
   it("nested records are not readonly by default when no reflection scope marks readonly", () => {
     const jd = new JoinDependency(Post);
     jd.addNestedAssociation("comments");
-    const rows = [{ t0_r0: 1, t0_r1: "Post A", t1_r0: 10, t1_r1: "C1", t1_r2: 1, t1_r3: null }];
+    const rows = [{ t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "C1", t1_r8: null }];
     const { parents } = jd.instantiateFromRows(rows);
     const comment = parents[0].association("comments").target[0];
     expect(comment._readonly).toBeFalsy();

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes } from "@blazetrails/arel";
@@ -19,10 +19,15 @@ describe("JoinDependency Arel node construction", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  fixtures({});
 
   class Owner extends Base {
     static {
+      // Canonical `owners` has `primary_key: :owner_id` (schema.rb) — declare it
+      // so the hasMany/belongsTo join predicates resolve against `owners.owner_id`,
+      // matching the schema `fixtures({})` warms.
+      this._primaryKey = "owner_id";
+      this.attribute("owner_id", "integer");
       this.attribute("name", "string");
     }
   }
@@ -171,7 +176,7 @@ describe("JoinDependency Arel node construction", () => {
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
     expect((eq.left as any).name).toBe("owner_id");
-    expect((eq.right as any).name).toBe("id");
+    expect((eq.right as any).name).toBe("owner_id");
   });
 
   it("emits OuterJoin for belongsTo with correct key direction", () => {
@@ -187,7 +192,7 @@ describe("JoinDependency Arel node construction", () => {
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
     // belongsTo: targetTable.pk = sourceTable.fk
-    expect((eq.left as any).name).toBe("id");
+    expect((eq.left as any).name).toBe("owner_id");
     expect((eq.right as any).name).toBe("owner_id");
   });
 

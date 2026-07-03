@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency extra columns in instantiate", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  fixtures({});
 
+  // Canonical `posts` column order (schema.rb): id, author_id, title — so `title`
+  // hydrates from `t0_r2`, matching the schema `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
+      this.attribute("author_id", "integer");
       this.attribute("title", "string");
     }
   }
@@ -40,7 +43,7 @@ describe("JoinDependency extra columns in instantiate", () => {
     const rows = [
       {
         t0_r0: 1,
-        t0_r1: "First Post",
+        t0_r2: "First Post",
         t1_r0: 10,
         t1_r1: 1,
         t1_r2: "Nice",
@@ -48,7 +51,7 @@ describe("JoinDependency extra columns in instantiate", () => {
       },
       {
         t0_r0: 1,
-        t0_r1: "First Post",
+        t0_r2: "First Post",
         t1_r0: 11,
         t1_r1: 1,
         t1_r2: "Great",
@@ -56,7 +59,7 @@ describe("JoinDependency extra columns in instantiate", () => {
       },
       {
         t0_r0: 2,
-        t0_r1: "Second Post",
+        t0_r2: "Second Post",
         t1_r0: 12,
         t1_r1: 2,
         t1_r2: "Cool",
@@ -78,7 +81,7 @@ describe("JoinDependency extra columns in instantiate", () => {
     const rows = [
       {
         t0_r0: 1,
-        t0_r1: "Post",
+        t0_r2: "Post",
         t1_r0: 10,
         t1_r1: 1,
         t1_r2: "Hello",
@@ -100,7 +103,7 @@ describe("JoinDependency extra columns in instantiate", () => {
     const jd = new JoinDependency(Post);
     jd.addAssociation("comments");
 
-    const rows = [{ t0_r0: 1, t0_r1: "Post", t1_r0: 10, t1_r1: 1, t1_r2: "Hi" }];
+    const rows = [{ t0_r0: 1, t0_r2: "Post", t1_r0: 10, t1_r1: 1, t1_r2: "Hi" }];
 
     const { parents } = jd.instantiateFromRows(rows);
 
