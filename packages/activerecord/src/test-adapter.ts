@@ -275,7 +275,7 @@ export async function createPooledTestAdapter(): Promise<{
 export function _resetPooledTestAdapterForTests(): void {
   if (_pooledHandler) {
     try {
-      _pooledHandler.clearAllConnectionsBang();
+      void _pooledHandler.clearAllConnectionsBang();
     } catch {}
   }
   _pooledHandler = null;

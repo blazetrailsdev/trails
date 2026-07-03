@@ -76,14 +76,13 @@ async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 
 /**
  * Tear down a pool-under-test, awaiting each adapter's async `driver.close()`
- * before returning. The sync `disconnect()` discards those drain promises
- * (Rails-synchronous behavior), so an async-only SQLite driver's handle could
- * still be closing when the next test's `makeAmbientPool()` reopens the same
- * ambient DB; `disconnectAsync()` awaits the drains, avoiding that race.
+ * before returning. `disconnect()` awaits those drain promises, so an
+ * async-only SQLite driver's handle is fully closed before the next test's
+ * `makeAmbientPool()` reopens the same ambient DB, avoiding a race.
  * (`conn.close()` would only checkin the connection, not close the driver.)
  */
 async function closePoolConnections(pool: ConnectionPool): Promise<void> {
-  await pool.disconnectAsync();
+  await pool.disconnect();
 }
 
 function makePool(size: number = 5): ConnectionPool {
