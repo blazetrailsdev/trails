@@ -415,14 +415,32 @@ export class ThroughAssociation extends Association {
       // for a scalar (has_one) through — a has_many through collects every
       // matching target at the source stage, so the extra JOIN would only risk
       // fanning out through rows.
+      //
+      // We add ONLY the immediate source reflection's join, so only predicates
+      // that reference the source table can be resolved on the through query.
+      // A reflection scope that reaches further (e.g. `.joins(nested)` with a
+      // predicate on that nested table) keeps those predicates off the through
+      // query — pushing them here without the deeper join would produce
+      // `no such column: <nested>.<col>`. Those deeper predicates stay at the
+      // source-preloader stage, where the full reflection scope (with its own
+      // joins/includes) is applied via `_getSourcePreloaders`. Rails' fuller
+      // through_scope also copies the scope's includes/references/joins/order
+      // (through_association.rb:117-142); mirroring that nested-join carry-over
+      // is a separate convergence, and no current has_one-through scope exercises
+      // it — the source-table filter is what this deviation needs.
       const isCollection = (this.reflection as any).isCollection?.() ?? false;
-      if (!isCollection && sourcePredicates.length > 0) {
+      const sourceTable = this._sourceTableName();
+      const joinablePredicates =
+        sourceTable != null
+          ? sourcePredicates.filter((pred) => predicateReferencesTable(pred, sourceTable))
+          : [];
+      if (!isCollection && joinablePredicates.length > 0) {
         const sourceRefl = this._sourceReflection;
         if (sourceRefl) {
           scope = scope.joins(sourceRefl.name);
           scope._whereClause = new WhereClause([
             ...scope._whereClause.predicates,
-            ...sourcePredicates,
+            ...joinablePredicates,
           ]);
         }
       }
@@ -491,6 +509,17 @@ export class ThroughAssociation extends Association {
     if (!throughRefl) return null;
     try {
       return (throughRefl.klass as any)?.tableName ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** @internal */
+  private _sourceTableName(): string | null {
+    const sourceRefl = this._sourceReflection;
+    if (!sourceRefl) return null;
+    try {
+      return (sourceRefl.klass as any)?.tableName ?? null;
     } catch {
       return null;
     }
