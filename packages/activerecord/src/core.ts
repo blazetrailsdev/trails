@@ -128,7 +128,11 @@ export async function prettyPrint(
           pp.text(attrName);
           pp.text(":");
           pp.breakable();
-          pp.text(attributeForInspect.call(this, attrName));
+          pp.text(
+            (this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(
+              attrName,
+            ),
+          );
         });
       },
     );
