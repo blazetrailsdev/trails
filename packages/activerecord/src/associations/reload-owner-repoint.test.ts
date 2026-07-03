@@ -7,23 +7,26 @@
 // record.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { association, registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { Base, association, registerModel } from "../index.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("reload — association owner re-point", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride the boot-laid canonical `authors` / `posts` on `Base.connection`
+  // (single-pool test model) rather than a sidecar `_pool` lease.
+  setupFixtures();
+  let adapter: typeof Base.connection;
 
-  beforeAll(async () => {
-    adapter = await createTestAdapter();
+  beforeAll(() => {
+    adapter = Base.connection;
     Author.adapter = adapter;
     Post.adapter = adapter;
     registerModel(Author);
     registerModel(Post);
   });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   it("exposes a reassignable owner on CollectionProxy", async () => {
     const first = await Author.create({ name: "first" });

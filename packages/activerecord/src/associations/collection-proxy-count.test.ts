@@ -22,11 +22,15 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride the boot-laid canonical `authors` / `posts` / `comments` on
+  // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
+  // lease. Transactional fixtures roll back per test.
+  setupFixtures();
+  let adapter: typeof Base.connection;
 
   // Lightweight local models backed by the canonical `authors` / `posts` /
   // `comments` tables (Author has_many posts, Post has_many comments). Keeping
@@ -56,8 +60,8 @@ describe("CollectionProxy#count — non-through fast path", () => {
     }
   }
 
-  beforeAll(async () => {
-    adapter = await createTestAdapter();
+  beforeAll(() => {
+    adapter = Base.connection;
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
     CpcComment.adapter = adapter;
@@ -72,7 +76,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
       foreignKey: "author_id",
     });
   });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   afterEach(() => Notifications.unsubscribeAll());
 

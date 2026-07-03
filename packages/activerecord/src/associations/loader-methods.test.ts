@@ -11,12 +11,17 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { MigrationContext } from "../migration.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride `Base.connection` (single-pool test model) rather than a sidecar
+  // `_pool` lease. The `lo_*` tables are genuinely bespoke (no canonical
+  // equivalent), so they're still laid via MigrationContext and dropped in
+  // afterAll — but on the primary boot connection.
+  setupFixtures();
+  let adapter: typeof Base.connection;
   let ctx: MigrationContext;
 
   class LoAuthor extends Base {
@@ -49,7 +54,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
   beforeAll(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");
@@ -72,7 +77,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   afterAll(async () => {
     await ctx.dropTable("lo_profiles", "lo_posts", "lo_authors", { ifExists: true });
   });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });

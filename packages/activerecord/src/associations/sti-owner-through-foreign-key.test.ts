@@ -7,24 +7,28 @@
 // has_one :through fixture — so the coverage lives here on the has_many path.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { Base, registerModel } from "../index.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reader } from "../test-helpers/models/reader.js";
 
 describe("STI owner has_many :through — declaring-class owner FK", () => {
-  let adapter: TestDatabaseAdapter;
+  // Ride the boot-laid canonical `posts` / `people` / `readers` on
+  // `Base.connection` (single-pool test model) rather than a sidecar `_pool`
+  // lease.
+  setupFixtures();
+  let adapter: typeof Base.connection;
 
-  beforeAll(async () => {
-    adapter = await createTestAdapter();
+  beforeAll(() => {
+    adapter = Base.connection;
     for (const klass of [Post, SpecialPost, Person, Reader]) {
       klass.adapter = adapter;
       registerModel(klass);
     }
   });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   it("creates the join row with the base-class owner FK (post_id, not special_post_id)", async () => {
     const post = await SpecialPost.create({ title: "sti", body: "b", type: "SpecialPost" });

@@ -7,12 +7,16 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { clearReflectionsCache } from "../reflection.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency walk() deduplication", () => {
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
   let adapter: any;
 
   class Post extends Base {
@@ -41,8 +45,8 @@ describe("JoinDependency walk() deduplication", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
     for (const m of [Post, Comment, Author, Like]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];

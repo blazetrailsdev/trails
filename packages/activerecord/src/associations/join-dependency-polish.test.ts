@@ -4,11 +4,16 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { Nodes, Table } from "@blazetrails/arel";
+
+// Ride the boot-laid canonical `Base.connection` (single-pool test model)
+// rather than a sidecar `_pool` lease; these wiring tests only need an
+// adapter for JoinDependency's quoting, not a bespoke schema.
+setupFixtures();
 
 describe("JoinBase.table", () => {
   let adapter: any;
@@ -19,8 +24,8 @@ describe("JoinBase.table", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
     (Post as any).adapter = adapter;
     (Post as any)._associations = [];
     registerModel(Post);
@@ -57,8 +62,8 @@ describe("joinType propagation in joinConstraints", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
     for (const m of [Post, Comment]) {
       (m as any).adapter = adapter;
       (m as any)._associations = [];

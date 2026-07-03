@@ -9,13 +9,17 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency Arel node construction", () => {
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
   let adapter: any;
 
   class Owner extends Base {
@@ -30,8 +34,8 @@ describe("JoinDependency Arel node construction", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
     Owner.adapter = adapter;
     Asset.adapter = adapter;
     (Owner as any)._associations = [];

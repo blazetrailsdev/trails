@@ -10,12 +10,17 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
 describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
+  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
+  // rather than a sidecar `_pool` lease; these wiring tests only need an
+  // adapter for JoinDependency's quoting, not a bespoke schema.
+  setupFixtures();
+
   class JdtAuthor extends Base {
     static {
       this.attribute("name", "string");
@@ -34,8 +39,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     }
   }
 
-  beforeEach(async () => {
-    const adapter = await createTestAdapter();
+  beforeEach(() => {
+    const adapter = Base.connection;
     for (const m of [JdtAuthor, JdtPost, JdtComment]) {
       m.adapter = adapter;
       (m as any)._associations = [];
@@ -124,7 +129,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetChild.tableName).toBe("jdt_comments");
   });
 
-  it("emits canonical self-join aliases when a nested-through chain references a table multiple times", async () => {
+  it("emits canonical self-join aliases when a nested-through chain references a table multiple times", () => {
     // Mirrors the alias-emission slice of Rails
     // test_nested_has_many_through_with_a_table_referenced_multiple_times
     // (nested_through_associations_test.rb:437): Author.similar_posts walks
@@ -159,7 +164,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
         this.attribute("name", "string");
       }
     }
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     for (const m of [StjAuthor, StjPost, StjTagging, StjTag]) {
       m.adapter = adapter;
       (m as any)._associations = [];
@@ -256,7 +261,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(throughNode.effectiveSqlName).toBe("jdt_posts");
   });
 
-  it("reuses one chain-tail alias for two distinct through associations sharing it", async () => {
+  it("reuses one chain-tail alias for two distinct through associations sharing it", () => {
     // Mirrors Rails JoinDependency#make_constraints memoizing `@joined_tables`
     // (join_dependency.rb:193-200): two `through: :posts` associations both
     // carry the owner's single `posts` reflection as their chain tail, so
@@ -297,7 +302,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
         this.attribute("value", "integer");
       }
     }
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     for (const m of [MemAuthor, MemPost, MemComment, MemRating]) {
       m.adapter = adapter;
       registerModel(m);
