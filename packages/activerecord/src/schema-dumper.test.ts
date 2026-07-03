@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
@@ -9,7 +9,18 @@ import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+
+// The first describe uses `setupFixtures()` (canonical schema + reset shield);
+// the later bespoke-table describes deliberately keep the global per-test reset,
+// so they only need `Base.connection` *established*. Establish it at file scope
+// (idempotent — `setupFixtures()` re-uses the same worker connection) so those
+// describes and the file-level afterAll don't depend on the first describe's
+// beforeAll having already run (e.g. when run in isolation via `-t`).
+beforeAll(async () => {
+  await establishFromTestConfig();
+});
 
 function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
   const adapter = Base.connection;

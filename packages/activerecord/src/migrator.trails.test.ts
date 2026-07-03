@@ -41,21 +41,27 @@ function makeMigration(
   };
 }
 
-describe("Migrator trails extensions", () => {
-  // Ride the primary schema-loaded pool (`Base.connection`) instead of the
-  // sidecar test pool; `setupFixtures()` establishes it.
-  setupFixtures();
+// Ride the primary schema-loaded pool (`Base.connection`) instead of the sidecar
+// test pool. Hoisted to file scope (not nested in the first describe) so every
+// describe in the file — including "Migrator advisory lock wrapping" below —
+// resolves `Base.connection` regardless of declaration/run order.
+setupFixtures();
 
+// `setupFixtures()` shields the schema_migrations / ar_internal_metadata tables
+// from the global reset, so clear them before every test to keep each case's
+// version + environment state fresh (mirrors Rails' setup/teardown, which
+// deletes all versions around every test). File-scoped because the advisory-lock
+// describe runs `migrate()` too and needs the same fresh version table.
+beforeEach(async () => {
+  await new SchemaMigration(Base.connection).dropTable();
+  await new InternalMetadata(Base.connection).dropTable();
+});
+
+describe("Migrator trails extensions", () => {
   let adapter: DatabaseAdapter;
 
-  // `setupFixtures()` shields the schema_migrations / ar_internal_metadata
-  // tables from the global reset, so clear them per test to keep each case's
-  // version + environment state fresh (mirrors Rails' setup/teardown, which
-  // deletes all versions around every test).
-  beforeEach(async () => {
+  beforeEach(() => {
     adapter = Base.connection;
-    await new SchemaMigration(adapter).dropTable();
-    await new InternalMetadata(adapter).dropTable();
   });
 
   it("stores environment after up migration", async () => {
