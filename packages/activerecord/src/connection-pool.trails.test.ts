@@ -266,7 +266,7 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
     const leased = (await pool.leaseConnection()) as SidecarAdapter;
 
     await pool.pinConnectionBang();
-    const pinned = (await await pool.checkout()) as SidecarAdapter;
+    const pinned = (await pool.checkout()) as SidecarAdapter;
     expect(pinned).toBe(leased);
     expect(leased.transactionManager.openTransactions).toBe(1);
     expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
