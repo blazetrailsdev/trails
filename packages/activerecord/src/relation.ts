@@ -652,6 +652,13 @@ export class Relation<T extends Base> {
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
     if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
+    // Rails: `where([])` is blank (`opts.blank?`) and returns the relation
+    // unchanged, like `where({})` / `where(null)` / `where("")`. An empty array
+    // must not fall into the sanitized-array unwrap (which would dereference a
+    // `undefined` head) nor the composite guard.
+    if (Array.isArray(conditionsOrSql) && conditionsOrSql.length === 0) {
+      return this._clone();
+    }
     // Composite-key form: array of column names + array of tuples. It is
     // always a two-argument call (`where(cols, tuples)`), so it is
     // disambiguated from Rails' sanitized-array conditions form
