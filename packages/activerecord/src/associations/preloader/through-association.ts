@@ -473,6 +473,15 @@ export class ThroughAssociation extends Association {
             } else {
               scope = scope.leftOuterJoins(sourceName);
             }
+            // Rails nests the scope's full `joins_values` under the source
+            // reflection (through_association.rb:132-134); `_namedInnerJoins`
+            // holds only symbol-association joins. A raw string / Arel join in
+            // the reflection scope (`.joins("INNER JOIN …")`) is not carried here
+            // — nesting a raw join under an association-name hash isn't
+            // meaningful for the join builder, and no current has_one-through
+            // scope uses one. If one ever does, its predicate's table stays out
+            // of the resolvable set and the predicate defers to the source stage
+            // (no `no such column`), same as the deeper-than-one-level case.
             if (nestedJoins.length > 0) {
               scope = scope.joins({ [sourceName]: nestedJoins });
             }
@@ -481,16 +490,21 @@ export class ThroughAssociation extends Association {
             // explicitly above, so that step is already realized and no separate
             // references pass is needed.
             //
-            // Rails carries the scope's `order` onto the through query only when
-            // `scope.eager_loading?` (through_association.rb:140) — true once an
-            // `includes` value is nested. Mirror that guard so the order
-            // determines which through row the has_one keeps, matching Rails.
+            // Rails carries the scope's `order` only when `scope.eager_loading?`
+            // (through_association.rb:140). In that branch Rails ALWAYS
+            // `includes!(source)` and `references!(source.table_name)`, so
+            // `includes_values.any? && references_eager_loaded_tables?`
+            // (relation.rb:1238-1242) holds and `eager_loading?` is true
+            // whenever this where-copy branch runs — it does NOT depend on the
+            // reflection scope carrying its own nested `includes`. Our equivalent
+            // of that unconditional source include/reference is the source join
+            // added just above, so carry the order whenever we reach here (the
+            // enclosing `copyable.length > 0` guard is the analogue of the branch
+            // running), matching Rails for a `.leftJoins(:x).where(…).order(…)`
+            // scope that has no top-level `.includes`.
             const orderClauses: any[] = reflScopeVals?._orderClauses ?? [];
             const rawOrderClauses: string[] = reflScopeVals?._rawOrderClauses ?? [];
-            if (
-              nestedIncludes.length > 0 &&
-              (orderClauses.length > 0 || rawOrderClauses.length > 0)
-            ) {
+            if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
               scope._orderClauses = [...scope._orderClauses, ...orderClauses];
               scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
             }
