@@ -234,7 +234,7 @@ export class Association {
   associationScope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    if (this._staleState != null && this.isStaleTarget()) this.resetScope();
+    if (this.isStaleTarget()) this.resetScope();
     if (this._cachedScope === undefined) {
       const ctor = this.owner.constructor as typeof Base & {
         _reflectOnAssociation?: (n: string) => unknown;
@@ -378,7 +378,15 @@ export class Association {
     // (nil/false falsy; `0`/`""` truthy) — here `!= null`, not `Boolean()`.
     // The stale and find-target branches are mutually exclusive (`stale_target?`
     // requires loaded, `find_target?` requires not-loaded), so they split cleanly.
-    if (this._staleState != null && this.isStaleTarget()) {
+    //
+    // Note: unlike Rails' `load_target` guard (`@stale_state && stale_target?`),
+    // we do NOT gate on a non-null prior `_staleState`. Rails relies on its
+    // `SingularAssociation#reader` resetting a stale association *before*
+    // `load_target` runs; our `readHasOne`/reader path drives `loadTarget`
+    // directly, so it must itself reload when the target went stale after a
+    // nil load — e.g. a has_one_through belongs_to whose through FK was nil at
+    // load time and is set afterward (`minivan.speedometer_id = …`).
+    if (this.isStaleTarget()) {
       // Rails `find_target` always issues a query; skip the in-memory
       // `doFindTarget` cache so a stale target is actually re-fetched.
       await this._findTarget();
