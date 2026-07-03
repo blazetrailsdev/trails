@@ -13,9 +13,9 @@ import { JoinDependency } from "./join-dependency.js";
 // so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
 // is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
+  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
+  // hydration rows below track the canonical column order (see the model
+  // comments), so no bespoke schema is declared.
   fixtures({});
 
   class Comment extends Base {
