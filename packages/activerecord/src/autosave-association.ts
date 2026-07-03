@@ -508,6 +508,22 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     await inst.persistThroughRecord();
   }
 
+  // A has_one *through* suppresses its through-proxy's independent autosave by
+  // planting a sentinel `_pendingReplace` on the (plain has_one) proxy: over an
+  // UNLOADED pre-existing join row the through builds a fresh join record in
+  // memory so `owner.through` reads present it synchronously, but that record
+  // must NOT be inserted here — the through's own `persistReplace` reconciles
+  // the existing DB row via `load_target` + `update`, and persisting it here
+  // would duplicate that row. A plain `HasOneAssociation` never sets
+  // `_pendingReplace` itself (it converged onto `_displacedRecord` +
+  // `autosaveHasOne`), and the through association itself clears its marker
+  // inside `persistThroughRecord` above, so a truthy marker on an instance with
+  // no `persistThroughRecord` is unambiguously that suppression sentinel. Skip
+  // the end-record persistence; the through owns the join row.
+  if (inst?._pendingReplace && typeof inst?.persistThroughRecord !== "function") {
+    return true;
+  }
+
   const child = inst?.target;
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
