@@ -26,6 +26,13 @@ export class CollectionAssociation extends Association {
   // nested_attributes.rb:487-547).
   nestedAttributesTarget: (Base | null)[] | null = null;
   protected _associationIds: unknown[] | null = null;
+  // Whether the most recent `removeRecords` was halted by a `before_remove`
+  // abort. Rails leaves `@target` untouched on abort (remove_records exits
+  // before `@target -= records`), and for has_many :through the abort-nil is
+  // masked by HMT#remove_records' `delete_through_records` return — so the
+  // CollectionProxy through-branch reads this to avoid pruning its loaded
+  // target when the removal was actually aborted. Read externally by the proxy.
+  _lastRemoveAborted = false;
   _pendingReplace: { newTarget: Base[]; originalTarget: Base[]; wasLoaded: boolean } | null = null;
   // trails-specific (RFC 0030): memoized named-scope relations built off the
   // proxy (`things.someScope()`). Rails has NO such cache — `scope :name`
@@ -301,16 +308,20 @@ export class CollectionAssociation extends Association {
    * Remove specific records from the association using the :dependent
    * strategy. Calls before_remove/after_remove callbacks.
    */
-  async delete(...records: Array<Base | number | string | bigint>): Promise<Base[]> {
-    return this.deleteOrDestroy(records.flat(), this.reflection.options.dependent);
+  async delete(...records: Array<Base | number | string | bigint>): Promise<Base[] | undefined> {
+    // Pass the raw splat (do NOT pre-flatten) so deleteOrDestroy's
+    // `records.empty?` check sees the un-flattened arg list, matching Rails:
+    // `delete()` → [] → nil, but `delete([])` → [[]] (size 1) → [] → [].
+    return this.deleteOrDestroy(records, this.reflection.options.dependent);
   }
 
   /**
    * Destroy specific records, ignoring the :dependent option.
    * Calls before_remove/after_remove + before_destroy/after_destroy callbacks.
    */
-  async destroy(...records: Array<Base | number | string | bigint>): Promise<Base[]> {
-    return this.deleteOrDestroy(records.flat(), "destroy");
+  async destroy(...records: Array<Base | number | string | bigint>): Promise<Base[] | undefined> {
+    // Raw splat, as in `delete` above — the empty check is pre-flatten.
+    return this.deleteOrDestroy(records, "destroy");
   }
 
   get size(): number {
@@ -721,10 +732,24 @@ export class CollectionAssociation extends Association {
   protected async deleteOrDestroy(
     records: Array<Base | number | string | bigint>,
     method?: string,
-  ): Promise<Base[]> {
-    // Rails delete_or_destroy: coerce id args to records, then type-check.
-    const resolved = await this.coerceToRecords(records.flat());
-    if (resolved.length === 0) return resolved;
+  ): Promise<Base[] | undefined> {
+    // Rails delete_or_destroy opens with `return if records.empty?`
+    // (collection_association.rb:385) BEFORE the flatten on the next line, so
+    // the check is against the raw splat: `delete()` → [] → nil, but an
+    // explicit `delete([])` → [[]] (size 1) skips the return, flattens to [],
+    // runs remove_records, and returns [] — NOT nil. `[]` is truthy in JS, so
+    // returning nil here would let a caller's `if (assoc.delete(...))` misread
+    // a no-arg removal as success; an empty-array arg keeps the [] contract.
+    if (records.length === 0) return undefined;
+    // Rails `delete`/`destroy` coerce ids via `find` only when a TOP-LEVEL splat
+    // arg is an Integer/String (`records.any? { … } … find(records)`,
+    // collection_association.rb:186-197) — BEFORE the flatten. An id nested in an
+    // array (`delete([id])` → `[[id]]`) is therefore NOT coerced; it survives to
+    // `raise_on_type_mismatch!` after `records.flatten` and raises. So run the
+    // id-check on the raw splat, then flatten, then type-check the flattened
+    // values — the order the non-through proxy path already follows.
+    const coerced = await this.coerceToRecords(records);
+    const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
     for (const record of resolved) (this as any).raiseOnTypeMismatchBang(record);
     const existingRecords = resolved.filter((r) => !r.isNewRecord());
     // A `before_remove` abort halts removal (removeRecords returns false); like
@@ -737,7 +762,9 @@ export class CollectionAssociation extends Association {
         removed = await this.removeRecords(existingRecords, resolved, method ?? "");
       });
     }
-    return removed ? resolved : [];
+    // Rails remove_records aborts via `catch(:abort) { ... } || return` → nil
+    // (collection_association.rb:399-402), so a halted before_remove returns nil.
+    return removed ? resolved : undefined;
   }
 
   /**
@@ -778,8 +805,12 @@ export class CollectionAssociation extends Association {
     // Rails remove_records: catch(:abort) { each before_remove } || return —
     // an aborted before_remove halts removal (target untouched); returns false.
     for (const record of records) {
-      if (!callback(this, "beforeRemove", record)) return false;
+      if (!callback(this, "beforeRemove", record)) {
+        this._lastRemoveAborted = true;
+        return false;
+      }
     }
+    this._lastRemoveAborted = false;
     if (existingRecords.length > 0) {
       await this.deleteRecords(existingRecords, method);
     }

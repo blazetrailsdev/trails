@@ -2397,15 +2397,28 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   by record reference (association semantics). Intentional permanent
   //   divergence — renaming either would break the Rails API surface.
   //   Accepts Integer/String keys too, mirroring Rails' delete_or_destroy.
-  async delete(...records: Array<T | number | string | bigint>): Promise<Base[]> {
+  async delete(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
+    // Rails CollectionAssociation#delete opens with `return if records.empty?`
+    // (collection_association.rb:385) BEFORE flatten, so a no-arg delete returns
+    // nil — not []. An explicit `delete([])` is `[[]]` (size 1) and falls through.
+    if (records.length === 0) return undefined;
     this._ensureThroughWritable();
     // Through (incl. HABTM): delegate to the association-layer delete_records.
     if (this._assocDef.options.through) {
       const assoc = this._record.association(this._assocName) as unknown as {
-        delete: (...r: Array<Base | number | string | bigint>) => Promise<Base[]>;
+        delete: (...r: Array<Base | number | string | bigint>) => Promise<Base[] | undefined>;
+        _lastRemoveAborted?: boolean;
       };
+      // Rails' CollectionProxy just delegates; the source @target is pruned
+      // INSIDE the association's remove_records (`@target -= records`) and ONLY
+      // when no before_remove aborts — an abort exits first
+      // (collection_association.rb:399-405), and HMT#remove_records prunes only
+      // the through/join targets while still returning the records
+      // (has_many_through_association.rb:116-118, 209-222). So propagate the
+      // returned records verbatim, but skip the proxy-target prune on abort so
+      // an aborted through delete doesn't make the collection look emptied.
       const removed = await assoc.delete(...records);
-      this._removeFromTarget(removed);
+      if (removed && !assoc._lastRemoveAborted) this._removeFromTarget(removed);
       return removed;
     }
     // Mirror Rails CollectionAssociation#delete → delete_or_destroy
@@ -2426,7 +2439,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `:dependent` (delete_or_destroy(records, options[:dependent])). Share the
     // remove_records path with `destroy`, which forces `:destroy`.
     const aborted = await this._removeRecords(modelRecords, this._deleteStrategy());
-    if (aborted) return [];
+    // Rails remove_records aborts via `catch(:abort) { ... } || return` → nil
+    // (collection_association.rb:399-405), so a halted before_remove returns nil.
+    if (aborted) return undefined;
     return modelRecords as Base[];
   }
 
@@ -2688,7 +2703,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
-  async destroy(...records: Array<T | number | string | bigint>): Promise<Base[]> {
+  async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
+    // Mirror `delete`: Rails delete_or_destroy opens with `return if
+    // records.empty?` (collection_association.rb:385), so a no-arg destroy
+    // returns nil — not []. Keep the two in lockstep on the empty/abort contract.
+    if (records.length === 0) return undefined;
     // Through (incl. HABTM): delegate to the association-layer destroy, exactly
     // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
     // has_many :through that runs HasManyThroughAssociation#delete_records
@@ -2701,10 +2720,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // branch and sync the proxy's own target from the returned removed records.
     if (this._isThrough) {
       const assoc = this._record.association(this._assocName) as unknown as {
-        destroy: (...r: Array<Base | number | string | bigint>) => Promise<Base[]>;
+        destroy: (...r: Array<Base | number | string | bigint>) => Promise<Base[] | undefined>;
+        _lastRemoveAborted?: boolean;
       };
+      // As in the `delete` through-branch: propagate the returned records, but
+      // skip the proxy-target prune on a before_remove abort so an aborted
+      // through destroy doesn't make the collection look emptied in memory
+      // (collection_association.rb:399-405; has_many_through_association.rb:
+      // 116-118, 209-222).
       const removed = await assoc.destroy(...(records as Base[]));
-      this._removeFromTarget(removed);
+      if (removed && !assoc._lastRemoveAborted) this._removeFromTarget(removed);
       return removed;
     }
     // Mirror Rails CollectionAssociation#destroy → delete_or_destroy
@@ -2732,7 +2757,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (collection_association.rb:385-396, via remove_records' `records`); an
     // aborted before_remove returns none, mirroring `delete`.
     const aborted = await this._removeRecords(modelRecords, "destroy");
-    return aborted ? [] : (modelRecords as Base[]);
+    // Rails remove_records returns nil on a before_remove abort
+    // (collection_association.rb:399-405); mirror `delete` with undefined.
+    return aborted ? undefined : (modelRecords as Base[]);
   }
 
   /**

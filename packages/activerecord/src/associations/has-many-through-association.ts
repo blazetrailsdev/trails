@@ -245,9 +245,18 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     records: Base[],
     method: string,
   ): Promise<boolean> {
-    const removed = await super.removeRecords(existingRecords, records, method);
+    // Rails HMT#remove_records (has_many_through_association.rb:116-118) is
+    // `super; delete_through_records(records)` — the method result is
+    // `delete_through_records`'s `records.each` (a truthy array), NOT super's
+    // return. So a `before_remove` abort inside super (whose `catch(:abort) … ||
+    // return` still skips the join-row DELETE in delete_records) does NOT
+    // propagate the nil/false the base method uses: the through delete/destroy
+    // returns the records on abort, not nil. Discard super's boolean and report
+    // truthy so deleteOrDestroy hands back `resolved`; the empty-args guard is
+    // the only through path that yields nil.
+    await super.removeRecords(existingRecords, records, method);
     await deleteThroughRecords(this, records);
-    return removed;
+    return true;
   }
 
   /**
