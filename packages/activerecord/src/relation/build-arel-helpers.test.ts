@@ -9,11 +9,11 @@
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 // Establish the primary (boot-laid canonical-schema) pool so `Post.connection`
 // and the bespoke da_pets/da_toys models resolve through `Base.connection`.
-setupFixtures();
+fixtures({});
 
 class Post extends Base {
   static _tableName = "posts";

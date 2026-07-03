@@ -6,11 +6,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+
+fixtures({});
 
 describe("Relation#unscope — full Rails key coverage", () => {
-  setupFixtures();
-
   class UscAuthor extends Base {
     static {
       this.attribute("name", "string");

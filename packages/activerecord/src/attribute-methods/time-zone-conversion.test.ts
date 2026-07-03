@@ -8,13 +8,13 @@ import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
-describe("TimeZoneConversionTest", () => {
-  setupFixtures();
+fixtures({});
 
+describe("TimeZoneConversionTest", () => {
   it("wraps datetime attribute when timeZoneAwareAttributes is true", () => {
     class Post extends Base {
       static {

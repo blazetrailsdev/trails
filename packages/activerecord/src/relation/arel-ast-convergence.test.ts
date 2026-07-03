@@ -29,9 +29,13 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { adapterType } from "../test-adapter.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
+
+// Establish the primary (boot-laid canonical-schema) pool so the bespoke
+// `Post` model's SQL compiles through `Base.connection`.
+fixtures({});
 
 class Post extends Base {
   static _tableName = "posts";
@@ -56,10 +60,6 @@ const placeholder1 = adapterType === "postgres" ? "$1" : "?";
 const placeholder2 = adapterType === "postgres" ? "$2" : "?";
 
 describe("RFC 0022 arel-AST convergence (relation layer)", () => {
-  // Establish the primary (boot-laid canonical-schema) pool so the bespoke
-  // `Post` model's SQL compiles through `Base.connection`.
-  setupFixtures();
-
   // Cluster 1: CTE array body → Arel::Nodes::UnionAll
   // (build_with_expression_from_value), not `.join(" UNION ALL ")`.
   describe("Relation#with with an array (UNION ALL) body", () => {

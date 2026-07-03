@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import {
   defineAttributeMethods,
   isAttributeMethodsGenerated,
   attributeNames,
 } from "../attribute-methods.js";
 
-describe("ReadTest", () => {
-  setupFixtures();
+fixtures({});
 
+describe("ReadTest", () => {
   // Mirrors read_test.rb's synthetic `@klass` (attribute_names %w{one two
   // three}, empty attribute_types): a minimal AttributeMethods host whose
   // accessors are NOT eagerly generated, so we can observe lazy generation

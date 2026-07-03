@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+
+fixtures({});
 
 describe("QueryTest", () => {
-  setupFixtures();
-
   it("query attribute returns false for nil", () => {
     class Post extends Base {
       static {

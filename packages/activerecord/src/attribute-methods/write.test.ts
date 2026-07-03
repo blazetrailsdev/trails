@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+
+fixtures({});
 
 describe("WriteTest", () => {
-  setupFixtures();
-
   it("_write_attribute writes value to attribute", () => {
     class Post extends Base {
       static {
