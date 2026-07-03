@@ -426,8 +426,11 @@ describe("AssociationCallbacksTest", () => {
     const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
     expect((await proxy.toArray()).length).toBe(1);
-    await proxy.delete(p);
+    // Rails calls `.destroy(post.id)` here; before_remove aborting must halt the
+    // whole destroy batch, leaving the record in place (nothing destroyed).
+    await proxy.destroy(p.id);
     expect((await proxy.toArray()).length).toBe(1);
+    expect(await (Post as any).exists(p.id)).toBe(true);
   });
 
   it("before_remove abort halts the whole removal, not just the current record", async () => {
@@ -547,6 +550,18 @@ describe("AssociationCallbacksTest", () => {
     await firm.destroy();
 
     expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
+  });
+
+  it("collection destroy fires before_remove and after_remove", async () => {
+    // remove_records (collection_association.rb) routes destroy through the same
+    // before_remove/after_remove callbacks as delete; assert the direct
+    // CollectionProxy#destroy path fires both and removes the row.
+    const firm = await Firm.create({ name: "Firm" });
+    const client = await firm.clients.create({ name: "Client" });
+    firm.log.length = 0;
+    await firm.clients.destroy(client);
+    expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
+    expect(await Client.exists(client.id)).toBe(false);
   });
 });
 

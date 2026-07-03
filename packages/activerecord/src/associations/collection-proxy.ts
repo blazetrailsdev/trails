@@ -2706,25 +2706,44 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
     this._raiseOnTypeMismatch(modelRecords);
 
-    const destroyed: Base[] = [];
+    const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
+
+    // Mirror Rails remove_records (collection_association.rb#remove_records): the
+    // before_remove loop, the destroy batch, in-memory target removal, and the
+    // after_remove callbacks form one unit — all run inside the transaction when
+    // there are persisted records, so before_remove side-effects participate in
+    // rollback, exactly as the `delete` path above.
+    let aborted = false;
     const run = async () => {
+      // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
+      // return`: if any record's before_remove halts, the entire operation
+      // aborts and nothing is destroyed.
       for (const record of modelRecords) {
+        if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true)) {
+          aborted = true;
+          return;
+        }
+      }
+      // Rails: delete_records(existing_records, :destroy) if existing_records.any?
+      // — only persisted records have a DB row to destroy.
+      for (const record of persistedRecords) {
         await record.destroy();
-        if (record.isDestroyed()) destroyed.push(record);
+      }
+      // Remove from target first, then fire after_remove for all records
+      // (Rails prunes @target before the after_remove loop).
+      this._removeFromTarget(modelRecords as Base[]);
+      for (const record of modelRecords) {
+        fireAssocCallbacks(this._assocDef.options.afterRemove, this._record, record);
       }
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
     // there are persisted records, so a mid-batch raise rolls back the batch.
-    if (modelRecords.some((r) => !r.isNewRecord())) {
+    if (persistedRecords.length > 0) {
       await this.transaction(run);
     } else {
       await run();
     }
-    // Non-through join/target pruning happens after the destroy batch (it is
-    // pure in-memory bookkeeping, not a DB write that needs the transaction).
-    if (destroyed.length > 0) {
-      this._removeFromTarget(destroyed);
-    }
+    if (aborted) return;
   }
 
   /**
