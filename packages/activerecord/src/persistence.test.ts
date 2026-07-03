@@ -24,6 +24,7 @@ import {
   registerModel,
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
+import type { TableDefinition as PgTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -1474,14 +1475,9 @@ describe("PersistenceTest", () => {
     //     t.text :content
     //   end
     await connection.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
-      (t as unknown as { uuid(name: string, options: Record<string, unknown>): void }).uuid(
-        "message_id",
-        {
-          primaryKey: true,
-          default: () => "uuid_generate_v4()",
-        },
-      );
-      t.text("content");
+      const pg = t as PgTableDefinition;
+      pg.uuid("message_id", { primaryKey: true, default: () => "uuid_generate_v4()" });
+      pg.text("content");
     });
   });
 
