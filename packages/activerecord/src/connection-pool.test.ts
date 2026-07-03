@@ -347,7 +347,7 @@ it("automatic reconnect can be disabled", async () => {
   pool.disconnectBang();
   pool.automaticReconnect = false;
 
-  await expect(await pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
+  await expect(pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
   await expect(pool.withConnection(() => {})).rejects.toThrow(/automatic_reconnect is disabled/);
 });
 

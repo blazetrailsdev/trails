@@ -55249,5 +55249,26 @@
     "rubyName": "encrypts",
     "call": "new",
     "reason": "encrypt_attribute's `EncryptedAttributeType.new` is emitted from the shared registerEncryptedType primitive (immediate direct-set / durable decorator) after encrypts routes through encryptAttribute - same construction, different TS method."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "pin_connection!",
+    "call": "checkout",
+    "reason": "pinConnectionBang acquires the pinned connection via the sync `_acquireConnection` helper (the trails pinned-checkout path); `checkout` is now async (converge-connection-pool-checkout-lease-async) and cannot be awaited from this path."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "connection",
+    "call": "lease_connection",
+    "reason": "The deprecated sync `.connection` getter routes through the sync `leaseConnectionSync` escape hatch; Rails-named `leaseConnection` is async in trails (converge-connection-pool-checkout-lease-async) and cannot be awaited from a sync getter."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "migration_connection",
+    "call": "lease_connection",
+    "reason": "migrationConnection (sync) routes through `leaseConnectionSync`; Rails-named `leaseConnection` is async in trails (converge-connection-pool-checkout-lease-async) and cannot be awaited from this sync accessor."
   }
 ]
