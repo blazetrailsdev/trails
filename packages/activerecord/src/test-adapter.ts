@@ -302,9 +302,10 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
  * Clears row state by **truncating** the boot-laid canonical tables (RFC 0059
  * lays the canonical schema once at boot and keeps it shape-stable, so dropping
  * the tables between tests is pure redundancy — only the rows need clearing).
- * Only genuinely bespoke tables a not-yet-converted `defineSchema` caller
- * created are dropped, so their shape can't leak into the next file. See
- * {@link resetTestTables}.
+ * Every non-canonical table is dropped (bespoke tables a not-yet-converted
+ * `defineSchema` caller created, plus the `schema_migrations` /
+ * `ar_internal_metadata` bookkeeping tables), matching the previous
+ * `dropAllTables` behavior. See {@link resetTestTables}.
  *
  *   - PG: enumerate every user schema via `current_schemas(false)`, not
  *     just `public`. Tests that create custom schemas (e.g. schema.test.ts

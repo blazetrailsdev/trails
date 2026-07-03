@@ -38,11 +38,12 @@ export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
  * Instead of `dropAllTables`' ~330-table `DROP TABLE` fan-out per test (the
  * dominant DDL-churn source measured in PR #4499), this **truncates** the
  * canonical tables (schema/indexes preserved — RFC 0059 lays them once at boot
- * and keeps them shape-stable) and **drops only genuinely bespoke tables** a
- * not-yet-converted `defineSchema` caller created, so their shape can't leak
- * into the next file. Bookkeeping tables (`schema_migrations` /
- * `ar_internal_metadata`) are left fully alone. Views/matviews are never
- * canonical, so they are always dropped.
+ * and keeps them shape-stable). **Every non-canonical table is dropped**, exactly
+ * as the previous unconditional `dropAllTables` did: bespoke tables a
+ * not-yet-converted `defineSchema` caller created (so their shape can't leak
+ * into the next file) *and* the `schema_migrations` / `ar_internal_metadata`
+ * bookkeeping tables (migrator tests manage those per-test and rely on the reset
+ * clearing them). Views/matviews are never canonical, so they are always dropped.
  */
 export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "reset");
