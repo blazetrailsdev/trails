@@ -2173,9 +2173,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // source reflection's association_primary_key column read off the target
           // (mirroring the composite-owner branch); the single-column write would
           // otherwise stringify the array into one bogus key and leave tag_id null.
+          // Mirrors Rails' `source_reflection.association_primary_key(reflection.klass)`
+          // (through_association.rb:60). The no-arg `associationPrimaryKey` getter
+          // resolves `this.klass`, which THROWS for a polymorphic belongs_to source
+          // ("cannot compute class"), so a polymorphic source must pass an explicit
+          // klass. That klass is the through reflection's own resolved target
+          // (`this.model` — the `sourceType`-pinned class, e.g. `Post` for
+          // `Tag#taggedPosts`), NOT the concrete (possibly STI-subclass) instance.
+          const resolveSourcePk = (): string | string[] | undefined =>
+            sourceRefl?.isPolymorphic?.()
+              ? sourceRefl.associationPrimaryKeyFor?.(this.model)
+              : sourceRefl?.associationPrimaryKey;
           let sourceJoinAttrs: Record<string, unknown>;
           if (Array.isArray(sourceFk)) {
-            const sourcePk = sourceRefl?.associationPrimaryKey;
+            const sourcePk = resolveSourcePk();
             const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
             if (sourcePkCols.length !== sourceFk.length) {
               throw new ConfigurationError(
@@ -2194,7 +2205,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             if (Array.isArray(targetPk)) {
               // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
               // when set, or fall back to "id" when it is part of the composite PK.
-              const srcPk = sourceRefl?.associationPrimaryKey;
+              const srcPk = resolveSourcePk();
               if (typeof srcPk === "string") {
                 targetPkCol = srcPk;
               } else if (targetPk.includes("id")) {
@@ -2205,14 +2216,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
                 );
               }
             } else {
-              // category.name, not category.id. For a polymorphic source
-              // belongs_to (e.g. `taggable`), the primary key can't be computed
-              // without a concrete class — resolve it against the target
-              // record's class (Rails passes reflection.klass here), which the
-              // sourceType option pins.
-              const srcPk = sourceRefl?.isPolymorphic?.()
-                ? sourceRefl.associationPrimaryKeyFor?.(record.constructor as typeof Base)
-                : sourceRefl?.associationPrimaryKey;
+              // Use the source reflection's association_primary_key when set —
+              // e.g. a belongs_to with primaryKey: "name" means the join FK
+              // references category.name, not category.id. For a polymorphic
+              // source, resolveSourcePk() keys off `this.model` (reflection.klass).
+              const srcPk = resolveSourcePk();
               targetPkCol = (typeof srcPk === "string" ? srcPk : null) ?? targetPk;
             }
             sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
