@@ -693,8 +693,11 @@ async function main(): Promise<void> {
   const modelsDirPrefix = MODELS_DIR + path.sep;
   // The canonical schema map is only consumed when materializing files UNDER
   // MODELS_DIR (test-local models elsewhere supply their own bespoke schema).
-  // Load it lazily via dynamic import so a test-file-only run never pulls in
-  // `define-schema`'s adapter-runtime dependency graph.
+  // Load it lazily via dynamic import so a test-file-only run never pays the
+  // import cost of `define-schema`'s adapter-runtime dependency graph. This is
+  // now purely an import-cost optimization: the static-import TDZ crash it
+  // originally worked around is fixed at the source (abstract-adapter defers its
+  // mixin wiring to first construction), so `isWrappedSchema` imports cleanly.
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
     const { TEST_SCHEMA } = await import("../src/test-helpers/test-schema.js");
