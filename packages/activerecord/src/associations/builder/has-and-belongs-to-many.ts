@@ -176,13 +176,14 @@ export class HasAndBelongsToMany {
 
     const joinModelName = `HABTM_${camelize(name)}`;
     const registryKey = `${model.name}::${joinModelName}`;
-    // Derive the source belongsTo name from the resolved class name so that
-    // class_name:-aliased associations (e.g. other_posts with class_name: "Post")
-    // share the same join-model source name as the canonical association ("post"),
-    // matching Rails' association_foreign_key derivation from klass.name.
-    const sourceName = options.className
-      ? underscore(demodulize(singularize(String(options.className))))
-      : singularize(name);
+    // Rails' `add_right_association` always names the join-model `belongs_to`
+    // from the association name via `name.to_s.singularize` — even when
+    // `class_name:` is set (e.g. `other_posts, class_name: "Post"` yields
+    // `belongs_to :other_post, class_name: "Post", foreign_key: "post_id"`).
+    // `source_reflection_names` then resolves the through `source:` via the same
+    // `singularize(assoc_name)`. The class-name-derived foreign key (`post_id`)
+    // is carried by `targetFk` (`habtmTargetFk`), passed to the join model below.
+    const sourceName = singularize(name);
     const JoinModel = deps.createHabtmJoinModel(
       model,
       joinModelName,

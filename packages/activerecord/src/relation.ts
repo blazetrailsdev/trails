@@ -2836,11 +2836,15 @@ export class Relation<T extends Base> {
       }
     }
 
-    // Preload associations via separate queries (includes + preload minus
-    // any includes we already eager-loaded above)
+    // Preload associations via separate queries. Rails builds this list as
+    // `preload = preload_values; preload += includes_values unless eager_loading?`
+    // (relation.rb:1321-1322) — preload_values FIRST, then any includes not
+    // already eager-loaded via JOIN. Order matters now that each spec runs as
+    // its own sequential `Preloader.call()`, so the query-issue sequence matches
+    // Rails for relations mixing `.preload(...)` and `.includes(...)`.
     const preloadAssocs = [
-      ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
       ...this._preloadAssociations,
+      ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
     ];
     // Set-op operands all instantiate as this model class, and the compound
     // bypasses the eager JOIN (operands stay arity-compatible), so the *other*
@@ -6172,12 +6176,25 @@ export class Relation<T extends Base> {
   ): Promise<void> {
     if (assocNames.length === 0) return;
     const { Preloader } = await import("./associations/preloader.js");
-    const preloader = new Preloader({
-      records: records as unknown as import("./base.js").Base[],
-      associations: assocNames,
-      scope: this._isStrictLoading ? StrictLoadingScope : undefined,
-    });
-    await preloader.call();
+    // Mirror Rails' `Relation#preload_associations`, which runs one Preloader
+    // per association-spec element (`preload.each { |as| Preloader.new(...).call }`,
+    // relation.rb:1321-1329) — NOT one Preloader over the whole list. Each spec
+    // gets its own Batch, so sibling associations from separate `includes`/
+    // `preload` arguments are never co-scheduled into a single
+    // `group_and_load_similar` pass. This keeps `class_name`-aliased HABTMs that
+    // share one join table (Category's `posts`/`otherPosts`/`specialPosts` on
+    // `categories_posts`) on distinct middle-loader passes, so each join-table
+    // row is instantiated as its own anonymous `HABTM_*` join model instead of
+    // whichever sibling wins a conflated group.
+    const scope = this._isStrictLoading ? StrictLoadingScope : undefined;
+    for (const assocName of assocNames) {
+      const preloader = new Preloader({
+        records: records as unknown as import("./base.js").Base[],
+        associations: [assocName],
+        scope,
+      });
+      await preloader.call();
+    }
   }
 
   // find, findBy, findByBang, findSoleBy, findOrCreateByBang, createOrFindByBang,
