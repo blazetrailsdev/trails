@@ -6545,8 +6545,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#arel (alias for toArel)
    */
-  arel(aliases?: AliasTracker): SelectManager {
-    return this.toArel(aliases);
+  arel(): SelectManager {
+    return this.toArel();
   }
 
   /**
