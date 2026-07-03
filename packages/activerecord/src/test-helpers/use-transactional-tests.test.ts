@@ -10,9 +10,8 @@
  *   PG_TEST_URL=postgres://localhost:5432/rails_test \
  *     pnpm vitest run packages/activerecord/src/test-helpers/use-transactional-tests.test.ts
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../base.js";
-import { defineSchema } from "./define-schema.js";
 import { useTransactionalTests } from "./use-transactional-tests.js";
 import { adapterType } from "../test-adapter.js";
 
@@ -26,8 +25,17 @@ const conn = () => Base.connection;
 describe("useTransactionalTests — DML isolation", () => {
   useTransactionalTests();
 
+  // txn_smoke_users is a bespoke smoke-test table (not in schema.rb): build it
+  // with create_table in beforeAll and drop it in afterAll, mirroring Rails'
+  // ad-hoc test tables.
   beforeAll(async () => {
-    await defineSchema({ txn_smoke_users: { name: "string" } });
+    await conn().createTable("txn_smoke_users", { force: true }, (t) => {
+      t.string("name");
+    });
+  });
+
+  afterAll(async () => {
+    await conn().dropTable("txn_smoke_users", { ifExists: true });
   });
 
   it("inserts a row that is visible within the same test", async () => {
