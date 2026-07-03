@@ -11,6 +11,7 @@ import {
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
+  ArgumentError,
 } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -609,6 +610,26 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
 }
 
 /**
+ * Mirrors ActiveModel::AttributeAssignment#assign_attributes' guard: a
+ * non-hash argument raises ArgumentError, not a raw TypeError. update /
+ * update! bypass Base#assignAttributes (raw writeAttribute loop), so they
+ * must enforce the same contract here.
+ */
+function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) {
+    const cls =
+      attrs === null
+        ? "NilClass"
+        : Array.isArray(attrs)
+          ? "Array"
+          : ((attrs as { constructor?: { name?: string } })?.constructor?.name ?? typeof attrs);
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${cls} passed.`,
+    );
+  }
+}
+
+/**
  * Mirrors: ActiveRecord::Persistence#update — assign + save. Returns the
  * boolean from save so callers can detect validation / callback aborts
  * without catching exceptions.
@@ -622,6 +643,7 @@ export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<boolean | undefined> {
+  assertHashAttributes(attrs);
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -653,6 +675,7 @@ export async function updateBang<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<true | undefined> {
+  assertHashAttributes(attrs);
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -1013,6 +1036,7 @@ export function _reapplyNestedAttrSetters(
  * happen in a follow-up.)
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
+  assertHashAttributes(attrs);
   // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
   // sanitizing so a blank strong-params object (always un-permitted) is a
   // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.
