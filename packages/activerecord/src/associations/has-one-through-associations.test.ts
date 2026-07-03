@@ -218,10 +218,13 @@ describe("HasOneThroughAssociationsTest", () => {
     // Rails' create_through_record reconciles against the persisted join row
     // (`through_record.update(attributes)`) instead of building a duplicate: on
     // save the existing membership is updated to point at the new club, no
-    // second membership row is inserted.
-    const before = await Membership.count();
+    // second membership row is inserted. Count is scoped to this member so a
+    // parallel fork's Membership rows can't perturb the delta (global-count
+    // shared-DB flake, cf. member_details, PR #4480).
+    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
+    const before = await countForMember();
     expect(await newMember.save()).toBe(true);
-    expect(await Membership.count()).toBe(before);
+    expect(await countForMember()).toBe(before);
     expect(finalClub.isPersisted()).toBe(true);
     const reloaded = await Membership.find(membership.id);
     expect(reloaded.club_id).toBe(finalClub.id);
