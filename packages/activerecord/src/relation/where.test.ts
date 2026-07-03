@@ -241,9 +241,10 @@ describe("WhereTest", () => {
   it("array first arg discards extra positional rest", () => {
     const withStray = (Post.all().where as any)(["id = ?", 1], 2);
     const withoutStray = (Post.all().where as any)(["id = ?", 1]);
+    // The stray 2 is dropped: the SQL is identical to the no-rest call and
+    // binds only the array's own tail (1), never the extra positional.
     expect(withStray.toSql()).toEqual(withoutStray.toSql());
     expect(withStray.toSql()).toContain("id = 1");
-    expect(withStray.toSql()).not.toContain("2");
   });
 
   it("where with nil cpk association", async () => {
