@@ -227,7 +227,9 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await countForMember()).toBe(before);
     expect(finalClub.isPersisted()).toBe(true);
     const reloaded = await Membership.find(membership.id);
-    expect(reloaded.club_id).toBe(finalClub.id);
+    // club_id round-trips as BigInt on PG/MariaDB but finalClub.id is a number;
+    // compare numerically rather than by Object.is identity.
+    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("creating multiple associations creates through record", async () => {
