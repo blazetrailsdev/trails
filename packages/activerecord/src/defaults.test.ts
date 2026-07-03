@@ -9,7 +9,7 @@ import { Base } from "./index.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import {
@@ -25,6 +25,13 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
+// Ride the boot-laid `Base.connection` (single-pool test model) rather than a
+// sidecar `_pool` lease; `fixtures({})` wires the handler for every block (empty
+// map → no seed rows). The bespoke per-test tables are recreated in each block's
+// hooks, so opt out of transactional fixtures — the per-test DDL must commit,
+// not roll back inside a wrapping (PG-poisoning) transaction.
+fixtures({}, { useTransactionalTests: false });
+
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 });
@@ -35,7 +42,7 @@ afterAll(() => {
 // Most suites below build their adapter-specific tables dynamically in
 // `beforeEach` (mirroring Rails' `setup` `@connection.create_table ...`): these
 // tables are not in `schema.rb` and have no canonical home, so they are created
-// per-test through the migration DSL on a pool-leased adapter and dropped in
+// per-test through the migration DSL on `Base.connection` and dropped in
 // `afterEach`. Building in `beforeEach` (not `beforeAll`) because the shared
 // per-worker DB is reset by the global `beforeEach` in test-setup-ar.ts.
 
@@ -70,7 +77,7 @@ describe("DefaultTest", () => {
 // table (postgresql_specific_schema.rb / sqlite_specific_schema.rb).
 describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
   it("multiline default text", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.text("multiline_default", { default: "--- []\n\n" });
@@ -97,7 +104,7 @@ describe("DefaultNumbersTest", () => {
   let DefaultNumber: typeof Base;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_numbers", { force: true }, (t: any) => {
       t.integer("positive_integer", { default: 7 });
@@ -140,7 +147,7 @@ describe("DefaultStringsTest", () => {
   let DefaultString: typeof Base;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_strings", { force: true }, (t: any) => {
       t.string("string_col", { default: "Smith" });
@@ -175,7 +182,7 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   let DefaultBinary: typeof Base;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_binaries", { force: true }, (t: any) => {
       t.binary("varbinary_col", { null: false, limit: 64, default: "varbinary_default" });
@@ -224,7 +231,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   let DefaultText: typeof Base;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("default_texts", { force: true }, (t: any) => {
       t.text("text_col", { default: "Smith" });
@@ -260,7 +267,7 @@ describeIfPg("PostgresqlDefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "random() * 100" });
@@ -320,7 +327,7 @@ describeIfMysql("MysqlDefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
     await ctx.createTable("datetime_defaults", { force: true }, (t: any) => {
       t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
@@ -534,7 +541,7 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
     await ctx.createTable("defaults", { force: true }, (t: any) => {
       t.integer("random_number", { default: () => "ABS(RANDOM())" });

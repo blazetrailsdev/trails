@@ -4,9 +4,10 @@ import { instantToS } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 function nsec(v: Temporal.Instant): number {
@@ -16,6 +17,12 @@ function nsec(v: Temporal.Instant): number {
 }
 
 describe("DateTimePrecisionTest", () => {
+  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
+  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
+  // rows). The bespoke `foos` table is recreated per-test, so opt out of
+  // transactional fixtures — the per-test DDL must commit, not roll back inside
+  // a wrapping (PG-poisoning) transaction.
+  fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
@@ -24,7 +31,7 @@ describe("DateTimePrecisionTest", () => {
   // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
   // here rather than seeding a placeholder into the canonical schema.
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
   });
   afterEach(async () => {
