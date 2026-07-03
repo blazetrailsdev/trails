@@ -12,7 +12,7 @@ function isTemporalDatetime(v: unknown): boolean {
 /**
  * Mirrors: activerecord/test/cases/persistence_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
 import {
   Base,
@@ -25,13 +25,9 @@ import {
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import {
-  TEST_SCHEMA as canonicalSchema,
-  POSTGRESQL_SPECIFIC_SCHEMA,
-} from "./test-helpers/test-schema.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { captureSql } from "./testing/sql-capture.js";
@@ -1466,7 +1462,33 @@ describe("PersistenceTest", () => {
     const connection = Base.connection as PostgreSQLAdapter;
     await connection.enableExtension("uuid-ossp");
     await connection.enableExtension("pgcrypto");
-    await defineSchema(POSTGRESQL_SPECIFIC_SCHEMA);
+    // Mirror postgresql_specific_schema.rb:
+    //   create_table :chat_messages, id: :uuid, force: true, **uuid_default
+    // With pgcrypto available, uuid_default is {} → the adapter defaults the
+    // uuid PK to gen_random_uuid().
+    await connection.createTable("chat_messages", { id: "uuid", force: true }, (t) => {
+      t.text("content");
+    });
+    //   create_table :chat_messages_custom_pk, id: false, force: true do |t|
+    //     t.uuid :message_id, primary_key: true, default: "uuid_generate_v4()"
+    //     t.text :content
+    //   end
+    await connection.createTable("chat_messages_custom_pk", { id: false, force: true }, (t) => {
+      (t as unknown as { uuid(name: string, options: Record<string, unknown>): void }).uuid(
+        "message_id",
+        {
+          primaryKey: true,
+          default: () => "uuid_generate_v4()",
+        },
+      );
+      t.text("content");
+    });
+  });
+
+  afterAll(async () => {
+    if (adapterType !== "postgres") return;
+    const connection = Base.connection as PostgreSQLAdapter;
+    await connection.dropTable("chat_messages_custom_pk", "chat_messages", { ifExists: true });
   });
 
   it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {

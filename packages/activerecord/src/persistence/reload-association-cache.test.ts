@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, transaction } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Publication } from "../test-helpers/models/publication.js";
 import { Editor } from "../test-helpers/models/editor.js";
 import { Editorship } from "../test-helpers/models/editorship.js";
@@ -19,10 +17,26 @@ describe("ReloadAssociationCacheTest", () => {
     registerModel(Publication);
     registerModel(Editor);
     registerModel(Editorship);
-    await defineSchema(adapter, {
-      publications: TEST_SCHEMA.publications,
-      editorships: TEST_SCHEMA.editorships,
-      editors: TEST_SCHEMA.editors,
+    // This wrapper adapter shares the boot DB (which already carries the
+    // canonical publications/editorships/editors) but has its own signature
+    // cache, so re-lay the three canonical tables through it — mirroring
+    // schema.rb's create_table shapes — to prime that cache.
+    // These are canonical, boot-owned tables re-laid to prime the wrapper's
+    // cache; a teardown drop would remove them from the shared boot DB, so no
+    // dropTable here (the boot schema owns/restores them).
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.createTable("publications", { force: true }, (t) => {
+      t.column("name", "string");
+      t.integer("editor_in_chief_id");
+    });
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.createTable("editorships", { force: true }, (t) => {
+      t.string("publication_id");
+      t.string("editor_id");
+    });
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await adapter.createTable("editors", { force: true }, (t) => {
+      t.string("name");
     });
   });
   withTransactionalFixtures(() => adapter);
