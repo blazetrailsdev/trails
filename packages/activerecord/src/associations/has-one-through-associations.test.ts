@@ -299,11 +299,7 @@ describe("HasOneThroughAssociationsTest", () => {
     });
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
-  // the source-table-condition arm (hairyClub) passes on SQLite but preloads nil on
-  // PG/MariaDB — eager-loading a has_one_through with a WHERE on the *source* table
-  // fails to match across the through join on those adapters.
-  it.skip("has one through with conditions eager loading", async () => {
+  it("has one through with conditions eager loading", async () => {
     const member = members("groucho");
     // conditions on the through table
     expect(
@@ -495,11 +491,7 @@ describe("HasOneThroughAssociationsTest", () => {
     await (await Club.all().includes("sponsoredMember").find(club.id)).save();
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
-  // passes on SQLite but fails on PG/MariaDB — `member.save()` does not persist the
-  // lone has_one `memberDetail` child there (its `member_id` is never written), so
-  // the `member_type` through resolves to nil. A cross-adapter has_one autosave gap.
-  it.skip("through belongs to after destroy", async () => {
+  it("through belongs to after destroy", async () => {
     const member = members("groucho");
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
     (member.association("memberDetail") as any).writer(memberDetail);
