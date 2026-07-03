@@ -1377,6 +1377,13 @@ export class JoinDependency {
     }
     const tables = [columnsFor(this._joinRoot, rootColumns, 0)];
     for (const node of this.nodes) {
+      // Rails' join_root tree holds only the reflected association nodes — the
+      // through/HABTM join-table links are joined by JoinAssociation#join_constraints
+      // but never become JoinParts, so their columns are not projected into the
+      // eager SELECT (and thus never need a GROUP BY entry). trails models those
+      // links as `isThroughNode` leaves for constraint building; skip their
+      // columns here to match Rails' projection.
+      if (node.isThroughNode) continue;
       tables.push(columnsFor(node, node.columns, node.tableIndex));
     }
     return (this._aliasesCache = new Aliases(tables));
