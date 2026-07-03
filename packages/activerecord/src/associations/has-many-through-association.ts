@@ -15,6 +15,7 @@ import {
   throughTargetScope,
 } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
+import { runAllCallbacks } from "@blazetrails/activemodel";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -281,8 +282,14 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         const destroyed = (await scope.destroyAll()) as Base[];
         count = destroyed.filter((r) => (r as any).isDestroyed?.()).length;
       } else {
+        // Rails' no-PK `:destroy` branch (has_many_through_association.rb:152):
+        // `scope.each(&:_run_destroy_callbacks)` runs each join row's
+        // before/after_destroy callbacks (no row delete) before the bulk
+        // `delete_all`, which removes them by matching all non-PK FK columns.
         const recs = (await scope.toArray()) as Base[];
-        for (const r of recs) await (r as any)._runDestroyCallbacks?.();
+        for (const r of recs) {
+          await runAllCallbacks((r.constructor as typeof Base).prototype, "destroy", r as any);
+        }
         count = await scope.deleteAll();
       }
     } else if (method === "nullify") {

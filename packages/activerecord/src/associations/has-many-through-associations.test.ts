@@ -405,7 +405,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(sicp.isPersisted()).toBe(true);
   });
 
-  it.skip("no pk join table delete", async () => {
+  it("no pk join table delete", async () => {
     class NoPkDelLesson extends Base {
       static {
         this._tableName = "lessons";
@@ -451,7 +451,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await NoPkDelLessonStudent.count()).toBeLessThan(lessonStudentCountBefore as number);
   });
 
-  it.skip("no pk join model callbacks", async () => {
+  it("no pk join model callbacks", async () => {
     class NoPkCbLesson extends Base {
       static {
         this._tableName = "lessons";
@@ -2253,7 +2253,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(fallSections.map((s: any) => s.id).sort()).toEqual(expectedIds);
   });
 
-  it.skip("post has many tags through association with composite query constraints", async () => {
+  it("post has many tags through association with composite query constraints", async () => {
     const blogPost = await ShardedBlogPost.find(shardedBlogPosts("great_post_blog_one").id);
     const expectedTagIds = (
       await ShardedBlogPostTag.where({
@@ -2263,8 +2263,6 @@ describe("HasManyThroughAssociationsTest", () => {
     ).map((t: any) => t.tag_id);
 
     const tagIds: any[] = [];
-    // Capture SQL by wrapping
-    const originalAll = (ShardedBlogPost.prototype as any).tags?.toArray;
     const tags2 = await (blogPost as any).tags.toArray();
     for (const t of tags2) tagIds.push(t.id);
 
@@ -2277,7 +2275,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(tagsSql).toMatch(new RegExp(`WHERE.*${quotedPostsTagsBlogId}`, "i"));
 
     expect(tagIds.length).toBeGreaterThan(0);
-    expect([...tagIds].sort()).toEqual([...expectedTagIds].sort());
+    // bigint id columns come back as BigInt on PG/MariaDB but Number on SQLite;
+    // normalize both sides like the sibling `tags has manu posts` assertion.
+    expect([...tagIds].map(Number).sort()).toEqual([...expectedTagIds].map(Number).sort());
   });
 
   it("tags has manu posts through association with composite query constraints", async () => {
@@ -2339,13 +2339,26 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((book as any).association("orderAgreements").isStaleTarget()).toBe(true);
   });
 
-  it.skip("cpk association build through singular", async () => {
+  it("cpk association build through singular", async () => {
     const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
     const order = await CpkOrderWithSingularBookChapters.create({ id: [1, 2] });
     const book = await (order as any).createBook({ id: [3, 4] });
     const chapter = await (order as any).chapters.build();
     const chapterBook = await chapter.association("book").loadTarget();
     expect(chapterBook?.id).toEqual(book.id);
+
+    // TS-only guard: the composite source FK routes through the JOIN-based
+    // AssociationScope rather than the single-column IN-subquery fallback, so
+    // assert the read path (not just build()) is safe for a composite owner PK
+    // — the scope must emit the composite ON clause and execute without error.
+    const chaptersSql = await (order as any).chapters.toSql();
+    const chapAuthorId = quoteTableName("cpk_chapters.author_id");
+    const chapBookId = quoteTableName("cpk_chapters.book_id");
+    const bookAuthorId = quoteTableName("cpk_books.author_id");
+    const bookId = quoteTableName("cpk_books.id");
+    expect(chaptersSql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
+    expect(chaptersSql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
+    await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
   // TS-only: insertRecord with validate false skips join record validation
