@@ -274,9 +274,10 @@ export async function createPooledTestAdapter(): Promise<{
 /** @internal — for the smoke test only. */
 export function _resetPooledTestAdapterForTests(): void {
   if (_pooledHandler) {
-    try {
-      void _pooledHandler.clearAllConnectionsBang();
-    } catch {}
+    // clearAllConnectionsBang is async: its synchronous teardown runs here, but
+    // catch the returned promise so a drain rejection stays best-effort rather
+    // than surfacing as an unhandled rejection during test teardown.
+    _pooledHandler.clearAllConnectionsBang().catch(() => {});
   }
   _pooledHandler = null;
   _pooledPoolPromise = null;
