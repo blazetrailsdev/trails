@@ -688,18 +688,13 @@ export class AssociationScope {
     // only the WHERE and ORDER predicates onto the main scope —
     // matching Rails' `where_clause +=` / `order_values |=` granular
     // merging (NOT a full Relation#merge, which would let the chain
-    // entry's limit/select/etc override the main scope). The head
-    // reflection (chain[0]) is handled by the scope/scopeFor branch
-    // below — Rails' chain_head item in add_constraints.
-    //
-    // Rails' reverse_each loop ALSO has an eager-load branch that merges
-    // a scope-chain item's includes/eager_load via
-    // `construct_join_dependency(associations, Arel::Nodes::OuterJoin)`
-    // (association_scope.rb:138-141). We don't propagate eager loads
-    // through the association scope here — the preloader handles that —
-    // so this branch isn't ported; the reference keeps the documented
-    // Rails dependency (activerecord → arel) visible.
-    void Nodes.OuterJoin;
+    // entry's limit/select/etc override the main scope). It ALSO folds in
+    // the item's joins / left_outer_joins and referenced eager-loads as
+    // OuterJoins (`_mergeReferencedJoins`, Rails' `construct_join_dependency
+    // (associations, Arel::Nodes::OuterJoin)` branch, association_scope.rb:
+    // 138-141) and applies its `unscope!` directives. The head reflection
+    // (chain[0]) is handled by the scope/scopeFor branch below — Rails'
+    // chain_head item in add_constraints.
     for (let i = chain.length - 1; i >= 1; i--) {
       scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
     }
@@ -976,10 +971,15 @@ export class AssociationScope {
    *   associations = item.eager_load_values | item.includes_values
    *   scope.joins! item.construct_join_dependency(associations, OuterJoin)
    *
-   * The entry's klass differs from the scope's target klass, so the joins are
-   * built as JoinDependencies against the ENTRY (`constructJoinDependency.call
-   * (evaluated, ...)`) and stashed in the cross-klass join-dep stores the
-   * relation already emits — the same mechanism Relation::Merger uses.
+   * `merge!` routes the named `joins` / `left_outer_joins` through
+   * Merger#merge_joins / #merge_outer_joins (merger.rb:118-150), which branch on
+   * `other.model == relation.model`: when the item's klass equals the target
+   * scope's klass the names union directly into `joins_values` /
+   * `left_outer_joins_values`; otherwise a cross-klass JoinDependency is built
+   * against the ITEM and stashed. Mirror both branches here (the same split
+   * Relation::Merger implements) so a same-klass entry — e.g. a self-through
+   * whose chain entry resolves to the association's own target — folds its join
+   * names in for the receiver to resolve rather than pre-building a JD.
    */
   private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
     const item = evaluated as {
@@ -997,25 +997,39 @@ export class AssociationScope {
     const target = scope as {
       _joinValues: unknown[];
       _joinClauses: unknown[];
+      _namedInnerJoins: unknown[];
+      _leftOuterJoinsValues: unknown[];
       _namedInnerJoinDeps: unknown[];
       _leftOuterJoinDeps: unknown[];
+      _modelClass?: typeof Base;
     };
+    const sameKlass = item._modelClass !== undefined && item._modelClass === target._modelClass;
     // item.only(:joins, :left_outer_joins) — carry raw SQL / Arel join nodes
-    // straight across, and build cross-klass JoinDependencies for named
-    // association joins (mirrors Merger#merge_joins / #merge_outer_joins).
+    // straight across, then union named association joins (same-klass) or build
+    // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
     for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
     for (const jv of item._joinValues ?? []) target._joinValues.push(jv);
     const namedInner = item._namedInnerJoins ?? [];
     if (namedInner.length > 0) {
-      target._namedInnerJoinDeps.push(
-        constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
-      );
+      if (sameKlass) {
+        for (const v of namedInner)
+          if (!target._namedInnerJoins.includes(v)) target._namedInnerJoins.push(v);
+      } else {
+        target._namedInnerJoinDeps.push(
+          constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
+        );
+      }
     }
     const namedLeft = item._leftOuterJoinsValues ?? [];
     if (namedLeft.length > 0) {
-      target._leftOuterJoinDeps.push(
-        constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
-      );
+      if (sameKlass) {
+        for (const v of namedLeft)
+          if (!target._leftOuterJoinsValues.includes(v)) target._leftOuterJoinsValues.push(v);
+      } else {
+        target._leftOuterJoinDeps.push(
+          constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
+        );
+      }
     }
     // associations = eager_load_values | includes_values → OuterJoin
     const associations = [
