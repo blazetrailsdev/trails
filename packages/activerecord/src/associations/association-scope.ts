@@ -999,7 +999,6 @@ export class AssociationScope {
       _joinClauses: unknown[];
       _namedInnerJoinDeps: unknown[];
       _leftOuterJoinDeps: unknown[];
-      _modelClass?: typeof Base;
     };
     // item.only(:joins, :left_outer_joins) — carry raw SQL / Arel join nodes
     // straight across, and build cross-klass JoinDependencies for named
