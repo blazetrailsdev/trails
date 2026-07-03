@@ -79,6 +79,13 @@ export async function disableReferentialIntegrity(
   // Re-deriving the list after the block ran would both double the catalog
   // enumeration (hot under RFC 0060's per-test truncate reset) and risk
   // re-enabling a different set if the block created/dropped tables.
+  //
+  // Snapshotting before `fn()` means that if the block drops a table, the
+  // ENABLE pass issues `ALTER TABLE <dropped> ENABLE TRIGGER ALL` against a
+  // gone table. Postgres raises undefined_table (42P01), which the adapter
+  // translates to StatementInvalid (an ActiveRecordError), so the enable-pass
+  // catch below swallows it — same as Rails silently rescues enable-pass
+  // errors (referential_integrity.rb:28-34).
   const tables = await this.tables();
 
   try {

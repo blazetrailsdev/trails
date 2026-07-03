@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { disableReferentialIntegrity } from "./referential-integrity.js";
+import { StatementInvalid } from "../../errors.js";
 
 interface FakeHost {
   quoteTableName(name: string): string;
@@ -67,5 +68,24 @@ describe("disableReferentialIntegrity", () => {
     );
     expect(enableSql).toBe(`ALTER TABLE "a" ENABLE TRIGGER ALL;ALTER TABLE "b" ENABLE TRIGGER ALL`);
     expect(enableSql).not.toContain(`"c"`);
+  });
+
+  it("swallows an enable-pass StatementInvalid when the block dropped a snapshotted table", async () => {
+    const host: FakeHost = {
+      quoteTableName: (name) => `"${name}"`,
+      // Mirrors the adapter translating undefined_table (42P01) to
+      // StatementInvalid (an ActiveRecordError) — the enable-pass catch must
+      // swallow it rather than let it escape disableReferentialIntegrity.
+      execute: async (sql) => {
+        if (sql.includes("ENABLE TRIGGER ALL")) {
+          throw new StatementInvalid('relation "gone" does not exist', { sql, binds: [] });
+        }
+        return [];
+      },
+      tables: async () => ["gone"],
+      transaction: async (fn) => fn(),
+    };
+
+    await expect(disableReferentialIntegrity.call(host, async () => {})).resolves.toBeUndefined();
   });
 });
