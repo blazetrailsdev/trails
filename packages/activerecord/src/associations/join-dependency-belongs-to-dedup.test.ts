@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
+  // hydration rows below track the canonical column order (see the model
+  // comments), so no bespoke schema is declared.
+  fixtures({});
 
   class Author extends Base {
     static {
@@ -17,11 +17,14 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     }
   }
 
+  // Canonical `posts` column order (schema.rb): id, author_id, title — the
+  // `tN_rN` hydration offsets below track this so the rows survive the schema
+  // cache `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
-      this.attribute("title", "string");
       this.attribute("author_id", "integer");
+      this.attribute("title", "string");
     }
   }
 
@@ -39,9 +42,9 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     jd.addAssociation("author");
 
     const rows = [
-      { t0_r0: 1, t0_r1: "Post A", t0_r2: 42, t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 2, t0_r1: "Post B", t0_r2: 42, t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 3, t0_r1: "Post C", t0_r2: 42, t1_r0: 42, t1_r1: "Alice" },
+      { t0_r0: 1, t0_r1: 42, t0_r2: "Post A", t1_r0: 42, t1_r1: "Alice" },
+      { t0_r0: 2, t0_r1: 42, t0_r2: "Post B", t1_r0: 42, t1_r1: "Alice" },
+      { t0_r0: 3, t0_r1: 42, t0_r2: "Post C", t1_r0: 42, t1_r1: "Alice" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -63,8 +66,8 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     jd.addAssociation("author");
 
     const rows = [
-      { t0_r0: 1, t0_r1: "Post A", t0_r2: 42, t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 2, t0_r1: "Post B", t0_r2: 99, t1_r0: 99, t1_r1: "Bob" },
+      { t0_r0: 1, t0_r1: 42, t0_r2: "Post A", t1_r0: 42, t1_r1: "Alice" },
+      { t0_r0: 2, t0_r1: 99, t0_r2: "Post B", t1_r0: 99, t1_r1: "Bob" },
     ];
 
     const { parents } = jd.instantiateFromRows(rows);

@@ -10,19 +10,24 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency Arel node construction", () => {
-  // Ride the boot-laid canonical `Base.connection` (single-pool test model)
-  // rather than a sidecar `_pool` lease; these wiring tests only need an
-  // adapter for JoinDependency's quoting, not a bespoke schema.
-  setupFixtures();
+  // Ride the canonical schema `fixtures({})` warms: the join predicates below
+  // resolve against the real canonical keys (e.g. `owners.owner_id`), so no
+  // bespoke schema is declared.
+  fixtures({});
 
   class Owner extends Base {
     static {
+      // Canonical `owners` has `primary_key: :owner_id` (schema.rb) — declare it
+      // so the hasMany/belongsTo join predicates resolve against `owners.owner_id`,
+      // matching the schema `fixtures({})` warms.
+      this._primaryKey = "owner_id";
+      this.attribute("owner_id", "integer");
       this.attribute("name", "string");
     }
   }
@@ -170,8 +175,13 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
+    // Both keys are named `owner_id` (canonical `owners.owner_id` PK + the
+    // `assets.owner_id` FK), so the join direction shows only in the relations:
+    // hasMany joins the child FK (assets) against the parent PK (owners).
     expect((eq.left as any).name).toBe("owner_id");
-    expect((eq.right as any).name).toBe("id");
+    expect((eq.left as any).relation.name).toBe("assets");
+    expect((eq.right as any).name).toBe("owner_id");
+    expect((eq.right as any).relation.name).toBe("owners");
   });
 
   it("emits OuterJoin for belongsTo with correct key direction", () => {
@@ -186,9 +196,14 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     const eq = on.expr as Nodes.Equality;
     expect(eq).toBeInstanceOf(Nodes.Equality);
-    // belongsTo: targetTable.pk = sourceTable.fk
-    expect((eq.left as any).name).toBe("id");
+    // belongsTo: targetTable.pk = sourceTable.fk. Both keys are named `owner_id`
+    // (canonical `owners.owner_id` PK + the `assets.owner_id` FK), so direction
+    // shows in the relations: target PK (owners) on the left, source FK (assets)
+    // on the right.
+    expect((eq.left as any).name).toBe("owner_id");
+    expect((eq.left as any).relation.name).toBe("owners");
     expect((eq.right as any).name).toBe("owner_id");
+    expect((eq.right as any).relation.name).toBe("assets");
   });
 
   it("builds joinRoot tree with children for each association", () => {
