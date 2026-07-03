@@ -2422,15 +2422,32 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : records;
     const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
 
-    // Persisted children are nullified via update_all (Rails delete_records
-    // else-branch), bypassing validations/callbacks. New-record children have
-    // no DB row — skip the DB call.
+    // Rails CollectionProxy#delete resolves the strategy from the reflection's
+    // `:dependent` (delete_or_destroy(records, options[:dependent])). Share the
+    // remove_records path with `destroy`, which forces `:destroy`.
+    const aborted = await this._removeRecords(modelRecords, this._deleteStrategy());
+    if (aborted) return [];
+    return modelRecords as Base[];
+  }
+
+  /**
+   * Shared implementation of Rails `CollectionAssociation#remove_records`
+   * (collection_association.rb:399-409): fire the abortable `before_remove`
+   * loop, run `delete_records` for the given strategy on the persisted subset,
+   * prune the in-memory target, then fire `after_remove`. Wrapped in a
+   * transaction when any record is persisted, mirroring `delete_or_destroy`.
+   * Both `delete` (strategy from `:dependent`) and `destroy` (forced `:destroy`)
+   * route through here so the two never drift. Returns whether a `before_remove`
+   * callback aborted the operation.
+   */
+  private async _removeRecords(
+    modelRecords: T[],
+    method: "delete_all" | "destroy" | "nullify",
+  ): Promise<boolean> {
+    // Persisted children are deleted/nullified via the DB; new-record children
+    // have no row — they only participate in the callbacks and target pruning.
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
 
-    // Mirror Rails remove_records (collection_association.rb#remove_records): the
-    // before_remove loop, DB update, in-memory target removal, and after_remove
-    // callbacks form one unit — all run inside the transaction when there are
-    // persisted records, so before_remove side-effects participate in rollback.
     let aborted = false;
     const removeRecords = async () => {
       // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
@@ -2443,13 +2460,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
       }
       if (persistedRecords.length > 0) {
-        // Mirror Rails CollectionProxy#delete → HasManyAssociation#delete_records:
-        // the effective strategy comes from the reflection's `:dependent`. `:destroy`
-        // destroys each record (callbacks run); `:delete_all` bulk-DELETEs the scoped
+        // Mirror Rails HasManyAssociation#delete_records: `:destroy` destroys
+        // each record (callbacks run); `:delete_all` bulk-DELETEs the scoped
         // rows; otherwise (incl. nil → the has_many default) nullify the FK.
-        const strategy = this._deleteStrategy();
-        if (strategy === "destroy") {
-          // Rails: records.each(&:destroy!).
+        if (method === "destroy") {
+          // Rails: records.each(&:destroy!) — bang so a failed destroy raises
+          // RecordNotDestroyed and rolls back the wrapping transaction.
           for (const record of persistedRecords) {
             await (record as any).destroyBang();
           }
@@ -2487,7 +2503,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             scope = scope.where(queryCols, tuples);
           }
           let count: number;
-          if (strategy === "delete_all") {
+          if (method === "delete_all") {
             count = await scope.deleteAll();
           } else {
             const nullUpdates = this._buildNullifyUpdates();
@@ -2521,8 +2537,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await removeRecords();
     }
-    if (aborted) return [];
-    return modelRecords as Base[];
+    return aborted;
   }
 
   private _removeFromTarget(records: Base[]): void {
@@ -2706,25 +2721,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
     this._raiseOnTypeMismatch(modelRecords);
 
-    const destroyed: Base[] = [];
-    const run = async () => {
-      for (const record of modelRecords) {
-        await record.destroy();
-        if (record.isDestroyed()) destroyed.push(record);
-      }
-    };
-    // Rails delete_or_destroy wraps remove_records in a transaction only when
-    // there are persisted records, so a mid-batch raise rolls back the batch.
-    if (modelRecords.some((r) => !r.isNewRecord())) {
-      await this.transaction(run);
-    } else {
-      await run();
-    }
-    // Non-through join/target pruning happens after the destroy batch (it is
-    // pure in-memory bookkeeping, not a DB write that needs the transaction).
-    if (destroyed.length > 0) {
-      this._removeFromTarget(destroyed);
-    }
+    // Rails CollectionProxy#destroy → delete_or_destroy(records, :destroy):
+    // the same remove_records path as `delete`, with the strategy forced to
+    // `:destroy`. Share `_removeRecords` so before_remove/after_remove callbacks,
+    // the counter-cache decrement, and the bang-destroy-in-transaction behavior
+    // stay in lockstep with `delete`.
+    await this._removeRecords(modelRecords, "destroy");
   }
 
   /**

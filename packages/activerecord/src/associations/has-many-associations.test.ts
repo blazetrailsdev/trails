@@ -467,6 +467,24 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
     expect(await HmTagging.findBy({ id: first.id })).toBeNull();
   });
+
+  // Same Rails behavior again, routed through CollectionProxy#destroy
+  // (`proxy.destroy(record)`) rather than `delete`. Rails' destroy calls
+  // delete_or_destroy(records, :destroy), sharing remove_records with delete, so
+  // the counter-cache decrement (gated on inverse_updates_counter_cache?) fires
+  // here too. Verbatim Rails name (one Rails test, three trails code paths).
+  it("deleting updates counter cache with dependent destroy", async () => {
+    const post = posts("welcome");
+    const startCount = (post as any).tags_count as number;
+    await post.updateColumns({ taggings_with_destroy_count: startCount });
+
+    const first = (await post.taggingsWithDestroy.first())!;
+    await post.taggingsWithDestroy.destroy(first);
+
+    await post.reload();
+    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
+    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+  });
 });
 
 describe("HasManyAssociationsTest", () => {
