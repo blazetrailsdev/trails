@@ -36,13 +36,13 @@ describe("StatementCacheTest", () => {
     await Book.create({ name: "my book" });
     await Book.create({ name: "my other book" });
 
-    const cache = StatementCache.create(ClothingItem.leaseConnection(), (params) => {
+    const cache = StatementCache.create(await ClothingItem.leaseConnection(), (params) => {
       return Book.where({ name: params.bind() }) as any;
     });
 
-    let b = await cache.execute(["my book"], ClothingItem.leaseConnection());
+    let b = await cache.execute(["my book"], await ClothingItem.leaseConnection());
     expect(b[0].readAttribute("name")).toBe("my book");
-    b = await cache.execute(["my other book"], ClothingItem.leaseConnection());
+    b = await cache.execute(["my other book"], await ClothingItem.leaseConnection());
     expect(b[0].readAttribute("name")).toBe("my other book");
   });
 
@@ -50,13 +50,13 @@ describe("StatementCacheTest", () => {
     const b1 = await Book.create({ name: "my book" });
     const b2 = await Book.create({ name: "my other book" });
 
-    const cache = StatementCache.create(ClothingItem.leaseConnection(), (params) => {
+    const cache = StatementCache.create(await ClothingItem.leaseConnection(), (params) => {
       return Book.where({ id: params.bind() }) as any;
     });
 
-    let b = await cache.execute([b1.id], ClothingItem.leaseConnection());
+    let b = await cache.execute([b1.id], await ClothingItem.leaseConnection());
     expect(b[0].readAttribute("name")).toBe(b1.readAttribute("name"));
-    b = await cache.execute([b2.id], ClothingItem.leaseConnection());
+    b = await cache.execute([b2.id], await ClothingItem.leaseConnection());
     expect(b[0].readAttribute("name")).toBe(b2.readAttribute("name"));
   });
 
@@ -71,18 +71,18 @@ describe("StatementCacheTest", () => {
   });
 
   it("statement cache with simple statement", async () => {
-    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+    const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
       return Book.where({ name: "my book" }).where("author_id > 3") as any;
     });
 
     await Book.create({ name: "my book", author_id: 4 });
 
-    const books = await cache.execute([], ClothingItem.leaseConnection());
+    const books = await cache.execute([], await ClothingItem.leaseConnection());
     expect(books[0].readAttribute("name")).toBe("my book");
   });
 
   it("statement cache with complex statement", async () => {
-    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+    const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
       return Liquid.joins({ molecules: "electrons" }).where({
         "molecules.name": "dioxane",
         "electrons.name": "lepton",
@@ -93,7 +93,7 @@ describe("StatementCacheTest", () => {
     const molecule = await (salty as any).molecules.create({ name: "dioxane" });
     await molecule.electrons.create({ name: "lepton" });
 
-    const liquids = await cache.execute([], ClothingItem.leaseConnection());
+    const liquids = await cache.execute([], await ClothingItem.leaseConnection());
     expect(liquids[0].readAttribute("name")).toBe("salty");
   });
 
@@ -103,17 +103,17 @@ describe("StatementCacheTest", () => {
   });
 
   it("statement cache values differ", async () => {
-    const cache = StatementCache.create(ClothingItem.leaseConnection(), () => {
+    const cache = StatementCache.create(await ClothingItem.leaseConnection(), () => {
       return Book.where({ name: "my book" }) as any;
     });
 
     for (let i = 0; i < 3; i++) await Book.create({ name: "my book" });
 
-    const firstBooks = await cache.execute([], ClothingItem.leaseConnection());
+    const firstBooks = await cache.execute([], await ClothingItem.leaseConnection());
 
     for (let i = 0; i < 3; i++) await Book.create({ name: "my book" });
 
-    const additionalBooks = await cache.execute([], ClothingItem.leaseConnection());
+    const additionalBooks = await cache.execute([], await ClothingItem.leaseConnection());
     expect(firstBooks.map((b) => b.id)).not.toEqual(additionalBooks.map((b) => b.id));
   });
 
@@ -122,7 +122,9 @@ describe("StatementCacheTest", () => {
     await Book.create({ name: "my other book" });
 
     const book = await Book.findBy({ name: "my book" });
-    const otherBook = await Book.leaseConnection().unpreparedStatement(() => {
+    const otherBook = await (
+      await Book.leaseConnection()
+    ).unpreparedStatement(() => {
       return Book.findBy({ name: "my other book" });
     });
 

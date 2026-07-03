@@ -289,7 +289,7 @@ describe("InvertibleMigrationTest", () => {
   setupHandlerSuite();
 
   afterEach(async () => {
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     for (const table of ["horses", "new_horses"]) {
       if (await connection.tableExists(table)) {
         await connection.dropTable(table);
@@ -448,7 +448,7 @@ describe("InvertibleMigrationTest", () => {
   });
 
   itIfSupports("comments", "migrate revert change table comment", async () => {
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     const migration1 = new ChangeTableComment1();
     await migration1.migrate("up");
     expect(await (connection as any).tableComment("horses")).toBe("Sekitoba");
@@ -462,7 +462,7 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("migrate enable and disable extension", async () => {
-    const connection = Horse.leaseConnection();
+    const connection = await Horse.leaseConnection();
     const migration1 = new InvertibleMigration();
     const migration2 = new DisableExtension1();
     const migration3 = new DisableExtension2();
@@ -490,7 +490,7 @@ describe("InvertibleMigrationTest", () => {
   // no block and _reverseOperation throws IrreversibleMigration for dropTable.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
   it.skip("migrate revert drop table", async () => {
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     const migration1 = new InvertibleMigration();
     await migration1.migrate("up");
     expect(await connection.tableExists("horses")).toBe(true);
@@ -509,7 +509,7 @@ describe("InvertibleMigrationTest", () => {
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
   it.skip("revert order", async () => {
     const block = (t: any) => t.string("name");
-    const recorder = new CommandRecorder(Base.leaseConnection());
+    const recorder = new CommandRecorder(await Base.leaseConnection());
     recorder.record("createTable", ["apples", block]);
     await recorder.revert(async () => {
       recorder.record("createTable", ["bananas", block]);
@@ -536,24 +536,24 @@ describe("InvertibleMigrationTest", () => {
 
   it("legacy up", async () => {
     await LegacyMigration.migrate("up");
-    expect(await Base.leaseConnection().tableExists("horses")).toBe(true);
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBe(true);
   });
 
   it("legacy down", async () => {
     await LegacyMigration.migrate("up");
     await LegacyMigration.migrate("down");
-    expect(await Base.leaseConnection().tableExists("horses")).toBe(false);
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBe(false);
   });
 
   it("up", async () => {
     await LegacyMigration.up();
-    expect(await Base.leaseConnection().tableExists("horses")).toBe(true);
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBe(true);
   });
 
   it("down", async () => {
     await LegacyMigration.up();
     await LegacyMigration.down();
-    expect(await Base.leaseConnection().tableExists("horses")).toBe(false);
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBe(false);
   });
 
   it("migrate down with table name prefix", async () => {
@@ -563,7 +563,7 @@ describe("InvertibleMigrationTest", () => {
       const migration = new InvertibleMigration();
       await migration.migrate("up");
       await expect(migration.migrate("down")).resolves.not.toThrow();
-      expect(await Base.leaseConnection().tableExists("p_horses_s")).toBe(false);
+      expect(await (await Base.leaseConnection()).tableExists("p_horses_s")).toBe(false);
     } finally {
       Base.tableNamePrefix = "";
       Base.tableNameSuffix = "";
@@ -578,16 +578,16 @@ describe("InvertibleMigrationTest", () => {
     const migration = new RevertCustomForeignKeyTable();
     await new InvertibleMigration().migrate("up");
     await migration.migrate("up");
-    expect(await Base.leaseConnection().columnExists("horses", "owner_id")).toBe(true);
+    expect(await (await Base.leaseConnection()).columnExists("horses", "owner_id")).toBe(true);
     await migration.migrate("down");
-    expect(await Base.leaseConnection().columnExists("horses", "owner_id")).toBe(false);
+    expect(await (await Base.leaseConnection()).columnExists("horses", "owner_id")).toBe(false);
   });
 
   it("migrate revert add index without name on expression", async () => {
     await new InvertibleMigration().migrate("up");
     await new RevertNonNamedExpressionIndexMigration().migrate("up");
 
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     expect(await connection.indexExists("horses", ["remind_at", "place_id"])).toBe(true);
 
     await new RevertNonNamedExpressionIndexMigration().migrate("down");
@@ -601,7 +601,7 @@ describe("InvertibleMigrationTest", () => {
     await new RevertNamedIndexMigration2().migrate("up");
     await new RevertNamedIndexMigration2().migrate("down");
 
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     expect(await connection.indexExists("horses", "content")).toBe(true);
     expect(await connection.indexExists("horses", "content", { name: "horses_index_named" })).toBe(
       false,
@@ -621,7 +621,7 @@ describe("InvertibleMigrationTest", () => {
     expect(horse2.readAttribute("oldie")).toBe(0); // created after migration
 
     await new UpOnlyMigration().migrate("down"); // should be no error
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     expect(await connection.columnExists("horses", "oldie")).toBe(false);
     Horse.resetColumnInformation();
   });
@@ -633,7 +633,7 @@ describe("InvertibleMigrationTest", () => {
       await new InvertibleMigration().migrate("up");
       await new RevertUniqueConstraintWithInvalidOption().migrate("up");
 
-      const connection = Base.leaseConnection();
+      const connection = await Base.leaseConnection();
       expect((await (connection as any).uniqueConstraints("horses")).length).toBe(1);
 
       await new RevertUniqueConstraintWithInvalidOption().migrate("down");
@@ -650,7 +650,7 @@ describe("InvertibleMigrationTest", () => {
     await new InvertibleMigration().migrate("up");
     await new RevertForeignKeyWithInvalidOption().migrate("up");
 
-    const connection = Base.leaseConnection();
+    const connection = await Base.leaseConnection();
     expect((await connection.foreignKeys("horses")).length).toBe(1);
 
     await new RevertForeignKeyWithInvalidOption().migrate("down");
@@ -664,7 +664,7 @@ describe("InvertibleMigrationTest", () => {
       await new InvertibleMigration().migrate("up");
       await new RevertCheckConstraintWithInvalidOption().migrate("up");
 
-      const connection = Base.leaseConnection();
+      const connection = await Base.leaseConnection();
       expect((await (connection as any).checkConstraints("horses")).length).toBe(1);
 
       await new RevertCheckConstraintWithInvalidOption().migrate("down");

@@ -1082,7 +1082,9 @@ describe("PreloaderTest", () => {
     try {
       await secondaryPool.adapterReady;
       // Canonical dogs shape in the secondary database.
-      await OtherDog.leaseConnection().executeMutation(
+      await (
+        await OtherDog.leaseConnection()
+      ).executeMutation(
         "CREATE TABLE `dogs` (`id` INTEGER PRIMARY KEY, `trainer_id` INTEGER, " +
           "`breeder_id` INTEGER, `dog_lover_id` INTEGER, `alias` VARCHAR(255))",
       );

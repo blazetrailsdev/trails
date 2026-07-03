@@ -28,7 +28,7 @@ describe("ConnectionManagementTest", () => {
   let app: App;
   let management: ConnectionManagement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "primary", {
         adapter: "sqlite3",
@@ -44,7 +44,7 @@ describe("ConnectionManagementTest", () => {
     management = middleware(app);
 
     // make sure we have an active connection
-    expect(Base.leaseConnection()).toBeTruthy();
+    expect(await Base.leaseConnection()).toBeTruthy();
     expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(true);
   });
 

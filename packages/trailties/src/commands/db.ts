@@ -163,7 +163,7 @@ async function forEachDatabase(
   for (const { name, raw, hashConfig } of filtered) {
     const prefix = multiDb ? `[${name}] ` : "";
     await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
-      const adapter = pool.leaseConnection();
+      const adapter = await pool.leaseConnection();
       await fn({ adapter, raw, config: hashConfig, name, prefix });
     });
   }
@@ -861,7 +861,7 @@ export function dbCommand(): Command {
         // may have been created by either our DatabaseTasks.create call
         // above or by better-sqlite3 on connect; the meaningful signal
         // is whether migrations have been applied.
-        const adapter = pool.leaseConnection();
+        const adapter = await pool.leaseConnection();
         const migrator = createMigrator(adapter, [], raw);
         const wasFresh = !(await migrator.schemaMigrationTableExists());
 
@@ -1077,7 +1077,7 @@ export function dbCommand(): Command {
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor(envName)) {
           await DatabaseTasks.withTemporaryPool(config, async (pool) => {
-            const adapter = pool.leaseConnection();
+            const adapter = await pool.leaseConnection();
             const filename = DatabaseTasks.cacheDumpFilename(config);
             await DatabaseTasks.dumpSchemaCache(adapter, filename);
             console.log(`Schema cache dumped to ${filename}`);

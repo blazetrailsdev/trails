@@ -296,7 +296,7 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes default sti subclass", async () => {
-    const adapter = Topic.leaseConnection() as any;
+    const adapter = (await Topic.leaseConnection()) as any;
     const originalType = (Topic as any).columnsHash()["type"].default;
     try {
       await adapter.changeColumnDefault("topics", "type", { from: originalType, to: "Reply" });
@@ -321,7 +321,7 @@ describe("PersistenceTest", () => {
   });
 
   it("reset column information resets children", async () => {
-    const adapter = Topic.leaseConnection() as any;
+    const adapter = (await Topic.leaseConnection()) as any;
     class Child extends Topic {}
     new Child(); // force schema to load
 

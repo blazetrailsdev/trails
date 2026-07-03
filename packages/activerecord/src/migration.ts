@@ -81,6 +81,10 @@ export interface MigrationArConfig {
   // Mirrors Rails' `Migration#connection` fallback to the migration connection
   // pool (`ActiveRecord::Base.lease_connection`) when no per-migration
   // connection has been assigned. Injected by Base to avoid the import cycle.
+  // Sync: since trails' Rails-named `leaseConnection` is now async (awaits
+  // per-checkout `verifyBang`), this is wired to the sync `leaseConnectionSync`
+  // escape hatch — it resolves a pinned connection / establishes a first lease
+  // synchronously, skipping only the async per-checkout verify.
   leaseConnection?: () => DatabaseAdapter;
 }
 let _arConfig: MigrationArConfig | null = null;

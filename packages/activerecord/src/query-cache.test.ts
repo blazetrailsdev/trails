@@ -65,7 +65,7 @@ describe("QueryCacheTest", () => {
     schema: canonicalSchema,
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     Task.connectionPool().clearQueryCache();
     Base.connectionPool().disableQueryCacheBang();
   });
@@ -191,7 +191,7 @@ describe("QueryCacheTest", () => {
     const post = await Post.first();
     await Post.cache(async () => {
       const query = association(post as never, "categories").select("post_id");
-      const result = await Post.leaseConnection().selectAll(query as never);
+      const result = await (await Post.leaseConnection()).selectAll(query as never);
       expect(result).toBeDefined();
       expect(typeof result.toArray).toBe("function");
     });
@@ -258,8 +258,8 @@ describe("QueryCacheTest", () => {
   it("select all with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.leaseConnection().selectAll(Post.all() as never);
-        await Post.leaseConnection().selectAll(Post.all() as never);
+        await (await Post.leaseConnection()).selectAll(Post.all() as never);
+        await (await Post.leaseConnection()).selectAll(Post.all() as never);
       });
     });
   });
@@ -267,8 +267,8 @@ describe("QueryCacheTest", () => {
   it("select one with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.leaseConnection().selectOne(Post.all() as never);
-        await Post.leaseConnection().selectOne(Post.all() as never);
+        await (await Post.leaseConnection()).selectOne(Post.all() as never);
+        await (await Post.leaseConnection()).selectOne(Post.all() as never);
       });
     });
   });
@@ -276,8 +276,8 @@ describe("QueryCacheTest", () => {
   it("select value with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.leaseConnection().selectValue(Post.all() as never);
-        await Post.leaseConnection().selectValue(Post.all() as never);
+        await (await Post.leaseConnection()).selectValue(Post.all() as never);
+        await (await Post.leaseConnection()).selectValue(Post.all() as never);
       });
     });
   });
@@ -285,8 +285,8 @@ describe("QueryCacheTest", () => {
   it("select values with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.leaseConnection().selectValues(Post.all() as never);
-        await Post.leaseConnection().selectValues(Post.all() as never);
+        await (await Post.leaseConnection()).selectValues(Post.all() as never);
+        await (await Post.leaseConnection()).selectValues(Post.all() as never);
       });
     });
   });
@@ -294,8 +294,8 @@ describe("QueryCacheTest", () => {
   it("select rows with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.leaseConnection().selectRows(Post.all() as never);
-        await Post.leaseConnection().selectRows(Post.all() as never);
+        await (await Post.leaseConnection()).selectRows(Post.all() as never);
+        await (await Post.leaseConnection()).selectRows(Post.all() as never);
       });
     });
   });
@@ -384,9 +384,9 @@ describe("QueryCacheTest", () => {
 
   it("cache does not wrap results in arrays", async () => {
     await Task.cache(async () => {
-      const value = await Task.leaseConnection().selectValue(
-        "SELECT count(*) AS count_all FROM tasks",
-      );
+      const value = await (
+        await Task.leaseConnection()
+      ).selectValue("SELECT count(*) AS count_all FROM tasks");
       expect(Number(value)).toBe(2);
     });
   });
@@ -416,7 +416,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache executes new queries within block", async () => {
-    Base.leaseConnection().enableQueryCacheBang();
+    (await Base.leaseConnection()).enableQueryCacheBang();
 
     await assertQueriesCount(1, false, async () => {
       expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
@@ -426,7 +426,9 @@ describe("QueryCacheTest", () => {
       expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
     });
 
-    await Base.leaseConnection().uncached(async () => {
+    await (
+      await Base.leaseConnection()
+    ).uncached(async () => {
       await assertQueriesCount(1, false, async () => {
         expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
       });
@@ -453,18 +455,18 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache does not establish connection if unconnected", async () => {
-    const mw = middleware(() => {
+    const mw = middleware(async () => {
       // The block runs without forcing a new connection beyond the executor's.
     });
     await mw();
   });
 
   it("query cache is enabled on connections established after middleware runs", async () => {
-    const mw = middleware(() => {
-      expect(Base.leaseConnection().queryCacheEnabled).toBe(true);
+    const mw = middleware(async () => {
+      expect((await Base.leaseConnection()).queryCacheEnabled).toBe(true);
     });
     await mw();
-    expect(Base.leaseConnection().queryCacheEnabled).toBe(false);
+    expect((await Base.leaseConnection()).queryCacheEnabled).toBe(false);
   });
 
   it.skip("query caching is local to the current thread", () => {
@@ -472,7 +474,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache is enabled on all connection pools", async () => {
-    const mw = middleware(() => {
+    const mw = middleware(async () => {
       expect(Base.connectionPool().queryCacheEnabled).toBe(true);
     });
     await mw();
@@ -517,7 +519,9 @@ describe("QueryCacheTest", () => {
     const mw = middleware(async () => {
       await Post.first();
       const before = Base.connectionPool().queryCache.size;
-      await Post.leaseConnection().uncached(
+      await (
+        await Post.leaseConnection()
+      ).uncached(
         async () => {
           await Post.create({ title: "a new post", body: "and a body" });
         },
@@ -526,7 +530,9 @@ describe("QueryCacheTest", () => {
       expect(Base.connectionPool().queryCache.size).toBe(before);
 
       expect(Base.connectionPool().queryCache.size).toBe(1);
-      await Post.leaseConnection().uncached(
+      await (
+        await Post.leaseConnection()
+      ).uncached(
         async () => {
           await Post.create({ title: "a new post", body: "and a body" });
         },
@@ -553,9 +559,13 @@ describe("QueryCacheTest", () => {
 
       await Post.first();
       expect(Base.connectionPool().queryCache.size).toBe(1);
-      await Post.leaseConnection().uncached(
+      await (
+        await Post.leaseConnection()
+      ).uncached(
         async () => {
-          await Post.leaseConnection().cache(async () => {
+          await (
+            await Post.leaseConnection()
+          ).cache(async () => {
             await Post.create({ title: "a new post", body: "and a body" });
           });
         },
@@ -589,11 +599,11 @@ describe("QueryCacheMutableParamTest", () => {
     await Base.connection.createTable("json_objs", { force: true }, (t) => {
       (t as unknown as { column(name: string, type: string): void }).column("payload", columnType);
     });
-    Base.leaseConnection().enableQueryCacheBang();
+    (await Base.leaseConnection()).enableQueryCacheBang();
   });
 
   afterEach(async () => {
-    Base.leaseConnection().disableQueryCacheBang();
+    (await Base.leaseConnection()).disableQueryCacheBang();
     await Base.connection.dropTable("json_objs", { ifExists: true });
   });
 
@@ -626,15 +636,15 @@ describe("QueryCacheExpiryTest", () => {
     schema: canonicalSchema,
   });
 
-  afterEach(() => {
-    Task.leaseConnection().clearQueryCache();
+  afterEach(async () => {
+    (await Task.leaseConnection()).clearQueryCache();
   });
 
   it("cache gets cleared after migration", async () => {
     await Post.find(1);
-    await Post.leaseConnection().changeColumn("posts", "title", "string", { limit: 80 });
+    await (await Post.leaseConnection()).changeColumn("posts", "title", "string", { limit: 80 });
     await expect(Post.find(1)).resolves.toBeDefined();
-    await Post.leaseConnection().changeColumn("posts", "title", "string");
+    await (await Post.leaseConnection()).changeColumn("posts", "title", "string");
   });
 
   // Rails uses `assert_called(query_cache, :clear, times: 1)`; trails counts

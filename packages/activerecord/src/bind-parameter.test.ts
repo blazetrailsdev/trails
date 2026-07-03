@@ -48,12 +48,15 @@ class DebugLogSubscriber extends LogSubscriber {
   }
 }
 
-function logBinds(binds: unknown[], sql = "select * from topics where id = ?"): string {
+async function logBinds(
+  binds: unknown[],
+  sql = "select * from topics where id = ?",
+): Promise<string> {
   const subscriber = new DebugLogSubscriber();
   // Rails' assert_logs_binds helpers build the payload with
   // `@connection.send(:type_casted_binds, binds)` — use the connection's real
   // type_casted_binds (abstract/quoting.ts) rather than hand-casting.
-  const conn = Topic.leaseConnection() as any;
+  const conn = (await Topic.leaseConnection()) as any;
   const event = new Event("sql.active_record", Temporal.Now.instant(), {
     name: "SQL",
     sql,
@@ -144,7 +147,7 @@ describe("BindParameterTest", () => {
     // (bind_parameter_test.rb:9); MySQL/MariaDB default it off, so mirror the
     // class-level guard here (the statement pool is only populated when prepared
     // statements are enabled).
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
@@ -163,7 +166,7 @@ describe("BindParameterTest", () => {
   });
 
   it("statement cache with query cache", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.enableQueryCacheBang();
     conn.clearCache();
@@ -180,7 +183,7 @@ describe("BindParameterTest", () => {
   });
 
   it("statement cache with find", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
@@ -205,7 +208,7 @@ describe("BindParameterTest", () => {
   });
 
   it("statement cache with find by", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
@@ -228,7 +231,7 @@ describe("BindParameterTest", () => {
   });
 
   it("statement cache with in clause", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     conn.clearCache();
 
@@ -261,7 +264,7 @@ describe("BindParameterTest", () => {
   it.skip("statement cache with sql string literal", () => {});
 
   it("too many binds", async () => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     const bindParamsLength = conn.bindParamsLength();
 
     const ids = Array.from({ length: bindParamsLength }, (_, i) => i + 1);
@@ -275,7 +278,7 @@ describe("BindParameterTest", () => {
   });
 
   it("too many binds with query cache", async () => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     conn.enableQueryCacheBang();
     try {
       const bindParamsLength = conn.bindParamsLength();
@@ -298,14 +301,14 @@ describe("BindParameterTest", () => {
   // fallback. A large multi-value `IN` now builds a real-bind `HomogeneousIn`,
   // so without the fallback these overflow the adapter's bind-params cap.
   it("materializes a record load whose IN exceeds the bind-params cap", async () => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
     const topics = await Topic.where({ id: ids });
     expect(topics.length).toBe(await Topic.count());
   });
 
   it("materializes a set-operation whose operand IN exceeds the bind-params cap", async () => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
     const rel = Topic.where({ id: ids }).union(Topic.where({ id: ids }));
     const topics = await rel.toArray();
@@ -315,7 +318,7 @@ describe("BindParameterTest", () => {
   it("bind from join in subquery", async (ctx) => {
     // Rails wraps the whole BindParameterTest in `if prepared_statements`
     // (bind_parameter_test.rb:9), so this case is gated too; mirror that guard.
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
     // Rails: `joins(:thinking_posts)` — a bare association name resolved to an
@@ -330,7 +333,7 @@ describe("BindParameterTest", () => {
   it("binds are logged", async (ctx) => {
     // Rails gates the whole BindParameterTest on `if prepared_statements`
     // (bind_parameter_test.rb:9); mirror that class wrapper.
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
     // Rails (bind_parameter_test.rb:137-145):
@@ -368,7 +371,7 @@ describe("BindParameterTest", () => {
     // which inlines its bind values into the SQL and logs no bind payload —
     // the same shape Rails emits — so there is no `[1]` to assert. Mirror the
     // Rails guard.
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
 
     const subscriber = new LogListener();
@@ -391,23 +394,25 @@ describe("BindParameterTest", () => {
     }
   });
 
-  it("logs binds after type cast", () => {
+  it("logs binds after type cast", async () => {
     const binds = [new QueryAttribute("id", "10", new IntegerType())];
     // Rails anchors the binds render to end-of-line: %r(\[\["id", 10\]\]\z)
     // (bind_parameter_test.rb:309). trails' safeJsonStringify drops the space.
-    expect(logBinds(binds)).toMatch(/\["id",10\]\]$/);
+    expect(await logBinds(binds)).toMatch(/\["id",10\]\]$/);
   });
 
-  it("logs unnamed binds", () => {
+  it("logs unnamed binds", async () => {
     const binds = ["abcd"];
     // Rails: %r(\[\[nil, "abcd"\]\]\z) (bind_parameter_test.rb:340), end-anchored.
-    expect(logBinds(binds, "select * from topics where title = $1")).toMatch(/\[null,"abcd"\]\]$/);
+    expect(await logBinds(binds, "select * from topics where title = $1")).toMatch(
+      /\[null,"abcd"\]\]$/,
+    );
   });
 
-  it("binds with filtered attributes", () => {
+  it("binds with filtered attributes", async () => {
     Base.filterAttributes = ["auth"];
     const binds = [new QueryAttribute("auth_token", "abcd", new StringType())];
-    expect(logBinds(binds, "select * from users where auth_token = ?")).toContain(
+    expect(await logBinds(binds, "select * from users where auth_token = ?")).toContain(
       '["auth_token","[FILTERED]"]',
     );
   });
@@ -456,13 +461,13 @@ describe("BindParameterTest", () => {
   it("bind params to sql with prepared statements", async (ctx) => {
     // Rails wraps the whole BindParameterTest in `if prepared_statements`;
     // MySQL/MariaDB default it off, so mirror that class-level guard here.
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     await assertBindParamsToSql(conn);
   });
 
   it("bind params to sql with unprepared statements", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     await conn.unpreparedStatement(async () => {
       await assertBindParamsToSql(conn);
@@ -470,7 +475,7 @@ describe("BindParameterTest", () => {
   });
 
   it("nested unprepared statements", async (ctx) => {
-    const conn = Topic.leaseConnection() as any;
+    const conn = (await Topic.leaseConnection()) as any;
     // Rails wraps the whole BindParameterTest in
     // `if lease_connection.prepared_statements`. MySQL/MariaDB default prepared
     // statements off, so this prepared-statement toggle behavior isn't exercised

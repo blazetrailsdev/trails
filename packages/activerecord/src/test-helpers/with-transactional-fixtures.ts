@@ -303,7 +303,7 @@ export function withTransactionalFixtures(
       // can resolve to different AsyncLocalStorage contexts and the unpin
       // won't find the pin set in beforeEach.
       await pool.pinConnectionBang({ fixture: true });
-      pool.leaseConnection();
+      await pool.leaseConnection();
     } else {
       // Non-pooled path — preserved verbatim. Mirrors Rails
       // ConnectionPool#pin_connection! body.

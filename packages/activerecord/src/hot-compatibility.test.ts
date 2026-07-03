@@ -100,7 +100,7 @@ describe("HotCompatibilityTest", () => {
     "cleans up after prepared statement failure in a transaction",
     async () => {
       const { adapter, pool } = await createPooledTestAdapter();
-      const ddlConnection = pool.checkout();
+      const ddlConnection = await pool.checkout();
       try {
         const migration = new MigrationContext(adapter);
         await migration.createTable("hot_compatibilities", { force: true }, (t) => {
@@ -146,7 +146,7 @@ describe("HotCompatibilityTest", () => {
     "cleans up after prepared statement failure in nested transactions",
     async () => {
       const { adapter, pool } = await createPooledTestAdapter();
-      const ddlConnection = pool.checkout();
+      const ddlConnection = await pool.checkout();
       try {
         const migration = new MigrationContext(adapter);
         await migration.createTable("hot_compatibilities", { force: true }, (t) => {

@@ -161,7 +161,7 @@ async function killConnectionFromServer(
   const pool = (
     conn as unknown as { pool: { checkout(): DatabaseAdapter; checkin(c: DatabaseAdapter): void } }
   ).pool;
-  const killer = pool.checkout();
+  const killer = await pool.checkout();
   try {
     if (adapterType === "mysql") {
       await killer.execute(`KILL ${connectionId}`);
@@ -1368,14 +1368,14 @@ describe("AdvisoryLocksEnabledTest", () => {
   });
 
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
-    expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(true);
+    expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
 
     await runWithoutConnection(async (origConnection) => {
       await Base.establishConnection({ ...origConnection, advisoryLocks: false });
-      expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(false);
+      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(false);
 
       await Base.establishConnection({ ...origConnection, advisoryLocks: true });
-      expect(Base.leaseConnection().isAdvisoryLocksEnabled()).toBe(true);
+      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
     });
   });
 });
