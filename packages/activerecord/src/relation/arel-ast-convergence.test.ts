@@ -28,17 +28,20 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter, adapterType } from "../test-adapter.js";
+import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
+
+// Establish the primary (boot-laid canonical-schema) pool so the bespoke
+// `Post` model's SQL compiles through `Base.connection`.
+fixtures({});
 
 class Post extends Base {
   static _tableName = "posts";
 }
 Post.attribute("id", "integer");
 Post.attribute("author", "string");
-Post.adapter = (await createSidecarTestAdapter()).adapter;
 
 // Pre-substitution SQL (raw `?` / `$N` placeholders) for the relation.
 function rawSql(rel: unknown): string {
