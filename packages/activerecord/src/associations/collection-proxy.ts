@@ -2679,7 +2679,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // raise_on_type_mismatch! before any DB write — exactly as the through
     // branch does via the association layer. Only a top-level bare id is
     // coerced; an id nested in an array is left to the type check, matching
-    // Rails and the `delete` branch above.
+    // Rails and the `delete` branch above. The `filter(Boolean)` is
+    // defensive-only: on a genuine missing id `find` raises RecordNotFound
+    // (Relation#find, collection-proxy.ts non-cache path) exactly as Rails
+    // does — it never returns a falsy element — so the filter only guards the
+    // theoretical null return and never silently drops a real record.
     const coerced = records.some((r) => typeof r !== "object")
       ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
       : (records as T[]);
