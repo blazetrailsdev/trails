@@ -38,7 +38,7 @@ class Post extends Base {
 }
 Post.attribute("id", "integer");
 Post.attribute("author", "string");
-Post.adapter = createSidecarTestAdapter().adapter;
+Post.adapter = (await createSidecarTestAdapter()).adapter;
 
 // Pre-substitution SQL (raw `?` / `$N` placeholders) for the relation.
 function rawSql(rel: unknown): string {

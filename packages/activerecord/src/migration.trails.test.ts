@@ -16,7 +16,7 @@ import { createTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("MigrationTest", () => {
-  it("migration.connection returns _connectionOverride when set", () => {
+  it("migration.connection returns _connectionOverride when set", async () => {
     class M extends Migration {
       async up() {}
       async down() {}
@@ -27,8 +27,8 @@ describe("MigrationTest", () => {
       _connectionOverride?: DatabaseAdapter;
       _poolOverride?: DatabaseAdapter;
     };
-    const baseAdapter = createTestAdapter();
-    const override = createTestAdapter();
+    const baseAdapter = await createTestAdapter();
+    const override = await createTestAdapter();
     internals.adapter = baseAdapter;
     expect(m.connection).toBe(baseAdapter);
     internals._connectionOverride = override;
@@ -37,7 +37,7 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(baseAdapter);
     delete internals._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
-    const poolOverride = createTestAdapter();
+    const poolOverride = await createTestAdapter();
     internals._poolOverride = poolOverride;
     expect(m.connectionPool).toBe(poolOverride);
     // connection is independent — _poolOverride must not affect it
@@ -46,7 +46,7 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(baseAdapter);
   });
 
-  it("migration.schema uses connection (respects _connectionOverride)", () => {
+  it("migration.schema uses connection (respects _connectionOverride)", async () => {
     class M extends Migration {
       async up() {}
       async down() {}
@@ -56,8 +56,8 @@ describe("MigrationTest", () => {
       adapter: DatabaseAdapter;
       _connectionOverride?: DatabaseAdapter;
     };
-    const baseAdapter = createTestAdapter();
-    const override = createTestAdapter();
+    const baseAdapter = await createTestAdapter();
+    const override = await createTestAdapter();
     internals.adapter = baseAdapter;
     expect((m.schema as unknown as { adapter: DatabaseAdapter }).adapter).toBe(baseAdapter);
     internals._connectionOverride = override;
@@ -65,7 +65,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration context with async migration() proxy", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migrations: MigrationProxy[] = [
       {
         version: "1",

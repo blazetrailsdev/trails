@@ -6,7 +6,7 @@
  * Test names mirror Rails' relation_test.rb / query_methods_test.rb
  * conventions where applicable.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
@@ -17,7 +17,7 @@ class Post extends Base {
 Post.attribute("id", "integer");
 Post.attribute("title", "string");
 Post.attribute("body", "text");
-Post.adapter = createSidecarTestAdapter().adapter;
+Post.adapter = (await createSidecarTestAdapter()).adapter;
 
 function relation(): Relation<Post> {
   return Post.all() as unknown as Relation<Post>;
@@ -211,16 +211,19 @@ describe("where-hash key resolves to the referenced join alias", () => {
   }
   HaPet.attribute("id", "integer");
   HaPet.attribute("name", "string");
-  HaPet.adapter = createSidecarTestAdapter().adapter;
   class HaToy extends Base {
     static _tableName = "da_toys";
   }
   HaToy.attribute("id", "integer");
   HaToy.attribute("name", "string");
   HaToy.attribute("pet_id", "integer");
-  HaToy.adapter = createSidecarTestAdapter().adapter;
   registerModel(HaPet);
   registerModel(HaToy);
+
+  beforeAll(async () => {
+    HaPet.adapter = (await createSidecarTestAdapter()).adapter;
+    HaToy.adapter = (await createSidecarTestAdapter()).adapter;
+  });
 
   it("aliases the JOIN to the reference name and binds the WHERE to it", () => {
     const sql = (HaPet as any)

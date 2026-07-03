@@ -3,8 +3,8 @@ import { Base, ReadonlyAttributeError } from "../index.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("WriteTest", () => {
-  it("_write_attribute writes value to attribute", () => {
-    createSidecarTestAdapter();
+  it("_write_attribute writes value to attribute", async () => {
+    await createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -15,8 +15,8 @@ describe("WriteTest", () => {
     expect(p.readAttribute("title")).toBe("new");
   });
 
-  it("_write_attribute writes directly without alias resolution", () => {
-    createSidecarTestAdapter();
+  it("_write_attribute writes directly without alias resolution", async () => {
+    await createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("body", "string");
@@ -32,8 +32,8 @@ describe("WriteTest", () => {
     expect(p._readAttribute("content")).toBe("via alias");
   });
 
-  it("_write_attribute bypasses readonly check", () => {
-    createSidecarTestAdapter();
+  it("_write_attribute bypasses readonly check", async () => {
+    await createSidecarTestAdapter();
     class Item extends Base {
       static {
         this.attribute("code", "string");

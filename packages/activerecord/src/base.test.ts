@@ -1613,7 +1613,7 @@ describe("BasicsTest", () => {
     expect(Concrete.tableName).toBe("concretes");
   });
   it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
-    const { adapter: pgAdapter } = createSidecarTestAdapter();
+    const { adapter: pgAdapter } = await createSidecarTestAdapter();
     const result = await pgAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
