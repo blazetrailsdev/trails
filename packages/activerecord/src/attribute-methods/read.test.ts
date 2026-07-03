@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter } from "../test-adapter.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import {
   defineAttributeMethods,
   isAttributeMethodsGenerated,
@@ -8,6 +8,8 @@ import {
 } from "../attribute-methods.js";
 
 describe("ReadTest", () => {
+  setupFixtures();
+
   // Mirrors read_test.rb's synthetic `@klass` (attribute_names %w{one two
   // three}, empty attribute_types): a minimal AttributeMethods host whose
   // accessors are NOT eagerly generated, so we can observe lazy generation
@@ -55,8 +57,7 @@ describe("ReadTest", () => {
     expect(Klass.attributeMethodsGenerated()).toBe(true);
   });
 
-  it("_read_attribute returns value for existing attribute", async () => {
-    await createSidecarTestAdapter();
+  it("_read_attribute returns value for existing attribute", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -66,8 +67,7 @@ describe("ReadTest", () => {
     expect(p._readAttribute("title")).toBe("hello");
   });
 
-  it("_read_attribute returns null for unset attribute", async () => {
-    await createSidecarTestAdapter();
+  it("_read_attribute returns null for unset attribute", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -77,8 +77,7 @@ describe("ReadTest", () => {
     expect(p._readAttribute("title")).toBeNull();
   });
 
-  it("_read_attribute does not apply alias resolution", async () => {
-    await createSidecarTestAdapter();
+  it("_read_attribute does not apply alias resolution", () => {
     class Post extends Base {
       static {
         this.attribute("body", "string");

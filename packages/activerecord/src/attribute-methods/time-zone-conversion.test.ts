@@ -3,19 +3,17 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversionTest
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter } from "../test-adapter.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
 describe("TimeZoneConversionTest", () => {
-  beforeEach(async () => {
-    await createSidecarTestAdapter();
-  });
+  setupFixtures();
 
   it("wraps datetime attribute when timeZoneAwareAttributes is true", () => {
     class Post extends Base {

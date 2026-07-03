@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter } from "../test-adapter.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 
 describe("QueryTest", () => {
-  beforeEach(async () => {
-    await createSidecarTestAdapter();
-  });
+  setupFixtures();
 
   it("query attribute returns false for nil", () => {
     class Post extends Base {

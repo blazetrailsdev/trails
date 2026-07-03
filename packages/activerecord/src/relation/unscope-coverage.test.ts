@@ -6,11 +6,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createSidecarTestAdapter } from "../test-adapter.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { setupFixtures } from "../test-helpers/fixtures.js";
 
 describe("Relation#unscope — full Rails key coverage", () => {
-  let adapter: DatabaseAdapter;
+  setupFixtures();
 
   class UscAuthor extends Base {
     static {
@@ -24,10 +23,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
     }
   }
 
-  beforeEach(async () => {
-    ({ adapter } = await createSidecarTestAdapter());
-    UscAuthor.adapter = adapter;
-    UscPost.adapter = adapter;
+  beforeEach(() => {
     registerModel("UscAuthor", UscAuthor);
     registerModel("UscPost", UscPost);
     (UscAuthor as any)._associations = [];
