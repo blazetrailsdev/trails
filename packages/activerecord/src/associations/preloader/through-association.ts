@@ -416,24 +416,25 @@ export class ThroughAssociation extends Association {
       // matching target at the source stage, so the extra JOIN would only risk
       // fanning out through rows.
       //
-      // We add ONLY the immediate source reflection's join, so only predicates
-      // that reference the source table can be resolved on the through query.
-      // A reflection scope that reaches further (e.g. `.joins(nested)` with a
-      // predicate on that nested table) keeps those predicates off the through
-      // query — pushing them here without the deeper join would produce
-      // `no such column: <nested>.<col>`. Those deeper predicates stay at the
-      // source-preloader stage, where the full reflection scope (with its own
-      // joins/includes) is applied via `_getSourcePreloaders`. Rails' fuller
-      // through_scope also copies the scope's includes/references/joins/order
-      // (through_association.rb:117-142); mirroring that nested-join carry-over
-      // is a separate convergence, and no current has_one-through scope exercises
-      // it — the source-table filter is what this deviation needs.
+      // We add ONLY the immediate source reflection's join, so a predicate may
+      // ride the through query as long as it needs no table beyond the source.
+      // That means source-table-qualified predicates AND unqualified ones (e.g.
+      // `where("name = ?")`, a Rails-valid source condition) — Rails copies the
+      // whole reflection_scope.where_clause once it joins the source
+      // (through_association.rb:117-129). What must NOT be pushed here is a
+      // predicate qualifying some *other* (nested) table the scope reaches via
+      // its own `.joins`, since we don't add that deeper join — it would produce
+      // `no such column: <nested>.<col>`. Those stay at the source-preloader
+      // stage, where the full reflection scope (with its own joins/includes) is
+      // applied via `_getSourcePreloaders`. Mirroring Rails' nested-join
+      // carry-over (through_association.rb:117-142) onto the through query is a
+      // separate convergence not exercised by any current has_one-through scope.
       const isCollection = (this.reflection as any).isCollection?.() ?? false;
       const sourceTable = this._sourceTableName();
       const joinablePredicates =
-        sourceTable != null
-          ? sourcePredicates.filter((pred) => predicateReferencesTable(pred, sourceTable))
-          : [];
+        sourceTable == null
+          ? []
+          : sourcePredicates.filter((pred) => !predicateReferencesForeignTable(pred, sourceTable));
       if (!isCollection && joinablePredicates.length > 0) {
         const sourceRefl = this._sourceReflection;
         if (sourceRefl) {
@@ -616,6 +617,58 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
   if (typeof sql !== "string") return false;
   const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^\\w.])${escaped}\\.`).test(sql);
+}
+
+/**
+ * True when `node` qualifies a column with some table *other* than `sourceTable`.
+ * Used to decide whether a reflection-scope predicate can ride the has_one-through
+ * query, which joins only the immediate source: source-table-qualified and
+ * unqualified predicates are safe (return false), but a predicate reaching a
+ * nested table the through query never joins is not (return true).
+ *
+ * Uses the same Arel `fetchAttribute` walk as `predicateReferencesTable` for
+ * precise hash/Arel conditions, and the same raw-SQL qualifier scan as
+ * `rawSqlReferencesTable` — extracting every `<word>.` qualifier and flagging any
+ * that is not `sourceTable`. The raw-SQL scan is a heuristic (a qualifier inside a
+ * string literal would be a false positive); no current scope hits that, and hash
+ * predicates take the exact Arel path.
+ * @internal
+ */
+function predicateReferencesForeignTable(node: any, sourceTable: string): boolean {
+  let foreign = false;
+  node.fetchAttribute?.((attr: any) => {
+    if (attr instanceof Nodes.Attribute && relationName(attr.relation.name) !== sourceTable) {
+      foreign = true;
+      return false;
+    }
+    return true;
+  });
+  if (foreign) return true;
+  if (node instanceof Nodes.Not) {
+    return predicateReferencesForeignTable((node as any).expr, sourceTable);
+  }
+  return rawSqlReferencesForeignTable(node, sourceTable);
+}
+
+/**
+ * True when a raw-SQL predicate node's text qualifies a column with any table
+ * other than `sourceTable`. Mirrors `rawSqlReferencesTable`'s node unwrapping.
+ * @internal
+ */
+function rawSqlReferencesForeignTable(node: any, sourceTable: string): boolean {
+  if (node instanceof Nodes.Grouping) {
+    return rawSqlReferencesForeignTable((node as any).expr, sourceTable);
+  }
+  let sql: string | undefined;
+  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
+  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
+  if (typeof sql !== "string") return false;
+  const qualifierRe = /(^|[^\w.])(\w+)\s*\./g;
+  let match: RegExpExecArray | null;
+  while ((match = qualifierRe.exec(sql)) !== null) {
+    if (match[2] !== sourceTable) return true;
+  }
+  return false;
 }
 
 /** @internal */
