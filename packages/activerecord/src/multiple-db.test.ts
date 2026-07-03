@@ -52,29 +52,29 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     { connection: () => Entrant.connection, ...seedOpts },
   );
 
-  it("connected", () => {
-    expect(Entrant.leaseConnection()).toBeTruthy();
-    expect(Course.leaseConnection()).toBeTruthy();
+  it("connected", async () => {
+    expect(await Entrant.leaseConnection()).toBeTruthy();
+    expect(await Course.leaseConnection()).toBeTruthy();
   });
 
-  it("proper connection", () => {
-    expect(Entrant.leaseConnection()).not.toBe(Course.leaseConnection());
-    expect(Entrant.leaseConnection()).toBe(Entrant.retrieveConnection());
-    expect(Course.leaseConnection()).toBe(Course.retrieveConnection());
-    expect(Base.leaseConnection()).toBe(Entrant.leaseConnection());
+  it("proper connection", async () => {
+    expect(await Entrant.leaseConnection()).not.toBe(await Course.leaseConnection());
+    expect(await Entrant.leaseConnection()).toBe(await Entrant.retrieveConnection());
+    expect(await Course.leaseConnection()).toBe(await Course.retrieveConnection());
+    expect(await Base.leaseConnection()).toBe(await Entrant.leaseConnection());
   });
 
-  it("swapping the connection", () => {
+  it("swapping the connection", async () => {
     const oldSpecName = Course.connectionSpecificationName;
     Course.connectionSpecificationName = "Base";
     try {
-      expect(Entrant.leaseConnection()).toBe(Course.leaseConnection());
+      expect(await Entrant.leaseConnection()).toBe(await Course.leaseConnection());
     } finally {
       Course.connectionSpecificationName = oldSpecName;
     }
   });
 
-  it("find", () => {
+  it("find", async () => {
     const c1 = courses("ruby");
     expect(c1.name).toBe("Ruby Development");
     const c2 = courses("java");
@@ -108,9 +108,9 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     // re-checks the connection. ESM can't hot-reload a module, so a re-import
     // returns the same cached `Course` class — this asserts the connection still
     // resolves through ARUnit2Model rather than a literal reload.
-    expect(Course.leaseConnection()).toBeTruthy();
+    expect(await Course.leaseConnection()).toBeTruthy();
     const reloaded = (await import("./test-helpers/models/course.js")).Course;
-    expect(reloaded.leaseConnection()).toBeTruthy();
+    expect(await reloaded.leaseConnection()).toBeTruthy();
   });
 
   it("transactions across databases", async () => {
@@ -138,9 +138,9 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     expect((await Entrant.find(1)).name).toBe("Ruby Developer");
   });
 
-  it("connection", () => {
-    expect(Entrant.leaseConnection()).toBe(Bird.leaseConnection());
-    expect(Entrant.leaseConnection()).not.toBe(Course.leaseConnection());
+  it("connection", async () => {
+    expect(await Entrant.leaseConnection()).toBe(await Bird.leaseConnection());
+    expect(await Entrant.leaseConnection()).not.toBe(await Course.leaseConnection());
   });
 
   // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
@@ -151,8 +151,8 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // `connects_to(arunit/arunit)` is *expected* to share Base's connection — which
   // independent in-memory DBs can't do.
   it("count on custom connection", async () => {
-    expect(ARUnit2Model.leaseConnection()).toBe(College.leaseConnection());
-    expect(Base.leaseConnection()).not.toBe(College.leaseConnection());
+    expect(await ARUnit2Model.leaseConnection()).toBe(await College.leaseConnection());
+    expect(await Base.leaseConnection()).not.toBe(await College.leaseConnection());
     expect(await College.count()).toBe(1);
   });
 
@@ -171,12 +171,17 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
       error = e as StatementInvalid;
     }
     expect(error).toBeInstanceOf(StatementInvalid);
-    expect(error!.connectionPool).toBe((Course.leaseConnection() as { pool: unknown }).pool);
+    expect(error!.connectionPool).toBe(
+      ((await Course.leaseConnection()) as { pool: unknown }).pool,
+    );
   });
 
   it("exception contains correct pool", async () => {
-    const courseConn = Course.leaseConnection() as { pool: unknown; execute(sql: string): unknown };
-    const entrantConn = Entrant.leaseConnection() as {
+    const courseConn = (await Course.leaseConnection()) as {
+      pool: unknown;
+      execute(sql: string): unknown;
+    };
+    const entrantConn = (await Entrant.leaseConnection()) as {
       pool: unknown;
       execute(sql: string): unknown;
     };

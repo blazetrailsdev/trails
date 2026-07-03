@@ -2153,8 +2153,8 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 describe("MigrationTest", () => {
   setupFixtures();
 
-  it("migration instance has connection", () => {
+  it("migration instance has connection", async () => {
     const migration = new (class extends Migration {})();
-    expect(migration.connection).toBe(Base.leaseConnection());
+    expect(migration.connection).toBe(await Base.leaseConnection());
   });
 });

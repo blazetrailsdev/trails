@@ -32,11 +32,11 @@ function setupConnection() {
 }
 
 describe("ConnectionHandlingTest", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setupConnection();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     connectedToStack().length = 0;
     Base.connectionHandler.clearAllConnectionsBang();
     setPermanentConnectionCheckout(true);
@@ -52,8 +52,8 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#lease_connection makes the lease permanent even inside #with_connection", async () => {
-    await Base.withConnection(() => {
-      const leased = Base.leaseConnection();
+    await Base.withConnection(async () => {
+      const leased = await Base.leaseConnection();
       expect(leased).toBeTruthy();
     });
     // leaseConnection makes sticky=true, so connection persists
@@ -65,7 +65,7 @@ describe("ConnectionHandlingTest", () => {
     Base.releaseConnection();
     await Base.withConnection(
       async (connection) => {
-        expect(Base.leaseConnection()).toBe(connection);
+        expect(await Base.leaseConnection()).toBe(connection);
       },
       { preventPermanentCheckout: true },
     );
@@ -73,7 +73,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#with_connection use the already leased connection if available", async () => {
-    const leased = Base.leaseConnection();
+    const leased = await Base.leaseConnection();
     await Base.withConnection((conn) => {
       expect(conn).toBe(leased);
     });
@@ -126,7 +126,7 @@ describe("ConnectionHandlingTest", () => {
       warnSpy.mockClear();
       Base.releaseConnection();
 
-      await Base.withConnection(() => {
+      await Base.withConnection(async () => {
         void Base.connection;
         expect(warnSpy).toHaveBeenCalledTimes(1);
       });
@@ -141,11 +141,11 @@ describe("ConnectionHandlingTest", () => {
 
     expect(() => Base.connection).toThrow(ActiveRecordError);
 
-    await Base.withConnection(() => {
+    await Base.withConnection(async () => {
       expect(() => Base.connection).toThrow(ActiveRecordError);
     });
 
-    Base.leaseConnection();
+    await Base.leaseConnection();
     expect(() => Base.connection).not.toThrow();
     Base.releaseConnection();
   });
@@ -164,7 +164,7 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionPool().activeConnection).toBeNull();
   });
 
-  it("connected_to switches role for block", () => {
+  it("connected_to switches role for block", async () => {
     expect(currentRole.call(Base)).toBe("writing");
     Base.connectedTo({ role: "reading" }, () => {
       expect(currentRole.call(Base)).toBe("reading");
@@ -172,7 +172,7 @@ describe("ConnectionHandlingTest", () => {
     expect(currentRole.call(Base)).toBe("writing");
   });
 
-  it("connected_to with reading role automatically prevents writes", () => {
+  it("connected_to with reading role automatically prevents writes", async () => {
     expect(currentPreventingWrites.call(Base)).toBe(false);
     Base.connectedTo({ role: "reading" }, () => {
       expect(currentPreventingWrites.call(Base)).toBe(true);
@@ -180,7 +180,7 @@ describe("ConnectionHandlingTest", () => {
     expect(currentPreventingWrites.call(Base)).toBe(false);
   });
 
-  it("connected_to switches shard for block", () => {
+  it("connected_to switches shard for block", async () => {
     expect(currentShard.call(Base)).toBe("default");
     Base.connectedTo({ role: "writing", shard: "shard_one" }, () => {
       expect(currentShard.call(Base)).toBe("shard_one");
@@ -188,7 +188,7 @@ describe("ConnectionHandlingTest", () => {
     expect(currentShard.call(Base)).toBe("default");
   });
 
-  it("connected_to? checks role and shard", () => {
+  it("connected_to? checks role and shard", async () => {
     expect(Base.connectedToQ({ role: "writing" })).toBe(true);
     expect(Base.connectedToQ({ role: "reading" })).toBe(false);
     Base.connectedTo({ role: "reading" }, () => {
@@ -196,7 +196,7 @@ describe("ConnectionHandlingTest", () => {
     });
   });
 
-  it("while_preventing_writes", () => {
+  it("while_preventing_writes", async () => {
     expect(currentPreventingWrites.call(Base)).toBe(false);
     Base.whilePreventingWrites(() => {
       expect(currentPreventingWrites.call(Base)).toBe(true);
@@ -204,7 +204,7 @@ describe("ConnectionHandlingTest", () => {
     expect(currentPreventingWrites.call(Base)).toBe(false);
   });
 
-  it("prohibit_shard_swapping", () => {
+  it("prohibit_shard_swapping", async () => {
     expect(Base.isShardSwappingProhibited()).toBe(false);
     Base.prohibitShardSwapping(() => {
       expect(Base.isShardSwappingProhibited()).toBe(true);
@@ -215,7 +215,7 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.isShardSwappingProhibited()).toBe(false);
   });
 
-  it("connection_specification_name defaults to Base", () => {
+  it("connection_specification_name defaults to Base", async () => {
     expect(Base.connectionSpecificationName).toBe("Base");
   });
 
@@ -237,26 +237,26 @@ describe("ConnectionHandlingTest", () => {
     }
   });
 
-  it("shard_keys and sharded?", () => {
+  it("shard_keys and sharded?", async () => {
     expect(Base.shardKeys()).toEqual([]);
     expect(Base.isSharded()).toBe(false);
   });
 
-  it("lease_connection and release_connection", () => {
-    const conn = Base.leaseConnection();
+  it("lease_connection and release_connection", async () => {
+    const conn = await Base.leaseConnection();
     expect(conn).toBeTruthy();
     expect(Base.connectionPool().activeConnection).toBe(conn);
     Base.releaseConnection();
     expect(Base.connectionPool().activeConnection).toBeNull();
   });
 
-  it("connection_pool returns pool", () => {
+  it("connection_pool returns pool", async () => {
     const pool = Base.connectionPool();
     expect(pool).toBeTruthy();
     expect(pool.role).toBe("writing");
   });
 
-  it("connection_db_config", () => {
+  it("connection_db_config", async () => {
     const config = Base.connectionDbConfig();
     expect(config.adapter).toBe("sqlite3");
   });
@@ -273,14 +273,14 @@ describe("ConnectionHandlingTest", () => {
     expect(config.configurationHash).not.toHaveProperty("url");
   });
 
-  it("is_connected?", () => {
+  it("is_connected?", async () => {
     const pool = Base.connectionPool();
-    pool.leaseConnection();
+    await pool.leaseConnection();
     expect(Base.isConnectedQ()).toBe(true);
     pool.releaseConnection();
   });
 
-  it("connectsTo rejects both database and shards", () => {
+  it("connectsTo rejects both database and shards", async () => {
     expect(() =>
       Base.connectsTo({
         database: { writing: "primary" },
@@ -291,18 +291,18 @@ describe("ConnectionHandlingTest", () => {
     );
   });
 
-  it("connectedTo requires role or shard", () => {
+  it("connectedTo requires role or shard", async () => {
     expect(() => Base.connectedTo({}, () => {})).toThrow(/must provide/);
   });
 
-  it("connectingTo pushes onto stack", () => {
+  it("connectingTo pushes onto stack", async () => {
     Base.connectingTo({ role: "reading" });
     expect(currentRole.call(Base)).toBe("reading");
     connectedToStack().pop();
     expect(currentRole.call(Base)).toBe("writing");
   });
 
-  it("connectedToMany switches for classes", () => {
+  it("connectedToMany switches for classes", async () => {
     class AbstractConn extends Base {
       static {
         this.abstractClass = true;
@@ -315,16 +315,16 @@ describe("ConnectionHandlingTest", () => {
     expect(currentRole.call(AbstractConn)).toBe("writing");
   });
 
-  it("clear_query_caches_for_current_thread does not throw", () => {
+  it("clear_query_caches_for_current_thread does not throw", async () => {
     expect(() => Base.clearQueryCachesForCurrentThread()).not.toThrow();
   });
 
-  it("schema_cache and clear_cache_bang do not throw", () => {
+  it("schema_cache and clear_cache_bang do not throw", async () => {
     expect(() => Base.schemaCache()).not.toThrow();
     expect(() => Base.clearCacheBang()).not.toThrow();
   });
 
-  it("remove_connection removes the pool", () => {
+  it("remove_connection removes the pool", async () => {
     expect(Base.connectionPool()).toBeTruthy();
     // Mirrors Rails `remove_connection`: returns the removed pool's db_config.
     const removed = Base.removeConnection();
@@ -335,7 +335,7 @@ describe("ConnectionHandlingTest", () => {
     setupConnection();
   });
 
-  it("remove_connection returns undefined when no pool exists", () => {
+  it("remove_connection returns undefined when no pool exists", async () => {
     Base.removeConnection();
     expect(Base.removeConnection()).toBeUndefined();
     // Re-establish for other tests
@@ -431,11 +431,11 @@ describe("ConnectionHandlingTest", () => {
     expect(connectedToStack()).toHaveLength(0);
   });
 
-  it("#isConnected delegates to isConnectedQ", () => {
+  it("#isConnected delegates to isConnectedQ", async () => {
     expect(Base.isConnected()).toBe(Base.isConnectedQ());
   });
 
-  it("#connection leases a connection when none is active", () => {
+  it("#connection leases a connection when none is active", async () => {
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
     const conn = Base.connection;
@@ -451,11 +451,11 @@ describe("ConnectionHandlingTest", () => {
     });
   });
 
-  it("#isPrimaryClass returns true for Base", () => {
+  it("#isPrimaryClass returns true for Base", async () => {
     expect(Base.isPrimaryClass()).toBe(true);
   });
 
-  it("#isPrimaryClass returns false for a normal model subclass", () => {
+  it("#isPrimaryClass returns false for a normal model subclass", async () => {
     class Post extends Base {}
     expect(Post.isPrimaryClass()).toBe(false);
   });
@@ -602,12 +602,12 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 });
 
 describe("AbstractAdapter#isPreventingWrites stack matching", () => {
-  afterEach(() => {
+  afterEach(async () => {
     connectedToStack().length = 0;
     Base.connectionHandler.clearAllConnectionsBang();
   });
 
-  it("Base.connectedTo preventing writes applies globally to unrelated pools", () => {
+  it("Base.connectedTo preventing writes applies globally to unrelated pools", async () => {
     class UnrelatedAbstract extends Base {
       static {
         this.abstractClass = true;
@@ -622,7 +622,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         adapterFactory: () => new BetterSQLite3Adapter(),
       },
     );
-    const conn = UnrelatedAbstract.leaseConnection();
+    const conn = await UnrelatedAbstract.leaseConnection();
     expect(conn.isPreventingWrites()).toBe(false);
     Base.connectedTo({ role: "writing", preventWrites: true }, () => {
       expect(conn.isPreventingWrites()).toBe(true);
@@ -630,7 +630,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     expect(conn.isPreventingWrites()).toBe(false);
   });
 
-  it("abstract-class connectedTo does not leak to unrelated pools", () => {
+  it("abstract-class connectedTo does not leak to unrelated pools", async () => {
     class AnimalsRecord extends Base {
       static {
         this.abstractClass = true;
@@ -651,15 +651,15 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
       { owner: "MealsRecord", role: "writing", adapterFactory: () => new BetterSQLite3Adapter() },
     );
-    const animals = AnimalsRecord.leaseConnection();
-    const meals = MealsRecord.leaseConnection();
+    const animals = await AnimalsRecord.leaseConnection();
+    const meals = await MealsRecord.leaseConnection();
     AnimalsRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
       expect(animals.isPreventingWrites()).toBe(true);
       expect(meals.isPreventingWrites()).toBe(false);
     });
   });
 
-  it("primary class connectedTo (after connectsTo) targets the Base-normalized pool", () => {
+  it("primary class connectedTo (after connectsTo) targets the Base-normalized pool", async () => {
     // Realistic primary-class flow: primaryAbstractClass marks abstract, then
     // connectsTo sets connectionClass=true so connectionClassForSelf walks no
     // further than ApplicationRecord. PoolConfig normalizes the descriptor
@@ -692,8 +692,8 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
       { owner: "OtherAbstract", role: "writing", adapterFactory: () => new BetterSQLite3Adapter() },
     );
-    const appConn = ApplicationRecord.leaseConnection();
-    const otherConn = OtherAbstract.leaseConnection();
+    const appConn = await ApplicationRecord.leaseConnection();
+    const otherConn = await OtherAbstract.leaseConnection();
     ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
       expect(appConn.isPreventingWrites()).toBe(true);
       expect(otherConn.isPreventingWrites()).toBe(false);
@@ -838,7 +838,7 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
 describe("threadedConnectionFor pool-identity guard", () => {
   class Secondary extends Base {}
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "primary", {
         adapter: "sqlite3",
@@ -851,7 +851,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
     Secondary.connectionSpecificationName = "Secondary";
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     Base.connectionHandler.clearAllConnectionsBang();
     Base.connectionSpecificationName = "Base";
   });
@@ -869,13 +869,13 @@ describe("threadedConnectionFor pool-identity guard", () => {
     });
   });
 
-  it("returns null outside any withQueryConnection wrap", () => {
+  it("returns null outside any withQueryConnection wrap", async () => {
     expect(threadedConnectionFor(Base)).toBeNull();
   });
 });
 
 describe("establish_connection accepts a DatabaseConfig", () => {
-  afterEach(() => {
+  afterEach(async () => {
     Base.connectionHandler.clearAllConnectionsBang();
   });
 
@@ -907,7 +907,7 @@ describe("establish_connection accepts a DatabaseConfig", () => {
 describe("loadConfigFile resolves config/database.* against Trails.root", () => {
   let tmpRoot: string;
 
-  afterEach(() => {
+  afterEach(async () => {
     setTrailsRoot(null);
     Base.connectionHandler.clearAllConnectionsBang();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });

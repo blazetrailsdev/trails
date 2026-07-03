@@ -49,6 +49,7 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
+import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
 import { getInheritanceColumn, findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
@@ -506,6 +507,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // errors — worse than letting construction fail.
       const throughRel = this._buildThroughScope() as Relation<T>;
       proxySelf._copyStateFrom(throughRel);
+      // A new owner's through/HABTM scope collapses to `none()` (unresolvable
+      // FK) — mark it so a mutated finder rebases onto the resolved join scope
+      // once the owner is saved (see `_seededNoneNewOwner`).
+      if ((throughRel as unknown as { _isNone: boolean })._isNone) {
+        this._seededNoneNewOwner = true;
+      }
     } else {
       // Build via `buildHasManyRelation` so CP's inherited Relation
       // state matches `scope()` / direct Relation callers: default
@@ -534,7 +541,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
       }
       if (seedRel === null) {
-        if (this._deferredFkError === undefined) proxySelf.noneBang();
+        if (this._deferredFkError === undefined) {
+          proxySelf.noneBang();
+          // New-owner seed: the `1=0` base must be rebased onto the resolved
+          // scope once the owner is saved (see `_seededNoneNewOwner`).
+          this._seededNoneNewOwner = true;
+        }
       } else {
         proxySelf._copyStateFrom(seedRel);
       }
@@ -555,6 +567,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     this._installMutationTracker();
+
+    // Capture the seed WHERE predicates so a later rebase (new-owner `1=0`
+    // seed, owner then saved) can separate them from mutation predicates.
+    this._seedWherePredicates = [
+      ...(this as unknown as { _whereClause: { predicates: unknown[] } })._whereClause.predicates,
+    ];
   }
 
   /**
@@ -669,7 +687,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * proxy's own diverged state is the intended target, so we keep it.
    */
   private _finderScope(): this {
-    return this._cpMutated ? this : (this.scope() as unknown as this);
+    if (!this._cpMutated) return this.scope() as unknown as this;
+    // A diverged proxy keeps its own clauses — UNLESS they sit on a stale
+    // new-owner `1=0` seed and the owner has since been saved. Then rebase the
+    // accumulated mutations onto the freshly resolved scope so the persisted
+    // FK is picked up, mirroring Rails' CollectionProxy delegating to
+    // `association.scope`.
+    if (this._seededNoneNewOwner) {
+      const fresh = this.scope() as unknown as { _isNone: boolean };
+      if (!fresh._isNone) {
+        const clone = super._clone();
+        rebaseNewOwnerSeed(
+          clone as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
+          fresh as unknown,
+          this._seedWherePredicates,
+        );
+        return clone as unknown as this;
+      }
+    }
+    return this;
   }
 
   /**

@@ -21,7 +21,7 @@ export class Bird extends Base {
     this.validates("name", { presence: true });
 
     this.beforeSave(async function (this: Bird) {
-      const conn = (this.constructor as typeof Base).leaseConnection();
+      const conn = await (this.constructor as typeof Base).leaseConnection();
       await (conn as any).materializeTransactions?.();
     });
 

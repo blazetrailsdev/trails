@@ -6,6 +6,7 @@ import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import { rebaseNewOwnerSeed } from "./associations/new-owner-seed-rebase.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
@@ -52,6 +53,26 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    */
   protected _newRelation(): Relation<T> {
     return new AssociationRelation<T>(this.model, this._association);
+  }
+
+  /**
+   * @internal Hook invoked by the shared finder helpers (`first`/`last`) before
+   * their `_isNone` short-circuit, and by this class's `toArray`, so a relation
+   * spawned off a stale new-owner `1=0` seed is rebased onto the live
+   * association scope once the owner is saved. No-op unless this relation still
+   * carries the seed and the rebuilt scope resolves a real FK.
+   */
+  _maybeRebaseAssociationSeed(): void {
+    if (!this._seededNoneNewOwner) return;
+    const assoc = this._association as unknown as { scope?: () => { _isNone: boolean } };
+    if (typeof assoc.scope !== "function") return;
+    const fresh = assoc.scope();
+    if (fresh._isNone) return;
+    rebaseNewOwnerSeed(
+      this as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
+      fresh as unknown,
+      this._seedWherePredicates,
+    );
   }
 
   /**
@@ -223,6 +244,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * way back, so accessing the inverse would re-query.
    */
   async toArray(): Promise<T[]> {
+    this._maybeRebaseAssociationSeed();
     const owner = this._association.owner;
     const reflection = this._association.reflection;
     // Resolve the inverse association name via the registered Reflection,

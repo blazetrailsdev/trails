@@ -25,16 +25,16 @@ describe("PooledConnectionsTest", () => {
   // connection, then checks it back in. Rails joins each thread before
   // spawning the next, so the checkouts are effectively serialized; the JS
   // port runs the same sequence single-threaded.
-  function checkoutCheckinConnections(
+  async function checkoutCheckinConnections(
     poolSize: number,
     iterations: number,
-  ): { pool: ConnectionPool; connectionCount: number; timedOut: number } {
+  ): Promise<{ pool: ConnectionPool; connectionCount: number; timedOut: number }> {
     const pool = establishConnection(poolSize, 0.5);
     let connectionCount = 0;
     let timedOut = 0;
     for (let i = 0; i < iterations; i++) {
       try {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         pool.checkin(conn);
         connectionCount += 1;
       } catch (err) {
@@ -45,16 +45,16 @@ describe("PooledConnectionsTest", () => {
     return { pool, connectionCount, timedOut };
   }
 
-  function checkoutCheckinConnectionsLoop(
+  async function checkoutCheckinConnectionsLoop(
     poolSize: number,
     loops: number,
-  ): { pool: ConnectionPool; connectionCount: number; timedOut: number } {
+  ): Promise<{ pool: ConnectionPool; connectionCount: number; timedOut: number }> {
     const pool = establishConnection(poolSize, 0.5);
     let connectionCount = 0;
     let timedOut = 0;
     for (let i = 0; i < loops; i++) {
       try {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         pool.checkin(conn);
         connectionCount += 1;
         // Rails calls `lease_connection.data_sources` here; the leasing side
@@ -62,7 +62,7 @@ describe("PooledConnectionsTest", () => {
         // keeps a second connection out of the pool so `connections` grows to
         // 2. We omit `data_sources` because exercising it would force an async
         // round-trip to a real DB, irrelevant to the pool-size assertion.
-        pool.leaseConnection();
+        await pool.leaseConnection();
       } catch (err) {
         if (err instanceof ConnectionTimeoutError) timedOut += 1;
         else throw err;
@@ -71,25 +71,25 @@ describe("PooledConnectionsTest", () => {
     return { pool, connectionCount, timedOut };
   }
 
-  it("pooled connection checkin one", () => {
-    const { pool, connectionCount, timedOut } = checkoutCheckinConnections(1, 2);
+  it("pooled connection checkin one", async () => {
+    const { pool, connectionCount, timedOut } = await checkoutCheckinConnections(1, 2);
     expect(connectionCount).toBe(2);
     expect(timedOut).toBe(0);
     expect(pool.connections.length).toBe(1);
   });
 
-  it("pooled connection checkin two", () => {
-    const { pool, connectionCount, timedOut } = checkoutCheckinConnectionsLoop(2, 3);
+  it("pooled connection checkin two", async () => {
+    const { pool, connectionCount, timedOut } = await checkoutCheckinConnectionsLoop(2, 3);
     expect(connectionCount).toBe(3);
     expect(timedOut).toBe(0);
     expect(pool.connections.length).toBe(2);
   });
 
-  it("pooled connection remove", () => {
+  it("pooled connection remove", async () => {
     const pool = establishConnection(2, 0.5);
-    const oldConnection = pool.leaseConnection();
-    const extraConnection = pool.checkout();
+    const oldConnection = await pool.leaseConnection();
+    const extraConnection = await pool.checkout();
     pool.remove(extraConnection);
-    expect(pool.leaseConnection()).toBe(oldConnection);
+    expect(await pool.leaseConnection()).toBe(oldConnection);
   });
 });

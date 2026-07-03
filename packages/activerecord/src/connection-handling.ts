@@ -355,7 +355,7 @@ export function clearQueryCachesForCurrentThread(this: typeof Base): void {
   });
 }
 
-export function leaseConnection(this: typeof Base): DatabaseAdapter {
+export function leaseConnection(this: typeof Base): Promise<DatabaseAdapter> {
   return connectionPool.call(this).leaseConnection();
 }
 
@@ -424,7 +424,7 @@ export function connectionPool(this: typeof Base): ConnectionPool {
   })!;
 }
 
-export function retrieveConnection(this: typeof Base): DatabaseAdapter {
+export function retrieveConnection(this: typeof Base): Promise<DatabaseAdapter> {
   const name = connectionSpecificationName.call(this);
   return this.connectionHandler.retrieveConnection(name, {
     role: coreCurrentRole.call(this as any),
@@ -467,7 +467,17 @@ export function connection(this: typeof Base): DatabaseAdapter {
     } else if (setting === "disallowed") {
       throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
     }
-    return pool.leaseConnection();
+    // Rails' getter leases synchronously here, flipping the lease permanent.
+    // trails' Rails-named `leaseConnection` is now async (it awaits per-checkout
+    // `verifyBang` — see ConnectionPool#checkout), which a synchronous getter
+    // cannot await. This deprecated path therefore uses the sync
+    // `leaseConnectionSync` escape hatch: it resolves a pinned connection and
+    // establishes a first lease exactly as before, but WITHOUT the async
+    // per-checkout verify/self-heal. That lost self-heal on the deprecated sync
+    // path is the documented residual tracked by
+    // `connection-pool-pinned-sync-checkout-per-checkout-verify`; the async
+    // Rails-named path (`withConnection`/`leaseConnection`) keeps full parity.
+    return pool.leaseConnectionSync();
   }
   return pool.activeConnection!;
 }

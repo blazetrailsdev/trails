@@ -216,7 +216,7 @@ export type TestDatabaseAdapter = DatabaseAdapter;
  * raw pool-leased DatabaseAdapter is returned directly.
  */
 export function createTestAdapter(): TestDatabaseAdapter {
-  return _pool.leaseConnection();
+  return _pool.leaseConnectionSync();
 }
 
 /**
@@ -248,7 +248,7 @@ export type SidecarAdapter = DatabaseAdapter & {
 export function createSidecarTestAdapter(): {
   adapter: SidecarAdapter;
 } {
-  const adapter = _pool.leaseConnection() as SidecarAdapter;
+  const adapter = _pool.leaseConnectionSync() as SidecarAdapter;
   return { adapter };
 }
 
@@ -268,7 +268,7 @@ export async function createPooledTestAdapter(): Promise<{
   pool: import("./connection-adapters/abstract/connection-pool.js").ConnectionPool;
 }> {
   const pool = await _establishPooledTestPool();
-  const adapter = pool.leaseConnection() as SidecarAdapter;
+  const adapter = pool.leaseConnectionSync() as SidecarAdapter;
   return { adapter, pool };
 }
 

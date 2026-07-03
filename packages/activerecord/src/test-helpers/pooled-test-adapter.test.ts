@@ -57,7 +57,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
         // taken outside this context would resolve to a different connection.
         await pool.pinConnectionBang(false);
         try {
-          const pinned = pool.checkout();
+          const pinned = await pool.checkout();
           await asExec(pinned).exec(`INSERT INTO ${tableName} (id) VALUES (1)`);
           const inside = await pinned.execute(`SELECT count(*) AS c FROM ${tableName}`);
           expect(Number((inside[0] as { c: number }).c)).toBe(1);

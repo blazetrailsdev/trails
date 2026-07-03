@@ -92,7 +92,7 @@ function makePool(size: number = 5): ConnectionPool {
 
 it("with connection prevent permanent checkout releases connection", async () => {
   const pool = makePool();
-  pool.leaseConnection();
+  await pool.leaseConnection();
   expect(pool.activeConnection).toBeTruthy();
   await pool.withConnection(
     (conn) => {
@@ -119,7 +119,7 @@ it("with connection prevent permanent checkout on fresh lease releases", async (
 
 it("withConnection waits for a released connection when pool is saturated", async () => {
   const pool = makePool(1);
-  const held = pool.checkout();
+  const held = await pool.checkout();
 
   let connSeen: DatabaseAdapter | undefined;
   const waiter = pool.withConnection(
@@ -141,7 +141,7 @@ it("withConnection rejects with ConnectionTimeoutError when pool stays saturated
   vi.useFakeTimers();
   try {
     const pool = makePool(1);
-    pool.checkout();
+    await pool.checkout();
 
     const waiter = pool.withConnection(() => {}, { checkoutTimeout: 0.05 });
     // Attach the rejection handler before advancing timers to avoid an
@@ -157,9 +157,9 @@ it("withConnection rejects with ConnectionTimeoutError when pool stays saturated
 it("withConnection waits using pool default timeout without explicit checkoutTimeout", async () => {
   // Regression: previously withConnection threw immediately when the pool was
   // saturated unless the caller passed { checkoutTimeout }. Now it always queues
-  // a waiter using checkoutAsync (matching Rails behaviour).
+  // a waiter using checkout (matching Rails behaviour).
   const pool = makePool(1);
-  const held = pool.checkout();
+  const held = await pool.checkout();
 
   let connSeen: DatabaseAdapter | undefined;
   const waiter = pool.withConnection((conn) => {
@@ -173,15 +173,15 @@ it("withConnection waits using pool default timeout without explicit checkoutTim
 
 it("full pool async checkout timeout", async () => {
   const pool = makePool(1);
-  pool.checkout();
-  await expect(pool.checkoutAsync(0.05)).rejects.toThrow(/could not obtain a connection/);
+  await pool.checkout();
+  await expect(pool.checkout(0.05)).rejects.toThrow(/could not obtain a connection/);
 });
 
-it("reaper flushes idle connections after idle_timeout", () => {
+it("reaper flushes idle connections after idle_timeout", async () => {
   try {
     vi.useFakeTimers();
     const pool = makeAmbientPool({ idleTimeout: 1, reapingFrequency: 10 });
-    const conn = pool.checkout();
+    const conn = await pool.checkout();
     pool.checkin(conn);
     expect(pool.stat().connections).toBe(1);
 
@@ -202,10 +202,10 @@ it("reaper flushes idle connections after idle_timeout", () => {
   }
 });
 
-it("disconnect calls disconnectBang on each pooled connection", () => {
+it("disconnect calls disconnectBang on each pooled connection", async () => {
   const pool = makePool(3);
-  const c1 = pool.checkout();
-  const c2 = pool.checkout();
+  const c1 = await pool.checkout();
+  const c2 = await pool.checkout();
   pool.checkin(c1);
   pool.checkin(c2);
   const spy1 = vi.fn();
@@ -220,9 +220,9 @@ it("disconnect calls disconnectBang on each pooled connection", () => {
   expect(pool.connections).toEqual([]);
 });
 
-it("disconnect under exclusive acquisition checks out idle connections during the block", () => {
+it("disconnect under exclusive acquisition checks out idle connections during the block", async () => {
   const pool = makePool(2);
-  const c1 = pool.checkout();
+  const c1 = await pool.checkout();
   pool.checkin(c1);
   const stat = pool.stat();
   expect(stat.busy).toBe(0);
@@ -233,10 +233,10 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(pool.stat().connections).toBe(0);
 });
 
-it("clearReloadableConnections only disconnects reloadable adapters", () => {
+it("clearReloadableConnections only disconnects reloadable adapters", async () => {
   const pool = makePool(3);
-  const c1 = pool.checkout();
-  const c2 = pool.checkout();
+  const c1 = await pool.checkout();
+  const c2 = await pool.checkout();
   pool.checkin(c1);
   pool.checkin(c2);
   // Mark only c1 as reloadable.
@@ -255,7 +255,7 @@ it("clearReloadableConnections only disconnects reloadable adapters", () => {
   expect(pool.connections).not.toContain(c1);
   // Survivor must not stay stuck in _checkedOut — it should be reusable.
   expect(pool.stat().busy).toBe(0);
-  const reused = pool.checkout();
+  const reused = await pool.checkout();
   expect(reused).toBe(c2);
   pool.checkin(reused);
 });
@@ -263,10 +263,10 @@ it("clearReloadableConnections only disconnects reloadable adapters", () => {
 it("pin connection reuses leased connection and checks in on unpin", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {
-    const leased = pool.leaseConnection() as SidecarAdapter;
+    const leased = (await pool.leaseConnection()) as SidecarAdapter;
 
     await pool.pinConnectionBang();
-    const pinned = pool.checkout() as SidecarAdapter;
+    const pinned = (await pool.checkout()) as SidecarAdapter;
     expect(pinned).toBe(leased);
     expect(leased.transactionManager.openTransactions).toBe(1);
     expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
@@ -290,23 +290,23 @@ it("pin connection isolation across execution contexts", async () => {
   try {
     await withExecutionContext(async () => {
       await pool.pinConnectionBang();
-      ctx1Conn = pool.checkout();
+      ctx1Conn = await pool.checkout();
 
       // Nested context gets a different pin
       await withExecutionContext(async () => {
         await pool.pinConnectionBang();
-        ctx2Conn = pool.checkout();
+        ctx2Conn = await pool.checkout();
         expect(ctx2Conn).not.toBe(ctx1Conn);
 
         // Checkin of ctx2's pinned connection is a no-op (still pinned)
         pool.checkin(ctx2Conn);
-        expect(pool.checkout()).toBe(ctx2Conn);
+        expect(await pool.checkout()).toBe(ctx2Conn);
 
         await pool.unpinConnectionBang();
       });
 
       // Back in ctx1 — still pinned to ctx1Conn
-      expect(pool.checkout()).toBe(ctx1Conn);
+      expect(await pool.checkout()).toBe(ctx1Conn);
       await pool.unpinConnectionBang();
     });
 
@@ -322,7 +322,7 @@ it("concurrent checkouts within a pinned context all return the pinned connectio
   const pool = makeAmbientPool({ pool: 5 });
   try {
     await pool.pinConnectionBang();
-    const pinned = pool.checkout();
+    const pinned = await pool.checkout();
 
     // Mirrors Promise.all sub-branches inside a `withTransactionalFixtures`
     // test body: AsyncContext propagates the pin's ctx id to every branch,
@@ -330,14 +330,14 @@ it("concurrent checkouts within a pinned context all return the pinned connectio
     // than pulling a free-list connection (which would race the pinned TX).
     const results = await Promise.all(
       Array.from({ length: 11 }, async () => {
-        const sync = pool.checkout();
-        const async_ = await pool.checkoutAsync();
-        return { sync, async_ };
+        const first = await pool.checkout();
+        const second = await pool.checkout();
+        return { first, second };
       }),
     );
-    for (const { sync, async_ } of results) {
-      expect(sync).toBe(pinned);
-      expect(async_).toBe(pinned);
+    for (const { first, second } of results) {
+      expect(first).toBe(pinned);
+      expect(second).toBe(pinned);
     }
     await pool.unpinConnectionBang();
   } finally {
@@ -356,11 +356,11 @@ it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)
   try {
     await withExecutionContext(async () => {
       await pool.pinConnectionBang({ fixture: true });
-      pinned = pool.checkout();
+      pinned = await pool.checkout();
     });
     // Different context — pin must still be visible.
     await withExecutionContext(async () => {
-      expect(pool.checkout()).toBe(pinned);
+      expect(await pool.checkout()).toBe(pinned);
       const clean = await pool.unpinConnectionBang();
       expect(clean).toBe(true);
     });
@@ -378,11 +378,11 @@ it("context pin takes priority over fixture pin in unpin", async () => {
     await pool.pinConnectionBang({ fixture: true });
     await withExecutionContext(async () => {
       await pool.pinConnectionBang(); // per-context pin in this scope
-      const before = pool.checkout();
+      const before = await pool.checkout();
       await pool.unpinConnectionBang(); // should clear the context pin
       // Fixture pin still alive — checkout in this nested context now sees
       // the fixture pin's connection.
-      expect(pool.checkout()).toBe(before);
+      expect(await pool.checkout()).toBe(before);
     });
     await pool.unpinConnectionBang(); // clears the fixture pin
     await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
@@ -402,7 +402,7 @@ describe("ConnectionPool schema cache", () => {
   // hand-stubs `posts` in the `in_memory_db?` branch, where no schema exists).
   fixtures(["posts"], { useTransactionalTests: false });
 
-  it("exposes a BoundSchemaReflection via pool.schemaCache", () => {
+  it("exposes a BoundSchemaReflection via pool.schemaCache", async () => {
     // Mirrors Rails ConnectionPool#schema_cache: returns a
     // BoundSchemaReflection wrapping the pool's SchemaReflection +
     // the pool itself. Previously pool.schemaCache was undefined on
@@ -412,7 +412,7 @@ describe("ConnectionPool schema cache", () => {
     expect(pool.schemaCache).toBeInstanceOf(BoundSchemaReflection);
   });
 
-  it("memoizes the bound reflection across calls", () => {
+  it("memoizes the bound reflection across calls", async () => {
     const pool = makePool();
     expect(pool.schemaCache).toBe(pool.schemaCache);
   });
@@ -450,7 +450,7 @@ describe("ConnectionPool schema cache", () => {
     }
   });
 
-  it("swapping schemaReflection invalidates the cached BoundSchemaReflection", () => {
+  it("swapping schemaReflection invalidates the cached BoundSchemaReflection", async () => {
     // Matches Rails' `ConnectionPool#schema_reflection=` which sets
     // @schema_cache = nil after swapping so subsequent pool.schema_cache
     // calls rebuild against the new reflection. Without this the
@@ -514,7 +514,7 @@ describe("ConnectionPool schema cache", () => {
       await writeCacheFixture(cacheFile, "more_testings", 0);
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
-        pool.leaseConnection();
+        await pool.leaseConnection();
         pool.releaseConnection();
         await pool._lazyLoadPromise;
         // BoundSchemaReflection side:
@@ -542,7 +542,7 @@ describe("ConnectionPool schema cache", () => {
       await writeCacheFixture(cacheFile, "stale_thing", 42);
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
-        pool.leaseConnection();
+        await pool.leaseConnection();
         pool.releaseConnection();
         // Verify lazy-load actually triggered so we're testing the
         // version-mismatch rejection — not just the absence of a load.
@@ -566,7 +566,7 @@ describe("ConnectionPool schema cache", () => {
       await writeCacheFixture(cacheFile, "widgets", 0);
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
-        pool.leaseConnection();
+        await pool.leaseConnection();
         pool.releaseConnection();
         // _lazyLoadPromise is null when the flag is off.
         expect(pool._lazyLoadPromise).toBeNull();
@@ -591,7 +591,7 @@ describe("ConnectionPool schema cache", () => {
     // can populate the cache.
     const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
-      pool.leaseConnection();
+      await pool.leaseConnection();
       pool.releaseConnection();
       expect(pool._eagerWarmPromise).not.toBeNull();
       await pool._eagerWarmPromise;
@@ -618,7 +618,7 @@ describe("ConnectionPool schema cache", () => {
 
     const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
-      pool.leaseConnection();
+      await pool.leaseConnection();
       pool.releaseConnection();
       // Lazy path suppressed; eager path drove the warm.
       expect(pool._lazyLoadPromise).toBeNull();
@@ -640,7 +640,7 @@ describe("ConnectionPool schema cache", () => {
 
     const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
-      pool.leaseConnection();
+      await pool.leaseConnection();
       pool.releaseConnection();
       expect(pool._eagerWarmPromise).toBeNull();
       expect(pool.schemaCache.isCached("posts")).toBe(false);
@@ -670,7 +670,7 @@ describe("ConnectionPool schema cache", () => {
     });
   });
 
-  it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", () => {
+  it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", async () => {
     // User explicitly setting schemaCachePath — even to '' or '   ' —
     // is a deliberate 'no cache' signal. Presence check ('in' +
     // != null) catches it before the defaultSchemaCachePath
@@ -717,7 +717,7 @@ describe("ConnectionPool schema cache", () => {
     }
   });
 
-  it("PoolConfig primes SchemaReflection with the config's schemaCachePath", () => {
+  it("PoolConfig primes SchemaReflection with the config's schemaCachePath", async () => {
     // Rails: `SchemaReflection.new(db_config.lazy_schema_cache_path)`.
     // HashConfig's lazySchemaCachePath returns the configured path
     // (or defaultSchemaCachePath fallback), which the reflection
@@ -739,24 +739,24 @@ describe("ConnectionPool schema cache", () => {
 });
 
 describe("adapterNameFromConfig", () => {
-  it("maps postgresql variants to postgres", () => {
+  it("maps postgresql variants to postgres", async () => {
     expect(adapterNameFromConfig("postgresql")).toBe("postgres");
     expect(adapterNameFromConfig("postgres")).toBe("postgres");
     expect(adapterNameFromConfig("pg")).toBe("postgres");
   });
 
-  it("maps mysql variants to mysql", () => {
+  it("maps mysql variants to mysql", async () => {
     expect(adapterNameFromConfig("mysql2")).toBe("mysql");
     expect(adapterNameFromConfig("mysql")).toBe("mysql");
     expect(adapterNameFromConfig("mariadb")).toBe("mysql");
   });
 
-  it("maps sqlite variants to sqlite", () => {
+  it("maps sqlite variants to sqlite", async () => {
     expect(adapterNameFromConfig("sqlite3")).toBe("sqlite");
     expect(adapterNameFromConfig("sqlite")).toBe("sqlite");
   });
 
-  it("defaults unknown to sqlite", () => {
+  it("defaults unknown to sqlite", async () => {
     expect(adapterNameFromConfig(undefined)).toBe("sqlite");
     expect(adapterNameFromConfig("unknown")).toBe("sqlite");
   });
@@ -772,12 +772,12 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
       await Promise.all([
         withExecutionContext(async () => {
-          const conn = pool.checkout();
+          const conn = await pool.checkout();
           cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
           pool.checkin(conn);
         }),
         withExecutionContext(async () => {
-          const conn = pool.checkout();
+          const conn = await pool.checkout();
           cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
           pool.checkin(conn);
         }),
@@ -796,7 +796,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       let cacheB: Store | null = null;
 
       await withExecutionContext(async () => {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
         cacheA!.enabled = true;
         await cacheA!.computeIfAbsent(KEY, async () => [{ x: 1 }]);
@@ -804,7 +804,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       });
 
       await withExecutionContext(async () => {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
         pool.checkin(conn);
       });
@@ -865,7 +865,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const pool = makeAmbientPool({ pool: 1 });
       try {
         // Prime the pool with one idle connection so pinConnectionBang acquires it.
-        const seed = pool.checkout();
+        const seed = await pool.checkout();
         pool.checkin(seed);
         // Stub verifyBang so pinConnectionBang's eager verify (awaited on the
         // pin path) is a no-op: a real backend would reconnect the checked-in
@@ -905,7 +905,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       // and _pinnedCount is left at 0 rather than pinning an unusable connection.
       const pool = makeAmbientPool({ pool: 1 });
       try {
-        const seed = pool.checkout();
+        const seed = await pool.checkout();
         pool.checkin(seed);
         vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
 
@@ -923,23 +923,23 @@ describe("ConnectionPoolConfiguration query cache", () => {
   });
 
   describe("checkout/checkin cache attachment", () => {
-    it("checkout attaches a Store; checkin clears it", () => {
+    it("checkout attaches a Store; checkin clears it", async () => {
       const pool = makePool(1);
-      const conn = pool.checkout();
+      const conn = await pool.checkout();
       const qc = (conn as unknown as { _queryCache: Store | null })._queryCache;
       expect(qc).toBeInstanceOf(Store);
       pool.checkin(conn);
       expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
     });
 
-    it("checkoutAsync attaches a Store on the fast (idle) path", async () => {
+    it("checkout attaches a Store on the fast (idle) path", async () => {
       const pool = makePool(1);
       // Seed one idle connection so _tryAcquire fires.
-      const seed = pool.checkout();
+      const seed = await pool.checkout();
       pool.checkin(seed);
 
       await withExecutionContext(async () => {
-        const conn = await pool.checkoutAsync();
+        const conn = await pool.checkout();
         expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
           Store,
         );
@@ -949,10 +949,10 @@ describe("ConnectionPoolConfiguration query cache", () => {
   });
 
   describe("pool-level enable/disable propagation", () => {
-    it("enableQueryCacheBang on the pool flips the checked-out connection's Store", () => {
+    it("enableQueryCacheBang on the pool flips the checked-out connection's Store", async () => {
       const pool = makePool(1);
       pool.enableQueryCacheBang();
-      const conn = pool.checkout();
+      const conn = await pool.checkout();
       const qc = (conn as unknown as { _queryCache: Store | null })._queryCache!;
       expect(qc.enabled).toBe(true);
       pool.disableQueryCacheBang();
@@ -964,7 +964,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const pool = makePool(1);
       let observed: Store | null = null;
       await pool.withQueryCache(async () => {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
         expect(observed!.enabled).toBe(true);
         await observed!.computeIfAbsent("SELECT 1", async () => [{ x: 1 }]);
@@ -977,7 +977,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
   });
 
   describe("queryCacheMaxSize wiring", () => {
-    it("threads dbConfig.queryCache through to the Store's max size", () => {
+    it("threads dbConfig.queryCache through to the Store's max size", async () => {
       const dbConfig = makeAmbientDbConfig({ pool: 1, queryCache: 7 });
       const pc = new PoolConfig(
         new ConnectionDescriptor("primary"),
@@ -1003,7 +1003,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
       let seenSize = -1;
       await withExecutionContext(async () => {
-        const conn = pool.checkout();
+        const conn = await pool.checkout();
         pool.checkin(conn);
         seenSize = registry._caches.size;
       });
@@ -1014,24 +1014,25 @@ describe("ConnectionPoolConfiguration query cache", () => {
 });
 
 describe("checkout/checkin callbacks", () => {
-  it("pinned sync checkout defers verifyBang to the async path and skips query-cache wiring", async () => {
+  it("pinned checkout verifies on every handout (reconnect-on-drop) and skips query-cache wiring", async () => {
     const pool = makeAmbientPool({ pool: 5 });
     await pool.pinConnectionBang();
-    const pinned = pool.checkout() as SidecarAdapter;
+    const pinned = (await pool.checkout()) as SidecarAdapter;
     const spy = vi.spyOn(pinned, "verifyBang");
     try {
-      // Rails re-runs `verify!` on every pinned checkout (connection_pool.rb:554)
-      // because its `verify!` is synchronous. trails' `verifyBang` is async, so the
-      // sync `checkout()` cannot await it — rather than fire-and-forget (which risked
-      // an unhandled rejection on teardown), the sync path hands back the connection
-      // the pin already verified and lets awaitable paths re-verify.
-      const again = pool.checkout();
+      // Rails re-runs `verify!` on every pinned checkout (connection_pool.rb:554),
+      // and `verify!` self-heals: `abstract_adapter.rb:759` reconnects
+      // (`restore_transactions: true`) when the connection is no longer active.
+      // trails' `checkout` is now async (converge-connection-pool-checkout-lease-async),
+      // so it awaits `verifyBang` — the async equivalent of that self-heal — on
+      // *every* pinned handout rather than only some paths. A connection dropped
+      // mid-session is thus re-verified (reconnected) at the next checkout.
+      const again = await pool.checkout();
       expect(again).toBe(pinned);
-      expect(spy).not.toHaveBeenCalled();
-      // The async handout still awaits verifyBang, so a verify failure propagates.
-      const asyncAgain = await pool.checkoutAsync();
-      expect(asyncAgain).toBe(pinned);
       expect(spy).toHaveBeenCalledTimes(1);
+      const againAgain = await pool.checkout();
+      expect(againAgain).toBe(pinned);
+      expect(spy).toHaveBeenCalledTimes(2);
       // Rails' pinned branch (connection_pool.rb:553-559) does not run
       // checkout_and_verify, so no Store is attached on the pinned path.
       expect((pinned as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
@@ -1046,7 +1047,7 @@ describe("checkout/checkin callbacks", () => {
   it("checkin runs the registered :checkin :after callbacks (unset_query_cache!, enable_lazy_transactions!)", async () => {
     const pool = makeAmbientPool({ pool: 1 });
     try {
-      const conn = pool.checkout();
+      const conn = await pool.checkout();
       expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
 
       const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
@@ -1066,7 +1067,7 @@ describe("checkout/checkin callbacks", () => {
     });
     const pool = makeAmbientPool({ pool: 1 });
     try {
-      pool.checkout();
+      await pool.checkout();
       expect(calls).toEqual([adapterType]);
     } finally {
       await closePoolConnections(pool);
@@ -1079,7 +1080,7 @@ describe("checkout/checkin callbacks", () => {
     }
   });
 
-  it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", () => {
+  it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", async () => {
     class SubAdapter extends AbstractAdapter {}
     const before = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
       ._connectionCallbacks.checkout.length;
@@ -1096,7 +1097,7 @@ describe("checkout/checkin callbacks", () => {
     expect(base.checkout.length).toBe(before);
   });
 
-  it("subclass without its own callback inherits AbstractAdapter's shared registry", () => {
+  it("subclass without its own callback inherits AbstractAdapter's shared registry", async () => {
     class SharedAdapter extends AbstractAdapter {}
     const sub = (SharedAdapter as unknown as { _connectionCallbacks: unknown })
       ._connectionCallbacks;

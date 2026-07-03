@@ -861,15 +861,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       group.push(`developers.${c}`);
       group.push(`developers_projects_2.${c}`);
     }
-    // trails selects the HABTM join-table columns in eager loads (Rails does
-    // not), so PG's strict GROUP BY needs them grouped too. Rails' body groups
-    // only developers/developers_projects_2/projects; the extra join aliases
-    // here mirror trails' wider eager SELECT. Deviation:
-    // habtm-eager-load-selects-join-table-columns (RFC 0023).
-    for (const c of ["developer_id", "project_id", "joined_on", "access_level"]) {
-      group.push(`developers_projects.${c}`);
-      group.push(`developers_projects_projects_join.${c}`);
-    }
     for (const c of Project.columnNames()) group.push(`projects.${c}`);
 
     const records = await (Developer as any)
@@ -1002,6 +993,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await (developer as any).projects.size()).toBe(1);
     expect((await (project as any).developers.first()).id).toBe(developer.id);
     expect((await (developer as any).projects.first()).id).toBe(project.id);
+  });
+
+  // RFC 0023-surfaced-deviations: a HABTM proxy whose owner was NEW when a
+  // finder relation was spawned off it (`project.developers.where(...)`) seeds
+  // the `1=0` NullRelation. After `save`, the mutated finder must rebase onto
+  // the resolved join scope so it picks up the persisted FK rather than the
+  // stale seed — mirroring Rails' CollectionProxy delegating to
+  // `association.scope`.
+  it("mutated finder on new-owner seed resolves the join after save", async () => {
+    const developer = await Developer.create({ name: "Zed" });
+    const project = new Project({ name: "Rails Testing" });
+    // `where(...)` spawns off the still-new owner's `1=0` seed.
+    const scoped = (project as any).developers.where({ name: "Zed" });
+    await (project as any).developers.push(developer);
+    await (project as any).saveBang();
+
+    expect((await scoped.first()).id).toBe(developer.id);
   });
 
   it("dynamic find should respect association include", async () => {

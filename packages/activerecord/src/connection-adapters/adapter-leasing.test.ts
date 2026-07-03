@@ -38,7 +38,7 @@ describe("AdapterLeasingTest", () => {
     expect(adapter.inUse).toBe(false);
   });
 
-  it("close", () => {
+  it("close", async () => {
     const dbConfig = new HashConfig("test", "primary", { adapter: "abstract" });
     const poolConfig = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig);
     const pool = new ConnectionPool(poolConfig);
@@ -46,13 +46,13 @@ describe("AdapterLeasingTest", () => {
     adapter.pool = pool;
 
     // Make sure the pool marks the connection in use
-    expect(pool.leaseConnection()).toBe(adapter);
+    expect(await pool.leaseConnection()).toBe(adapter);
     expect(adapter.inUse).toBe(true);
 
     // Close should put the adapter back in the pool
     adapter.close();
     expect(adapter.inUse).toBe(false);
 
-    expect(pool.leaseConnection()).toBe(adapter);
+    expect(await pool.leaseConnection()).toBe(adapter);
   });
 });

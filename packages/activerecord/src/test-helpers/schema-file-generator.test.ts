@@ -2,7 +2,18 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getPathAsync, getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync, getEnv } from "@blazetrails/activesupport";
 import { generateSchemaFile } from "./schema-file-generator.js";
-import type { Schema } from "./define-schema.js";
+import type {
+  Schema,
+  ColumnSpec,
+  AnyPrimitiveColumnSpec,
+  PrimitiveColumnSpec,
+} from "./define-schema.js";
+import {
+  COLUMN_TYPE_MAP_PG,
+  COLUMN_TYPE_MAP_MYSQL,
+  COLUMN_TYPE_MAP_SQLITE,
+  serialIdType,
+} from "./define-schema.js";
 
 const MINI_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -216,5 +227,104 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "integer", { primaryKey: true }');
     fs.unlinkSync(filePath);
+  });
+});
+
+// PARITY GUARD — schema-file-generator.ts's per-adapter type mapping is a
+// parallel re-implementation of define-schema.ts's COLUMN_TYPE_MAP_* /
+// serialIdType. A one-sided edit reintroduces silent drift: PR #4461 fixed a
+// MariaDB regression where the generator's stale SCHEMA_TO_AR_MYSQL still
+// remapped date/time/json → string, even though define-schema.ts's map had
+// been converged to native MySQL types by PR #4141 — so boot-laid canonical
+// `topics.last_read` was created as varchar(255) instead of date. This guard
+// drives the generator for a schema covering every PrimitiveColumnSpec on each
+// adapter and asserts the emitted `t.column(name, "type", …)` matches the
+// authoritative COLUMN_TYPE_MAP_* the fixtures path (define-schema.ts) uses.
+describe("generateSchemaFile / define-schema.ts type-map parity", () => {
+  // Generate a schema file, read it back, and delete it — the generator's only
+  // observable output is the emitted module text.
+  async function readGenerated(schema: Schema, adapter: string): Promise<string> {
+    const filePath = await generateSchemaFile(schema, adapter);
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    fs.unlinkSync(filePath);
+    return content;
+  }
+
+  // Extract the emitted AR type for each column from a generated schema file:
+  // matches `t.column("colName", "arType", …)`.
+  function emittedTypes(content: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    const re = /t\.column\("([^"]+)", "([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) out[m[1]] = m[2];
+    return out;
+  }
+
+  // One column per key, named after the primitive so we can look it up.
+  function schemaFor(types: readonly AnyPrimitiveColumnSpec[]): Schema {
+    const columns: Record<string, ColumnSpec> = {};
+    for (const t of types) columns[`c_${t}`] = t;
+    return { parity_probe: columns };
+  }
+
+  // `Record<PrimitiveColumnSpec, string>` forces each map to carry every
+  // primitive, so iterating its keys covers the full type surface — a primitive
+  // added to define-schema.ts is automatically exercised here.
+  const CASES: ReadonlyArray<{
+    adapter: string;
+    map: Record<string, string>;
+  }> = [
+    { adapter: "postgres", map: COLUMN_TYPE_MAP_PG },
+    { adapter: "mysql", map: COLUMN_TYPE_MAP_MYSQL },
+    { adapter: "sqlite", map: COLUMN_TYPE_MAP_SQLITE },
+  ];
+
+  for (const { adapter, map } of CASES) {
+    it(`emits the same column type as COLUMN_TYPE_MAP for every primitive on ${adapter}`, async () => {
+      const primitives = Object.keys(map) as AnyPrimitiveColumnSpec[];
+      const emitted = emittedTypes(await readGenerated(schemaFor(primitives), adapter));
+      for (const primitive of primitives) {
+        expect(emitted[`c_${primitive}`], `${adapter} type for "${primitive}"`).toBe(
+          map[primitive],
+        );
+      }
+    });
+  }
+
+  // The exact #4461 regression, pinned: the generator's stale map remapped
+  // date/time/json → string on MySQL, so these must stay native, not VARCHAR.
+  it("emits native date/time/json (not string) on MySQL — the PR #4461 regression", async () => {
+    const emitted = emittedTypes(await readGenerated(schemaFor(["date", "time", "json"]), "mysql"));
+    expect(emitted["c_date"]).toBe("date");
+    expect(emitted["c_time"]).toBe("time");
+    expect(emitted["c_json"]).toBe("json");
+  });
+
+  it("injects precision:6 on MySQL bare datetime columns (mirrors define-schema.ts)", async () => {
+    const content = await readGenerated({ parity_probe: { at: "datetime" } }, "mysql");
+    expect(content).toContain('t.column("at", "datetime", { precision: 6 })');
+  });
+
+  it("does not inject precision on non-MySQL datetime columns", async () => {
+    for (const adapter of ["postgres", "sqlite"]) {
+      const content = await readGenerated({ parity_probe: { at: "datetime" } }, adapter);
+      expect(content).toContain('t.column("at", "datetime", {})');
+    }
+  });
+
+  it("emits serial-PK width matching serialIdType for every adapter", async () => {
+    for (const adapter of ["postgres", "mysql", "sqlite"]) {
+      for (const type of ["integer", "big_integer"] as PrimitiveColumnSpec[]) {
+        const schema: Schema = {
+          parity_probe: { columns: { pk: type }, primaryKey: ["pk"] },
+        };
+        const content = await readGenerated(schema, adapter);
+        const want = serialIdType(type, adapter);
+        expect(content, `${adapter} serial PK for "${type}"`).toContain(
+          `t.column("pk", "${want}", { primaryKey: true })`,
+        );
+      }
+    }
   });
 });

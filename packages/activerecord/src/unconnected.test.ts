@@ -8,12 +8,12 @@ class TestRecord extends Base {}
 describe("TestUnconnectedAdapter", () => {
   let underlying: { active: boolean };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
       { owner: "Base" },
     );
-    underlying = Base.leaseConnection() as unknown as { active: boolean };
+    underlying = (await Base.leaseConnection()) as unknown as { active: boolean };
     Base.removeConnection();
   });
 
