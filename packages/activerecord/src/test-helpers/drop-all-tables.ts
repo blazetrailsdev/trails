@@ -69,6 +69,41 @@ async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<v
   clearAppliedSchemaSignaturesForTables(adapter, dropped);
 }
 
+/**
+ * Truncate only the candidate canonical tables that actually hold rows.
+ *
+ * Truncating is the between-test row-clear, but on PostgreSQL every
+ * `truncateTables` call pays `disableReferentialIntegrity` (an `ALTER TABLE …
+ * TRIGGER` pass over *every* table) and on MySQL/MariaDB `TRUNCATE` is
+ * DDL-grade (drop+recreate tablespace) per table — so truncating all ~330
+ * canonical tables per test, even the empty ones, dominates CI time. Most
+ * non-transactional tests write to zero canonical tables, so a single
+ * `EXISTS` probe collapses the work to the handful (often none) that changed;
+ * when none changed we skip `truncateTables` entirely (no referential-integrity
+ * pass at all).
+ *
+ * Exactness matters — missing a non-empty table would leak rows into the next
+ * test — so on any probe failure we fall back to truncating the full candidate
+ * set (the previous, correct-but-slower behavior).
+ */
+async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]): Promise<void> {
+  if (candidates.length === 0) return;
+  let toTruncate = candidates;
+  try {
+    const probe = candidates
+      .map(
+        (t) =>
+          `SELECT '${t.replace(/'/g, "''")}' AS t WHERE EXISTS (SELECT 1 FROM ${adapter.quoteTableName(t)})`,
+      )
+      .join(" UNION ALL ");
+    const rows = (await adapter.execute(probe)) as Array<{ t?: string; T?: string }>;
+    toTruncate = rows.map((r) => r.t ?? r.T).filter((t): t is string => Boolean(t));
+  } catch {
+    toTruncate = candidates;
+  }
+  if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
+}
+
 function _isPgConnectionError(e: unknown): boolean {
   const err = e as { code?: string; message?: string } | null;
   if (!err) return false;
@@ -150,7 +185,7 @@ async function _resetPgTablesOnce(
       if (_isPgConnectionError(e)) throw e;
     }
   }
-  if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
+  await truncateNonEmpty(adapter, toTruncate);
 }
 
 async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
@@ -186,7 +221,7 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
         dropped.push(name);
       } catch {}
     }
-    if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
+    await truncateNonEmpty(adapter, toTruncate);
   } finally {
     try {
       await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
@@ -217,6 +252,6 @@ async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Pro
       dropped.push(name);
     } catch {}
   }
-  if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
+  await truncateNonEmpty(adapter, toTruncate);
   return dropped;
 }
