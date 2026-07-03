@@ -1,6 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { clearAppliedSchemaSignaturesForTables } from "./define-schema.js";
-import { metadataTableNames } from "../tasks/database-tasks.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 
 /**
@@ -8,23 +7,14 @@ import { TEST_SCHEMA } from "./test-schema.js";
  * (`template-global-setup.ts` → `TEST_SCHEMA`) lays down once and keeps
  * shape-stable for the whole run. Between tests these only need their **rows**
  * cleared (TRUNCATE), never a DROP — see {@link resetTestTables}.
+ *
+ * Everything else — bespoke tables a not-yet-converted `defineSchema` caller
+ * created, and the `schema_migrations` / `ar_internal_metadata` bookkeeping
+ * tables that migrator tests manage per-test — is dropped, exactly as the
+ * previous unconditional `dropAllTables` did, so no per-test migration/schema
+ * state leaks across the reset.
  */
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
-
-/**
- * Whether a table is a boot-laid canonical table (truncate, don't drop) or a
- * bookkeeping table (`schema_migrations` / `ar_internal_metadata`, left fully
- * alone so migration state + schema-signature stamping survive). Everything
- * else is a bespoke table a not-yet-converted `defineSchema` caller created;
- * those are dropped so their shape can't leak into the next file.
- */
-type TableKind = "canonical" | "bookkeeping" | "bespoke";
-
-function classifyTable(name: string, bookkeeping: ReadonlySet<string>): TableKind {
-  if (bookkeeping.has(name)) return "bookkeeping";
-  if (CANONICAL_TABLE_NAMES.has(name)) return "canonical";
-  return "bespoke";
-}
 
 /**
  * Drops every user table/view/matview in the database and reconciles the
@@ -140,7 +130,6 @@ async function _resetPgTablesOnce(
     }
   }
 
-  const bookkeeping = metadataTableNames();
   const toTruncate: string[] = [];
   const tableRows = (await adapter.execute(
     `SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ${schema}`,
@@ -149,12 +138,10 @@ async function _resetPgTablesOnce(
     // A table living outside the default (public) schema — e.g. schema.test.ts's
     // test_schema/test_schema2 — can never be a boot-laid canonical table; drop
     // it regardless of mode so it can't bleed state into the next file.
-    const kind = s === "public" ? classifyTable(t, bookkeeping) : "bespoke";
-    if (mode === "reset" && kind === "canonical") {
+    if (mode === "reset" && s === "public" && CANONICAL_TABLE_NAMES.has(t)) {
       toTruncate.push(t);
       continue;
     }
-    if (mode === "reset" && kind === "bookkeeping") continue;
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
       dropped.push(t);
@@ -171,7 +158,6 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
   // adapter.executeMutation so both paths share one implementation.
   const dropped: string[] = [];
   const toTruncate: string[] = [];
-  const bookkeeping = metadataTableNames();
   try {
     await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
     const tableRows = await adapter.execute(
@@ -190,12 +176,10 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
       if (!name) continue;
-      const kind = classifyTable(name, bookkeeping);
-      if (mode === "reset" && kind === "canonical") {
+      if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
         toTruncate.push(name);
         continue;
       }
-      if (mode === "reset" && kind === "bookkeeping") continue;
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
         dropped.push(name);
@@ -213,7 +197,6 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
 async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
   const dropped: string[] = [];
   const toTruncate: string[] = [];
-  const bookkeeping = metadataTableNames();
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
@@ -224,12 +207,10 @@ async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Pro
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
-    const kind = classifyTable(name, bookkeeping);
-    if (mode === "reset" && kind === "canonical") {
+    if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
       toTruncate.push(name);
       continue;
     }
-    if (mode === "reset" && kind === "bookkeeping") continue;
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
       dropped.push(name);

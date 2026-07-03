@@ -134,22 +134,18 @@ describe("resetTestTables", () => {
     expect(await listTables(adapter)).toContain("articles");
   });
 
-  it("leaves bookkeeping tables (schema_migrations / ar_internal_metadata) intact", async () => {
-    // These carry migration state + the schema-signature stamp that lets each
-    // worker take the fast TRUNCATE-only reconstruct path; dropping them would
-    // force a full purge+reload per file.
+  it("drops bookkeeping tables (schema_migrations / ar_internal_metadata) like the old drop-all", async () => {
+    // These are non-canonical, so the reset drops them — matching the previous
+    // unconditional dropAllTables. Migrator tests (non-transactional) rely on a
+    // clean schema_migrations per test; preserving it would leak migration
+    // state and break them.
     await adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
     );
-    await adapter.executeMutation(`INSERT INTO schema_migrations (version) VALUES ('20260703')`);
 
     await resetTestTables(adapter);
 
-    expect(await listTables(adapter)).toContain("schema_migrations");
-    // Bookkeeping rows are preserved too — neither dropped nor truncated.
-    expect(
-      ((await adapter.execute(`SELECT version FROM schema_migrations`)) as unknown[]).length,
-    ).toBe(1);
+    expect(await listTables(adapter)).not.toContain("schema_migrations");
   });
 });
 

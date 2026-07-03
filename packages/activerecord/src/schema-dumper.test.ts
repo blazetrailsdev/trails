@@ -373,8 +373,8 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
-    await ctx.createTable("temp_cache", {}, (t) => t.string("val"));
+    await ctx.createTable("users", { force: true }, (t) => t.string("name"));
+    await ctx.createTable("temp_cache", { force: true }, (t) => t.string("val"));
     SchemaDumper.ignoreTables = [/^temp_/];
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("users");
@@ -390,7 +390,7 @@ describe("SchemaDumperTest", () => {
   // column is `key` (not `id`), which keeps the explicit `id: false` in the dump
   // on every adapter. Tracked as an RFC 0048 follow-up story.
   it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await ctx.createTable("string_key_objects", { id: false }, (t) => {
+    await ctx.createTable("string_key_objects", { id: false, force: true }, (t) => {
       t.string("key", { null: false });
     });
     await ctx.addIndex("string_key_objects", "key", { unique: true });
@@ -477,7 +477,7 @@ describe("SchemaDumperTest", () => {
   // backtick output), not by supports_expression_index?. Our body is a PG/SQLite
   // port (`lower(a || b)`), so it's a pre-existing divergence — left as-is.
   it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("users", { force: true }, (t) => {
       t.string("first_name");
       t.string("last_name");
     });
