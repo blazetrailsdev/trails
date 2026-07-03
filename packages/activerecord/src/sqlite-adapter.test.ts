@@ -250,7 +250,7 @@ describe("SQLite adapter driver binding", () => {
     const rows = await conn.execute("SELECT name FROM pool_t");
     expect(rows).toEqual([{ name: "pooled" }]);
     await conn.internalExecute("DROP TABLE IF EXISTS pool_t", "SCHEMA");
-    pool.disconnectBang();
+    await pool.disconnectBang();
   });
 
   it("pool disconnect drains an in-flight async-only close before resolving", async () => {

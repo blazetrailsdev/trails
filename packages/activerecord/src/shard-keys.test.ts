@@ -43,8 +43,8 @@ describe("ShardsKeysTest", () => {
     });
   });
 
-  afterEach(() => {
-    Base.connectionHandler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await Base.connectionHandler.clearAllConnectionsBang();
     (Base as any).configurations = prevConfigs;
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;

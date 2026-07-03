@@ -48,8 +48,8 @@ describe("ConnectionManagementTest", () => {
     expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(true);
   });
 
-  afterEach(() => {
-    Base.connectionHandler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await Base.connectionHandler.clearAllConnectionsBang();
   });
 
   it("app delegation", () => {

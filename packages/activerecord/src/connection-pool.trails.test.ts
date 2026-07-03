@@ -212,7 +212,7 @@ it("disconnect calls disconnectBang on each pooled connection", async () => {
   (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
   (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
 
   expect(spy1).toHaveBeenCalled();
   expect(spy2).toHaveBeenCalled();
@@ -227,7 +227,7 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(stat.busy).toBe(0);
   expect(stat.idle).toBe(1);
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
   // After disconnect, the pool is fully drained.
   expect(pool.stat().connections).toBe(0);
 });
