@@ -9,6 +9,9 @@ export const toBeLinkedUsersFixtureData = {
   jamis: {
     name: "Jamis",
     account_id: ref("to_be_linked_accounts", "signals37"),
-    settings: { ":symbol": "symbol", string: "string" },
+    // Rails YAML loads the `:symbol` key as a Ruby Symbol; HashWithIndifferentAccess
+    // normalizes it to the plain string "symbol" via Symbol#to_s. Mirror that runtime
+    // key here rather than the YAML-literal ":symbol".
+    settings: { symbol: "symbol", string: "string" },
   },
 };
