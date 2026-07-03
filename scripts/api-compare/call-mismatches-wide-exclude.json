@@ -21100,6 +21100,27 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "with_exclusively_acquired_all_connections",
+    "reason": "RFC 0023 async split: disconnect delegates its synchronous teardown to the private _disconnect helper (so the async wrapper can await the drains), which is where withExclusivelyAcquiredAllConnections is invoked; attribution artifact of the sync-helper/async-wrapper split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "disconnect!",
+    "reason": "RFC 0023 async split: the per-connection conn.disconnect! (disconnectBang) loop lives in the private _disconnect helper that disconnect delegates to; attribution artifact of the sync-helper/async-wrapper split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "disconnect",
+    "call": "clear",
+    "reason": "RFC 0023 async split: the pool-state clears (_available/_checkedOut/_leases) live in the private _disconnect helper that disconnect delegates to; attribution artifact of the sync-helper/async-wrapper split."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
