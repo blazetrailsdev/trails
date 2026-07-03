@@ -6060,6 +6060,46 @@ describe("HasManyAssociationsTest", () => {
     void post;
   });
 
+  it("collection destroy uses destroy bang and rolls back the batch on failure", async () => {
+    // Rails CollectionProxy#destroy runs `records.each(&:destroy!)` inside
+    // delete_or_destroy's transaction, so a child that can't be destroyed raises
+    // RecordNotDestroyed and rolls back the whole batch — an earlier, already
+    // destroyed sibling is restored.
+    class HaltingComment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("body", "string");
+        this.beforeDestroy(function (this: any) {
+          if (this._readAttribute("body") === "keep") throwAbort();
+        });
+      }
+    }
+    class PostWithHaltingComments extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.hasMany("haltingComments", {
+          className: "HaltingComment",
+          foreignKey: "post_id",
+          dependent: "destroy",
+        });
+      }
+    }
+    registerModel(PostWithHaltingComments);
+    registerModel(HaltingComment);
+    const post = await PostWithHaltingComments.create({ title: "T", body: "b" });
+    const first = await HaltingComment.create({ post_id: post.id, body: "removable" });
+    const second = await HaltingComment.create({ post_id: post.id, body: "keep" });
+
+    const { RecordNotDestroyed: RND } = await import("../index.js");
+    await expect((post as any).haltingComments.destroy(first, second)).rejects.toBeInstanceOf(RND);
+
+    // Rolled back: the removable sibling destroyed before the halt is restored.
+    expect(await HaltingComment.exists(first.id)).toBe(true);
+    expect(await HaltingComment.exists(second.id)).toBe(true);
+  });
+
   it("has many preloading with duplicate records", async () => {
     const allPosts = await HmPost.joins("comments").preload("comments").order("id");
     const first = allPosts[0] as any;
