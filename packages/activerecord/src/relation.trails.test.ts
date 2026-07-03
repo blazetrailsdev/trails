@@ -7,13 +7,11 @@
  * in relation_test.rb. Moved verbatim so they no longer count as bespoke
  * "extra" tests against the Rails parity metric.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 
-import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -27,47 +25,26 @@ import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
-
 describe("isBlank / isPresent", () => {
+  // `developers` is canonical (schema.rb `create_table :developers`) and
+  // boot-laid empty on the primary worker DB, so ride `Base.connection` (the
+  // handler suite) rather than a sidecar-pool lease with an in-test
+  // `createTable`. Transactional fixtures roll back the inserted row per test.
+  setupFixtures();
+  useHandlerTransactionalFixtures();
+
   it("isBlank returns true when no records exist", async () => {
-    const adapter = freshAdapter();
+    // Inline model on the canonical `developers` table (not the canonical
+    // Developer model): this exercises isBlank/isPresent mechanics, and
+    // Developer's `name` is a restricted, non-dirty-tracked attribute, so
+    // `create({ name })` needs a plainly-declared `name` to persist.
     class SampleRecord extends Base {
       static _tableName = "developers";
-    }
-    SampleRecord.attribute("id", "integer");
-    SampleRecord.attribute("name", "string");
-    SampleRecord.adapter = adapter;
-    // `developers` is canonical (schema.rb `create_table :developers`) and
-    // boot-laid on the primary worker DB, but this suite stubs
-    // `AR_NO_AUTO_SCHEMA` and drives a connection leased from the sidecar test
-    // `_pool` (createTestAdapter), which doesn't carry that boot-laid schema, so
-    // create the table explicitly here. `force: true` makes it idempotent when
-    // the sidecar DB happens to already hold it. Dropped by name in `afterAll`.
-    await (
-      adapter as unknown as {
-        createTable(name: string, opts: object, fn: (t: any) => void): Promise<void>;
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
       }
-    ).createTable("developers", { force: true }, (t: any) => {
-      t.string("name");
-      t.string("first_name");
-      t.integer("salary", { default: 70000 });
-      t.integer("firm_id");
-      t.integer("mentor_id");
-      t.datetime("legacy_created_at");
-      t.datetime("legacy_updated_at");
-      t.datetime("legacy_created_on");
-      t.datetime("legacy_updated_on");
-    });
+    }
 
     expect(await SampleRecord.all().isBlank()).toBe(true);
     expect(await SampleRecord.all().isPresent()).toBe(false);
@@ -75,21 +52,6 @@ describe("isBlank / isPresent", () => {
     await SampleRecord.create({ name: "Alice" });
     expect(await SampleRecord.all().isBlank()).toBe(false);
     expect(await SampleRecord.all().isPresent()).toBe(true);
-  });
-
-  // Drop tables/rows this describe wrote on the shared adapter so the
-  // following transactional-fixture describe (RelationTest) doesn't inherit
-  // them — its withTransactionalFixtures pushes the global-reset opt-out
-  // before any cleanup would otherwise run. Drop the `developers` table this
-  // suite created by name (so a sibling file's differently-shaped `developers`
-  // can't collide under parallel forks), then reset the shared adapter state.
-  afterAll(async () => {
-    await (
-      createTestAdapter() as unknown as {
-        dropTable(name: string, opts?: object): Promise<void>;
-      }
-    ).dropTable("developers", { ifExists: true });
-    await resetTestAdapterState();
   });
 });
 
