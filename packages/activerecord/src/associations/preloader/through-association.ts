@@ -386,63 +386,64 @@ export class ThroughAssociation extends Association {
       }
     } else {
       // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
-      // reflection scope's WHERE onto the through query (and joins the source so
-      // target-table columns resolve). We split the where_clause: predicates that
-      // reference the THROUGH table belong here (the through query is the only one
-      // that selects that table), while source/target-table predicates stay at
-      // the source-preloader stage (see `_getSourcePreloaders`), which covers the
-      // JOIN branch's intent without a single-query JOIN. Without this split a
-      // through-table condition lands on the source query as
-      // `no such column: <through_table>.<col>`.
+      // reflection scope's WHERE onto the through query and joins/includes the
+      // source reflection so source-table columns resolve there too
+      // (through_association.rb:117-129). We approximate that per-predicate.
       const { throughPredicates, sourcePredicates } = this._partitionReflectionWhere();
-      if (throughPredicates.length > 0) {
-        scope._whereClause = new WhereClause([
-          ...scope._whereClause.predicates,
-          ...throughPredicates,
-        ]);
-      }
-
-      // For a has_one through, the through preloader materializes only the
-      // FIRST through record per owner (Preloader::Association#load_records keeps
-      // one row for a non-collection). A source-table condition deferred to the
-      // source-preloader stage can then filter out that lone record's target,
-      // nilling the has_one even though a different through record's target would
-      // match — and which row is "first" depends on unstable PG/MariaDB ordering.
-      // Rails avoids this by JOINing the source reflection onto the through query
-      // and copying the reflection scope's WHERE (through_association.rb
-      // `through_scope`), so the source condition constrains which through row
-      // wins. Mirror that with a joins()+where on the source reflection, but only
-      // for a scalar (has_one) through — a has_many through collects every
-      // matching target at the source stage, so the extra JOIN would only risk
-      // fanning out through rows.
-      //
-      // We add ONLY the immediate source reflection's join, so a predicate may
-      // ride the through query as long as it needs no table beyond the source.
-      // That means source-table-qualified predicates AND unqualified ones (e.g.
-      // `where("name = ?")`, a Rails-valid source condition) — Rails copies the
-      // whole reflection_scope.where_clause once it joins the source
-      // (through_association.rb:117-129). What must NOT be pushed here is a
-      // predicate qualifying some *other* (nested) table the scope reaches via
-      // its own `.joins`, since we don't add that deeper join — it would produce
-      // `no such column: <nested>.<col>`. Those stay at the source-preloader
-      // stage, where the full reflection scope (with its own joins/includes) is
-      // applied via `_getSourcePreloaders`. Mirroring Rails' nested-join
-      // carry-over (through_association.rb:117-142) onto the through query is a
-      // separate convergence not exercised by any current has_one-through scope.
-      const isCollection = (this.reflection as any).isCollection?.() ?? false;
+      const throughTable = this._throughTableName();
       const sourceTable = this._sourceTableName();
-      const joinablePredicates =
-        sourceTable == null
-          ? []
-          : sourcePredicates.filter((pred) => !predicateReferencesForeignTable(pred, sourceTable));
-      if (!isCollection && joinablePredicates.length > 0) {
-        const sourceRefl = this._sourceReflection;
-        if (sourceRefl) {
-          scope = scope.joins(sourceRefl.name);
+      const isCollection = (this.reflection as any).isCollection?.() ?? false;
+
+      if (isCollection) {
+        // has_many through: it collects every matching target at the source stage,
+        // so the through query only needs the through-table predicates to select
+        // intermediate rows. Source/target predicates stay at the source-preloader
+        // stage (see `_getSourcePreloaders`); adding a source join here would only
+        // risk fanning out through rows.
+        if (throughPredicates.length > 0) {
           scope._whereClause = new WhereClause([
             ...scope._whereClause.predicates,
-            ...joinablePredicates,
+            ...throughPredicates,
           ]);
+        }
+      } else {
+        // has_one through: the through preloader materializes only the FIRST
+        // through record per owner (Preloader::Association#load_records keeps one
+        // row for a non-collection). A source-table condition deferred to the
+        // source-preloader stage can then filter out that lone record's target,
+        // nilling the has_one even though a different through record's target
+        // would match — and which row is "first" depends on unstable PG/MariaDB
+        // ordering. So we copy every reflection-scope predicate the through query
+        // can resolve and add the source join when any of them needs it, so the
+        // condition constrains which through row wins (Rails' through_scope).
+        //
+        // "Can resolve" = references no table beyond the through/source pair. A
+        // predicate reaching a further (nested) table the scope joins via its own
+        // `.joins` stays at the source-preloader stage, where the full reflection
+        // scope (with those joins) is applied — pushing it here without the deeper
+        // join would produce `no such column: <nested>.<col>`. This admits both
+        // source-qualified and unqualified predicates, and mixed through/source
+        // predicates (e.g. `memberships.favorite = ? OR clubs.name = ?`), which
+        // land in the throughPredicates bucket but still need the source join.
+        // Mirroring Rails' nested-join carry-over (through_association.rb:117-142)
+        // is a separate convergence no current has_one-through scope exercises.
+        const allowed = [throughTable, sourceTable].filter((t): t is string => t != null);
+        const copyable = [...throughPredicates, ...sourcePredicates].filter(
+          (pred) => !predicateReferencesForeignTable(pred, allowed),
+        );
+        const needsSourceJoin =
+          sourceTable != null &&
+          copyable.some((pred) => predicateReferencesTable(pred, sourceTable));
+        if (needsSourceJoin) {
+          const sourceRefl = this._sourceReflection;
+          // leftOuterJoins (not an inner join) mirrors Rails' includes!/references!
+          // LEFT OUTER JOIN: it never drops a through row for a null source, so a
+          // mixed OR predicate can still select a through row via its through-table
+          // arm while the WHERE filters the source arm.
+          if (sourceRefl) scope = scope.leftOuterJoins(sourceRefl.name);
+        }
+        if (copyable.length > 0) {
+          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...copyable]);
         }
       }
     }
@@ -620,24 +621,25 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
 }
 
 /**
- * True when `node` qualifies a column with some table *other* than `sourceTable`.
+ * True when `node` qualifies a column with some table NOT in `allowedTables`.
  * Used to decide whether a reflection-scope predicate can ride the has_one-through
- * query, which joins only the immediate source: source-table-qualified and
- * unqualified predicates are safe (return false), but a predicate reaching a
- * nested table the through query never joins is not (return true).
+ * query, which selects the through table and joins the immediate source: a
+ * predicate qualifying only those (or unqualified) is safe (return false), but one
+ * reaching a further nested table the through query never joins is not (true).
  *
  * Uses the same Arel `fetchAttribute` walk as `predicateReferencesTable` for
  * precise hash/Arel conditions, and the same raw-SQL qualifier scan as
  * `rawSqlReferencesTable` — extracting every `<word>.` qualifier and flagging any
- * that is not `sourceTable`. The raw-SQL scan is a heuristic (a qualifier inside a
+ * not in `allowedTables`. The raw-SQL scan is a heuristic (a qualifier inside a
  * string literal would be a false positive); no current scope hits that, and hash
  * predicates take the exact Arel path.
  * @internal
  */
-function predicateReferencesForeignTable(node: any, sourceTable: string): boolean {
+function predicateReferencesForeignTable(node: any, allowedTables: string[]): boolean {
+  const allowed = new Set(allowedTables);
   let foreign = false;
   node.fetchAttribute?.((attr: any) => {
-    if (attr instanceof Nodes.Attribute && relationName(attr.relation.name) !== sourceTable) {
+    if (attr instanceof Nodes.Attribute && !allowed.has(relationName(attr.relation.name))) {
       foreign = true;
       return false;
     }
@@ -645,19 +647,19 @@ function predicateReferencesForeignTable(node: any, sourceTable: string): boolea
   });
   if (foreign) return true;
   if (node instanceof Nodes.Not) {
-    return predicateReferencesForeignTable((node as any).expr, sourceTable);
+    return predicateReferencesForeignTable((node as any).expr, allowedTables);
   }
-  return rawSqlReferencesForeignTable(node, sourceTable);
+  return rawSqlReferencesForeignTable(node, allowed);
 }
 
 /**
  * True when a raw-SQL predicate node's text qualifies a column with any table
- * other than `sourceTable`. Mirrors `rawSqlReferencesTable`'s node unwrapping.
+ * not in `allowed`. Mirrors `rawSqlReferencesTable`'s node unwrapping.
  * @internal
  */
-function rawSqlReferencesForeignTable(node: any, sourceTable: string): boolean {
+function rawSqlReferencesForeignTable(node: any, allowed: Set<string>): boolean {
   if (node instanceof Nodes.Grouping) {
-    return rawSqlReferencesForeignTable((node as any).expr, sourceTable);
+    return rawSqlReferencesForeignTable((node as any).expr, allowed);
   }
   let sql: string | undefined;
   if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
@@ -666,7 +668,7 @@ function rawSqlReferencesForeignTable(node: any, sourceTable: string): boolean {
   const qualifierRe = /(^|[^\w.])(\w+)\s*\./g;
   let match: RegExpExecArray | null;
   while ((match = qualifierRe.exec(sql)) !== null) {
-    if (match[2] !== sourceTable) return true;
+    if (!allowed.has(match[2])) return true;
   }
   return false;
 }
