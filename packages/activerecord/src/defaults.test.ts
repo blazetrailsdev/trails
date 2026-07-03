@@ -21,13 +21,16 @@ import {
 import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
 // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-// sidecar `_pool` lease; `setupFixtures()` wires the handler for every block.
-setupFixtures();
+// sidecar `_pool` lease; `fixtures({})` wires the handler and per-test
+// transactional rollback for every block (empty map → no seed rows). The
+// bespoke per-test tables are laid/dropped in each block's hooks, so
+// schema-cache warming doesn't touch them.
+fixtures({});
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

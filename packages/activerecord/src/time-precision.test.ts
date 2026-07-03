@@ -6,7 +6,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
@@ -15,8 +15,10 @@ function nsecTime(v: Temporal.PlainTime): number {
 
 describe("TimePrecisionTest", () => {
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `setupFixtures()` wires the handler.
-  setupFixtures();
+  // sidecar `_pool` lease; `fixtures({})` wires the handler and per-test
+  // transactional rollback (empty map → no seed rows). The bespoke `foos` table
+  // is laid/dropped per-test, so schema-cache warming doesn't touch it.
+  fixtures({});
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 

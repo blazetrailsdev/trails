@@ -5,7 +5,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
@@ -29,8 +29,10 @@ describe("CacheKeyTest", () => {
   // rather than seeding placeholders into the canonical schema. Rails also sets
   // `self.use_transactional_tests = false`, so each test recreates the tables.
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `setupFixtures()` wires the handler.
-  setupFixtures();
+  // sidecar `_pool` lease; `fixtures({})` wires the handler and per-test
+  // transactional rollback (empty map → no seed rows). The bespoke tables are
+  // laid/dropped per-test, so schema-cache warming doesn't touch them.
+  fixtures({});
   let ctx: MigrationContext;
 
   beforeEach(async () => {
