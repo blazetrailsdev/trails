@@ -1000,8 +1000,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     expect(await (project as any).developers.size()).toBe(1);
     expect(await (developer as any).projects.size()).toBe(1);
-    expect((await (project as any).developers.toArray())[0].id).toBe(developer.id);
-    expect((await (developer as any).projects.toArray())[0].id).toBe(project.id);
+    expect((await (project as any).developers.first()).id).toBe(developer.id);
+    expect((await (developer as any).projects.first()).id).toBe(project.id);
   });
 
   it("dynamic find should respect association include", async () => {
