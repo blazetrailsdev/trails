@@ -47,11 +47,12 @@ describe("isBlank / isPresent", () => {
     SampleRecord.attribute("id", "integer");
     SampleRecord.attribute("name", "string");
     SampleRecord.adapter = adapter;
-    // Fresh (non-boot-pool) adapter, so the canonical `developers` table isn't
-    // laid down — create it here, mirroring schema.rb's `create_table :developers`.
-    // Torn down by the describe's `afterAll(resetTestAdapterState)`, which drops
-    // every table this suite wrote on the shared test adapter.
-    // eslint-disable-next-line blazetrails/require-table-teardown
+    // `developers` is canonical (schema.rb `create_table :developers`) and
+    // boot-laid on the primary worker DB, but this suite stubs
+    // `AR_NO_AUTO_SCHEMA` and drives a connection leased from the sidecar test
+    // `_pool` (createTestAdapter), which doesn't carry that boot-laid schema, so
+    // create the table explicitly here. `force: true` makes it idempotent when
+    // the sidecar DB happens to already hold it. Dropped by name in `afterAll`.
     await (
       adapter as unknown as {
         createTable(name: string, opts: object, fn: (t: any) => void): Promise<void>;
@@ -79,8 +80,15 @@ describe("isBlank / isPresent", () => {
   // Drop tables/rows this describe wrote on the shared adapter so the
   // following transactional-fixture describe (RelationTest) doesn't inherit
   // them — its withTransactionalFixtures pushes the global-reset opt-out
-  // before any cleanup would otherwise run.
+  // before any cleanup would otherwise run. Drop the `developers` table this
+  // suite created by name (so a sibling file's differently-shaped `developers`
+  // can't collide under parallel forks), then reset the shared adapter state.
   afterAll(async () => {
+    await (
+      createTestAdapter() as unknown as {
+        dropTable(name: string, opts?: object): Promise<void>;
+      }
+    ).dropTable("developers", { ifExists: true });
     await resetTestAdapterState();
   });
 });
