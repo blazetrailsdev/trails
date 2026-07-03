@@ -345,9 +345,9 @@ async function updateThroughCounterCaches(
   const sourceRefl = ctor._reflectOnAssociation?.(assoc.reflection.name)?.sourceReflection;
 
   // Rails: klass.decrement_counter(source_reflection.counter_cache_column, ids).
-  // Only act on a resolved string column — a bare `counter_cache: true` whose
-  // reflection can't resolve the column name is left untouched rather than
-  // guessed at.
+  // `counterCacheColumn()` resolves a truthy `counter_cache` (incl. `true`) to a
+  // concrete column, so the `string` check is a defensive type-narrow, not a
+  // real filter.
   if (sourceRefl?.options?.counterCache) {
     const counter = sourceRefl.counterCacheColumn?.();
     const klass = safeKlass(sourceRefl) as {
