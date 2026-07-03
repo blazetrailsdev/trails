@@ -34,11 +34,10 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   // for this suite. D-1..N test files use the same one-liner.
   setupFixtures();
 
-  // Tables laid via Base.connection — the connection itself resolves through
+  // Table laid via Base.connection — the connection itself resolves through
   // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.
   beforeAll(async () => {
     const adapter = Base.connection;
-    await adapter.createTable("handler_resolved_posts", (t) => t.string("title"));
     await adapter.createTable("handler_resolved_comments", (t) => t.string("body"));
     // D-0a: load schema for the bare model (no explicit attribute declarations).
     // This deadlocked before the fix; now routes through the checked-out adapter.
