@@ -10,20 +10,15 @@
  * failing the query with `no such column: companies.metadata`. Rails' eager
  * SELECT projects only real table columns.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Firm, Company, Client } from "../test-helpers/models/company.js";
 import { registerModel } from "../index.js";
 
 describe("getModelColumns virtual-attribute eager projection", () => {
   setupFixtures();
   const { companies } = fixtures(["companies"]);
-  beforeAll(async () => {
-    await defineSchema({ companies: TEST_SCHEMA.companies }, { dropExisting: true });
-  });
   registerModel(Company);
   registerModel(Firm);
   registerModel(Client);
