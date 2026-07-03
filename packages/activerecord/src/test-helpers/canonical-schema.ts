@@ -14,7 +14,10 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { TableDefinition } from "../connection-adapters/abstract/schema-definitions.js";
+import type {
+  TableDefinition,
+  AddIndexOptions,
+} from "../connection-adapters/abstract/schema-definitions.js";
 import type { ColumnSpec } from "./define-schema.js";
 import {
   COLUMN_TYPE_MAP_MYSQL,
@@ -150,6 +153,46 @@ interface TableMeta {
 }
 
 /**
+ * Apply a table's collected indexes with the schema.rb gating both surviving
+ * schema loaders share: an expression index (`"(lower(x))"` — a string column
+ * with non-word chars) is skipped on adapters without
+ * `supports_expression_index?`, and the MySQL-only sub-part `length:` is dropped
+ * elsewhere (the abstract SchemaCreation visitor would emit invalid `col(n)` DDL
+ * on PG/SQLite). Exported so the `schema-file-generator.ts` parity guard can pin
+ * `generateSchemaFile` against the *real* gating code here — this module outlives
+ * `defineSchema` (RFC 0059 phase 4 retires the DSL), so the guard anchors to a
+ * survivor, not a copy.
+ */
+export async function emitTableIndexes(
+  ss: {
+    addIndex(
+      table: string,
+      columns: string | string[],
+      options: AddIndexOptions,
+    ): Promise<void> | void;
+  },
+  adapter: DatabaseAdapter,
+  table: string,
+  indexes: ReadonlyArray<{ columns: string | string[]; opts: IndexOpts }>,
+): Promise<void> {
+  for (const { columns, opts } of indexes) {
+    const isExpression = typeof columns === "string" && /\W/.test(columns);
+    if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
+    const length = adapter.adapterName === "mysql" ? opts.length : undefined;
+    await ss.addIndex(table, columns, {
+      unique: opts.unique,
+      where: opts.where,
+      name: opts.name,
+      order: opts.order as Record<string, string> | undefined,
+      length,
+      nullsNotDistinct: opts.nullsNotDistinct,
+      using: opts.using,
+      type: opts.type,
+    });
+  }
+}
+
+/**
  * Lay the canonical AR test schema onto a freshly-created (empty) database.
  * The template DB is built once at boot, so — unlike `defineSchema` — this
  * issues no drops, no signature-cache bookkeeping, and no schema-cache warming.
@@ -194,23 +237,10 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
       fn(builder);
     });
 
-    for (const { columns, opts } of builder.indexes) {
-      // Expression indexes (non-word chars) are gated on adapter support, and
-      // sub-part length is MySQL-only — mirroring defineSchema / schema.rb.
-      const isExpression = typeof columns === "string" && /\W/.test(columns);
-      if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-      const length = adapter.adapterName === "mysql" ? opts.length : undefined;
-      await ss.addIndex(name, columns, {
-        unique: opts.unique,
-        where: opts.where,
-        name: opts.name,
-        order: opts.order as Record<string, string> | undefined,
-        length,
-        nullsNotDistinct: opts.nullsNotDistinct,
-        using: opts.using,
-        type: opts.type,
-      });
-    }
+    // Expression-index / MySQL-length gating (mirroring schema.rb) lives in the
+    // shared, exported emitTableIndexes so the generator parity guard can pin
+    // against the real code rather than a copy.
+    await emitTableIndexes(ss, adapter, name, builder.indexes);
   };
 
   await define("1_need_quoting", {}, (t) => {
