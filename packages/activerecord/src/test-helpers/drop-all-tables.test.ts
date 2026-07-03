@@ -133,6 +133,24 @@ describe("resetTestTables", () => {
     // Canonical tables are still present after the bespoke drop.
     expect(await listTables(adapter)).toContain("articles");
   });
+
+  it("leaves bookkeeping tables (schema_migrations / ar_internal_metadata) intact", async () => {
+    // These carry migration state + the schema-signature stamp that lets each
+    // worker take the fast TRUNCATE-only reconstruct path; dropping them would
+    // force a full purge+reload per file.
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
+    );
+    await adapter.executeMutation(`INSERT INTO schema_migrations (version) VALUES ('20260703')`);
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).toContain("schema_migrations");
+    // Bookkeeping rows are preserved too — neither dropped nor truncated.
+    expect(
+      ((await adapter.execute(`SELECT version FROM schema_migrations`)) as unknown[]).length,
+    ).toBe(1);
+  });
 });
 
 describe("dropAllTables", () => {
