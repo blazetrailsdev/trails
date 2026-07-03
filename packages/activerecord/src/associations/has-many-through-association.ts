@@ -295,19 +295,21 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
     // Mirror Rails' counter-cache tail (has_many_through_association.rb): update
     // the through reflection's counter when it's a collection and the method
-    // warrants it (`update_through_counter?`), otherwise the source reflection's
-    // counter. `:destroy` on a through whose join belongs_to already maintains a
-    // counter (e.g. taggings' `tags_count`) falls to the source branch, so a
-    // distinct source counter like `tags_with_destroy_count` still decrements.
+    // warrants it (`update_through_counter?`), otherwise this association's OWN
+    // reflection — `update_counter(-count)` defaults its reflection arg to
+    // `reflection()`, i.e. the has_many :through reflection itself, NOT Rails'
+    // `source_reflection`. `:destroy` on a through whose join belongs_to already
+    // maintains a counter (e.g. taggings' `tags_count`) falls to this branch, so
+    // a distinct own counter like `tags_with_destroy_count` still decrements.
     const ctor = this.owner.constructor as {
       _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
     };
-    const sourceRefl = ctor._reflectOnAssociation?.(this.reflection.name);
+    const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
     const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
     if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
       await updateThroughCounterCache(this.owner, throughRefl, -count);
     } else {
-      await updateThroughCounterCache(this.owner, sourceRefl, -count);
+      await updateThroughCounterCache(this.owner, ownRefl, -count);
     }
 
     return count;
