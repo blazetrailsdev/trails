@@ -425,8 +425,12 @@ describe("HasOneThroughAssociationsTest", () => {
     const organization = organizations("nsa");
     const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    // `writer` on a persisted owner returns the immediate-persist `persistReplace`
+    // promise (has-one-association.ts:52-57); it MUST be awaited (per its JSDoc)
+    // or the floating write races member.save()'s own has_one autosave — the
+    // exact double-write the `_pendingReplace` skip guard is meant to prevent.
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
     expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
@@ -449,8 +453,8 @@ describe("HasOneThroughAssociationsTest", () => {
 
     let before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
     expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
@@ -459,7 +463,7 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(await includesMember(newOrganization)).toBe(false);
 
     before = await memberDetailCount(member);
-    (member.association("organization") as any).writer(newOrganization);
+    await (member.association("organization") as any).writer(newOrganization);
     await member.save();
     expect(await memberDetailCount(member)).toBe(before);
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
