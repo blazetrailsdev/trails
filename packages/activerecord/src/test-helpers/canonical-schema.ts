@@ -18,6 +18,7 @@ import type {
   TableDefinition,
   AddIndexOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
+import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import type { ColumnSpec } from "./define-schema.js";
 import {
   COLUMN_TYPE_MAP_MYSQL,
@@ -192,55 +193,83 @@ export async function emitTableIndexes(
   }
 }
 
-/**
- * Lay the canonical AR test schema onto a freshly-created (empty) database.
- * The template DB is built once at boot, so — unlike `defineSchema` — this
- * issues no drops, no signature-cache bookkeeping, and no schema-cache warming.
- */
-export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<void> {
-  const { SchemaStatements } = await import("../connection-adapters/abstract/schema-statements.js");
-  const withSs = adapter as unknown as {
-    schemaStatements?: () => InstanceType<typeof SchemaStatements>;
-  };
-  const ss = withSs.schemaStatements ? withSs.schemaStatements() : new SchemaStatements(adapter);
+/** One canonical table's definition: its name, table-level metadata, and the
+ *  column/index builder block. Pure data (no adapter, no DDL), so a named subset
+ *  can be dropped and recreated on demand (see {@link rebuildCanonicalTables}). */
+interface CanonicalTableDef {
+  name: string;
+  meta: TableMeta;
+  fn: (t: TableBuilder) => void;
+}
+
+/** Memoized ordered registry, built once per module instance. */
+let _registry: CanonicalTableDef[] | null = null;
+
+/** Resolve the adapter's schema-statement helper and per-adapter column type map. */
+async function prepareSchema(
+  adapter: DatabaseAdapter,
+): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
+  const { SchemaStatements: SchemaStatementsCtor } =
+    await import("../connection-adapters/abstract/schema-statements.js");
+  const withSs = adapter as unknown as { schemaStatements?: () => SchemaStatements };
+  const ss = withSs.schemaStatements
+    ? withSs.schemaStatements()
+    : new SchemaStatementsCtor(adapter);
   const typeMap =
     adapter.adapterName === "postgres"
       ? COLUMN_TYPE_MAP_PG
       : adapter.adapterName === "mysql"
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
+  return { ss, typeMap };
+}
 
+/** Create one canonical table (and its indexes) from its definition, emitting
+ *  the same DDL `defineSchema` did. */
+async function runTable(
+  adapter: DatabaseAdapter,
+  ss: SchemaStatements,
+  typeMap: Record<string, string | undefined>,
+  def: CanonicalTableDef,
+): Promise<void> {
+  const { name, meta, fn } = def;
+  const createOpts: { id?: false; primaryKey?: string[] } = {};
+  if (meta.id === false || meta.serialPk !== undefined || meta.primaryKey !== undefined) {
+    createOpts.id = false;
+  }
+  if (meta.primaryKey !== undefined) createOpts.primaryKey = meta.primaryKey;
+  const compositePk =
+    meta.primaryKey !== undefined && meta.serialPk === undefined ? new Set(meta.primaryKey) : null;
+
+  let builder!: TableBuilder;
+  await ss.createTable(name, createOpts, (t: TableDefinition) => {
+    builder = new TableBuilder(t, adapter.adapterName, typeMap, meta.serialPk ?? null, compositePk);
+    fn(builder);
+  });
+
+  // Expression-index / MySQL-length gating (mirroring schema.rb) lives in the
+  // shared, exported emitTableIndexes so the generator parity guard can pin
+  // against the real code rather than a copy.
+  await emitTableIndexes(ss, adapter, name, builder.indexes);
+}
+
+/**
+ * Build (once) the ordered registry of canonical table definitions. The body is
+ * the hand-written `create_table` sequence mirroring
+ * `vendor/rails/activerecord/test/schema/schema.rb`; here `define` only records
+ * each table, so the same data drives both the full boot-time lay
+ * ({@link loadCanonicalSchema}) and a named-subset rebuild
+ * ({@link rebuildCanonicalTables}).
+ */
+async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
+  if (_registry) return _registry;
+  const tables: CanonicalTableDef[] = [];
   const define = async (
     name: string,
     meta: TableMeta,
     fn: (t: TableBuilder) => void,
   ): Promise<void> => {
-    const createOpts: { id?: false; primaryKey?: string[] } = {};
-    if (meta.id === false || meta.serialPk !== undefined || meta.primaryKey !== undefined) {
-      createOpts.id = false;
-    }
-    if (meta.primaryKey !== undefined) createOpts.primaryKey = meta.primaryKey;
-    const compositePk =
-      meta.primaryKey !== undefined && meta.serialPk === undefined
-        ? new Set(meta.primaryKey)
-        : null;
-
-    let builder!: TableBuilder;
-    await ss.createTable(name, createOpts, (t: TableDefinition) => {
-      builder = new TableBuilder(
-        t,
-        adapter.adapterName,
-        typeMap,
-        meta.serialPk ?? null,
-        compositePk,
-      );
-      fn(builder);
-    });
-
-    // Expression-index / MySQL-length gating (mirroring schema.rb) lives in the
-    // shared, exported emitTableIndexes so the generator parity guard can pin
-    // against the real code rather than a copy.
-    await emitTableIndexes(ss, adapter, name, builder.indexes);
+    tables.push({ name, meta, fn });
   };
 
   await define("1_need_quoting", {}, (t) => {
@@ -2047,7 +2076,57 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
     t.string("title");
   });
 
+  _registry = tables;
+  return tables;
+}
+
+/**
+ * Lay the full canonical AR test schema onto a freshly-created (empty) database.
+ * The template DB is built once at boot, so — unlike `defineSchema` — this issues
+ * no drops, no signature-cache bookkeeping, and no schema-cache warming.
+ */
+export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<void> {
+  const { ss, typeMap } = await prepareSchema(adapter);
+  for (const def of await buildCanonicalRegistry()) {
+    await runTable(adapter, ss, typeMap, def);
+  }
   // create_table/drop_table clear the connection's prepared statements in Rails;
   // mirror that so PostgreSQL doesn't reuse a stale cached plan (0A000).
+  (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+}
+
+/**
+ * Drop and recreate a named subset of canonical tables, restoring each to its
+ * full canonical shape — the `create_table`-based equivalent of
+ * `defineSchema({ …subset }, { dropExisting: true })`. Test files use it as an
+ * anti-contamination shield against a sibling file that left a canonical table
+ * in a reduced shape on the shared per-worker DB. Throws on an unknown name — a
+ * silent skip would quietly disable the shield and let the flake back in.
+ */
+export async function rebuildCanonicalTables(
+  adapter: DatabaseAdapter,
+  names: readonly string[],
+): Promise<void> {
+  const registry = await buildCanonicalRegistry();
+  const wanted = new Set(names);
+  const known = new Set(registry.map((d) => d.name));
+  const unknown = [...wanted].filter((n) => !known.has(n));
+  if (unknown.length > 0) {
+    // Test-helper invariant with no Rails error counterpart — a bare Error is
+    // intentional (mirrors the throws in the sibling define-schema.ts helper).
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(`rebuildCanonicalTables: unknown canonical table(s): ${unknown.join(", ")}`);
+  }
+  const defs = registry.filter((d) => wanted.has(d.name));
+  if (defs.length === 0) return;
+  const { ss, typeMap } = await prepareSchema(adapter);
+  // Drop in reverse registry order (FK-referencing tables before their targets),
+  // then recreate forward so targets exist first.
+  for (const def of [...defs].reverse()) {
+    await ss.dropTable(def.name, { ifExists: true });
+  }
+  for (const def of defs) {
+    await runTable(adapter, ss, typeMap, def);
+  }
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
 }

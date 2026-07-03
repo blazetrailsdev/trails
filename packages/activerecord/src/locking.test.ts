@@ -14,7 +14,7 @@ import {
 } from "./index.js";
 import { Associations, association } from "./associations.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
@@ -54,38 +54,34 @@ describe("OptimisticLockingTest", () => {
   beforeAll(async () => {
     // Force-recreate every canonical table this suite touches. The worker's
     // canonical schema preload keeps their signatures cache-warm, so a plain
-    // `defineSchema` (including the fixtures' own) is a no-op — meaning a sibling
+    // schema load (including the fixtures' own) is a no-op — meaning a sibling
     // file that physically replaced a table with a bespoke shape (e.g.
     // autosave-association's `people: { name, first_name }`) would survive into
-    // this suite. `dropExisting` bypasses the signature cache and rebuilds them
-    // from the canonical schema verbatim, so we never write a reduced shape that
-    // could in turn contaminate later suites. Covers the fixture tables plus the
-    // bespoke-class tables: `ships` (ReadonlyNameShip) and the
-    // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`). The
-    // `jobs`/`comments`/`personal_legacy_things` tables back Person's
-    // `dependent:` associations, which `destroy with dirty primary key`
-    // traverses (see the model registrations below).
-    await defineSchema(
-      {
-        people: canonicalSchema.people,
-        references: canonicalSchema.references,
-        legacy_things: canonicalSchema.legacy_things,
-        string_key_objects: canonicalSchema.string_key_objects,
-        ships: canonicalSchema.ships,
-        lock_without_defaults: canonicalSchema.lock_without_defaults,
-        lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
-        treasures: canonicalSchema.treasures,
-        peoples_treasures: canonicalSchema.peoples_treasures,
-        cars: canonicalSchema.cars,
-        wheels: canonicalSchema.wheels,
-        bulbs: canonicalSchema.bulbs,
-        engines: canonicalSchema.engines,
-        jobs: canonicalSchema.jobs,
-        comments: canonicalSchema.comments,
-        personal_legacy_things: canonicalSchema.personal_legacy_things,
-      },
-      { dropExisting: true },
-    );
+    // this suite. Drop + recreate them from the canonical schema verbatim, so we
+    // never write a reduced shape that could in turn contaminate later suites.
+    // Covers the fixture tables plus the bespoke-class tables: `ships`
+    // (ReadonlyNameShip) and the `lock_without_defaults*` pair (Rails:
+    // `t.timestamps null: true`). The `jobs`/`comments`/`personal_legacy_things`
+    // tables back Person's `dependent:` associations, which `destroy with dirty
+    // primary key` traverses (see the model registrations below).
+    await rebuildCanonicalTables(Base.connection, [
+      "people",
+      "references",
+      "legacy_things",
+      "string_key_objects",
+      "ships",
+      "lock_without_defaults",
+      "lock_without_defaults_cust",
+      "treasures",
+      "peoples_treasures",
+      "cars",
+      "wheels",
+      "bulbs",
+      "engines",
+      "jobs",
+      "comments",
+      "personal_legacy_things",
+    ]);
     registerModel("Car", Car);
     registerModel("Wheel", Wheel);
     registerModel("Bulb", Bulb);
@@ -676,16 +672,13 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     usesTransaction: schemaChangeTests,
   });
   beforeAll(async () => {
-    await defineSchema(
-      {
-        people: canonicalSchema.people,
-        legacy_things: canonicalSchema.legacy_things,
-        personal_legacy_things: canonicalSchema.personal_legacy_things,
-        lock_without_defaults: canonicalSchema.lock_without_defaults,
-        lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
-      },
-      { dropExisting: true },
-    );
+    await rebuildCanonicalTables(Base.connection, [
+      "people",
+      "legacy_things",
+      "personal_legacy_things",
+      "lock_without_defaults",
+      "lock_without_defaults_cust",
+    ]);
   });
 
   // Mirrors Rails' private add_counter_column_to / remove_counter_column_from

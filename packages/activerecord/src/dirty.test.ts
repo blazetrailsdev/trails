@@ -8,10 +8,10 @@
  * removes the divergent `people`/`posts`/`pirates` shapes the old version wrote
  * per-test into the shared worker DB.
  *
- * A single `beforeAll` `dropExisting` rebuild of the rode tables is still
- * required as a shield: sibling files DROP+CREATE these same shared tables with
- * reduced shapes, and the signature cache makes a plain `defineSchema` a no-op
- * that wouldn't restore the canonical columns. See the `beforeAll` comment and
+ * A single `beforeAll` canonical rebuild of the rode tables is still required as
+ * a shield: sibling files DROP+CREATE these same shared tables with reduced
+ * shapes, and the signature cache makes a plain schema load a no-op that
+ * wouldn't restore the canonical columns. See the `beforeAll` comment and
  * `locking.test.ts` for the same pattern.
  *
  * Test names mirror the Ruby method names verbatim (`test:compare` matches on
@@ -29,8 +29,7 @@ import { describeIfSupports } from "./test-helpers/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
@@ -100,30 +99,27 @@ describe("DirtyTest", () => {
 
   // Canonical-schema shield. This suite rides the preloaded canonical tables
   // (people / topics / pirates / parrots / aircraft / numeric_data) rather than
-  // declaring its own, so the worker's signature cache keeps each `defineSchema`
-  // a no-op. But a sibling file that ran earlier in this worker can physically
+  // declaring its own, so the worker's signature cache keeps each plain schema
+  // load a no-op. But a sibling file that ran earlier in this worker can physically
   // DROP+CREATE a shared table with a reduced shape (e.g. callbacks.test.ts'
   // `topics: { title }` / `people: { name }`, clone.test.ts' trimmed `topics`,
   // reflection.test.ts' `people: { name, age, active }`). That leaves the table
   // missing the columns these tests read — `written_on` (datetime tests) and
   // `created_at`/`updated_at` (whose auto-write is the only thing populating
   // `saved_changes` after an INSERT) — so the suite reflects the wrong shape and
-  // fails. `dropExisting` bypasses the signature cache and rebuilds each table
-  // from the canonical schema verbatim (also clearing the adapter's per-table
-  // column cache via `createTable`), mirroring locking.test.ts' shield. The
+  // fails. `rebuildCanonicalTables` bypasses the signature cache and rebuilds
+  // each table from the canonical schema verbatim (also clearing the adapter's
+  // per-table column cache via `createTable`), mirroring locking.test.ts' shield. The
   // warm-up below then reflects the rebuilt canonical columns.
   beforeAll(async () => {
-    await defineSchema(
-      {
-        people: canonicalSchema.people,
-        topics: canonicalSchema.topics,
-        pirates: canonicalSchema.pirates,
-        parrots: canonicalSchema.parrots,
-        aircraft: canonicalSchema.aircraft,
-        numeric_data: canonicalSchema.numeric_data,
-      },
-      { dropExisting: true },
-    );
+    await rebuildCanonicalTables(Base.connection, [
+      "people",
+      "topics",
+      "pirates",
+      "parrots",
+      "aircraft",
+      "numeric_data",
+    ]);
 
     // Force schema reflection ONCE per worker: trails reflects columns lazily on
     // first query, and in-memory dirty tracking (`new Model()` then assign) needs

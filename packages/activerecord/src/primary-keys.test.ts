@@ -8,7 +8,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
 import { Keyboard } from "./test-helpers/models/keyboard.js";
@@ -27,19 +27,16 @@ describe("PrimaryKeysTest", () => {
   beforeAll(async () => {
     registerModel(Reply);
     registerModel(SillyReply);
-    await defineSchema(
-      {
-        topics: canonicalSchema.topics,
-        subscribers: canonicalSchema.subscribers,
-        movies: canonicalSchema.movies,
-        dashboards: canonicalSchema.dashboards,
-        non_primary_keys: canonicalSchema.non_primary_keys,
-        developers: canonicalSchema.developers,
-        developers_projects: canonicalSchema.developers_projects,
-        cpk_books: canonicalSchema.cpk_books,
-      },
-      { dropExisting: true },
-    );
+    await rebuildCanonicalTables(Base.connection, [
+      "topics",
+      "subscribers",
+      "movies",
+      "dashboards",
+      "non_primary_keys",
+      "developers",
+      "developers_projects",
+      "cpk_books",
+    ]);
   });
 
   it("to key with default primary key", async () => {
@@ -537,14 +534,7 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   beforeAll(async () => {
-    await defineSchema(
-      {
-        cpk_books: canonicalSchema.cpk_books,
-        cpk_orders: canonicalSchema.cpk_orders,
-        cpk_authors: canonicalSchema.cpk_authors,
-      },
-      { dropExisting: true },
-    );
+    await rebuildCanonicalTables(Base.connection, ["cpk_books", "cpk_orders", "cpk_authors"]);
     const conn = Base.connection as any;
     await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
     await conn.createTable(
