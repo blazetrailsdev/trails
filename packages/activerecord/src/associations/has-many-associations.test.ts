@@ -3535,15 +3535,14 @@ describe("HasManyAssociationsTest", () => {
     expect(ids.length).toBe(1);
     expect(ids).toContain(p1.id);
   });
-  // TODO: non-standard FK thr_id_* not in canonical posts/comments
-  it.skip("get ids for through", async () => {
+  it("get ids for through", async () => {
     class ThrIdAuthor extends Base {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
         this.hasMany("thr_id_posts", {
           className: "ThrIdPost",
-          foreignKey: "thr_id_author_id",
+          foreignKey: "author_id",
         });
         this.hasMany("thr_id_comments", {
           through: "thr_id_posts",
@@ -3554,17 +3553,19 @@ describe("HasManyAssociationsTest", () => {
     }
     class ThrIdPost extends Base {
       static {
-        this.attribute("thr_id_author_id", "integer");
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.hasMany("thr_id_comments", {
           className: "ThrIdComment",
-          foreignKey: "thr_id_post_id",
+          foreignKey: "post_id",
         });
       }
     }
     class ThrIdComment extends Base {
       static {
-        this.attribute("thr_id_post_id", "integer");
+        this._tableName = "comments";
+        this.attribute("post_id", "integer");
         this.attribute("body", "string");
       }
     }
@@ -3572,8 +3573,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ThrIdPost);
     registerModel(ThrIdComment);
     const author = await ThrIdAuthor.create({ name: "Alice" });
-    const post = await ThrIdPost.create({ thr_id_author_id: author.id, title: "P", body: "body" });
-    const comment = await ThrIdComment.create({ thr_id_post_id: post.id, body: "C" });
+    const post = await ThrIdPost.create({ author_id: author.id, title: "P", body: "body" });
+    const comment = await ThrIdComment.create({ post_id: post.id, body: "C" });
     const comments = await loadHasManyThrough(author, "thr_id_comments", {
       through: "thr_id_posts",
       className: "ThrIdComment",
@@ -3657,15 +3658,14 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts.length).toBe(2);
   });
-  // TODO: non-standard FK hc_author_id/hc_post_id not in canonical posts/comments
-  it.skip("has many through respects hash conditions", async () => {
+  it("has many through respects hash conditions", async () => {
     class HcAuthor extends Base {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
         this.hasMany("hcPosts", {
           className: "HcPost",
-          foreignKey: "hc_author_id",
+          foreignKey: "author_id",
         });
         this.hasMany("helloPostComments", {
           className: "HcComment",
@@ -3677,17 +3677,19 @@ describe("HasManyAssociationsTest", () => {
     }
     class HcPost extends Base {
       static {
-        this.attribute("hc_author_id", "integer");
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.hasMany("hcComments", {
           className: "HcComment",
-          foreignKey: "hc_post_id",
+          foreignKey: "post_id",
         });
       }
     }
     class HcComment extends Base {
       static {
-        this.attribute("hc_post_id", "integer");
+        this._tableName = "comments";
+        this.attribute("post_id", "integer");
         this.attribute("body", "string");
       }
     }
@@ -3698,12 +3700,12 @@ describe("HasManyAssociationsTest", () => {
 
     const author = await HcAuthor.create({ name: "David" });
     const post = await HcPost.create({
-      hc_author_id: author.id,
+      author_id: author.id,
       title: "Hello World",
       body: "body",
     });
-    await HcComment.create({ hc_post_id: post.id, body: "hello" });
-    await HcComment.create({ hc_post_id: post.id, body: "goodbye" });
+    await HcComment.create({ post_id: post.id, body: "hello" });
+    await HcComment.create({ post_id: post.id, body: "goodbye" });
 
     const comments = await loadHasMany(author, "helloPostComments", {
       className: "HcComment",
@@ -4306,8 +4308,7 @@ describe("HasManyAssociationsTest", () => {
     // "one?" returns false when more than one record
     expect(posts.length === 1).toBe(false);
   });
-  // TODO: non-standard FK ns_author_id not in canonical posts
-  it.skip("joins with namespaced model should use correct type", async () => {
+  it("joins with namespaced model should use correct type", async () => {
     class NsAuthor extends Base {
       static {
         this._tableName = "authors";
@@ -4316,17 +4317,18 @@ describe("HasManyAssociationsTest", () => {
     }
     class NsPost extends Base {
       static {
-        this.attribute("ns_author_id", "integer");
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
         this.attribute("title", "string");
       }
     }
     registerModel(NsAuthor);
     registerModel(NsPost);
     const author = await NsAuthor.create({ name: "Alice" });
-    await NsPost.create({ ns_author_id: author.id, title: "A", body: "body" });
+    await NsPost.create({ author_id: author.id, title: "A", body: "body" });
     const posts = await loadHasMany(author, "ns_posts", {
       className: "NsPost",
-      foreignKey: "ns_author_id",
+      foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
   });
