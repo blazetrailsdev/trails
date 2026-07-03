@@ -241,6 +241,16 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 // adapter and asserts the emitted `t.column(name, "type", …)` matches the
 // authoritative COLUMN_TYPE_MAP_* the fixtures path (define-schema.ts) uses.
 describe("generateSchemaFile / define-schema.ts type-map parity", () => {
+  // Generate a schema file, read it back, and delete it — the generator's only
+  // observable output is the emitted module text.
+  async function readGenerated(schema: Schema, adapter: string): Promise<string> {
+    const filePath = await generateSchemaFile(schema, adapter);
+    const fs = await getFsAsync();
+    const content = fs.readFileSync(filePath, "utf-8");
+    fs.unlinkSync(filePath);
+    return content;
+  }
+
   // Extract the emitted AR type for each column from a generated schema file:
   // matches `t.column("colName", "arType", …)`.
   function emittedTypes(content: string): Record<string, string> {
@@ -258,6 +268,9 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     return { parity_probe: columns };
   }
 
+  // `Record<PrimitiveColumnSpec, string>` forces each map to carry every
+  // primitive, so iterating its keys covers the full type surface — a primitive
+  // added to define-schema.ts is automatically exercised here.
   const CASES: ReadonlyArray<{
     adapter: string;
     map: Record<string, string>;
@@ -270,34 +283,33 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   for (const { adapter, map } of CASES) {
     it(`emits the same column type as COLUMN_TYPE_MAP for every primitive on ${adapter}`, async () => {
       const primitives = Object.keys(map) as AnyPrimitiveColumnSpec[];
-      const filePath = await generateSchemaFile(schemaFor(primitives), adapter);
-      const fs = await getFsAsync();
-      const content = fs.readFileSync(filePath, "utf-8");
-      const emitted = emittedTypes(content);
+      const emitted = emittedTypes(await readGenerated(schemaFor(primitives), adapter));
       for (const primitive of primitives) {
         expect(emitted[`c_${primitive}`], `${adapter} type for "${primitive}"`).toBe(
           map[primitive],
         );
       }
-      fs.unlinkSync(filePath);
     });
   }
 
+  // The exact #4461 regression, pinned: the generator's stale map remapped
+  // date/time/json → string on MySQL, so these must stay native, not VARCHAR.
+  it("emits native date/time/json (not string) on MySQL — the PR #4461 regression", async () => {
+    const emitted = emittedTypes(await readGenerated(schemaFor(["date", "time", "json"]), "mysql"));
+    expect(emitted["c_date"]).toBe("date");
+    expect(emitted["c_time"]).toBe("time");
+    expect(emitted["c_json"]).toBe("json");
+  });
+
   it("injects precision:6 on MySQL bare datetime columns (mirrors define-schema.ts)", async () => {
-    const filePath = await generateSchemaFile({ parity_probe: { at: "datetime" } }, "mysql");
-    const fs = await getFsAsync();
-    const content = fs.readFileSync(filePath, "utf-8");
+    const content = await readGenerated({ parity_probe: { at: "datetime" } }, "mysql");
     expect(content).toContain('t.column("at", "datetime", { precision: 6 })');
-    fs.unlinkSync(filePath);
   });
 
   it("does not inject precision on non-MySQL datetime columns", async () => {
     for (const adapter of ["postgres", "sqlite"]) {
-      const filePath = await generateSchemaFile({ parity_probe: { at: "datetime" } }, adapter);
-      const fs = await getFsAsync();
-      const content = fs.readFileSync(filePath, "utf-8");
+      const content = await readGenerated({ parity_probe: { at: "datetime" } }, adapter);
       expect(content).toContain('t.column("at", "datetime", {})');
-      fs.unlinkSync(filePath);
     }
   });
 
@@ -307,14 +319,11 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
         const schema: Schema = {
           parity_probe: { columns: { pk: type }, primaryKey: ["pk"] },
         };
-        const filePath = await generateSchemaFile(schema, adapter);
-        const fs = await getFsAsync();
-        const content = fs.readFileSync(filePath, "utf-8");
+        const content = await readGenerated(schema, adapter);
         const want = serialIdType(type, adapter);
         expect(content, `${adapter} serial PK for "${type}"`).toContain(
           `t.column("pk", "${want}", { primaryKey: true })`,
         );
-        fs.unlinkSync(filePath);
       }
     }
   });
