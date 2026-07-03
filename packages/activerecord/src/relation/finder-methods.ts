@@ -10,7 +10,10 @@
 
 import { Nodes } from "@blazetrails/arel";
 import { pluralize } from "@blazetrails/activesupport";
-import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import {
+  ActiveModelRangeError,
+  sanitizeForMassAssignment as sanitizeForbiddenAttributes,
+} from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
@@ -693,6 +696,16 @@ export const FinderMethods = {
 
 /** @internal */
 export function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
+  // Mirrors construct_relation_for_exists (finder_methods.rb:438): unwrap/forbid
+  // strong-params objects before the Array/Hash/scalar case-analysis below. A
+  // plain hash/array/scalar/node passes through unchanged. Skip only the
+  // `undefined` sentinel (our stand-in for Rails' `:none`, which Rails
+  // harmlessly sanitizes as a plain symbol); dereferencing `.permitted` on it
+  // would throw, and `exists?` never reaches here with `null` (short-circuited
+  // to false upstream), so `undefined` is the sole non-sanitizable input.
+  if (conditions !== undefined) {
+    conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
+  }
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
   // (or except(:order).limit!(1) when distinct+offset are both set)
   let relation: any;
