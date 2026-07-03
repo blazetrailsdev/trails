@@ -1563,10 +1563,14 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
     // Synchronous acquisition: this is the exclusive-access sweep on the sync
     // disconnect/discard lifecycle path, which cannot await. `checkout` is now
     // async (it awaits verifyBang), so we call the sync `_acquireConnection`
-    // directly — the sweep only reaches here when all connections are busy, so
-    // acquisition raises `ConnectionTimeoutError` (converted below) exactly as
-    // the old sync `checkout()` did. (Lifecycle-path async convergence is
-    // tracked by `converge-connection-pool-lifecycle-async`.)
+    // directly. This fallback only exists to grab ownership / surface a timeout
+    // for a busy connection — the acquired connection is immediately blocked and
+    // discarded by the sweep, so it deliberately skips checkout_and_verify's
+    // clean!/query-cache wiring (running it here regresses disconnect/discard
+    // tests). The sweep only reaches here when connections are busy, so
+    // acquisition raises `ConnectionTimeoutError` (converted below).
+    // (Lifecycle-path async convergence is tracked by
+    // `converge-connection-pool-lifecycle-async`.)
     return pool._acquireConnection();
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {

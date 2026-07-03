@@ -330,14 +330,14 @@ it("concurrent checkouts within a pinned context all return the pinned connectio
     // than pulling a free-list connection (which would race the pinned TX).
     const results = await Promise.all(
       Array.from({ length: 11 }, async () => {
-        const sync = await pool.checkout();
-        const async_ = await pool.checkout();
-        return { sync, async_ };
+        const first = await pool.checkout();
+        const second = await pool.checkout();
+        return { first, second };
       }),
     );
-    for (const { sync, async_ } of results) {
-      expect(sync).toBe(pinned);
-      expect(async_).toBe(pinned);
+    for (const { first, second } of results) {
+      expect(first).toBe(pinned);
+      expect(second).toBe(pinned);
     }
     await pool.unpinConnectionBang();
   } finally {
