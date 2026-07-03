@@ -205,9 +205,20 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("currentMembership") as any).create();
+    const membership = await (newMember.association("currentMembership") as any).create();
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
+
+    // Rails' create_through_record reconciles against the persisted join row
+    // (`through_record.update(attributes)`) instead of building a duplicate: on
+    // save the existing membership is updated to point at the new club, no
+    // second membership row is inserted.
+    const before = await Membership.count();
+    expect(await newMember.save()).toBe(true);
+    expect(await Membership.count()).toBe(before);
+    expect(newClub.isPersisted()).toBe(true);
+    const reloaded = await Membership.find(membership.id);
+    expect(reloaded.club_id).toBe(newClub.id);
   });
 
   it("creating multiple associations creates through record", async () => {
