@@ -1,7 +1,7 @@
 /**
  * Phase D-0 / D-0a: verify that:
  *   1. Base.connectionHandler is bootstrapped per worker (isConnectedQ)
- *   2. defineSchema(schema) resolves the adapter from Base.adapter internally
+ *   2. Base.connection resolves the adapter from the handler internally
  *   3. A model with no direct `static { this.adapter = ... }` assignment
  *      resolves its adapter via the Rails-shape handler chain
  *   4. (D-0a) A bare `class Post extends Base {}` with no explicit attribute
@@ -10,9 +10,7 @@
  */
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base } from "../base.js";
-import { defineSchema } from "./define-schema.js";
 import { dropAllTables } from "./drop-all-tables.js";
-import { clearAppliedSchemaSignatures } from "./define-schema.js";
 import { setupFixtures } from "./fixtures.js";
 
 class HandlerResolvedPost extends Base {
@@ -36,34 +34,23 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   // for this suite. D-1..N test files use the same one-liner.
   setupFixtures();
 
-  // No adapter arg — resolves via Base.connectionHandler. This is the
-  // new Rails-shape call pattern that D-1..N test files will use.
+  // Tables laid via Base.connection — the connection itself resolves through
+  // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.
   beforeAll(async () => {
-    await defineSchema({
-      handler_resolved_posts: { title: "string" },
-      handler_resolved_comments: { body: "string" },
-    });
+    const adapter = Base.connection;
+    await adapter.createTable("handler_resolved_posts", (t) => t.string("title"));
+    await adapter.createTable("handler_resolved_comments", (t) => t.string("body"));
     // D-0a: load schema for the bare model (no explicit attribute declarations).
     // This deadlocked before the fix; now routes through the checked-out adapter.
     await HandlerResolvedComment.loadSchema();
   });
 
   afterAll(async () => {
-    const adapter = Base.connection;
-    await dropAllTables(adapter);
-    clearAppliedSchemaSignatures(adapter);
+    await dropAllTables(Base.connection);
   });
 
   it("isConnectedQ() is true after setupHandlerSuite()", () => {
     expect(Base.isConnectedQ()).toBe(true);
-  });
-
-  it("defineSchema(schema) without adapter arg creates the table via the handler", async () => {
-    // If the table wasn't created, create would throw a "no such table" error.
-    // This verifies defineSchema resolved Base.adapter internally.
-    const post = await HandlerResolvedPost.create({ title: "hello" });
-    expect(post.title).toBe("hello");
-    expect(post.isPersisted()).toBe(true);
   });
 
   it("bare class extends Base loads schema via lazy reflection without deadlock", async () => {
