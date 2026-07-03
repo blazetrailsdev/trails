@@ -6541,12 +6541,15 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return the Arel SelectManager.
+   * Return the Arel SelectManager. `aliases` threads an existing AliasTracker
+   * so a join scope built via `arel` re-aliases tables already claimed by the
+   * caller (Rails `def arel(aliases = nil); build_arel(c, aliases); end`,
+   * query_methods.rb:1594).
    *
    * Mirrors: ActiveRecord::Relation#arel (alias for toArel)
    */
-  arel(): SelectManager {
-    return this.toArel();
+  arel(aliases?: AliasTracker): SelectManager {
+    return this.toArel(aliases);
   }
 
   /**
