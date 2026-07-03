@@ -793,7 +793,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await ppl.first()).toBeNull();
   });
 
-  it.skip("should raise exception for destroying mismatching records", async () => {
+  it("should raise exception for destroying mismatching records", async () => {
     const personCountBefore = await Person.count();
     const readerCountBefore = await Reader.count();
     const post = await Post.find(posts("welcome").id);
