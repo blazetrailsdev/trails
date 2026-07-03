@@ -217,6 +217,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
       t.string("group");
       t.datetime("created_at", { null: true, precision: 6 });
       t.datetime("updated_at", { null: true, precision: 6 });
+      t.index(["author_name", "title"]);
     });
     try {
       expect(await a.primaryKey("topics")).toBe("id");

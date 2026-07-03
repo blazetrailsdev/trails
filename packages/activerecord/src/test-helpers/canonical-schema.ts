@@ -1414,6 +1414,7 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
     t.string("group");
     t.datetime("created_at", { null: true });
     t.datetime("updated_at", { null: true });
+    t.index(["author_name", "title"]);
   });
 
   await define("toys", { serialPk: "toy_id" }, (t) => {
