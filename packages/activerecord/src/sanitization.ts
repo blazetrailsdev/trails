@@ -77,10 +77,16 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
       const value = values.shift();
       if (spec === "%s") return quoter.quoteString(String(value ?? ""));
       // Rails applies `statement % values.collect { quote_string(v.to_s) }`, so
-      // Ruby's `%d` runs `Integer()` on the stringified value — which rejects
-      // trailing garbage (`Integer("12abc")`) and non-integers (`Integer("3.5")`),
-      // not just empties. Mirror that strictness instead of `parseInt`'s lenient
-      // prefix-parse (which would silently emit `12` / `3`).
+      // Ruby's `%d` runs `Integer()` on the stringified value, rejecting trailing
+      // garbage (`Integer("12abc")`) and non-integers (`Integer("3.5")`), not just
+      // empties — so we validate a plain base-10 integer rather than lean on
+      // `parseInt`'s lenient prefix-parse (which would emit `12` / `3`).
+      // DEVIATION: Ruby's `Integer()` also honors base prefixes on strings
+      // (`"012"` → 8-radix 10, `"0x1A"` → 26); we intentionally treat the value
+      // as base-10 only. `%d` binds are integers in practice (finder_test.rb uses
+      // `["id = %d", 1]`); a leading-zero/hex *string* bind to a `%d` fragment is
+      // pathological and absent from the Rails suite, so we don't reproduce the
+      // base-prefix parse.
       const text = String(value ?? "").trim();
       if (!/^[+-]?\d+$/.test(text)) {
         throw new PreparedStatementInvalid(
