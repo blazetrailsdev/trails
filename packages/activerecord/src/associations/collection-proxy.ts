@@ -3440,9 +3440,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
     // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
-    // for the shapes it can route. Composite keys stay on the IN-subquery
-    // fallback below (they trip its ConfigurationError guards); other
-    // unroutable shapes (nested/polymorphic) do too.
+    // for the shapes it can route. Most composite-key shapes stay on the
+    // IN-subquery fallback below (they trip its ConfigurationError guards), as
+    // do other unroutable shapes (nested/polymorphic). The one composite case
+    // that DOES route to `buildThroughJoinScope` is a composite source FK on a
+    // hasMany source (see the `Array.isArray(sourceFk)` branch below): the
+    // single-column IN-subquery can't express that tuple match, and the
+    // JOIN-based scope handles the composite ON clause safely even with a
+    // composite owner PK.
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
     const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
     const targetPkComposite = Array.isArray((this.model as any).primaryKey);
@@ -3555,9 +3560,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         ? (sourceRefl?.foreignKey ?? `${underscore(sourceAsName)}_id`)
         : (sourceRefl?.foreignKey ?? `${underscore(throughClassName)}_id`);
       if (Array.isArray(sourceFk)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite foreign key on the hasMany source — the target-side IN-subquery needs a single column.`,
+        // Composite source FK (e.g. CPK `has_many :chapters, through: :book`
+        // where the join model's `has_many` source uses a composite key): the
+        // single-column IN-subquery can't express the tuple match, so route
+        // through the JOIN-based AssociationScope, which builds the composite ON
+        // clause. Falls back to a null scope only when the owner FK is absent.
+        const joinRel = buildThroughJoinScope(
+          this._record,
+          this._assocName,
+          this._assocDef.options,
         );
+        return joinRel ?? (targetModel as any).all().none();
       }
       // When the source reflection specifies a primaryKey option (e.g.
       // `has_many :orderAgreements, primaryKey: "id"` on a CPK through model),
