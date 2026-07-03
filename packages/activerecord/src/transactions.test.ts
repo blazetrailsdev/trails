@@ -427,7 +427,7 @@ describe("TransactionTest", () => {
 
   it("successful with return outside inner transaction", async () => {
     let committed = false;
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const original = connection.commitDbTransaction.bind(connection);
     const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
       committed = true;
@@ -493,7 +493,7 @@ describe("TransactionTest", () => {
 
   it("number of transactions in commit", async () => {
     let num: number | undefined;
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const original = connection.commitDbTransaction.bind(connection);
     const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
       num = connection.transactionManager.openTransactions;
@@ -946,7 +946,7 @@ describe("TransactionTest", () => {
   });
 
   itIfSupports("savepoints", "using named savepoints", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await Topic.transaction(async () => {
       first.approved = true;
       await first.saveBang();
@@ -965,7 +965,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback when commit raises", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
       throw new Error("OH NOES");
     });
@@ -1227,7 +1227,7 @@ describe("TransactionTest", () => {
 
   it("transactions state from rollback", async () => {
     const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
     expect(txn.open).toBe(true);
@@ -1242,7 +1242,7 @@ describe("TransactionTest", () => {
 
   it("transactions state from commit", async () => {
     const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
     expect(txn.open).toBe(true);
@@ -1257,7 +1257,7 @@ describe("TransactionTest", () => {
 
   it("mark transaction state as committed", async () => {
     const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
     await txn.rollback();
@@ -1268,7 +1268,7 @@ describe("TransactionTest", () => {
 
   it("mark transaction state as rolledback", async () => {
     const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
     await txn.commit();
@@ -1279,7 +1279,7 @@ describe("TransactionTest", () => {
 
   it("mark transaction state as nil", async () => {
     const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
     await txn.commit();
@@ -1311,7 +1311,7 @@ describe("TransactionTest", () => {
   it("rollback dirty changes even with raise during rollback removes from pool", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const pool = (Topic as any).connectionPool();
     connection.rollbackDbTransaction = async () => {
       throw new Rollback();
@@ -1330,7 +1330,7 @@ describe("TransactionTest", () => {
   it("rollback dirty changes even with raise during rollback doesnt commit transaction", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     connection.rollbackDbTransaction = async () => {
       throw new Rollback();
     };
@@ -1354,7 +1354,7 @@ describe("TransactionTest", () => {
   it("connection removed from pool when commit raises and rollback raises", async () => {
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
 
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const pool = (Topic as any).connectionPool();
     connection.transactionManager.commitTransaction = async () => {
       throw new Error("commit failed");
@@ -1376,7 +1376,7 @@ describe("TransactionTest", () => {
   });
 
   it("connection removed from pool when begin raises after successfully beginning a transaction", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     const pool = (Topic as any).connectionPool();
     await connection.disableLazyTransactionsBang();
     connection.beginDbTransaction = async () => {
@@ -1426,12 +1426,12 @@ describe("TransactionTest", () => {
 
   // Several tests below disable lazy transactions on the shared connection;
   // re-enable afterward so later tests in this describe start from the default.
-  afterEach(() => {
-    (Topic as any).leaseConnection().enableLazyTransactionsBang();
+  afterEach(async () => {
+    (await (Topic as any).leaseConnection()).enableLazyTransactionsBang();
   });
 
   it("savepoints name", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await Topic.transaction(async () => {
       await Topic.deleteAll(); // Dirty the transaction to force a savepoint below
 
@@ -1462,7 +1462,7 @@ describe("TransactionTest", () => {
   });
 
   it("releasing named savepoints", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await Topic.transaction(async () => {
       await connection.materializeTransactions();
 
@@ -1537,7 +1537,7 @@ describe("TransactionTest", () => {
   });
 
   it("nested transactions after disable lazy transactions", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await connection.disableLazyTransactionsBang();
 
     const actualQueries = await captureSql(
@@ -1590,7 +1590,7 @@ describe("TransactionTest", () => {
   });
 
   it("accessing raw connection materializes transaction", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
       await Topic.transaction(async () => {
         await connection.rawConnection();
@@ -1599,7 +1599,7 @@ describe("TransactionTest", () => {
   });
 
   it("accessing raw connection disables lazy transactions", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
     await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
       await Topic.transaction(async () => {});
@@ -1607,7 +1607,7 @@ describe("TransactionTest", () => {
   });
 
   it("checking in connection reenables lazy transactions", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
     // Mirrors `Topic.connection_pool.checkin`: run the `:checkin` callbacks
     // (one of which is enable_lazy_transactions!) around `expire`.
@@ -1618,7 +1618,7 @@ describe("TransactionTest", () => {
   });
 
   it("transactions can be manually materialized", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();
@@ -1658,7 +1658,7 @@ describe("TransactionTest", () => {
   });
 
   it.skipIf(adapterType !== "sqlite")("sqlite add column in transaction", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     try {
       (Topic as any).resetColumnInformation();
       await connection.addColumn("topics", "stuff", "string");
@@ -1685,7 +1685,7 @@ describe("TransactionTest", () => {
   });
 
   it.skipIf(adapterType !== "sqlite")("sqlite default transaction mode is immediate", async () => {
-    const connection = (Topic as any).leaseConnection();
+    const connection = await (Topic as any).leaseConnection();
     await assertQueriesMatch(/BEGIN IMMEDIATE TRANSACTION/i, undefined, false, async () => {
       await Topic.transaction(async () => {
         await connection.materializeTransactions();

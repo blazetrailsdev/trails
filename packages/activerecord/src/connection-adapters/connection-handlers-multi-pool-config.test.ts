@@ -43,12 +43,12 @@ describe("ConnectionHandlersMultiPoolConfigTest", () => {
     ).not.toBeUndefined();
   });
 
-  it("connected?", () => {
+  it("connected?", async () => {
     handler.establishConnection(primaryConfig(), { owner: "primary" });
     handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
 
     // connect to default
-    handler.connectionPoolList("writing")[0].leaseConnection();
+    await handler.connectionPoolList("writing")[0].leaseConnection();
 
     expect(handler.isConnected("primary")).toBe(true);
     expect(handler.isConnected("primary", { shard: "default" })).toBe(true);

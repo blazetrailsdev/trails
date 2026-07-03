@@ -333,7 +333,7 @@ export class DatabaseTasks {
       pool &&
       (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
     ) {
-      await runMigration(pool.leaseConnection());
+      await runMigration(await pool.leaseConnection());
     } else {
       // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
       await this.withTemporaryConnection(config, runMigration);
@@ -938,7 +938,7 @@ export class DatabaseTasks {
     const { Base } = await import("../base.js");
     this._baseClass = Base;
     const pool = Base.connectionPool();
-    const adapter = pool.leaseConnection();
+    const adapter = await pool.leaseConnection();
     const { Migrator } = await import("../migration.js");
     const migrator = new Migrator(adapter, this._migrations);
     // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
@@ -1035,7 +1035,7 @@ export class DatabaseTasks {
           if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
           await this.withTemporaryPool(dbConfig, async (pool) => {
             const { Migrator } = await import("../migration.js");
-            const migrator = new Migrator(pool.leaseConnection(), this._migrations);
+            const migrator = new Migrator(await pool.leaseConnection(), this._migrations);
             await migrator.migrate(version ?? null);
           });
         }
@@ -1062,7 +1062,7 @@ export class DatabaseTasks {
     const { Migrator } = await import("../migration.js");
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
-        const migrator = new Migrator(pool.leaseConnection(), this._migrations);
+        const migrator = new Migrator(await pool.leaseConnection(), this._migrations);
         const versionsToRun = await migrator.pendingMigrationVersions();
         for (const version of versionsToRun) {
           if (targetVersion !== null && targetVersion !== Number(version)) continue;
@@ -1120,7 +1120,7 @@ export class DatabaseTasks {
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     ) => Promise<T>,
   ): Promise<T> {
-    return this.withTemporaryPool(config, (pool) => fn(pool.leaseConnection()));
+    return this.withTemporaryPool(config, async (pool) => fn(await pool.leaseConnection()));
   }
 
   static async withTemporaryPoolForEach<T>(
@@ -1159,7 +1159,11 @@ export class DatabaseTasks {
     | null {
     if (!this._baseClass) return null;
     try {
-      return this._baseClass.connectionPool().leaseConnection();
+      // The Rails-named `leaseConnection` is now async (it awaits per-checkout
+      // `verifyBang` — see ConnectionPool#checkout). This sync accessor uses the
+      // `leaseConnectionSync` escape hatch, which resolves a pinned connection /
+      // establishes a first lease without the async verify.
+      return this._baseClass.connectionPool().leaseConnectionSync();
     } catch (error) {
       if (error instanceof ConnectionNotDefined) return null;
       throw error;

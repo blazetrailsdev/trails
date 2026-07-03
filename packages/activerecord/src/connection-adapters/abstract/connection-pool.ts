@@ -500,11 +500,45 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Lease management ---
 
-  leaseConnection(): DatabaseAdapter {
+  // Async for the same reason as `checkout` (see its comment): the pinned-reuse
+  // path routes through `checkout`, which awaits `verifyBang`. Intentional
+  // NAME+semantics fidelity to Rails' `lease_connection`, not the sync return.
+  async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this._connectionLease();
     lease.sticky = true;
     if (!lease.connection) {
-      lease.connection = this.checkout();
+      lease.connection = await this.checkout();
+    }
+    return lease.connection;
+  }
+
+  /**
+   * Test-infra-only synchronous lease. The Rails-named `leaseConnection` /
+   * `checkout` are now async (they await per-checkout `verifyBang` — see
+   * {@link checkout}), but the test adapter factories in `test-adapter.ts`
+   * (`createTestAdapter`, `createSidecarTestAdapter`) are invoked from dozens of
+   * synchronous test call sites. This mirrors the pre-async sync lease: it
+   * establishes/returns the lease connection *without* the async per-checkout
+   * verify (`checkoutAndVerify` still runs on a fresh non-pinned checkout, as
+   * the old sync `checkout()` did). NOT part of the Rails surface — do not use
+   * on production/query paths; those go through async `leaseConnection` /
+   * `withConnection`.
+   *
+   * @internal
+   */
+  leaseConnectionSync(): DatabaseAdapter {
+    const lease = this._connectionLease();
+    lease.sticky = true;
+    if (!lease.connection) {
+      const pinned = this._resolvePinnedConnection();
+      if (pinned) {
+        if (this._connections && !this._connections.includes(pinned)) {
+          this._connections.push(pinned);
+        }
+        lease.connection = pinned;
+      } else {
+        lease.connection = checkoutAndVerify(this, this._acquireConnection());
+      }
     }
     return lease.connection;
   }
@@ -643,47 +677,16 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Checkout / Checkin ---
 
-  checkout(): DatabaseAdapter {
-    const pinned = this._resolvePinnedConnection();
-    if (pinned) {
-      // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
-      // unconditionally, ensure membership in @connections, and return — no
-      // checkout_and_verify / QueryCache wiring on the pinned connection.
-      if (this._connections && !this._connections.includes(pinned)) {
-        this._connections.push(pinned);
-      }
-      // Rails re-runs `verify!` on *every* pinned checkout (connection_pool.rb:554),
-      // and `verify!` self-heals: `abstract_adapter.rb:759` reconnects
-      // (`restore_transactions: true`) when the connection is no longer `active?`.
-      // But Rails' `verify!` is synchronous, whereas trails' `verifyBang` is async
-      // (a real backend issues a liveness round-trip), so the sync `checkout()` API
-      // cannot await it. The previous `fireAndForgetVerify` fired the promise and
-      // swallowed a teardown-race rejection to avoid an unhandled rejection — but
-      // even it did not heal *this* checkout: it returned `pinned` before the async
-      // verify resolved, so the caller received the same (possibly stale)
-      // connection object either way. It only reconnected the socket in the
-      // background for some *later* use.
-      //
-      // We drop the sync verify. Every path that CAN await already verifies (and
-      // thus self-heals) the pinned connection: `pinConnectionBang` awaits
-      // `verifyBang` at establishment, and `checkoutAsync` awaits it on every
-      // awaitable handout below — that is the path trails' modern query execution
-      // (`withConnection` → `checkoutAsync`) actually takes, so per-checkout
-      // reconnect-on-drop parity with Rails is preserved there. The only handout
-      // that loses per-checkout self-heal is the *deprecated* sync `.connection` /
-      // `leaseConnection` path making repeated sync `checkout()` calls within one
-      // pinned session; a connection that dies mid-session is then recovered at
-      // query time (withRawConnection retry) rather than pre-emptively at checkout.
-      // Full sync-path parity is impossible without awaiting (the impedance
-      // mismatch this whole story is about) and is tracked for convergence in
-      // story `connection-pool-pinned-sync-checkout-per-checkout-verify`.
-      return pinned;
-    }
-    const conn = this._acquireConnection();
-    return checkoutAndVerify(this, conn);
-  }
-
-  async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
+  // `checkout` is async in trails even though Rails' `ConnectionPool#checkout`
+  // (connection_pool.rb:547) is synchronous. This is an intentional, documented
+  // divergence: trails' `verifyBang` issues a real backend liveness round-trip
+  // and is async, whereas Rails' `verify!` (abstract_adapter.rb:759) is sync.
+  // To reconnect-on-drop on *every* pinned checkout the way Rails does, we must
+  // await `verifyBang`, so the whole method returns a Promise. Fidelity here is
+  // the method NAME + semantics (per-checkout verify/self-heal), NOT the sync
+  // return type — do not "converge back" to a sync return. See RFC
+  // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
+  async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
     if (pinned) {
       // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
@@ -808,7 +811,7 @@ export class ConnectionPool implements ReapablePool {
     const needsCheckout = !lease.connection;
     if (needsCheckout) {
       try {
-        lease.connection = await this.checkoutAsync(options.checkoutTimeout);
+        lease.connection = await this.checkout(options.checkoutTimeout);
       } catch (err) {
         restoreSticky();
         throw err;
@@ -1355,7 +1358,7 @@ export class ConnectionPool implements ReapablePool {
   /**
    * Resolve the connection that all checkouts in the current execution
    * context should route to while a pin is active. Centralizes the lookup
-   * used by `checkout`, `checkoutAsync`, and `_acquireConnection` so every
+   * used by `checkout` and `_acquireConnection` so every
    * lease entry point honors `pinConnectionBang` consistently — mirrors
    * Rails' `@pinned_connection` short-circuit in
    * `ConnectionPool#checkout` (connection_pool.rb:547).
@@ -1557,7 +1560,14 @@ function attemptToCheckoutAllExistingConnections(
  */
 function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
   try {
-    return pool.checkout();
+    // Synchronous acquisition: this is the exclusive-access sweep on the sync
+    // disconnect/discard lifecycle path, which cannot await. `checkout` is now
+    // async (it awaits verifyBang), so we call the sync `_acquireConnection`
+    // directly — the sweep only reaches here when all connections are busy, so
+    // acquisition raises `ConnectionTimeoutError` (converted below) exactly as
+    // the old sync `checkout()` did. (Lifecycle-path async convergence is
+    // tracked by `converge-connection-pool-lifecycle-async`.)
+    return pool._acquireConnection();
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {
       throw new ExclusiveConnectionTimeoutError(

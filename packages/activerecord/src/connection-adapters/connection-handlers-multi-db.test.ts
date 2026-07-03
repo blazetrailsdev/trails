@@ -86,16 +86,18 @@ describe("ConnectionHandlersMultiDbTest", () => {
     // relation itself (then-stripped) so it escapes the block as a loaded
     // Relation rather than auto-unwrapping to an array.
     const relation = await Base.connectedTo({ role: "secondary" }, async () => {
-      await MultiConnectionTestModel.leaseConnection().executeMutation(
+      await (
+        await MultiConnectionTestModel.leaseConnection()
+      ).executeMutation(
         "CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))",
       );
       await MultiConnectionTestModel.createBang({ connection_role: "reading" });
       const loaded = await MultiConnectionTestModel.where({ connection_role: "reading" }).load();
       // Relation is already loaded (cached); dropping here is behavior-neutral
       // and balances require-table-teardown for the raw-created table.
-      await MultiConnectionTestModel.leaseConnection().executeMutation(
-        "DROP TABLE IF EXISTS `multi_connection_test_models`",
-      );
+      await (
+        await MultiConnectionTestModel.leaseConnection()
+      ).executeMutation("DROP TABLE IF EXISTS `multi_connection_test_models`");
       return loaded;
     });
 

@@ -82,7 +82,7 @@ describeIfSqlite("CopyTableTest", () => {
   fixtures(["customers"], { schema: canonicalSchema });
 
   it("copy table", async () => {
-    await testCopyTable(Base.leaseConnection() as any);
+    await testCopyTable((await Base.leaseConnection()) as any);
   });
 
   it.skip("copy table with column with default", () => {
@@ -96,7 +96,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table renaming column", async () => {
-    const conn = Base.leaseConnection() as any;
+    const conn = (await Base.leaseConnection()) as any;
     await testCopyTable(
       conn,
       "customers",
@@ -113,7 +113,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table allows to pass options to create table", async () => {
-    const conn = Base.leaseConnection() as any;
+    const conn = (await Base.leaseConnection()) as any;
     // testCopyTable drops `blocker_table` (its `to`) at the end, mirroring Rails.
     // eslint-disable-next-line blazetrails/require-table-teardown
     await conn.createTable("blocker_table");
@@ -121,7 +121,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table with index", async () => {
-    const conn = Base.leaseConnection() as any;
+    const conn = (await Base.leaseConnection()) as any;
     await testCopyTable(conn, "comments", "comments_with_index", {}, async () => {
       await conn.addIndex("comments_with_index", ["post_id", "type"]);
       await testCopyTable(conn, "comments_with_index", "comments_with_index2", {}, async () => {
@@ -132,7 +132,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table without primary key", async () => {
-    const conn = Base.leaseConnection() as any;
+    const conn = (await Base.leaseConnection()) as any;
     await testCopyTable(conn, "developers_projects", "programmers_projects", {}, async () => {
       expect(await conn.primaryKey("programmers_projects")).toBeNull();
     });
@@ -151,7 +151,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table with unconventional primary key", async () => {
-    const conn = Base.leaseConnection() as any;
+    const conn = (await Base.leaseConnection()) as any;
     await testCopyTable(conn, "owners", "owners_unconventional", {}, async () => {
       const originalPk = await conn.primaryKey("owners");
       const copiedPk = await conn.primaryKey("owners_unconventional");
@@ -160,7 +160,7 @@ describeIfSqlite("CopyTableTest", () => {
   });
 
   it("copy table with binary column", async () => {
-    await testCopyTable(Base.leaseConnection() as any, "binaries", "binaries2");
+    await testCopyTable((await Base.leaseConnection()) as any, "binaries", "binaries2");
   });
 
   it.skip("copy table with virtual column", () => {

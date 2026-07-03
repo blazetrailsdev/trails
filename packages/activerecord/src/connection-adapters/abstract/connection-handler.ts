@@ -211,7 +211,7 @@ export class ConnectionHandler {
   retrieveConnection(
     connectionName: string,
     options?: { role?: string; shard?: string },
-  ): DatabaseAdapter {
+  ): Promise<DatabaseAdapter> {
     const pool = this.retrieveConnectionPool(connectionName, {
       role: options?.role,
       shard: options?.shard,

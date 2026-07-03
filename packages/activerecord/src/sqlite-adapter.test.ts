@@ -242,7 +242,7 @@ describe("SQLite adapter driver binding", () => {
       },
     );
     const pool = new ConnectionPool(poolConfig);
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     expect(conn.active).toBe(false);
     await conn.internalExecute("CREATE TABLE pool_t (id INTEGER PRIMARY KEY, name TEXT)", "SCHEMA");
     expect(conn.active).toBe(true);
@@ -290,7 +290,7 @@ describe("SQLite adapter driver binding", () => {
       },
     );
     const pool = new ConnectionPool(poolConfig);
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS drain_t", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS drain_t", "SCHEMA");
@@ -319,7 +319,7 @@ describe("SQLite adapter driver binding", () => {
       },
     );
     const pool = new ConnectionPool(poolConfig);
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE sync_drain_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_drain_t", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_drain_t", "SCHEMA");
@@ -383,7 +383,7 @@ describe("SQLite adapter driver binding", () => {
         }) as unknown as DatabaseAdapter,
     );
     const pool = new ConnectionPool(poolConfig);
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE reload_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS reload_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
@@ -402,7 +402,7 @@ describe("SQLite adapter driver binding", () => {
         () => new AbstractSQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
       ),
     );
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE flush_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS flush_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
@@ -421,7 +421,7 @@ describe("SQLite adapter driver binding", () => {
         () => new AbstractSQLite3Adapter(":memory:", { driver }) as unknown as DatabaseAdapter,
       ),
     );
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE discard_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS discard_t", "SCHEMA");
     // Rails' discard! abandons the handle without closing; fire the async close
@@ -455,7 +455,7 @@ describe("SQLite adapter driver binding", () => {
           }) as unknown as DatabaseAdapter,
       ),
     );
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE swap_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS swap_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);
@@ -463,7 +463,7 @@ describe("SQLite adapter driver binding", () => {
     failCheckout = true;
     // The next checkout reuses the open available conn, fails verification, and
     // discards it — firing an async close the sync catch can't await.
-    expect(() => pool.checkout()).toThrow(/checkout boom/);
+    await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
     expect(isClosed()).toBe(false);
     release();
     await pool.drainPendingCloses();
@@ -481,7 +481,7 @@ describe("SQLite adapter driver binding", () => {
           }) as unknown as DatabaseAdapter,
       ),
     );
-    const conn = pool.checkout() as unknown as AbstractSQLite3Adapter;
+    const conn = (await pool.checkout()) as unknown as AbstractSQLite3Adapter;
     await conn.internalExecute("CREATE TABLE sync_seam_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_seam_t", "SCHEMA");
     pool.checkin(conn as unknown as DatabaseAdapter);

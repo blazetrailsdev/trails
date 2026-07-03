@@ -114,7 +114,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     try {
       expect(fs.existsSync(cachePath)).toBe(false);
-      const adapter = Base.connectionPool().leaseConnection();
+      const adapter = await Base.connectionPool().leaseConnection();
       await DatabaseTasks.dumpSchemaCache(adapter, cachePath);
       expect(fs.existsSync(cachePath)).toBe(true);
     } finally {
@@ -798,7 +798,7 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
     const pool = Base.connectionPool();
-    await new SchemaMigration(pool.leaseConnection()).createTable();
+    await new SchemaMigration(await pool.leaseConnection()).createTable();
     DatabaseTasks.registerMigrations([
       {
         version: "1",
