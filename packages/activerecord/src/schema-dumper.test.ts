@@ -17,11 +17,10 @@ function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
   return { adapter, ctx };
 }
 
-function freshSidecarCtx(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
-  const adapter = Base.connection;
-  const ctx = new MigrationContext(adapter);
-  return { adapter, ctx };
-}
+// Formerly leased a distinct sidecar adapter; now that both ride the primary
+// `Base.connection` pool the two are identical, so this stays a thin alias to
+// avoid churning the call sites.
+const freshSidecarCtx: () => { adapter: DatabaseAdapter; ctx: MigrationContext } = freshCtx;
 
 // Mirrors: ActiveRecord::TestCase#with_postgresql_datetime_type. Temporarily
 // flips PostgreSQLAdapter.datetimeType so :datetime resolves to :timestamptz.

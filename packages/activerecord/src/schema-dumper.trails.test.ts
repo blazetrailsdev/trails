@@ -4,7 +4,7 @@
 // adapter-introspection dump path (SchemaDumperAdapterTest), async header
 // ordering, and DSL-helper round-trips. Kept out of the Rails-mirrored
 // schema-dumper.test.ts so test:compare maps cleanly.
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
@@ -336,7 +336,9 @@ describe("SchemaDumperAdapterTest", () => {
 
   // Drop the real tables these adapter-backed tests create on the shared
   // per-worker DB so they don't collide with sibling files under parallel forks.
-  afterAll(async () => {
+  // `setupFixtures()` disables the global per-test reset, so drop them per test
+  // (not just in afterAll) to keep the shared-DB exposure window one test wide.
+  afterEach(async () => {
     const cleanupCtx = new MigrationContext(Base.connection);
     const o = { ifExists: true } as const;
     await cleanupCtx.dropTable("barcodes", o);
