@@ -79,8 +79,8 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
 }
 
 // Mirrors migration_test.rb's `assert_column Person` / `assert_no_column
-// Person`: re-read Person's columns from the migration DB, then restore Person's
-// original adapter and column cache (our leased test adapter is per-instance).
+// Person`: re-read Person's columns after the migrator ran, then reset its
+// column cache so the scratch `last_name` doesn't linger in reflection state.
 async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
   const original = (Person as any)._adapter;
   try {
