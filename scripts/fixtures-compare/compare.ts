@@ -403,6 +403,13 @@ function resolveEnumSymbol(table: string, attr: string, symbol: string): number 
 // keeps the literal ":symbol" string, and the TS fixture stores the normalized
 // "symbol", so strip a single leading colon on `:word`-shaped keys before
 // comparing store/serialize hashes.
+//
+// Blanket-stripping every `:word` key (rather than scoping to known columns) is
+// safe: in YAML `:word:` is symbol syntax, so a `:word`-shaped key out of the
+// parser is *always* a Ruby-symbol artifact, never intentional string data — a
+// literal colon-prefixed key would require quoting (`":word":`), of which the
+// Rails fixture corpus has zero. Every `:word` key in the corpus (admin/users,
+// to_be_linked/users, naked/yml/trees) is a genuine symbol.
 function normalizeSymbolKey(key: string): string {
   return SYMBOL_RE.test(key) ? key.slice(1) : key;
 }
