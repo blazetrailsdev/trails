@@ -37,6 +37,8 @@ import {
   Firm as CanonicalFirm,
 } from "./test-helpers/models/company.js";
 import { StatementInvalid } from "./index.js";
+import { ForbiddenAttributesError } from "@blazetrails/activemodel";
+import { ProtectedParams } from "./test-helpers/protected-params.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -1061,8 +1063,15 @@ describe("FinderTest", () => {
   });
   it("exists with strong parameters", async () => {
     const { Post } = makeModel();
+    expect(await Post.exists(new ProtectedParams({ title: "exists_sp" }).permit())).toBe(false);
+
     await Post.create({ title: "exists_sp" });
-    expect(await Post.exists({ title: "exists_sp" })).toBe(true);
+
+    expect(await Post.exists(new ProtectedParams({ title: "exists_sp" }).permit())).toBe(true);
+
+    await expect(Post.exists(new ProtectedParams({ title: "exists_sp" }))).rejects.toBeInstanceOf(
+      ForbiddenAttributesError,
+    );
   });
   it("exists passing active record object is not permitted", async () => {
     const { Post } = makeModel();
