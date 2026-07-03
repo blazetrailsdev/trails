@@ -94,6 +94,8 @@ describe("EagerAssociationTest", () => {
     tags,
     people,
     categories,
+    members,
+    clubs,
   } = fixtures([
     "authors",
     "authorFavorites",
@@ -158,10 +160,20 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("loading with scope including joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("loading with scope including joins", async () => {
+    let member = await Member.first();
+    expect(member?.id).toBe(members("groucho").id);
+    expect((await (member as any).association("generalClub").loadTarget())?.id).toBe(
+      clubs("boring_club").id,
+    );
+
+    member = (await Member.preload("generalClub").first()) as any;
+    expect(member?.id).toBe(members("groucho").id);
+    expect((member as any).association("generalClub").target?.id).toBe(clubs("boring_club").id);
+
+    member = (await Member.eagerLoad("generalClub").first()) as any;
+    expect(member?.id).toBe(members("groucho").id);
+    expect((member as any).association("generalClub").target?.id).toBe(clubs("boring_club").id);
   });
   it.skip("loading association with same table joins", () => {
     // BLOCKED: associations — eager-loading feature gap

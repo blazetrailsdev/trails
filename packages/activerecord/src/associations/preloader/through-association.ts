@@ -417,17 +417,36 @@ export class ThroughAssociation extends Association {
         // can resolve and add the source join when any of them needs it, so the
         // condition constrains which through row wins (Rails' through_scope).
         //
-        // "Can resolve" = references no table beyond the through/source pair. A
-        // predicate reaching a further (nested) table the scope joins via its own
-        // `.joins` stays at the source-preloader stage, where the full reflection
-        // scope (with those joins) is applied — pushing it here without the deeper
-        // join would produce `no such column: <nested>.<col>`. This admits both
-        // source-qualified and unqualified predicates, and mixed through/source
-        // predicates (e.g. `memberships.favorite = ? OR clubs.name = ?`), which
-        // land in the throughPredicates bucket but still need the source join.
-        // Mirroring Rails' nested-join carry-over (through_association.rb:117-142)
-        // is a separate convergence no current has_one-through scope exercises.
-        const allowed = [throughTable, sourceTable].filter((t): t is string => t != null);
+        // "Can resolve" = references no table beyond the through/source pair OR
+        // a deeper table the reflection scope itself reaches via its own
+        // `.joins`/`.leftJoins`/`.includes`. Rails' through_scope nests those
+        // structural values under the source reflection name so the deeper table
+        // is joined onto the through query too (through_association.rb:120-142);
+        // we carry them the same way and widen the resolvable-table set with the
+        // tables they join, so a predicate qualifying such a nested table
+        // (e.g. `general`'s `categories.name`) constrains which through row wins
+        // instead of being deferred to the source-preloader stage. A predicate
+        // reaching a table NOT joined by the scope still stays at the source
+        // stage (pushing it here would produce `no such column: <nested>.<col>`).
+        // This also admits source-qualified and unqualified predicates, and
+        // mixed through/source predicates (e.g.
+        // `memberships.favorite = ? OR clubs.name = ?`), which land in the
+        // throughPredicates bucket but still need the source join.
+        const sourceRefl = this._sourceReflection;
+        const reflScopeVals = this._reflectionScope;
+        const nestedIncludes: any[] = reflScopeVals?._includesAssociations ?? [];
+        const nestedJoins: any[] = reflScopeVals?._namedInnerJoins ?? [];
+        const nestedLeftOuter: any[] = reflScopeVals?._leftOuterJoinsValues ?? [];
+        const nestedTables = sourceRefl
+          ? this._resolveNestedTableNames(sourceRefl, [
+              ...nestedIncludes,
+              ...nestedJoins,
+              ...nestedLeftOuter,
+            ])
+          : [];
+        const allowed = [throughTable, sourceTable, ...nestedTables].filter(
+          (t): t is string => t != null,
+        );
         const copyable = [...throughPredicates, ...sourcePredicates].filter(
           (pred) => !predicateReferencesForeignTable(pred, allowed),
         );
@@ -441,8 +460,55 @@ export class ThroughAssociation extends Association {
           // mirrors Rails' LEFT OUTER JOIN: it never drops a through row for a
           // null source, so a mixed OR predicate can still select a through row
           // via its through-table arm while the WHERE filters the source arm.
-          const sourceRefl = this._sourceReflection;
-          if (sourceRefl) scope = scope.leftOuterJoins(sourceRefl.name);
+          if (sourceRefl) {
+            const sourceName = sourceRefl.name;
+            // Nest the scope's own joins/includes under the source reflection so
+            // the deeper tables their predicates qualify are joined onto the
+            // through query (Rails joins!/left_outer_joins!/includes!
+            // source_reflection.name => …). The nested left-outer form already
+            // joins the source, so only add the bare source join otherwise.
+            const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
+            if (nestedOuter.length > 0) {
+              scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });
+            } else {
+              scope = scope.leftOuterJoins(sourceName);
+            }
+            // Rails nests the scope's full `joins_values` under the source
+            // reflection (through_association.rb:132-134); `_namedInnerJoins`
+            // holds only symbol-association joins. A raw string / Arel join in
+            // the reflection scope (`.joins("INNER JOIN …")`) is not carried here
+            // — nesting a raw join under an association-name hash isn't
+            // meaningful for the join builder, and no current has_one-through
+            // scope uses one. If one ever does, its predicate's table stays out
+            // of the resolvable set and the predicate defers to the source stage
+            // (no `no such column`), same as the deeper-than-one-level case.
+            if (nestedJoins.length > 0) {
+              scope = scope.joins({ [sourceName]: nestedJoins });
+            }
+            // Rails also `references!(source_reflection.table_name)` so its
+            // `includes!(source)` promotes to a LEFT JOIN. We join the source
+            // explicitly above, so that step is already realized and no separate
+            // references pass is needed.
+            //
+            // Rails carries the scope's `order` only when `scope.eager_loading?`
+            // (through_association.rb:140). In that branch Rails ALWAYS
+            // `includes!(source)` and `references!(source.table_name)`, so
+            // `includes_values.any? && references_eager_loaded_tables?`
+            // (relation.rb:1238-1242) holds and `eager_loading?` is true
+            // whenever this where-copy branch runs — it does NOT depend on the
+            // reflection scope carrying its own nested `includes`. Our equivalent
+            // of that unconditional source include/reference is the source join
+            // added just above, so carry the order whenever we reach here (the
+            // enclosing `copyable.length > 0` guard is the analogue of the branch
+            // running), matching Rails for a `.leftJoins(:x).where(…).order(…)`
+            // scope that has no top-level `.includes`.
+            const orderClauses: any[] = reflScopeVals?._orderClauses ?? [];
+            const rawOrderClauses: string[] = reflScopeVals?._rawOrderClauses ?? [];
+            if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
+              scope._orderClauses = [...scope._orderClauses, ...orderClauses];
+              scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
+            }
+          }
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...copyable]);
         }
       }
@@ -503,6 +569,51 @@ export class ThroughAssociation extends Association {
 
     this._reflectionWherePartition = result;
     return result;
+  }
+
+  /**
+   * Resolve the table names an `AssociationSpec` list reaches from the source
+   * reflection's klass. Used to widen the has_one-through query's resolvable-table
+   * set with the tables the reflection scope joins via its own
+   * `.joins`/`.leftJoins`/`.includes`, so a predicate qualifying one of them can
+   * ride the through query (Rails' nested through_scope carry-over,
+   * through_association.rb:120-142). Resolution is single-level against the source
+   * klass — deeper hash nesting collects the first-level key only, which covers
+   * the canonical scopes; an unresolvable (e.g. polymorphic) association is
+   * skipped, leaving its predicate at the source-preloader stage.
+   * @internal
+   */
+  private _resolveNestedTableNames(sourceRefl: AssociationLikeReflection, specs: any[]): string[] {
+    let klass: typeof Base;
+    try {
+      klass = sourceRefl.klass;
+    } catch {
+      return [];
+    }
+    const names: string[] = [];
+    const collect = (spec: any): void => {
+      if (spec == null) return;
+      if (typeof spec === "string") {
+        names.push(spec);
+      } else if (Array.isArray(spec)) {
+        for (const s of spec) collect(s);
+      } else if (typeof spec === "object") {
+        for (const key of Object.keys(spec)) names.push(key);
+      }
+    };
+    for (const spec of specs) collect(spec);
+
+    const tables: string[] = [];
+    for (const name of names) {
+      try {
+        const r = (klass as any)._reflectOnAssociation?.(name);
+        const t = r?.klass?.tableName;
+        if (typeof t === "string") tables.push(t);
+      } catch {
+        /* polymorphic / unresolved association — leave predicate at source stage */
+      }
+    }
+    return tables;
   }
 
   /** @internal */
