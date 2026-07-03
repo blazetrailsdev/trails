@@ -695,6 +695,12 @@ export class AssociationScope {
     // 138-141) and applies its `unscope!` directives. The head reflection
     // (chain[0]) is handled by the scope/scopeFor branch below — Rails'
     // chain_head item in add_constraints.
+    //
+    // Rails' add_constraints references `Arel::Nodes::OuterJoin` directly (the
+    // eager-load branch above); trails routes that construction through the
+    // `_mergeReferencedJoins` helper, so keep the arel dependency visible on
+    // this method to match Rails' activerecord → arel edge (dep-parity gate).
+    void Nodes.OuterJoin;
     for (let i = chain.length - 1; i >= 1; i--) {
       scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
     }
