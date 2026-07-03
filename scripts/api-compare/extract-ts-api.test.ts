@@ -680,6 +680,31 @@ describe("extractFromProgram — include() detection", () => {
     expect(ext).toHaveLength(1);
   });
 
+  it("detects include() calls nested inside a module-level helper function", () => {
+    // Mirrors connection-adapters/abstract-adapter.ts after PR #4458, which
+    // moved the `include(AbstractAdapter, ...)` calls into a guarded
+    // `ensureAbstractAdapterMixinsApplied()` helper to break a module-eval
+    // TDZ cycle. The calls are no longer top-level expression statements but
+    // still describe the host's mixin surface, so they must be attributed.
+    const info = extractFromFiles("/p", {
+      "math.ts": `export const Math = { add() {}, mul() {} };`,
+      "node.ts": `export class Node {}`,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Node } from "./node.js";
+        import { Math } from "./math.js";
+        let applied = false;
+        function ensureMixinsApplied() {
+          if (applied) return;
+          applied = true;
+          include(Node, Math);
+        }
+        ensureMixinsApplied();
+      `,
+    });
+    expect(info.classes["node.ts:Node"].extends).toContain("Math");
+  });
+
   it("resolves a const-cast host (`const _X = X as unknown as new (...) => X`)", () => {
     // Mirrors arel/index.ts post-#814.
     const info = extractFromFiles("/p", {
