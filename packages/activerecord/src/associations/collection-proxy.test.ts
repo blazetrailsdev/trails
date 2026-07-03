@@ -6,6 +6,7 @@
 // non-through nullify path). No bespoke tables.
 
 import { describe, it, expect } from "vitest";
+import { throwAbort } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -483,6 +484,163 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     // exist; a new-record-only delete runs outside any transaction.
     expect(opened).toBe(false);
     expect(proxy.target.length).toBe(0);
+  });
+});
+
+// CollectionAssociation#delete_or_destroy opens with `return if records.empty?`
+// (collection_association.rb:385) and remove_records aborts via
+// `catch(:abort) { ... } || return` (collection_association.rb:399-402), so both
+// `delete` and `destroy` return nil — not [] — on an empty batch or a halted
+// before_remove. `[]` vs nil is observable (a JS `[]` is truthy), so mirror the
+// nil return with `undefined`. No Rails test asserts the return value directly,
+// so these use descriptive trails-only names.
+describe("CollectionProxy#delete / #destroy — nil return on empty or abort", () => {
+  fixtures(["authors", "posts"]);
+
+  // Author subclass on the canonical `authors` table whose has_many :posts
+  // carries a before_remove that throws :abort — the only deviation from the
+  // default Author#posts association.
+  class AuthorWithAbortingBeforeRemove extends Base {
+    static {
+      this.tableName = "authors";
+      this.hasMany("posts", {
+        className: "Post",
+        foreignKey: "author_id",
+        beforeRemove: () => throwAbort(),
+      });
+    }
+  }
+  registerModel("AuthorWithAbortingBeforeRemove", AuthorWithAbortingBeforeRemove);
+
+  it("returns nil when delete is called with no records", async () => {
+    const author = await Author.create({ name: "Owner" });
+    const proxy = association<Post>(author, "posts");
+    expect(await proxy.delete()).toBeUndefined();
+  });
+
+  it("returns nil when destroy is called with no records", async () => {
+    const author = await Author.create({ name: "Owner" });
+    const proxy = association<Post>(author, "posts");
+    expect(await proxy.destroy()).toBeUndefined();
+  });
+
+  it("returns [] (not nil) when delete is called with an explicit empty array", async () => {
+    // Rails checks `records.empty?` on the raw splat before flatten, so
+    // `delete([])` is `[[]]` (size 1) → flattens to [] → returns [], unlike the
+    // no-arg `delete()` which returns nil (collection_association.rb:385-388).
+    const author = await Author.create({ name: "Owner" });
+    const proxy = association<Post>(author, "posts");
+    expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
+      [],
+    );
+  });
+
+  it("returns nil when a before_remove callback aborts delete", async () => {
+    const author = await AuthorWithAbortingBeforeRemove.create({ name: "Owner" });
+    const post = await Post.create({ title: "p", body: "p", author_id: author.id as number });
+    const proxy = association<Post>(author, "posts");
+    await proxy.load();
+
+    expect(await proxy.delete(post)).toBeUndefined();
+    // The abort halted the operation: the child FK is untouched.
+    const reloaded = await Post.find(post.id as number);
+    expect((reloaded as any).author_id).toBe(Number(author.id));
+  });
+});
+
+// The nil-on-empty contract holds through the association layer too, which is
+// what `CollectionProxy#delete/#destroy` delegate to for has_many :through
+// (collection_proxy.rb:620-693 → @association.delete/destroy): the shared
+// `delete_or_destroy` returns nil for empty args (collection_association.rb:385).
+// The ABORT case, however, diverges from the non-through path:
+// `HasManyThroughAssociation#remove_records` (has_many_through_association.rb:
+// 116-118) runs `super; delete_through_records(records)` and returns the latter's
+// records array, discarding super's abort-nil — so a through before_remove abort
+// still skips the DB delete but returns the records, NOT nil.
+describe("CollectionProxy#delete / #destroy through has_many :through — nil on empty, records on abort", () => {
+  fixtures(["posts", "tags"]);
+
+  // Post subclass on the canonical `posts` table whose `has_many :tags,
+  // through: :taggings` carries a before_remove that throws :abort — the only
+  // deviation from the default Post#tags through association.
+  class PostWithAbortingTagRemove extends Base {
+    static {
+      this.tableName = "posts";
+      this.hasMany("taggings", { as: "taggable" });
+      this.hasMany("tags", { through: "taggings", beforeRemove: () => throwAbort() });
+    }
+  }
+  registerModel("PostWithAbortingTagRemove", PostWithAbortingTagRemove);
+
+  it("returns nil when a through delete is called with no records", async () => {
+    const post = await Post.create({ title: "p", body: "p" });
+    const proxy = association<Tag>(post, "tags");
+    expect(await proxy.delete()).toBeUndefined();
+  });
+
+  it("returns [] (not nil) when a through delete is called with an explicit empty array", async () => {
+    // The raw-splat empty check holds through the association layer too:
+    // `delete([])` flattens to [] and returns [], not nil.
+    const post = await Post.create({ title: "p", body: "p" });
+    const proxy = association<Tag>(post, "tags");
+    expect(await (proxy.delete as (...r: unknown[]) => Promise<Base[] | undefined>)([])).toEqual(
+      [],
+    );
+  });
+
+  it("returns the records (not nil) when a before_remove aborts a through delete, leaving the join row", async () => {
+    const post = await PostWithAbortingTagRemove.create({ title: "p", body: "p" });
+    const tag = await Tag.create({ name: "t" });
+    await Tagging.create({
+      taggable_id: post.id as number,
+      taggable_type: "PostWithAbortingTagRemove",
+      tag_id: tag.id as number,
+    });
+    const proxy = association<Tag>(post, "tags");
+    await proxy.load();
+
+    // Rails HMT#remove_records returns delete_through_records(records) → the
+    // records array, NOT the base method's abort-nil
+    // (has_many_through_association.rb:116-118). So the through delete returns
+    // the records even on abort — unlike the non-through path.
+    const result = await proxy.delete(tag);
+    expect(result).toHaveLength(1);
+    expect((result as Tag[])[0]).toBe(tag);
+    // The abort still skips super's delete_records, so the DB join row survives.
+    const count = await Tagging.where({ taggable_id: post.id as number }).count();
+    expect(count).toBe(1);
+    // Rails leaves @target intact on abort (remove_records exits before
+    // `@target -= records`), so the proxy's loaded collection is NOT emptied.
+    expect(proxy.target).toHaveLength(1);
+    expect(proxy.target[0].id).toBe(tag.id);
+  });
+
+  it("coerces a bare id but raises on an id nested in an array for a through delete", async () => {
+    // Rails checks `records.any? { Integer/String }` on the raw splat before
+    // flatten (collection_association.rb:186-197): a bare `delete(id)` is coerced
+    // via `find`, but `delete([id])` is `[[id]]` (no top-level id) → flattens to
+    // `[id]` → `raise_on_type_mismatch!` on the raw id → AssociationTypeMismatch.
+    const post = await Post.create({ title: "p", body: "p" });
+    const tag = await Tag.create({ name: "t" });
+    await Tagging.create({
+      taggable_id: post.id as number,
+      taggable_type: "Post",
+      tag_id: tag.id as number,
+    });
+    const proxy = association<Tag>(post, "tags");
+    await proxy.load();
+
+    // An id nested in an array is not coerced — it hits the type check and raises.
+    await expect((proxy.delete as (...r: unknown[]) => Promise<unknown>)([tag.id])).rejects.toThrow(
+      /Tag.*expected/,
+    );
+    // The join row is untouched by the failed call.
+    expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(1);
+
+    // A bare top-level id IS coerced via find and removes the join row.
+    const removed = await proxy.delete(tag.id as number);
+    expect(removed).toBeDefined();
+    expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(0);
   });
 });
 
