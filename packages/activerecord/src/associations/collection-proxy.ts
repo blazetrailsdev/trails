@@ -2670,6 +2670,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
+    // Rails CollectionAssociation#delete_or_destroy short-circuits with
+    // `return if records.empty?` before any find/type-check/callback, so an
+    // empty `destroy()` returns nil (CollectionProxy#destroy taps that nil).
+    if (records.length === 0) return undefined;
     // Through (incl. HABTM): delegate to the association-layer destroy, exactly
     // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
     // has_many :through that runs HasManyThroughAssociation#delete_records

@@ -566,6 +566,15 @@ describe("AssociationCallbacksTest", () => {
     expect(firm.log).toEqual([`before_remove${client.id}`, `after_remove${client.id}`]);
     expect(await Client.exists(client.id)).toBe(false);
   });
+
+  it("collection destroy with no arguments returns undefined", async () => {
+    // Rails delete_or_destroy `return if records.empty?` → nil; no callbacks run.
+    const firm = await Firm.create({ name: "Firm" });
+    await firm.clients.create({ name: "Client" });
+    firm.log.length = 0;
+    expect(await firm.clients.destroy()).toBeUndefined();
+    expect(firm.log).toEqual([]);
+  });
 });
 
 // ==========================================================================
