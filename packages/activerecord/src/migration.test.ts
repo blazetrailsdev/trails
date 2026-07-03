@@ -10,11 +10,13 @@ import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
-import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
+import { repairWorkerSchema } from "./test-helpers/schema-repair.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -43,39 +45,19 @@ import {
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
-  const adapter = await createTestAdapter();
+  const adapter = Base.connection;
   const ctx = new MigrationContext(adapter);
   return { adapter, ctx };
 }
 
 // The migration-on-`people` tests (Rails runs `add_column/remove_column
 // "people", "last_name"` through a `Migrator`) need the canonical `people`
-// table materialized before the migrator runs. The SQLite lane's leased adapter
-// has no template, so build the canonical `people` shape directly with
-// `createTable` (mirroring the `people` entry in test-helpers/test-schema.ts —
-// never a fabricated shape); `force: true` makes it a no-op on lanes that
-// already have it. The afterEach strips the scratch `last_name` column and the
-// afterAll drops the table, so nothing leaks into the shared worker DB.
+// table materialized before the migrator runs. `setupFixtures()` establishes
+// the schema-loaded primary pool, so `Base.connection` already carries the
+// canonical `people` table — no hand-built shape required. The afterEach strips
+// the scratch `last_name` column so sibling files see the pristine shape.
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
-  const adapter = await createTestAdapter();
-  await adapter.createTable("people", { force: true }, (t) => {
-    t.string("first_name", { null: false });
-    t.integer("primary_contact_id");
-    t.string("gender", { limit: 1 });
-    t.integer("number1_fan_id");
-    t.integer("lock_version", { null: false, default: 0 });
-    t.string("comments");
-    t.integer("followers_count", { default: 0 });
-    t.integer("friends_too_count", { default: 0 });
-    t.integer("best_friend_id");
-    t.integer("best_friend_of_id");
-    t.integer("insures", { null: false, default: 0 });
-    t.datetime("born_at");
-    t.integer("cars_count", { default: 0 });
-    t.datetime("created_at", { null: false });
-    t.datetime("updated_at", { null: false });
-  });
-  return adapter;
+  return Base.connection;
 }
 
 // Build a MigrationProxy whose `up` runs `body` (e.g. `add_column "people", …`)
@@ -112,11 +94,19 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
   }
 }
 
+// Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
+// schema-loaded primary pool established by `setupFixtures()` rather than a
+// sidecar `_pool` lease (RFC 0059). `setupFixtures()` shields the shared worker
+// DB from the global `resetTestAdapterState()`, so this file owns the per-test
+// cleanup of the bespoke tables its `MigrationContext` sub-describes create —
+// see the afterEach/afterAll below and each test's own `finally`.
+setupFixtures();
+
 // Mirrors migration_test.rb's teardown, which strips the scratch columns the
 // people-migration tests add back off the shared canonical `people` table and
 // clears recorded versions — so sibling files see the pristine canonical shape.
 afterEach(async () => {
-  const adapter = await createTestAdapter();
+  const adapter = Base.connection;
   const ctx = new MigrationContext(adapter);
   try {
     // Gate the drop on the ADAPTER's live introspection, not `removeColumn`'s
@@ -148,10 +138,16 @@ afterEach(async () => {
 });
 
 // Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
-// does too); they leak into the shared per-worker DB, so drop each by name —
-// mirroring Rails' teardown — to avoid collisions with sibling files.
+// does too); with the global reset shielded they leak into the shared per-worker
+// DB, so drop each BESPOKE table by name — mirroring Rails' teardown — to avoid
+// collisions with sibling files. Canonical tables (`people`, `books`,
+// `memberships`, `values`, …) are deliberately NOT in this list: dropping a
+// canonical table would corrupt siblings that ride it. The two ReservedWords
+// tests below force-create a bespoke `values(value)` over the canonical
+// `values` shape, so restore any drifted canonical table via
+// `repairWorkerSchema` after the bespoke drops.
 afterAll(async () => {
-  const { ctx } = await freshContext();
+  const { adapter, ctx } = await freshContext();
   const o = { ifExists: true } as const;
   await ctx.dropTable("big_numbers", o);
   await ctx.dropTable("binary_testings", o);
@@ -163,24 +159,26 @@ afterAll(async () => {
   await ctx.dropTable("bk6", o);
   await ctx.dropTable("bk7", o);
   await ctx.dropTable("bk_idx", o);
-  await ctx.dropTable("books", o);
-  await ctx.dropTable("games", o);
-  await ctx.dropTable("join_table", o);
-  await ctx.dropTable("memberships", o);
   await ctx.dropTable("nonexistent", o);
   await ctx.dropTable("old_name", o);
-  await ctx.dropTable("people", o);
   await ctx.dropTable("pend_t", o);
+  await ctx.dropTable("people_src", o);
+  await ctx.dropTable("people_src2", o);
+  await ctx.dropTable("pre_new_suf", o);
   await ctx.dropTable("pre_old_suf", o);
   await ctx.dropTable("rv_bulk", o);
+  await ctx.dropTable("something", o);
+  await ctx.dropTable("table_from_query_testings", o);
+  await ctx.dropTable("table_from_query_testings2", o);
   await ctx.dropTable("test_binary_limits", o);
   await ctx.dropTable("test_integer_limits", o);
   await ctx.dropTable("test_text_limits", o);
   await ctx.dropTable("test_text_sizes", o);
   await ctx.dropTable("testings", o);
   await ctx.dropTable("things", o);
-  await ctx.dropTable("values", o);
   await ctx.dropTable("widgets", o);
+  await ctx.dropTable("wtx_test", o);
+  await repairWorkerSchema(adapter, TEST_SCHEMA);
 });
 
 function internalMetadataExistsSql(kind: typeof adapterType): string {
@@ -231,13 +229,21 @@ describe("MigrationTest", () => {
     const { ctx } = await freshContext();
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
-    await ctx.createTable("pre_old_suf", {}, (t) => {
-      t.string("value");
-    });
+    // Own the scratch tables for the whole test: with the global reset shielded
+    // by setupFixtures(), a leaked `pre_old_suf`/`pre_new_suf` would break the
+    // create/rename below, so clear any leak up front and drop in the finally.
+    await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
+    try {
+      await ctx.createTable("pre_old_suf", {}, (t) => {
+        t.string("value");
+      });
 
-    await ctx.renameTable("old", "new");
-    expect(ctx.tableExists("pre_old_suf")).toBe(false);
-    expect(ctx.tableExists("pre_new_suf")).toBe(true);
+      await ctx.renameTable("old", "new");
+      expect(ctx.tableExists("pre_old_suf")).toBe(false);
+      expect(ctx.tableExists("pre_new_suf")).toBe(true);
+    } finally {
+      await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
+    }
   });
 
   it("decimal scale without precision should raise", () => {
@@ -294,7 +300,7 @@ describe("MigrationTest", () => {
 
 // -- Helpers --
 async function freshAdapter(): Promise<DatabaseAdapter> {
-  return await createTestAdapter();
+  return Base.connection;
 }
 
 // ==========================================================================
@@ -610,7 +616,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration context with default schema migration", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -641,7 +647,7 @@ describe("MigrationTest", () => {
   });
 
   it("migrator versions", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -705,7 +711,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration detection without schema migration table", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
         version: "1",
@@ -719,7 +725,7 @@ describe("MigrationTest", () => {
   });
 
   it("any migrations", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const withMigrations = new Migrator(adapter, [
       {
         version: "1",
@@ -734,7 +740,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration version", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
         version: "20131219224947",
@@ -750,13 +756,21 @@ describe("MigrationTest", () => {
 
   it("create table with if not exists true", async () => {
     const { ctx } = await freshContext();
-    await ctx.createTable("things", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.createTable("things", { ifNotExists: true }, (t) => {
-      t.string("name");
-    });
-    expect(ctx.tableExists("things")).toBe(true);
+    // With the global reset shielded by setupFixtures(), a leaked `things` from
+    // a sibling file would make the first, non-ifNotExists create raise; clear
+    // any leak up front and drop in the finally so DDL stays confined here.
+    await ctx.dropTable("things", { ifExists: true });
+    try {
+      await ctx.createTable("things", {}, (t) => {
+        t.string("name");
+      });
+      await ctx.createTable("things", { ifNotExists: true }, (t) => {
+        t.string("name");
+      });
+      expect(ctx.tableExists("things")).toBe(true);
+    } finally {
+      await ctx.dropTable("things", { ifExists: true });
+    }
   });
 
   it("create table raises for long table names", async () => {
@@ -874,7 +888,7 @@ describe("MigrationTest", () => {
   });
 
   it("filtering migrations", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const ran: string[] = [];
     const migrations: MigrationProxy[] = [
       {
@@ -906,7 +920,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
         version: "100",
@@ -930,7 +944,7 @@ describe("MigrationTest", () => {
     "ddl_transactions",
     "migrator one up with exception and rollback using run",
     async () => {
-      const adapter = await createTestAdapter();
+      const adapter = Base.connection;
       const migrations: MigrationProxy[] = [
         {
           version: "100",
@@ -988,6 +1002,9 @@ describe("MigrationTest", () => {
     // Error message matches Rails format (no "this and" because no transaction)
     expect(err.message).toMatch(/An error has occurred, all later migrations canceled/);
     expect(err.message).not.toContain("this and");
+    // The failed no-transaction migration leaves `wtx_test` behind (that is the
+    // point of the test); drop it so it does not leak past the shielded reset.
+    await adapter.dropTable("wtx_test", { ifExists: true });
   });
 
   it("internal metadata table name", async () => {
@@ -1290,7 +1307,7 @@ describe("MigrationTest", () => {
   );
 
   itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
-    const { adapter: realAdapter } = await createSidecarTestAdapter();
+    const realAdapter = Base.connection;
     const migrator = new Migrator(realAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
@@ -1306,7 +1323,7 @@ describe("MigrationTest", () => {
 
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
     // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
-    const testAdapter = await createTestAdapter();
+    const testAdapter = Base.connection;
     const migrator = new Migrator(testAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     // Must fit in a signed 63-bit integer
@@ -1361,7 +1378,7 @@ describe("MigrationTest", () => {
       // the adapter's single persistent pg.Client (no separate pinned
       // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
       // the same session is the closure proof.
-      const { adapter: realAdapter } = await createSidecarTestAdapter();
+      const realAdapter = Base.connection;
       const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
       const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
       try {
@@ -1441,7 +1458,7 @@ describe("MigrationTest", () => {
       // table (default PK, not the canonical `as`/`group_id` shape), exercises
       // add_index/remove_index on the `value` column, and drops the table in an
       // `ensure` (our `finally`) so nothing leaks into the shared worker DB.
-      const connection = await createTestAdapter();
+      const connection = Base.connection;
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
       });
@@ -1462,7 +1479,7 @@ describe("MigrationTest", () => {
       // same bespoke `values(value)` table as the ReservedWords test above, but
       // adds/removes an explicitly named index and drops the table in `finally`
       // (Rails' `ensure`).
-      const connection = await createTestAdapter();
+      const connection = Base.connection;
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
       });
@@ -1482,6 +1499,20 @@ describe("MigrationTest", () => {
     let bulkAdapter: DatabaseAdapter;
     beforeEach(async () => {
       bulkAdapter = await freshAdapter();
+    });
+    // Each test creates its own uniquely-named `bk*` table; with the global
+    // reset shielded by setupFixtures() they would persist across tests and into
+    // sibling files, so drop them here (Rails' teardown drops the ad-hoc table).
+    afterEach(async () => {
+      const o = { ifExists: true } as const;
+      await bulkAdapter.dropTable("bk1", o);
+      await bulkAdapter.dropTable("bk2", o);
+      await bulkAdapter.dropTable("bk3", o);
+      await bulkAdapter.dropTable("bk4", o);
+      await bulkAdapter.dropTable("bk5", o);
+      await bulkAdapter.dropTable("bk6", o);
+      await bulkAdapter.dropTable("bk7", o);
+      await bulkAdapter.dropTable("bk_idx", o);
     });
     function makeBulkMig(m: Migration): Migration {
       (m as any).adapter = bulkAdapter;
@@ -1968,7 +1999,7 @@ describe("MigrationTest", () => {
             static version = ts;
             async change() {}
           }
-          const futureAdapter = await createTestAdapter();
+          const futureAdapter = Base.connection;
           expect(
             () =>
               new Migrator(futureAdapter, [
