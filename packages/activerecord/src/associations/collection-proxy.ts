@@ -507,6 +507,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // errors — worse than letting construction fail.
       const throughRel = this._buildThroughScope() as Relation<T>;
       proxySelf._copyStateFrom(throughRel);
+      // A new owner's through/HABTM scope collapses to `none()` (unresolvable
+      // FK) — mark it so a mutated finder rebases onto the resolved join scope
+      // once the owner is saved (see `_seededNoneNewOwner`).
+      if ((throughRel as unknown as { _isNone: boolean })._isNone) {
+        this._seededNoneNewOwner = true;
+      }
     } else {
       // Build via `buildHasManyRelation` so CP's inherited Relation
       // state matches `scope()` / direct Relation callers: default

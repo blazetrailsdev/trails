@@ -1004,6 +1004,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await (developer as any).projects.first()).id).toBe(project.id);
   });
 
+  // RFC 0023-surfaced-deviations: a HABTM proxy whose owner was NEW when a
+  // finder relation was spawned off it (`project.developers.where(...)`) seeds
+  // the `1=0` NullRelation. After `save`, the mutated finder must rebase onto
+  // the resolved join scope so it picks up the persisted FK rather than the
+  // stale seed — mirroring Rails' CollectionProxy delegating to
+  // `association.scope`.
+  it("mutated finder on new-owner seed resolves the join after save", async () => {
+    const developer = await Developer.create({ name: "Zed" });
+    const project = new Project({ name: "Rails Testing" });
+    // `where(...)` spawns off the still-new owner's `1=0` seed.
+    const scoped = (project as any).developers.where({ name: "Zed" });
+    await (project as any).developers.push(developer);
+    await (project as any).saveBang();
+
+    expect((await scoped.first()).id).toBe(developer.id);
+  });
+
   it("dynamic find should respect association include", async () => {
     // SQL error in sort clause if :include is not included
     // due to Unknown column 'authors.id'
