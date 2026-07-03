@@ -2249,6 +2249,7 @@ export class Base extends Model {
     this: T,
     conditions: Record<string, unknown>,
   ): Relation<InstanceType<T>>;
+  static whereNot<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
   static whereNot<T extends typeof Base>(
     this: T,
     cols: string[],
@@ -2256,23 +2257,25 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static whereNot<T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown> | string[],
+    conditions: Record<string, unknown> | string[] | unknown[],
     tuples?: unknown[][],
   ): Relation<InstanceType<T>> {
-    if (Array.isArray(conditions) && conditions.every((c) => typeof c === "string")) {
-      // Same fast-fail as Base.where: composite-key form requires
-      // a tuples argument as an array of arrays. Without this guard
-      // a stray `Model.whereNot(['c'])` would forward only the cols
-      // and Relation#whereNot's matching guard would throw — same
-      // outcome but the error message would mention Relation, not Model.
+    // Rails' `where.not` mirrors `where` — a single array argument is the
+    // sanitized-conditions form (`where.not(["name = ?", x])`, query_methods.rb:28)
+    // built via `build_where_clause(...).invert`; the composite-key form is the
+    // two-argument `whereNot(cols, tuples)`. Disambiguate by argument count.
+    if (Array.isArray(conditions) && tuples !== undefined) {
       if (!Array.isArray(tuples)) {
         throw argumentError(
           `${(this as { name?: string }).name ?? "Model"}.whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
         );
       }
-      return this.all().whereNot(conditions, tuples);
+      return this.all().whereNot(conditions as string[], tuples);
     }
-    return this.all().whereNot(conditions as Record<string, unknown>);
+    if (Array.isArray(conditions)) {
+      return this.all().whereNot(conditions as unknown[]);
+    }
+    return this.all().whereNot(conditions);
   }
 
   // insertAll / upsertAll / updateAll / deleteAll / destroyBy / deleteBy

@@ -76,15 +76,18 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement.replace(/%[sdi]/g, (spec) => {
       const value = values.shift();
       if (spec === "%s") return quoter.quoteString(String(value ?? ""));
-      // Ruby's `"%d" % "abc"` raises (Integer() rejects the value); mirror that
-      // rather than emitting a literal `NaN` into the SQL.
-      const int = parseInt(String(value), 10);
-      if (Number.isNaN(int)) {
+      // Rails applies `statement % values.collect { quote_string(v.to_s) }`, so
+      // Ruby's `%d` runs `Integer()` on the stringified value — which rejects
+      // trailing garbage (`Integer("12abc")`) and non-integers (`Integer("3.5")`),
+      // not just empties. Mirror that strictness instead of `parseInt`'s lenient
+      // prefix-parse (which would silently emit `12` / `3`).
+      const text = String(value ?? "").trim();
+      if (!/^[+-]?\d+$/.test(text)) {
         throw new PreparedStatementInvalid(
           `invalid value for %d bind variable (${String(value)}) in: ${statement}`,
         );
       }
-      return String(int);
+      return String(parseInt(text, 10));
     });
   }
 
