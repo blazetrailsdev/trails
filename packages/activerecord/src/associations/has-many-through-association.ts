@@ -359,18 +359,11 @@ async function updateThroughCounterCaches(
     }
   }
 
-  // Rails: update_counter(-count) on the owner's reflection counter cache.
+  // Rails: update_counter(-count) → owner.increment!(counter, -count) on the
+  // owner's reflection counter cache (has_many_association.rb:100).
   const counterCol = assoc.reflection.options.counterCache;
   if (!counterCol) return;
-  const owner = assoc.owner as any;
-  const column = String(counterCol);
-  if (typeof owner.incrementBang === "function") {
-    await owner.incrementBang(column, -count);
-  } else if (typeof owner.updateCounters === "function") {
-    await owner.updateCounters({ [column]: -count });
-  } else if (typeof owner.increment === "function") {
-    owner.increment(column, -count);
-  }
+  await assoc.owner.incrementBang(String(counterCol), -count);
 }
 
 /** The pre-built join row and the source reflection's inverse it wires to. */
