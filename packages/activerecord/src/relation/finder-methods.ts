@@ -698,10 +698,12 @@ export const FinderMethods = {
 export function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
   // Mirrors construct_relation_for_exists (finder_methods.rb:438): unwrap/forbid
   // strong-params objects before the Array/Hash/scalar case-analysis below. A
-  // plain hash/array/scalar/node passes through unchanged. Skip the `undefined`
-  // sentinel (our stand-in for Rails' `:none`, which Rails harmlessly sanitizes
-  // as a plain symbol) — sanitize only unwraps params-style objects.
-  if (conditions != null) {
+  // plain hash/array/scalar/node passes through unchanged. Skip only the
+  // `undefined` sentinel (our stand-in for Rails' `:none`, which Rails
+  // harmlessly sanitizes as a plain symbol); dereferencing `.permitted` on it
+  // would throw, and `exists?` never reaches here with `null` (short-circuited
+  // to false upstream), so `undefined` is the sole non-sanitizable input.
+  if (conditions !== undefined) {
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
   }
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
