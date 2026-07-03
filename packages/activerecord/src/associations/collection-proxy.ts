@@ -2120,6 +2120,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           sourceReflection?: {
             foreignKey?: string | string[];
             associationPrimaryKey?: string | string[];
+            associationPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+            isPolymorphic?: () => boolean;
+            foreignType?: string;
           };
         } | null;
       }
@@ -2198,11 +2201,27 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             } else {
               // Use sourceRefl.associationPrimaryKey when set — e.g. a
               // belongs_to with primaryKey: "name" means the join FK references
-              // category.name, not category.id.
-              const srcPk = sourceRefl?.associationPrimaryKey;
+              // category.name, not category.id. A polymorphic source reflection
+              // (e.g. `taggable`) can't compute its class, so its bare
+              // `associationPrimaryKey` getter raises — resolve against the
+              // pushed record's class via `associationPrimaryKeyFor` instead
+              // (Rails' `association_primary_key(klass)`).
+              const srcPk = sourceRefl?.associationPrimaryKeyFor
+                ? sourceRefl.associationPrimaryKeyFor(record.constructor as typeof Base)
+                : sourceRefl?.associationPrimaryKey;
               targetPkCol = (typeof srcPk === "string" ? srcPk : null) ?? targetPk;
             }
             sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
+          }
+          // Polymorphic source (e.g. `source: :taggable, source_type: "Post"`):
+          // set the join's `<source>_type` column so the belongs_to resolves to
+          // the pushed record's class. Mirrors Rails' construct_join_attributes /
+          // build_through_record source_type handling.
+          if (sourceRefl?.isPolymorphic?.() || this._assocDef.options.sourceType) {
+            const sourceTypeCol = sourceRefl?.foreignType ?? `${underscore(sourceName)}_type`;
+            sourceJoinAttrs[sourceTypeCol] =
+              this._assocDef.options.sourceType ??
+              polymorphicName(record.constructor as typeof Base);
           }
           // Extract WHERE conditions that belong to the through model's table.
           // Use the explicit `throughScope` (passed from AssociationRelation#create

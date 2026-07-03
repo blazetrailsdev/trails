@@ -268,22 +268,48 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     const extra = throughScopeAttributes(this);
     if (Object.keys(extra).length > 0) scope = scope.where(extra);
 
+    // Dispatch on `method` exactly as Rails' `delete_records` case statement:
+    // `:destroy` destroys the join rows (or, on a PK-less join model, runs their
+    // destroy callbacks then bulk-deletes); `:nullify` nulls the source FK;
+    // otherwise (`:delete_all`/canonical `"delete"`) a bulk delete WITHOUT
+    // callbacks. The prior code keyed the destroy path off the join model's PK
+    // instead of `method`, so `dependent: :delete_all` wrongly fired the join
+    // model's destroy callbacks.
     let count = 0;
-    if (method === "nullify") {
+    if (method === "destroy") {
+      if ((scope.model as typeof Base | undefined)?.primaryKey) {
+        const destroyed = (await scope.destroyAll()) as Base[];
+        count = destroyed.filter((r) => (r as any).isDestroyed?.()).length;
+      } else {
+        const recs = (await scope.toArray()) as Base[];
+        for (const r of recs) await (r as any)._runDestroyCallbacks?.();
+        count = await scope.deleteAll();
+      }
+    } else if (method === "nullify") {
       count = await scope.updateAll({ [sourceForeignKey(this)]: null });
-    } else if ((scope.model as typeof Base | undefined)?.primaryKey) {
-      // Destroy (not Rails' bulk delete_all) so the join model's belongs_to
-      // counter caches and before_destroy guards fire — trails keys through
-      // counter caches off that callback. See PR notes.
-      const destroyed = (await scope.destroyAll()) as Base[];
-      count = destroyed.filter((r) => (r as any).isDestroyed?.()).length;
     } else {
-      const recs = (await scope.toArray()) as Base[];
-      for (const r of recs) await (r as any)._runDestroyCallbacks?.();
       count = await scope.deleteAll();
     }
 
     await deleteThroughRecords(this, records);
+
+    // Mirror Rails' counter-cache tail (has_many_through_association.rb): update
+    // the through reflection's counter when it's a collection and the method
+    // warrants it (`update_through_counter?`), otherwise the source reflection's
+    // counter. `:destroy` on a through whose join belongs_to already maintains a
+    // counter (e.g. taggings' `tags_count`) falls to the source branch, so a
+    // distinct source counter like `tags_with_destroy_count` still decrements.
+    const ctor = this.owner.constructor as {
+      _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
+    };
+    const sourceReflection = ctor._reflectOnAssociation?.(this.reflection.name);
+    const throughReflection = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
+    if (throughReflection?.isCollection?.() && updateThroughCounter(throughReflection, method)) {
+      await updateThroughCounterCache(this.owner, throughReflection, -count);
+    } else {
+      await updateThroughCounterCache(this.owner, sourceReflection, -count);
+    }
+
     return count;
   }
 
@@ -590,6 +616,46 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
 /** @internal */
 function isUpdateThroughCounter(assoc: HasManyThroughAssociation, method: string): boolean {
   return method !== "destroy" && (assoc as any)._isUpdateThroughCounter?.(method) !== false;
+}
+
+/**
+ * Rich reflection surface `delete_records` needs for its counter-cache tail.
+ * @internal
+ */
+interface RichCounterReflection {
+  isCollection?: () => boolean;
+  hasCachedCounter?: () => boolean;
+  counterCacheColumn?: () => string | null;
+  isInverseUpdatesCounterCache?: () => unknown;
+}
+
+/**
+ * Mirrors Rails' `HasManyThroughAssociation#update_through_counter?`: `:destroy`
+ * updates the through counter only when the through belongs_to does NOT already
+ * maintain it (else the destroy callback double-counts); `:nullify` never; any
+ * other method always.
+ * @internal
+ */
+function updateThroughCounter(throughReflection: RichCounterReflection, method: string): boolean {
+  if (method === "destroy") return !throughReflection.isInverseUpdatesCounterCache?.();
+  if (method === "nullify") return false;
+  return true;
+}
+
+/**
+ * Mirrors Rails' `HasManyAssociation#update_counter(difference, reflection)`:
+ * bump the owner's cached counter column when the reflection has one.
+ * @internal
+ */
+async function updateThroughCounterCache(
+  owner: Base,
+  reflection: RichCounterReflection | undefined,
+  difference: number,
+): Promise<void> {
+  if (!reflection?.hasCachedCounter?.()) return;
+  const column = reflection.counterCacheColumn?.();
+  if (!column) return;
+  await (owner as any).incrementBang?.(column, difference);
 }
 
 /** @internal */
