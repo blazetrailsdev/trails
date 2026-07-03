@@ -271,7 +271,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     let count = 0;
     if (method === "nullify") {
       count = await scope.updateAll({ [sourceForeignKey(this)]: null });
-      await updateThroughCounterCaches(this, count, records, method);
+      await updateThroughCounterCaches(this, count, records);
       await deleteThroughRecords(this, records);
       return count;
     } else if ((scope.model as typeof Base | undefined)?.primaryKey) {
@@ -318,14 +318,20 @@ function sourceForeignKey(assoc: HasManyThroughAssociation): string {
 
 /**
  * Mirrors the counter-cache half of Rails' `HasManyThroughAssociation#delete_records`
- * (has_many_through_association.rb:163-173). For a `nullify` delete the through
- * join rows are updated in place (not deleted), so the join model's `belongs_to`
- * counter callbacks never fire — decrement the owner's counters here instead:
+ * (has_many_through_association.rb:163-173) for the `:nullify` path only. Because
+ * `nullify` UPDATEs the through join rows in place (rather than deleting them),
+ * the join model's `belongs_to` counter callbacks never fire, so the counters
+ * that a delete/destroy would maintain through those callbacks must be
+ * decremented here:
  *
- * - `source_reflection.options[:counter_cache]` (when set, and `method != :destroy`):
- *   `klass.decrement_counter` on the target rows by their ids.
- * - `update_through_counter?(:nullify)` is always `false`, so the owner's own
- *   reflection counter is decremented via `update_counter(-count)`.
+ * - `source_reflection.options[:counter_cache]` (Rails runs this for every
+ *   non-`:destroy` method): `klass.decrement_counter` on the target rows by id.
+ * - `update_through_counter?(:nullify)` is always `false`, so Rails takes the
+ *   `else` branch — `update_counter(-count)` on the owner's own reflection.
+ *
+ * The destroy/delete branches of `deleteRecords` route through `destroyAll`,
+ * whose per-row callbacks already maintain these counters, so this helper is
+ * deliberately scoped to `nullify` to avoid double-counting.
  *
  * @internal
  */
@@ -333,24 +339,27 @@ async function updateThroughCounterCaches(
   assoc: HasManyThroughAssociation,
   count: number,
   records: Base[],
-  method: string,
 ): Promise<void> {
   if (count <= 0) return;
   const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
-  const sourceRefl = refl?.sourceReflection;
+  const sourceRefl = ctor._reflectOnAssociation?.(assoc.reflection.name)?.sourceReflection;
 
-  if (sourceRefl?.options?.counterCache && method !== "destroy") {
-    const counter = sourceRefl.counterCacheColumn?.() ?? sourceRefl.options.counterCache;
+  // Rails: klass.decrement_counter(source_reflection.counter_cache_column, ids).
+  // Only act on a resolved string column — a bare `counter_cache: true` whose
+  // reflection can't resolve the column name is left untouched rather than
+  // guessed at.
+  if (sourceRefl?.options?.counterCache) {
+    const counter = sourceRefl.counterCacheColumn?.();
     const klass = safeKlass(sourceRefl) as {
       decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
     } | null;
     const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
-    if (klass?.decrementCounter && counter && ids.length > 0) {
-      await klass.decrementCounter(String(counter), ids);
+    if (typeof counter === "string" && klass?.decrementCounter && ids.length > 0) {
+      await klass.decrementCounter(counter, ids);
     }
   }
 
+  // Rails: update_counter(-count) on the owner's reflection counter cache.
   const counterCol = assoc.reflection.options.counterCache;
   if (!counterCol) return;
   const owner = assoc.owner as any;
