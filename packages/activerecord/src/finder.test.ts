@@ -29,9 +29,13 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 // rows (topics(:second), topics(:fourth)).
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
-import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
+import { Comment as CanonicalComment, SpecialComment } from "./test-helpers/models/comment.js";
 import { Customer as CanonicalCustomer, Address } from "./test-helpers/models/customer.js";
 import { Author as CanonicalAuthor } from "./test-helpers/models/author.js";
+import { Tagging as CanonicalTagging } from "./test-helpers/models/tagging.js";
+import { Subscriber as CanonicalSubscriber } from "./test-helpers/models/subscriber.js";
+import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
+import { Tag as CanonicalTag } from "./test-helpers/models/tag.js";
 import {
   Company as CanonicalCompany,
   Firm as CanonicalFirm,
@@ -546,65 +550,6 @@ describe("FinderTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
-  it("exists", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.exists()).toBe(true);
-  });
-
-  it("exists with scope", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.where({ title: "a" }).exists()).toBe(true);
-    expect(await Topic.where({ title: "z" }).exists()).toBe(false);
-  });
-
-  it("exists with nil arg", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(await Topic.exists()).toBe(false);
-  });
-
-  it("exists with empty hash arg", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.exists({})).toBe(true);
-  });
-
-  it("exists with order", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.order("title").exists()).toBe(true);
-  });
-
-  it("exists with empty table and no args given", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(await Topic.exists()).toBe(false);
-  });
-
   it("count by sql", async () => {
     class Topic extends Base {
       static {
@@ -660,16 +605,6 @@ describe("FinderTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it("exists returns true with one record and no args", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.exists()).toBe(true);
-  });
-
   it("find by sql with sti on joined table", async () => {
     class Topic extends Base {
       static {
@@ -702,28 +637,6 @@ describe("FinderTest", () => {
     await Topic.create({ title: "b" });
     const values = await Topic.all().pluck("title");
     expect(values.length).toBe(2);
-  });
-
-  it("exists with order and distinct", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    expect(await Topic.order("title").distinct().exists()).toBe(true);
-  });
-
-  it("exists with loaded relation", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "a" });
-    const rel = Topic.all();
-    await rel.load();
-    expect(await rel.exists()).toBe(true);
   });
 
   it("find by ids with limit and offset", async () => {
@@ -854,41 +767,6 @@ describe("FinderTest", () => {
     expect(Array.isArray(results)).toBe(true);
   });
 
-  it("exists uses existing scope", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "scoped" });
-    expect(await Topic.where({ title: "scoped" }).exists()).toBe(true);
-    expect(await Topic.where({ title: "missing" }).exists()).toBe(false);
-  });
-
-  it("exists with string", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "hello" });
-    expect(await Topic.exists()).toBe(true);
-  });
-
-  it("exists with joins", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Topic.create({ title: "join-test" });
-    // exists on a joined query should work
-    const sql = Topic.joins("LEFT OUTER JOIN posts ON posts.id = topics.id")
-      .where({ title: "join-test" })
-      .toSql();
-    expect(sql).toContain("LEFT OUTER JOIN");
-  });
-
   it("find with large number", async () => {
     class Topic extends Base {
       static {
@@ -972,30 +850,6 @@ describe("FinderTest", () => {
     const sql = Topic.where({ id: subq }).toSql();
     expect(sql).toContain("IN");
   });
-  it("exists with loaded relation having updated owner record", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string", { default: "" });
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    await Post.create({ title: "hello" });
-    const exists = await Post.where({ title: "hello" }).exists();
-    expect(exists).toBe(true);
-  });
-
-  it("exists with distinct and offset and select", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string", { default: "" });
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    const exists = await Post.distinct().offset(1).exists();
-    expect(exists).toBe(true);
-  });
 
   it("find with nil inside set passed for attribute", async () => {
     class Post extends Base {
@@ -1060,60 +914,6 @@ describe("FinderTest", () => {
     await Post.create({ title: "proc_test" });
     const found = await Post.findBy({ title: "proc_test" });
     expect(found).toBeDefined();
-  });
-  it("exists with strong parameters", async () => {
-    const { Post } = makeModel();
-    expect(await Post.exists(new ProtectedParams({ title: "exists_sp" }).permit())).toBe(false);
-
-    await Post.create({ title: "exists_sp" });
-
-    expect(await Post.exists(new ProtectedParams({ title: "exists_sp" }).permit())).toBe(true);
-
-    await expect(Post.exists(new ProtectedParams({ title: "exists_sp" }))).rejects.toBeInstanceOf(
-      ForbiddenAttributesError,
-    );
-  });
-  it("exists passing active record object is not permitted", async () => {
-    const { Post } = makeModel();
-    await expect(Post.exists(new Post())).rejects.toMatchObject({
-      message:
-        "You are passing an instance of ActiveRecord::Base to `exists?`. " +
-        "Please pass the id of the object by calling `.id`.",
-    });
-  });
-  it("exists does not select columns without alias", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "alias_test" });
-    expect(await Post.exists()).toBe(true);
-  });
-  it("exists with left joins", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "lj" });
-    expect(await Post.exists()).toBe(true);
-  });
-  it("exists with eager load", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "el" });
-    expect(await Post.exists()).toBe(true);
-  });
-  it("exists with includes limit and empty result", async () => {
-    const { Post } = makeModel();
-    expect(await Post.exists()).toBe(false);
-  });
-  it("exists with distinct association includes and limit", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "dail" });
-    expect(await Post.limit(1).exists()).toBe(true);
-  });
-  it("exists with distinct association includes limit and order", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "dailo" });
-    expect(await Post.order("title").limit(1).exists()).toBe(true);
-  });
-  it("exists should reference correct aliases while joining tables of has many through association", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "hmt" });
-    expect(await Post.exists()).toBe(true);
   });
   // "exists with aggregate having three mappings" and its "…with one
   // difference" sibling live in the fixture-backed FinderTest block below —
@@ -1430,46 +1230,6 @@ describe("FinderTest", () => {
     expect(found.id).toBe(p.id);
   });
 
-  it("exists with polymorphic relation", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "poly" });
-    expect(await Post.exists()).toBe(true);
-  });
-
-  it("exists with empty loaded relation", async () => {
-    const { Post } = makeModel();
-    const rel = Post.all();
-    await rel.load();
-    expect(await rel.exists()).toBe(false);
-  });
-
-  it("exists with loaded relation having unsaved records", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "saved" });
-    expect(await Post.exists()).toBe(true);
-  });
-
-  it("exists with distinct and offset and joins", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    expect(await Post.distinct().offset(1).exists()).toBe(true);
-  });
-
-  it("exists with distinct and offset and eagerload and order", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-    expect(await Post.distinct().offset(1).order("title").exists()).toBe(true);
-  });
-
-  it("exists does not instantiate records", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "no_inst" });
-    const result = await Post.exists();
-    expect(result).toBe(true);
-  });
-
   it("find on relation with large number", async () => {
     const { Post } = makeModel();
     await expect(Post.find(99999999)).rejects.toThrow();
@@ -1605,13 +1365,6 @@ describe("FinderTest", () => {
     const result = await Topic.find(emptyArray);
     expect(result).toEqual([]);
     expect(result).not.toBe(emptyArray);
-  });
-
-  it("exists returns false with false arg", async () => {
-    const Topic = makeTopic();
-    await Topic.create({ title: "One" });
-    const exists = await Topic.exists(false);
-    expect(exists).toBe(false);
   });
 
   it("find on array conditions", async () => {
@@ -2430,5 +2183,329 @@ describe("FinderTest", () => {
         ),
       }),
     ).toBe(false);
+  });
+});
+
+// ==========================================================================
+// FinderTest — faithful port of the finder_test.rb `test_exists*` cluster,
+// riding canonical models (Topic/Author/Post/Comment/Subscriber/Customer/
+// Developer) + the real fixtures. Replaces the earlier synthetic `exists`
+// coverage (RFC 0023). Test names match Rails verbatim.
+// ==========================================================================
+describe("FinderTest", () => {
+  const { topics, authors, developers } = fixtures(
+    [
+      "topics",
+      "authors",
+      "posts",
+      "comments",
+      "categorizations",
+      "taggings",
+      "subscribers",
+      "developers",
+      "ratings",
+    ],
+    { schema: canonicalSchema },
+  );
+  useHandlerTransactionalFixtures();
+
+  const Topic = CanonicalTopic;
+  const Author = CanonicalAuthor;
+  const Post = CanonicalPost;
+  const Comment = CanonicalComment;
+  const Tagging = CanonicalTagging;
+  const Subscriber = CanonicalSubscriber;
+  const Developer = CanonicalDeveloper;
+  registerModel("Topic", Topic);
+  registerModel("Reply", CanonicalReply);
+  // Post#tags_with_destroy (dependent: :destroy) walks the Tag class on the
+  // destroy cascade in `exists with loaded relation having unsaved records`.
+  registerModel("Tag", CanonicalTag);
+  // uniqueCategorizedPosts.includes("specialComments") resolves the SpecialComment
+  // STI subtype through the registry.
+  registerModel("SpecialComment", SpecialComment);
+
+  it("exists", async () => {
+    expect(await Topic.exists(1)).toBe(true);
+    expect(await Topic.exists("1")).toBe(true);
+    expect(await Topic.exists({ title: "The First Topic" })).toBe(true);
+    expect(await Topic.exists({ heading: "The First Topic" })).toBe(true);
+    expect(await Topic.exists({ author_name: "Mary", approved: true })).toBe(true);
+    expect(await Topic.exists(["parent_id = ?", 1])).toBe(true);
+    expect(await Topic.exists({ id: [1, 9999] })).toBe(true);
+
+    expect(await Topic.exists(45)).toBe(false);
+    expect(await Topic.exists(9999999999999999999999999999999n)).toBe(false);
+    expect(await Topic.exists((new Topic() as any).id)).toBe(false);
+
+    // Rails routes `[1, 2]` through `where!([1, 2])`, which raises ArgumentError
+    // (finder_test.rb:202). trails' where() tags that error `name: "ArgumentError"`.
+    await expect(Topic.exists([1, 2])).rejects.toMatchObject({ name: "ArgumentError" });
+  });
+
+  it("exists with scope", async () => {
+    const davids = Author.where({ name: "David" });
+    expect(await davids.exists()).toBe(true);
+    expect(await davids.exists(authors("david").id)).toBe(true);
+    expect(await davids.exists(authors("mary").id)).toBe(false);
+    expect(await davids.exists("42")).toBe(false);
+    expect(await davids.exists(42)).toBe(false);
+    expect(await davids.exists((davids.new() as any).id)).toBe(false);
+
+    const fake = Author.where({ name: "fake author" });
+    expect(await fake.exists()).toBe(false);
+    expect(await fake.exists(authors("david").id)).toBe(false);
+  });
+
+  it("exists uses existing scope", async () => {
+    const post = (await authors("david").posts.first())!;
+    const authorsRel = Author.includes("posts").where({ name: "David", posts: { id: post.id } });
+    expect(await authorsRel.exists(authors("david").id)).toBe(true);
+  });
+
+  it("exists with polymorphic relation", async () => {
+    const post = await Post.createBang({
+      title: "Post",
+      body: "default",
+      taggings: [Tagging.new({ comment: "tagging comment" })],
+    });
+    const relation = Post.taggedWithComment("tagging comment");
+
+    expect(await relation.exists({ title: ["Post"] })).toBe(true);
+    expect(await relation.exists(["title LIKE ?", "Post%"])).toBe(true);
+    expect(await relation.exists()).toBe(true);
+    expect(await relation.exists(post.id)).toBe(true);
+    expect(await relation.exists(String(post.id))).toBe(true);
+
+    expect(await relation.exists(false)).toBe(false);
+  });
+
+  it("exists with string", async () => {
+    expect(await Subscriber.exists("foo")).toBe(false);
+    expect(await Subscriber.exists("   ")).toBe(false);
+
+    await Subscriber.createBang({ id: "foo" });
+    await Subscriber.createBang({ id: "   " });
+
+    expect(await Subscriber.exists("foo")).toBe(true);
+    expect(await Subscriber.exists("   ")).toBe(true);
+  });
+
+  it("exists with strong parameters", async () => {
+    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permit())).toBe(false);
+
+    await Subscriber.createBang({ nick: "foo" });
+
+    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permit())).toBe(true);
+
+    await expect(Subscriber.exists(new ProtectedParams({ nick: "foo" }))).rejects.toThrow(
+      ForbiddenAttributesError,
+    );
+  });
+
+  it("exists passing active record object is not permitted", async () => {
+    await expect(Topic.exists(new Topic())).rejects.toThrow(
+      "You are passing an instance of ActiveRecord::Base to `exists?`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+  });
+
+  it("exists does not select columns without alias", async () => {
+    await assertQueriesMatch(
+      new RegExp(`SELECT 1 AS one FROM ${escapeRegExp(quoteTableName("topics"))}`, "i"),
+      undefined,
+      false,
+      async () => {
+        await Topic.exists();
+      },
+    );
+  });
+
+  it("exists returns true with one record and no args", async () => {
+    expect(await Topic.exists()).toBe(true);
+  });
+
+  it("exists returns false with false arg", async () => {
+    expect(await Topic.exists(false)).toBe(false);
+  });
+
+  it("exists with loaded relation", async () => {
+    const relation = await Topic.all().load();
+    await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
+      expect(await relation.exists()).toBe(true);
+    });
+  });
+
+  it("exists with empty loaded relation", async () => {
+    await Topic.deleteAll();
+    const relation = await Topic.all().load();
+    await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
+      expect(await relation.exists()).toBe(false);
+    });
+  });
+
+  it("exists with loaded relation having unsaved records", async () => {
+    const author = authors("david");
+    const posts = await author.posts.load();
+    expect(posts.length).toBeGreaterThan(0);
+    for (const post of posts) await post.destroy();
+
+    await assertQueriesMatch(/SELECT 1 AS one/i, undefined, false, async () => {
+      expect(await author.posts.exists()).toBe(false);
+    });
+  });
+
+  it("exists with loaded relation having updated owner record", async () => {
+    const author = authors("david");
+    expect((await author.posts).length).toBeGreaterThan(0);
+
+    for (const post of await author.posts) {
+      post.author = null;
+      await post.saveBang();
+    }
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await author.posts.exists()).toBe(false);
+    });
+  });
+
+  it("exists with nil arg", async () => {
+    expect(await Topic.exists(null)).toBe(false);
+    expect(await Topic.exists()).toBe(true);
+
+    expect(await (await Topic.first())!.replies.exists(null)).toBe(false);
+    expect(await (await Topic.first())!.replies.exists()).toBe(true);
+  });
+
+  it("exists with empty hash arg", async () => {
+    expect(await Topic.exists({})).toBe(true);
+  });
+
+  it("exists with distinct and offset and joins", async () => {
+    expect(await Post.leftJoins("comments").distinct().offset(10).exists()).toBe(true);
+    expect(await Post.leftJoins("comments").distinct().offset(11).exists()).toBe(false);
+  });
+
+  it("exists with distinct and offset and select", async () => {
+    expect(await Post.select("body").distinct().offset(4).exists()).toBe(true);
+    expect(await Post.select("body").distinct().offset(5).exists()).toBe(false);
+  });
+
+  it("exists with distinct and offset and eagerload and order", async () => {
+    expect(
+      await Post.eagerLoad("comments")
+        .distinct()
+        .offset(10)
+        .merge(Comment.order({ post_id: "asc" }))
+        .exists(),
+    ).toBe(true);
+    expect(
+      await Post.eagerLoad("comments")
+        .distinct()
+        .offset(11)
+        .merge(Comment.order({ post_id: "asc" }))
+        .exists(),
+    ).toBe(false);
+  });
+
+  it("exists with order and distinct", async () => {
+    expect(await Topic.order("id").distinct().exists()).toBe(true);
+  });
+
+  it("exists with order", async () => {
+    expect(await Topic.order(arelSql("invalid sql here")).exists()).toBe(true);
+  });
+
+  it("exists with joins", async () => {
+    expect(
+      await Topic.joins("replies")
+        .where({ replies_topics: { approved: true } })
+        .order("replies_topics.created_at DESC")
+        .exists(),
+    ).toBe(true);
+  });
+
+  it("exists with left joins", async () => {
+    expect(
+      await Topic.leftJoins("replies")
+        .where({ replies_topics: { approved: true } })
+        .order("replies_topics.created_at DESC")
+        .exists(),
+    ).toBe(true);
+  });
+
+  it("exists with eager load", async () => {
+    expect(
+      await Topic.eagerLoad("replies")
+        .where({ replies_topics: { approved: true } })
+        .order("replies_topics.created_at DESC")
+        .exists(),
+    ).toBe(true);
+  });
+
+  it("exists with includes limit and empty result", async () => {
+    await assertNoQueries(false, async () => {
+      expect(await Topic.includes("replies").limit(0).exists()).toBe(false);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await Topic.includes("replies").limit(1).where("0 = 1").exists()).toBe(false);
+    });
+  });
+
+  it("exists with distinct association includes and limit", async () => {
+    const author = (await Author.first())!;
+    const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts.includes(
+      "specialComments",
+    );
+    await assertNoQueries(false, async () => {
+      expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await uniqueCategorizedPosts.limit(1).exists()).toBe(true);
+    });
+  });
+
+  it("exists with distinct association includes limit and order", async () => {
+    const author = (await Author.first())!;
+    const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts
+      .includes("specialComments")
+      .order("comments.tags_count DESC");
+    await assertNoQueries(false, async () => {
+      expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await uniqueCategorizedPosts.limit(1).exists()).toBe(true);
+    });
+  });
+
+  it("exists should reference correct aliases while joining tables of has many through association", async () => {
+    const ratings = (developers("david") as any).ratings
+      .includes({ comment: "post" })
+      .where({ posts: { id: 1 } });
+    await assertQueriesCount(1, false, async () => {
+      expect(await ratings.limit(1).exists()).toBe(false);
+    });
+  });
+
+  it("exists with empty table and no args given", async () => {
+    await Topic.deleteAll();
+    expect(await Topic.exists()).toBe(false);
+  });
+
+  it("exists does not instantiate records", async () => {
+    // Rails: assert_not_called(Developer, :instantiate) — `instantiate` is a
+    // class (singleton) method, so we spy the static directly.
+    const original = (Developer as any).instantiate;
+    let called = false;
+    (Developer as any).instantiate = function (this: unknown, ...args: unknown[]) {
+      called = true;
+      return original.apply(this, args);
+    };
+    try {
+      await Developer.exists();
+    } finally {
+      (Developer as any).instantiate = original;
+    }
+    expect(called).toBe(false);
   });
 });
