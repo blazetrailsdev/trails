@@ -15900,13 +15900,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "delete_records",
-    "call": "decrement_counter",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-many-through-association.ts",
-    "rubyName": "delete_records",
     "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -15922,13 +15915,6 @@
     "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "delete_records",
     "call": "klass",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-many-through-association.ts",
-    "rubyName": "delete_records",
-    "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -55192,7 +55178,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "disconnect!",
-    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction — including `conn.disconnectBang()` — to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction \u2014 including `conn.disconnectBang()` \u2014 to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
   },
   {
     "package": "activerecord",
@@ -55206,7 +55192,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
     "call": "disconnect!",
-    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear — including `conn.disconnectBang()` — to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear \u2014 including `conn.disconnectBang()` \u2014 to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
   },
   {
     "package": "activerecord",
