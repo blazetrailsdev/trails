@@ -494,7 +494,11 @@ describe("HasOneThroughAssociationsTest", () => {
   it("through belongs to after destroy", async () => {
     const member = members("groucho");
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
+    // Rails `@member.member_detail = @member_detail` is a synchronous assignment;
+    // our writer is awaitable on a persisted owner. Un-awaited it floats a
+    // persistReplace that races member.save's has_one autosave and drops the
+    // child row on PG/MariaDB (see member_details double-write). Await to match.
+    await (member.association("memberDetail") as any).writer(memberDetail);
     await member.save();
 
     expect(await readHasOne(memberDetail, "memberType")).not.toBeNull();
