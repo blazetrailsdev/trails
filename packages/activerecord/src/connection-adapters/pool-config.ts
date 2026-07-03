@@ -164,30 +164,23 @@ export class PoolConfig {
     return this._pool !== null;
   }
 
-  disconnectBang(options: { automaticReconnect?: boolean } = {}): void {
+  async disconnectBang(options: { automaticReconnect?: boolean } = {}): Promise<void> {
     if (!this._pool) return;
     if (options.automaticReconnect !== undefined) {
       (this._pool as any).automaticReconnect = options.automaticReconnect;
     }
-    this._pool.disconnectBang();
-  }
-
-  disconnect(): void {
-    if (this._pool) {
-      this._pool.disconnect();
-    }
+    await this._pool.disconnectBang();
   }
 
   /**
-   * Async-draining variant of `disconnect`: awaits each adapter's pending
-   * async `driver.close()` (async-only SQLite drivers) before resolving, so
-   * the underlying handle is fully closed before the caller re-opens the DB.
-   * No-ops to a resolved promise when the pool is uninitialized or all drivers
-   * close synchronously.
+   * Disconnects the pool, awaiting each adapter's pending async `driver.close()`
+   * (async-only SQLite drivers) before resolving, so the underlying handle is
+   * fully closed before the caller re-opens the DB. No-ops to a resolved promise
+   * when the pool is uninitialized or all drivers close synchronously.
    */
-  async disconnectAsync(): Promise<void> {
+  async disconnect(): Promise<void> {
     if (this._pool) {
-      await this._pool.disconnectAsync();
+      await this._pool.disconnect();
     }
   }
 
@@ -234,30 +227,17 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
-  static disconnectAllBang(): void {
+  static async disconnectAllBang(): Promise<void> {
+    const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
       const config = ref.deref();
       if (!config) {
         INSTANCES.delete(ref);
         continue;
       }
-      config.disconnectBang({ automaticReconnect: true });
+      drains.push(config.disconnectBang({ automaticReconnect: true }));
     }
-  }
-
-  /** Async-draining variant of `disconnectAllBang`. */
-  static async disconnectAllBangAsync(): Promise<void> {
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      if (config._pool) {
-        (config._pool as any).automaticReconnect = true;
-        await config._pool.disconnectAsync();
-      }
-    }
+    await Promise.all(drains);
   }
 
   get schemaCache(): SchemaCache | null {

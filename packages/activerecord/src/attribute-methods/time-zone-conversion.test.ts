@@ -13,8 +13,8 @@ import { loadSchemaFromAdapter } from "../model-schema.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
 describe("TimeZoneConversionTest", () => {
-  beforeEach(() => {
-    createSidecarTestAdapter();
+  beforeEach(async () => {
+    await createSidecarTestAdapter();
   });
 
   it("wraps datetime attribute when timeZoneAwareAttributes is true", () => {

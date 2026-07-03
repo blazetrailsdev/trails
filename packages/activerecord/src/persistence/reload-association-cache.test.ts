@@ -10,7 +10,7 @@ describe("ReloadAssociationCacheTest", () => {
   let adapter: TestDatabaseAdapter;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     Publication.adapter = adapter;
     Editor.adapter = adapter;
     Editorship.adapter = adapter;

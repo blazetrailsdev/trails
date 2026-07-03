@@ -680,6 +680,31 @@ describe("extractFromProgram — include() detection", () => {
     expect(ext).toHaveLength(1);
   });
 
+  it("detects include() calls nested inside a module-level helper function", () => {
+    // Mirrors connection-adapters/abstract-adapter.ts after PR #4458, which
+    // moved the `include(AbstractAdapter, ...)` calls into a guarded
+    // `ensureAbstractAdapterMixinsApplied()` helper to break a module-eval
+    // TDZ cycle. The calls are no longer top-level expression statements but
+    // still describe the host's mixin surface, so they must be attributed.
+    const info = extractFromFiles("/p", {
+      "math.ts": `export const Math = { add() {}, mul() {} };`,
+      "node.ts": `export class Node {}`,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Node } from "./node.js";
+        import { Math } from "./math.js";
+        let applied = false;
+        function ensureMixinsApplied() {
+          if (applied) return;
+          applied = true;
+          include(Node, Math);
+        }
+        ensureMixinsApplied();
+      `,
+    });
+    expect(info.classes["node.ts:Node"].extends).toContain("Math");
+  });
+
   it("resolves a const-cast host (`const _X = X as unknown as new (...) => X`)", () => {
     // Mirrors arel/index.ts post-#814.
     const info = extractFromFiles("/p", {
@@ -721,6 +746,26 @@ describe("extractFromProgram — extend() detection", () => {
         import { Base } from "./base.js";
         import { Querying as QueryingMixin } from "./querying.js";
         extend(Base, QueryingMixin);
+      `,
+    });
+    expect(info.classes["base.ts:Base"].extends).toContain("Querying");
+  });
+
+  it("detects extend() calls nested inside a module-level helper function", () => {
+    // The extend pass shares the whole-file walk with include(), so a call
+    // applied from a deferred-mixin helper (rather than a top-level statement)
+    // must still be attributed to the host.
+    const info = extractFromFiles("/p", {
+      "querying.ts": `export class Querying { all(): void {} }`,
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import { Base } from "./base.js";
+        import { Querying } from "./querying.js";
+        function ensureMixinsApplied() {
+          extend(Base, Querying);
+        }
+        ensureMixinsApplied();
       `,
     });
     expect(info.classes["base.ts:Base"].extends).toContain("Querying");

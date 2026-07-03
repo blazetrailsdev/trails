@@ -542,7 +542,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await Reference.count()).toBe(Number(refCountBefore) - 1);
   });
 
-  it.skip("delete all for with dependent option nullify", async () => {
+  it("delete all for with dependent option nullify", async () => {
     const person = await Person.find(people("david").id);
     expect(await (person as any).jobsWithDependentNullify.count()).toBe(1);
 
@@ -934,7 +934,7 @@ describe("HasManyThroughAssociationsTest", () => {
     );
   });
 
-  it.skip("update counter caches on delete with dependent nullify", async () => {
+  it("update counter caches on delete with dependent nullify", async () => {
     const post = await Post.find(posts("welcome").id);
     const tag = await (post as any).tags.create({ name: "doomed" });
     await post.updateColumns({ tags_with_nullify_count: await (post as any).tags.count() });
@@ -2409,7 +2409,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   // TS-only: delete_all for with dependent option nullify
-  it.skip("delete_all for with dependent option nullify", async () => {
+  it("delete_all for with dependent option nullify", async () => {
     const person = await Person.find(people("michael").id);
     const countBefore = await (person as any).jobsWithDependentNullify.count();
     const jobCountBefore = await Job.count();

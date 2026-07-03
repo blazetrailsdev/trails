@@ -30,8 +30,8 @@ describe("JoinDependency Arel node construction", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     Owner.adapter = adapter;
     Asset.adapter = adapter;
     (Owner as any)._associations = [];

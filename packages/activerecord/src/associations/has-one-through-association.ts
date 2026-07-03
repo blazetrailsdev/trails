@@ -135,15 +135,18 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * through record plus its source on the owner's next `save`.
    *
    * We only read the through proxy's in-memory `target`, never `loadTarget`
-   * (async): when the through has no loaded target we `build`. This is exact
-   * for a new owner (no PK → Rails could not query either) and for the fresh
-   * `build`/`create` cases the tests exercise (no pre-existing join row). The
-   * one divergence is `build`/`create` on a *persisted* owner that already has
-   * an *unloaded* join row: Rails' `load_target` would find and
-   * `assign_attributes`/`update` it, whereas we build a fresh one. Reconciling
-   * that would require a synchronous DB read this write path cannot make; it is
-   * an unusual shape (building a through for an owner that already has one) and
-   * is not exercised by Rails' suite.
+   * (async). When that target is present and *persisted* — a persisted owner
+   * that already has a loaded join row (e.g. `create_current_membership!` then
+   * `build_club`) — we reconcile as Rails' `load_target` + `update` arm does:
+   * `assign_attributes` in memory and defer the join-row `update` to
+   * `createThroughRecord`, rather than building a duplicate. When there is no
+   * loaded target we `build`. This is exact for a new owner (no PK → Rails
+   * could not query either) and for the fresh `build`/`create` cases (no
+   * pre-existing join row). The one remaining divergence is `build`/`create` on
+   * a *persisted* owner whose pre-existing join row is *unloaded*: Rails'
+   * `load_target` would query and reconcile it, whereas we build a fresh one —
+   * reconciling that would require a synchronous DB read this write path cannot
+   * make, and it is not exercised by Rails' suite.
    * @internal
    */
   private constructThroughRecordInMemory(record: Base, save: boolean): void {
@@ -157,18 +160,46 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     if (throughRecord) {
       if ((throughRecord as any).isNewRecord?.()) {
         (throughRecord as any).assignAttributes?.(attrs);
+      } else {
+        // Persisted owner already has a (loaded) join row: Rails'
+        // create_through_record runs `through_record.update(attributes)` on it
+        // rather than building a duplicate. We assign the new source in memory
+        // now (so the has_one_through source reads through immediately, e.g.
+        // `member.club == new_club` after `build_club`) and queue this
+        // association's own deferred `createThroughRecord`, which re-loads the
+        // persisted join row and `update`s it on the owner's next save. That
+        // deferred path — not the through proxy's `_pendingReplace` below —
+        // owns the persistence here, so the built/new-record autosave arm is
+        // skipped (throughRecord is not new) and no duplicate join is written.
+        (throughRecord as any).assignAttributes?.(attrs);
+        // Repeated build/create before save must re-point `record` at the
+        // latest source (mirrors the `_pendingReplace.record = record`
+        // reassignment in `replace()`): Rails runs `through_record.update`
+        // synchronously every call, so the last build wins. Leaving a stale
+        // `record` here would make the deferred `createThroughRecord`
+        // reconstruct attrs from an earlier club and silently revert the
+        // in-memory assignment on save.
+        // `previousTarget` is unread on this path: HasOneThroughAssociation's
+        // persistReplace consumes only `pending.record` (the base class's
+        // displaced-record nullify logic doesn't apply — the join row is
+        // reconciled via `update`, not replaced), so `null` is inert here.
+        if (this._pendingReplace) {
+          this._pendingReplace.record = record;
+        } else {
+          this._pendingReplace = { record, previousTarget: null };
+        }
       }
     } else {
       throughRecord = throughProxy.build?.(attrs) ?? null;
     }
-    // trails gates the unconditional has_one autosave callback on
-    // `options.autosave` (autosave-association.ts), so a join record with no
-    // pending replace would never be written on owner.save. Rails persists it
-    // via the through's has_one autosave (`save_has_one_association`); we
-    // reproduce that by queueing the built/assigned join record on the through
-    // association's own pending replace, which `flushPendingReplaces` runs on
-    // the owner's next save (cascading to the join record's belongs_to source,
-    // e.g. an unsaved `club`).
+    // A has_one_through's autosave target is the END record, and its
+    // persistence routes through `createThroughRecord` (join-model build/save),
+    // not the base `save_has_one_association` save. We reproduce Rails'
+    // through-side has_one autosave by queueing the built/assigned join record
+    // on the through association's own pending replace, which
+    // `flushPendingReplaces` runs on the owner's next save (cascading to the
+    // join record's belongs_to source, e.g. an unsaved `club`). The base
+    // `autosaveHasOne` defers to this queued replace rather than double-saving.
     if (
       throughRecord &&
       (throughRecord as any).isNewRecord?.() &&

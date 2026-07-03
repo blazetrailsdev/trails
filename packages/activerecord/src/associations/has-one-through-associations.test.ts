@@ -205,9 +205,31 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("building works with has one through belongs to", async () => {
     const newMember = await Member.create({ name: "Joe" });
-    await (newMember.association("currentMembership") as any).create();
+    const membership = await (newMember.association("currentMembership") as any).create();
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
+
+    // Rebuilding before save must re-point the deferred reconcile at the
+    // latest club (Rails runs `through_record.update` synchronously every
+    // call, so the last build wins) — not persist the first one on save.
+    const finalClub = (newMember.association("club") as any).build();
+    expect(newMember.association("club").target).toBe(finalClub);
+
+    // Rails' create_through_record reconciles against the persisted join row
+    // (`through_record.update(attributes)`) instead of building a duplicate: on
+    // save the existing membership is updated to point at the new club, no
+    // second membership row is inserted. Count is scoped to this member so a
+    // parallel fork's Membership rows can't perturb the delta (global-count
+    // shared-DB flake, cf. member_details, PR #4480).
+    const countForMember = () => Membership.where({ member_id: newMember.id }).count();
+    const before = await countForMember();
+    expect(await newMember.save()).toBe(true);
+    expect(await countForMember()).toBe(before);
+    expect(finalClub.isPersisted()).toBe(true);
+    const reloaded = await Membership.find(membership.id);
+    // club_id round-trips as BigInt on PG/MariaDB but finalClub.id is a number;
+    // compare numerically rather than by Object.is identity.
+    expect(Number(reloaded.club_id)).toBe(Number(finalClub.id));
   });
 
   it("creating multiple associations creates through record", async () => {
@@ -412,15 +434,27 @@ describe("HasOneThroughAssociationsTest", () => {
     // runtime equivalent.
   });
 
+  // Rails' `assert_difference "MemberDetail.count", 1` runs serially in a txn;
+  // trails runs parallel forks against a shared DB, so a global count races
+  // against concurrent member_details fixture reloads. Scope the delta to this
+  // member — the invariant Rails asserts (exactly one new join row for the
+  // member) — which still catches a genuine double-write for this member.
+  const memberDetailCount = async (member: any): Promise<number> =>
+    (await MemberDetail.where({ member_id: member.id }).count()) as number;
+
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");
     const organization = organizations("nsa");
-    const before = (await MemberDetail.count()) as number;
+    const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    // `writer` on a persisted owner returns the immediate-persist `persistReplace`
+    // promise (has-one-association.ts:52-57); it MUST be awaited (per its JSDoc)
+    // or the floating write races member.save()'s own has_one autosave — the
+    // exact double-write the `_pendingReplace` skip guard is meant to prevent.
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     const orgMembers = (await organization.association("members").loadTarget()) as any[];
     expect(orgMembers.some((m: any) => m.id === member.id)).toBe(true);
@@ -439,21 +473,21 @@ describe("HasOneThroughAssociationsTest", () => {
       return (o.association("members").target as any[]).some((m: any) => m.id === member.id);
     };
 
-    let before = (await MemberDetail.count()) as number;
+    let before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(true);
     expect(await includesMember(newOrganization)).toBe(false);
 
-    before = (await MemberDetail.count()) as number;
-    (member.association("organization") as any).writer(newOrganization);
+    before = await memberDetailCount(member);
+    await (member.association("organization") as any).writer(newOrganization);
     await member.save();
-    expect((await MemberDetail.count()) as number).toBe(before);
+    expect(await memberDetailCount(member)).toBe(before);
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(false);

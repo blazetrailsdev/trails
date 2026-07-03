@@ -57,7 +57,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
     CpcComment.adapter = adapter;

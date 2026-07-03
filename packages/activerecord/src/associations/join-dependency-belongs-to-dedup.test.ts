@@ -5,7 +5,7 @@ import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
-  let adapter: ReturnType<typeof createTestAdapter>;
+  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
 
   class Author extends Base {
     static {
@@ -22,8 +22,8 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
     for (const m of [Author, Post]) {
       m.adapter = adapter;
       m._associations = [];

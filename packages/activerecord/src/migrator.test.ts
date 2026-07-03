@@ -67,8 +67,8 @@ describe("MigratorTest", () => {
     return sm;
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await createTestAdapter();
   });
 
   it("migrator with duplicate names", () => {

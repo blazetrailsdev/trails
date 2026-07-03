@@ -3,8 +3,8 @@ import { Base } from "../index.js";
 import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("QueryTest", () => {
-  beforeEach(() => {
-    createSidecarTestAdapter();
+  beforeEach(async () => {
+    await createSidecarTestAdapter();
   });
 
   it("query attribute returns false for nil", () => {

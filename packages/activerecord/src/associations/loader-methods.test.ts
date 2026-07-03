@@ -49,7 +49,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");

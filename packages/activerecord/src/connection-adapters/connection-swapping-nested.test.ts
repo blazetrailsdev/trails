@@ -34,8 +34,8 @@ describe("ConnectionSwappingNestedTest", () => {
     vi.stubEnv("TRAILS_ENV", "default_env");
   });
 
-  afterEach(() => {
-    Base.connectionHandler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await Base.connectionHandler.clearAllConnectionsBang();
     (Base as any).configurations = prevConfigs;
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
@@ -370,7 +370,7 @@ describe("ConnectionSwappingNestedTest", () => {
     }
   });
 
-  it("prevent writes handles class reloading", () => {
+  it("prevent writes handles class reloading", async () => {
     (Base as any).configurations = {
       default_env: {
         arunit: { adapter: "sqlite3", database: ":memory:" },
@@ -391,7 +391,7 @@ describe("ConnectionSwappingNestedTest", () => {
     });
 
     // emulate a reload in development mode
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     (ReloadedRecordV1 as any).connectionClass = false;
 
     class ReloadedRecordV2 extends Base {

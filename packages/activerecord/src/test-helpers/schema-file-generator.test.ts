@@ -394,8 +394,12 @@ function normalizeRecorded(recorded: RecordedIndex[]): string {
 // Drive the GENERATOR: emit the schema file, dynamic-import it (the real
 // loadSchema path — DatabaseTasks.loadSchema imports the same file:// URL), and
 // run its default export against the recorder.
-async function generatorIndexes(schema: Schema, adapter: string): Promise<RecordedIndex[]> {
-  const filePath = await generateSchemaFile(schema, adapter);
+async function generatorIndexes(
+  schema: Schema,
+  adapter: string,
+  supportsExpressionIndex?: boolean,
+): Promise<RecordedIndex[]> {
+  const filePath = await generateSchemaFile(schema, adapter, supportsExpressionIndex);
   const path = await getPathAsync();
   const href = path.pathToFileURL!(filePath).href;
   const mod = (await import(href)) as { default: (ctx: unknown) => Promise<void> };
@@ -509,23 +513,23 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
     }
   });
 
-  // TRACKED RESIDUAL — expression-index gating coarseness. The generator has no
-  // DB version, so it drops expression indexes on ALL of MySQL (`adapterName
-  // === "mysql"`); canonical-schema.ts's `emitTableIndexes` uses the runtime
-  // `supportsExpressionIndex`, which is TRUE on MySQL 8.0.13+. So on a live
-  // MySQL 8 the two DIVERGE: the canonical loader keeps the expression index,
-  // the boot-laid generator path drops it. This is safe today because the only
-  // live generator caller is the PG-only template path (template-global-setup.ts).
-  // A future MySQL-template caller must thread a version-aware check into the
-  // generator. This test PINS the known divergence so a fix (or a new MySQL
-  // caller) surfaces here rather than silently dropping an index; it is not
-  // cheaply closable without a live MySQL-8 adapter to read the version from.
-  it("expression-index gating diverges on MySQL 8 (tracked residual, not a live-adapter test)", async () => {
-    const gen = await generatorIndexes(GENERATOR_SCHEMA, "mysql");
-    const canonMysql8 = await canonicalIndexes(PARITY_INDEXES, "mysql", true);
-    // Generator: coarse mysql skip → no expression index.
-    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
-    // canonical-schema on MySQL 8 (supportsExpressionIndex true): keeps it.
-    expect(canonMysql8.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(true);
+  // Expression-index gating parity on MySQL 8. The generator now threads the
+  // caller-resolved `supportsExpressionIndex` capability (MySQL >= 8.0.13,
+  // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql"`
+  // skip, so on a live MySQL 8 (supportsExpressionIndex true) it keeps the
+  // expression index — matching canonical-schema.ts's `emitTableIndexes`, which
+  // uses the same runtime check. (Previously the PR #4471 tracked residual: the
+  // two diverged because the generator had no DB version. Closed by threading
+  // the capability flag from the caller into `generateSchemaFile`.)
+  it("emits the same addIndex calls as canonical-schema.ts on mysql 8 (expression index kept)", async () => {
+    const [gen, canonMysql8] = await Promise.all([
+      generatorIndexes(GENERATOR_SCHEMA, "mysql", true),
+      canonicalIndexes(PARITY_INDEXES, "mysql", true),
+    ]);
+    // All four indexes survive on MySQL 8 (expression kept). Pin the count so
+    // the equality below can't pass vacuously.
+    expect(gen).toHaveLength(PARITY_INDEXES.length);
+    expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(true);
+    expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canonMysql8));
   });
 });

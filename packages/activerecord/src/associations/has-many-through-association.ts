@@ -293,50 +293,48 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
     await deleteThroughRecords(this, records);
 
-    // Mirror Rails' counter-cache tail (has_many_through_association.rb): update
-    // the through reflection's counter when it's a collection and the method
-    // warrants it (`update_through_counter?`), otherwise this association's OWN
-    // reflection — `update_counter(-count)` defaults its reflection arg to
-    // `reflection()`, i.e. the has_many :through reflection itself, NOT Rails'
-    // `source_reflection`. `:destroy` on a through whose join belongs_to already
-    // maintains a counter (e.g. taggings' `tags_count`) falls to this branch, so
-    // a distinct own counter like `tags_with_destroy_count` still decrements.
+    // Rails' counter-cache tail (has_many_through_association.rb:159-173). Kept
+    // inline (rather than in a helper) so the ported `delete_records` body makes
+    // the same calls Rails' does — `decrement_counter`, `map`,
+    // `update_through_counter?` — for the api:compare call-set ratchet.
     const ctor = this.owner.constructor as {
       _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
     };
     const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
 
-    // Rails (has_many_through_association.rb:159-162): when the SOURCE belongs_to
-    // (on the join model, pointing at the target) declares its own counter_cache,
-    // decrement it on the TARGET class for every method except `:destroy` — whose
-    // per-record destroy callbacks already maintain it. Unreachable by the
-    // canonical test models (no source belongs_to carries a counter_cache), but
-    // ported for Rails fidelity rather than dropped.
-    const sourceRefl = (
-      ownRefl as
-        | {
-            sourceReflection?: {
-              options?: { counterCache?: unknown };
-              counterCacheColumn?: () => string | null;
-            };
-          }
-        | undefined
-    )?.sourceReflection;
+    // Rails (159-162): when the SOURCE belongs_to (on the join model) declares
+    // its own counter_cache, `klass.decrement_counter` on the target rows by id
+    // for every method except `:destroy` (whose per-record callbacks handle it).
+    // Unreachable by the canonical models but ported for fidelity. `safeKlass` +
+    // id null-filter are defensive (a class-less polymorphic source, null PKs).
+    const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
+      ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
-      if (counter) {
-        await (this.klass as unknown as typeof Base).decrementCounter(
-          counter,
-          records.map((r) => (r as { id?: unknown }).id),
-        );
+      const klass = safeKlass(sourceRefl) as {
+        decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
+      } | null;
+      const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
+      if (typeof counter === "string" && klass?.decrementCounter && ids.length > 0) {
+        await klass.decrementCounter(counter, ids);
       }
     }
 
-    const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
-    if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
-      await updateThroughCounterCache(this.owner, throughRefl, -count);
-    } else {
-      await updateThroughCounterCache(this.owner, ownRefl, -count);
+    // Rails (169-173): `update_counter(-count, through_reflection)` when the
+    // through reflection is a collection and `update_through_counter?` allows,
+    // else `update_counter(-count)` on this association's OWN reflection (Rails'
+    // `update_counter` defaults its reflection arg to `reflection()`, the
+    // has_many :through reflection itself — NOT `source_reflection`). A `:destroy`
+    // whose join belongs_to already maintains a counter (taggings' `tags_count`)
+    // falls to the own branch, so a distinct own counter (`tags_with_destroy_count`)
+    // still decrements.
+    if (count > 0) {
+      const throughRefl = throughName ? ctor._reflectOnAssociation?.(throughName) : undefined;
+      if (throughRefl?.isCollection?.() && updateThroughCounter(throughRefl, method)) {
+        await updateThroughCounterCache(this.owner, throughRefl, -count);
+      } else {
+        await updateThroughCounterCache(this.owner, ownRefl, -count);
+      }
     }
 
     return count;
@@ -366,6 +364,13 @@ function sourceForeignKey(assoc: HasManyThroughAssociation): string {
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   return sourceRefl?.foreignKey ?? `${underscore(singularize(assoc.reflection.name))}_id`;
+}
+
+/** Source belongs_to surface the `delete_records` counter tail reads. @internal */
+interface SourceCounterReflection {
+  options?: { counterCache?: unknown };
+  counterCacheColumn?: () => string | null;
+  klass?: unknown;
 }
 
 /** The pre-built join row and the source reflection's inverse it wires to. */

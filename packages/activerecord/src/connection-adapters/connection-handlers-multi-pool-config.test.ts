@@ -12,8 +12,8 @@ describe("ConnectionHandlersMultiPoolConfigTest", () => {
     handler = new ConnectionHandler();
   });
 
-  afterEach(() => {
-    handler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await handler.clearAllConnectionsBang();
   });
 
   it("establish connection with pool configs", () => {

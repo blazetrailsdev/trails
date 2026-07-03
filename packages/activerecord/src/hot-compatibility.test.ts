@@ -26,7 +26,7 @@ describe("HotCompatibilityTest", () => {
     klass: typeof Base;
     adapter: DatabaseAdapter;
   }> {
-    const adapter = createTestAdapter();
+    const adapter = await createTestAdapter();
     const migration = new MigrationContext(adapter);
     await migration.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");

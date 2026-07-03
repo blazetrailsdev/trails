@@ -18,7 +18,7 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
   let adapter: TestDatabaseAdapter;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     for (const klass of [Post, SpecialPost, Person, Reader]) {
       klass.adapter = adapter;
       registerModel(klass);

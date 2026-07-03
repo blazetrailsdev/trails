@@ -109,7 +109,11 @@ function schemaChecksum(code: string): string {
   return h.toString(36);
 }
 
-function generateCode(schema: Schema, adapterName?: string): string {
+function generateCode(
+  schema: Schema,
+  adapterName?: string,
+  supportsExpressionIndex?: boolean,
+): string {
   const lines: string[] = [
     `import type { MigrationContext } from "@blazetrails/activerecord";`,
     ``,
@@ -177,14 +181,16 @@ function generateCode(schema: Schema, adapterName?: string): string {
     // characters, e.g. "(lower(external_id))") is gated below.
     for (const index of indexesOf(tableSpec)) {
       const isExpression = typeof index.columns === "string" && /\W/.test(index.columns);
-      // Coarse `adapterName === "mysql"` gate (not the precise
-      // `supports_expression_index?`, which is true on MySQL 8.0.13+) because
-      // the generator has no DB version. This is exact for the only live
-      // caller — the PG-only template path (template-global-setup.ts) — where
-      // MySQL/SQLite build via defineSchema's runtime supportsExpressionIndex
-      // check instead. A future MySQL-template caller would need that check
-      // here to avoid dropping the index on MySQL 8.
-      if (isExpression && adapterName === "mysql") continue;
+      // Expression-index gate. The generator has no live adapter, so the caller
+      // threads in `supportsExpressionIndex` (resolved from the DB version) to
+      // match `emitTableIndexes`' runtime `supportsExpressionIndex(adapter)`
+      // check (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB). When the flag is
+      // omitted, fall back to the coarse `adapterName === "mysql"` skip — exact
+      // for the only live caller today, the PG-only template path
+      // (template-global-setup.ts), where PG always supports expression indexes.
+      const dropExpression =
+        supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql";
+      if (isExpression && dropExpression) continue;
       const optEntries: string[] = [];
       if (index.unique) optEntries.push(`unique: true`);
       if (index.where !== undefined) optEntries.push(`where: ${JSON.stringify(index.where)}`);
@@ -216,11 +222,21 @@ function generateCode(schema: Schema, adapterName?: string): string {
  *
  * Pass `adapterName` to apply adapter-specific column mappings (e.g. MySQL
  * date/time/json → string, datetime precision:6 default).
+ *
+ * Pass `supportsExpressionIndex` (resolved from the caller's live DB version)
+ * to gate expression indexes with `supportsExpressionIndex` semantics
+ * (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB) instead of the coarse
+ * `adapterName === "mysql"` skip. Omitted for the PG-only template caller,
+ * where PG always supports expression indexes.
  */
-export async function generateSchemaFile(schema: Schema, adapterName?: string): Promise<string> {
+export async function generateSchemaFile(
+  schema: Schema,
+  adapterName?: string,
+  supportsExpressionIndex?: boolean,
+): Promise<string> {
   const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);
   const poolId = getEnv("VITEST_POOL_ID") ?? "0";
-  const code = generateCode(schema, adapterName);
+  const code = generateCode(schema, adapterName, supportsExpressionIndex);
   const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
   if (fs.writeFile) {
     await fs.writeFile(filePath, code);

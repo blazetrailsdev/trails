@@ -4,8 +4,8 @@ import { ShardSelector } from "./middleware/shard-selector.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 
 describe("ShardSelectorTest", () => {
-  afterEach(() => {
-    Base.connectionHandler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await Base.connectionHandler.clearAllConnectionsBang();
   });
 
   function setupShards() {

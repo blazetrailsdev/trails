@@ -195,7 +195,7 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
  *    {@link TransactionalFixturesAdapter} without an extra cast.
  */
 export async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const adapter = await createTestAdapter();
   await installEncryptionSchema(adapter);
   return adapter;
 }

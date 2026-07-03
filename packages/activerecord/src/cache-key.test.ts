@@ -32,7 +32,7 @@ describe("CacheKeyTest", () => {
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = createTestAdapter();
+    adapter = await createTestAdapter();
     ctx = new MigrationContext(adapter);
     await ctx.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
     await ctx.createTable("cache_me_with_versions", { force: true }, (t: any) => t.timestamps());
