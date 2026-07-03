@@ -1838,7 +1838,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("preloading empty through association via joins", async () => {
     const readerId = readers("michael_welcome").id;
-    const person = await Person.create({ first_name: "Gaga" });
+    const person = await Person.createBang({ first_name: "Gaga" });
     const loaded = await Person.where({ id: person.id })
       .where(`readers.id = ${readerId} or 1=1`)
       .references("readers")
