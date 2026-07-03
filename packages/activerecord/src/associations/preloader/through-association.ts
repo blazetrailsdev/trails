@@ -476,6 +476,24 @@ export class ThroughAssociation extends Association {
             if (nestedJoins.length > 0) {
               scope = scope.joins({ [sourceName]: nestedJoins });
             }
+            // Rails also `references!(source_reflection.table_name)` so its
+            // `includes!(source)` promotes to a LEFT JOIN. We join the source
+            // explicitly above, so that step is already realized and no separate
+            // references pass is needed.
+            //
+            // Rails carries the scope's `order` onto the through query only when
+            // `scope.eager_loading?` (through_association.rb:140) — true once an
+            // `includes` value is nested. Mirror that guard so the order
+            // determines which through row the has_one keeps, matching Rails.
+            const orderClauses: any[] = reflScopeVals?._orderClauses ?? [];
+            const rawOrderClauses: string[] = reflScopeVals?._rawOrderClauses ?? [];
+            if (
+              nestedIncludes.length > 0 &&
+              (orderClauses.length > 0 || rawOrderClauses.length > 0)
+            ) {
+              scope._orderClauses = [...scope._orderClauses, ...orderClauses];
+              scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
+            }
           }
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...copyable]);
         }
