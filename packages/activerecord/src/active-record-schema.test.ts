@@ -6,9 +6,10 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } 
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
 import { MigrationContext } from "./migration.js";
 
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -19,15 +20,18 @@ afterAll(() => {
 });
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  return await createTestAdapter();
+function freshAdapter(): DatabaseAdapter {
+  return Base.connection;
 }
 
 describe("ActiveRecordSchemaTest", () => {
+  // Ride the primary schema-loaded pool via `Base.connection`.
+  setupFixtures();
+
   let adapter: DatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeEach(() => {
+    adapter = freshAdapter();
   });
 
   afterEach(async () => {

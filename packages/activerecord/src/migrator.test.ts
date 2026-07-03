@@ -8,9 +8,10 @@ import {
   UnknownMigrationVersionError,
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 
 // MIGRATIONS_ROOT — Rails reads fixture migration directories from disk; the
 // trails equivalents live under test-helpers/migrations.
@@ -50,6 +51,10 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 }
 
 describe("MigratorTest", () => {
+  // Rails' setup rides `ActiveRecord::Base.connection_pool`; `setupFixtures()`
+  // establishes the primary schema-loaded pool so `Base.connection` resolves.
+  setupFixtures();
+
   let adapter: DatabaseAdapter;
 
   // Rails' migrator_class(count) builds a MigrationContext subclass whose
@@ -67,8 +72,15 @@ describe("MigratorTest", () => {
     return sm;
   }
 
+  // Rails' setup/teardown do `@schema_migration.create_table` +
+  // `delete_all_versions rescue nil` around each test; on the shared
+  // `Base.connection` pool the schema_migrations rows persist between tests, so
+  // clear them here to match Rails' fresh-per-test version state.
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.deleteAllVersions();
   });
 
   it("migrator with duplicate names", () => {

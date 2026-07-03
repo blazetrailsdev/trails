@@ -12,10 +12,19 @@ import { describe, it, expect } from "vitest";
 import { MigrationContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration } from "./migration.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { Base } from "./base.js";
+import { SchemaMigration } from "./schema-migration.js";
+import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 
 describe("MigrationTest", () => {
+  // Ride the primary schema-loaded pool (`Base.connection`); `newRawTestAdapter`
+  // supplies the *distinct* adapter objects the override-routing identity checks
+  // need (Rails builds a second connection from the primary config rather than
+  // leasing a standing sidecar pool).
+  setupFixtures();
+
   it("migration.connection returns _connectionOverride when set", async () => {
     class M extends Migration {
       async up() {}
@@ -27,8 +36,8 @@ describe("MigrationTest", () => {
       _connectionOverride?: DatabaseAdapter;
       _poolOverride?: DatabaseAdapter;
     };
-    const baseAdapter = await createTestAdapter();
-    const override = await createTestAdapter();
+    const baseAdapter = Base.connection;
+    const override = newRawTestAdapter();
     internals.adapter = baseAdapter;
     expect(m.connection).toBe(baseAdapter);
     internals._connectionOverride = override;
@@ -37,7 +46,7 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(baseAdapter);
     delete internals._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
-    const poolOverride = await createTestAdapter();
+    const poolOverride = newRawTestAdapter();
     internals._poolOverride = poolOverride;
     expect(m.connectionPool).toBe(poolOverride);
     // connection is independent — _poolOverride must not affect it
@@ -56,8 +65,8 @@ describe("MigrationTest", () => {
       adapter: DatabaseAdapter;
       _connectionOverride?: DatabaseAdapter;
     };
-    const baseAdapter = await createTestAdapter();
-    const override = await createTestAdapter();
+    const baseAdapter = Base.connection;
+    const override = newRawTestAdapter();
     internals.adapter = baseAdapter;
     expect((m.schema as unknown as { adapter: DatabaseAdapter }).adapter).toBe(baseAdapter);
     internals._connectionOverride = override;
@@ -65,7 +74,10 @@ describe("MigrationTest", () => {
   });
 
   it("migration context with async migration() proxy", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
+    // schema_migrations is shielded from the global reset by `setupFixtures()`,
+    // so start from a clean versions table to assert currentVersion === 1.
+    await new SchemaMigration(adapter).dropTable();
     const migrations: MigrationProxy[] = [
       {
         version: "1",
