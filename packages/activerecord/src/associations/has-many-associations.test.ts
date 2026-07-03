@@ -248,6 +248,77 @@ describe("HasManyAssociationsTest", () => {
       await firm.clientsOfFirm.concat(Client.new({ name: "Natural Company" }));
     });
   });
+
+  it("destroying", async () => {
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+
+    const before = (await Client.count()) as number;
+    const first = await firstFirm.clientsOfFirm.first();
+    await firstFirm.clientsOfFirm.destroy(first);
+    expect(await Client.count()).toBe(before - 1);
+
+    await firstFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await firstFirm.clientsOfFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+  });
+
+  it("destroying by integer id", async () => {
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+
+    const before = (await Client.count()) as number;
+    const first = await firstFirm.clientsOfFirm.first();
+    // Rails coerces a bare Integer id to the record via the scoped `find`.
+    await firstFirm.clientsOfFirm.destroy(first.id);
+    expect(await Client.count()).toBe(before - 1);
+
+    await firstFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await firstFirm.clientsOfFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+  });
+
+  it("destroying by string id", async () => {
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+
+    const before = (await Client.count()) as number;
+    const first = await firstFirm.clientsOfFirm.first();
+    // Rails coerces a bare String id to the record via the scoped `find`.
+    await firstFirm.clientsOfFirm.destroy(String(first.id));
+    expect(await Client.count()).toBe(before - 1);
+
+    await firstFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await firstFirm.clientsOfFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+  });
+
+  it("destroying a collection", async () => {
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+
+    await firstFirm.clientsOfFirm.create({ name: "Another Client" });
+    expect(await firstFirm.clientsOfFirm.size()).toBe(3);
+
+    const all = (await firstFirm.clientsOfFirm.load()) as any[];
+    const before = (await Client.count()) as number;
+    // Rails passes the records nested in an array — a single Array arg, not
+    // bare ids — so id-coercion is skipped and the array is flattened.
+    await firstFirm.clientsOfFirm.destroy([all[0], all[1]]);
+    expect(await Client.count()).toBe(before - 2);
+
+    await firstFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await firstFirm.clientsOfFirm.reload();
+    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+  });
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
@@ -630,45 +701,11 @@ describe("HasManyAssociationsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
   // -- Destroying --
-
-  it("destroying", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "ToDestroy", body: "body" });
-    await post.destroy();
-    expect(post.isDestroyed()).toBe(true);
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
-  });
-
-  it("destroying by integer id", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "Target", body: "body" });
-    await HmPost.destroy(post.id!);
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
-  });
-
-  it("destroying a collection", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    for (const p of posts) await (p as any).destroy();
-    const remaining = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
+  // `test_destroying`, `test_destroying_by_integer_id`,
+  // `test_destroying_by_string_id`, and `test_destroying_a_collection` live in
+  // the companies-fixture `HasManyAssociationsTest` describe above, where they
+  // exercise `clients_of_firm.destroy(...)` on the CollectionProxy exactly as
+  // Rails does (id-coercion + raise_on_type_mismatch! on the non-through path).
 
   it("destroy all", async () => {
     class DestroyAllAuthor extends Base {
@@ -2987,16 +3024,6 @@ describe("HasManyAssociationsTest", () => {
     expect(author.isDestroyed()).toBe(true);
   });
 
-  it("destroying by string id", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.destroy(String(post.id) as any);
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
-  });
   it("destroy all on association clears scope", async () => {
     class DestroyAllScopeAuthor extends Base {
       static {

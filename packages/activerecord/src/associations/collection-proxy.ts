@@ -2669,7 +2669,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
-  async destroy(...records: T[]): Promise<void> {
+  async destroy(...records: Array<T | number | string | bigint>): Promise<void> {
     // Through (incl. HABTM): delegate to the association-layer destroy, exactly
     // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
     // has_many :through that runs HasManyThroughAssociation#delete_records
@@ -2688,16 +2688,34 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._removeFromTarget(removed);
       return;
     }
+    // Mirror Rails CollectionAssociation#destroy → delete_or_destroy
+    // (collection_association.rb:387-389): coerce Integer/String args to records
+    // via the scoped `find` first (so a bare id finds+destroys the row rather
+    // than throwing `record.destroy is not a function`), flatten, then run
+    // raise_on_type_mismatch! before any DB write — exactly as the through
+    // branch does via the association layer. Only a top-level bare id is
+    // coerced; an id nested in an array is left to the type check, matching
+    // Rails and the `delete` branch above. The `filter(Boolean)` is
+    // defensive-only: on a genuine missing id `find` raises RecordNotFound
+    // (Relation#find, collection-proxy.ts non-cache path) exactly as Rails
+    // does — it never returns a falsy element — so the filter only guards the
+    // theoretical null return and never silently drops a real record.
+    const coerced = records.some((r) => typeof r !== "object")
+      ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
+      : (records as T[]);
+    const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
+    this._raiseOnTypeMismatch(modelRecords);
+
     const destroyed: Base[] = [];
     const run = async () => {
-      for (const record of records) {
+      for (const record of modelRecords) {
         await record.destroy();
         if (record.isDestroyed()) destroyed.push(record);
       }
     };
     // Rails delete_or_destroy wraps remove_records in a transaction only when
     // there are persisted records, so a mid-batch raise rolls back the batch.
-    if (records.some((r) => !r.isNewRecord())) {
+    if (modelRecords.some((r) => !r.isNewRecord())) {
       await this.transaction(run);
     } else {
       await run();
