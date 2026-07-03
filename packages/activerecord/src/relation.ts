@@ -630,6 +630,13 @@ export class Relation<T extends Base> {
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(node: Nodes.Node): Relation<T>;
   /**
+   * Sanitized-conditions array form: `where(["name = ?", x])` /
+   * `where(["name = :name", { name: x }])` / `where(["name = '%s'", x])`.
+   * A single array argument routes through `buildWhereClause`, matching Rails'
+   * `sanitize_sql(array)`; the two-argument composite form below is distinct.
+   */
+  where(conditions: unknown[]): Relation<T>;
+  /**
    * Composite-key form: `where(['c1', 'c2'], [[v11, v12], [v21, v22]])`
    * compiles to `(c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22)`.
    * The Rails analog is `where({['c1', 'c2'] => [[v11, v12], ...]})` —
@@ -641,23 +648,35 @@ export class Relation<T extends Base> {
    */
   where(cols: string[], tuples: unknown[][]): Relation<T>;
   where(
-    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | null,
+    conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
     if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
-    // Composite-key form: array of column names + array of tuples.
-    if (Array.isArray(conditionsOrSql) && conditionsOrSql.every((c) => typeof c === "string")) {
-      // Fast-fail on malformed call: must have exactly one extra
-      // argument that is an array of tuples. Without this guard, a
-      // stray `where(['a','b'])` would fall through to whereBang and
-      // treat the array as a record (numeric keys), producing
-      // nonsense.
+    // Rails: `where([])` is blank (`args.length == 1 && args.first.blank?`,
+    // query_methods.rb:1036) and returns the relation unchanged, like
+    // `where({})` / `where(null)` / `where("")`. This applies ONLY to the
+    // single-argument call — `where([], tuples)` (a 2-arg composite) must fall
+    // through so the empty column list raises rather than silently no-opping.
+    if (Array.isArray(conditionsOrSql) && conditionsOrSql.length === 0 && rest.length === 0) {
+      return this._clone();
+    }
+    // Composite-key form: array of column names + array of tuples. It is
+    // always a two-argument call (`where(cols, tuples)`), so it is
+    // disambiguated from Rails' sanitized-array conditions form
+    // (`where(["name = ?", x])`, a single array argument) by the presence of
+    // the extra `tuples` argument. A single all-strings array falls through
+    // to `buildWhereClause`, which unwraps `[head, ...tail]` and sanitizes.
+    if (
+      Array.isArray(conditionsOrSql) &&
+      rest.length > 0 &&
+      conditionsOrSql.every((c) => typeof c === "string")
+    ) {
       if (rest.length !== 1 || !Array.isArray(rest[0])) {
         throw argumentError(
           "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const cols = conditionsOrSql;
+      const cols = conditionsOrSql as string[];
       const tuples = rest[0] as unknown[][];
       const node = this.predicateBuilder.buildComposite(cols, tuples);
       if (node === null) return this._clone().noneBang();
@@ -1068,8 +1087,12 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#where.not
    */
   whereNot(conditions: Record<string, unknown>): Relation<T>;
+  whereNot(conditions: unknown[]): Relation<T>;
   whereNot(cols: string[], tuples: unknown[][]): Relation<T>;
-  whereNot(conditions: Record<string, unknown> | string[], tuples?: unknown[][]): Relation<T> {
+  whereNot(
+    conditions: Record<string, unknown> | string[] | unknown[],
+    tuples?: unknown[][],
+  ): Relation<T> {
     // Mirrors WhereChain#not → build_where_clause: unwrap/forbid strong-params
     // before deriving references or predicates.
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
@@ -1079,17 +1102,23 @@ export class Relation<T extends Base> {
     for (const t of referencesFromConditions(conditions)) {
       if (!rel._referencesValues.includes(t)) rel._referencesValues.push(t);
     }
-    if (Array.isArray(conditions) && conditions.every((c) => typeof c === "string")) {
-      // Fast-fail on malformed call: see Relation#where guard for
-      // the same reasoning. Without this, a stray
-      // `whereNot(['a','b'])` falls through to Object.entries and
-      // produces an invalid predicate.
+    if (
+      Array.isArray(conditions) &&
+      tuples !== undefined &&
+      conditions.every((c) => typeof c === "string")
+    ) {
+      // Composite-key form: `whereNot(cols, tuples)`. Present only when the
+      // second (tuples) argument is supplied AND the column list is all
+      // strings — kept symmetric with `where`'s composite guard so a
+      // mixed-type array (`whereNot(["a", 5], ...)`) routes to the
+      // sanitized-conditions path below instead of building a bogus
+      // predicate off a non-string column name.
       if (!Array.isArray(tuples)) {
         throw argumentError(
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      const node = this.predicateBuilder.buildComposite(conditions, tuples);
+      const node = this.predicateBuilder.buildComposite(conditions as string[], tuples);
       // null = empty/all-filtered → NOT (no rows) = ALL rows = no
       // predicate added (matches Rails' `where.not(...)` no-op for
       // empty hashes).
@@ -1098,8 +1127,21 @@ export class Relation<T extends Base> {
       }
       return rel;
     }
+    if (Array.isArray(conditions)) {
+      // Rails: `where.not(["name = ?", x])` → `build_where_clause(opts, rest).invert`
+      // (query_methods.rb:49). Route the single-array sanitized-conditions form
+      // through the same builder as `where` (it unwraps `[head, ...tail]`), then
+      // invert. An empty array has no `head`; Rails likewise raises on
+      // `where.not([])` (build_where_clause reassigns `opts = nil`).
+      if (conditions.length === 0) {
+        throw argumentError("Relation#whereNot: unsupported argument (empty array)");
+      }
+      const clause = rel.buildWhereClause(conditions) as WhereClause;
+      rel._whereClause.predicates.push(...clause.invert().predicates);
+      return rel;
+    }
     const castConditions: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(conditions as Record<string, unknown>)) {
+    for (const [key, value] of Object.entries(conditions)) {
       castConditions[key] = Array.isArray(value)
         ? value.map((v) => this._castWhereValue(key, v))
         : this._castWhereValue(key, value);

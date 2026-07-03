@@ -148,22 +148,26 @@ describe("Relation#where — composite-key form", () => {
     expect(sql).not.toMatch(/OR/);
   });
 
-  it("Relation#where(cols) without tuples arg throws a clear error", () => {
-    expect(() => (CpkBook as any).all().where(["author_id"])).toThrow(
-      /requires a tuples argument as an array of arrays/,
-    );
+  it("Relation#where(single array arg) routes to the sanitized-conditions form, not composite", () => {
+    // A single all-strings array is Rails' `where(["sql fragment"])` form, not
+    // the two-argument composite `where(cols, tuples)`, so it must sanitize
+    // rather than raise the composite-key ArgumentError.
+    const sql = (CpkBook as any).all().where(["author_id = 1"]).toSql();
+    expect(sql).toMatch(/author_id = 1/);
   });
 
-  it("Relation#whereNot(cols) without tuples arg throws a clear error", () => {
-    expect(() => (CpkBook as any).all().whereNot(["author_id"])).toThrow(
-      /requires a tuples argument as an array of arrays/,
-    );
+  it("Relation#whereNot(single array arg) routes to the sanitized-conditions form, not composite", () => {
+    // Rails' `where.not(["name = ?", x])` (query_methods.rb:28) is the
+    // sanitized-conditions form built via `build_where_clause(...).invert`, so a
+    // single array must negate the fragment rather than raise the composite-key
+    // ArgumentError.
+    const sql = (CpkBook as any).all().whereNot(["author_id = 1"]).toSql();
+    expect(sql).toMatch(/NOT \(author_id = 1\)/);
   });
 
-  it("Base.where(cols) without tuples arg throws a clear error", () => {
-    expect(() => (CpkBook as any).where(["author_id"])).toThrow(
-      /requires a tuples argument as an array of arrays/,
-    );
+  it("Base.where(single array arg) routes to the sanitized-conditions form, not composite", () => {
+    const sql = (CpkBook as any).where(["author_id = 1"]).toSql();
+    expect(sql).toMatch(/author_id = 1/);
   });
 
   it("Base.whereNot(cols, tuples) routes through Relation#whereNot composite form", async () => {
@@ -173,10 +177,29 @@ describe("Relation#where — composite-key form", () => {
     expect(matched.map((r: any) => r.title)).toEqual(["keep"]);
   });
 
-  it("Base.whereNot(cols) without tuples arg throws a clear ArgumentError", () => {
-    expect(() => (CpkBook as any).whereNot(["author_id"])).toThrow(
-      /requires a tuples argument as an array of arrays/,
+  it("Base.whereNot(single array arg) routes to the sanitized-conditions form, not composite", () => {
+    const sql = (CpkBook as any).whereNot(["author_id = 1"]).toSql();
+    expect(sql).toMatch(/NOT \(author_id = 1\)/);
+  });
+
+  it("whereNot(mixed-type cols, tuples) routes to sanitize (symmetric with where), not a bogus composite", () => {
+    // The composite form requires an all-strings column list, kept symmetric
+    // with `where`. A non-string element means it is NOT composite cols, so it
+    // routes to the sanitized-conditions path (which surfaces a bind-arity
+    // error) rather than building a predicate off a coerced `5` column.
+    expect(() => (CpkBook as any).all().whereNot(["author_id", 5], [[1, 2]])).toThrow(
+      /wrong number of bind variables/,
     );
+    expect(() => (CpkBook as any).whereNot(["author_id", 5], [[1, 2]])).toThrow(
+      /wrong number of bind variables/,
+    );
+  });
+
+  it("where([], tuples) is the composite form and raises on the empty column list, not a silent no-op", () => {
+    // The blank short-circuit (`where([])`) applies only to the single-argument
+    // call; a supplied tuples arg keeps this on the composite path.
+    expect(() => (CpkBook as any).all().where([], [[1, 2]])).toThrow(/empty column list/);
+    expect(() => (CpkBook as any).where([], [[1, 2]])).toThrow(/empty column list/);
   });
 
   it("whereNot(cols, tuples) negates the OR-of-AND grouping", async () => {

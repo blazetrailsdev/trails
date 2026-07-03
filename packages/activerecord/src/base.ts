@@ -2208,6 +2208,7 @@ export class Base extends Model {
     sql: string,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
     cols: string[],
@@ -2215,32 +2216,45 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string | string[],
+    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[],
     ...rest: unknown[]
   ): Relation<InstanceType<T>> {
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
     }
-    if (Array.isArray(conditionsOrSql) && conditionsOrSql.every((c) => typeof c === "string")) {
-      // Fast-fail: composite-key form requires exactly one extra
-      // argument that is an array of tuples. Without this, a stray
-      // `Model.where(['a','b'])` would fall through to the hash path
-      // and treat the array as a record (numeric keys), producing
-      // nonsense.
+    // Composite-key form (`where(cols, tuples)`) is a two-argument call, so it
+    // is disambiguated from Rails' sanitized-array conditions form
+    // (`where(["name = ?", x])`, a single array argument) by argument count. A
+    // single all-strings array falls through to `Relation#where`, which routes
+    // it to `buildWhereClause` for sanitization / BoundSqlLiteral handling.
+    if (
+      Array.isArray(conditionsOrSql) &&
+      rest.length > 0 &&
+      conditionsOrSql.every((c) => typeof c === "string")
+    ) {
       if (rest.length !== 1 || !Array.isArray(rest[0])) {
         throw argumentError(
           `${(this as { name?: string }).name ?? "Model"}.where(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
         );
       }
-      return this.all().where(conditionsOrSql, rest[0] as unknown[][]);
+      return this.all().where(conditionsOrSql as string[], rest[0] as unknown[][]);
     }
-    return this.all().where(conditionsOrSql as Record<string, unknown>);
+    if (Array.isArray(conditionsOrSql)) {
+      // A single array argument is the sanitized-conditions form. Any extra
+      // positional `rest` is intentionally dropped, mirroring Rails'
+      // `build_where_clause`, whose `opts, *rest = opts` overwrites `rest` with
+      // the array tail and discards the originally-passed args
+      // (query_methods.rb:1616-1618).
+      return this.all().where(conditionsOrSql as unknown[]);
+    }
+    return this.all().where(conditionsOrSql);
   }
 
   static whereNot<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
   ): Relation<InstanceType<T>>;
+  static whereNot<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
   static whereNot<T extends typeof Base>(
     this: T,
     cols: string[],
@@ -2248,23 +2262,33 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static whereNot<T extends typeof Base>(
     this: T,
-    conditions: Record<string, unknown> | string[],
+    conditions: Record<string, unknown> | string[] | unknown[],
     tuples?: unknown[][],
   ): Relation<InstanceType<T>> {
-    if (Array.isArray(conditions) && conditions.every((c) => typeof c === "string")) {
-      // Same fast-fail as Base.where: composite-key form requires
-      // a tuples argument as an array of arrays. Without this guard
-      // a stray `Model.whereNot(['c'])` would forward only the cols
-      // and Relation#whereNot's matching guard would throw — same
-      // outcome but the error message would mention Relation, not Model.
+    // Rails' `where.not` mirrors `where` — a single array argument is the
+    // sanitized-conditions form (`where.not(["name = ?", x])`, query_methods.rb:28)
+    // built via `build_where_clause(...).invert`; the composite-key form is the
+    // two-argument `whereNot(cols, tuples)`. Disambiguate by argument count, and
+    // require the column list to be all strings (symmetric with `where`) so a
+    // mixed-type array routes to the sanitized-conditions path.
+    if (
+      Array.isArray(conditions) &&
+      tuples !== undefined &&
+      conditions.every((c) => typeof c === "string")
+    ) {
       if (!Array.isArray(tuples)) {
         throw argumentError(
           `${(this as { name?: string }).name ?? "Model"}.whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
         );
       }
-      return this.all().whereNot(conditions, tuples);
+      return this.all().whereNot(conditions as string[], tuples);
     }
-    return this.all().whereNot(conditions as Record<string, unknown>);
+    if (Array.isArray(conditions)) {
+      // Single-array sanitized-conditions form; any extra positional arg is
+      // dropped, matching Rails' `build_where_clause` overwrite (as in `where`).
+      return this.all().whereNot(conditions as unknown[]);
+    }
+    return this.all().whereNot(conditions);
   }
 
   // insertAll / upsertAll / updateAll / deleteAll / destroyBy / deleteBy

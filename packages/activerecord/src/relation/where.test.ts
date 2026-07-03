@@ -499,14 +499,10 @@ describe("WhereTest", () => {
     expect(await Edge.where({ sink: {} }).count()).toBe(0);
   });
 
-  it.skip("where with blank conditions", async () => {
-    // BLOCKED: predicate-builder — an empty array `[]` should be a blank condition
-    // (all rows), like `{}`/`null`/`""` (which already behave Rails-faithfully).
-    // ROOT-CAUSE: relation/query-methods.ts routes `where([])` into the
-    // composite-key tuple form and raises ArgumentError instead of treating it
-    // as blank.
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("where with blank conditions", async () => {
+    // `where([])` now short-circuits as blank (`opts.blank?` → no-op),
+    // matching `{}` / `null` / `""` — see relation.ts#where. (RFC 0023
+    // finder-array-conditions-composite-ambiguity.)
     for (const blank of [[], {}, null, ""]) {
       const result = await Edge.where(blank as any).order("sink_id");
       expect(result).toHaveLength(4);

@@ -63,13 +63,38 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement;
   }
 
-  // %s format string support (e.g., "name='%s' and id='%s'") — Rails:
+  // Format-string support (e.g., "name = '%s'", "id = %d") — Rails:
   //   statement % values.collect { |v| connection.quote_string(v.to_s) }
-  const formatStringCount = (statement.match(/%s/g) ?? []).length;
-  if (formatStringCount > 0) {
-    raiseIfBindArityMismatch(statement, formatStringCount, binds.length);
+  // Ruby's Kernel#format applies after each value is quoted to a string, so
+  // `%d` coerces the quoted string back to an integer. We support the `%s`
+  // (quoted string) and `%d`/`%i` (integer) specifiers that appear in
+  // conditions fragments.
+  const specifiers = statement.match(/%[sdi]/g) ?? [];
+  if (specifiers.length > 0) {
+    raiseIfBindArityMismatch(statement, specifiers.length, binds.length);
     const values = [...binds];
-    return statement.replace(/%s/g, () => quoter.quoteString(String(values.shift() ?? "")));
+    return statement.replace(/%[sdi]/g, (spec) => {
+      const value = values.shift();
+      if (spec === "%s") return quoter.quoteString(String(value ?? ""));
+      // Rails applies `statement % values.collect { quote_string(v.to_s) }`, so
+      // Ruby's `%d` runs `Integer()` on the stringified value, rejecting trailing
+      // garbage (`Integer("12abc")`) and non-integers (`Integer("3.5")`), not just
+      // empties — so we validate a plain base-10 integer rather than lean on
+      // `parseInt`'s lenient prefix-parse (which would emit `12` / `3`).
+      // DEVIATION: Ruby's `Integer()` also honors base prefixes on strings
+      // (`"012"` → 8-radix 10, `"0x1A"` → 26); we intentionally treat the value
+      // as base-10 only. `%d` binds are integers in practice (finder_test.rb uses
+      // `["id = %d", 1]`); a leading-zero/hex *string* bind to a `%d` fragment is
+      // pathological and absent from the Rails suite, so we don't reproduce the
+      // base-prefix parse.
+      const text = String(value ?? "").trim();
+      if (!/^[+-]?\d+$/.test(text)) {
+        throw new PreparedStatementInvalid(
+          `invalid value for %d bind variable (${String(value)}) in: ${statement}`,
+        );
+      }
+      return String(parseInt(text, 10));
+    });
   }
 
   raiseIfBindArityMismatch(statement, 0, binds.length);

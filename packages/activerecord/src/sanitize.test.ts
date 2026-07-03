@@ -339,6 +339,18 @@ describe("sanitizeSql", () => {
     expect(() => Post.sanitizeSqlArray("SELECT 1")).not.toThrow();
   });
 
+  it("sanitizeSqlArray interpolates %d as an integer and rejects non-integer values", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    expect(Post.sanitizeSqlArray("id = %d", 1)).toBe("id = 1");
+    expect(Post.sanitizeSqlArray("id = %d", "12")).toBe("id = 12");
+    // Ruby's `Integer()` (via `statement % values`) rejects trailing garbage and
+    // non-integers, unlike parseInt's lenient prefix-parse.
+    expect(() => Post.sanitizeSqlArray("id = %d", "12abc")).toThrow(/invalid value for %d/);
+    expect(() => Post.sanitizeSqlArray("id = %d", "3.5")).toThrow(/invalid value for %d/);
+  });
+
   it("sanitizeSql dispatches through this.sanitizeSqlArray (subclass override)", () => {
     class Post extends Base {
       static _tableName = "posts";
