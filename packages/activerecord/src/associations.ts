@@ -751,14 +751,17 @@ export function _canRouteThroughViaAssociationScope(
   if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection()) {
     return false;
   }
-  // Through-a-through (nested) cases — either the throughReflection
-  // OR the sourceReflection is itself a ThroughReflection. Rails
-  // exposes both via ThroughReflection#isNested (reflection.ts:1187);
-  // PR 3c sticks with chain-length-2, so any nested shape falls back
-  // to the 2-step loader.
-  if (typeof reflection.isNested === "function" && reflection.isNested()) return false;
   const src = reflection.sourceReflection;
   if (!src) return false;
+  // Nested-through (through-a-through) shapes — either the throughReflection
+  // OR the sourceReflection is itself a ThroughReflection. Rails routes ALL
+  // nested-through associations through the JOIN-based AssociationScope:
+  // `reflection.chain` flattens any nesting into a uniform list of join
+  // steps (association_scope.rb `add_constraints` walks that list with no
+  // `nested?` special-case). Route them here unconditionally — the
+  // per-step poly guards below target the chain-length-2 direct-source
+  // shape and don't apply to the flattened multi-step walk.
+  if (typeof reflection.isNested === "function" && reflection.isNested()) return true;
   // Polymorphic has_many / has_one source (rare): the chain walker
   // would need inversion machinery not present in PR 3c. Polymorphic
   // belongsTo source WITH sourceType is routed — AssociationScope's
@@ -782,35 +785,31 @@ export function _canRouteThroughViaAssociationScope(
 }
 
 /**
- * Nested-through with a through *source* reflection — e.g. Owner
- * `has_many :persons, through: :pets` where `Pet#persons` is itself a
- * has_many-through (with a polymorphic `looter` source). The legacy 2-step
- * `loadHasManyThrough` / IN-subquery fallback can only project a single source
- * FK column and cannot walk a multi-step chain, so it produces an empty or
- * nonsensical result. The JOIN-based AssociationScope flattens the whole
- * reflection chain (Rails' `reflection.chain`) into a single INNER JOIN,
- * carrying any polymorphic `sourceType` condition — route these shapes there.
+ * Record-aware routing decision for a `:through` load. Layers the owner's
+ * persistence state on top of the structural `_canRouteThroughViaAssociationScope`
+ * gate.
  *
- * Gated narrowly: the *through* reflection must be a plain (non-nested)
- * association and only the *source* is nested, which is the shape the fallback
- * mishandles. Nested-through-*through* shapes keep their existing working path.
+ * A nested-through association on an UNSAVED owner is kept on the 2-step
+ * `loadHasManyThrough` / IN-subquery loader: the SQL JOIN can only see through
+ * rows already in the database, not an in-memory-assigned through target
+ * (`post.author = mary` before save). Rails resolves those from the loaded
+ * through target via `find_target?`; our 2-step loader mirrors that. Once the
+ * owner is persisted the JOIN path (Rails' flattened `reflection.chain` walk)
+ * is authoritative. Non-nested shapes route regardless of owner state — their
+ * through rows only exist once the owner has a PK, so an unsaved owner
+ * short-circuits to an empty result either way.
  * @internal
  */
-export function _isNestedThroughSourceRoutable(
+export function _routeThroughViaAssociationScope(
+  record: Base,
   reflection: ReflectionLike | null | undefined,
+  options: AssociationOptions,
 ): boolean {
-  if (!reflection) return false;
-  if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection()) {
+  if (!_canRouteThroughViaAssociationScope(reflection, options)) return false;
+  if (record.isNewRecord() && typeof reflection?.isNested === "function" && reflection.isNested()) {
     return false;
   }
-  const src = (reflection as any).sourceReflection;
-  const through = (reflection as any).throughReflection;
-  return (
-    typeof src?.isThroughReflection === "function" &&
-    src.isThroughReflection() &&
-    typeof through?.isThroughReflection === "function" &&
-    !through.isThroughReflection()
-  );
+  return true;
 }
 
 /**
@@ -1522,7 +1521,7 @@ export async function loadHasOne(
     if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
       return _loadSingularThroughViaDisableJoinsScope(record, reflEarly, options);
     }
-    if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
+    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
       return loadHasOneThrough(record, assocName, options);
     }
     // Fall through into the AssociationScope path below.
@@ -1591,9 +1590,15 @@ export async function loadHasOne(
   // reads. For non-through, reflection.joinForeignKey is the owner-
   // side activeRecordPrimaryKey for hasOne. For through reflections,
   // joinForeignKey delegates to the SOURCE reflection (whose FK is on
-  // the through table, not the owner). The relevant owner-side
-  // column is on the through_reflection.
-  const reflForOwnerFk = reflection?.throughReflection ?? reflection ?? null;
+  // the through table, not the owner). The relevant owner-side column
+  // is on chain.last (Rails orders the chain target→owner); for a
+  // nested-through-through only chain.last reads the owner column.
+  const ownerChain = (reflection as any)?.chain;
+  const reflForOwnerFk =
+    (Array.isArray(ownerChain) && ownerChain.length ? ownerChain[ownerChain.length - 1] : null) ??
+    reflection?.throughReflection ??
+    reflection ??
+    null;
   const pkCheckCols = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -1821,18 +1826,14 @@ export async function loadHasMany(
     if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
       return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
     }
-    if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
-      // Nested-through whose SOURCE is itself a through reflection falls through
-      // into the JOIN-based AssociationScope path below (which flattens the
-      // whole `reflection.chain`), sharing its inverse-wiring and null-FK
-      // short-circuit. An unpersisted owner resolves its through step from the
-      // in-memory association target (e.g. `post.author = mary` before save),
-      // which the SQL JOIN cannot see — keep those on the 2-step loader.
-      const nestedSourceRoutable =
-        !record.isNewRecord() && _isNestedThroughSourceRoutable(reflEarly);
-      if (!nestedSourceRoutable) {
-        return loadHasManyThrough(record, assocName, options);
-      }
+    // Nested-through shapes flatten their whole `reflection.chain` into the
+    // JOIN-based AssociationScope path below, sharing its inverse-wiring and
+    // null-FK short-circuit. An unsaved owner resolves its through step from
+    // the in-memory association target (e.g. `post.author = mary` before save),
+    // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
+    // those on the 2-step loader.
+    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
+      return loadHasManyThrough(record, assocName, options);
     }
     // Fall through into the AssociationScope path below.
   }
@@ -1904,9 +1905,15 @@ export async function loadHasMany(
   // side activeRecordPrimaryKey for hasMany. For through reflections,
   // joinForeignKey delegates to the SOURCE reflection (whose FK is on
   // the through table, not the owner) — wrong column. The relevant
-  // owner-side column is on the through_reflection (chain.last in the
-  // chain ordering).
-  const reflForOwnerFk = reflection?.throughReflection ?? reflection ?? null;
+  // owner-side column is on chain.last (Rails orders the chain
+  // target→owner); for a nested-through-through the through_reflection
+  // is itself a through, so only chain.last reads the owner column.
+  const ownerChain = (reflection as any)?.chain;
+  const reflForOwnerFk =
+    (Array.isArray(ownerChain) && ownerChain.length ? ownerChain[ownerChain.length - 1] : null) ??
+    reflection?.throughReflection ??
+    reflection ??
+    null;
   const fkCheckPks = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -2290,10 +2297,18 @@ export function buildThroughJoinScope(
   const ctor = record.constructor as typeof Base;
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (!reflection) return null;
-  // Null-FK short-circuit on the owner-side column — for a through reflection
-  // that's the through_reflection's joinForeignKey (the owner FK on the join
-  // table), mirroring loadHasMany.
-  const reflForOwnerFk = (reflection as any).throughReflection ?? reflection;
+  // Null-FK short-circuit on the owner-side column. The owner-adjacent step is
+  // the LAST reflection in `reflection.chain` (Rails orders the chain
+  // target→owner), whose `joinForeignKey` is the owner's key column. For a
+  // simple (chain-length-2) through that's the through_reflection; for a
+  // nested-through-through the through_reflection is itself a through whose
+  // `joinForeignKey` delegates to its own source (a column NOT on the owner),
+  // so `chain.last` is required to read the right owner column.
+  const chain = (reflection as any).chain;
+  const reflForOwnerFk =
+    (Array.isArray(chain) && chain.length ? chain[chain.length - 1] : null) ??
+    (reflection as any).throughReflection ??
+    reflection;
   const fkCols = Array.isArray(reflForOwnerFk.joinForeignKey)
     ? reflForOwnerFk.joinForeignKey
     : [reflForOwnerFk.joinForeignKey];

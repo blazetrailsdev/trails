@@ -61,8 +61,7 @@ import {
   buildHasManyRelation,
   buildThroughJoinScope,
   loadHasMany,
-  _canRouteThroughViaAssociationScope,
-  _isNestedThroughSourceRoutable,
+  _routeThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
   _setCollectionInverseInstance,
   _violatesStrictLoading,
@@ -1547,15 +1546,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // belongsTo-without-sourceType): fall back to the loader.
       // Disable-joins diverged case also falls through here — the
       // generic Relation.prototype.count path below honors the
-      // proxy's in-place mutations. A persisted nested-through-source
+      // proxy's in-place mutations. A persisted nested-through
       // shape IS COUNT-able via `_buildThroughScope`'s JOIN, so it stays
       // on the scope().count() fast path below rather than the loader.
-      const nestedSourceRoutable =
-        !this._record.isNewRecord() && _isNestedThroughSourceRoutable(refl);
       if (
         !this._assocDef.options.disableJoins &&
-        !_canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
-        !nestedSourceRoutable
+        !_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
       ) {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
@@ -3489,29 +3485,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       refl &&
       !ownerPkComposite &&
       !targetPkComposite &&
-      _canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+      _routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
     ) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
-    }
-    // Nested-through with a through *source* reflection (e.g. Owner
-    // `has_many :persons, through: :pets` where `Pet#persons` is itself a
-    // has_many-through with a polymorphic source). The IN-subquery fallback
-    // below only knows how to project a single source FK/PK column and cannot
-    // walk a multi-step chain, so it emits a nonsensical predicate. The
-    // JOIN-based AssociationScope flattens the whole reflection chain (Rails'
-    // `reflection.chain`) into a single INNER JOIN, carrying the polymorphic
-    // `sourceType` type condition — delegate to it here.
-    if (
-      !ownerPkComposite &&
-      !targetPkComposite &&
-      !this._record.isNewRecord() &&
-      _isNestedThroughSourceRoutable(refl)
-    ) {
-      const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
-      // null FK → empty, mirroring the sibling routing block above; do NOT fall
-      // through to the IN-subquery below, which can't walk a nested source.
-      return joinRel ?? (this.model as any).all().none();
     }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
