@@ -1,31 +1,35 @@
 import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
 import { setupFixtures } from "./fixtures.js";
-import { dropAllTables } from "./drop-all-tables.js";
+import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
 
-async function tableCount(a: DatabaseAdapter): Promise<number> {
+async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (a.adapterName === "sqlite") {
     return (
       (await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-      )) as unknown[]
-    ).length;
+      )) as Array<{ name: string }>
+    ).map((r) => r.name);
   } else if (a.adapterName === "postgres") {
     return (
       (await a.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
-      )) as unknown[]
-    ).length;
+      )) as Array<{ tablename: string }>
+    ).map((r) => r.tablename);
   } else {
     return (
       (await a.execute(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-      )) as unknown[]
-    ).length;
+        `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+      )) as Array<{ name?: string; TABLE_NAME?: string }>
+    ).map((r) => (r.name ?? r.TABLE_NAME)!);
   }
+}
+
+async function tableCount(a: DatabaseAdapter): Promise<number> {
+  return (await listTables(a)).length;
 }
 
 setupFixtures();
@@ -101,6 +105,47 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     // Total execute calls = 4 proves the retry path ran.
     expect(fakeAdapter.execute).toHaveBeenCalledTimes(4);
     expect(mutationCallCount).toBe(1);
+  });
+});
+
+describe("resetTestTables", () => {
+  it("truncates canonical tables (keeps shape) instead of dropping them", async () => {
+    await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4242)`);
+    expect(
+      ((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length,
+    ).toBeGreaterThan(0);
+
+    await resetTestTables(adapter);
+
+    // Canonical table survives (not dropped)...
+    expect(await listTables(adapter)).toContain("articles");
+    // ...but its rows are cleared.
+    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+  });
+
+  it("drops bespoke (non-canonical) tables so their shape can't leak", async () => {
+    await adapter.executeMutation(`CREATE TABLE bespoke_reset_t (id INTEGER PRIMARY KEY)`);
+    expect(await listTables(adapter)).toContain("bespoke_reset_t");
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).not.toContain("bespoke_reset_t");
+    // Canonical tables are still present after the bespoke drop.
+    expect(await listTables(adapter)).toContain("articles");
+  });
+
+  it("drops bookkeeping tables (schema_migrations / ar_internal_metadata) like the old drop-all", async () => {
+    // These are non-canonical, so the reset drops them — matching the previous
+    // unconditional dropAllTables. Migrator tests (non-transactional) rely on a
+    // clean schema_migrations per test; preserving it would leak migration
+    // state and break them.
+    await adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
+    );
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).not.toContain("schema_migrations");
   });
 });
 

@@ -8,6 +8,7 @@ import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 async function freshCtx(): Promise<{ adapter: TestDatabaseAdapter; ctx: MigrationContext }> {
@@ -329,6 +330,16 @@ describe("SchemaDumperTest", () => {
   beforeEach(async () => {
     const f = await freshCtx();
     ctx = f.ctx;
+    // These cases build bespoke tables and dump the whole schema; the global
+    // truncate-reset leaves the ~330 canonical tables in place (only clearing
+    // rows), which would make each full-schema dump introspect all of them and
+    // blow the per-test timeout. Drop to an empty DB so the dumps stay cheap and
+    // deterministic (the old drop-all reset contract these cases were written
+    // against). Carpet-bomb is intentional here: the tables to remove are the
+    // boot-laid canonical set this file did NOT create, so dropTable("…") of
+    // owned tables cannot express it.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await dropAllTables(f.adapter);
   });
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
@@ -373,8 +384,8 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", async () => {
-    await ctx.createTable("users", {}, (t) => t.string("name"));
-    await ctx.createTable("temp_cache", {}, (t) => t.string("val"));
+    await ctx.createTable("users", { force: true }, (t) => t.string("name"));
+    await ctx.createTable("temp_cache", { force: true }, (t) => t.string("val"));
     SchemaDumper.ignoreTables = [/^temp_/];
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain("users");
@@ -390,7 +401,7 @@ describe("SchemaDumperTest", () => {
   // column is `key` (not `id`), which keeps the explicit `id: false` in the dump
   // on every adapter. Tracked as an RFC 0048 follow-up story.
   it("schema dump keeps id false when id is false and unique not null column added", async () => {
-    await ctx.createTable("string_key_objects", { id: false }, (t) => {
+    await ctx.createTable("string_key_objects", { id: false, force: true }, (t) => {
       t.string("key", { null: false });
     });
     await ctx.addIndex("string_key_objects", "key", { unique: true });
@@ -477,7 +488,7 @@ describe("SchemaDumperTest", () => {
   // backtick output), not by supports_expression_index?. Our body is a PG/SQLite
   // port (`lower(a || b)`), so it's a pre-existing divergence — left as-is.
   it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
-    await ctx.createTable("users", {}, (t) => {
+    await ctx.createTable("users", { force: true }, (t) => {
       t.string("first_name");
       t.string("last_name");
     });
@@ -783,7 +794,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
         t.timestamps();
       });
@@ -867,7 +878,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
       });
       await ctx.addColumn("posts", "created_at", "datetime");
@@ -897,7 +908,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
       });
       await ctx.addColumn("posts", "posted_at", "datetime");
@@ -915,6 +926,10 @@ describe("SchemaDumperDefaultsTest", () => {
     const f = await freshCtx();
     ctx = f.ctx;
     adapter = f.adapter;
+    // See SchemaDumperTest beforeEach: drop to an empty DB so full-schema dumps
+    // don't introspect the ~330 canonical tables the truncate-reset preserves.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await dropAllTables(f.adapter);
   });
 
   it("schema dump defaults with universally supported types", async () => {

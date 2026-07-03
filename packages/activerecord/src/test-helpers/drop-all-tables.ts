@@ -1,5 +1,20 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { clearAppliedSchemaSignaturesForTables } from "./define-schema.js";
+import { TEST_SCHEMA } from "./test-schema.js";
+
+/**
+ * Table names the boot-time canonical schema
+ * (`template-global-setup.ts` → `TEST_SCHEMA`) lays down once and keeps
+ * shape-stable for the whole run. Between tests these only need their **rows**
+ * cleared (TRUNCATE), never a DROP — see {@link resetTestTables}.
+ *
+ * Everything else — bespoke tables a not-yet-converted `defineSchema` caller
+ * created, and the `schema_migrations` / `ar_internal_metadata` bookkeeping
+ * tables that migrator tests manage per-test — is dropped, exactly as the
+ * previous unconditional `dropAllTables` did, so no per-test migration/schema
+ * state leaks across the reset.
+ */
+const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
 
 /**
  * Drops every user table/view/matview in the database and reconciles the
@@ -14,21 +29,79 @@ import { clearAppliedSchemaSignaturesForTables } from "./define-schema.js";
  * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
+  await resetTables(adapter, "drop-all");
+}
+
+/**
+ * Between-test row reset that keeps the boot-laid canonical schema intact.
+ *
+ * Instead of `dropAllTables`' ~330-table `DROP TABLE` fan-out per test (the
+ * dominant DDL-churn source measured in PR #4499), this **truncates** the
+ * canonical tables (schema/indexes preserved — RFC 0059 lays them once at boot
+ * and keeps them shape-stable). **Every non-canonical table is dropped**, exactly
+ * as the previous unconditional `dropAllTables` did: bespoke tables a
+ * not-yet-converted `defineSchema` caller created (so their shape can't leak
+ * into the next file) *and* the `schema_migrations` / `ar_internal_metadata`
+ * bookkeeping tables (migrator tests manage those per-test and rely on the reset
+ * clearing them). Views/matviews are never canonical, so they are always dropped.
+ */
+export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
+  await resetTables(adapter, "reset");
+}
+
+type ResetMode = "drop-all" | "reset";
+
+async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   let dropped: string[];
   switch (adapter.adapterName) {
     case "postgres":
-      dropped = await dropAllPgTables(adapter);
+      dropped = await resetPgTables(adapter, mode);
       break;
     case "mysql":
-      dropped = await dropAllMysqlTables(adapter);
+      dropped = await resetMysqlTables(adapter, mode);
       break;
     case "sqlite":
-      dropped = await dropAllSqliteTables(adapter);
+      dropped = await resetSqliteTables(adapter, mode);
       break;
     default:
       dropped = [];
   }
   clearAppliedSchemaSignaturesForTables(adapter, dropped);
+}
+
+/**
+ * Truncate only the candidate canonical tables that actually hold rows.
+ *
+ * Truncating is the between-test row-clear, but on PostgreSQL every
+ * `truncateTables` call pays `disableReferentialIntegrity` (an `ALTER TABLE …
+ * TRIGGER` pass over *every* table) and on MySQL/MariaDB `TRUNCATE` is
+ * DDL-grade (drop+recreate tablespace) per table — so truncating all ~330
+ * canonical tables per test, even the empty ones, dominates CI time. Most
+ * non-transactional tests write to zero canonical tables, so a single
+ * `EXISTS` probe collapses the work to the handful (often none) that changed;
+ * when none changed we skip `truncateTables` entirely (no referential-integrity
+ * pass at all).
+ *
+ * Exactness matters — missing a non-empty table would leak rows into the next
+ * test — so on any probe failure we fall back to truncating the full candidate
+ * set (the previous, correct-but-slower behavior).
+ */
+async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]): Promise<void> {
+  if (candidates.length === 0) return;
+  let toTruncate = candidates;
+  try {
+    const probe = candidates
+      .map(
+        (t) =>
+          `SELECT '${t.replace(/'/g, "''")}' AS t WHERE EXISTS (SELECT 1 FROM ${adapter.quoteTableName(t)})`,
+      )
+      .join(" UNION ALL ");
+    const rows = (await adapter.execute(probe)) as Array<{ t?: string; T?: string }>;
+    toTruncate = rows.map((r) => r.t ?? r.T).filter((t): t is string => Boolean(t));
+  } catch {
+    toTruncate = candidates;
+  }
+  if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
 }
 
 function _isPgConnectionError(e: unknown): boolean {
@@ -44,7 +117,7 @@ function _isPgConnectionError(e: unknown): boolean {
   );
 }
 
-async function dropAllPgTables(adapter: DatabaseAdapter): Promise<string[]> {
+async function resetPgTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
   // Accumulate across both attempts: tables dropped before a connection error
   // are gone from pg_tables, so the retry won't re-enumerate them. Returning
   // only the retry's list would leave their signature entries un-reconciled —
@@ -52,14 +125,14 @@ async function dropAllPgTables(adapter: DatabaseAdapter): Promise<string[]> {
   // back to `cachedSig !== undefined`.
   const dropped: string[] = [];
   try {
-    await _dropAllPgTablesOnce(adapter, dropped);
+    await _resetPgTablesOnce(adapter, mode, dropped);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      await _dropAllPgTablesOnce(adapter, dropped);
+      await _resetPgTablesOnce(adapter, mode, dropped);
     } else {
       throw e;
     }
@@ -67,8 +140,13 @@ async function dropAllPgTables(adapter: DatabaseAdapter): Promise<string[]> {
   return dropped;
 }
 
-async function _dropAllPgTablesOnce(adapter: DatabaseAdapter, dropped: string[]): Promise<void> {
+async function _resetPgTablesOnce(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  dropped: string[],
+): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
+  // Views/matviews are never canonical — always drop them.
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
@@ -87,9 +165,19 @@ async function _dropAllPgTablesOnce(adapter: DatabaseAdapter, dropped: string[])
       if (_isPgConnectionError(e)) throw e;
     }
   }
-  for (const { schemaname: s, tablename: t } of (await adapter.execute(
+
+  const toTruncate: string[] = [];
+  const tableRows = (await adapter.execute(
     `SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ${schema}`,
-  )) as { schemaname: string; tablename: string }[]) {
+  )) as { schemaname: string; tablename: string }[];
+  for (const { schemaname: s, tablename: t } of tableRows) {
+    // A table living outside the default (public) schema — e.g. schema.test.ts's
+    // test_schema/test_schema2 — can never be a boot-laid canonical table; drop
+    // it regardless of mode so it can't bleed state into the next file.
+    if (mode === "reset" && s === "public" && CANONICAL_TABLE_NAMES.has(t)) {
+      toTruncate.push(t);
+      continue;
+    }
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
       dropped.push(t);
@@ -97,13 +185,15 @@ async function _dropAllPgTablesOnce(adapter: DatabaseAdapter, dropped: string[])
       if (_isPgConnectionError(e)) throw e;
     }
   }
+  await truncateNonEmpty(adapter, toTruncate);
 }
 
-async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<string[]> {
+async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
   // Works with both the legacy pool model (_driverPool) and the current
   // single-connection model (_client). Falls back to adapter.execute /
   // adapter.executeMutation so both paths share one implementation.
   const dropped: string[] = [];
+  const toTruncate: string[] = [];
   try {
     await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
     const tableRows = await adapter.execute(
@@ -121,12 +211,17 @@ async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<string[]> {
     }
     for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
-      if (name)
-        try {
-          await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
-          dropped.push(name);
-        } catch {}
+      if (!name) continue;
+      if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
+        toTruncate.push(name);
+        continue;
+      }
+      try {
+        await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
+        dropped.push(name);
+      } catch {}
     }
+    await truncateNonEmpty(adapter, toTruncate);
   } finally {
     try {
       await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
@@ -135,8 +230,9 @@ async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<string[]> {
   return dropped;
 }
 
-async function dropAllSqliteTables(adapter: DatabaseAdapter): Promise<string[]> {
+async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
   const dropped: string[] = [];
+  const toTruncate: string[] = [];
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
@@ -147,10 +243,15 @@ async function dropAllSqliteTables(adapter: DatabaseAdapter): Promise<string[]> 
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
   )) as { name: string }[]) {
+    if (mode === "reset" && CANONICAL_TABLE_NAMES.has(name)) {
+      toTruncate.push(name);
+      continue;
+    }
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
       dropped.push(name);
     } catch {}
   }
+  await truncateNonEmpty(adapter, toTruncate);
   return dropped;
 }

@@ -18,7 +18,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { dropAllTables, resetTestTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
 import { ConnectionNotEstablished } from "./errors.js";
 import { getEnv } from "@blazetrails/activesupport";
@@ -299,13 +299,19 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
  * starts from a clean slate. Called from a global `beforeEach` hook in
  * test-setup-ar.ts.
  *
- * Drops tables based on the actual database state.
+ * Clears row state by **truncating** the boot-laid canonical tables (RFC 0059
+ * lays the canonical schema once at boot and keeps it shape-stable, so dropping
+ * the tables between tests is pure redundancy — only the rows need clearing).
+ * Every non-canonical table is dropped (bespoke tables a not-yet-converted
+ * `defineSchema` caller created, plus the `schema_migrations` /
+ * `ar_internal_metadata` bookkeeping tables), matching the previous
+ * `dropAllTables` behavior. See {@link resetTestTables}.
  *
  *   - PG: enumerate every user schema via `current_schemas(false)`, not
  *     just `public`. Tests that create custom schemas (e.g. schema.test.ts
  *     with test_schema/test_schema2) leak tables that survive a public-only
  *     drop and continue to bleed state.
- *   - MySQL: drops on a single dedicated pool connection with
+ *   - MySQL: runs on a single dedicated pool connection with
  *     FOREIGN_KEY_CHECKS=0 for the whole sequence. Per-statement exec()s
  *     can't reliably bracket the drops because each call may pick a
  *     different pool connection.
@@ -318,7 +324,7 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
 export async function resetTestAdapterState(): Promise<void> {
   await _pool.withConnection(
     async (adapter) => {
-      await dropAllTables(adapter);
+      await resetTestTables(adapter);
       // Clear schema cache on all live pool connections (mirrors Rails'
       // ConnectionPool#clear_cache!). Tests that construct raw adapters directly
       // also need the global signature cache cleared.
