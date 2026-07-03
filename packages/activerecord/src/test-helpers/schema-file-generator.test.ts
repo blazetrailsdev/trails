@@ -13,7 +13,9 @@ import {
   COLUMN_TYPE_MAP_MYSQL,
   COLUMN_TYPE_MAP_SQLITE,
   serialIdType,
+  defineSchema,
 } from "./define-schema.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 
 const MINI_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -326,5 +328,178 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
         );
       }
     }
+  });
+});
+
+// PARITY GUARD — schema-file-generator.ts hand-mirrors define-schema.ts's index
+// option gating (schema-file-generator.ts:178-204 vs define-schema.ts:834-861).
+// A one-sided edit reintroduces the silent-drift class PR #4461 fixed for the
+// per-adapter TYPE map — see the type-map parity guard above (PR #4464), which
+// deliberately scoped out this index-gating surface. This guard drives BOTH
+// emitters through a recording context for one representative schema on each
+// adapter and asserts they issue the same `addIndex(columns, options)` calls,
+// so the length/expression/pass-through gating stays in lockstep:
+//
+//   - `length:` sub-part prefix is MySQL-only DDL, dropped for non-MySQL in both.
+//   - unique/where/name/order/nullsNotDistinct/using/type pass through verbatim.
+//   - expression indexes (`"(lower(x))"`) gate per adapter — the KNOWN residual
+//     below, since the generator has no DB version.
+type RecordedIndex = { columns: string | string[]; options: Record<string, unknown> };
+
+// A recording `MigrationContext` / `SchemaStatements`: `createTable` runs the
+// column callback against a no-op table builder (columns aren't under test here)
+// and every `addIndex` is captured with the exact options object the emitter
+// passed. `dropTable`/`clearCacheBang` are the only other surface either path
+// touches on a fresh (uncached, pool-less) adapter.
+function makeIndexRecorder(): { recorded: RecordedIndex[]; ctx: Record<string, unknown> } {
+  const recorded: RecordedIndex[] = [];
+  const noopTable = { column: () => {} };
+  const ctx: Record<string, unknown> = {
+    dropTable: async () => {},
+    createTable: async (_name: string, _opts: unknown, cb?: (t: typeof noopTable) => void) => {
+      cb?.(noopTable);
+    },
+    addIndex: async (
+      _table: string,
+      columns: string | string[],
+      options: Record<string, unknown>,
+    ) => {
+      recorded.push({ columns, options });
+    },
+  };
+  return { recorded, ctx };
+}
+
+// Strip `undefined` values (define-schema.ts passes every option key, undefined
+// where absent; the generator omits absent keys) so the two normalize equal.
+function normalizeIndexOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(options)) if (v !== undefined) out[k] = v;
+  return out;
+}
+
+function normalizeRecorded(recorded: RecordedIndex[]): string {
+  return JSON.stringify(
+    recorded.map((r) => ({ columns: r.columns, options: normalizeIndexOptions(r.options) })),
+  );
+}
+
+// Drive the GENERATOR: emit the schema file, dynamic-import it (the real
+// loadSchema path — DatabaseTasks.loadSchema imports the same file:// URL), and
+// run its default export against the recorder.
+async function generatorIndexes(schema: Schema, adapter: string): Promise<RecordedIndex[]> {
+  const filePath = await generateSchemaFile(schema, adapter);
+  const path = await getPathAsync();
+  const href = path.pathToFileURL!(filePath).href;
+  const mod = (await import(href)) as { default: (ctx: unknown) => Promise<void> };
+  const { recorded, ctx } = makeIndexRecorder();
+  await mod.default(ctx);
+  const fs = await getFsAsync();
+  fs.unlinkSync(filePath);
+  return recorded;
+}
+
+// Drive DEFINE-SCHEMA: a fake pool-less adapter whose `schemaStatements()`
+// returns the recorder. `supportsExpressionIndex` mimics the live DB
+// capability the runtime check reads (MySQL ≥ 8.0.13 / SQLite ≥ 3.9 true,
+// MariaDB false); `getDatabaseVersion` is awaited first by the real gate.
+async function defineSchemaIndexes(
+  schema: Schema,
+  adapter: string,
+  supportsExpressionIndex: boolean,
+): Promise<RecordedIndex[]> {
+  const { recorded, ctx } = makeIndexRecorder();
+  const fakeAdapter = {
+    adapterName: adapter,
+    schemaStatements: () => ctx,
+    supportsExpressionIndex: () => supportsExpressionIndex,
+    getDatabaseVersion: async () => {},
+    clearCacheBang: () => {},
+  } as unknown as AbstractAdapter;
+  await defineSchema(fakeAdapter, schema);
+  return recorded;
+}
+
+// One table exercising every IndexSpec option plus an expression index. Boolean
+// flags are only ever set truthy (never explicit `false`) so the generator's
+// truthy `if (index.unique)` omission and define-schema's always-passed
+// `unique: index.unique` normalize identically.
+const INDEX_PARITY_SCHEMA: Schema = {
+  parity_probe: {
+    columns: {
+      title: "string",
+      rating: "integer",
+      body: "text",
+      external_id: "string",
+    },
+    indexes: [
+      { columns: "title", unique: true, name: "idx_probe_title", where: "rating > 0" },
+      { columns: ["title", "rating"], order: { rating: "desc" }, length: { title: 10 } },
+      { columns: "rating", length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
+      { columns: "(lower(external_id))" },
+    ],
+  },
+};
+
+describe("generateSchemaFile / define-schema.ts index-gating parity", () => {
+  // On PG/SQLite the generator keeps expression indexes (its coarse skip is
+  // MySQL-only) and define-schema keeps them when the adapter supports them —
+  // so drive define-schema with `supportsExpressionIndex: true` to match.
+  for (const adapter of ["postgres", "sqlite"] as const) {
+    it(`emits the same addIndex calls as define-schema.ts on ${adapter}`, async () => {
+      const [gen, def] = await Promise.all([
+        generatorIndexes(INDEX_PARITY_SCHEMA, adapter),
+        defineSchemaIndexes(INDEX_PARITY_SCHEMA, adapter, true),
+      ]);
+      expect(normalizeRecorded(gen)).toBe(normalizeRecorded(def));
+    });
+  }
+
+  // On MySQL the generator drops every expression index unconditionally; the
+  // MariaDB reality (no expression-index support) makes define-schema drop it
+  // too, so the deterministic surface — length gating + pass-through options —
+  // stays in lockstep. (The MySQL-8 divergence is the tracked residual below.)
+  it("emits the same addIndex calls as define-schema.ts on mysql (MariaDB, no expression index)", async () => {
+    const [gen, def] = await Promise.all([
+      generatorIndexes(INDEX_PARITY_SCHEMA, "mysql"),
+      defineSchemaIndexes(INDEX_PARITY_SCHEMA, "mysql", false),
+    ]);
+    expect(normalizeRecorded(gen)).toBe(normalizeRecorded(def));
+    // Length survives on MySQL (both keep it) and the expression index is
+    // dropped by both — pin those two gates explicitly.
+    expect(gen.some((r) => r.options.length !== undefined)).toBe(true);
+    expect(gen.some((r) => r.columns === "(lower(external_id))")).toBe(false);
+  });
+
+  it("drops sub-part index length: for non-MySQL adapters (both emitters)", async () => {
+    for (const adapter of ["postgres", "sqlite"] as const) {
+      const [gen, def] = await Promise.all([
+        generatorIndexes(INDEX_PARITY_SCHEMA, adapter),
+        defineSchemaIndexes(INDEX_PARITY_SCHEMA, adapter, true),
+      ]);
+      expect(gen.every((r) => r.options.length === undefined)).toBe(true);
+      expect(def.every((r) => normalizeIndexOptions(r.options).length === undefined)).toBe(true);
+    }
+  });
+
+  // TRACKED RESIDUAL — expression-index gating coarseness. The generator has no
+  // DB version, so it drops expression indexes on ALL of MySQL (`adapterName
+  // === "mysql"`); define-schema.ts uses the runtime `supportsExpressionIndex`,
+  // which is TRUE on MySQL 8.0.13+. So on a live MySQL 8 the two DIVERGE: the
+  // fixtures path (define-schema) keeps the expression index, the boot-laid
+  // generator path drops it. This is safe today because the only live generator
+  // caller is the PG-only template path (template-global-setup.ts) — MySQL
+  // builds via define-schema's runtime check. A future MySQL-template caller
+  // must thread a version-aware check into the generator. This test PINS the
+  // known divergence so a fix (or a new MySQL caller) surfaces here rather than
+  // silently dropping an index; it is not cheaply closable without a live
+  // MySQL-8 adapter to read the version from.
+  it("expression-index gating diverges on MySQL 8 (tracked residual, not a live-adapter test)", async () => {
+    const gen = await generatorIndexes(INDEX_PARITY_SCHEMA, "mysql");
+    const defMysql8 = await defineSchemaIndexes(INDEX_PARITY_SCHEMA, "mysql", true);
+    // Generator: coarse mysql skip → no expression index.
+    expect(gen.some((r) => r.columns === "(lower(external_id))")).toBe(false);
+    // define-schema on MySQL 8 (supportsExpressionIndex true): keeps it.
+    expect(defMysql8.some((r) => r.columns === "(lower(external_id))")).toBe(true);
   });
 });
