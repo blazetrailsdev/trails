@@ -373,19 +373,18 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
   async loadTarget(): Promise<Base | Base[] | null> {
-    // Mirrors Rails' guard `(@stale_state && stale_target?) || find_target?`
-    // (association.rb:190). The `@stale_state &&` factor uses Ruby truthiness
-    // (nil/false falsy; `0`/`""` truthy) — here `!= null`, not `Boolean()`.
-    // The stale and find-target branches are mutually exclusive (`stale_target?`
-    // requires loaded, `find_target?` requires not-loaded), so they split cleanly.
-    //
-    // Note: unlike Rails' `load_target` guard (`@stale_state && stale_target?`),
-    // we do NOT gate on a non-null prior `_staleState`. Rails relies on its
-    // `SingularAssociation#reader` resetting a stale association *before*
-    // `load_target` runs; our `readHasOne`/reader path drives `loadTarget`
-    // directly, so it must itself reload when the target went stale after a
-    // nil load — e.g. a has_one_through belongs_to whose through FK was nil at
-    // load time and is set afterward (`minivan.speedometer_id = …`).
+    // Corresponds to Rails' guard `(@stale_state && stale_target?) ||
+    // find_target?` (association.rb:190), but we intentionally drop the
+    // `@stale_state &&` factor. Rails relies on `SingularAssociation#reader`
+    // resetting a stale association *before* `load_target` runs (reset clears
+    // `@stale_state` to nil, so it's `find_target?` that fires post-reset — the
+    // `@stale_state &&` factor is moot on that path). trails' reader does not
+    // reset-before-load, so `loadTarget` must itself reload when the target
+    // went stale after a nil load — e.g. a has_one_through belongs_to whose
+    // through FK was nil at load time and is set afterward
+    // (`minivan.speedometer_id = …`). The stale and find-target branches stay
+    // mutually exclusive (`stale_target?` requires loaded, `find_target?`
+    // requires not-loaded), so they split cleanly.
     if (this.isStaleTarget()) {
       // Rails `find_target` always issues a query; skip the in-memory
       // `doFindTarget` cache so a stale target is actually re-fetched.
