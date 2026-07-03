@@ -75,12 +75,16 @@ export async function disableReferentialIntegrity(
 ): Promise<void> {
   let originalException: Error | null = null;
 
+  // Enumerate the catalog once and re-enable exactly the set we disabled.
+  // Re-deriving the list after the block ran would both double the catalog
+  // enumeration (hot under RFC 0060's per-test truncate reset) and risk
+  // re-enabling a different set if the block created/dropped tables.
+  const tables = await this.tables();
+
   try {
     await this.transaction(
       async () => {
-        await this.execute(
-          disableReferentialIntegritySql.call(this, await this.tables()).join(";"),
-        );
+        await this.execute(disableReferentialIntegritySql.call(this, tables).join(";"));
       },
       { requiresNew: true },
     );
@@ -106,7 +110,7 @@ export async function disableReferentialIntegrity(
   try {
     await this.transaction(
       async () => {
-        await this.execute(enableReferentialIntegritySql.call(this, await this.tables()).join(";"));
+        await this.execute(enableReferentialIntegritySql.call(this, tables).join(";"));
       },
       { requiresNew: true },
     );
