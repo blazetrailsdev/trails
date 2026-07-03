@@ -783,7 +783,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
         t.timestamps();
       });
@@ -867,7 +867,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
       });
       await ctx.addColumn("posts", "created_at", "datetime");
@@ -897,7 +897,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     async () => {
-      await ctx.createTable("posts", {}, (t) => {
+      await ctx.createTable("posts", { force: true }, (t) => {
         t.string("title");
       });
       await ctx.addColumn("posts", "posted_at", "datetime");
