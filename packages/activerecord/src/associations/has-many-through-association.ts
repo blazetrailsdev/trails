@@ -271,6 +271,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     let count = 0;
     if (method === "nullify") {
       count = await scope.updateAll({ [sourceForeignKey(this)]: null });
+      await updateThroughCounterCaches(this, count, records, method);
+      await deleteThroughRecords(this, records);
+      return count;
     } else if ((scope.model as typeof Base | undefined)?.primaryKey) {
       // Destroy (not Rails' bulk delete_all) so the join model's belongs_to
       // counter caches and before_destroy guards fire — trails keys through
@@ -311,6 +314,54 @@ function sourceForeignKey(assoc: HasManyThroughAssociation): string {
   const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   return sourceRefl?.foreignKey ?? `${underscore(singularize(assoc.reflection.name))}_id`;
+}
+
+/**
+ * Mirrors the counter-cache half of Rails' `HasManyThroughAssociation#delete_records`
+ * (has_many_through_association.rb:163-173). For a `nullify` delete the through
+ * join rows are updated in place (not deleted), so the join model's `belongs_to`
+ * counter callbacks never fire — decrement the owner's counters here instead:
+ *
+ * - `source_reflection.options[:counter_cache]` (when set, and `method != :destroy`):
+ *   `klass.decrement_counter` on the target rows by their ids.
+ * - `update_through_counter?(:nullify)` is always `false`, so the owner's own
+ *   reflection counter is decremented via `update_counter(-count)`.
+ *
+ * @internal
+ */
+async function updateThroughCounterCaches(
+  assoc: HasManyThroughAssociation,
+  count: number,
+  records: Base[],
+  method: string,
+): Promise<void> {
+  if (count <= 0) return;
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection;
+
+  if (sourceRefl?.options?.counterCache && method !== "destroy") {
+    const counter = sourceRefl.counterCacheColumn?.() ?? sourceRefl.options.counterCache;
+    const klass = safeKlass(sourceRefl) as {
+      decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
+    } | null;
+    const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
+    if (klass?.decrementCounter && counter && ids.length > 0) {
+      await klass.decrementCounter(String(counter), ids);
+    }
+  }
+
+  const counterCol = assoc.reflection.options.counterCache;
+  if (!counterCol) return;
+  const owner = assoc.owner as any;
+  const column = String(counterCol);
+  if (typeof owner.incrementBang === "function") {
+    await owner.incrementBang(column, -count);
+  } else if (typeof owner.updateCounters === "function") {
+    await owner.updateCounters({ [column]: -count });
+  } else if (typeof owner.increment === "function") {
+    owner.increment(column, -count);
+  }
 }
 
 /** The pre-built join row and the source reflection's inverse it wires to. */

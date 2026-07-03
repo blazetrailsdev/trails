@@ -2536,6 +2536,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return (throughModel as any).where(conditions).deleteAll();
   }
 
+  private async _nullifyThroughAll(): Promise<number> {
+    const assoc = this._record.association(this._assocName) as unknown as {
+      loadTarget: () => Promise<Base[]>;
+      deleteRecords: (records: Base[], method: string) => Promise<number>;
+    };
+    const target = await assoc.loadTarget();
+    if (target.length === 0) return 0;
+    return assoc.deleteRecords(target, "nullify");
+  }
+
   /**
    * Resolve the effective `:dependent` strategy for a record-level `delete`,
    * mirroring Rails `HasManyAssociation#delete_records`: `:destroy` destroys each
@@ -3757,7 +3767,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       // Nullify: set-based SQL update to null FKs (no per-record callbacks)
       if (this._isThrough) {
-        count = await this._deleteThroughAllSql();
+        // Rails `delete_or_nullify_all_records(:nullify)` → `delete_records`
+        // (has_many_through_association.rb:136-175) UPDATEs the source FK on the
+        // join rows to NULL — it does NOT delete them — and decrements the
+        // owner's counter caches. Delegate to the association layer (as `clear`
+        // does) so nullify semantics and counters are handled in one place,
+        // rather than `_deleteThroughAllSql`, which would DELETE the join rows.
+        count = await this._nullifyThroughAll();
       } else {
         const nullUpdates = this._buildNullifyUpdates();
         if (diverged) {
