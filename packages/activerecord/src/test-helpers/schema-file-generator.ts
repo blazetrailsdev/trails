@@ -15,19 +15,8 @@ import type { Schema, ColumnSpec, TableSchema, IndexSpec } from "./define-schema
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
 
-// Mirrors define-schema.ts COLUMN_TYPE_MAP_MYSQL: date/time/json map to
-// "string" (VARCHAR 255) on MySQL so the column type matches what defineSchema
-// produced before this path was introduced.
-const SCHEMA_TO_AR_MYSQL: Record<string, string> = {
-  ...SCHEMA_TO_AR,
-  date: "string",
-  time: "string",
-  json: "string",
-};
-
-function toArType(primitive: string, adapterName?: string): string {
-  const map = adapterName === "mysql" ? SCHEMA_TO_AR_MYSQL : SCHEMA_TO_AR;
-  return map[primitive] ?? primitive;
+function toArType(primitive: string): string {
+  return SCHEMA_TO_AR[primitive] ?? primitive;
 }
 
 function isWrapped(t: TableSchema): t is {
@@ -176,7 +165,7 @@ function generateCode(schema: Schema, adapterName?: string): string {
         }
         const primitive = typeof colSpec === "string" ? colSpec : colSpec.type;
         lines.push(
-          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive, adapterName))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
+          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
         );
       }
       lines.push(`  });`);

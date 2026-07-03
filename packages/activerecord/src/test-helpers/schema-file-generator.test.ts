@@ -133,13 +133,15 @@ describe("generateSchemaFile (MySQL adapter)", () => {
     }
   });
 
-  it("remaps date, time, json columns to string (VARCHAR)", () => {
-    expect(content).toContain('"occurred_on", "string"');
-    expect(content).toContain('"scheduled_time", "string"');
-    expect(content).toContain('"metadata", "string"');
-    expect(content).not.toContain('"date"');
-    expect(content).not.toContain('"time"');
-    expect(content).not.toContain('"json"');
+  it("emits native date, time, json column types (matching define-schema.ts)", () => {
+    // define-schema.ts COLUMN_TYPE_MAP_MYSQL maps date/time/json to their
+    // native MySQL types (PR #4141) so DATE/TIME/JSON columns round-trip as
+    // PlainDate/PlainTime/parsed-JSON instead of raw strings. The generator
+    // must agree, or the boot-laid canonical schema lays these as VARCHAR and
+    // schema loading never registers them for casting.
+    expect(content).toContain('"occurred_on", "date"');
+    expect(content).toContain('"scheduled_time", "time"');
+    expect(content).toContain('"metadata", "json"');
   });
 
   it("injects precision:6 for bare datetime columns", () => {
