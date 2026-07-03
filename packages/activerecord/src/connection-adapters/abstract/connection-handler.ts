@@ -190,10 +190,12 @@ export class ConnectionHandler {
     });
   }
 
-  clearReloadableConnectionsBang(role?: string | null): void {
+  async clearReloadableConnectionsBang(role?: string | null): Promise<void> {
+    const draining: Array<Promise<void>> = [];
     this.eachConnectionPool(role, (pool) => {
-      pool.clearReloadableConnectionsBang();
+      draining.push(pool.clearReloadableConnectionsBang());
     });
+    await Promise.all(draining);
   }
 
   clearAllConnectionsBang(role?: string | null): void {
@@ -202,10 +204,12 @@ export class ConnectionHandler {
     });
   }
 
-  flushIdleConnectionsBang(role?: string | null): void {
+  async flushIdleConnectionsBang(role?: string | null): Promise<void> {
+    const draining: Array<Promise<void>> = [];
     this.eachConnectionPool(role, (pool) => {
-      pool.flushBang();
+      draining.push(pool.flushBang());
     });
+    await Promise.all(draining);
   }
 
   retrieveConnection(

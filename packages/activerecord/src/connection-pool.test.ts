@@ -218,7 +218,7 @@ it("idle timeout configuration", async () => {
   const keepConn = await keepPool.checkout();
   keepPool.checkin(keepConn);
   expect(keepPool.stat().connections).toBe(1);
-  keepPool.flush();
+  await keepPool.flush();
   expect(keepPool.stat().connections).toBe(1);
 
   // Small idleTimeout: flush() with no args removes expired idle connections
@@ -242,11 +242,11 @@ it("idle timeout configuration", async () => {
     flushPool.checkin(flushConn);
     expect(flushPool.stat().connections).toBe(1);
     // Not yet expired
-    flushPool.flush();
+    await flushPool.flush();
     expect(flushPool.stat().connections).toBe(1);
     // Advance past the 1-second idleTimeout
     vi.advanceTimersByTime(2000);
-    flushPool.flush();
+    await flushPool.flush();
     expect(flushPool.stat().connections).toBe(0);
   } finally {
     vi.useRealTimers();
@@ -267,7 +267,7 @@ it("disable flush", async () => {
   const conn = await pool.checkout();
   pool.checkin(conn);
   // flush is a no-op when idleTimeout is null
-  pool.flush();
+  await pool.flush();
   expect(pool.stat().connections).toBe(1);
 });
 
@@ -278,10 +278,10 @@ it("flush", async () => {
   expect(pool.stat().connections).toBe(1);
   expect(pool.stat().idle).toBe(1);
   // Flush with high idle threshold — nothing removed
-  pool.flush(9999);
+  await pool.flush(9999);
   expect(pool.stat().connections).toBe(1);
   // Flush with 0 threshold — removes all idle
-  pool.flush(0);
+  await pool.flush(0);
   expect(pool.stat().connections).toBe(0);
 });
 
@@ -292,7 +292,7 @@ it("flush bang", async () => {
   pool.checkin(c1);
   pool.checkin(c2);
   expect(pool.stat().idle).toBe(2);
-  pool.flushBang();
+  await pool.flushBang();
   expect(pool.stat().connections).toBe(0);
   expect(pool.stat().idle).toBe(0);
 });

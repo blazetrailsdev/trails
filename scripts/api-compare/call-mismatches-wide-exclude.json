@@ -55305,5 +55305,40 @@
     "rubyName": "migration_connection",
     "call": "lease_connection",
     "reason": "migrationConnection (sync) routes through `leaseConnectionSync`; Rails-named `leaseConnection` is async in trails (converge-connection-pool-checkout-lease-async) and cannot be awaited from this sync accessor."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "disconnect!",
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction — including `conn.disconnectBang()` — to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "flush",
+    "call": "delete",
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); the idle-connection removal (`_connections.splice` / `_lastCheckinAt.delete`, Rails' `@connections.delete`) lives in the private `_flush` core it delegates to. Same behavior, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "disconnect!",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear — including `conn.disconnectBang()` — to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "clear",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); the `_available.clear()` / lease-clearing lives in the private `_clearReloadableConnections` core it delegates to. Same behavior, moved into the shared sync helper."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "clear_reloadable_connections",
+    "call": "with_exclusively_acquired_all_connections",
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); the `withExclusivelyAcquiredAllConnections` critical section lives in the private `_clearReloadableConnections` core it delegates to. Same call, moved into the shared sync helper."
   }
 ]

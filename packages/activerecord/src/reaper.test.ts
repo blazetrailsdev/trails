@@ -14,7 +14,7 @@ function makePool(): ReapablePool & {
     reap() {
       this.reaped++;
     },
-    flush() {
+    async flush() {
       this.flushed++;
     },
     isDiscarded() {
