@@ -2,10 +2,11 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { createPooledTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
 // Rails' `get_prepared_statement_cache(connection)` reaches into
 // `@statements.@cache[Process.pid]`. The trails PG adapter owns a single
@@ -18,6 +19,7 @@ function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
 }
 
 describe("HotCompatibilityTest", () => {
+  setupHandlerSuite();
   // Rails' setup builds the table + model fresh per test (use_transactional_tests
   // = false). We mirror that with a helper that creates the table and a model
   // bound to a fresh adapter, returning both so the test can drive remove_column
@@ -26,7 +28,7 @@ describe("HotCompatibilityTest", () => {
     klass: typeof Base;
     adapter: DatabaseAdapter;
   }> {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migration = new MigrationContext(adapter);
     await migration.createTable("hot_compatibilities", { force: true }, (t) => {
       t.string("foo");
@@ -99,7 +101,8 @@ describe("HotCompatibilityTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in a transaction",
     async () => {
-      const { adapter, pool } = await createPooledTestAdapter();
+      const pool = Base.connectionPool();
+      const adapter = Base.connection;
       const ddlConnection = await pool.checkout();
       try {
         const migration = new MigrationContext(adapter);
@@ -145,7 +148,8 @@ describe("HotCompatibilityTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in nested transactions",
     async () => {
-      const { adapter, pool } = await createPooledTestAdapter();
+      const pool = Base.connectionPool();
+      const adapter = Base.connection;
       const ddlConnection = await pool.checkout();
       try {
         const migration = new MigrationContext(adapter);
