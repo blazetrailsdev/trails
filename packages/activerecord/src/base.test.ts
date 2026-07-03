@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import {
   Base,
   NotImplementedError,
@@ -19,8 +19,6 @@ import { connectedToStack } from "./core.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
@@ -34,9 +32,6 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -2040,9 +2035,6 @@ describe("BasicsTest", () => {
 describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   class PostInner extends Base {
     static {
@@ -2163,9 +2155,6 @@ describe("BasicsTest", () => {
 describe("BasicsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   // -- Table name inference --
   it("table name guesses", () => {
