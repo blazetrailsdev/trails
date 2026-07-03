@@ -403,6 +403,7 @@ export class LoaderQuery {
       keysMatch &&
       this._scopeAdapterId() === other._scopeAdapterId() &&
       this._scopeTableName() === other._scopeTableName() &&
+      this._joinModelDiscriminator() === other._joinModelDiscriminator() &&
       this._valuesForQueries() === other._valuesForQueries()
     );
   }
@@ -411,11 +412,44 @@ export class LoaderQuery {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
-    return `${keyName}::${this._scopeAdapterId()}::${this._scopeTableName()}::${this._valuesForQueries()}`;
+    return `${keyName}::${this._scopeAdapterId()}::${this._scopeTableName()}::${this._joinModelDiscriminator()}::${this._valuesForQueries()}`;
   }
 
   private _scopeTableName(): string {
     return this.scope?._modelClass?.tableName ?? this.scope?.tableName ?? "";
+  }
+
+  // NOTE: this discriminator has NO direct Rails analog. Rails'
+  // `LoaderQuery#eql?`/`#hash` (preloader/association.rb:17-26) key only on
+  // `association_key_name`, `scope.table_name`, `connection_specification_name`,
+  // and `values_for_queries` — no class identity — and `Batch` groups every
+  // non-ThroughAssociation loader (HABTM middle loaders included) by that key.
+  //
+  // It is needed because of how a batched group is *materialized* here: each
+  // `class_name`-aliased HABTM gets its own anonymous join model (e.g.
+  // `HABTM_Posts`, `HABTM_OtherPosts`) that shares one join table
+  // (`categories_posts`) but carries a differently named source `belongsTo`
+  // (`post` vs `otherPost`, per Rails' `add_right_association`, which names it
+  // from `singularize(assocName)`). Two such middle loaders have identical
+  // Rails-shaped `LoaderQuery` keys, so they batch into one query and every row
+  // is instantiated as whichever join model wins the group. The through source
+  // preloader (`ThroughAssociation._getSourcePreloaders`) then preloads the
+  // source reflection's name (`otherPost`) on records of the wrong class
+  // (`HABTM_Posts`), which does not declare it — raising `AssociationNotFound`.
+  // All four Rails-shaped key fields are provably identical for these loaders
+  // (same `category_id` key, same `categories_posts` table, same connection,
+  // and byte-identical `valuesForQueries` — the aliased HABTMs carry no scope),
+  // so no Rails-faithful field can separate them: the anonymous join-model class
+  // name is the only thing that differs. This stays a deliberately narrow,
+  // trails-local guard keyed only on anonymous `HABTM_*` join models, so it
+  // cannot perturb ordinary models or STI subclasses that legitimately share a
+  // table. (Rails exercises this exact shape in
+  // `test_eager_with_multiple_associations_with_same_table_has_many_and_habtm`
+  // without the split; how its batched-record instantiation avoids the same
+  // conflation was not pinned down from static reading of the Rails source.)
+  private _joinModelDiscriminator(): string {
+    const name: string | undefined = this.scope?._modelClass?.name;
+    return name?.startsWith("HABTM_") ? name : "";
   }
 
   // Mirrors Rails' `scope.model.connection_specification_name` in
