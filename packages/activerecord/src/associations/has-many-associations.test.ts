@@ -319,6 +319,16 @@ describe("HasManyAssociationsTest", () => {
     await firstFirm.clientsOfFirm.reload();
     expect(await firstFirm.clientsOfFirm.size()).toBe(1);
   });
+
+  it("destroy returns the removed records", async () => {
+    // Rails CollectionProxy#destroy returns `@association.destroy(*records)`,
+    // i.e. the removed records (collection_association.rb:385-396). An aborted
+    // before_remove returns none.
+    const firstFirm = companies("first_firm") as any;
+    const first = await firstFirm.clientsOfFirm.first();
+    const removed = await firstFirm.clientsOfFirm.destroy(first);
+    expect(removed.map((r: any) => r.id)).toEqual([first.id]);
+  });
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {

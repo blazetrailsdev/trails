@@ -2444,6 +2444,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     modelRecords: T[],
     method: "delete_all" | "destroy" | "nullify",
   ): Promise<boolean> {
+    // Rails delete_or_destroy (collection_association.rb:385-390) type-checks
+    // every record — after id-coercion/flatten, before any DB write — for both
+    // `delete` and `destroy`. Run it here so the two share the guard.
+    this._raiseOnTypeMismatch(modelRecords);
     // Persisted children are deleted/nullified via the DB; new-record children
     // have no row — they only participate in the callbacks and target pruning.
     const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
@@ -2684,7 +2688,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
-  async destroy(...records: Array<T | number | string | bigint>): Promise<void> {
+  async destroy(...records: Array<T | number | string | bigint>): Promise<Base[]> {
     // Through (incl. HABTM): delegate to the association-layer destroy, exactly
     // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
     // has_many :through that runs HasManyThroughAssociation#delete_records
@@ -2701,7 +2705,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       };
       const removed = await assoc.destroy(...(records as Base[]));
       this._removeFromTarget(removed);
-      return;
+      return removed;
     }
     // Mirror Rails CollectionAssociation#destroy → delete_or_destroy
     // (collection_association.rb:387-389): coerce Integer/String args to records
@@ -2719,14 +2723,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
       : (records as T[]);
     const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
-    this._raiseOnTypeMismatch(modelRecords);
 
     // Rails CollectionProxy#destroy → delete_or_destroy(records, :destroy):
     // the same remove_records path as `delete`, with the strategy forced to
-    // `:destroy`. Share `_removeRecords` so before_remove/after_remove callbacks,
-    // the counter-cache decrement, and the bang-destroy-in-transaction behavior
-    // stay in lockstep with `delete`.
-    await this._removeRecords(modelRecords, "destroy");
+    // `:destroy`. Share `_removeRecords` so type-check, before_remove/after_remove
+    // callbacks, the counter-cache decrement, and the bang-destroy-in-transaction
+    // behavior stay in lockstep with `delete`. Rails returns the removed records
+    // (collection_association.rb:385-396, via remove_records' `records`); an
+    // aborted before_remove returns none, mirroring `delete`.
+    const aborted = await this._removeRecords(modelRecords, "destroy");
+    return aborted ? [] : (modelRecords as Base[]);
   }
 
   /**
