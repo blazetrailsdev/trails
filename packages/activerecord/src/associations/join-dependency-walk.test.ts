@@ -17,7 +17,6 @@ describe("JoinDependency walk() deduplication", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: any;
 
   class Post extends Base {
     static {
@@ -46,9 +45,7 @@ describe("JoinDependency walk() deduplication", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Post, Comment, Author, Like]) {
-      (m as any).adapter = adapter;
       (m as any)._associations = [];
       (m as any)._reflections = {};
       clearReflectionsCache(m);
@@ -109,7 +106,6 @@ describe("JoinDependency walk() deduplication", () => {
         this.attribute("post_id", "integer");
       }
     }
-    (Tag as any).adapter = adapter;
     (Tag as any)._associations = [];
     (Tag as any)._reflections = {};
     clearReflectionsCache(Tag);

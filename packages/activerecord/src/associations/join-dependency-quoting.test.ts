@@ -20,7 +20,6 @@ describe("JoinDependency Arel node construction", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: any;
 
   class Owner extends Base {
     static {
@@ -35,9 +34,6 @@ describe("JoinDependency Arel node construction", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
-    Owner.adapter = adapter;
-    Asset.adapter = adapter;
     (Owner as any)._associations = [];
     (Asset as any)._associations = [];
     registerModel(Owner);
@@ -85,8 +81,6 @@ describe("JoinDependency Arel node construction", () => {
     class StiSubOwner extends StiOwner {}
     enableSti(StiOwner);
     registerSubclass(StiSubOwner);
-    StiOwner.adapter = adapter;
-    StiSubOwner.adapter = adapter;
     (StiOwner as any)._associations = [];
     (StiSubOwner as any)._associations = [];
     registerModel(StiOwner);
@@ -124,9 +118,6 @@ describe("JoinDependency Arel node construction", () => {
     enableSti(Vehicle);
     registerSubclass(Car);
     registerSubclass(ElectricCar);
-    Vehicle.adapter = adapter;
-    Car.adapter = adapter;
-    ElectricCar.adapter = adapter;
     (Vehicle as any)._associations = [];
     (Car as any)._associations = [];
     (ElectricCar as any)._associations = [];
@@ -220,7 +211,6 @@ describe("JoinDependency Arel node construction", () => {
         this.attribute("body", "string");
       }
     }
-    Comment.adapter = adapter;
     (Comment as any)._associations = [];
     registerModel(Comment);
 

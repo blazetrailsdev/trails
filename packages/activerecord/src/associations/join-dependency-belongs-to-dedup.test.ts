@@ -9,7 +9,6 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: typeof Base.connection;
 
   class Author extends Base {
     static {
@@ -27,9 +26,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Author, Post]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

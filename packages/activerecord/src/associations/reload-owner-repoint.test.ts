@@ -7,7 +7,7 @@
 // record.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, association, registerModel } from "../index.js";
+import { association, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -17,12 +17,8 @@ describe("reload — association owner re-point", () => {
   // (single-pool test model) rather than a sidecar `_pool` lease. `fixtures({})`
   // establishes the handler and per-test transactional rollback (no seed rows).
   fixtures({});
-  let adapter: typeof Base.connection;
 
   beforeAll(() => {
-    adapter = Base.connection;
-    Author.adapter = adapter;
-    Post.adapter = adapter;
     registerModel(Author);
     registerModel(Post);
   });

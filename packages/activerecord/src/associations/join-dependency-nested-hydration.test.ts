@@ -9,7 +9,6 @@ describe("JoinDependency nested hydration", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: typeof Base.connection;
 
   // prettier-ignore
   class Author extends Base {
@@ -25,9 +24,7 @@ describe("JoinDependency nested hydration", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Author, Comment, Post]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

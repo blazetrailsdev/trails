@@ -16,8 +16,6 @@ import { Nodes, Table } from "@blazetrails/arel";
 setupFixtures();
 
 describe("JoinBase.table", () => {
-  let adapter: any;
-
   class Post extends Base {
     static {
       this.attribute("title", "string");
@@ -25,8 +23,6 @@ describe("JoinBase.table", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
-    (Post as any).adapter = adapter;
     (Post as any)._associations = [];
     registerModel(Post);
   });
@@ -47,8 +43,6 @@ describe("JoinBase.table", () => {
 });
 
 describe("joinType propagation in joinConstraints", () => {
-  let adapter: any;
-
   class Post extends Base {
     static {
       this.attribute("title", "string");
@@ -63,9 +57,7 @@ describe("joinType propagation in joinConstraints", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Post, Comment]) {
-      (m as any).adapter = adapter;
       (m as any)._associations = [];
       registerModel(m);
     }

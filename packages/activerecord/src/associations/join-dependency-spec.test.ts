@@ -18,7 +18,6 @@ describe("JoinDependency#addAssociationSpec", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: any;
 
   class Post extends Base {
     static {
@@ -47,9 +46,7 @@ describe("JoinDependency#addAssociationSpec", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Post, Comment, Author, Tag]) {
-      (m as any).adapter = adapter;
       (m as any)._associations = [];
       (m as any)._reflections = {};
       clearReflectionsCache(m);

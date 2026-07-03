@@ -7,7 +7,7 @@
 // has_one :through fixture — so the coverage lives here on the has_many path.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -19,12 +19,9 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
   // lease. `fixtures({})` establishes the handler and per-test transactional
   // rollback (no seed rows).
   fixtures({});
-  let adapter: typeof Base.connection;
 
   beforeAll(() => {
-    adapter = Base.connection;
     for (const klass of [Post, SpecialPost, Person, Reader]) {
-      klass.adapter = adapter;
       registerModel(klass);
     }
   });

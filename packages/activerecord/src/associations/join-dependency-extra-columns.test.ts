@@ -9,7 +9,6 @@ describe("JoinDependency extra columns in instantiate", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: typeof Base.connection;
 
   class Post extends Base {
     static {
@@ -27,9 +26,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Post, Comment]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

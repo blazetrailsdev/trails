@@ -17,7 +17,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   // rather than a sidecar `_pool` lease; these wiring tests only need an
   // adapter for JoinDependency's quoting, not a bespoke schema.
   setupFixtures();
-  let adapter: typeof Base.connection;
 
   class Comment extends Base {
     static {
@@ -42,9 +41,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   }
 
   beforeEach(() => {
-    adapter = Base.connection;
     for (const m of [Comment, Post, Reader]) {
-      m.adapter = adapter;
       m._associations = [];
       registerModel(m);
     }

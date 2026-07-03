@@ -33,9 +33,7 @@ describe("JoinDependency AliasTracker wiring", () => {
   }
 
   beforeEach(() => {
-    const adapter = Base.connection;
     for (const m of [Post, Comment, Tag]) {
-      (m as any).adapter = adapter;
       (m as any)._associations = [];
       registerModel(m);
     }

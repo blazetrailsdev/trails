@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, transaction } from "../index.js";
+import { registerModel, transaction } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Publication } from "../test-helpers/models/publication.js";
 import { Editor } from "../test-helpers/models/editor.js";
@@ -15,9 +15,6 @@ describe("ReloadAssociationCacheTest", () => {
   fixtures({});
 
   beforeAll(() => {
-    Publication.adapter = Base.connection;
-    Editor.adapter = Base.connection;
-    Editorship.adapter = Base.connection;
     registerModel(Publication);
     registerModel(Editor);
     registerModel(Editorship);

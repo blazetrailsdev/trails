@@ -40,9 +40,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   }
 
   beforeEach(() => {
-    const adapter = Base.connection;
     for (const m of [JdtAuthor, JdtPost, JdtComment]) {
-      m.adapter = adapter;
       (m as any)._associations = [];
       registerModel(m);
     }
@@ -164,9 +162,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
         this.attribute("name", "string");
       }
     }
-    const adapter = Base.connection;
     for (const m of [StjAuthor, StjPost, StjTagging, StjTag]) {
-      m.adapter = adapter;
       (m as any)._associations = [];
       registerModel(m);
     }
@@ -302,9 +298,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
         this.attribute("value", "integer");
       }
     }
-    const adapter = Base.connection;
     for (const m of [MemAuthor, MemPost, MemComment, MemRating]) {
-      m.adapter = adapter;
       registerModel(m);
     }
 

@@ -22,7 +22,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   // MigrationContext and dropped in afterAll — but on the primary boot
   // connection.
   fixtures({});
-  let adapter: typeof Base.connection;
   let ctx: MigrationContext;
 
   class LoAuthor extends Base {
@@ -55,8 +54,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
   beforeAll(async () => {
-    adapter = Base.connection;
-    ctx = new MigrationContext(adapter);
+    ctx = new MigrationContext(Base.connection);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");
     });
@@ -68,9 +66,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
       t.string("bio");
       t.integer("lo_author_id");
     });
-    LoAuthor.adapter = adapter;
-    LoPost.adapter = adapter;
-    LoProfile.adapter = adapter;
     registerModel(LoAuthor);
     registerModel(LoPost);
     registerModel(LoProfile);

@@ -30,7 +30,6 @@ describe("CollectionProxy#count — non-through fast path", () => {
   // lease. `fixtures({})` establishes the handler and per-test transactional
   // rollback (no seed rows) — the tests create their own data.
   fixtures({});
-  let adapter: typeof Base.connection;
 
   // Lightweight local models backed by the canonical `authors` / `posts` /
   // `comments` tables (Author has_many posts, Post has_many comments). Keeping
@@ -61,10 +60,6 @@ describe("CollectionProxy#count — non-through fast path", () => {
   }
 
   beforeAll(() => {
-    adapter = Base.connection;
-    CpcAuthor.adapter = adapter;
-    CpcPost.adapter = adapter;
-    CpcComment.adapter = adapter;
     registerModel("CpcAuthor", CpcAuthor);
     registerModel("CpcPost", CpcPost);
     registerModel("CpcComment", CpcComment);
