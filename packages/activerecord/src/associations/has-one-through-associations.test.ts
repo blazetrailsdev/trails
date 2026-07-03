@@ -412,15 +412,27 @@ describe("HasOneThroughAssociationsTest", () => {
     // runtime equivalent.
   });
 
+  // Rails' `assert_difference "MemberDetail.count", 1` runs serially in a txn;
+  // trails runs parallel forks against a shared DB, so a global count races
+  // against concurrent member_details fixture reloads. Scope the delta to this
+  // member — the invariant Rails asserts (exactly one new join row for the
+  // member) — which still catches a genuine double-write for this member.
+  const memberDetailCount = async (member: any): Promise<number> =>
+    (await MemberDetail.where({ member_id: member.id }).count()) as number;
+
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");
     const organization = organizations("nsa");
-    const before = (await MemberDetail.count()) as number;
+    const before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    // `writer` on a persisted owner returns the immediate-persist `persistReplace`
+    // promise (has-one-association.ts:52-57); it MUST be awaited (per its JSDoc)
+    // or the floating write races member.save()'s own has_one autosave — the
+    // exact double-write the `_pendingReplace` skip guard is meant to prevent.
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     const orgMembers = (await organization.association("members").loadTarget()) as any[];
     expect(orgMembers.some((m: any) => m.id === member.id)).toBe(true);
@@ -439,21 +451,21 @@ describe("HasOneThroughAssociationsTest", () => {
       return (o.association("members").target as any[]).some((m: any) => m.id === member.id);
     };
 
-    let before = (await MemberDetail.count()) as number;
+    let before = await memberDetailCount(member);
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
-    (member.association("organization") as any).writer(organization);
+    await (member.association("memberDetail") as any).writer(memberDetail);
+    await (member.association("organization") as any).writer(organization);
     await member.save();
-    expect(((await MemberDetail.count()) as number) - before).toBe(1);
+    expect((await memberDetailCount(member)) - before).toBe(1);
     expect((await readHasOne(member, "organization"))?.id).toBe(organization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(true);
     expect(await includesMember(newOrganization)).toBe(false);
 
-    before = (await MemberDetail.count()) as number;
-    (member.association("organization") as any).writer(newOrganization);
+    before = await memberDetailCount(member);
+    await (member.association("organization") as any).writer(newOrganization);
     await member.save();
-    expect((await MemberDetail.count()) as number).toBe(before);
+    expect(await memberDetailCount(member)).toBe(before);
     expect((await readHasOne(member, "organization"))?.id).toBe(newOrganization.id);
     expect((await readHasOne(member, "memberDetail"))?.readAttribute("extra_data")).toBe("Extra");
     expect(await includesMember(organization)).toBe(false);
