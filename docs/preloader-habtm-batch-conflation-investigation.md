@@ -61,23 +61,55 @@ a HABTM middle loader has `branches == 1` and exactly one runnable HABTM loader:
 ```
 
 Across the whole test there is **never** a pass whose runnable set contains two
-HABTM middle loaders. Rails fully resolves one HABTM through-chain
-(middle `HABTM_Posts` → source `Post` → done) before the next HABTM's middle
-load begins. Because each join-table row is thus instantiated only under its own
-join model, `ThroughAssociation#source_preloaders` always preloads the matching
-source `belongs_to` (`post` on `HABTM_Posts`, `otherPost` on `HABTM_OtherPosts`)
-— no conflation is possible.
+HABTM middle loaders. Because each join-table row is thus instantiated only under
+its own join model, `ThroughAssociation#source_preloaders` always preloads the
+matching source `belongs_to` (`post` on `HABTM_Posts`, `otherPost` on
+`HABTM_OtherPosts`) — no conflation is possible.
 
-The isolation is a **scheduling** property, not a key property: it comes from
-Rails processing each through-association's middle loaders one branch-subtree at
-a time (`preloader/batch.rb` + `preloader/through_association.rb:70-80`), never
-presenting sibling same-table middle loaders to `group_and_load_similar`
-together.
+### 2a. Why `branches == 1` — the pinned root cause
+
+The isolation is **not** a `Batch`/`Branch` scheduling subtlety (both trails and
+Rails run the identical `batch.rb` algorithm). It is one level up, in the driver
+that invokes the preloader. Rails'
+`ActiveRecord::Relation#preload_associations`
+(`vendor/rails/activerecord/lib/active_record/relation.rb:1321-1328`) runs **one
+`Preloader.call` per top-level entry**:
+
+```ruby
+def preload_associations(records) # :nodoc:
+  preload = preload_values
+  preload += includes_values unless eager_loading?
+  scope = strict_loading_value ? StrictLoadingScope : nil
+  preload.each do |associations|
+    ActiveRecord::Associations::Preloader.new(records: records, associations: associations, scope: scope).call
+  end
+end
+```
+
+So `includes(:posts, :other_posts, :special_posts)` fans out into **three
+separate `Preloader.call` invocations** — three separate `Batch`es, each with a
+single branch (`branches == 1`). The sibling HABTM through-associations are never
+members of the same `Batch`, so their middle loaders can never reach the same
+`group_and_load_similar` pass.
 
 ### 3. trails co-groups all three siblings in one pass
 
-The same instrumentation in `preloader/batch.ts` shows trails presenting **all
-three** sibling middle loaders to `_groupAndLoadSimilar` in a single Batch pass:
+trails' driver does **not** fan out per entry. `Relation#_preloadAssociationsForRecords`
+(`packages/activerecord/src/relation.ts:6169-6181`) passes the **whole list** to a
+**single** `Preloader`:
+
+```ts
+const preloader = new Preloader({
+  records: records as unknown as import("./base.js").Base[],
+  associations: assocNames, // e.g. ["posts", "otherPosts", "specialPosts"]
+  scope: this._isStrictLoading ? StrictLoadingScope : undefined,
+});
+await preloader.call();
+```
+
+So all three HABTM branches live in **one** `Batch`. Instrumenting
+`preloader/batch.ts` confirms trails presents **all three** sibling middle loaders
+to `_groupAndLoadSimilar` in a single pass:
 
 ```
 [TRAILS-PASS] loaders=HABTM_Posts:categories_posts,HABTM_OtherPosts:categories_posts,HABTM_SpecialPosts:categories_posts futureTables={posts}
@@ -90,28 +122,34 @@ source preloader looks up the sibling's `belongsTo`.
 ## Verdict
 
 The `_joinModelDiscriminator` guard is **(b): a trails-local compensation for a
-Batch-scheduling divergence**, not a faithful stand-in for a Rails mechanism
-(a). Rails' key fields are provably identical across the three join models
-(same `hash`); Rails avoids conflation purely by never co-scheduling sibling
-same-table through middle loaders. trails co-schedules them.
+preloader-driver divergence**, not a faithful stand-in for a Rails key mechanism
+(a). Rails' `LoaderQuery` fields are provably identical across the three join
+models (same `hash`); Rails avoids conflation purely because its
+`Relation#preload_associations` runs **one `Preloader.call` per top-level
+`includes`/`preload` entry**, so sibling same-table HABTM through-associations
+are never in the same `Batch`. trails runs one `Preloader` for the whole entry
+list, so they are — and their identical `LoaderQuery` keys then collapse them
+into one query.
 
 The guard achieves the correct **outcome** (each join model materializes its own
-rows) by the only field that differs — the anonymous class name — but it does so
-at the wrong layer. The Rails-faithful fix is to converge trails'
-`Preloader::Batch`/`Branch` scheduling so sibling through-association middle
-loaders sharing a join table are presented to `_groupAndLoadSimilar` one at a
-time (Rails' observed `branches=1`-per-HABTM behavior), after which the
-`HABTM_*` name-sniff can be dropped.
+rows) by the only field that differs — the anonymous class name — but at the
+wrong layer. The `Batch`/`Branch`/`LoaderQuery` code is already Rails-faithful;
+the divergence is a single locus in the driver.
 
 ## Recommendation
 
 - Keep the PR #4468 guard as an **interim** compensation (it is narrow — keyed
   only on anonymous `HABTM_*` join models — so it cannot perturb ordinary models
   or STI subclasses that legitimately share a table), with its comment updated
-  to reference this investigation and classify it as a scheduling-divergence
+  to reference this investigation and classify it as a driver-divergence
   compensation rather than "mechanism not pinned".
 - Do the real convergence under
-  `converge-habtm-jointable-preloader-batch-scheduling`: match Rails' scheduler
-  and drop the name-sniff. That change touches the core preloader scheduler
-  (broad blast radius across all eager loading), so it is scoped as its own
-  story rather than folded into #4468.
+  `converge-habtm-jointable-preloader-batch-scheduling`: converge
+  `Relation#_preloadAssociationsForRecords` (`relation.ts:6169-6181`) to Rails'
+  per-entry loop (`relation.rb:1325`) — iterate `assocNames` and build a fresh
+  `Preloader` per entry — then drop the `HABTM_*` name-sniff. This is a small,
+  Rails-faithful change, but it removes trails' current cross-entry batching
+  (trails today co-batches same-table loaders across distinct top-level
+  `includes` entries, which Rails does not), so it can shift query counts in
+  `assertNoQueries`-style tests — hence it is scoped as its own story with a
+  full preloader/eager-loading regression run rather than folded into #4468.
