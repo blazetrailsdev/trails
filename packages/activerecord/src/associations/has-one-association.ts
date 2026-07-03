@@ -17,7 +17,16 @@ import { polymorphicName } from "../inheritance.js";
  * Mirrors: ActiveRecord::Associations::HasOneAssociation
  */
 export class HasOneAssociation extends SingularAssociation {
-  _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
+  /**
+   * The record that was displaced by a deferred (non-awaitable) assignment to a
+   * *persisted* owner — recorded by `queueWrite`/mass-assignment and removed
+   * (FK-nullified/destroyed per `:dependent`) by the owner's `save`-time
+   * has_one autosave callback (`autosaveHasOne` → `removeDisplaced`). Rails does
+   * this removal synchronously inside `replace`; the JS property setter cannot
+   * `await`, so we carry the displaced record forward to the single autosave
+   * persistence path rather than running a parallel `persistReplace`.
+   */
+  _displacedRecord: Base | null = null;
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
@@ -25,34 +34,98 @@ export class HasOneAssociation extends SingularAssociation {
 
   override reset(): void {
     super.reset();
-    this._pendingReplace = null;
+    this._displacedRecord = null;
   }
 
   /**
    * Queue-only writer for the JS property setter (`owner.account = x`,
    * builder/has-one.ts `defineWriters`) and mass-assignment, neither of which
-   * can `await`. Records the pending change (FK set in-memory via `replace`)
-   * and defers persistence to the owner's next `save()` (`flushPendingReplaces`
-   * → `persistReplace`) — no DB I/O, no Promise returned, no floating promise.
-   * The awaitable `writer` below is the Rails-faithful immediate-persist path.
+   * can `await`. Sets the foreign key and inverse in memory via `replace` and
+   * defers persistence to the owner's next `save()`, where the has_one autosave
+   * callback (`autosaveHasOne`) persists the new record and removes any
+   * displaced one — the single Rails `save_has_one_association` path. No DB I/O,
+   * no Promise returned, no floating promise. The awaitable `writer` below is
+   * the Rails-faithful immediate-persist path.
    */
   queueWrite(record: Base | null): void {
+    const displaced = this.target;
     this.replace(record);
+    if (
+      (this.owner as { isPersisted?: () => boolean }).isPersisted?.() &&
+      displaced &&
+      !(displaced as { isDestroyed?: () => boolean }).isDestroyed?.() &&
+      !sameRecord(displaced, record)
+    ) {
+      this._displacedRecord = displaced;
+    }
   }
 
   /**
    * Mirrors Rails `HasOneAssociation#replace`, which persists on assignment to
    * a *saved* owner: the displaced record is nullified/deleted/destroyed and
-   * the new record saved immediately. Returns the `persistReplace()` Promise so
-   * callers can `await` the writes — the only floating-promise-free way to
-   * reach the immediate path from JS (the sync property setter cannot await, so
-   * it uses `queueWrite` instead). For a *new* owner the foreign key isn't known
-   * yet, so persistence defers to the owner's next save (`flushPendingReplaces`).
+   * the new record saved immediately. Returns a Promise so callers can `await`
+   * the writes — the only floating-promise-free way to reach the immediate path
+   * from JS (the sync property setter cannot await, so it uses `queueWrite`
+   * instead). For a *new* owner the foreign key isn't known yet, so persistence
+   * defers to the owner's next save (`autosaveHasOne`).
    */
   override writer(record: Base | null): void | Promise<void> {
+    const displaced = this.target;
     this.replace(record);
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
-      return this.persistReplace();
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      return this.persistImmediate(record, displaced);
+    }
+  }
+
+  /**
+   * The awaitable immediate-persist body for assignment to a *saved* owner —
+   * Rails' `HasOneAssociation#replace` transaction (has_one_association.rb:59-77):
+   * remove the displaced record, then re-derive the foreign key and save the new
+   * record. `replace` has already set the in-memory target/inverse.
+   */
+  private async persistImmediate(record: Base | null, displaced: Base | null): Promise<void> {
+    await transactionIf(this, true, async () => {
+      if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
+        const currentTarget = this.target;
+        this.target = displaced;
+        try {
+          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+        } finally {
+          this.target = currentTarget;
+        }
+      }
+      if (record && typeof (record as any).save === "function") {
+        this.setOwnerAttributes(record);
+        this.setInverseInstance(record);
+        const saved = await (record as any).save();
+        if (!saved) {
+          this.nullifyOwnerAttributes(record);
+          if (displaced) this.setOwnerAttributes(displaced);
+          throw new RecordNotSaved(
+            `Failed to save the new associated ${this.reflection.name}.`,
+            record,
+          );
+        }
+      }
+    });
+  }
+
+  /**
+   * Remove the record displaced by a deferred assignment to a persisted owner.
+   * Called by the has_one autosave callback (`autosaveHasOne`) before persisting
+   * the new target — the deferred analog of the `remove_target!` Rails runs
+   * inside `HasOneAssociation#replace`.
+   */
+  async removeDisplaced(): Promise<void> {
+    const displaced = this._displacedRecord;
+    if (!displaced) return;
+    this._displacedRecord = null;
+    const currentTarget = this.target;
+    this.target = displaced;
+    try {
+      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+    } finally {
+      this.target = currentTarget;
     }
   }
 
@@ -145,112 +218,23 @@ export class HasOneAssociation extends SingularAssociation {
     // raise FrozenError.
   }
 
-  protected override replace(record: Base | null, save = true): void {
+  protected override replace(record: Base | null, _save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = !sameRecord(this.target, record);
     if (assigningAnother || (record as any)?.hasChangesToSave) {
       if (record) {
+        // Set the foreign key (from the owner's — possibly still-nil — primary
+        // key) and inverse in memory. Persistence is Rails'
+        // `save_has_one_association` (our `autosaveHasOne`), which re-derives the
+        // FK once the owner has a primary key and saves the record. This method
+        // does no DB I/O; the immediate-persist path lives in `writer` →
+        // `persistImmediate`.
         this.setOwnerAttributes(record);
         this.setInverseInstance(record);
-      }
-      if (save && (this.owner as any).isPersisted?.()) {
-        // The record currently associated (about to be displaced by `record`).
-        const displaced = this.target;
-        if (this._pendingReplace) {
-          // Only clear on a true revert: a different-record assignment being set back.
-          // Same-record (dirty) assignments must not clear even if record === previousTarget.
-          const wasAssignedAnother = !sameRecord(
-            this._pendingReplace.previousTarget,
-            this._pendingReplace.record,
-          );
-          if (wasAssignedAnother && sameRecord(record, this._pendingReplace.previousTarget)) {
-            this._pendingReplace = null;
-          } else if (
-            displaced &&
-            (displaced as any).isPersisted?.() &&
-            !sameRecord(displaced, record)
-          ) {
-            // The previously-pending record was persisted independently (e.g.
-            // assigned via `writer` then saved directly), so it is now the real
-            // associated record being displaced and must have its FK nullified.
-            // This arises on the writer path: assign A to a persisted owner
-            // (queues `_pendingReplace` with `previousTarget: null`), persist A
-            // directly, then assign B — a later `writer` for a different record
-            // must promote the now-persisted record A to `previousTarget`.
-            // (Note: `setNewRecord` now calls `replace(record, false)`, so the
-            // build/create paths queue nothing here.) Exercised by "has one
-            // assignment triggers save on change on replacing object".
-            this._pendingReplace = { record, previousTarget: displaced };
-          } else {
-            this._pendingReplace.record = record;
-          }
-        } else {
-          this._pendingReplace = { record, previousTarget: displaced };
-        }
-      } else if (save && record && (this.owner as any).isNewRecord?.()) {
-        // New owner: the foreign key isn't known yet, so defer persistence
-        // until the owner is saved (`flushPendingReplaces`), mirroring Rails'
-        // default has_one save-on-create autosave.
-        this._pendingReplace = { record, previousTarget: null };
       }
     }
     this.target = record;
     this.loadedBang();
-  }
-
-  async persistReplace(): Promise<void> {
-    const pending = this._pendingReplace;
-    if (!pending) return;
-    // Clear before the first `await`. Two consecutive synchronous property-setter
-    // assignments (`owner.account = a; owner.account = b`) each run `replace` then
-    // queue; clearing now means a concurrent `persistReplace` sees a null
-    // `_pendingReplace` and processes its own captured `pending` rather than
-    // racing on a mutated object. A failed save surfaces through the awaiting
-    // caller / `save()` rejection, so clearing early costs nothing on the error path.
-    this._pendingReplace = null;
-    await transactionIf(this, true, async () => {
-      if (
-        pending.previousTarget &&
-        !(pending.previousTarget as any).isDestroyed?.() &&
-        !sameRecord(pending.previousTarget, pending.record)
-      ) {
-        // removeTargetBang reads assoc.target; temporarily restore previousTarget
-        // so it operates on the old record, not the new one already set in replace()
-        const currentTarget = this.target;
-        this.target = pending.previousTarget;
-        try {
-          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-        } finally {
-          this.target = currentTarget;
-        }
-      }
-      if (pending.record && typeof (pending.record as any).save === "function") {
-        // Re-derive the foreign key from the owner: on the new-owner path the
-        // owner's PK was unknown when `replace` ran, so set it now that the
-        // owner has been persisted.
-        this.setOwnerAttributes(pending.record);
-        // Re-seed the inverse now the FK is finalized. This deferred new-owner
-        // flush is trails' analog of Rails' `save_has_one_association`
-        // (autosave_association.rb:489-497), which — `unless through_reflection`
-        // — writes the FK then calls `association.set_inverse_instance(record)`.
-        // It recaptures the child belongs_to's stale state from the just-written
-        // FK (via `inversedFrom` → replaceKeys → loadedBang) so its reader sees
-        // `stale_target? == false` and keeps the inversed instance rather than
-        // reloading. The `through_reflection` guard is structural here:
-        // HasOneThroughAssociation overrides `persistReplace` and never reaches
-        // this base path.
-        this.setInverseInstance(pending.record);
-        const saved = await (pending.record as any).save();
-        if (!saved) {
-          this.nullifyOwnerAttributes(pending.record);
-          if (pending.previousTarget) this.setOwnerAttributes(pending.previousTarget);
-          throw new RecordNotSaved(
-            `Failed to save the new associated ${this.reflection.name}.`,
-            pending.record,
-          );
-        }
-      }
-    });
   }
 
   /**
@@ -337,10 +321,11 @@ export class HasOneAssociation extends SingularAssociation {
    * Mirrors Rails' `HasOneAssociation#set_new_record` (has_one_association.rb
    * :87-93): `replace(record, false)`. The save flag is false because the
    * foreign keys are set when the record is instantiated (via
-   * `scope_for_create`), so they don't need updating within `replace`. Passing
-   * `false` avoids queueing a redundant `_pendingReplace` after the inline
-   * `save` in `_createRecord`, which would otherwise re-persist the record on
-   * the owner's next save.
+   * `scope_for_create`), so they don't need updating within `replace`. The base
+   * `replace` no longer branches on the flag (it only sets the FK/inverse in
+   * memory), but the through override still honors it, and a create-path child
+   * is already persisted, so the owner's next `autosaveHasOne` sees it unchanged
+   * and does not re-save.
    */
   protected override setNewRecord(record: Base): void {
     this.replace(record, false);

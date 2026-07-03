@@ -25,8 +25,48 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
  * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation
  */
 export class HasOneThroughAssociation extends HasOneAssociation {
+  /**
+   * A has_one_through persists its association through a join-model
+   * build/create/update/destroy (`createThroughRecord`), not the direct
+   * foreign-key save the base `HasOneAssociation` uses. The through target
+   * therefore keeps its own deferred-replace queue (flushed post-commit by
+   * `flushPendingReplaces` → `persistReplace`); the base has_one converged onto
+   * the single `autosaveHasOne` path and no longer carries this.
+   */
+  _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  override reset(): void {
+    super.reset();
+    this._pendingReplace = null;
+  }
+
+  /**
+   * The deferred (non-awaitable) property-setter / mass-assignment path. The
+   * base `queueWrite` records a displaced record for the direct-FK autosave to
+   * remove, but a through routes displacement through the join model
+   * (`createThroughRecord` destroys the stale join), so we defer purely to
+   * `replace` (which queues `_pendingReplace`).
+   */
+  override queueWrite(record: Base | null): void {
+    this.replace(record);
+  }
+
+  /**
+   * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
+   * saved owner. The base `writer` saves the target's foreign key directly,
+   * which is wrong for a through (persistence routes through the join model), so
+   * we override to run the deferred `persistReplace` instead. For a new owner
+   * persistence defers to the owner's next save (`flushPendingReplaces`).
+   */
+  override writer(record: Base | null): void | Promise<void> {
+    this.replace(record);
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
+      return this.persistReplace();
+    }
   }
 
   /**
@@ -153,31 +193,18 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     const throughProxy = throughAssociation(this);
     if (!throughProxy) return;
     const attrs = constructJoinAttributes(this, record);
-    let throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
+    const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
       if ((throughRecord as any).isNewRecord?.()) {
         (throughRecord as any).assignAttributes?.(attrs);
       }
     } else {
-      throughRecord = throughProxy.build?.(attrs) ?? null;
-    }
-    // A has_one_through's autosave target is the END record, and its
-    // persistence routes through `createThroughRecord` (join-model build/save),
-    // not the base `save_has_one_association` save. We reproduce Rails'
-    // through-side has_one autosave by queueing the built/assigned join record
-    // on the through association's own pending replace, which
-    // `flushPendingReplaces` runs on the owner's next save (cascading to the
-    // join record's belongs_to source, e.g. an unsaved `club`). The base
-    // `autosaveHasOne` defers to this queued replace rather than double-saving.
-    if (
-      throughRecord &&
-      (throughRecord as any).isNewRecord?.() &&
-      !(throughProxy as { _pendingReplace?: unknown })._pendingReplace
-    ) {
-      (throughProxy as { _pendingReplace?: unknown })._pendingReplace = {
-        record: throughRecord,
-        previousTarget: null,
-      };
+      // Build the join record in memory on the through proxy. The through proxy
+      // is itself an association whose own autosave callback persists this built
+      // record (cascading to its belongs_to source, e.g. an unsaved `club`) on
+      // the owner's next save — no queue on the through proxy is needed now that
+      // the general has_one autosave path persists lone built join records.
+      throughProxy.build?.(attrs);
     }
   }
 
@@ -187,7 +214,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * Called by autosave after owner.save(). Calls createThroughRecord which
    * creates/updates/destroys the join-model record as needed.
    */
-  override async persistReplace(): Promise<void> {
+  async persistReplace(): Promise<void> {
     const pending = this._pendingReplace;
     if (!pending) return;
     // Clear before the first `await` — mirrors HasOneAssociation#persistReplace.
