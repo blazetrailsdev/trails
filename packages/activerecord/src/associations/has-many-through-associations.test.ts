@@ -1607,7 +1607,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(eagerGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
   });
 
-  it.skip("has many through polymorphic with rewhere", async () => {
+  it("has many through polymorphic with rewhere", async () => {
     const post = await TaggedPost.create({ title: "Tagged", body: "Post" });
     const tag = await (post as any).tags.create({ name: "Tag" });
     const preloaded = (await TaggedPost.preload("tags").last())!.tags;
@@ -1839,7 +1839,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (p as any).posts.toArray()).toEqual([]);
   });
 
-  it.skip("preloading empty through with polymorphic source association", async () => {
+  it("preloading empty through with polymorphic source association", async () => {
     const owner = await Owner.create({ name: "Rainbow Unicat" });
     const pet = await Pet.create({ owner_id: owner.id });
     const person = await Person.create({ first_name: "Gaga" });
@@ -1870,7 +1870,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(toys2.map((t: any) => t.id).sort()).toEqual(toys1.map((t: any) => t.id).sort());
   });
 
-  it.skip("has many through with polymorphic source", async () => {
+  it("has many through with polymorphic source", async () => {
     const general = await Tag.find(tags("general").id);
     const post = await (general as any).taggedPosts.create({ title: "foo", body: "bar" });
     const reloaded = await Post.find(post.id);

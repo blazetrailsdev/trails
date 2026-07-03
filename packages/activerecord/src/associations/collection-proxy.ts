@@ -62,6 +62,7 @@ import {
   buildThroughJoinScope,
   loadHasMany,
   _canRouteThroughViaAssociationScope,
+  _isNestedThroughSourceRoutable,
   ownerHasUnresolvedThroughKey,
   _setCollectionInverseInstance,
   _violatesStrictLoading,
@@ -1546,10 +1547,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // belongsTo-without-sourceType): fall back to the loader.
       // Disable-joins diverged case also falls through here — the
       // generic Relation.prototype.count path below honors the
-      // proxy's in-place mutations.
+      // proxy's in-place mutations. A persisted nested-through-source
+      // shape IS COUNT-able via `_buildThroughScope`'s JOIN, so it stays
+      // on the scope().count() fast path below rather than the loader.
+      const nestedSourceRoutable =
+        !this._record.isNewRecord() && _isNestedThroughSourceRoutable(refl);
       if (
         !this._assocDef.options.disableJoins &&
-        !_canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+        !_canRouteThroughViaAssociationScope(refl, this._assocDef.options) &&
+        !nestedSourceRoutable
       ) {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
@@ -2167,9 +2173,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // source reflection's association_primary_key column read off the target
           // (mirroring the composite-owner branch); the single-column write would
           // otherwise stringify the array into one bogus key and leave tag_id null.
+          // Mirrors Rails' `source_reflection.association_primary_key(reflection.klass)`
+          // (through_association.rb:60). The no-arg `associationPrimaryKey` getter
+          // resolves `this.klass`, which THROWS for a polymorphic belongs_to source
+          // ("cannot compute class"), so a polymorphic source must pass an explicit
+          // klass. That klass is the through reflection's own resolved target
+          // (`this.model` — the `sourceType`-pinned class, e.g. `Post` for
+          // `Tag#taggedPosts`), NOT the concrete (possibly STI-subclass) instance.
+          const resolveSourcePk = (): string | string[] | undefined =>
+            sourceRefl?.isPolymorphic?.()
+              ? sourceRefl.associationPrimaryKeyFor?.(this.model)
+              : sourceRefl?.associationPrimaryKey;
           let sourceJoinAttrs: Record<string, unknown>;
           if (Array.isArray(sourceFk)) {
-            const sourcePk = sourceRefl?.associationPrimaryKey;
+            const sourcePk = resolveSourcePk();
             const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
             if (sourcePkCols.length !== sourceFk.length) {
               throw new ConfigurationError(
@@ -2188,7 +2205,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             if (Array.isArray(targetPk)) {
               // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
               // when set, or fall back to "id" when it is part of the composite PK.
-              const srcPk = sourceRefl?.associationPrimaryKey;
+              const srcPk = resolveSourcePk();
               if (typeof srcPk === "string") {
                 targetPkCol = srcPk;
               } else if (targetPk.includes("id")) {
@@ -2199,16 +2216,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
                 );
               }
             } else {
-              // Use sourceRefl.associationPrimaryKey when set — e.g. a
-              // belongs_to with primaryKey: "name" means the join FK references
-              // category.name, not category.id. A polymorphic source reflection
-              // (e.g. `taggable`) can't compute its class, so its bare
-              // `associationPrimaryKey` getter raises — resolve against the
-              // pushed record's class via `associationPrimaryKeyFor` instead
-              // (Rails' `association_primary_key(klass)`).
-              const srcPk = sourceRefl?.associationPrimaryKeyFor
-                ? sourceRefl.associationPrimaryKeyFor(record.constructor as typeof Base)
-                : sourceRefl?.associationPrimaryKey;
+              // Use the source reflection's association_primary_key when set —
+              // e.g. a belongs_to with primaryKey: "name" means the join FK
+              // references category.name, not category.id. For a polymorphic
+              // source, resolveSourcePk() keys off `this.model` (reflection.klass).
+              const srcPk = resolveSourcePk();
               targetPkCol = (typeof srcPk === "string" ? srcPk : null) ?? targetPk;
             }
             sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
@@ -2270,7 +2282,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             // reflection.type = options[:foreign_type] || "#{options[:as]}_type".
             const typeCol =
               throughAssoc.options.foreignType ?? `${underscore(throughAssoc.options.as)}_type`;
-            joinAttrs[typeCol] = polymorphicName(ctor);
+            // A scope that rewrites the polymorphic type (e.g. TaggedPost's
+            // `taggings` scope `rewhere(taggable_type: "TaggedPost")`) wins over
+            // the owner's own polymorphicName — Rails builds the join record
+            // through the scoped association, so its type value is authoritative.
+            if (!(typeCol in throughScopeAttrs)) joinAttrs[typeCol] = polymorphicName(ctor);
           }
           // Mirrors Rails' save_through_record: skip insert if the through record
           // was already persisted (e.g. via autosave triggered by record.save in
@@ -3459,6 +3475,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
+    }
+    // Nested-through with a through *source* reflection (e.g. Owner
+    // `has_many :persons, through: :pets` where `Pet#persons` is itself a
+    // has_many-through with a polymorphic source). The IN-subquery fallback
+    // below only knows how to project a single source FK/PK column and cannot
+    // walk a multi-step chain, so it emits a nonsensical predicate. The
+    // JOIN-based AssociationScope flattens the whole reflection chain (Rails'
+    // `reflection.chain`) into a single INNER JOIN, carrying the polymorphic
+    // `sourceType` type condition — delegate to it here.
+    if (
+      !ownerPkComposite &&
+      !targetPkComposite &&
+      !this._record.isNewRecord() &&
+      _isNestedThroughSourceRoutable(refl)
+    ) {
+      const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
+      // null FK → empty, mirroring the sibling routing block above; do NOT fall
+      // through to the IN-subquery below, which can't walk a nested source.
+      return joinRel ?? (this.model as any).all().none();
     }
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);

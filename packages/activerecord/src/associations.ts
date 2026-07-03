@@ -782,6 +782,38 @@ export function _canRouteThroughViaAssociationScope(
 }
 
 /**
+ * Nested-through with a through *source* reflection — e.g. Owner
+ * `has_many :persons, through: :pets` where `Pet#persons` is itself a
+ * has_many-through (with a polymorphic `looter` source). The legacy 2-step
+ * `loadHasManyThrough` / IN-subquery fallback can only project a single source
+ * FK column and cannot walk a multi-step chain, so it produces an empty or
+ * nonsensical result. The JOIN-based AssociationScope flattens the whole
+ * reflection chain (Rails' `reflection.chain`) into a single INNER JOIN,
+ * carrying any polymorphic `sourceType` condition — route these shapes there.
+ *
+ * Gated narrowly: the *through* reflection must be a plain (non-nested)
+ * association and only the *source* is nested, which is the shape the fallback
+ * mishandles. Nested-through-*through* shapes keep their existing working path.
+ * @internal
+ */
+export function _isNestedThroughSourceRoutable(
+  reflection: ReflectionLike | null | undefined,
+): boolean {
+  if (!reflection) return false;
+  if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection()) {
+    return false;
+  }
+  const src = (reflection as any).sourceReflection;
+  const through = (reflection as any).throughReflection;
+  return (
+    typeof src?.isThroughReflection === "function" &&
+    src.isThroughReflection() &&
+    typeof through?.isThroughReflection === "function" &&
+    !through.isThroughReflection()
+  );
+}
+
+/**
  * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
  * but for `disable_joins: true` through associations — runs the chain
  * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
@@ -1790,7 +1822,17 @@ export async function loadHasMany(
       return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
     }
     if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
-      return loadHasManyThrough(record, assocName, options);
+      // Nested-through whose SOURCE is itself a through reflection falls through
+      // into the JOIN-based AssociationScope path below (which flattens the
+      // whole `reflection.chain`), sharing its inverse-wiring and null-FK
+      // short-circuit. An unpersisted owner resolves its through step from the
+      // in-memory association target (e.g. `post.author = mary` before save),
+      // which the SQL JOIN cannot see — keep those on the 2-step loader.
+      const nestedSourceRoutable =
+        !record.isNewRecord() && _isNestedThroughSourceRoutable(reflEarly);
+      if (!nestedSourceRoutable) {
+        return loadHasManyThrough(record, assocName, options);
+      }
     }
     // Fall through into the AssociationScope path below.
   }
