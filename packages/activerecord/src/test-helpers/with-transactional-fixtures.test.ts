@@ -258,15 +258,14 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 // so the test targets that mechanism directly — the invariant boundary is the
 // same whether callers go via Base.transaction() or withinNewTransaction().
 //
-// F5 removed SidecarFixtures; createSidecarTestAdapter() now returns the raw
-// pool-leased adapter directly. Pool-backed isolation (each checkout gets its
-// own AsyncLocalStorage context) lands at E5; these tests remain skipped until
-// that ships.
+// These adapters come straight from the primary pool (`Base.connection`).
+// Pool-backed isolation (each checkout gets its own AsyncLocalStorage context)
+// lands at E5; these tests remain skipped until that ships.
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
-    const sidecarA = (await primaryAdapter()) as unknown as SidecarAdapter;
-    const sidecarB = (await primaryAdapter()) as unknown as SidecarAdapter;
+    const chainA = (await primaryAdapter()) as unknown as SidecarAdapter;
+    const chainB = (await primaryAdapter()) as unknown as SidecarAdapter;
 
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
@@ -285,10 +284,10 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     let bObservedCurrentTxJoinable = true;
 
     await Promise.all([
-      sidecarA.withinNewTransaction({ joinable: false }, async () => {
+      chainA.withinNewTransaction({ joinable: false }, async () => {
         // Verify chain A genuinely has an open transaction before signalling B,
         // so a vacuous pass (e.g. lazy open) is caught immediately.
-        expect(sidecarA.openTransactions).toBeGreaterThan(0);
+        expect(chainA.openTransactions).toBeGreaterThan(0);
         // Transaction is open. Signal chain B to read.
         signalBReady();
         // Hold the transaction open until chain B has read.
@@ -298,12 +297,12 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
         // Wait until chain A is inside a live transaction before reading.
         await bReady;
         try {
-          bObservedOpen = sidecarB.openTransactions;
-          bObservedInTransaction = sidecarB.inTransaction;
+          bObservedOpen = chainB.openTransactions;
+          bObservedInTransaction = chainB.inTransaction;
           // currentTransaction() returns null (current filter) or NullTransaction
           // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
           // joinable rather than identity keeps this green through E2–E5.
-          const ct = sidecarB.currentTransaction() as { joinable?: boolean } | null;
+          const ct = chainB.currentTransaction() as { joinable?: boolean } | null;
           bObservedCurrentTxJoinable = ct?.joinable ?? false;
         } finally {
           // Always unblock chain A so the test fails rather than hangs.

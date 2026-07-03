@@ -384,12 +384,11 @@ describe("defineSchema", () => {
   });
 
   describe("clearAppliedSchemaSignatures", () => {
-    // Regression: under the sidecar shape a single shared raw adapter
-    // survives across tests, so the signature cache must be invalidated
-    // alongside dropAllTables — otherwise defineSchema(sameSpec) no-ops
-    // over a now-missing table.
+    // Regression: a single pooled adapter survives across tests, so the
+    // signature cache must be invalidated alongside dropAllTables — otherwise
+    // defineSchema(sameSpec) no-ops over a now-missing table.
     //
-    // Use the raw sidecar adapter (no `tables: Set`) so this exercises the
+    // Use the raw pool-leased adapter (no `tables: Set`) so this exercises the
     // cache-only path. The wrapper's `tables` Set would let
     // `adapterKnownTables` detect the drop and force DDL re-execution
     // without the explicit clear, masking the bug.

@@ -139,7 +139,8 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  * @example
  *   let adapter: DatabaseAdapter;
  *   beforeAll(async () => {
- *     adapter = createTestAdapter();
+ *     await establishFromTestConfig();
+ *     adapter = Base.connection;
  *     await defineSchema(adapter, { ... });
  *   });
  *   withTransactionalFixtures(() => adapter);
