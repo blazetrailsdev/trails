@@ -24,9 +24,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     });
   });
 
-  afterEach(() => {
-    handler.clearAllConnectionsBang();
-    Base.connectionHandler.clearAllConnectionsBang();
+  afterEach(async () => {
+    await handler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   });
 
   function withBaseConfigs(
@@ -47,7 +47,10 @@ describe("ConnectionHandlersMultiDbTest", () => {
       (Base as any).configurations = prevConfigs;
       DatabaseConfigurations.defaultEnv = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
-      Base.connectionHandler.clearAllConnectionsBang();
+      // Sync helper (fn: () => void); the async clearAllConnectionsBang tears
+      // down synchronously here, so catch (rather than await) its drain promise
+      // to keep this best-effort without cascading async through ~15 callers.
+      void Base.connectionHandler.clearAllConnectionsBang().catch(() => {});
     }
   }
 

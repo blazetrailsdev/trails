@@ -857,16 +857,24 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Lifecycle ---
 
-  disconnect(raiseOnAcquisitionTimeout: boolean = true): void {
-    this._disconnect(raiseOnAcquisitionTimeout);
+  /**
+   * Converges Rails' `ConnectionPool#disconnect`: tears down synchronously, then
+   * awaits each adapter's pending async `driver.close()` (async-only SQLite
+   * drivers) before resolving, so the underlying handle is fully closed before
+   * the caller re-opens the same DB. Resolves immediately for sync drivers. The
+   * `Promise` return is an intentional, documented divergence from Rails'
+   * synchronous `disconnect` (forced by promise-returning `driver.close()`),
+   * NOT a regression to revert.
+   */
+  async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
+    await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
   }
 
   /**
-   * Synchronous teardown shared by `disconnect`/`disconnectAsync`. Returns the
-   * pending async-close drains surfaced by adapters whose `driver.close()` is
-   * promise-returning (async-only SQLite drivers); sync drivers contribute
-   * nothing. `disconnect` ignores them (Rails-synchronous behavior);
-   * `disconnectAsync` awaits them so no close is left in flight.
+   * Synchronous teardown shared by `disconnect`. Returns the pending async-close
+   * drains surfaced by adapters whose `driver.close()` is promise-returning
+   * (async-only SQLite drivers); sync drivers contribute nothing. `disconnect`
+   * awaits them so no close is left in flight.
    */
   private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
@@ -890,22 +898,20 @@ export class ConnectionPool implements ReapablePool {
     return draining;
   }
 
+  async disconnectBang(): Promise<void> {
+    await this.disconnect(false);
+  }
+
   /**
-   * Async-draining variant of `disconnect`: tears down synchronously, then
-   * awaits each adapter's pending async `driver.close()` before resolving, so
-   * an async-only driver's handle is fully closed before the caller proceeds
-   * (e.g. re-opens the same DB). For sync drivers this resolves immediately.
+   * Converges Rails' `ConnectionPool#discard!`: discards synchronously, then
+   * awaits any adapter's in-flight async `driver.close()` before resolving, so
+   * the handle is fully closed before the caller re-opens the same DB. Resolves
+   * immediately for sync drivers (or when nothing is in flight). The `Promise`
+   * return is an intentional, documented divergence from Rails' synchronous
+   * `discard!` (forced by promise-returning `driver.close()`), NOT a regression.
    */
-  async disconnectAsync(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
-    await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
-  }
-
-  disconnectBang(): void {
-    this.disconnect(false);
-  }
-
-  discardBang(): void {
-    this._discardBang();
+  async discardBang(): Promise<void> {
+    await Promise.all(this._discardBang());
   }
 
   /**
@@ -921,15 +927,14 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Synchronous discard shared by `discardBang`/`discardBangAsync`. Returns the
-   * pending async-close drains surfaced by adapters with an async-only
+   * Synchronous discard shared by `discardBang`/`discardBangDraining`. Returns
+   * the pending async-close drains surfaced by adapters with an async-only
    * `driver.close()` already in flight (e.g. fired by a prior `disconnectBang`
    * on a still-pooled conn). Rails' `discard!` abandons the raw handle without
    * closing it, so SQLite's `discardBang()` fires no new close; but dropping our
    * `_connections` reference here would orphan any in-flight close, leaking the
-   * handle past teardown and racing a re-open. `discardBang` discards
-   * synchronously and drops the drains (Rails-void); `discardBangDraining` /
-   * `discardBangAsync` surface or await them.
+   * handle past teardown and racing a re-open. `discardBang` awaits the drains;
+   * `discardBangDraining` surfaces them for the `PoolConfig` sweep to await.
    */
   private _discardBang(): Array<Promise<void>> {
     if (this.isDiscarded()) return [];
@@ -954,16 +959,6 @@ export class ConnectionPool implements ReapablePool {
     this._checkedOut.clear();
     this._lastCheckinAt.clear();
     return draining;
-  }
-
-  /**
-   * Async-draining variant of `discardBang`: discards synchronously, then awaits
-   * any adapter's in-flight async `driver.close()` before resolving, so the
-   * handle is fully closed before the caller re-opens the same DB. Resolves
-   * immediately for sync drivers (or when nothing is in flight).
-   */
-  async discardBangAsync(): Promise<void> {
-    await Promise.all(this.discardBangDraining());
   }
 
   /**

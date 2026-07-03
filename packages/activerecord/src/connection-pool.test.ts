@@ -115,7 +115,7 @@ it("checkout after close", async () => {
   expect(conn).toBeTruthy();
   pool.releaseConnection();
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
 
   // After disconnect, leaseConnection creates a fresh connection
   const conn2 = await pool.leaseConnection();
@@ -196,7 +196,7 @@ it("reap and active", async () => {
   pool.reap();
   // In single-threaded JS, no connections have dead owners, so reap is a no-op
   expect(pool.connections.length).toBe(count);
-  pool.disconnect();
+  await pool.disconnect();
 });
 
 it("idle timeout configuration", async () => {
@@ -338,7 +338,7 @@ it("automatic reconnect restores after disconnect", async () => {
   expect(await pool.leaseConnection()).toBeTruthy();
   pool.releaseConnection();
 
-  pool.disconnectBang();
+  await pool.disconnectBang();
   // With automaticReconnect=true (default), new connections are created
   expect(await pool.leaseConnection()).toBeTruthy();
   pool.releaseConnection();
@@ -346,7 +346,7 @@ it("automatic reconnect restores after disconnect", async () => {
 
 it("automatic reconnect can be disabled", async () => {
   const pool = makePool();
-  pool.disconnectBang();
+  await pool.disconnectBang();
   pool.automaticReconnect = false;
 
   await expect(pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
@@ -390,7 +390,7 @@ it("connection notification is called", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
 
@@ -410,7 +410,7 @@ it("connection notification is called for shard", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
 

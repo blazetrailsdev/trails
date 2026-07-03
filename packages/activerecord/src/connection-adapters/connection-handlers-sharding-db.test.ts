@@ -29,13 +29,13 @@ async function withBaseConfigs(
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
     if (opts.defaultEnv) vi.unstubAllEnvs();
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
   }
 }
 
 describe("ConnectionHandlersShardingDbTest", () => {
   afterEach(async () => {
-    Base.connectionHandler.clearAllConnectionsBang();
+    await Base.connectionHandler.clearAllConnectionsBang();
     (Base as any)._shardKeys = undefined;
     (Base as any)._defaultShard = undefined;
     (Base as any).connectionClass = undefined;
@@ -213,7 +213,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
       });
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
       (Base as any)._shardKeys = undefined;
     }
   });
@@ -369,7 +369,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         });
       }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
     }
   });
 
@@ -402,7 +402,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       expect(SecondaryBase.defaultShard()).toBe("not_default");
       expect(SomeOtherBase.defaultShard()).toBe("default");
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
     }
   });
 
@@ -415,7 +415,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
       });
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
     }
     expect(ShardedAbstractBase.defaultShard()).toBe("not_default");
 
@@ -486,7 +486,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
         await connB.executeMutation(`DROP TABLE IF EXISTS "shard_connection_test_model_bs"`);
       });
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
       (SecondaryBase as any).connectionClass = undefined;
       (SomeOtherBase as any).connectionClass = undefined;
     }
@@ -564,7 +564,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`);
       expect(fooRows.length).toBe(1);
     } finally {
-      Base.connectionHandler.clearAllConnectionsBang();
+      await Base.connectionHandler.clearAllConnectionsBang();
       (SecondaryBase as any).connectionClass = undefined;
     }
   });

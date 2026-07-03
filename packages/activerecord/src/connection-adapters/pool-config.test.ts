@@ -79,14 +79,14 @@ describe("PoolConfig", () => {
   });
 
   describe("disconnectBang", () => {
-    it("is a no-op when pool is not initialized", () => {
-      expect(() => config.disconnectBang()).not.toThrow();
+    it("is a no-op when pool is not initialized", async () => {
+      await expect(config.disconnectBang()).resolves.toBeUndefined();
     });
 
-    it("disconnects the pool when initialized", () => {
+    it("disconnects the pool when initialized", async () => {
       const pool = config.pool;
       const spy = vi.spyOn(pool, "disconnect");
-      config.disconnectBang();
+      await config.disconnectBang();
       expect(spy).toHaveBeenCalled();
     });
   });
@@ -187,14 +187,14 @@ describe("PoolConfig", () => {
   });
 
   describe("static disconnectAllBang", () => {
-    it("disconnects all tracked instances", () => {
+    it("disconnects all tracked instances", async () => {
       const c1 = new PoolConfig(makeDescriptor("a"), makeDbConfig("a"));
       const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));
       const pool1 = c1.pool;
       const pool2 = c2.pool;
       const spy1 = vi.spyOn(pool1, "disconnect");
       const spy2 = vi.spyOn(pool2, "disconnect");
-      PoolConfig.disconnectAllBang();
+      await expect(PoolConfig.disconnectAllBang()).resolves.toBeUndefined();
       expect(spy1).toHaveBeenCalled();
       expect(spy2).toHaveBeenCalled();
     });

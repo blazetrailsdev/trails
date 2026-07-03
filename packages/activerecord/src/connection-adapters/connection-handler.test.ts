@@ -482,7 +482,7 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
-    handler.clearAllConnectionsBang();
+    await handler.clearAllConnectionsBang();
     expect(pool.isConnected()).toBe(false);
   });
 
@@ -641,7 +641,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("clear all connections bang is safe on empty handler", async () => {
-    expect(() => handler.clearAllConnectionsBang()).not.toThrow();
+    await expect(handler.clearAllConnectionsBang()).resolves.toBeUndefined();
   });
 
   it("flush idle connections bang is safe on empty handler", async () => {

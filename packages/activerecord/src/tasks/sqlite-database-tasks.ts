@@ -104,18 +104,10 @@ export class SQLiteDatabaseTasks {
   private async disconnect(): Promise<void> {
     try {
       const pool = Base.connectionPool();
-      // Iterate existing pool connections and await their async close() before
-      // pool.disconnect() fires disconnectBang() synchronously. disconnectBang()
-      // does not await driver.close() for async SQLite drivers (#1269).
-      for (const conn of pool.connections) {
-        try {
-          const c = conn as unknown as { close?: () => Promise<void> };
-          if (typeof c.close === "function") await c.close();
-        } catch {
-          // best effort per connection
-        }
-      }
-      pool.disconnect();
+      // `pool.disconnect()` awaits each adapter's async `driver.close()` before
+      // resolving, so async-only SQLite drivers are fully closed before the
+      // subsequent drop/create re-opens the same file (#1269).
+      await pool.disconnect();
     } catch {
       // best effort
     }
