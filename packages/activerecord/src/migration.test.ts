@@ -32,8 +32,6 @@ function emitTableSql(td: TableDefinition): string {
   if (adapterName === "mysql") return new MysqlSchemaCreation().accept(td);
   return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
 }
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports, adapterSupports } from "./test-helpers/supports.js";
@@ -52,13 +50,31 @@ async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: Migratio
 
 // The migration-on-`people` tests (Rails runs `add_column/remove_column
 // "people", "last_name"` through a `Migrator`) need the canonical `people`
-// table materialized before the migrator runs. Under AR_NO_AUTO_SCHEMA=1 the
-// SQLite lane's leased adapter has no template, so define the canonical `people`
-// shape (a subset of the canonical TEST_SCHEMA — never a fabricated shape);
-// on the template lanes this is a cache-hit no-op.
+// table materialized before the migrator runs. The SQLite lane's leased adapter
+// has no template, so build the canonical `people` shape directly with
+// `createTable` (mirroring the `people` entry in test-helpers/test-schema.ts —
+// never a fabricated shape); `force: true` makes it a no-op on lanes that
+// already have it. The afterEach strips the scratch `last_name` column and the
+// afterAll drops the table, so nothing leaks into the shared worker DB.
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
   const adapter = await createTestAdapter();
-  await defineSchema(adapter, { people: TEST_SCHEMA.people });
+  await adapter.createTable("people", { force: true }, (t) => {
+    t.string("first_name", { null: false });
+    t.integer("primary_contact_id");
+    t.string("gender", { limit: 1 });
+    t.integer("number1_fan_id");
+    t.integer("lock_version", { null: false, default: 0 });
+    t.string("comments");
+    t.integer("followers_count", { default: 0 });
+    t.integer("friends_too_count", { default: 0 });
+    t.integer("best_friend_id");
+    t.integer("best_friend_of_id");
+    t.integer("insures", { null: false, default: 0 });
+    t.datetime("born_at");
+    t.integer("cars_count", { default: 0 });
+    t.datetime("created_at", { null: false });
+    t.datetime("updated_at", { null: false });
+  });
   return adapter;
 }
 
@@ -104,8 +120,8 @@ afterEach(async () => {
   const ctx = new MigrationContext(adapter);
   try {
     // Gate the drop on the ADAPTER's live introspection, not `removeColumn`'s
-    // own `ifExists` short-circuit: under AR_ONE_SCHEMA the MigrationContext
-    // column cache is empty (defineSchema is a canonical no-op), so an
+    // own `ifExists` short-circuit: the MigrationContext column cache may be
+    // empty for the freshly created `people` table, so an
     // `ifExists` check would consult that empty cache, conclude last_name is
     // absent, skip the drop, and leak the column into the next test.
     if (await (adapter as any).columnExists("people", "last_name")) {
@@ -153,6 +169,7 @@ afterAll(async () => {
   await ctx.dropTable("memberships", o);
   await ctx.dropTable("nonexistent", o);
   await ctx.dropTable("old_name", o);
+  await ctx.dropTable("people", o);
   await ctx.dropTable("pend_t", o);
   await ctx.dropTable("pre_old_suf", o);
   await ctx.dropTable("rv_bulk", o);
@@ -1419,33 +1436,44 @@ describe("MigrationTest", () => {
   });
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
-      // `values` is a SQL reserved word and a canonical table. Rails' ReservedWords
-      // MigrationTest builds its own `values`; under AR_ONE_SCHEMA we ride the
-      // canonical table instead of reshaping it, exercising the same reserved-word
-      // add_index/remove_index path on an existing canonical column and removing
-      // the index in the test so nothing leaks.
-      const adapter = await createTestAdapter();
-      await defineSchema(adapter, { values: TEST_SCHEMA.values });
-      const ctx = new MigrationContext(adapter);
-      await ctx.addIndex("values", "group_id");
-      expect(await (adapter as any).indexExists("values", "group_id")).toBe(true);
-      await ctx.removeIndex("values", { column: "group_id" });
-      expect(await (adapter as any).indexExists("values", "group_id")).toBe(false);
+      // Mirrors migration_test.rb's ReservedWordsMigrationTest verbatim: `values`
+      // is a SQL reserved word, so Rails builds its own bespoke `values(value)`
+      // table (default PK, not the canonical `as`/`group_id` shape), exercises
+      // add_index/remove_index on the `value` column, and drops the table in an
+      // `ensure` (our `finally`) so nothing leaks into the shared worker DB.
+      const connection = await createTestAdapter();
+      await connection.createTable("values", { force: true }, (t) => {
+        t.integer("value");
+      });
+      try {
+        await connection.addIndex("values", "value");
+        expect(await connection.indexExists("values", "value")).toBe(true);
+        await connection.removeIndex("values", "value");
+        expect(await connection.indexExists("values", "value")).toBe(false);
+      } finally {
+        await connection.dropTable("values", { ifExists: true });
+      }
     });
   });
 
   describe("ExplicitlyNamedIndexMigrationTest", () => {
     it("drop index by name", async () => {
-      // Ride the canonical `values` table (see the ReservedWords test above):
-      // add an explicitly named index on an existing canonical column, then drop
-      // it by name within the test so the canonical table is never reshaped.
-      const adapter = await createTestAdapter();
-      await defineSchema(adapter, { values: TEST_SCHEMA.values });
-      const ctx = new MigrationContext(adapter);
-      await ctx.addIndex("values", "group_id", { name: "a_different_name" });
-      expect(await (adapter as any).indexExists("values", "group_id")).toBe(true);
-      await ctx.removeIndex("values", { name: "a_different_name" });
-      expect(await (adapter as any).indexExists("values", "group_id")).toBe(false);
+      // Mirrors migration_test.rb's ExplicitlyNamedIndexMigrationTest verbatim:
+      // same bespoke `values(value)` table as the ReservedWords test above, but
+      // adds/removes an explicitly named index and drops the table in `finally`
+      // (Rails' `ensure`).
+      const connection = await createTestAdapter();
+      await connection.createTable("values", { force: true }, (t) => {
+        t.integer("value");
+      });
+      try {
+        await connection.addIndex("values", "value", { name: "a_different_name" });
+        expect(await connection.indexExists("values", "value")).toBe(true);
+        await connection.removeIndex("values", "value", { name: "a_different_name" });
+        expect(await connection.indexExists("values", "value")).toBe(false);
+      } finally {
+        await connection.dropTable("values", { ifExists: true });
+      }
     });
   });
 
