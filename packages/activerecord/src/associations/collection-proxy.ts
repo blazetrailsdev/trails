@@ -2713,14 +2713,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // after_remove callbacks form one unit — all run inside the transaction when
     // there are persisted records, so before_remove side-effects participate in
     // rollback, exactly as the `delete` path above.
-    let aborted = false;
     const run = async () => {
       // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
       // return`: if any record's before_remove halts, the entire operation
-      // aborts and nothing is destroyed.
+      // aborts (nothing destroyed) and destroy returns undefined.
       for (const record of modelRecords) {
         if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record, true)) {
-          aborted = true;
           return;
         }
       }
@@ -2743,7 +2741,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await run();
     }
-    if (aborted) return;
   }
 
   /**
