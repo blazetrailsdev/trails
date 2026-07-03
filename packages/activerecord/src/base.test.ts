@@ -12,7 +12,7 @@ import {
 } from "./index.js";
 import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
-import { createSidecarTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./test-helpers/quote-regex.js";
 import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
@@ -1613,7 +1613,7 @@ describe("BasicsTest", () => {
     expect(Concrete.tableName).toBe("concretes");
   });
   it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
-    const { adapter: pgAdapter } = await createSidecarTestAdapter();
+    const pgAdapter = Base.connection;
     const result = await pgAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });

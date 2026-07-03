@@ -10,9 +10,8 @@
  */
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Base, transaction } from "./index.js";
-import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { setupFixtures, fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -319,22 +318,29 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
 // SchemaAdapter TM delegation regression test (Phase 1)
 // ==========================================================================
 describe("SchemaAdapter TM delegation", () => {
-  // createTestAdapter wraps a shared inner adapter; without local restore,
-  // spies leak into the next test in this file.
+  // These tests read `Base.connection` directly (Rails' counterparts run under
+  // ActiveRecord::TestCase, which has an established base connection before the
+  // body calls lease_connection). This is a separate top-level describe from
+  // TransactionTest, so bootstrap the handler here rather than depending on a
+  // sibling describe having run first. Non-transactional: these tests commit
+  // rows to `items` and clean up in afterAll (Rails `use_transactional_tests`
+  // is not in play here).
+  fixtures({}, { useTransactionalTests: false });
+  // Tests here spy on `Base.connection`; without local restore, spies leak
+  // into the next test in this file.
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  // These tests create rows in the shared `items` table (via createTestAdapter →
-  // shared pool) outside of any transactional rollback guard. In PG, adapters
+  // These tests create rows in the shared `items` table (via `Base.connection`)
+  // outside of any transactional rollback guard. In PG, adapters
   // pointing at the same database share the create-table signature cache, so a
   // later file's canonical schema load is a cache hit and does NOT drop the
   // table — leaving these rows visible to tests in other files (e.g. the
   // `EachTest > findEach yields each record` case in batches.test.ts which
   // expects an empty items table). Clean up unconditionally after all tests here.
   afterAll(async () => {
-    const a = await createTestAdapter();
-    await a.executeMutation("DELETE FROM items");
+    await Base.connection.executeMutation("DELETE FROM items");
   });
 
   // SchemaAdapter.setup() calls execDdlWithSavepoint which issues
@@ -350,20 +356,18 @@ describe("SchemaAdapter TM delegation", () => {
   // DDL savepoints are released eagerly (releaseSavepoint right after exec);
   // TM does not track them and never tries to release them again.
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
-    // Keep the wrapper for defineSchema/Model.adapter so the per-wrapper
-    // signature cache stays isolated across tests in this describe; spy on
-    // the shared real adapter via the sidecar — that's what the wrapper's
-    // withinNewTransaction routes to and what TM dispatches against.
-    const testAdapter = await createTestAdapter();
-    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
-    // `items` is a boot-owned canonical table, so it is not torn down here (the
-    // describe's afterAll clears rows; the boot schema owns/restores the shape).
+    // The model runs on `Base.connection`; spy on that same adapter — it's what
+    // TM dispatches `withinNewTransaction` against.
+    const testAdapter = Base.connection;
+    // Re-lay canonical `items` (drop-and-recreate, mirroring schema.rb's
+    // `create_table :items`) to prime the signature cache. `items` is a
+    // boot-owned canonical table, so it is not torn down here (the describe's
+    // afterAll clears rows; the boot schema owns/restores the shape).
     // eslint-disable-next-line blazetrails/require-table-teardown
     await testAdapter.createTable("items", { force: true }, (t) => {
       t.column("name", "string");
     });
-    const { adapter: realAdapter } = await createSidecarTestAdapter();
+    const realAdapter = Base.connection;
     const spy = vi.spyOn(realAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
@@ -382,9 +386,9 @@ describe("SchemaAdapter TM delegation", () => {
     const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
-    const testAdapter = await createTestAdapter();
-    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    const testAdapter = Base.connection;
+    // Re-lay canonical `items` (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime the signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
     // describe's afterAll clears rows; the boot schema owns/restores the shape).
 
@@ -429,9 +433,9 @@ describe("SchemaAdapter TM delegation", () => {
     // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
     // in favour of pool-per-connection isolation (tested by the E1 safety-net
     // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
-    const testAdapter = await createTestAdapter();
-    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    const testAdapter = Base.connection;
+    // Re-lay canonical `items` (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime the signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
     // describe's afterAll clears rows; the boot schema owns/restores the shape).
 
@@ -493,9 +497,9 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
-    const testAdapter = await createTestAdapter();
-    // Re-lay canonical `items` through the wrapper (drop-and-recreate, mirroring
-    // schema.rb's `create_table :items`) to prime its per-wrapper signature cache.
+    const testAdapter = Base.connection;
+    // Re-lay canonical `items` (drop-and-recreate, mirroring
+    // schema.rb's `create_table :items`) to prime the signature cache.
     // `items` is a boot-owned canonical table, so it is not torn down here (the
     // describe's afterAll clears rows; the boot schema owns/restores the shape).
 

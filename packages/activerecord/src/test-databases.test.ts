@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { createAndMigrate, eachDatabase, createAndLoadSchema } from "./test-databases.js";
-import { createTestAdapter } from "./test-adapter.js";
 import type { MigrationProxy } from "./migration.js";
-import type { Base } from "./base.js";
+import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
 // supplied stubbed configs. Mirrors the production shape — production code
@@ -25,6 +25,7 @@ afterAll(() => {
 });
 
 describe("TestDatabasesTest", () => {
+  fixtures({});
   let priorCurrent: DatabaseConfigurations | null;
   beforeEach(() => {
     priorCurrent = DatabaseConfigurations.current;
@@ -264,7 +265,7 @@ describe("TestDatabasesTest", () => {
   });
 
   it("createAndMigrate runs migrations on all adapters", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const log: string[] = [];
     const migrations: MigrationProxy[] = [
       {
@@ -284,11 +285,7 @@ describe("TestDatabasesTest", () => {
   });
 
   it("eachDatabase iterates all adapters", async () => {
-    const adapters = [
-      await createTestAdapter(),
-      await createTestAdapter(),
-      await createTestAdapter(),
-    ];
+    const adapters = [Base.connection, Base.connection, Base.connection];
     const visited: number[] = [];
 
     await eachDatabase(adapters, async (_adapter, index) => {
