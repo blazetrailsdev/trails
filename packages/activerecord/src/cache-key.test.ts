@@ -29,10 +29,11 @@ describe("CacheKeyTest", () => {
   // rather than seeding placeholders into the canonical schema. Rails also sets
   // `self.use_transactional_tests = false`, so each test recreates the tables.
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-  // sidecar `_pool` lease; `fixtures({})` wires the handler and per-test
-  // transactional rollback (empty map → no seed rows). The bespoke tables are
-  // laid/dropped per-test, so schema-cache warming doesn't touch them.
-  fixtures({});
+  // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
+  // rows). Rails sets `use_transactional_tests = false` here and recreates the
+  // bespoke tables per-test, so opt out of transactional fixtures — the per-test
+  // DDL must commit, not roll back inside a wrapping (PG-poisoning) transaction.
+  fixtures({}, { useTransactionalTests: false });
   let ctx: MigrationContext;
 
   beforeEach(async () => {

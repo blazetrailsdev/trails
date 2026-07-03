@@ -26,11 +26,11 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
 // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
-// sidecar `_pool` lease; `fixtures({})` wires the handler and per-test
-// transactional rollback for every block (empty map → no seed rows). The
-// bespoke per-test tables are laid/dropped in each block's hooks, so
-// schema-cache warming doesn't touch them.
-fixtures({});
+// sidecar `_pool` lease; `fixtures({})` wires the handler for every block (empty
+// map → no seed rows). The bespoke per-test tables are recreated in each block's
+// hooks, so opt out of transactional fixtures — the per-test DDL must commit,
+// not roll back inside a wrapping (PG-poisoning) transaction.
+fixtures({}, { useTransactionalTests: false });
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
