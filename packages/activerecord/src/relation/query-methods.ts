@@ -935,8 +935,11 @@ export function buildWhereClause(
   opts = sanitizeForbiddenAttributes(opts as Record<string, unknown>);
 
   if (Array.isArray(opts)) {
+    // Mirrors Ruby `opts, *rest = opts` (query_methods.rb:1616-1618): the
+    // array destructure OVERWRITES rest with the array's tail, discarding any
+    // rest that was passed alongside the array — it does not append to it.
     const [head, ...tail] = opts as unknown[];
-    return buildWhereClause.call(this, head, [...tail, ...rest]);
+    return buildWhereClause.call(this, head, tail);
   }
 
   if (opts instanceof Nodes.Node) return new WhereClause([opts]);

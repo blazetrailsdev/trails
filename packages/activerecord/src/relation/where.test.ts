@@ -233,6 +233,20 @@ describe("WhereTest", () => {
     expect(() => CpkBook.where(["author_id", "id"], tupleIds).toSql()).not.toThrow();
   });
 
+  // Mirrors Ruby `opts, *rest = opts` (query_methods.rb:1616-1618): when the
+  // first argument is an array fragment, the array destructure OVERWRITES any
+  // rest passed alongside it — the stray trailing arg is dropped, binding only
+  // the array's own tail. Reachable via Relation#where with an array first arg
+  // plus an extra positional; Base.where drops rest before it gets here.
+  it("array first arg discards extra positional rest", () => {
+    const withStray = (Post.all().where as any)(["id = ?", 1], 2);
+    const withoutStray = (Post.all().where as any)(["id = ?", 1]);
+    // The stray 2 is dropped: the SQL is identical to the no-rest call, which
+    // binds only the array's own tail (1) — never the extra positional. (An
+    // appended 2 would emit a second bind and diverge the SQL.)
+    expect(withStray.toSql()).toEqual(withoutStray.toSql());
+  });
+
   it("where with nil cpk association", async () => {
     const order = await CpkOrder.create({ shop_id: 1, id: 2 });
     // Rails: order.books.create!(id: [3, 4]) — composite Book PK [author_id, id]
