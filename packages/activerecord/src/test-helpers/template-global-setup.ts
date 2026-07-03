@@ -20,7 +20,7 @@ import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { defineSchema } from "./define-schema.js";
+import { loadCanonicalSchema } from "./canonical-schema.js";
 import { generateSchemaFile } from "./schema-file-generator.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { InternalMetadata } from "../internal-metadata.js";
@@ -51,7 +51,7 @@ async function buildTemplateSchema(
   close: () => Promise<void>,
 ): Promise<void> {
   try {
-    await defineSchema(adapter, TEST_SCHEMA, { force: true });
+    await loadCanonicalSchema(adapter);
   } finally {
     await close();
   }
@@ -151,7 +151,7 @@ const pgAdapter: DbTemplateAdapter = {
       max: 1,
     }) as unknown as DatabaseAdapter;
     try {
-      await defineSchema(adapter, TEST_SCHEMA, { force: true });
+      await loadCanonicalSchema(adapter);
       // Stamp ar_internal_metadata so every slot cloned from this template
       // reports `schemaUpToDate` → each worker's reconstructFromSchema only
       // TRUNCATEs (no DDL) instead of paying a full purge+reload per test
@@ -161,7 +161,7 @@ const pgAdapter: DbTemplateAdapter = {
       const sha1 = await schemaSha1(schemaFile);
       await new InternalMetadata(adapter).createTableAndSetFlags("test", sha1);
     } finally {
-      // Teardown must not mask a build/stamp failure: if defineSchema threw,
+      // Teardown must not mask a build/stamp failure: if the loader threw,
       // a disconnect/terminate that also throws would replace the original
       // error. Swallow teardown errors so the meaningful one always surfaces.
       try {

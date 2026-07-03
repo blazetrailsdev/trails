@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -15,15 +14,14 @@ afterAll(() => {
 });
 
 // Tables in this file (postgresql_times, postgresql_oids, ex) use PG-specific
-// types (interval, oid, name, char) that aren't expressible via defineSchema.
-// They're created via raw DDL inside each test; defineSchema(adapter, {}) marks
-// the file as TM-Phase-5 compliant (auto-schema path disabled, no model relies
-// on it). The outer per-test transaction rolls back DDL between tests.
+// types (interval, oid, name, char) that aren't expressible via createTable's
+// typed builder; they're created via raw DDL inside each test (mirroring
+// Rails' `@connection.create_table`). The outer per-test transaction rolls
+// back DDL between tests.
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
   });
   afterAll(async () => {
     // `ex` is created in-test and rolled back by withTransactionalFixtures;

@@ -2,35 +2,16 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { adapterType } from "./test-adapter.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-
-// Ride the canonical Rails tables this file's models map to (posts / topics are
-// the persisted workhorses; the rest are reflected by in-memory `new()`).
-// Test models add their own extra attributes via `attribute(...)`; those that
-// aren't real canonical columns are simply excluded from INSERTs
-// (`attributesForCreate` filters by `columnNames()`), so they exercise the
-// in-memory attribute path without needing a bespoke table shape.
-const TEST_SCHEMA = {
-  posts: canonicalSchema.posts,
-  topics: canonicalSchema.topics,
-  items: canonicalSchema.items,
-  people: canonicalSchema.people,
-  users: canonicalSchema.users,
-  products: canonicalSchema.products,
-  events: canonicalSchema.events,
-  keyboards: canonicalSchema.keyboards,
-};
 
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
@@ -38,9 +19,6 @@ const TEST_SCHEMA = {
 describe("AttributeMethodsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
@@ -884,9 +862,6 @@ describe("AttributeMethodsTest", () => {
 describe("AttributeMethodsTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
 
   it("read_attribute with nil should not asplode", async () => {
     class Topic extends Base {
@@ -1253,9 +1228,6 @@ describe("AttributeMethodsTest", () => {
 describe("attribute_alias arelTable integration", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
   it("test_attribute_alias_in_where_references_association_name", () => {
     // Unit cover for the `arelTable.get(alias)` mechanism, NOT the Rails port:
     // the Rails `test_attribute_alias_in_where_references_association_name` lives

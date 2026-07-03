@@ -18,9 +18,11 @@ import { Between } from "./nodes/binary.js";
  *   `infinity?` / `unboundable?` / `open_ended?` — private helpers
  *
  * TS deviations (deliberate, called out in the audit):
- * - `infinitySign` and `unboundableSign` collapse: Trails has no
- *   `unboundable?` value protocol, so both reduce to checking
- *   `+/-Infinity` (and a `Quoted` wrapper around the same).
+ * - `infinitySign` / `unboundableSign` read the signed `isInfinite()` /
+ *   `isUnboundable()` a bound value may expose (a QueryAttribute bind, or the
+ *   RangeHandler out-of-range sentinel) — Trails' stand-in for Ruby's
+ *   `infinity?` / `unboundable?` value protocols — plus bare `±Infinity`
+ *   (and a `Quoted` wrapper around it).
  * - The TS port accepts three input shapes (array, object, positional)
  *   instead of Ruby's single `Range`.
  */
@@ -60,27 +62,64 @@ export function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boo
   return { begin: beginOrRange, end, excludeEnd: excludeEnd === true };
 }
 
-// Mirrors Rails Predications#infinity? — signed infinity check. Trails
-// has no `infinite?` protocol; only +/-Infinity (and Quoted(Infinity))
-// register.
+// Mirrors Rails Predications#infinity? — signed infinity check. Recognizes
+// +/-Infinity (and a Quoted wrapper around the same) plus any bound value
+// exposing a signed `isInfinite()` (e.g. a QueryAttribute bind whose value is
+// ±Float::INFINITY).
 export function infinitySign(value: unknown): 1 | -1 | 0 {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
   if (value instanceof Quoted) return infinitySign(value.value);
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as InfiniteLike).isInfinite === "function"
+  ) {
+    const r = (value as InfiniteLike).isInfinite!();
+    if (r === 1 || r === true) return 1;
+    if (r === -1) return -1;
+  }
   return 0;
 }
 
-// Mirrors Rails Predications#unboundable? — Trails has no separate
-// unboundable protocol on user values, so it collapses to infinitySign.
-// Kept named so the decision tree below reads side-by-side with Rails.
+// Mirrors Rails Predications#unboundable? — a bound is unboundable when it is
+// out of range for its column type. Trails threads that through a bound value
+// exposing `isUnboundable()` (a QueryAttribute bind, or the RangeHandler's
+// out-of-range sentinel), which returns a signed value (`1` past the max, `-1`
+// past the min) mirroring Ruby's `value <=> 0`. Falls back to infinitySign for
+// bare ±Infinity bounds.
 export function unboundableSign(value: unknown): 1 | -1 | 0 {
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as UnboundableLike).isUnboundable === "function"
+  ) {
+    const r = (value as UnboundableLike).isUnboundable!();
+    if (r === 1 || r === true) return 1;
+    if (r === -1) return -1;
+    if (r === 0) return 0;
+  }
   return infinitySign(value);
 }
 
-// Mirrors Rails Predications#open_ended? — null/undefined or any
-// signed-infinity bound counts as "no bound on this side".
+interface InfiniteLike {
+  isInfinite?: () => number | boolean | null;
+}
+
+interface UnboundableLike {
+  isUnboundable?: () => 1 | -1 | 0 | boolean;
+}
+
+// Mirrors Rails Predications#open_ended? — `value.nil? || infinity?(value) ||
+// unboundable?(value)`. A null/undefined, ±Infinity, or out-of-range
+// (unboundable) bound counts as "no bound on this side".
 export function isOpenEnded(value: unknown): boolean {
-  return value === null || value === undefined || infinitySign(value) !== 0;
+  return (
+    value === null ||
+    value === undefined ||
+    infinitySign(value) !== 0 ||
+    unboundableSign(value) !== 0
+  );
 }
 
 export function betweenFromRange(host: RangeHost, range: RangeLike): Node {

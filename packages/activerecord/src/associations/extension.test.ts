@@ -2,11 +2,10 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -28,27 +27,6 @@ describe("AssociationsExtensionsTest", () => {
     ["posts", "comments", "developers", "projects", "developersProjects"],
     { schema: canonicalSchema },
   );
-  // Force-recreate `posts`/`comments` to the canonical shape. Under vitest's
-  // per-file module isolation the signature/schema caches reset to canonical
-  // each file, so `fixtures`' own `defineSchema` sees a cache-hit and
-  // skips the repair — leaving a reduced `posts:{title}` shape (no `body`) that
-  // a sibling handler-suite file co-scheduled earlier in the same fork wrote to
-  // the shared worker DB. `dropExisting` drops + recreates unconditionally, so
-  // the posts fixture INSERT (which carries a `body` value) finds the column.
-  // Registered after `fixtures` so this `beforeAll` runs last and wins.
-  beforeAll(async () => {
-    await defineSchema(
-      {
-        posts: canonicalSchema.posts,
-        comments: canonicalSchema.comments,
-        developers: canonicalSchema.developers,
-        projects: canonicalSchema.projects,
-        developers_projects: canonicalSchema.developers_projects,
-      },
-      { dropExisting: true },
-    );
-  });
-
   it("extension on has many", async () => {
     const proxy = association(posts("welcome"), "comments") as unknown as {
       findMostRecent: () => Promise<Base | null>;

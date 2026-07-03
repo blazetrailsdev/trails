@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { LogSubscriber, setVerboseQueryLogs } from "./log-subscriber.js";
 import { Base } from "./index.js";
@@ -8,11 +8,9 @@ import {
   Logger,
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -106,12 +104,6 @@ describe("LogSubscriberTest", () => {
   // ActiveRecord::Base.logger. A `developers` table is all those SELECTs need.
   setupFixtures();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      developers: TEST_SCHEMA.developers,
-    });
-  });
-
   beforeEach(() => {
     mockLogger = new MockLogger();
     LogSubscriber.logger = mockLogger;

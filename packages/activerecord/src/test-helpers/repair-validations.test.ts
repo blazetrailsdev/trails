@@ -1,18 +1,13 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { defineSchema } from "./define-schema.js";
 import { setupFixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { repairValidations } from "./repair-validations.js";
 
+// interests and zines are canonical schema.rb tables laid by the boot schema;
+// the inline models ride them rather than recreating a bespoke shape.
 setupFixtures();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    interests: { topic: "string", zine_id: "integer" },
-    zines: { title: "string" },
-  });
-});
 
 describe("repairValidations", () => {
   it("removes a validator added inside the block after it returns", async () => {

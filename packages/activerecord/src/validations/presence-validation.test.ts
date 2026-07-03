@@ -6,8 +6,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { association } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
@@ -43,13 +41,8 @@ describe("PresenceValidationTest", () => {
   useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    await defineSchema({
-      humans: TEST_SCHEMA.humans,
-      faces: TEST_SCHEMA.faces,
-      interests: TEST_SCHEMA.interests,
-      speedometers: TEST_SCHEMA.speedometers,
-      dashboards: TEST_SCHEMA.dashboards,
-    });
+    // The canonical humans/faces/interests/speedometers/dashboards tables are
+    // laid at boot by loadCanonicalSchema.
     registerModel("Human", Human);
     registerModel("Boy", Boy);
     registerModel("Face", Face);

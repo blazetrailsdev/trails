@@ -72,7 +72,12 @@ export class ArrayHandler {
     } else if (scalarValues.length === 1) {
       valuesPredicate = this.predicateBuilder.build(attribute, scalarValues[0]);
     } else {
-      valuesPredicate = attribute.in(scalarValues);
+      // Rails builds the multi-value case with
+      // `Arel::Nodes::HomogeneousIn.new(values, attribute, :in)`. Its
+      // `castedValues` natively drops out-of-range / non-serializable values and
+      // casts per column type, so `[1, 2^63]` → `IN (1)` without any sentinel
+      // pre-substitution.
+      valuesPredicate = new Nodes.HomogeneousIn(scalarValues, attribute, "in");
     }
 
     if (hasNull) {

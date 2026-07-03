@@ -4,8 +4,6 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -58,7 +56,22 @@ describeIfMysql("Mysql2Adapter", () => {
     async function withOmgPost(
       fn: (omgPost: typeof Base, db: string) => Promise<void>,
     ): Promise<void> {
-      await defineSchema(adapter, { posts: canonicalSchema.posts });
+      // Mirror schema.rb's canonical `posts` create_table (the table @omgpost
+      // rides). Rails loads the whole schema on the shared connection; here the
+      // per-test adapter lays just this table and drops it in the finally.
+      await adapter.createTable("posts", { force: true }, (t: any) => {
+        t.integer("author_id");
+        t.string("title", { null: false });
+        t.text("body", { null: false });
+        t.string("type");
+        t.integer("legacy_comments_count", { default: 0 });
+        t.integer("taggings_with_delete_all_count", { default: 0 });
+        t.integer("taggings_with_destroy_count", { default: 0 });
+        t.integer("tags_count", { default: 0 });
+        t.integer("indestructible_tags_count", { default: 0 });
+        t.integer("tags_with_destroy_count", { default: 0 });
+        t.integer("tags_with_nullify_count", { default: 0 });
+      });
       try {
         const db = await adapter.currentDatabase();
         // Mirror Rails' `def self.name; "Post"` override on the anonymous
@@ -182,7 +195,30 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
 
   it("primary key method with ansi quotes", async () => {
     const a = ansi!;
-    await defineSchema(a, { topics: canonicalSchema.topics });
+    // Mirror schema.rb's canonical `topics` create_table.
+    await a.createTable("topics", { force: true }, (t: any) => {
+      t.string("title", { limit: 250 });
+      t.string("author_name");
+      t.string("author_email_address");
+      // MySQL upgrades bare DATETIME to DATETIME(6) (Rails datetime-with-precision),
+      // matching the boot-laid canonical `topics` — pass precision explicitly.
+      t.datetime("written_on", { precision: 6 });
+      t.time("bonus_time");
+      t.date("last_read");
+      t.text("content");
+      t.text("important");
+      t.binary("binary_content");
+      t.boolean("approved", { default: true });
+      t.integer("replies_count", { default: 0 });
+      t.integer("unique_replies_count", { default: 0 });
+      t.integer("parent_id");
+      t.string("parent_title");
+      t.string("type");
+      t.string("group");
+      t.datetime("created_at", { null: true, precision: 6 });
+      t.datetime("updated_at", { null: true, precision: 6 });
+      t.index(["author_name", "title"]);
+    });
     try {
       expect(await a.primaryKey("topics")).toBe("id");
     } finally {
@@ -194,9 +230,14 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     const a = ansi!;
     // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
     // student_id referencing students(id) — both from the canonical schema.
-    await defineSchema(a, {
-      students: canonicalSchema.students,
-      lessons_students: canonicalSchema.lessons_students,
+    await a.createTable("students", { force: true }, (t: any) => {
+      t.string("name");
+      t.boolean("active");
+      t.integer("college_id");
+    });
+    await a.createTable("lessons_students", { force: true, id: false }, (t: any) => {
+      t.bigint("lesson_id");
+      t.bigint("student_id");
     });
     try {
       await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });

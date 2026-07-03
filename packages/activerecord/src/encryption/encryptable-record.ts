@@ -105,6 +105,11 @@ setEncryptingOnlyEncryptorFactory(() => new EncryptingOnlyEncryptor());
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
+// Sentinel distinguishing "column not reflected in the warm cache" from a
+// genuinely-cached `undefined`/`null` column default. Lets columnDefaultFor
+// fall back to the def default only when the schema cache has no answer.
+const NOT_CACHED = Symbol("encryption.columnDefault.notCached");
+
 /**
  * Provides the `encrypts` declaration for model classes, enabling
  * transparent attribute encryption/decryption. This is wired into
@@ -284,18 +289,45 @@ export class EncryptableRecord {
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
+    // Mirrors Rails' `default: columns_hash[name.to_s]&.default` — thread the
+    // TRUE DB column default into the encrypted type so a plaintext default
+    // deserializes without an attempted decrypt (see EncryptedAttributeType's
+    // `@default && @default == value` guard in decryptAsText). The default comes
+    // from a query-free peek of the warm schema cache (columnDefaultFor /
+    // cachedColumnDefaultFor), NOT the reflected def's `defaultValue` (which an
+    // `attribute(name, { default })` override would poison) and NOT `columnsHash()`
+    // (which would warm the shared schema cache and perturb sibling tests).
     if (typeof modelClass.decorateAttributes === "function") {
       const def = modelClass._attributeDefinitions?.get?.(name);
       if (!def) return;
-      if (def.type instanceof EncryptedAttributeType) return;
-      // The decorator returns null when the type is already encrypted — the
-      // PendingDecorator replays on every _defaultAttributes rebuild, so it
-      // must be idempotent to avoid double-wrapping.
-      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) =>
-        castType instanceof EncryptedAttributeType
-          ? (null as unknown as Type)
-          : new EncryptedAttributeType({ scheme, castType }),
-      );
+      // Resolve the default Rails threads: `columns_hash[name].default`. When the
+      // schema cache is warm the peek is authoritative (the TRUE column default,
+      // ignoring any `attribute()` override). Before reflection it isn't cached,
+      // so we fall back to the def default as a provisional value and correct it
+      // on the post-reflection replay.
+      const cached = this.cachedColumnDefaultFor(modelClass, name);
+      const authoritative = cached !== NOT_CACHED;
+      const columnDefault = authoritative ? (cached ?? undefined) : (def.defaultValue ?? undefined);
+      if (def.type instanceof EncryptedAttributeType) {
+        // Already wrapped. Re-wrap only to correct a provisional default once the
+        // authoritative column default is known and differs — otherwise stay put
+        // so the PendingDecorator queue doesn't grow on every replay. The
+        // immediate apply below updates def.type, so the next replay early-returns.
+        if (!authoritative || def.type._default === columnDefault) return;
+      }
+      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) => {
+        if (castType instanceof EncryptedAttributeType) {
+          if (!authoritative || (castType as any)._default === columnDefault) {
+            return null as unknown as Type;
+          }
+          return new EncryptedAttributeType({
+            scheme,
+            castType: castType.castType,
+            default: columnDefault,
+          });
+        }
+        return new EncryptedAttributeType({ scheme, castType, default: columnDefault });
+      });
       return;
     }
 
@@ -307,7 +339,11 @@ export class EncryptableRecord {
       castType = castType.castType;
     }
 
-    const encryptedType = new EncryptedAttributeType({ scheme, castType });
+    const encryptedType = new EncryptedAttributeType({
+      scheme,
+      castType,
+      default: this.columnDefaultFor(modelClass, name, existingDef),
+    });
 
     // Register directly into _attributeDefinitions (not via attribute()
     // which expects a string type name).
@@ -324,6 +360,60 @@ export class EncryptableRecord {
   }
 
   /**
+   * Resolve the column's schema default, mirroring Rails'
+   * `default: columns_hash[name.to_s]&.default` (encryptable_record.rb:91).
+   *
+   * Rails threads the TRUE DB column default — not the possibly-overridden
+   * `attribute(name, { default: X })` value. When a model declares an
+   * `attribute()` default that differs from the column default, the reflected
+   * def's `defaultValue` holds the override, so reading it would thread the
+   * wrong value into `EncryptedAttributeType`.
+   *
+   * So we first peek the already-warm schema cache (query-free, no
+   * `loadSchema`/`columnsHash` — those warm the shared cache and perturb
+   * sibling encryption tests). If the column is reflected there, its `.default`
+   * is the authoritative DB default. Otherwise (plain mock models, or a def
+   * seen before reflection) we fall back to the def's `defaultValue` — which,
+   * absent an `attribute()` override, already carries the column default.
+   * Returns undefined (Rails' nil default) when neither yields a value.
+   * @internal
+   */
+  static columnDefaultFor(modelClass: any, name: string, def: any): unknown {
+    const cached = this.cachedColumnDefaultFor(modelClass, name);
+    if (cached !== NOT_CACHED) return cached ?? undefined;
+    return def?.defaultValue ?? undefined;
+  }
+
+  /**
+   * Query-free peek of a reflected column's DB default from the raw schema
+   * cache, WITHOUT leasing a connection or calling `loadSchema` (either would
+   * warm the shared cache — see the story's sibling-perturbation note). Resolves
+   * the raw sync `SchemaCache` the same connection-less way
+   * `reset_column_information` does: a directly-assigned `_adapter`, else the
+   * pool config's cache slot. Returns `NOT_CACHED` when the table isn't warm
+   * yet or the column isn't present, so callers fall back to the def default.
+   * @internal
+   */
+  static cachedColumnDefaultFor(modelClass: any, name: string): unknown {
+    try {
+      const table: string | undefined = modelClass?.tableName;
+      if (!table) return NOT_CACHED;
+      const direct = modelClass._adapter as
+        | { schemaCache?: { getCachedColumnsHash?: (t: string) => any } }
+        | undefined;
+      const cache =
+        direct?.schemaCache ?? modelClass.connectionPool?.()?.poolConfig?.schemaCache ?? undefined;
+      if (typeof cache?.getCachedColumnsHash !== "function") return NOT_CACHED;
+      const columns = cache.getCachedColumnsHash(table);
+      const column = columns?.[name];
+      if (!column) return NOT_CACHED;
+      return column.default ?? undefined;
+    } catch {
+      return NOT_CACHED;
+    }
+  }
+
+  /**
    * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
    * Declares the case-preserving `original_<name>` encrypted column and
    * overrides the accessors so reads return the original-cased value.
@@ -331,10 +421,24 @@ export class EncryptableRecord {
    */
   static preserveOriginalEncrypted(modelClass: any, name: string): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+    // Record the source attribute so the post-reflection hook
+    // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
+    // can re-run the missing-column check against the authoritative DB column
+    // set — closing the fail-open gap when the adapter isn't connected at
+    // declaration time. Own-property guarded like `_encryptedAttributes` so a
+    // subclass declaring ignoreCase doesn't mutate the parent's Set.
+    if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
+      modelClass._ignoreCasePreservedAttributes = new Set<string>(
+        modelClass._ignoreCasePreservedAttributes ?? [],
+      );
+    }
+    modelClass._ignoreCasePreservedAttributes.add(name);
+
     // Enforce the missing-column requirement against the columns known now.
     // `columnNames()` forces a schema load when an adapter is connected, so the
     // check fires for real models; at Base.encrypts static-init with no adapter
-    // it returns [] and requireOriginalColumnPresent defers (see its doc).
+    // it returns [] and requireOriginalColumnPresent defers (see its doc) — the
+    // post-reflection hook above then catches a genuinely absent column.
     this.requireOriginalColumnPresent(modelClass, name, modelClass.columnNames?.() ?? []);
 
     // Declare original_<name> with a default scheme, mirroring Rails' bare
@@ -370,6 +474,34 @@ export class EncryptableRecord {
     throw new ConfigurationError(
       `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
     );
+  }
+
+  /**
+   * Re-run the `original_<name>` missing-column requirement for every
+   * ignoreCase-preserved attribute against the authoritative column set
+   * reflected from the real adapter schema. Driven from schema reflection
+   * (`applyColumnsHash`), which runs only once the DB columns are known — so
+   * unlike the eager `columnNames()` partial-load path, `reflectedColumnNames`
+   * distinguishes "schema reflected, column absent" (fail-closed, raise) from
+   * "declaration in progress" (never reaches here). Mirrors Rails' fail-closed
+   * `preserve_original_encrypted`, whose `column_names` is always complete.
+   * @internal
+   */
+  static requireOriginalColumnsAfterReflection(
+    modelClass: any,
+    reflectedColumnNames: string[],
+  ): void {
+    // Read is intentionally NOT own-property-guarded (unlike the write in
+    // preserveOriginalEncrypted): an STI subclass with no ignoreCase
+    // declarations of its own should still enforce the base's preserved
+    // attributes, so we deliberately resolve the inherited Set via the
+    // prototype chain. Re-running it for both host and originatingHost is
+    // idempotent — requireOriginalColumnPresent yields the same result each pass.
+    const preserved: Set<string> | undefined = modelClass._ignoreCasePreservedAttributes;
+    if (!preserved || preserved.size === 0) return;
+    for (const name of preserved) {
+      this.requireOriginalColumnPresent(modelClass, name, reflectedColumnNames);
+    }
   }
 
   /** @internal */

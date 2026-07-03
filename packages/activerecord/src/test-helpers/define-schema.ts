@@ -193,7 +193,7 @@ function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
  *
  * @internal
  */
-function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string {
+export function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
   if (adapterName === "postgres") return isBig ? "bigserial" : "serial";
@@ -225,7 +225,7 @@ function indexesOf(table: TableSchema): IndexSpec[] {
  *
  * @internal
  */
-async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
+export async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
   const a = adapter as {
     supportsExpressionIndex?: () => boolean;
     getDatabaseVersion?: () => Promise<unknown>;
@@ -279,7 +279,7 @@ function resolveReferences(schema: Schema): string[] {
 }
 
 /** @internal */
-const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
+export const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
   string: "string",
   text: "text",
   integer: "integer",
@@ -319,7 +319,7 @@ const PG_ONLY_TYPES = new Set<string>(["citext", "hstore", "uuid", "interval", "
 // types are deliberately absent: defineSchema throws when one is used against
 // MySQL or SQLite.
 /** @internal */
-const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
+export const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   string: "string",
   text: "text",
   integer: "integer",
@@ -341,7 +341,7 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
 // json all now inherit the native names from COLUMN_TYPE_MAP_MYSQL; `binary`
 // inherits the BLOB mapping likewise.
 /** @internal */
-const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
+export const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_MYSQL,
 };
 

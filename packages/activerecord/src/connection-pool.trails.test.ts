@@ -23,15 +23,12 @@ import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { newRawTestAdapter, ambientPoolConfiguration } from "./test-adapter.js";
+import { newRawTestAdapter, ambientPoolConfiguration, adapterType } from "./test-adapter.js";
+import type { SidecarAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
-import type {
-  AdapterName,
-  AbstractAdapter as DatabaseAdapter,
-} from "./connection-adapters/abstract-adapter.js";
-import { Result } from "./result.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 /**
  * Build a HashConfig for a pool-under-test cloned from the ambient lane
@@ -91,85 +88,6 @@ async function closePoolConnections(pool: ConnectionPool): Promise<void> {
 
 function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
-}
-
-class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName(): AdapterName {
-    return "sqlite";
-  }
-  isNoDatabaseError(_error: unknown): boolean {
-    return false;
-  }
-  // This double has no real raw connection; report active so checkout's
-  // verify! is a no-op (mirroring Rails, where the pinned connection is
-  // active and verify! returns without reconnecting).
-  override get active(): boolean {
-    return true;
-  }
-  readonly inTransaction = false;
-
-  async execute(
-    _sql: string,
-    _binds?: unknown[],
-    _name?: string,
-  ): Promise<Record<string, unknown>[]> {
-    return [];
-  }
-  async executeMutation(_sql: string, _binds?: unknown[], _name?: string): Promise<number> {
-    return 0;
-  }
-  async beginTransaction(): Promise<void> {}
-  async commit(): Promise<void> {}
-  async rollback(): Promise<void> {}
-  async createSavepoint(_name: string): Promise<void> {}
-  async releaseSavepoint(_name: string): Promise<void> {}
-  async rollbackToSavepoint(_name: string): Promise<void> {}
-  async selectAll(sql: string, _n?: string | null, b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql, b));
-  }
-  async selectOne(sql: string, _n?: string | null, b?: unknown[]) {
-    return (await this.execute(sql, b))[0];
-  }
-  async selectValue(_s: string) {
-    return undefined;
-  }
-  async selectValues(_s: string) {
-    return [];
-  }
-  async selectRows(_s: string) {
-    return [];
-  }
-  async execQuery(sql: string, _n?: string | null, b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql, b));
-  }
-  async execInsert(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
-  }
-  async execDelete(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
-  }
-  async execUpdate(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.executeMutation(sql, b);
-  }
-  isWriteQuery(_sql: string) {
-    return false;
-  }
-  emptyInsertStatementValue() {
-    return "DEFAULT VALUES";
-  }
-}
-
-// The transaction-pin / callback tests below drive a hand-written
-// transaction-manager double (no real backend), so the pool config's adapter
-// label is cosmetic — but it is still cloned from the ambient lane config
-// rather than hardcoding SQLite. The double itself reports `adapterName` as
-// "sqlite" because it is a pure in-memory fake, not a lane-native connection.
-function makeTransactionAwarePool(size: number = 5): ConnectionPool {
-  const dbConfig = makeAmbientDbConfig({ pool: size });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: () => new TransactionAwareTestAdapter(),
-  });
-  return new ConnectionPool(pc);
 }
 
 it("with connection prevent permanent checkout releases connection", async () => {
@@ -343,76 +261,88 @@ it("clearReloadableConnections only disconnects reloadable adapters", () => {
 });
 
 it("pin connection reuses leased connection and checks in on unpin", async () => {
-  const pool = makeTransactionAwarePool(5);
-  const leased = pool.leaseConnection() as TransactionAwareTestAdapter;
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    const leased = pool.leaseConnection() as SidecarAdapter;
 
-  await pool.pinConnectionBang();
-  const pinned = pool.checkout() as TransactionAwareTestAdapter;
-  expect(pinned).toBe(leased);
-  expect(leased.transactionManager.openTransactions).toBe(1);
-  expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
+    await pool.pinConnectionBang();
+    const pinned = pool.checkout() as SidecarAdapter;
+    expect(pinned).toBe(leased);
+    expect(leased.transactionManager.openTransactions).toBe(1);
+    expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
 
-  const clean = await pool.unpinConnectionBang();
-  expect(clean).toBe(true);
-  expect(leased.transactionManager.openTransactions).toBe(0);
+    const clean = await pool.unpinConnectionBang();
+    expect(clean).toBe(true);
+    expect(leased.transactionManager.openTransactions).toBe(0);
 
-  // Pinning takes ownership — connection is checked in on final unpin (matches Rails)
-  expect(pool.stat().idle).toBe(1);
+    // Pinning takes ownership — connection is checked in on final unpin (matches Rails)
+    expect(pool.stat().idle).toBe(1);
+  } finally {
+    await closePoolConnections(pool);
+  }
 });
 
 it("pin connection isolation across execution contexts", async () => {
-  const pool = makeTransactionAwarePool(5);
+  const pool = makeAmbientPool({ pool: 5 });
   let ctx1Conn: DatabaseAdapter | null = null;
   let ctx2Conn: DatabaseAdapter | null = null;
 
-  await withExecutionContext(async () => {
-    await pool.pinConnectionBang();
-    ctx1Conn = pool.checkout();
-
-    // Nested context gets a different pin
+  try {
     await withExecutionContext(async () => {
       await pool.pinConnectionBang();
-      ctx2Conn = pool.checkout();
-      expect(ctx2Conn).not.toBe(ctx1Conn);
+      ctx1Conn = pool.checkout();
 
-      // Checkin of ctx2's pinned connection is a no-op (still pinned)
-      pool.checkin(ctx2Conn);
-      expect(pool.checkout()).toBe(ctx2Conn);
+      // Nested context gets a different pin
+      await withExecutionContext(async () => {
+        await pool.pinConnectionBang();
+        ctx2Conn = pool.checkout();
+        expect(ctx2Conn).not.toBe(ctx1Conn);
 
+        // Checkin of ctx2's pinned connection is a no-op (still pinned)
+        pool.checkin(ctx2Conn);
+        expect(pool.checkout()).toBe(ctx2Conn);
+
+        await pool.unpinConnectionBang();
+      });
+
+      // Back in ctx1 — still pinned to ctx1Conn
+      expect(pool.checkout()).toBe(ctx1Conn);
       await pool.unpinConnectionBang();
     });
 
-    // Back in ctx1 — still pinned to ctx1Conn
-    expect(pool.checkout()).toBe(ctx1Conn);
-    await pool.unpinConnectionBang();
-  });
-
-  expect(ctx1Conn).toBeTruthy();
-  expect(ctx2Conn).toBeTruthy();
-  expect(ctx1Conn).not.toBe(ctx2Conn);
+    expect(ctx1Conn).toBeTruthy();
+    expect(ctx2Conn).toBeTruthy();
+    expect(ctx1Conn).not.toBe(ctx2Conn);
+  } finally {
+    await closePoolConnections(pool);
+  }
 });
 
 it("concurrent checkouts within a pinned context all return the pinned connection", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-  const pinned = pool.checkout();
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    const pinned = pool.checkout();
 
-  // Mirrors Promise.all sub-branches inside a `withTransactionalFixtures`
-  // test body: AsyncContext propagates the pin's ctx id to every branch,
-  // so every concurrent lease must resolve to the pinned connection rather
-  // than pulling a free-list connection (which would race the pinned TX).
-  const results = await Promise.all(
-    Array.from({ length: 11 }, async () => {
-      const sync = pool.checkout();
-      const async_ = await pool.checkoutAsync();
-      return { sync, async_ };
-    }),
-  );
-  for (const { sync, async_ } of results) {
-    expect(sync).toBe(pinned);
-    expect(async_).toBe(pinned);
+    // Mirrors Promise.all sub-branches inside a `withTransactionalFixtures`
+    // test body: AsyncContext propagates the pin's ctx id to every branch,
+    // so every concurrent lease must resolve to the pinned connection rather
+    // than pulling a free-list connection (which would race the pinned TX).
+    const results = await Promise.all(
+      Array.from({ length: 11 }, async () => {
+        const sync = pool.checkout();
+        const async_ = await pool.checkoutAsync();
+        return { sync, async_ };
+      }),
+    );
+    for (const { sync, async_ } of results) {
+      expect(sync).toBe(pinned);
+      expect(async_).toBe(pinned);
+    }
+    await pool.unpinConnectionBang();
+  } finally {
+    await closePoolConnections(pool);
   }
-  await pool.unpinConnectionBang();
 });
 
 it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)", async () => {
@@ -421,36 +351,44 @@ it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)
   // executionContextId(), so a pin set in context A is invisible from context B
   // and `unpinConnectionBang` from B would throw "There isn't a pinned
   // connection". The `{ fixture: true }` slot is pool-scoped and avoids this.
-  const pool = makeTransactionAwarePool(5);
+  const pool = makeAmbientPool({ pool: 5 });
   let pinned: DatabaseAdapter | null = null;
-  await withExecutionContext(async () => {
-    await pool.pinConnectionBang({ fixture: true });
-    pinned = pool.checkout();
-  });
-  // Different context — pin must still be visible.
-  await withExecutionContext(async () => {
-    expect(pool.checkout()).toBe(pinned);
-    const clean = await pool.unpinConnectionBang();
-    expect(clean).toBe(true);
-  });
+  try {
+    await withExecutionContext(async () => {
+      await pool.pinConnectionBang({ fixture: true });
+      pinned = pool.checkout();
+    });
+    // Different context — pin must still be visible.
+    await withExecutionContext(async () => {
+      expect(pool.checkout()).toBe(pinned);
+      const clean = await pool.unpinConnectionBang();
+      expect(clean).toBe(true);
+    });
+  } finally {
+    await closePoolConnections(pool);
+  }
 });
 
 it("context pin takes priority over fixture pin in unpin", async () => {
   // If both pins are active, an unpinConnectionBang call from a context that
   // owns the per-context pin must unpin *its* pin, not the fixture-wide one.
   // Otherwise the context pin lingers and the next unpin double-rollbacks.
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang({ fixture: true });
-  await withExecutionContext(async () => {
-    await pool.pinConnectionBang(); // per-context pin in this scope
-    const before = pool.checkout();
-    await pool.unpinConnectionBang(); // should clear the context pin
-    // Fixture pin still alive — checkout in this nested context now sees
-    // the fixture pin's connection.
-    expect(pool.checkout()).toBe(before);
-  });
-  await pool.unpinConnectionBang(); // clears the fixture pin
-  await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang({ fixture: true });
+    await withExecutionContext(async () => {
+      await pool.pinConnectionBang(); // per-context pin in this scope
+      const before = pool.checkout();
+      await pool.unpinConnectionBang(); // should clear the context pin
+      // Fixture pin still alive — checkout in this nested context now sees
+      // the fixture pin's connection.
+      expect(pool.checkout()).toBe(before);
+    });
+    await pool.unpinConnectionBang(); // clears the fixture pin
+    await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+  } finally {
+    await closePoolConnections(pool);
+  }
 });
 
 describe("ConnectionPool schema cache", () => {
@@ -879,67 +817,108 @@ describe("ConnectionPoolConfiguration query cache", () => {
 
   describe("pin wiring", () => {
     it("pinConnectionBang increments _pinnedCount; unpinConnectionBang decrements it", async () => {
-      const pool = makeTransactionAwarePool(1);
+      const pool = makeAmbientPool({ pool: 1 });
 
       const pinnedCount = () =>
         (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
 
-      expect(pinnedCount()).toBe(0);
-
-      await withExecutionContext(async () => {
-        await pool.pinConnectionBang();
-        expect(pinnedCount()).toBe(1);
-        await pool.unpinConnectionBang();
+      try {
         expect(pinnedCount()).toBe(0);
-      });
+
+        await withExecutionContext(async () => {
+          await pool.pinConnectionBang();
+          expect(pinnedCount()).toBe(1);
+          await pool.unpinConnectionBang();
+          expect(pinnedCount()).toBe(0);
+        });
+      } finally {
+        await closePoolConnections(pool);
+      }
     });
 
     it("two concurrent contexts each contribute to _pinnedCount independently", async () => {
-      const pool = makeTransactionAwarePool(2);
+      const pool = makeAmbientPool({ pool: 2 });
       const pinnedCount = () =>
         (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
 
-      await Promise.all([
-        withExecutionContext(async () => {
-          await pool.pinConnectionBang();
-          expect(pinnedCount()).toBeGreaterThanOrEqual(1);
-          await pool.unpinConnectionBang();
-        }),
-        withExecutionContext(async () => {
-          await pool.pinConnectionBang();
-          expect(pinnedCount()).toBeGreaterThanOrEqual(1);
-          await pool.unpinConnectionBang();
-        }),
-      ]);
+      try {
+        await Promise.all([
+          withExecutionContext(async () => {
+            await pool.pinConnectionBang();
+            expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            await pool.unpinConnectionBang();
+          }),
+          withExecutionContext(async () => {
+            await pool.pinConnectionBang();
+            expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            await pool.unpinConnectionBang();
+          }),
+        ]);
 
-      expect(pinnedCount()).toBe(0);
+        expect(pinnedCount()).toBe(0);
+      } finally {
+        await closePoolConnections(pool);
+      }
     });
 
     it("decrements _pinnedCount when beginTransaction throws", async () => {
-      const pool = makeTransactionAwarePool(1);
-      // Prime the pool with one idle connection so pinConnectionBang acquires it.
-      const seed = pool.checkout();
-      pool.checkin(seed);
-      // Swap its transactionManager with one that throws on beginTransaction.
-      (seed as unknown as { _transactionManager: unknown })._transactionManager = {
-        beginTransaction: async () => {
-          throw new Error("begin failed");
-        },
-        get currentTransaction() {
-          return { open: false };
-        },
-        // The error-path checkin runs Rails' `:checkin :after enable_lazy_transactions!`
-        // callback, which delegates here — a real transaction manager always has it.
-        enableLazyTransactionsBang() {},
-      };
+      const pool = makeAmbientPool({ pool: 1 });
+      try {
+        // Prime the pool with one idle connection so pinConnectionBang acquires it.
+        const seed = pool.checkout();
+        pool.checkin(seed);
+        // Stub verifyBang so pinConnectionBang's eager verify (awaited on the
+        // pin path) is a no-op: a real backend would reconnect the checked-in
+        // connection and rebuild its transactionManager, discarding the
+        // throwing double swapped in below. This isolates the beginTransaction
+        // error path under test.
+        vi.spyOn(seed, "verifyBang").mockResolvedValue(undefined);
+        // Swap its transactionManager with one that throws on beginTransaction.
+        (seed as unknown as { _transactionManager: unknown })._transactionManager = {
+          beginTransaction: async () => {
+            throw new Error("begin failed");
+          },
+          get currentTransaction() {
+            return { open: false };
+          },
+          // The error-path checkin runs Rails' `:checkin :after enable_lazy_transactions!`
+          // callback, which delegates here — a real transaction manager always has it.
+          enableLazyTransactionsBang() {},
+        };
 
-      const pinnedCount = () =>
-        (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+        const pinnedCount = () =>
+          (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
 
-      await withExecutionContext(async () => {
-        await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
-        expect(pinnedCount()).toBe(0);
-      });
+        await withExecutionContext(async () => {
+          await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
+          expect(pinnedCount()).toBe(0);
+        });
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+
+    it("propagates a verify failure from pinConnectionBang instead of pinning a dead connection", async () => {
+      // Rails eagerly runs verify! at pin_connection! (connection_pool.rb:336)
+      // and lets a failure raise. pinConnectionBang awaits verifyBang, so a dead
+      // connection aborts the pin: the error propagates, no transaction opens,
+      // and _pinnedCount is left at 0 rather than pinning an unusable connection.
+      const pool = makeAmbientPool({ pool: 1 });
+      try {
+        const seed = pool.checkout();
+        pool.checkin(seed);
+        vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
+
+        const pinnedCount = () =>
+          (pool as unknown as { _cacheConfig: { _pinnedCount: number } })._cacheConfig._pinnedCount;
+
+        await withExecutionContext(async () => {
+          await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");
+          expect(pinnedCount()).toBe(0);
+        });
+      } finally {
+        await closePoolConnections(pool);
+      }
     });
   });
 
@@ -1035,14 +1014,23 @@ describe("ConnectionPoolConfiguration query cache", () => {
 });
 
 describe("checkout/checkin callbacks", () => {
-  it("pinned checkout calls verifyBang unconditionally and skips query-cache wiring", async () => {
-    const pool = makeTransactionAwarePool(5);
+  it("pinned sync checkout defers verifyBang to the async path and skips query-cache wiring", async () => {
+    const pool = makeAmbientPool({ pool: 5 });
     await pool.pinConnectionBang();
-    const pinned = pool.checkout() as TransactionAwareTestAdapter;
+    const pinned = pool.checkout() as SidecarAdapter;
     const spy = vi.spyOn(pinned, "verifyBang");
     try {
+      // Rails re-runs `verify!` on every pinned checkout (connection_pool.rb:554)
+      // because its `verify!` is synchronous. trails' `verifyBang` is async, so the
+      // sync `checkout()` cannot await it — rather than fire-and-forget (which risked
+      // an unhandled rejection on teardown), the sync path hands back the connection
+      // the pin already verified and lets awaitable paths re-verify.
       const again = pool.checkout();
       expect(again).toBe(pinned);
+      expect(spy).not.toHaveBeenCalled();
+      // The async handout still awaits verifyBang, so a verify failure propagates.
+      const asyncAgain = await pool.checkoutAsync();
+      expect(asyncAgain).toBe(pinned);
       expect(spy).toHaveBeenCalledTimes(1);
       // Rails' pinned branch (connection_pool.rb:553-559) does not run
       // checkout_and_verify, so no Store is attached on the pinned path.
@@ -1051,31 +1039,37 @@ describe("checkout/checkin callbacks", () => {
       // Always unpin so an early assertion failure can't leak the pinned
       // connection into the rest of this file's run.
       await pool.unpinConnectionBang();
+      await closePoolConnections(pool);
     }
   });
 
-  it("checkin runs the registered :checkin :after callbacks (unset_query_cache!, enable_lazy_transactions!)", () => {
-    const pool = makeTransactionAwarePool(1);
-    const conn = pool.checkout() as TransactionAwareTestAdapter;
-    expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
+  it("checkin runs the registered :checkin :after callbacks (unset_query_cache!, enable_lazy_transactions!)", async () => {
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      const conn = pool.checkout();
+      expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
 
-    const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
-    pool.checkin(conn);
+      const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
+      pool.checkin(conn);
 
-    expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
-    expect(lazySpy).toHaveBeenCalledTimes(1);
+      expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+      expect(lazySpy).toHaveBeenCalledTimes(1);
+    } finally {
+      await closePoolConnections(pool);
+    }
   });
 
-  it("setCallback registers a custom :checkout callback that runs on checkout", () => {
+  it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
     const calls: string[] = [];
     AbstractAdapter.setCallback("checkout", "after", function () {
       calls.push(this.adapterName);
     });
+    const pool = makeAmbientPool({ pool: 1 });
     try {
-      const pool = makeTransactionAwarePool(1);
       pool.checkout();
-      expect(calls).toEqual(["sqlite"]);
+      expect(calls).toEqual([adapterType]);
     } finally {
+      await closePoolConnections(pool);
       // Drop the test-registered callback so it can't leak into sibling tests.
       (
         AbstractAdapter as unknown as {

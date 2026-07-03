@@ -474,6 +474,8 @@ export function resetDefaultContext(): void {
 registerEncryptionHooks({
   encrypts,
   applyPendingEncryptions,
+  requireOriginalColumnsAfterReflection: (klass: any, columnNames: string[]) =>
+    EncryptableRecord.requireOriginalColumnsAfterReflection(klass, columnNames),
   buildScheme,
   encryptedAttributeQ,
   ciphertextFor,

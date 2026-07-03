@@ -6,7 +6,6 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { dumpAllTableSchema } from "../../test-helpers/schema-dumping-helper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
@@ -21,9 +20,8 @@ afterAll(() => {
 });
 
 // Tables here are PG-schema-qualified (test_schema.things, music.songs, …),
-// which defineSchema can't express — they're provisioned via raw DDL in
-// setupSchemas. The empty defineSchema({}) call only flips the
-// Phase-5 marker so the file satisfies the AR_NO_AUTO_SCHEMA=1 audit.
+// which createTable's typed builder can't express — they're provisioned via
+// raw DDL in setupSchemas (mirroring Rails' `@connection.create_table`).
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -122,10 +120,6 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
 }
 
 setupFixtures();
-
-beforeAll(async () => {
-  await defineSchema({});
-});
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

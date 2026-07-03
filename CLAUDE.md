@@ -10,6 +10,21 @@ package list, and the `declare` / associations / enums / schema reference, see
 
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always use `scripts/start-worktree.sh` to start a worktree.
+- **The Rails source of truth is vendored at `vendor/rails/`** (populated in
+  every worktree by `start-worktree.sh`; refresh with `pnpm vendor:fetch` from
+  the main worktree). Before porting or fixing anything, read the
+  corresponding Rails code and test there — e.g.
+  `vendor/rails/activerecord/lib/active_record/...` and
+  `vendor/rails/activerecord/test/cases/...`. The canonical test schema is
+  `vendor/rails/activerecord/test/schema/schema.rb`, which
+  `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
+  test needs a table or column, check schema.rb first; if it's not there,
+  don't invent it. Likewise, Rails' test models live in
+  `vendor/rails/activerecord/test/models/` (ours:
+  `packages/activerecord/src/test-helpers/models/`) and its fixture data in
+  `vendor/rails/activerecord/test/fixtures/` (ours:
+  `packages/activerecord/src/test-helpers/fixtures/`) — mirror those too
+  rather than making up models or fixture rows.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
@@ -88,7 +103,7 @@ package list, and the `declare` / associations / enums / schema reference, see
   corresponding Rails test first.
 - **`defineSchema` is canonical-only — no bespoke tables.** In AR tests,
   `defineSchema()` may pass **only** the canonical `TEST_SCHEMA`
-  (`test-helpers/test-schema.js`); never re-declare a table inline or invent a
+  (`test-helpers/test-schema.ts`); never re-declare a table inline or invent a
   free table name. Prefer `useHandlerFixtures` / `setupHandlerSuite` on the
   default canonical tables (and the official models in
   `packages/activerecord/src/test-helpers/models/`) over `defineSchema`. Table,

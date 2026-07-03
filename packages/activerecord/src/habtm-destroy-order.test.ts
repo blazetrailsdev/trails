@@ -1,24 +1,14 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, association, registerModel, Rollback } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 // Mirrors vendor/rails/activerecord/test/models/lesson.rb — `class LessonError`.
 class LessonError extends Error {}
 
 setupFixtures();
 useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    students: TEST_SCHEMA.students,
-    lessons: TEST_SCHEMA.lessons,
-    lessons_students: TEST_SCHEMA.lessons_students,
-  });
-});
 
 describe("HabtmDestroyOrderTest", () => {
   function makeModels() {

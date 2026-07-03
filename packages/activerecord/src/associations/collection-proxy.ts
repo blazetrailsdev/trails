@@ -656,6 +656,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * The relation that bounded finder requeries (`first`/`last`/`take`/
+   * `find_nth`) run against when the target is not loaded. An unmutated
+   * proxy's own copied relation clauses are seeded ONCE at construction, so
+   * when the owner was a new record then — its FK is unresolvable and the
+   * seed collapses to the `1=0` NullRelation — those clauses never pick up
+   * the primary key assigned on `save`, and the requery keeps returning
+   * nothing even though the collection is non-empty. `scope()` rebuilds the
+   * association scope fresh each call (picking up the now-persisted FK),
+   * mirroring Rails' CollectionProxy whose queries delegate to
+   * `association.scope`. Once a scope-mutator bang has run (`_cpMutated`) the
+   * proxy's own diverged state is the intended target, so we keep it.
+   */
+  private _finderScope(): this {
+    return this._cpMutated ? this : (this.scope() as unknown as this);
+  }
+
+  /**
    * Shared execution core for `toArray()` and `load()`. Routes both the
    * unmutated and mutated (whereBang / orderBang / ...) proxy through a
    * single `loadHasMany` call. When the proxy state has diverged from the
@@ -2830,7 +2847,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (n === undefined) return records[records.length - 1] ?? null;
       return n === 0 ? [] : records.slice(-n);
     }
-    return basePerformLast.call(this as any, n);
+    return basePerformLast.call(this._finderScope() as any, n);
   }
 
   /**
@@ -2869,10 +2886,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // so the loaded branch is handled here.
     if (n !== undefined) {
       if (this._targetLoaded) return this._target.slice(0, n);
-      return baseFindTakeWithLimit(this as any, n);
+      return baseFindTakeWithLimit(this._finderScope() as any, n);
     }
     if (this._offsetMemo.has("take")) return this._offsetMemo.get("take")!;
-    const record = this._targetLoaded ? (this._target[0] ?? null) : await baseFindTake(this as any);
+    const record = this._targetLoaded
+      ? (this._target[0] ?? null)
+      : await baseFindTake(this._finderScope() as any);
     this._offsetMemo.set("take", record);
     return record;
   }
@@ -2902,7 +2921,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
     if (this._targetLoaded) return this._target.slice(index, index + limit);
-    return baseFindNthWithLimit.call(this as any, index, limit);
+    return baseFindNthWithLimit.call(this._finderScope() as any, index, limit);
   }
 
   /**
@@ -2914,7 +2933,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   protected override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
     if (this._targetLoaded) return this._target[this._target.length - 1 - index] ?? null;
-    return baseFindNthFromLast.call(this as any, index);
+    return baseFindNthFromLast.call(this._finderScope() as any, index);
   }
 
   /**

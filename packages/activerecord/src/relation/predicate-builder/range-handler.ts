@@ -2,6 +2,32 @@ import { Nodes } from "@blazetrails/arel";
 import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
 
 /**
+ * Stand-in for a range bound that is out of range for its column type.
+ *
+ * Rails' RangeHandler wraps every bound in a QueryAttribute, whose
+ * `unboundable?` reports the signed distance from zero for out-of-range values
+ * (`+1` past the max, `-1` past the min) so Arel's `Predications#between` can
+ * collapse the comparison (`in([])` / `not_in([])` / a single-sided bound)
+ * instead of emitting a bind that would raise ActiveModelRangeError.
+ *
+ * Trails threads only the out-of-range bounds through this sentinel — in-range
+ * bounds stay as their plain cast values so ordinary ranges emit unchanged
+ * SQL. `arel`'s `unboundableSign` / `isOpenEnded` recognise it via
+ * `isUnboundable()`; it never reaches the visitor as a bind.
+ */
+export class UnboundableBound {
+  constructor(readonly sign: 1 | -1) {}
+
+  isUnboundable(): 1 | -1 {
+    return this.sign;
+  }
+
+  isInfinite(): null {
+    return null;
+  }
+}
+
+/**
  * Handles Range values in where conditions by delegating to
  * `attribute.between`, which encodes Rails' Arel `Predications#between`
  * decision tree (open-ended, ±Infinity, exclude-end).

@@ -199,6 +199,11 @@ export function dangerousAttributeMethods(): Set<string> {
     "decrypt",
     "encryptedAttribute",
     "ciphertextFor",
+    // Framework readers hosted off the curated list above but still part of
+    // Rails' `Base.instance_methods` — an attribute (or enum) named after one of
+    // these must be treated as dangerous, mirroring `dangerous_attribute_method?`.
+    "attributes",
+    "logger",
   ]);
   return _dangerousMethodsCache;
 }

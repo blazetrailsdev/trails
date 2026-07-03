@@ -26,11 +26,10 @@
  * Not Rails-mirrored test names — RFC 0022 is a TS-internal refactor with no
  * new Ruby counterpart, so the names describe the invariant.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { createSidecarTestAdapter, adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
 
@@ -124,10 +123,9 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     // the derived-table subquery actually scopes the rows. Executes against
     // the active adapter (each CI lane runs its own backend).
     describe("executing through Relation#pluck", () => {
+      // `posts` rides the boot-laid canonical schema (RFC 0059 Phase 1);
+      // per-file `repairWorkerSchema` restores any sibling drift beforehand.
       fixtures(["posts"], { schema: canonicalSchema });
-      beforeAll(async () => {
-        await defineSchema({ posts: canonicalSchema.posts }, { dropExisting: true });
-      });
 
       it("scopes plucked rows to the from(subquery)", async () => {
         const sub = CanonicalPost.where("id <= 2");

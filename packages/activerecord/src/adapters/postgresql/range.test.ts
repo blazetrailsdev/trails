@@ -9,7 +9,6 @@ import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 
 beforeAll(() => {
@@ -23,18 +22,14 @@ afterAll(() => {
 // The `postgresql_ranges` table uses the PG-specific range
 // types (int4range, int8range, numrange, tsrange, tstzrange, daterange,
 // plus user-defined floatrange/stringrange), which aren't expressible via
-// defineSchema. The table is created via raw DDL below; defineSchema(
-// adapter, {}) marks the file as TM-Phase-5 compliant.
+// createTable's typed builder; the table is created via raw DDL below
+// (mirroring Rails' `@connection.create_table "postgresql_ranges"`).
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
 const toBigInt = (s: string) => BigInt(s);
 
 setupFixtures();
-
-beforeAll(async () => {
-  await defineSchema({});
-});
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

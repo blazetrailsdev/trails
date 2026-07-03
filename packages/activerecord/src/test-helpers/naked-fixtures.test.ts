@@ -1,11 +1,9 @@
 // Tests for the tableless fixture loader — mirrors Rails' naked/yml fixture test cases.
 // vendor/rails/activerecord/test/cases/fixtures_test.rb (FixturesTest)
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { useFixtures } from "./use-fixtures.js";
 import { defineJoinTableFixtures } from "./define-fixtures.js";
-import { defineSchema } from "./define-schema.js";
 import { setupFixtures } from "./fixtures.js";
-import { TEST_SCHEMA } from "./test-schema.js";
 import { Tree } from "./models/tree.js";
 import { Base } from "../base.js";
 import "../relation.js";
@@ -14,20 +12,10 @@ import { nakedYmlCompaniesFixtureData } from "./fixtures/naked/yml/companies.js"
 import { nakedYmlParrotsFixtureData } from "./fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./fixtures/naked/yml/trees.js";
 
-// Subset of TEST_SCHEMA for tables touched by tableless tests.
-const NAKED_SCHEMA = {
-  accounts: TEST_SCHEMA.accounts,
-  companies: TEST_SCHEMA.companies,
-  parrots: TEST_SCHEMA.parrots,
-  trees: TEST_SCHEMA.trees,
-} as const;
-
+// accounts, companies, parrots, and trees are canonical schema.rb tables laid
+// by the boot schema — the tableless tests ride them rather than recreating.
 describe("tableless useFixtures (naked/yml)", () => {
   setupFixtures();
-
-  beforeAll(async () => {
-    await defineSchema(Base.connection, NAKED_SCHEMA);
-  });
 
   // test_empty_yaml_fixture — accounts.yml is an empty file; seeding 0 rows succeeds.
   describe("test_empty_yaml_fixture", () => {

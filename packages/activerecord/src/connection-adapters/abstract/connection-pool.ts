@@ -568,7 +568,13 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (isTransactionAware(connection)) {
-        connection.verifyBang();
+        // Rails eagerly validates here (connection_pool.rb:336,
+        // `@pinned_connection.verify!`) *before* opening the transaction and
+        // lets a failure raise out of pin_connection!. This method is async, so
+        // unlike the sync checkout() path we can await and propagate that
+        // failure faithfully — a dead connection aborts the pin (the catch
+        // below decrements _pinnedCount and rethrows) rather than being pinned.
+        await connection.verifyBang();
         await connection.transactionManager.beginTransaction({
           joinable: false,
           _lazy: false,
@@ -643,10 +649,34 @@ export class ConnectionPool implements ReapablePool {
       // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
       // unconditionally, ensure membership in @connections, and return — no
       // checkout_and_verify / QueryCache wiring on the pinned connection.
-      (pinned as unknown as { verifyBang(): void }).verifyBang();
       if (this._connections && !this._connections.includes(pinned)) {
         this._connections.push(pinned);
       }
+      // Rails re-runs `verify!` on *every* pinned checkout (connection_pool.rb:554),
+      // and `verify!` self-heals: `abstract_adapter.rb:759` reconnects
+      // (`restore_transactions: true`) when the connection is no longer `active?`.
+      // But Rails' `verify!` is synchronous, whereas trails' `verifyBang` is async
+      // (a real backend issues a liveness round-trip), so the sync `checkout()` API
+      // cannot await it. The previous `fireAndForgetVerify` fired the promise and
+      // swallowed a teardown-race rejection to avoid an unhandled rejection — but
+      // even it did not heal *this* checkout: it returned `pinned` before the async
+      // verify resolved, so the caller received the same (possibly stale)
+      // connection object either way. It only reconnected the socket in the
+      // background for some *later* use.
+      //
+      // We drop the sync verify. Every path that CAN await already verifies (and
+      // thus self-heals) the pinned connection: `pinConnectionBang` awaits
+      // `verifyBang` at establishment, and `checkoutAsync` awaits it on every
+      // awaitable handout below — that is the path trails' modern query execution
+      // (`withConnection` → `checkoutAsync`) actually takes, so per-checkout
+      // reconnect-on-drop parity with Rails is preserved there. The only handout
+      // that loses per-checkout self-heal is the *deprecated* sync `.connection` /
+      // `leaseConnection` path making repeated sync `checkout()` calls within one
+      // pinned session; a connection that dies mid-session is then recovered at
+      // query time (withRawConnection retry) rather than pre-emptively at checkout.
+      // Full sync-path parity is impossible without awaiting (the impedance
+      // mismatch this whole story is about) and is tracked for convergence in
+      // story `connection-pool-pinned-sync-checkout-per-checkout-verify`.
       return pinned;
     }
     const conn = this._acquireConnection();

@@ -33,16 +33,31 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       expect(sql).toBe('"users"."id" NOT IN (?, ?)');
     });
 
-    it("compiles empty IN as 1=0", () => {
+    it("compiles empty IN as IN (NULL)", () => {
+      // Mirrors Rails to_sql.rb:347-349 — empty casted_values emits
+      // `quote(nil)` inside the parens, not a `1=0` short-circuit.
       const node = new Nodes.HomogeneousIn([], users.get("id"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("1=0");
+      expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
-    it("compiles empty NOT IN as 1=1", () => {
+    it("compiles empty NOT IN as NOT IN (NULL)", () => {
       const node = new Nodes.HomogeneousIn([], users.get("id"), "notin");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("1=1");
+      expect(sql).toBe('"users"."id" NOT IN (NULL)');
+    });
+
+    it("compiles an all-non-serializable IN as IN (NULL)", () => {
+      // A multi-value array whose values all filter out of castedValues (e.g.
+      // all out-of-range ids) must render `IN (NULL)`, never the invalid `IN ()`.
+      const filteringRelation = {
+        name: "users",
+        typeForAttribute: () => ({ isSerializable: () => false, serialize: (v: unknown) => v }),
+      };
+      const attr = new Nodes.Attribute(filteringRelation as never, "id");
+      const node = new Nodes.HomogeneousIn([1, 2], attr, "in");
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
     it("compiles string values", () => {
@@ -81,6 +96,38 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       const node = new Nodes.HomogeneousIn([1, 2], fakeAttr, "in");
       expect(node.right.every((r) => r instanceof Nodes.SqlLiteral)).toBe(true);
       expect(calls).toEqual([[1, 2]]);
+    });
+  });
+
+  describe("castedValues", () => {
+    // A fake attribute exposing a type_caster with isSerializable + serialize,
+    // mirroring Arel::Attribute#type_caster (an ActiveModel type). castedValues
+    // must consult isSerializable (Rails' `type.serializable?`), NOT a
+    // non-existent `serializable`.
+    const fakeAttr = (typeCaster: unknown): Nodes.Node =>
+      ({ name: "id", typeCaster }) as unknown as Nodes.Node;
+
+    it("drops non-serializable values and serializes the rest", () => {
+      const attr = fakeAttr({
+        isSerializable: (v: unknown) => (v as number) < 100,
+        serialize: (v: unknown) => (v as number) * 10,
+      });
+      const node = new Nodes.HomogeneousIn([1, 250, 3], attr, "in");
+      expect(node.castedValues).toEqual([10, 30]);
+    });
+
+    it("drops values that serialize to null", () => {
+      const attr = fakeAttr({
+        isSerializable: () => true,
+        serialize: (v: unknown) => (v === 2 ? null : v),
+      });
+      const node = new Nodes.HomogeneousIn([1, 2, 3], attr, "in");
+      expect(node.castedValues).toEqual([1, 3]);
+    });
+
+    it("returns raw values when the attribute has no type_caster", () => {
+      const node = new Nodes.HomogeneousIn([1, 2, 3], fakeAttr(undefined), "in");
+      expect(node.castedValues).toEqual([1, 2, 3]);
     });
   });
 

@@ -1115,6 +1115,9 @@ export class Base extends Model {
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
     const resolved = (this as any)._attributeAliases?.[name] ?? name;
+    // Rails raises inside enum's `decorate_attributes` block for an enum backed
+    // by neither a DB column nor an explicit `attribute` type.
+    _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
     return (this._attributeDefinitions as any)?.get(resolved)?.type ?? typeRegistry.lookup("value");
   }
 

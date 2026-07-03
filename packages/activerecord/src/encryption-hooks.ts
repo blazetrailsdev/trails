@@ -15,6 +15,16 @@ export interface EncryptionHooks {
   applyPendingEncryptions(klass: any): void;
 
   /**
+   * Re-check the ignoreCase `original_<name>` missing-column requirement against
+   * the authoritative column set reflected from the real adapter schema. Called
+   * from schema reflection so a genuinely absent column raises Configuration
+   * even when `encrypts(ignoreCase)` was declared before the adapter connected
+   * (fail-closed, matching Rails). Optional: only registered once the encryption
+   * namespace is loaded; base.ts callers no-op through the stub otherwise.
+   */
+  requireOriginalColumnsAfterReflection?(klass: any, columnNames: string[]): void;
+
+  /**
    * Build a Scheme from `Base.encrypts` options, adapting the legacy
    * `{ encrypt, decrypt }` shim and supplying a defaultEncryptor fallback.
    * Optional: only registered once the encryption namespace is loaded; callers

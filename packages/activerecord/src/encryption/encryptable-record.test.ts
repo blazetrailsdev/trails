@@ -30,7 +30,6 @@ import {
   Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { itIfSupports } from "../test-helpers/supports.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -369,7 +368,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // Rails' EncryptedFirstTrafficLight (`encrypts :state` declared before
     // `serialize :state, type: Array`) on the canonical `traffic_lights` table.
     const adp = await freshAdapter();
-    await defineSchema(adp, { traffic_lights: canonicalSchema.traffic_lights });
+    // `freshAdapter()` already lays the canonical `traffic_lights` table via
+    // installEncryptionSchema, so no additional schema setup is needed here.
     const EncryptedFirstTrafficLight = class extends Base {
       static {
         this._tableName = "traffic_lights";
@@ -508,6 +508,68 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       expect(book.name).toBe("<untitled>");
     },
   );
+  it("threads the reflected column default so a plaintext default deserializes without decrypting", async () => {
+    // Regression for encrypt-thread-column-default-into-encrypted-type: a
+    // reflection-only encrypted model (no explicit `attribute(..., { default })`)
+    // must pick up the column's schema default via columns_hash and thread it
+    // into the EncryptedAttributeType. With the default threaded, the plaintext
+    // default value round-trips through deserialize (via the `@default == value`
+    // guard) instead of attempting — and failing — to decrypt it when
+    // support_unencrypted_data is off.
+    const adapter = await freshAdapter();
+    const Book = class ReflectionOnlyEncryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true });
+      }
+    } as any;
+    await Book.loadSchema();
+
+    Configurable.config.supportUnencryptedData = false;
+
+    // Persist the plaintext column default (as the DB would when a row is
+    // inserted without a name), bypassing encryption.
+    const book = await withoutEncryption(() => Book.create({}));
+    expect(book.name).toBe("<untitled>");
+
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
+  it("threads the true column default, not an attribute() override, into the encrypted type", async () => {
+    // Rails threads `default: columns_hash[name.to_s]&.default` — the TRUE DB
+    // column default — not the possibly-overridden `attribute(name, { default })`
+    // value (encryptable_record.rb:91). Here the model overrides `name`'s default
+    // to "OVERRIDE" while the `encrypted_books.name` column default is
+    // "<untitled>", so the two diverge. The encrypted type must carry the COLUMN
+    // default. Observable via the `@default == value` guard: with the column
+    // default threaded, the plaintext "<untitled>" round-trips through deserialize
+    // instead of being (wrongly) treated as ciphertext and failing to decrypt.
+    const adapter = await freshAdapter();
+    const Book = class OverriddenDefaultEncryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.adapter = adapter;
+        this.attribute("name", "string", { default: "OVERRIDE" });
+        this.encrypts("name", { deterministic: true });
+      }
+    } as any;
+    await Book.loadSchema();
+
+    const type = Book._attributeDefinitions.get("name").type;
+    expect(type._default).toBe("<untitled>");
+
+    Configurable.config.supportUnencryptedData = false;
+
+    // The DB stores the column default "<untitled>" as plaintext when a row is
+    // inserted without a name; reading it back must round-trip via the threaded
+    // default rather than attempting to decrypt it.
+    const book = await withoutEncryption(() => Book.create({ name: "<untitled>" }));
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("<untitled>");
+  });
+
   it("can dump and load records that use encryption", async () => {
     // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
     // attribute state (ciphertexts) and reconstructing a new instance via the DB-load
@@ -943,6 +1005,41 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     ).not.toThrow();
   });
 
+  // Post-reflection re-check: `requireOriginalColumnsAfterReflection` iterates
+  // the recorded ignoreCase source attributes and re-runs the requirement
+  // against the authoritative reflected column set. These exercise the new
+  // static deterministically, independent of schema-cache warmth.
+  it("post-reflection re-check raises when a preserved attribute's original_<name> column is absent", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, ["id", "name"]),
+    ).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  it("post-reflection re-check does not raise when the original_<name> column is present", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, [
+        "id",
+        "name",
+        "original_name",
+      ]),
+    ).not.toThrow();
+  });
+
+  it("post-reflection re-check is a no-op when no ignoreCase attributes were preserved", () => {
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection({} as any, ["id", "name"]),
+    ).not.toThrow();
+  });
+
+  it("post-reflection re-check defers when the reflected column set is empty (schema not loaded)", () => {
+    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
+    expect(() =>
+      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, []),
+    ).not.toThrow();
+  });
+
   // End-to-end: a real Base.encrypts(ignoreCase) on the canonical `authors`
   // table (which has `name` but no `original_name`) must raise, exercising the
   // full encrypts → encryptAttribute → preserveOriginalEncrypted wiring.
@@ -960,5 +1057,82 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
       } as any;
       new Model();
     }).toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  // Fail-closed after reflection: when `encrypts(ignoreCase)` is declared at
+  // static-init BEFORE the adapter is connected, `columnNames()` returns [] so
+  // the declaration-time check defers (old fail-open behavior). Once the real
+  // adapter schema is reflected, a genuinely-absent `original_name` column on
+  // `authors` must still raise — matching Rails' fail-closed
+  // preserve_original_encrypted.
+  it("Base.encrypts ignoreCase declared before the adapter connects raises after schema reflection", async () => {
+    const adapter = await freshAdapter();
+    // Declare while supportUnencryptedData is true so the declaration-time check
+    // defers (regardless of schema-cache warmth), then flip it off and force a
+    // fresh reflection via resetColumnInformation — so ONLY the post-reflection
+    // hook can raise. This deterministically exercises the new fail-closed
+    // wiring on `authors` (which has `name` but no `original_name`).
+    Configurable.config.supportUnencryptedData = true;
+    const Model = class extends Base {
+      static _tableName = "authors";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+      }
+    } as any;
+    Configurable.config.supportUnencryptedData = false;
+    Model.resetColumnInformation();
+    await expect(async () => {
+      await Model.loadSchema();
+      new Model();
+    }).rejects.toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  // Reproduces the originally-reported fail-open scenario end-to-end: the
+  // adapter is genuinely not connected when `encrypts(ignoreCase)` runs, so
+  // `columnNames()` returns [] (not because config suppressed the check) and
+  // the declaration-time check defers. Once the adapter connects and the real
+  // `authors` schema reflects, the missing `original_name` column must raise.
+  // The raise lands at reflection when the schema cache is cold, or already at
+  // declaration when a sibling test warmed `authors` into the shared cache
+  // (columnNames() reflects immediately) — either way it is fail-closed, so the
+  // whole declaration + reflection is wrapped in the rejection assertion.
+  it("Base.encrypts ignoreCase with a genuinely-disconnected adapter is fail-closed", async () => {
+    const adapter = await freshAdapter();
+    await expect(async () => {
+      const Model = class extends Base {
+        static _tableName = "authors";
+        static {
+          // No adapter yet: columnNames() === [] here so the check defers.
+          this.encrypts("name", { deterministic: true, ignoreCase: true });
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      } as any;
+      await Model.loadSchema();
+      new Model();
+    }).rejects.toThrow(/must create an additional column named 'original_name'/);
+  });
+
+  // No false positive: `original_name` genuinely exists on `encrypted_books`,
+  // so reflecting the real schema after a before-adapter declaration must NOT
+  // raise, even though the source attribute was declared before the column.
+  it("Base.encrypts ignoreCase does not raise after reflection when original_<name> is present", async () => {
+    const adapter = await freshAdapter();
+    const Model = class extends Base {
+      static _tableName = "encrypted_books";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("original_name", "string");
+        this.encrypts("name", { deterministic: true, ignoreCase: true });
+        this.adapter = adapter;
+      }
+    } as any;
+    await Model.loadSchema();
+    expect(() => new Model()).not.toThrow();
   });
 });

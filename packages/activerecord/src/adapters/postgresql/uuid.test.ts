@@ -7,7 +7,6 @@ import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql
 import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base, registerModel } from "../../index.js";
@@ -22,9 +21,9 @@ afterAll(() => {
 
 // The `uuid_data_type` table needs raw DDL because the `guid` column's
 // DEFAULT is `gen_random_uuid()` (from the `pgcrypto` extension set up
-// in beforeAll). defineSchema can express the `uuid` column type but
-// not the function-call default; defineSchema({}) marks the
-// file as TM-Phase-5 compliant.
+// in beforeAll) — a function-call default that createTable's typed builder
+// can't express. It is created via raw DDL below (mirroring Rails'
+// `@connection.create_table "uuid_data_type"`).
 setupFixtures();
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -36,7 +35,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   beforeEach(async () => {
-    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS uuid_data_type`);
     await adapter.exec(`
       CREATE TABLE uuid_data_type (

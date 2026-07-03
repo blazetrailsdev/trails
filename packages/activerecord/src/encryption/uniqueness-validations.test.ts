@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   makeKeyProvider,
 } from "./test-helpers.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Configurable } from "./configurable.js";
@@ -16,7 +15,6 @@ import { UniquenessValidator } from "../validations.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupFixtures();
 useHandlerTransactionalFixtures();
@@ -32,12 +30,8 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     serialize?: (...args: any[]) => unknown;
   } = {};
 
-  beforeAll(async () => {
-    await defineSchema({
-      encrypted_books: TEST_SCHEMA.encrypted_books,
-    });
-  });
-
+  // EncryptedBook rides the canonical `encrypted_books` table, laid at boot by
+  // loadCanonicalSchema — no per-suite schema setup is needed.
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
     savedExtendQueries = Configurable.config.extendQueries;

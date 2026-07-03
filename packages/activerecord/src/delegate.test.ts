@@ -1,20 +1,11 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 setupFixtures();
 useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    authors: TEST_SCHEMA.authors,
-    posts: TEST_SCHEMA.posts,
-  });
-});
 
 describe("Delegate (Rails-guided)", () => {
   // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post

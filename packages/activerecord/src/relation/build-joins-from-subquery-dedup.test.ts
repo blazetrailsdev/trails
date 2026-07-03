@@ -18,8 +18,6 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 
@@ -31,7 +29,6 @@ describe("build_joins from(subquery) dedup", () => {
     // during JoinDependency construction.
     registerModel("Post", Post);
     registerModel("Author", Author);
-    await defineSchema({ posts: canonicalSchema.posts, authors: canonicalSchema.authors });
   });
 
   it("emits a single INNER JOIN (no LEFT OUTER JOIN) through the from-subquery", () => {

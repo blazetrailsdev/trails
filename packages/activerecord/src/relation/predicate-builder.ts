@@ -3,12 +3,17 @@ import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
 import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
-import { RangeHandler } from "./predicate-builder/range-handler.js";
+import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
+
+interface BoundType {
+  cast?(x: unknown): unknown;
+  serialize?(x: unknown): unknown;
+}
 
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
@@ -38,27 +43,83 @@ export class PredicateBuilder {
     this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
-      // Prefer the attribute's own relation typeCaster (covers joined/aliased tables)
-      const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
-      const attrType = (
-        attrRelation as
-          | { typeForAttribute?(n: string): { cast?(x: unknown): unknown } | null }
-          | undefined
-      )?.typeForAttribute?.(attribute.name);
-      if (attrType?.cast) return attrType.cast(v);
-      // Fall back to the predicate builder's table/model context
-      const ctx = this._tableContext as {
-        typeForAttribute?(n: string): { cast?(x: unknown): unknown } | null;
-      } | null;
-      const ctxType = ctx?.typeForAttribute?.(attribute.name);
-      if (ctxType?.cast) return ctxType.cast(v);
-      const arelType = this.table.typeForAttribute(attribute.name) as
-        | { cast?(x: unknown): unknown }
-        | undefined;
-      return arelType?.cast ? arelType.cast(v) : v;
+      // Resolve the type once so sign detection and the cast below agree for
+      // joined/aliased attributes (see resolveBoundType).
+      const type = this.resolveBoundType(attribute);
+      const sentinel = this.unboundableSentinel(attribute.name, v, type);
+      if (sentinel) return sentinel;
+      return type?.cast ? type.cast(v) : v;
     });
     this.basicObjectHandler = new BasicObjectHandler(this);
     this.relationHandler = new RelationHandler();
+  }
+
+  /**
+   * Returns an {@link UnboundableBound} sentinel when `value` is out of range
+   * for `type`, else null. Both the detection and the sign come from a
+   * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
+   * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
+   * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
+   * than a second sign computation) keeps this in lockstep with the
+   * equality/negation single-value paths, and handles non-numeric out-of-range
+   * bounds (e.g. custom types) type-agnostically.
+   *
+   * Callers pass the type from {@link resolveBoundType} (not the narrower
+   * `this.table`-only lookup `buildBindAttribute` uses) so sign detection uses
+   * the same type as the accompanying cast — otherwise a joined/aliased bound
+   * could be detected against the wrong (or identity) type.
+   */
+  private unboundableSentinel(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): UnboundableBound | null {
+    const sign = this.queryAttributeWithType(columnName, value, type).isUnboundable();
+    return sign === false ? null : new UnboundableBound(sign);
+  }
+
+  /**
+   * Builds a QueryAttribute bind for a bound using {@link resolveBoundType}'s
+   * relation/context/table cascade rather than `buildBindAttribute`'s narrower
+   * `this.table`-only lookup. Used by the negation path so a joined/aliased
+   * out-of-range bound is typed correctly (and thus detected as unboundable →
+   * `1=1`) instead of falling through to the identity fallback and silently
+   * binding a raw value the column can't hold.
+   */
+  private bindAttributeFor(attribute: Nodes.Attribute, value: unknown): QueryAttribute {
+    return this.queryAttributeWithType(attribute.name, value, this.resolveBoundType(attribute));
+  }
+
+  private queryAttributeWithType(
+    columnName: string,
+    value: unknown,
+    type: BoundType | undefined,
+  ): QueryAttribute {
+    const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
+      cast(v: unknown): unknown;
+      serialize(v: unknown): unknown;
+    };
+    return new QueryAttribute(columnName, value, castType);
+  }
+
+  /**
+   * Resolves the column type for a range bound, preferring the attribute's own
+   * relation typeCaster (covers joined/aliased tables), then the predicate
+   * builder's table/model context, then the arel table. Mirrors the cascade
+   * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
+   */
+  private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
+    const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
+    const attrType = (
+      attrRelation as { typeForAttribute?(n: string): BoundType | null } | undefined
+    )?.typeForAttribute?.(attribute.name);
+    if (attrType) return attrType;
+    const ctx = this._tableContext as {
+      typeForAttribute?(n: string): BoundType | null;
+    } | null;
+    const ctxType = ctx?.typeForAttribute?.(attribute.name);
+    if (ctxType) return ctxType;
+    return this.table.typeForAttribute(attribute.name) as BoundType | undefined;
   }
 
   buildFromHash(
@@ -120,12 +181,54 @@ export class PredicateBuilder {
           conditions,
         );
         nodes.push(...assocNodes);
+      } else if (
+        this._tableContext &&
+        typeof this._tableContext.aggregatedWith === "function" &&
+        this._tableContext.aggregatedWith(key)
+      ) {
+        nodes.push(...this.buildFromHashAggregate(key, value, negated));
       } else {
         const attr = this.resolveColumn(key);
         nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
       }
     }
     return nodes;
+  }
+
+  /**
+   * Expand a `composed_of` aggregate value into predicates over its mapped
+   * columns. Mirrors PredicateBuilder#expand_from_hash's `aggregated_with?`
+   * branch: `where(address: Address.new(...))` becomes
+   * `address_street = ? AND address_city = ? AND address_country = ?`.
+   *
+   * @internal
+   */
+  private buildFromHashAggregate(key: string, value: unknown, negated: boolean): Nodes.Node[] {
+    const reflection = this._tableContext.reflectOnAggregation(key);
+    const mapping: [string, string][] = reflection.mapping();
+    // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
+    const values =
+      value === null || value === undefined ? [null] : Array.isArray(value) ? value : [value];
+    if (mapping.length === 1 || values.length === 0) {
+      const [columnName, aggregateAttr] = mapping[0];
+      // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
+      const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
+      return negated
+        ? this.buildNegatedFromHash({ [columnName]: mapped })
+        : this.buildFromHash({ [columnName]: mapped });
+    }
+    // Multi-mapping: one AND-group per object over every mapped column, ORed
+    // together (grouping_queries). Each column is built positively; negation is
+    // applied once at the group level, mirroring expand_from_hash.
+    const queryGroups: Nodes.Node[][] = values.map((object) =>
+      mapping.map(([fieldAttr, aggregateAttr]) =>
+        this.build(
+          this.resolveColumn(fieldAttr),
+          extractAggregateAttr(object, aggregateAttr, true),
+        ),
+      ),
+    );
+    return this.groupingQueries(queryGroups, negated);
   }
 
   /** @internal */
@@ -247,7 +350,15 @@ export class PredicateBuilder {
     if (this.isRelation(value)) {
       return this.relationHandler.callNegated(attribute, value);
     }
-    return attribute.notEq(value);
+    // Build a bind attribute (as the positive BasicObjectHandler path does)
+    // rather than passing the raw value: Rails builds negation by inverting a
+    // positively-built predicate, so the RHS is a QueryAttribute bind. This
+    // also lets an out-of-range value report `unboundable?` at the visitor
+    // (`!=` → `1=1`) instead of raising ActiveModelRangeError when bound.
+    // Route through bindAttributeFor so a joined/aliased column is typed via the
+    // full resolveBoundType cascade (an OOR bound typed only on this.table's
+    // identity fallback would neither raise nor collapse to `1=1`).
+    return attribute.notEq(this.bindAttributeFor(attribute, value));
   }
 
   private buildNegatedArray(attribute: Nodes.Attribute, value: unknown[]): Nodes.Node {
@@ -286,7 +397,10 @@ export class PredicateBuilder {
     if (scalarValues.length === 1) {
       parts.push(this.buildNegated(attribute, scalarValues[0]));
     } else if (scalarValues.length > 1) {
-      parts.push(attribute.notIn(scalarValues));
+      // Mirror Rails `ArrayHandler#call` + `.invert`: the multi-value case is a
+      // `HomogeneousIn` node, inverted to `:notin`. Its `castedValues` drops
+      // out-of-range values, matching the positive IN path.
+      parts.push(new Nodes.HomogeneousIn(scalarValues, attribute, "notin"));
     }
 
     if (hasNull) {
@@ -624,6 +738,36 @@ export class PredicateBuilder {
 // property but is not a plain object literal (those stand in for Ruby Hashes).
 function respondsToId(value: unknown): value is { id: unknown } {
   return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
+}
+
+// Read an aggregate's mapped attribute off a value object. Mirrors Rails'
+// two call shapes in expand_from_hash: the single-mapping branch uses
+// `object.respond_to?(attr) ? object.public_send(attr) : object` (scalar
+// passthrough when the value isn't an aggregate object), while the
+// multi-mapping branch uses `object.try!(attr)` — which returns nil only when
+// the *receiver* is nil and RAISES NoMethodError when a non-nil object doesn't
+// respond to `attr` (a broken composed_of mapping is a programmer error, not a
+// silent no-match). Getters and methods both resolve — a function value is
+// invoked with the object as receiver.
+function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): unknown {
+  if (object === null || object === undefined) return tryBang ? null : object;
+  if (typeof object === "object" && attr in object) {
+    const v = (object as Record<string, unknown>)[attr];
+    return typeof v === "function" ? (v as (...a: unknown[]) => unknown).call(object) : v;
+  }
+  // Multi-mapping (`try!`) surfaces the missing attribute; single-mapping
+  // (`respond_to? ? … : object`) falls back to the scalar passthrough.
+  if (tryBang) {
+    throw new TypeError(
+      `composed_of value ${describeAggregateValue(object)} does not respond to mapped attribute '${attr}'`,
+    );
+  }
+  return object;
+}
+
+function describeAggregateValue(object: unknown): string {
+  const ctor = (object as { constructor?: { name?: string } } | null)?.constructor?.name;
+  return ctor ? `(${ctor})` : String(object);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

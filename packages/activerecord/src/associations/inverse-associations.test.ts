@@ -13,7 +13,6 @@ import {
 } from "../index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -1262,8 +1261,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 // fixture-backed block above.
 describe("InverseBelongsToTests", () => {
   setupFixtures();
-  beforeAll(async () => {
-    await defineSchema(canonicalSchema);
+  beforeAll(() => {
     [Branch, BrokenBranch].forEach((m) => registerModel(m));
   });
 

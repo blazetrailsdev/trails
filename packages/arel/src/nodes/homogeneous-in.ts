@@ -49,15 +49,25 @@ export class HomogeneousIn extends Node {
     return this.values.map((v) => buildQuoted(v, this.attribute));
   }
 
+  // Mirrors Arel::Nodes::HomogeneousIn#casted_values (homogeneous_in.rb:39-47):
+  //   type = attribute.type_caster
+  //   values.map { |raw| type.serialize(raw) if type.serializable?(raw) }.compact
+  // The `isSerializable` guard drops out-of-range / non-serializable values
+  // (e.g. a bignum id past the column's range) before they can reach a bind,
+  // and `compact` drops any that serialize to null — so `id IN [1, 2**63]`
+  // collapses to `IN (1)` and `id IN [2**63]` to an empty list (`1=0`).
   get castedValues(): unknown[] {
     const attr = this.attribute as unknown as {
-      typeCaster?: { serialize?: (v: unknown) => unknown; serializable?: (v: unknown) => boolean };
+      typeCaster?: {
+        serialize?: (v: unknown) => unknown;
+        isSerializable?: (v: unknown) => boolean;
+      };
     };
-    if (!attr?.typeCaster) return this.values;
-    const caster = attr.typeCaster;
+    const caster = attr?.typeCaster;
+    if (!caster) return this.values;
     const result: unknown[] = [];
     for (const raw of this.values) {
-      if (typeof caster.serializable === "function" && !caster.serializable(raw)) continue;
+      if (typeof caster.isSerializable === "function" && !caster.isSerializable(raw)) continue;
       if (typeof caster.serialize === "function") {
         const cast = caster.serialize(raw);
         if (cast != null) result.push(cast);
