@@ -530,3 +530,51 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
     expect((proxy.targetsByPrimaryKey() as Map<string, CpkBook>).size).toBe(1);
   });
 });
+
+// RFC 0023-surfaced-deviations: a CollectionProxy's relation clauses are seeded
+// ONCE at construction. When the owner is a NEW record then, its FK is
+// unresolvable and the seed collapses to the `1=0` NullRelation. A relation
+// spawned off that stale seed (`owner.things.where(...)`) — or the proxy itself
+// once a bang has diverged it — must pick up the persisted FK once the owner is
+// saved, mirroring Rails' CollectionProxy delegating every query to the live
+// `association.scope`.
+describe("CollectionProxy — mutated finder requery on stale new-owner seed", () => {
+  fixtures(["authors", "posts"]);
+
+  it("resolves the persisted FK on first/last/take/find_nth after save", async () => {
+    // Owner is a NEW record when the mutated relation is spawned, so its seed
+    // is the `1=0` NullRelation.
+    const author = new Author({ name: "New Owner" });
+    const rel = (association<Post>(author, "posts") as any)
+      .where({ title: "match" })
+      .order({ id: "asc" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const first = await Post.create({ title: "match", body: "1", author_id: authorId });
+    const last = await Post.create({ title: "match", body: "2", author_id: authorId });
+    // A non-matching sibling proves the mutation (`where(title:)`) is still
+    // applied on top of the rebuilt scope, not dropped.
+    await Post.create({ title: "other", body: "3", author_id: authorId });
+
+    expect((await rel.first()).id).toBe(first.id);
+    expect((await rel.last()).id).toBe(last.id);
+    expect((await rel.take()).title).toBe("match");
+    expect((await rel.second()).id).toBe(last.id);
+  });
+
+  it("resolves the persisted FK when the proxy itself is mutated while new", async () => {
+    const author = new Author({ name: "New Owner Two" });
+    const proxy = association<Post>(author, "posts") as any;
+    // Diverge the proxy in place (sets `_cpMutated`) while the owner is still a
+    // new record, so its base is the stale `1=0` seed.
+    proxy.whereBang({ title: "keep" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const kept = await Post.create({ title: "keep", body: "1", author_id: authorId });
+    await Post.create({ title: "drop", body: "2", author_id: authorId });
+
+    expect((await proxy.first()).id).toBe(kept.id);
+  });
+});

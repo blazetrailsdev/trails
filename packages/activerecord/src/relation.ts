@@ -506,6 +506,21 @@ export class Relation<T extends Base> {
   /** @internal */
   _havingClause: WhereClause = WhereClause.empty();
   private _isNone = false;
+  /**
+   * @internal True when this relation's WHERE base is the stale new-owner
+   * `1=0` NullRelation seed of a `CollectionProxy` (owner was a NEW record when
+   * the proxy was constructed). Set on the proxy at construction and propagated
+   * to every spawned relation via `_copyStateFrom`, so a query executed after
+   * the owner is saved can rebase the dead seed onto the resolved association
+   * scope. See `associations/new-owner-seed-rebase.ts`.
+   */
+  _seededNoneNewOwner = false;
+  /**
+   * @internal Identity snapshot of the seed WHERE predicates captured when a
+   * `CollectionProxy` is constructed, so a rebase can separate accumulated
+   * mutation predicates from the stale `1=0` seed. Empty on ordinary relations.
+   */
+  _seedWherePredicates: readonly unknown[] = [];
   private _lockValue: string | null = null;
   private _setOperation: {
     type: "union" | "unionAll" | "intersect" | "except";
@@ -7210,6 +7225,8 @@ export class Relation<T extends Base> {
     this._ctes = [...source._ctes];
     this._skipPreloading = source._skipPreloading;
     this._skipQueryCache = source._skipQueryCache;
+    this._seededNoneNewOwner = source._seededNoneNewOwner;
+    this._seedWherePredicates = [...source._seedWherePredicates];
   }
 
   /** @internal */
