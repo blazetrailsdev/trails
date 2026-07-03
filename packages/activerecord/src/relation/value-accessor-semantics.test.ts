@@ -7,21 +7,15 @@
  * the `boolean | undefined` flag fields), so the names are descriptive rather
  * than mirrored from a metaprogrammed Rails test.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 
 setupFixtures();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ posts: TEST_SCHEMA.posts });
-});
-
 /** The split join-storage and group fields the reader semantics build on. */
 type JoinInternals = {
   _namedInnerJoins: unknown[];

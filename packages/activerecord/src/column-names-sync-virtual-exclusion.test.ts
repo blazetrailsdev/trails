@@ -4,29 +4,35 @@
  * Rails' `column_names` is always `columns.map(&:name)` and the first call
  * performs a synchronous, blocking schema load, so a virtual `attribute()`
  * (declared with no backing DB column) never appears in it. trails' DB layer is
- * async; the equivalent load is `ensureSchemaLoaded()`. `defineSchema` eagerly
- * warms the adapter schema cache (the boot-time analogue of Rails loading
- * `db/schema_cache.yml`), so a synchronous `Model.columnNames()` on a connected
- * model with a real table is DB-faithful without a prior reflection — matching
- * Rails' `columns.map(&:name)`.
+ * async; the equivalent load is `ensureSchemaLoaded()`. The boot-time canonical
+ * schema loader eagerly warms the adapter schema cache (the analogue of Rails
+ * loading `db/schema_cache.yml`), so a synchronous `Model.columnNames()` on a
+ * connected model with a real table is DB-faithful without a prior reflection —
+ * matching Rails' `columns.map(&:name)`.
  *
  * No `useHandlerTransactionalFixtures()` here on purpose: its per-test
- * `clearSchemaCache` teardown would wipe the `beforeAll`-warmed cache, which is
+ * `clearSchemaCache` teardown would wipe the boot-warmed cache, which is
  * exactly the cold-cache state this test must avoid.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("column_names sync virtual exclusion", () => {
   setupFixtures();
   beforeAll(async () => {
-    await defineSchema({ posts: TEST_SCHEMA.posts });
+    // Warm the shared schema cache for `posts` (the boot-time analogue of Rails
+    // loading `db/schema_cache.yml`) so a synchronous `columnNames()` on a cold
+    // model reflects the real DB columns. `columnsHash` populates the exact
+    // `_columnsHash` that model-schema.ts reads and short-circuits when warm.
+    const conn = Base.connection as unknown as {
+      schemaCache: { columnsHash(pool: unknown, table: string): Promise<unknown> };
+      pool: unknown;
+    };
+    await conn.schemaCache.columnsHash(conn.pool, "posts");
   });
 
   it("excludes virtual attributes from a synchronous column_names on a cold model", () => {

@@ -19,8 +19,6 @@ import { UniquenessValidator } from "../validations.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupFixtures();
 
@@ -125,7 +123,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
 
     installExtendedQueriesIfConfigured();
 
-    await defineSchema({ books: TEST_SCHEMA.books });
     books = buildBooks();
     // Warm the books table once before any test runs so the first create
     // doesn't race with the test-adapter's regex-recovery schema path on

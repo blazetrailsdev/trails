@@ -2,9 +2,7 @@ import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { StatementInvalid } from "./errors.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 
 class MockDatabaseError extends Error {}
@@ -32,7 +30,6 @@ class Book extends Base {
 describe("StatementInvalidTest", () => {
   setupFixtures();
   beforeAll(async () => {
-    await defineSchema({ books: TEST_SCHEMA.books });
     await Book.loadSchema();
   });
 

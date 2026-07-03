@@ -13,9 +13,7 @@ import { Account } from "./test-helpers/models/account.js";
 import { Toy } from "./test-helpers/models/toy.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
   "This is normally set by the railtie initializer when used with Rails!";
@@ -40,7 +38,6 @@ describe("SignedIdTest", () => {
     registerModel(Account);
     registerModel(Company);
     registerModel(Toy);
-    await defineSchema({ mateys: TEST_SCHEMA.mateys });
   });
 
   let account: Account;

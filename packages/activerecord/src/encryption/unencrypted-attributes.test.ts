@@ -7,10 +7,8 @@ import {
   assertNotEncryptedAttribute,
   withoutEncryption,
 } from "./test-helpers.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
 import { Configurable } from "./configurable.js";
 import { Decryption as DecryptionError } from "./errors.js";
@@ -25,7 +23,6 @@ useHandlerTransactionalFixtures();
 beforeAll(async () => {
   configureEncryption();
   ({ EncryptedPost } = await import("../test-helpers/models/post-encrypted.js"));
-  await defineSchema({ posts: TEST_SCHEMA.posts });
   await EncryptedPost.loadSchema();
 });
 

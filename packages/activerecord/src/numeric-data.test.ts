@@ -6,8 +6,6 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 
 // Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
@@ -18,7 +16,6 @@ setupFixtures();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
-  await defineSchema({ numeric_data: TEST_SCHEMA.numeric_data });
   await NumericData.loadSchema();
 });
 

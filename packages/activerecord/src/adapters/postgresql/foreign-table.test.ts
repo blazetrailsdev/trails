@@ -8,9 +8,7 @@
  */
 import { describe, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupFixtures } from "../../test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "../../test-helpers/test-schema.js";
 import { Base } from "../../index.js";
 import { Professor } from "../../test-helpers/models/professor.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
@@ -53,7 +51,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await defineSchema({ professors: TEST_SCHEMA.professors }, { dropExisting: true });
     await adapter.exec(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,

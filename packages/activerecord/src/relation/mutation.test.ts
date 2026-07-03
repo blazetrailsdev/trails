@@ -10,20 +10,14 @@
  * internal fields (`_orderClauses`, `_selectColumns`, `_lockValue`, …), which
  * are the camelCase equivalents of Rails' `*_values` / `*_value`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 
 setupFixtures();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ posts: TEST_SCHEMA.posts });
-});
-
 /** Fresh relation per test — the trails analogue of Rails' `Relation.new(FakeKlass)`. */
 function relation(): any {
   return Post.all();

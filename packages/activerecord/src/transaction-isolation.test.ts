@@ -2,18 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { adapterSupports } from "./test-helpers/supports.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { describeIfPg, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).
 // Rails: TransactionIsolationUnsupportedTest
 describe("TransactionIsolationUnsupportedTest", () => {
   setupFixtures();
-  beforeAll(async () => {
-    await defineSchema({ tags: TEST_SCHEMA.tags });
-  });
 
   it.skipIf(adapterType !== "sqlite")("setting the isolation level raises an error", async () => {
     class Tag extends Base {
@@ -50,9 +45,6 @@ describe("TransactionIsolationUnsupportedTest", () => {
 // mysql,postgresql adapter set).
 describe("TransactionIsolationTest", () => {
   setupFixtures();
-  beforeAll(async () => {
-    await defineSchema({ tags: TEST_SCHEMA.tags });
-  });
 
   it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "setting isolation when joining a transaction raises an error",
@@ -111,7 +103,6 @@ describeIfPg("TransactionIsolationTest", () => {
   beforeAll(async () => {
     await Tag.establishConnection(PG_TEST_URL);
     await Tag2.establishConnection(PG_TEST_URL);
-    await defineSchema(Tag.connection, { tags: TEST_SCHEMA.tags });
   });
 
   afterAll(async () => {
