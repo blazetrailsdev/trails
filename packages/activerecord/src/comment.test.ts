@@ -3,16 +3,22 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, beforeEach, afterEach, expect } from "vitest";
+import { Base } from "./index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { MigrationContext } from "./migration.js";
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 describe("CommentTest", () => {
-  let adapter: Awaited<ReturnType<typeof createTestAdapter>>;
+  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
+  // sidecar `_pool` lease; `setupFixtures()` wires the handler.
+  setupFixtures();
+  let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
     await ctx.createTable("commenteds", { comment: "A table with comment", force: true }, (t) => {
       t.string("name", { comment: "Comment should help clarify the column purpose" });

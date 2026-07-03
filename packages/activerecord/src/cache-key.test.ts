@@ -3,9 +3,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
+import { setupFixtures } from "./test-helpers/fixtures.js";
 import { setDefaultTimezone } from "./type/internal/timezone.js";
 
 // Mirrors Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars).
@@ -28,12 +28,13 @@ describe("CacheKeyTest", () => {
   // t.timestamps }` in `setup` and drops them in `teardown`. Mirror that here
   // rather than seeding placeholders into the canonical schema. Rails also sets
   // `self.use_transactional_tests = false`, so each test recreates the tables.
-  let adapter: DatabaseAdapter;
+  // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
+  // sidecar `_pool` lease; `setupFixtures()` wires the handler.
+  setupFixtures();
   let ctx: MigrationContext;
 
   beforeEach(async () => {
-    adapter = await createTestAdapter();
-    ctx = new MigrationContext(adapter);
+    ctx = new MigrationContext(Base.connection);
     await ctx.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
     await ctx.createTable("cache_me_with_versions", { force: true }, (t: any) => t.timestamps());
   });
@@ -48,7 +49,6 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = false;
       }
     }
-    (CacheMe as any).adapter = adapter;
     return CacheMe as any;
   }
 
@@ -58,7 +58,6 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = true;
       }
     }
-    (CacheMeWithVersion as any).adapter = adapter;
     return CacheMeWithVersion as any;
   }
 
