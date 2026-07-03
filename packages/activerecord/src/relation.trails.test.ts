@@ -34,6 +34,10 @@ describe("isBlank / isPresent", () => {
   useHandlerTransactionalFixtures();
 
   it("isBlank returns true when no records exist", async () => {
+    // Inline model on the canonical `developers` table (not the canonical
+    // Developer model): this exercises isBlank/isPresent mechanics, and
+    // Developer's `name` is a restricted, non-dirty-tracked attribute, so
+    // `create({ name })` needs a plainly-declared `name` to persist.
     class SampleRecord extends Base {
       static _tableName = "developers";
       static {
