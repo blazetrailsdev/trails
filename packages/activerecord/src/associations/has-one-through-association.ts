@@ -172,7 +172,20 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         // owns the persistence here, so the built/new-record autosave arm is
         // skipped (throughRecord is not new) and no duplicate join is written.
         (throughRecord as any).assignAttributes?.(attrs);
-        if (!this._pendingReplace) {
+        // Repeated build/create before save must re-point `record` at the
+        // latest source (mirrors the `_pendingReplace.record = record`
+        // reassignment in `replace()`): Rails runs `through_record.update`
+        // synchronously every call, so the last build wins. Leaving a stale
+        // `record` here would make the deferred `createThroughRecord`
+        // reconstruct attrs from an earlier club and silently revert the
+        // in-memory assignment on save.
+        // `previousTarget` is unread on this path: HasOneThroughAssociation's
+        // persistReplace consumes only `pending.record` (the base class's
+        // displaced-record nullify logic doesn't apply — the join row is
+        // reconciled via `update`, not replaced), so `null` is inert here.
+        if (this._pendingReplace) {
+          this._pendingReplace.record = record;
+        } else {
           this._pendingReplace = { record, previousTarget: null };
         }
       }

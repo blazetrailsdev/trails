@@ -209,6 +209,12 @@ describe("HasOneThroughAssociationsTest", () => {
     const newClub = (newMember.association("club") as any).build();
     expect(newMember.association("club").target).toBe(newClub);
 
+    // Rebuilding before save must re-point the deferred reconcile at the
+    // latest club (Rails runs `through_record.update` synchronously every
+    // call, so the last build wins) — not persist the first one on save.
+    const finalClub = (newMember.association("club") as any).build();
+    expect(newMember.association("club").target).toBe(finalClub);
+
     // Rails' create_through_record reconciles against the persisted join row
     // (`through_record.update(attributes)`) instead of building a duplicate: on
     // save the existing membership is updated to point at the new club, no
@@ -216,9 +222,9 @@ describe("HasOneThroughAssociationsTest", () => {
     const before = await Membership.count();
     expect(await newMember.save()).toBe(true);
     expect(await Membership.count()).toBe(before);
-    expect(newClub.isPersisted()).toBe(true);
+    expect(finalClub.isPersisted()).toBe(true);
     const reloaded = await Membership.find(membership.id);
-    expect(reloaded.club_id).toBe(newClub.id);
+    expect(reloaded.club_id).toBe(finalClub.id);
   });
 
   it("creating multiple associations creates through record", async () => {
