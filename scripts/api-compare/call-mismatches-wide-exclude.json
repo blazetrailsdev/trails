@@ -15977,13 +15977,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "delete_records",
-    "call": "update_through_counter?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-many-through-association.ts",
-    "rubyName": "delete_records",
     "call": "where!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
