@@ -988,6 +988,8 @@ export class AssociationScope {
       _joinClauses?: unknown[];
       _namedInnerJoins?: unknown[];
       _leftOuterJoinsValues?: unknown[];
+      _namedInnerJoinDeps?: unknown[];
+      _leftOuterJoinDeps?: unknown[];
       _includesAssociations?: unknown[];
       _eagerLoadAssociations?: unknown[];
       _modelClass?: typeof Base;
@@ -1031,6 +1033,13 @@ export class AssociationScope {
         );
       }
     }
+    // Carry forward any cross-klass JoinDependencies the item already
+    // accumulated from an earlier `.merge()` (e.g. a nested through-scope-of-a-
+    // through-scope). Rails routes `merge! item.only(:joins, :left_outer_joins)`
+    // through the same Merger, whose merge_joins / merge_outer_joins forward
+    // `other._namedInnerJoinDeps` / `other._leftOuterJoinDeps` (merger.ts:127,149).
+    target._namedInnerJoinDeps.push(...(item._namedInnerJoinDeps ?? []));
+    target._leftOuterJoinDeps.push(...(item._leftOuterJoinDeps ?? []));
     // associations = eager_load_values | includes_values → OuterJoin. Rails'
     // `|` unions with dedup, so an association named in BOTH eager_load and
     // includes yields a single JoinDependency entry (not a double join).
