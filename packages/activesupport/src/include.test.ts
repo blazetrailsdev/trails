@@ -27,6 +27,40 @@ describe("include", () => {
     expect(new User().greet()).toBe("original");
   });
 
+  it("later include wins over an earlier mixin, but class body beats both", () => {
+    // Ruby's `include A; include B` puts B higher in the ancestry, so a method
+    // both define resolves to B (last-included wins). Neither replaces a method
+    // defined directly in the class body.
+    class User {
+      classBody() {
+        return "class-body";
+      }
+    }
+    const A = {
+      shared() {
+        return "A";
+      },
+      classBody() {
+        return "A-classBody";
+      },
+    };
+    const B = {
+      shared() {
+        return "B";
+      },
+      classBody() {
+        return "B-classBody";
+      },
+    };
+    include(User, A);
+    include(User, B);
+
+    // Later mixin (B) wins over the earlier one (A).
+    expect((new User() as any).shared()).toBe("B");
+    // A method defined in the class body beats every included mixin.
+    expect(new User().classBody()).toBe("class-body");
+  });
+
   it("fires the included callback after methods are copied", () => {
     const order: string[] = [];
     class User {}
