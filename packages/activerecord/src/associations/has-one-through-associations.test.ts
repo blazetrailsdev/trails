@@ -321,10 +321,19 @@ describe("HasOneThroughAssociationsTest", () => {
     });
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
-  // the source-table-condition arm (hairyClub) passes on SQLite but preloads nil on
-  // PG/MariaDB — eager-loading a has_one_through with a WHERE on the *source* table
-  // fails to match across the through join on those adapters.
+  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-source-condition-preload-selects-wrong-through-row):
+  // The source-table-condition arm (hairyClub) preloads nil on PG/MariaDB. Root
+  // cause: preloader/through-association.ts splits the reflection scope's WHERE —
+  // through-table predicates go on the through query, but source-table predicates
+  // (hairyClub's `where({clubs:{name}})`) are deferred to the source stage. For a
+  // has_one through, the preloader picks the *first* through record (groucho has
+  // four unordered Membership-STI rows) and only then applies the source filter,
+  // so on PG/MariaDB's unstable ordering a non-moustache membership wins and the
+  // name condition nils the club. Rails resolves it with a single JOIN so the
+  // source condition constrains which through row wins. Passes on SQLite (order
+  // happens to surface the moustache membership first). The through-table arm
+  // (favoriteClub) works on all adapters. Needs the has_one-through source-JOIN
+  // fix, tracked as a separate story; do not un-skip until converged.
   it.skip("has one through with conditions eager loading", async () => {
     const member = members("groucho");
     // conditions on the through table
@@ -529,14 +538,14 @@ describe("HasOneThroughAssociationsTest", () => {
     await (await Club.all().includes("sponsoredMember").find(club.id)).save();
   });
 
-  // TRACKED-PENDING-CONVERGENCE (0023 hasone-through-pg-maria-eager-and-autosave-gaps):
-  // passes on SQLite but fails on PG/MariaDB — `member.save()` does not persist the
-  // lone has_one `memberDetail` child there (its `member_id` is never written), so
-  // the `member_type` through resolves to nil. A cross-adapter has_one autosave gap.
-  it.skip("through belongs to after destroy", async () => {
+  it("through belongs to after destroy", async () => {
     const member = members("groucho");
     const memberDetail = new MemberDetail({ extra_data: "Extra" });
-    (member.association("memberDetail") as any).writer(memberDetail);
+    // Rails `@member.member_detail = @member_detail` is a synchronous assignment;
+    // our writer is awaitable on a persisted owner. Un-awaited it floats a
+    // persistReplace that races member.save's has_one autosave and drops the
+    // child row on PG/MariaDB (see member_details double-write). Await to match.
+    await (member.association("memberDetail") as any).writer(memberDetail);
     await member.save();
 
     expect(await readHasOne(memberDetail, "memberType")).not.toBeNull();
