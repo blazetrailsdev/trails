@@ -141,10 +141,14 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
   });
 
-  it("left outer joins forbids to use string as argument", () => {
-    expect(() =>
-      Author.leftOuterJoins('LEFT OUTER JOIN "posts" ON "posts"."user_id" = "users"."id"'),
-    ).toThrow();
+  it("left outer joins forbids to use string as argument", async () => {
+    // Rails stores the arg verbatim and only raises lazily at build time (on
+    // `.to_a`), from build_join_buckets — not eagerly at leftOuterJoins(...).
+    await expect(
+      Author.leftOuterJoins(
+        'LEFT OUTER JOIN "posts" ON "posts"."user_id" = "users"."id"',
+      ).toArray(),
+    ).rejects.toThrow("only Hash, Symbol and Array are allowed");
   });
 
   it("left outer joins with string join", async () => {

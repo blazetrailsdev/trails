@@ -2694,6 +2694,28 @@ export function selectAssociationList(
   return result;
 }
 
+/**
+ * Rails only accepts Symbol/Hash/Array as a left-outer arg — a bare String is
+ * not a Symbol, so `left_outer_joins("raw sql")` raises "only Hash, Symbol and
+ * Array are allowed" lazily from build_join_buckets' block
+ * (query_methods.rb:1830-1836). trails collapses Ruby Symbol and String to one
+ * JS string type, so an association name and a raw SQL fragment are
+ * indistinguishable by type; a raw fragment is a string containing whitespace,
+ * which no association identifier has. Reject those (and any other non-spec
+ * value) at build time, mirroring Rails' lazy raise point and message.
+ *
+ * @internal
+ */
+export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
+  for (const v of values) {
+    if (typeof v === "string") {
+      if (/\s/.test(v)) throw argumentError("only Hash, Symbol and Array are allowed");
+    } else if (typeof v !== "symbol" && !Array.isArray(v) && !isPlainObject(v)) {
+      throw argumentError("only Hash, Symbol and Array are allowed");
+    }
+  }
+}
+
 /** @internal */
 export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
   const buckets: Record<string, unknown[]> = {
@@ -2710,7 +2732,21 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
   // JoinDependency is prepended to stashed_left_joins.
   if (this._leftOuterJoinsValues.length > 0) {
     const stashedLeft: JoinDependency[] = [];
-    const namedLeft = selectNamedJoins.call(this, this._leftOuterJoinsValues, stashedLeft);
+    assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
+    // Mirror Rails' block (query_methods.rb:1830-1836): a CTEJoin becomes an
+    // OuterJoin join_node; any other non-association value raises.
+    const namedLeft = selectNamedJoins.call(
+      this,
+      this._leftOuterJoinsValues,
+      stashedLeft,
+      (left) => {
+        if (left instanceof CTEJoin) {
+          buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
+        } else {
+          throw argumentError("only Hash, Symbol and Array are allowed");
+        }
+      },
+    );
 
     if (
       this._namedInnerJoins.length === 0 &&
