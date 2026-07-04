@@ -843,7 +843,7 @@ export class SchemaStatements {
     ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
-    const name = options.name ?? this._checkConstraintName(tableName, expression);
+    const name = this.checkConstraintName(tableName, { name: options.name, expression });
     const validate = options.validate !== false;
     const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
     await this.adapter.executeMutation(
@@ -864,36 +864,32 @@ export class SchemaStatements {
       return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
     }
     // Mirrors Rails remove_check_constraint(table, expression = nil, **options):
-    // prefer an explicit :name (threaded from invert_add_check_constraint), else
-    // derive from the expression via the same hash add_check_constraint used, so
-    // the reversal drops the constraint under its real name.
-    let name: string | undefined;
-    let ifExists: boolean;
+    // resolve the live constraint via check_constraint_for! (by :name, else the
+    // hash of the expression) and drop it by its real name — mirroring how
+    // removeForeignKey resolves via foreignKeyForBang. No name is derived-and-dropped.
+    let expression: string | undefined;
+    let opts: { name?: string; ifExists?: boolean };
     if (typeof expressionOrOptions === "string") {
-      ifExists = options.ifExists === true;
-      name = options.name ?? this._checkConstraintName(tableName, expressionOrOptions);
+      expression = expressionOrOptions;
+      opts = { ...options };
     } else {
-      ifExists = (expressionOrOptions?.ifExists ?? options.ifExists) === true;
-      name = expressionOrOptions?.name ?? options.name;
+      expression = undefined;
+      opts = { ...(expressionOrOptions ?? {}), ...options };
     }
-    if (!name) {
+    // Only pass `name` when present: checkConstraintFor derives one from the
+    // expression, and an explicit `name: undefined` would clobber it.
+    const lookup: { name?: string; expression?: string } = { expression };
+    if (opts.name !== undefined) lookup.name = opts.name;
+    const chk = await this.checkConstraintFor(tableName, lookup);
+    if (!chk) {
+      if (opts.ifExists === true) return;
       throw new ArgumentError(
-        "remove_check_constraint requires either an expression or { name } option",
+        `Table '${tableName}' has no check constraint for ${expression ?? JSON.stringify(opts)}`,
       );
     }
-    const ifExistsSql = ifExists ? " IF EXISTS" : "";
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT${ifExistsSql} ${this._qi(name)}`,
+      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT ${this._qi(chk.name)}`,
     );
-  }
-
-  _checkConstraintName(tableName: string, expression: string): string {
-    let hash = 0;
-    for (let i = 0; i < expression.length; i++) {
-      hash = ((hash << 5) - hash + expression.charCodeAt(i)) | 0;
-    }
-    const hex = (hash >>> 0).toString(16).padStart(8, "0");
-    return `chk_${tableName}_${hex}`;
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
