@@ -117,9 +117,10 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 });
 
 // Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
-// raw DatabaseAdapter directly instead of going through createTestAdapter().
-// The helper must accept that shape — `transactionManager` lives on the
-// adapter itself via AbstractAdapter, not behind an `innerAdapter` wrapper.
+// raw DatabaseAdapter directly instead of leasing one from a pool (Base.connection
+// or createPooledTestAdapter()). The helper must accept that shape —
+// `transactionManager` lives on the adapter itself via AbstractAdapter, not
+// behind an `innerAdapter` wrapper.
 describe("withTransactionalFixtures (raw adapter)", () => {
   let adapter: AbstractSQLite3Adapter;
   const exec = (sql: string) => adapter.exec(sql);
