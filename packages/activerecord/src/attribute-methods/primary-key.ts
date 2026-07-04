@@ -95,6 +95,27 @@ interface PrimaryKeyInstance {
   _writeAttribute(name: string, value: unknown): void;
 }
 
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+
+/**
+ * Normalize a primary-key value so that a `bigint`-backed id compares `===`
+ * with an `integer`-typed foreign key holding the same logical value.
+ *
+ * On PG the driver returns a table's default `bigint` id as a JS `bigint`,
+ * while `integer`-typed FK columns cast through IntegerType to `number`. Ruby
+ * has a single Integer type, so `child.fk == parent.id` can never straddle two
+ * representations there; here it can. Collapse a safe-range `bigint` to
+ * `number` (values beyond MAX_SAFE_INTEGER stay `bigint` to preserve precision —
+ * they cannot equal a 4-byte integer FK anyway).
+ */
+function normalizeIntegerId(value: unknown): unknown {
+  if (typeof value === "bigint" && value >= MIN_SAFE_BIGINT && value <= MAX_SAFE_BIGINT) {
+    return Number(value);
+  }
+  return value;
+}
+
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id
  * @internal
@@ -102,10 +123,10 @@ interface PrimaryKeyInstance {
 export function getId(this: PrimaryKeyInstance): unknown {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
-  if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
+  if (Array.isArray(pk)) return pk.map((col) => normalizeIntegerId(this._readAttribute(col)));
   // Rails: `_read_attribute(@primary_key)`. A nil primary key reads through the
   // AttributeSet's Null attribute, returning nil without raising.
-  return this._readAttribute(pk as string);
+  return normalizeIntegerId(this._readAttribute(pk as string));
 }
 
 /**
