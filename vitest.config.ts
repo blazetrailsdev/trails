@@ -315,7 +315,10 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: "activerecord",
-          include: ["packages/activerecord/src/**/*.test.ts"],
+          include: [
+            "packages/activerecord/src/**/*.test.ts",
+            "packages/activerecord/scripts/**/*.test.ts",
+          ],
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
