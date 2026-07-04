@@ -594,6 +594,49 @@ function assignableNestedAttributes(attributes: Record<string, unknown>): Record
 }
 
 /**
+ * Rails builds a nested record via `association.build(attributes)` →
+ * `assign_attributes`, which raises `UnknownAttributeError` for any key with no
+ * writer. trails' `Model.new`/build silently drops unknown keys (the base-level
+ * constructor leniency tracked by RFC 0046), so the nested build path guards
+ * explicitly — mirroring the same check the collection flush path already runs.
+ * Control keys (`_destroy`, the addressing `id`) are stripped by
+ * `assignableNestedAttributes` before this sees them; the primary key is always
+ * assignable. When the target schema isn't loaded (`_attributeDefinitions`
+ * empty) there is nothing to validate against, so the check is skipped.
+ */
+function assertNestedAttributesAreKnown(
+  targetModel: typeof Base,
+  assignable: Record<string, unknown>,
+): void {
+  const keys = Object.keys(assignable);
+  if (keys.length === 0) return;
+  let attrDefs: Map<string, unknown> | undefined = (targetModel as any)._attributeDefinitions;
+  // trails loads a model's schema lazily on first `new`, so `_attributeDefinitions`
+  // may still be empty before the first nested build. Warm it once (and reuse the
+  // instance as an alias-aware probe below); when the model is genuinely
+  // schemaless there is nothing to validate against, so skip.
+  let probe: Base | undefined;
+  if (!attrDefs || attrDefs.size === 0) {
+    probe = new (targetModel as any)() as Base;
+    attrDefs = (targetModel as any)._attributeDefinitions;
+  }
+  if (!attrDefs || attrDefs.size === 0) return;
+  const pk = (targetModel as any).primaryKey;
+  const pkColumns = new Set<string>((Array.isArray(pk) ? pk : [pk]).map(String));
+  // `assignable` comes from `assignableNestedAttributes`, which already strips
+  // the `id` addressing key (UNASSIGNABLE_KEYS), so only a non-`id` primary key
+  // needs an explicit exemption here.
+  for (const key of keys) {
+    if (attrDefs.has(key) || pkColumns.has(key)) continue;
+    // Resolve aliases before raising: `hasAttribute` maps an aliased name onto
+    // its real column (matching the flush path's lazy dummy construction).
+    probe ??= new (targetModel as any)() as Base;
+    if ((probe as any).hasAttribute(key)) continue;
+    throw new UnknownAttributeError(probe as object, key);
+  }
+}
+
+/**
  * The slice of the singular (`belongsTo`/`hasOne`) runtime association used by
  * the one-to-one nested-attributes writer. `target` is the in-memory record (or
  * null); `build` / `initializeAttributes` mirror Rails' `build_#{name}` and
@@ -695,6 +738,8 @@ export function assignNestedAttributesForOneToOneAssociation(
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord(record, associationName, attributes)) {
     const assignable = assignableNestedAttributes(attributes);
+    const targetModel = resolveCollectionTargetModel(record, associationName);
+    if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
     if (existing && existing.isNewRecord()) {
       // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
       // rather than replacing it: assign into it, then re-anchor FK/scope/
@@ -815,14 +860,16 @@ export function assignNestedAttributesForCollectionAssociation(
   // `isAutosave` is always true here. The branch remains only as a guard for a
   // hypothetical direct caller on a non-autosave collection (which never sets a
   // nestedAttributesTarget and defers everything to the post-save flush).
+  const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
   for (const a of attrs) {
     if (!hasNestedId(a)) {
       if (!isRejectNewRecord(record, associationName, a)) {
-        nestedTarget.push(
-          collectionProxyFor(record, associationName).build(assignableNestedAttributes(a)),
-        );
+        const assignable = assignableNestedAttributes(a);
+        if (collectionTargetModel)
+          assertNestedAttributesAreKnown(collectionTargetModel, assignable);
+        nestedTarget.push(collectionProxyFor(record, associationName).build(assignable));
       } else {
         nestedTarget.push(null);
       }
