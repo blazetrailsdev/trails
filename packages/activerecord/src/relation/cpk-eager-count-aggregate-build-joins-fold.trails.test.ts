@@ -77,6 +77,30 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     expect(await CpkBook.eagerLoad("chapters").count("cpk_books.revision")).toBe(2);
   });
 
+  it("eager_load(:assoc).limit(n).count(column) respects the limit via a DISTINCT-column subquery", async () => {
+    await seedBooksWithChapters();
+    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 3 });
+    let count = 0;
+    const sqls = await captureSql(async () => {
+      count = (await CpkBook.eagerLoad("chapters").limit(2).count("cpk_books.revision")) as number;
+    });
+    // Rails `build_count_subquery` wraps `SELECT DISTINCT revision ... LIMIT 2`
+    // in an outer COUNT, so the limit caps the distinct column values counted (2
+    // of the 3 distinct revisions) rather than being silently dropped.
+    expect(count).toBe(2);
+    const countSql = sqls.find((s) => /count/i.test(s)) ?? "";
+    expect(countSql).toMatch(/subquery_for_count/i);
+    expect(countSql).toMatch(/LIMIT 2/i);
+    expect(countSql).toMatch(/DISTINCT/i);
+  });
+
+  it("eager_load(:assoc).offset(n).count(column) respects the offset via the subquery", async () => {
+    await seedBooksWithChapters();
+    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 3 });
+    // 3 distinct revisions; offset(1) drops one → counts 2.
+    expect(await CpkBook.eagerLoad("chapters").offset(1).count("cpk_books.revision")).toBe(2);
+  });
+
   async function seedBooksWithOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
     await CpkOrder.create({ shop_id: 1, id: 100, status: "open" });

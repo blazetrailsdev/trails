@@ -803,6 +803,39 @@ export async function performCount(
           QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
         const table = this._modelClass.arelTable;
         if (column != null && column !== "*") {
+          // Rails `build_count_subquery` (calculations.rb:662-678): a limit/offset
+          // over an eager-loaded count wraps a DISTINCT-column subquery so the
+          // limit constrains distinct column values before COUNT — rather than
+          // being silently dropped over the fanned LEFT OUTER JOIN. Only the
+          // no-limit case emits the flat `COUNT(DISTINCT col)`.
+          if (this._limitValue !== null || this._offsetValue !== null) {
+            const innerManager = table.project(
+              (aggregateColumn(this, column) as any).as("count_column"),
+            );
+            innerManager.distinct();
+            this._applyJoinsToManager(innerManager, makeEagerJd());
+            this._applyWheresToManager(innerManager, table);
+            applyFromToManager(this, innerManager);
+            if (this._limitValue !== null) innerManager.take(this._limitValue);
+            if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
+            const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
+            const countCol = new Nodes.NamedFunction("COUNT", [
+              new Nodes.SqlLiteral("count_column"),
+            ]);
+            const outerManager = table.project(countCol.as("count"));
+            outerManager.from(new Nodes.SqlLiteral(`(${innerSql}) AS subquery_for_count`));
+            const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
+            const [withCtes, ctedBinds] = prependCtes(this, outerSql, [
+              ...allInnerBinds,
+              ...outerBinds,
+            ]);
+            const result = await this._conn().selectAll(
+              withCtes,
+              `${this._modelClass.name} Count`,
+              ctedBinds,
+            );
+            return Number(result.toArray()[0]?.count ?? 0);
+          }
           const manager = table.project(
             (aggregateColumn(this, column) as any).count(true).as("count"),
           );
