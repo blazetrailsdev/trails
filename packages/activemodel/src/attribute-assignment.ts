@@ -99,8 +99,15 @@ export function sanitizeForMassAssignment(
  * here; JS has no `each_pair`, so we accept a plain object (prototype is
  * `Object.prototype` or null) or a params-style wrapper that duck-types
  * `permitted?`/`to_h` (ActionController::Parameters' analogue). A Date, Map,
- * Set, or arbitrary class instance has no hash semantics and raises, matching
- * Rails' rejection of anything not responding to `each_pair`.
+ * Set, or arbitrary class instance has no hash semantics and raises.
+ *
+ * KNOWN GAP: `HashWithIndifferentAccess` is a Hash subclass that Rails' guard
+ * admits (it inherits `Hash#each_pair`), but trails HWIA stores entries in a
+ * private `Map` — so it fails this proto/duck-type check AND the downstream
+ * `_assignAttributes` `Object.entries` loop can't read it either (a pre-existing
+ * silent no-op). Real HWIA mass-assignment is tracked separately in
+ * `assign-attributes-hwia-each-pair`; this guard does not regress it (it was
+ * never assigned before).
  */
 export function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
   if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs) || !isHashLike(attrs)) {
@@ -127,6 +134,10 @@ function typeNameForError(value: unknown): string {
   // Ruby: nil.class #=> NilClass (not "Null").
   if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
+  // Mirror Ruby's `value.class` name: a class instance (Date, Time, …) reports
+  // its constructor name, not the generic "Object" that `typeof` collapses to.
+  const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
+  if (ctorName) return ctorName;
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
 }

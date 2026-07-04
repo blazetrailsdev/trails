@@ -143,7 +143,9 @@ describe("AttributeAssignmentTest", () => {
     expect(() => p.assignAttributes("not a hash" as any)).toThrow(ArgumentError);
     expect(() => p.assignAttributes(null as any)).toThrow(ArgumentError);
     expect(() => p.assignAttributes([] as any)).toThrow(ArgumentError);
-    expect(() => p.assignAttributes(new Date() as any)).toThrow(ArgumentError);
+    expect(() => p.assignAttributes(new Date() as any)).toThrow(
+      "When assigning attributes, you must pass a hash as an argument, Date passed.",
+    );
   });
 
   it("forbidden attributes cannot be used for mass assignment", () => {
