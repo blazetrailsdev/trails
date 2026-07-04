@@ -138,28 +138,12 @@ export function registerClassWithPrecision(
  *   mirroring Rails' IntegerType(limit: 8) but with BigInt-precision arithmetic.
  */
 class PgInteger8 extends BigIntegerType {
+  // Re-establish the 8-byte bound that BigIntegerType drops (max_value =
+  // Infinity). IntegerType's isInRange/isSerializable already compare in BigInt
+  // space, so 2^63 is correctly detected out of range (float64 cannot
+  // distinguish 2^63 from 2^63-1).
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
-  }
-
-  // BigInt-precision range check: float64 cannot distinguish 2^63 from 2^63-1.
-  protected override isInRange(value: number | null): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") {
-      const bytes = this._limit();
-      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
-      const min = -(1n << BigInt(bytes * 8 - 1));
-      return value >= min && value <= max;
-    }
-    return super.isInRange(value);
-  }
-
-  // BigInt-aware serializable check (inherited isSerializable converts BigInt via
-  // Number() before calling isInRange, losing precision at the 2^63 boundary).
-  override isSerializable(value: unknown): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
-    return super.isSerializable(value);
   }
 
   override serializeCastValue(value: number | null): number | null {

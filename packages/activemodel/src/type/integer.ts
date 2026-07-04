@@ -49,6 +49,11 @@ export class IntegerType extends NumericValueType {
 
   isSerializable(value: unknown): boolean {
     if (value === null || value === undefined) return true;
+    // A BigInt is passed straight to the arbitrary-precision range check.
+    // Routing through `Number(value)` would collapse `2n**63n` and `2n**63n-1n`
+    // to the same float (9223372036854775808), so an exactly-2^63 value on an
+    // 8-byte column would wrongly test in-range — see `isInRange`.
+    if (typeof value === "bigint") return this.isInRange(value);
     let num: number;
     if (typeof value === "number") {
       num = value;
@@ -67,14 +72,14 @@ export class IntegerType extends NumericValueType {
 
   /**
    * Mirrors: ActiveModel::Type::Integer#range (integer.rb:84).
-   * Rails: `attr_reader :range` over the half-open `min_value...max_value`.
-   * Exposed as a getter so subclasses can override; matches Rails'
-   * `private` accessor visibility.
+   * Rails: `attr_reader :range` over the half-open `min_value...max_value`
+   * (exclusive max). Exposed as a getter so subclasses can override; matches
+   * Rails' `private` accessor visibility.
    *
    * @internal Rails-private helper.
    */
   protected get range(): [number, number] {
-    return [this.minValue(), this.maxValue() - 1];
+    return [this.minValue(), this.maxValue()];
   }
 
   /**
@@ -83,12 +88,30 @@ export class IntegerType extends NumericValueType {
    *     !value || range.member?(value)
    *   end
    *
+   * Rails' Integer arithmetic is arbitrary-precision, so its half-open
+   * `min_value...max_value` check is exact. JS `number` is float64, which
+   * cannot distinguish `2**63` from `2**63-1`; comparing there would let an
+   * exactly-2^63 value slip past an 8-byte column's exclusive-max bound. We
+   * therefore compare in BigInt space. `min`/`max` are exact powers of two
+   * (or 0), so they convert losslessly; a `number` value is truncated toward
+   * zero first, matching Ruby's `to_i` before `range.member?`. BigInteger's
+   * unlimited `±Infinity` bounds are honored without a BigInt conversion.
+   *
    * @internal Rails-private helper.
    */
-  protected isInRange(value: number | null): boolean {
+  protected isInRange(value: number | bigint | null): boolean {
     if (value == null) return true;
     const [min, max] = this.range;
-    return value >= min && value <= max;
+    let big: bigint;
+    if (typeof value === "bigint") {
+      big = value;
+    } else {
+      if (!isFinite(value)) return false;
+      big = BigInt(Math.trunc(value));
+    }
+    const lowerOk = min === Number.NEGATIVE_INFINITY || big >= BigInt(min);
+    const upperOk = max === Number.POSITIVE_INFINITY || big < BigInt(max);
+    return lowerOk && upperOk;
   }
 
   /** @internal Rails-private helper. */
