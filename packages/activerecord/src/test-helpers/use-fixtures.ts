@@ -6,7 +6,8 @@ import {
   throughJoinTableNames,
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
-import { defineSchema, type Schema } from "./define-schema.js";
+import { type Schema } from "./define-schema.js";
+import { ensureCanonicalTables } from "./canonical-schema.js";
 import {
   fixtureRegistry,
   isJoinTableEntry,
@@ -271,11 +272,8 @@ function useTablelessFixtures(
   if (opts?.schema) {
     const fullSchema = opts.schema;
     beforeAll(async () => {
-      const sub: Schema = {};
-      for (const { table } of entries) {
-        if (table in fullSchema) sub[table] = fullSchema[table]!;
-      }
-      await defineSchema(getAdapter(), sub);
+      const names = entries.map((e) => e.table).filter((t) => t in fullSchema);
+      await ensureCanonicalTables(getAdapter(), names);
     });
   }
 
@@ -486,7 +484,7 @@ export function useFixtures(
     const fullSchema = opts.schema;
     beforeAll(async () => {
       if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-      await defineSchema(getAdapter(), sliceSchema(fixtures, fullSchema));
+      await ensureCanonicalTables(getAdapter(), Object.keys(sliceSchema(fixtures, fullSchema)));
     });
   }
 

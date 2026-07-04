@@ -2096,6 +2096,38 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
 }
 
 /**
+ * Idempotently ensure a named subset of canonical tables exists, creating only
+ * the ones that are missing — the drop-free counterpart of
+ * {@link rebuildCanonicalTables}. This is the ensure-exists primitive the
+ * fixtures engine calls in place of `defineSchema({ …subset })`: under the
+ * template-clone model the canonical tables already exist, so this is a near
+ * no-op (one `tableExists` probe per name, no DDL), which keeps it clean of the
+ * per-load DROP/CREATE churn RFC 0060 targets. Names not in the canonical
+ * registry are silently skipped, mirroring `sliceSchema`'s documented contract
+ * (a non-canonical set's missing table surfaces a precise error at seed time).
+ * Missing tables are created in forward registry order so FK targets exist
+ * before the tables that reference them.
+ */
+export async function ensureCanonicalTables(
+  adapter: DatabaseAdapter,
+  names: readonly string[],
+): Promise<void> {
+  const wanted = new Set(names);
+  const defs = (await buildCanonicalRegistry()).filter((d) => wanted.has(d.name));
+  if (defs.length === 0) return;
+  const { ss, typeMap } = await prepareSchema(adapter);
+  let created = false;
+  for (const def of defs) {
+    if (await ss.tableExists(def.name)) continue;
+    await runTable(adapter, ss, typeMap, def);
+    created = true;
+  }
+  // create_table clears the connection's prepared statements in Rails; only
+  // bother when we actually issued DDL (the common no-op path skips it).
+  if (created) (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+}
+
+/**
  * Drop and recreate a named subset of canonical tables, restoring each to its
  * full canonical shape — the `create_table`-based equivalent of
  * `defineSchema({ …subset }, { dropExisting: true })`. Test files use it as an
