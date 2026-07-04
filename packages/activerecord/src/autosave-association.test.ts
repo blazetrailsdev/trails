@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
@@ -486,6 +487,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   function makeModels() {
     class Company extends Base {
+      declare name: string | null;
+      declare clients: AssociationProxy<Client>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -493,6 +497,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class Client extends Base {
+      declare name: string | null;
+      declare client_of: number | null;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -535,6 +542,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it("invalid adding with validate false", async () => {
     const { Company } = makeModels();
     class UnvalidatedClient extends Base {
+      declare name: string | null;
+      declare client_of: number | null;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -633,6 +643,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // FK has_many keyed on the "id" component (primaryKey: :id). Assigning the
     // child ids must populate order_id with the owner's "id" component.
     class AiCpkOrder extends Base {
+      declare shop_id: number | null;
+      declare status: string | null;
+      declare orderAgreements: AssociationProxy<AiCpkOrderAgreement>;
+
       static {
         this._tableName = "cpk_orders";
         this.attribute("shop_id", "integer");
@@ -647,6 +661,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class AiCpkOrderAgreement extends Base {
+      declare order_id: number | null;
+      declare signature: string | null;
+      declare order: AiCpkOrder | null;
+      declare loadBelongsTo: (name: "order") => Promise<AiCpkOrder | null>;
+
       static {
         this._tableName = "cpk_order_agreements";
         this.attribute("order_id", "integer");
@@ -682,6 +701,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // keyed on [shop_id, order_id] auto-derived from the owner's CPK. The child
     // (book) is itself CPK [author_id, id], so its ids arrive as tuples.
     class AiCpkTwoOrder extends Base {
+      declare shop_id: number | null;
+      declare status: string | null;
+      declare books: AssociationProxy<AiCpkTwoBook>;
+
       static {
         this._tableName = "cpk_orders";
         this.attribute("shop_id", "integer");
@@ -695,6 +718,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class AiCpkTwoBook extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare order_id: number | null;
+      declare shop_id: number | null;
+      declare order: AiCpkTwoOrder | null;
+      declare loadBelongsTo: (name: "order") => Promise<AiCpkTwoOrder | null>;
+
       static {
         this._tableName = "cpk_books";
         this.attribute("author_id", "integer");
@@ -749,6 +779,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // and the has_one uses a non-composite single-column FK, autosave should propagate
     // the "id" component of the composite PK into the child's FK column.
     class CpkOrderPk extends Base {
+      declare shop_id: number | null;
+      declare status: string | null;
+      declare cpkBookFk: CpkBookFk | null;
+      declare loadHasOne: (name: "cpkBookFk") => Promise<CpkBookFk | null>;
+
       static {
         this._tableName = "cpk_orders";
         this.attribute("shop_id", "integer");
@@ -763,6 +798,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class CpkBookFk extends Base {
+      declare order_id: number | null;
+      declare signature: string | null;
+
       static {
         this._tableName = "cpk_order_agreements";
         this.attribute("order_id", "integer");
@@ -784,6 +822,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
   it("assign ids for through a belongs to", async () => {
     class AidFirm extends Base {
+      declare name: string | null;
+      declare aidContracts: AssociationProxy<AidContract>;
+      declare aidDevelopers: AssociationProxy<Base>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -799,6 +841,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class AidContract extends Base {
+      declare company_id: number | null;
+      declare developer_id: number | null;
+      declare aidDeveloper: AidDeveloper | null;
+      declare loadBelongsTo: (name: "aidDeveloper") => Promise<AidDeveloper | null>;
+
       static {
         this._tableName = "contracts";
         this.attribute("company_id", "integer");
@@ -810,6 +857,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       }
     }
     class AidDeveloper extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "developers";
         this.attribute("name", "string");
@@ -933,6 +982,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
   function makeModels() {
     class Firm extends Base {
+      declare name: string | null;
+      declare account: Account | null;
+      declare loadHasOne: (name: "account") => Promise<Account | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -944,6 +997,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class Account extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -959,6 +1015,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("should save parent but not invalid child", async () => {
     // Without autosave: invalid has_one child does not block parent save
     class PFirm extends Base {
+      declare name: string | null;
+      declare pAccount: PAccount | null;
+      declare loadHasOne: (name: "pAccount") => Promise<PAccount | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -966,6 +1026,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class PAccount extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -1000,6 +1063,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("save succeeds for invalid has one with validate false", async () => {
     const { Firm } = makeModels();
     class LooseAccount extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -1075,6 +1141,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks firing order on create", async () => {
     const log: string[] = [];
     class CbFirm extends Base {
+      declare name: string | null;
+      declare cbAccount: CbAccount | null;
+      declare loadHasOne: (name: "cbAccount") => Promise<CbAccount | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -1095,6 +1165,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class CbAccount extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -1120,6 +1193,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks firing order on update", async () => {
     const log: string[] = [];
     class CuFirm extends Base {
+      declare name: string | null;
+      declare cuAccount: CuAccount | null;
+      declare loadHasOne: (name: "cuAccount") => Promise<CuAccount | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -1140,6 +1217,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class CuAccount extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -1164,6 +1244,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks firing order on save", async () => {
     const log: string[] = [];
     class CsFirm extends Base {
+      declare name: string | null;
+      declare csAccount: CsAccount | null;
+      declare loadHasOne: (name: "csAccount") => Promise<CsAccount | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -1181,6 +1265,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class CsAccount extends Base {
+      declare credit_limit: number | null;
+      declare firm_id: number | null;
+
       static {
         this._tableName = "accounts";
         this.attribute("credit_limit", "integer");
@@ -1203,6 +1290,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks on child when parent autosaves child", async () => {
     const log: string[] = [];
     class CbParent extends Base {
+      declare name: string | null;
+      declare cbChild: CbChild | null;
+      declare loadHasOne: (name: "cbChild") => Promise<CbChild | null>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1214,6 +1305,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class CbChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -1240,6 +1334,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       static _tableName = "companies";
     }
     class Iris extends Base {
+      declare firm_id: number | null;
+      declare eye: Eye | null;
+      declare loadBelongsTo: (name: "eye") => Promise<Eye | null>;
+
       static _tableName = "accounts";
       static {
         this.attribute("firm_id", "integer");
@@ -1291,6 +1389,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
     const log: string[] = [];
     class PolyParent extends Base {
+      declare name: string | null;
+      declare polyChild: PolyChild | null;
+      declare loadHasOne: (name: "polyChild") => Promise<PolyChild | null>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1303,6 +1405,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class PolyChild extends Base {
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this._tableName = "chefs";
         this.attribute("employable_id", "integer");
@@ -1345,6 +1452,8 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks on child when child autosaves parent", async () => {
     const log: string[] = [];
     class CbOwner extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1354,6 +1463,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class CbPet extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+      declare cbOwner: CbOwner | null;
+      declare loadBelongsTo: (name: "cbOwner") => Promise<CbOwner | null>;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -1392,6 +1506,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
     const log: string[] = [];
     class PolyAsParent extends Base {
+      declare name: string | null;
+      declare polyAsChild: PolyAsChild | null;
+      declare loadHasOne: (name: "polyAsChild") => Promise<PolyAsChild | null>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1415,6 +1533,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class PolyAsChild extends Base {
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this._tableName = "chefs";
         this.attribute("employable_id", "integer");
@@ -1462,12 +1585,17 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1519,12 +1647,17 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("should automatically save bang the associated model if it sets the inverse record", async () => {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1583,6 +1716,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // When multiple validators fire on the same child attribute, all messages
     // should be merged onto the parent under the dotted attribute key.
     class DualValidShip extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1592,6 +1728,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class DualPirate extends Base {
+      declare catchphrase: string | null;
+      declare dualValidShip: DualValidShip | null;
+      declare loadHasOne: (name: "dualValidShip") => Promise<DualValidShip | null>;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -1615,6 +1755,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should still allow to bypass validations on the associated model", async () => {
     const { Pirate } = makeModels();
     class FlexShip extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1634,6 +1777,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // Rails: test "should allow to bypass validations on associated models at any depth"
     // save(validate: false) should skip validation on the parent and all nested records.
     class DeepPart extends Base {
+      declare name: string | null;
+      declare ship_id: number | null;
+
       static {
         this._tableName = "ship_parts";
         this.attribute("name", "string");
@@ -1642,6 +1788,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class DeepShip extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+      declare deepParts: AssociationProxy<DeepPart>;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1651,6 +1801,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class DeepPirate extends Base {
+      declare catchphrase: string | null;
+      declare deepShip: DeepShip | null;
+      declare loadHasOne: (name: "deepShip") => Promise<DeepShip | null>;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -1697,6 +1851,8 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
   it("should not save and return false if a callback cancelled saving", async () => {
     class CcPirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -1738,12 +1894,17 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // registration time and never re-registers (define_non_cyclic_method's
     // `method_defined?` guard), so a re-declaration would not take effect.
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -1764,6 +1925,11 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("recognises inverse polymorphic association changes with same foreign key", async () => {
     class SwapChef extends Base {
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this._tableName = "chefs";
         this.attribute("employable_id", "integer");
@@ -1775,6 +1941,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class SwapCakeDesigner extends Base {
+      declare name: string | null;
+      declare chef: SwapChef | null;
+      declare loadHasOne: (name: "chef") => Promise<SwapChef | null>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1787,6 +1957,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     class SwapDrinkDesigner extends Base {
+      declare name: string | null;
+      declare chef: SwapChef | null;
+      declare loadHasOne: (name: "chef") => Promise<SwapChef | null>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1829,6 +2003,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   function makeModels() {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1836,6 +2012,9 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -1850,12 +2029,22 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   function makeOrderModels() {
     class Customer extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "customers";
         this.attribute("name", "string");
       }
     }
     class Order extends Base {
+      declare name: string | null;
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare billing: Customer | null;
+      declare shipping: Customer | null;
+      declare loadBelongsTo: ((name: "billing") => Promise<Customer | null>) &
+        ((name: "shipping") => Promise<Customer | null>);
+
       static {
         this._tableName = "nodes";
         this.attribute("name", "string");
@@ -1905,6 +2094,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("save succeeds for invalid belongs to with validate false", async () => {
     class FlexAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1912,6 +2103,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
     registerModel("FlexAuthor", FlexAuthor);
     class FlexPost extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+      declare flexAuthor: FlexAuthor | null;
+      declare loadBelongsTo: (name: "flexAuthor") => Promise<FlexAuthor | null>;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2041,12 +2237,19 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("store association with a polymorphic relationship", async () => {
     class PolyMember extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "members";
         this.attribute("name", "string");
       }
     }
     class PolySponsor extends Base {
+      declare sponsorable_id: number | null;
+      declare sponsorable_type: string | null;
+      declare sponsorable: Base | null;
+      declare loadBelongsTo: (name: "sponsorable") => Promise<Base | null>;
+
       static {
         this._tableName = "sponsors";
         this.attribute("sponsorable_id", "integer");
@@ -2096,6 +2299,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     // Rails: test "composite primary key autosave" — creating a has_one child
     // via autosave propagates composite FK columns from parent to child.
     class CpkOrder2 extends Base {
+      declare shop_id: number | null;
+      declare status: string | null;
+      declare cpkBook2: CpkBook2 | null;
+      declare loadHasOne: (name: "cpkBook2") => Promise<CpkBook2 | null>;
+
       static {
         this._tableName = "cpk_orders";
         this.attribute("shop_id", "integer");
@@ -2110,6 +2318,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       }
     }
     class CpkBook2 extends Base {
+      declare author_id: number | null;
+      declare shop_id: number | null;
+      declare order_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "cpk_books";
         this.attribute("author_id", "integer");
@@ -2151,6 +2364,8 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -2158,6 +2373,9 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -2218,6 +2436,8 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("should still allow to bypass validations on the associated model", async () => {
     class FlexPirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -2225,6 +2445,9 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     }
     registerModel("FlexPirate", FlexPirate);
     class FlexShip extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -2253,6 +2476,9 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   });
   it("should not save and return false if a callback cancelled saving", async () => {
     class CcShip extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -2318,12 +2544,17 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Bird extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "birds";
         this.attribute("name", "string");
@@ -2378,11 +2609,16 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   function makeIndexedHasMany(opts: { indexErrors?: boolean } = {}) {
     const seed = `Idx${Math.random().toString(36).slice(2, 8)}`;
     class Parent extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Child extends Base {
+      declare name: string | null;
+      declare parent_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
@@ -2422,6 +2658,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   });
   it("errors details with error on base should be indexed when passed as array", () => {
     class P extends Base {
+      declare name: string | null;
+      declare kids: AssociationProxy<C>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("kids", {
@@ -2432,6 +2671,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
     }
     class C extends Base {
+      declare favorite: boolean | null;
+      declare p_id: number | null;
+
       static {
         this.attribute("favorite", "boolean");
         this.attribute("p_id", "integer");
@@ -2463,6 +2705,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     });
     try {
       class Reference extends Base {
+        declare favorite: boolean | null;
+        declare job_id: number | null;
+        declare person_id: number | null;
+
         static {
           this.attribute("favorite", "boolean");
           this.attribute("job_id", "integer");
@@ -2474,6 +2720,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         }
       }
       class Person extends Base {
+        declare name: string | null;
+
         static {
           this.attribute("name", "string");
         }
@@ -2512,6 +2760,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     });
     try {
       class Reference extends Base {
+        declare favorite: boolean | null;
+        declare job_id: number | null;
+        declare person_id: number | null;
+
         static {
           this.attribute("favorite", "boolean");
           this.attribute("job_id", "integer");
@@ -2523,6 +2775,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         }
       }
       class Person extends Base {
+        declare name: string | null;
+
         static {
           this.attribute("name", "string");
           this.validates("reference", { presence: true });
@@ -2572,6 +2826,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   useHandlerTransactionalFixtures();
   it("autosave works even when other callbacks update the parent model", async () => {
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -2579,6 +2836,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -2610,6 +2869,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // When autosave validates an associated record, it should NOT pass the owner's
     // standard (:create/:update) validation context — only custom contexts propagate.
     class Person extends Base {
+      declare first_name: string | null;
+
       static {
         this._tableName = "people";
         this.attribute("first_name", "string");
@@ -2625,6 +2886,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Reference extends Base {
+      declare person_id: number | null;
+
       static {
         this._tableName = "references";
         this.attribute("person_id", "integer");
@@ -2657,6 +2920,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // propagation (autosave_association.rb:384) means custom contexts fire even
     // on unchanged persisted children, unlike the default :create/:update skip.
     class Widget extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2665,6 +2931,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Owner extends Base {
+      declare name: string | null;
+      declare widgets: AssociationProxy<Widget>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2692,6 +2961,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave collection association callbacks get called once", async () => {
     let saveCount = 0;
     class Book extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2702,6 +2974,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2728,6 +3002,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave has one association callbacks get called once", async () => {
     let saveCount = 0;
     class Profile extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2738,6 +3015,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class User extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2764,6 +3043,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("autosave belongs to association callbacks get called once", async () => {
     let saveCount = 0;
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2773,6 +3054,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2803,12 +3087,17 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // saves a new target during owner save and writes the parent PK back
     // onto the owner's foreign key.
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2837,12 +3126,18 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // drops the extra FK entries; the loop only writes the positions
     // where both sides exist. No CompositePrimaryKeyMismatchError.
     class Parent extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class Child extends Base {
+      declare parent_id: number | null;
+      declare group: string | null;
+      declare title: string | null;
+
       static {
         this._tableName = "topics";
         this.attribute("parent_id", "integer");
@@ -2880,6 +3175,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // default branch, so the lambda doesn't `throw(:abort)` and the owner
     // save still succeeds — the child simply remains unpersisted.
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2887,6 +3184,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2919,12 +3219,17 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Ruby's `self[nil] = id` would raise — our impl skips the nil-FK
     // partner so a misconfigured pair doesn't blow up the owner save.
     class Parent extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class Child extends Base {
+      declare author_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "books";
         this.attribute("author_id", "integer");
@@ -2955,6 +3260,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("should not add the same callbacks multiple times for has one", async () => {
     let saveCount = 0;
     class Profile extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -2965,6 +3273,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class User extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2993,6 +3303,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("should not add the same callbacks multiple times for belongs to", async () => {
     let saveCount = 0;
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3002,6 +3314,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3029,6 +3344,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("should not add the same callbacks multiple times for has many", async () => {
     let saveCount = 0;
     class Book extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3039,6 +3357,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3065,6 +3385,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   it("should not add the same callbacks multiple times for has and belongs to many", async () => {
     let saveCount = 0;
     class Parrot extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "parrots";
         this.attribute("name", "string");
@@ -3074,6 +3396,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -3108,6 +3432,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Prisoner: belongs_to :ship (autosave: true). Cyclic: prisoner.valid? calls ship.valid? again.
     // _ensureNoDuplicateErrors (after_validation) deduplicates to exactly 1 error for :name.
     class ShipCyclic extends Base {
+      declare name: string | null;
+      declare prisoners: AssociationProxy<PrisonerCyclic>;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -3117,6 +3444,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     class PrisonerCyclic extends Base {
+      declare ship_id: number | null;
+      declare ship: ShipCyclic | null;
+      declare loadBelongsTo: (name: "ship") => Promise<ShipCyclic | null>;
+
       static {
         this._tableName = "prisoners";
         this.attribute("ship_id", "integer");
@@ -3153,12 +3484,17 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -3166,6 +3502,9 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       }
     }
     class Part extends Base {
+      declare name: string | null;
+      declare ship_id: number | null;
+
       static {
         this._tableName = "ship_parts";
         this.attribute("name", "string");
@@ -3263,6 +3602,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should generate validation methods for has_many associations", async () => {
     class VmParent extends Base {
+      declare name: string | null;
+      declare vmChildren: AssociationProxy<VmChild>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3274,6 +3616,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class VmChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3291,6 +3636,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should generate validation methods for has_one associations with :validate => true", async () => {
     class VoParent extends Base {
+      declare name: string | null;
+      declare voChild: VoChild | null;
+      declare loadHasOne: (name: "voChild") => Promise<VoChild | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -3302,6 +3651,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class VoChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3319,6 +3671,10 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
     class NvParent extends Base {
+      declare name: string | null;
+      declare nvChild: NvChild | null;
+      declare loadHasOne: (name: "nvChild") => Promise<NvChild | null>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -3330,6 +3686,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class NvChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3347,6 +3706,8 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should generate validation methods for belongs_to associations with :validate => true", async () => {
     class BvOwner extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3354,6 +3715,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class BvChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+      declare bvOwner: BvOwner | null;
+      declare loadBelongsTo: (name: "bvOwner") => Promise<BvOwner | null>;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3375,6 +3741,8 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should not generate validation methods for belongs_to associations without :validate => true", async () => {
     class NbOwner extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3382,6 +3750,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class NbChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+      declare nbOwner: NbOwner | null;
+      declare loadBelongsTo: (name: "nbOwner") => Promise<NbOwner | null>;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3403,6 +3776,9 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
   it("should generate validation methods for HABTM associations with :validate => true", async () => {
     class HvParent extends Base {
+      declare catchphrase: string | null;
+      declare hvTags: AssociationProxy<HvTag>;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -3416,6 +3792,8 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       }
     }
     class HvTag extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "parrots";
         this.attribute("name", "string");
@@ -3439,12 +3817,17 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -3452,6 +3835,9 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
       }
     }
     class Part extends Base {
+      declare name: string | null;
+      declare ship_id: number | null;
+
       static {
         this._tableName = "ship_parts";
         this.attribute("name", "string");
@@ -3515,12 +3901,17 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   useHandlerTransactionalFixtures();
   it("autosave new record on belongs to can be disabled per relationship", async () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3546,6 +3937,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record on has one can be disabled per relationship", async () => {
     class Profile extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3553,6 +3947,8 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
       }
     }
     class User extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3577,6 +3973,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record on has many can be disabled per relationship", async () => {
     class Book extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -3584,6 +3983,8 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
       }
     }
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3609,6 +4010,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   it("autosave new record with after create callback", async () => {
     const log: string[] = [];
     class Ship extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
@@ -3616,6 +4020,8 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
       }
     }
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
@@ -3644,6 +4050,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record with after create callback and habtm association", async () => {
     class Comment extends Base {
+      declare post_id: number | null;
+      declare body: string | null;
+
       static {
         this._tableName = "comments";
         this.attribute("post_id", "integer");
@@ -3651,12 +4060,20 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
       }
     }
     class Category extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "categories";
         this.attribute("name", "string");
       }
     }
     class PostWithAfterCreateCallback extends Base {
+      declare title: string | null;
+      declare body: string | null;
+      declare author_id: number | null;
+      declare comments: AssociationProxy<Comment>;
+      declare categories: AssociationProxy<Category>;
+
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
@@ -3703,6 +4120,8 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   useHandlerTransactionalFixtures();
   it("should automatically validate associations", async () => {
     class Item extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -3714,6 +4133,8 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true, on: "create" });
@@ -3782,6 +4203,8 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
   useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -3794,6 +4217,8 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 
   it("should not automatically validate associations without :validate => true", async () => {
     class Item extends Base {
+      declare label: string | null;
+
       static {
         this.attribute("label", "string");
       }
@@ -3805,6 +4230,8 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 
   it("validations still fire on unchanged association with custom validation context", async () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true, on: "create" });
@@ -3820,6 +4247,8 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
   useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
     class Profile extends Base {
+      declare bio: string | null;
+
       static {
         this.attribute("bio", "string");
         this.validates("bio", { presence: true });
@@ -3832,6 +4261,8 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 
   it("should not automatically add validate associations without :validate => true", async () => {
     class Address extends Base {
+      declare street: string | null;
+
       static {
         this.attribute("street", "string");
       }
@@ -3846,12 +4277,20 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   useHandlerTransactionalFixtures();
   it("should not has one through model", async () => {
     class HotOrg extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
       }
     }
     class HotMember extends Base {
+      declare name: string | null;
+      declare hotDetail: HotDetail | null;
+      declare hotOrg: Base | null;
+      declare loadHasOne: ((name: "hotDetail") => Promise<HotDetail | null>) &
+        ((name: "hotOrg") => Promise<Base | null>);
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3867,6 +4306,13 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
       }
     }
     class HotDetail extends Base {
+      declare company_id: number | null;
+      declare developer_id: number | null;
+      declare hotOrg: HotOrg | null;
+      declare hotMember: HotMember | null;
+      declare loadBelongsTo: ((name: "hotOrg") => Promise<HotOrg | null>) &
+        ((name: "hotMember") => Promise<HotMember | null>);
+
       static {
         this._tableName = "contracts";
         this.attribute("company_id", "integer");
@@ -3898,6 +4344,12 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   });
   it("should not reversed has one through model", async () => {
     class RevOrg extends Base {
+      declare name: string | null;
+      declare revDetail: RevDetail | null;
+      declare revMember: Base | null;
+      declare loadHasOne: ((name: "revDetail") => Promise<RevDetail | null>) &
+        ((name: "revMember") => Promise<Base | null>);
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -3913,12 +4365,21 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
       }
     }
     class RevMember extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class RevDetail extends Base {
+      declare company_id: number | null;
+      declare developer_id: number | null;
+      declare revOrg: RevOrg | null;
+      declare revMember: RevMember | null;
+      declare loadBelongsTo: ((name: "revOrg") => Promise<RevOrg | null>) &
+        ((name: "revMember") => Promise<RevMember | null>);
+
       static {
         this._tableName = "contracts";
         this.attribute("company_id", "integer");
@@ -3953,6 +4414,8 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
   useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
     class Tag extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
@@ -3964,6 +4427,8 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
   });
   it("should not automatically validate associations without :validate => true", async () => {
     class Label extends Base {
+      declare text: string | null;
+
       static {
         this.attribute("text", "string");
       }
@@ -3981,6 +4446,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   // Comment after_save callback that reads back the inverse `post.comments`.
   function makeModels() {
     class Post extends Base {
+      declare title: string | null;
+      declare body: string | null;
+      declare comments: AssociationProxy<Comment>;
+
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
@@ -3989,6 +4458,11 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
       }
     }
     class Comment extends Base {
+      declare body: string | null;
+      declare post_id: number | null;
+      declare post: Post | null;
+      declare loadBelongsTo: (name: "post") => Promise<Post | null>;
+
       postCommentsCount?: number;
       static {
         this._tableName = "comments";
@@ -4020,12 +4494,19 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
   useHandlerTransactionalFixtures();
   it("should not raise error", async () => {
     class BtOwner extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class BtRecord extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+      declare btOwner: BtOwner | null;
+      declare loadBelongsTo: (name: "btOwner") => Promise<BtOwner | null>;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4091,12 +4572,17 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
   function makeModels() {
     class Pirate extends Base {
+      declare catchphrase: string | null;
+
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
       }
     }
     class Bird extends Base {
+      declare name: string | null;
+      declare pirate_id: number | null;
+
       static {
         this._tableName = "birds";
         this.attribute("name", "string");
@@ -4134,6 +4620,9 @@ describe("should update children when autosave is true and parent is new but chi
   useHandlerTransactionalFixtures();
   it("should update children when autosave is true and parent is new but child is not", async () => {
     class UcParent extends Base {
+      declare name: string | null;
+      declare ucChildren: AssociationProxy<UcChild>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4145,6 +4634,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class UcChild extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4166,6 +4658,9 @@ describe("should update children when autosave is true and parent is new but chi
   });
   it("should automatically save the associated models", async () => {
     class NAutoTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4173,6 +4668,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class NAutoArticle extends Base {
+      declare name: string | null;
+      declare nautoTags: AssociationProxy<NAutoTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4196,6 +4694,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should automatically save bang the associated models", async () => {
     class ASB1Tag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4203,6 +4704,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class ASB1Article extends Base {
+      declare name: string | null;
+      declare asb1Tags: AssociationProxy<ASB1Tag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4225,6 +4729,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should not update children when parent creation with no reason", async () => {
     class NUCTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4232,6 +4739,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class NUCArticle extends Base {
+      declare name: string | null;
+      declare nucTags: AssociationProxy<NUCTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4253,6 +4763,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should automatically validate the associated models", async () => {
     class AVTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4261,6 +4774,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class AVArticle extends Base {
+      declare name: string | null;
+      declare avTags: AssociationProxy<AVTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4280,6 +4796,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should not use default invalid error on associated models", async () => {
     class NDITag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4288,6 +4807,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class NDIArticle extends Base {
+      declare name: string | null;
+      declare ndiTags: AssociationProxy<NDITag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4309,6 +4831,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should default invalid error from i18n", async () => {
     class DITag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4317,6 +4842,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class DIArticle extends Base {
+      declare name: string | null;
+      declare diTags: AssociationProxy<DITag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4337,6 +4865,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should allow to bypass validations on the associated models on update", async () => {
     class BVUTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4345,6 +4876,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class BVUArticle extends Base {
+      declare name: string | null;
+      declare bvuTags: AssociationProxy<BVUTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4367,6 +4901,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should validation the associated models on create", async () => {
     class VCTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4375,6 +4912,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class VCArticle extends Base {
+      declare name: string | null;
+      declare vcTags: AssociationProxy<VCTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4394,6 +4934,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should allow to bypass validations on the associated models on create", async () => {
     class BVTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4402,6 +4945,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class BVArticle extends Base {
+      declare name: string | null;
+      declare bvTags: AssociationProxy<BVTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4423,6 +4969,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should not save and return false if a callback cancelled saving in either create or update", async () => {
     class CBTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4433,6 +4982,8 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class CBArticle extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4447,6 +4998,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should not load the associated models if they were not loaded yet", async () => {
     class NLTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4454,6 +5008,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class NLArticle extends Base {
+      declare name: string | null;
+      declare nlTags: AssociationProxy<NLTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4472,6 +5029,9 @@ describe("should update children when autosave is true and parent is new but chi
   });
   it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
     class METag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4480,6 +5040,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class MEArticle extends Base {
+      declare name: string | null;
+      declare meTags: AssociationProxy<METag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4500,6 +5063,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should rollback any changes if an exception occurred while saving", async () => {
     class RBTag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4507,6 +5073,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class RBArticle extends Base {
+      declare name: string | null;
+      declare rbTags: AssociationProxy<RBTag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4532,6 +5101,9 @@ describe("should update children when autosave is true and parent is new but chi
 
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
     class RITag extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
       static {
         this._tableName = "books";
         this.attribute("name", "string");
@@ -4540,6 +5112,9 @@ describe("should update children when autosave is true and parent is new but chi
       }
     }
     class RIArticle extends Base {
+      declare name: string | null;
+      declare riTags: AssociationProxy<RITag>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4565,6 +5140,8 @@ describe("ChangedForAutosaveTest", () => {
 
   it("parent is changed_for_autosave when nested autosave child is changed", () => {
     class Child extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
@@ -4673,6 +5250,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   // hits branch 2 and returns queryConstraintsList — pairing with the composite FK.
   it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
     class QcOwner extends Base {
+      declare tree_id: number | null;
+      declare name: string | null;
+      declare qcChild: QcChild | null;
+      declare loadHasOne: (name: "qcChild") => Promise<QcChild | null>;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
@@ -4688,6 +5270,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
       }
     }
     class QcChild extends Base {
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
@@ -4722,6 +5308,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     // association both FK and PK would be composite, so no-mismatch is the happy path.
     // This test confirms the collapse does NOT fire for QC-derived PK arrays.
     class QcNoCollapse extends Base {
+      declare tree_id: number | null;
+      declare name: string | null;
+      declare qcNoCollapseChild: QcNoCollapseChild | null;
+      declare loadHasOne: (name: "qcNoCollapseChild") => Promise<QcNoCollapseChild | null>;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
@@ -4738,6 +5329,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
       }
     }
     class QcNoCollapseChild extends Base {
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
@@ -4766,6 +5361,11 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   // computePrimaryKey collapses the QC list to a scalar PK via the "id" rule.
   it("uses queryConstraintsList as PK when class has_query_constraints? and scalar FK", async () => {
     class QcTenant extends Base {
+      declare tree_id: number | null;
+      declare name: string | null;
+      declare qcTenantRecord: QcTenantRecord | null;
+      declare loadHasOne: (name: "qcTenantRecord") => Promise<QcTenantRecord | null>;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
@@ -4782,6 +5382,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
       }
     }
     class QcTenantRecord extends Base {
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "nodes";
         this.attribute("tree_id", "integer");
