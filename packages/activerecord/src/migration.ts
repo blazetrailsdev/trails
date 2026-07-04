@@ -2263,6 +2263,16 @@ export class MigrationContext {
     const cols = Array.isArray(columns) ? columns : [columns];
     const unique = options?.unique ?? false;
     const an = this._adapterName;
+    // Warm the cached database version before issuing the index DDL. The MySQL
+    // adapter's `addIndex` builds the `CREATE INDEX` through its SchemaCreation
+    // visitor, which gates the `DESC`/`ASC` sort-order suffix on
+    // `supportsIndexSortOrder()` — a synchronous read of `_databaseVersion` that
+    // silently yields false when unset. MigrationContext#addIndex runs on the
+    // shared-worker schema-reconstruct path on a freshly-leased connection whose
+    // version is still cold, and neither MySQL `addIndex` override warms it, so
+    // warm it here — otherwise a genuinely descending index round-trips ascending
+    // (the MariaDB reconstruct flake fixed in #4397).
+    if (an === "mysql") await this.connection.getDatabaseVersion?.();
     // Rails' `Migration` delegates the DDL — and the default index-name
     // derivation (index_name → generate_index_name, incl. the identifier-length
     // hash fallback) — to `connection.add_index`. Delegate rather than
@@ -2280,9 +2290,9 @@ export class MigrationContext {
     // (abstract/schema_statements.rb#add_options_for_index_columns, via the
     // MySQL adapter's `super` call). PostgreSQL/SQLite always support it; MySQL
     // is version-gated (MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1), so older servers drop
-    // `DESC`/`ASC` from the DDL. The delegated `addIndex` above has already warmed
-    // the cached database version, so `supportsIndexSortOrder()` reads true/false
-    // correctly here — the stored `orders` must match what the DDL persisted.
+    // `DESC`/`ASC` from the DDL. The version was warmed above, so
+    // `supportsIndexSortOrder()` reads true/false correctly here — the stored
+    // `orders` must match what the DDL the adapter emitted actually persisted.
     const sortOrderSupported =
       typeof this.connection.supportsIndexSortOrder === "function"
         ? this.connection.supportsIndexSortOrder()
