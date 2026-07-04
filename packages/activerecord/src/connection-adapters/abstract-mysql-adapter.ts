@@ -122,7 +122,7 @@ class MysqlBigInteger extends BigIntegerType {
   }
 
   override serializeCastValue(value: number | null): number | null {
-    return this.ensureInRange(value);
+    return this.ensureInRange(value) as number | null;
   }
 
   override serialize(value: unknown): unknown {

@@ -146,9 +146,16 @@ describe("IntegerTest", () => {
   });
 
   it("columns with a larger limit have larger ranges", () => {
-    // bigint range (8 bytes)
-    const bigVal = 2 ** 53 - 1; // MAX_SAFE_INTEGER
-    expect(type.cast(bigVal)).toBe(bigVal);
+    const type = new Types.IntegerType({ limit: 8 });
+
+    expect(type.serialize(9223372036854775807n)).toBe(9223372036854775807n);
+    expect(type.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);
+    expect(() => type.serialize(-9999999999999999999999999999999n)).toThrowError(
+      /out of range for IntegerType/,
+    );
+    expect(() => type.serialize(9999999999999999999999999999999n)).toThrowError(
+      /out of range for IntegerType/,
+    );
   });
 
   it("serializable? checks an 8-byte column bound in BigInt space (2^63 exclusive)", () => {
