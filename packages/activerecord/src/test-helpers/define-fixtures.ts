@@ -500,6 +500,113 @@ type InsertHost = DatabaseStatementsHost &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
 /**
+ * A fixture set whose rows are fully built (ids/associations/timestamps/encryption
+ * resolved) but not yet inserted. Mirrors Rails' `FixtureSet#table_rows` — the
+ * pure row-building result, decoupled from the single `insert_fixtures_set` that
+ * writes an entire load's worth of sets (`fixtures.rb` `insert`).
+ * @internal
+ */
+export interface PreparedFixtureSet {
+  /** Every table this set writes: the model's own table plus any through/HABTM join tables. */
+  tables: Record<string, FixtureAttrs[]>;
+  /** Model table needing a Postgres serial-sequence resync after insert, or null. */
+  serialReset: { table: string; column: string } | null;
+  /** Restores the declared-id registry when the shared insert fails (see `ref`). */
+  rollback: () => void;
+  /** Reloads the persisted rows into the caller-facing result once the insert has run. */
+  finalize: () => Promise<Record<string, unknown>>;
+}
+
+/**
+ * Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
+ * SQLite rowids and MySQL AUTO_INCREMENT, which self-adjust), so a record
+ * created after fixtures load would draw a value the fixtures already used and
+ * hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!`
+ * (postgresql/schema_statements.rb) by syncing the serial sequence to MAX(col)
+ * once the rows are in. Resolve the sequence first and only `setval` when it
+ * exists — an `id` PK without a serial sequence (UUID / explicit PK) yields a
+ * NULL sequence, and `setval(NULL, …)` would raise and poison the surrounding
+ * per-test transaction (a swallowed JS catch can't un-abort it).
+ */
+async function resetPkSequence(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  serialResetCol: string,
+): Promise<void> {
+  // pg_get_serial_sequence takes the column as a bound text value and matches
+  // it verbatim (case-sensitive, no quote-stripping); defineSchema stores every
+  // identifier with its exact case, so passing the column as-is matches both
+  // lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs.
+  const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
+    tableName,
+    serialResetCol,
+  ]);
+  const sequence = seqRows[0]?.seq as string | null | undefined;
+  if (!sequence) return;
+  const qt = adapter.quoteTableName(tableName);
+  const qc = adapter.quoteColumnName(serialResetCol);
+  await adapter.executeMutation(
+    `SELECT setval($1, GREATEST(COALESCE(MAX(${qc}), 0), 1), COALESCE(MAX(${qc}), 0) <> 0) FROM ${qt}`,
+    [sequence],
+  );
+}
+
+/**
+ * Inserts a whole load's worth of prepared fixture sets through a SINGLE
+ * `insertFixturesSet` call, mirroring Rails' `fixtures.rb` `insert`: it merges
+ * every set's `table_rows` into one `table_rows_for_connection` hash and calls
+ * `conn.insert_fixtures_set(table_rows_for_connection, keys)` exactly once per
+ * pool per load. That one call owns the sole `disable_referential_integrity`
+ * block and the sole `transaction(requires_new: true)` — so referential
+ * integrity is toggled once per load, not once per table (RFC 0060: the #4528
+ * profile pinned 96% of PG DDL time on per-table RI toggling).
+ *
+ * Sets are prepared in declaration order (so a later set's `ref()` resolves ids
+ * a prior set registered), then all rows land together with RI disabled, so
+ * cross-table FK order among them does not matter. Returns each set's reloaded
+ * result in the same order the sets were passed.
+ * @internal
+ */
+export async function insertPreparedFixtureSets(
+  adapter: DatabaseAdapter,
+  prepared: PreparedFixtureSet[],
+): Promise<Record<string, unknown>[]> {
+  // No sets → nothing to insert; skip the load's RI toggle entirely.
+  if (prepared.length === 0) return [];
+
+  // Merge per-table rows across every set. Rails uses `unshift(*rows)` so a set
+  // prepared later prepends its rows; for the common case of one set per table
+  // order is irrelevant, and RI is disabled during the insert regardless.
+  const merged: Record<string, FixtureAttrs[]> = {};
+  for (const p of prepared) {
+    for (const [table, rows] of Object.entries(p.tables)) {
+      (merged[table] ??= []).unshift(...rows);
+    }
+  }
+
+  // One insert_fixtures_set for the whole load: deletes every table once, then
+  // inserts every row, all inside one RI-disabled transaction.
+  try {
+    await insertFixturesSet.call(adapter as unknown as InsertHost, merged, Object.keys(merged));
+  } catch (err) {
+    // On failure, roll back every set's declared-id registry so a subsequent
+    // ref() doesn't resolve to ids for rows that never landed in the database.
+    for (const p of prepared) p.rollback();
+    throw err;
+  }
+
+  if (adapter.adapterName === "postgres") {
+    for (const p of prepared) {
+      if (p.serialReset) await resetPkSequence(adapter, p.serialReset.table, p.serialReset.column);
+    }
+  }
+
+  const results: Record<string, unknown>[] = [];
+  for (const p of prepared) results.push(await p.finalize());
+  return results;
+}
+
+/**
  * Mirrors Rails' EncryptedFixtures#encrypt_fixture_data +
  * process_preserved_original_columns. For each encrypted attribute in each
  * row, serializes the cleartext value to ciphertext in-place so the DB stores
@@ -563,7 +670,28 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
 }
 
 /**
- * Inserts fixture rows for a model and returns persisted instances keyed by label.
+ * Inserts fixture rows for a single model and returns persisted instances keyed
+ * by label. Thin wrapper over {@link prepareModelFixtures} +
+ * {@link insertPreparedFixtureSets} for callers loading one set on its own
+ * (e.g. `FixtureSet.create`); multi-set loaders (`useFixtures`) prepare every
+ * set first and insert them together through one `insertFixturesSet`.
+ */
+export async function defineFixtures<T extends BaseClass, K extends string>(
+  adapter: DatabaseAdapter,
+  ModelClass: T,
+  fixtures: Record<K, FixtureAttrs>,
+): Promise<{ [P in K]: InstanceType<T> }> {
+  const prepared = await prepareModelFixtures(adapter, ModelClass, fixtures);
+  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
+  return result as { [P in K]: InstanceType<T> };
+}
+
+/**
+ * Builds (but does not insert) the fixture rows for a model, returning a
+ * {@link PreparedFixtureSet}. Mirrors Rails' `FixtureSet#table_rows`: id,
+ * association, timestamp, and encryption resolution happen here; the actual
+ * write is deferred to {@link insertPreparedFixtureSets} so a whole load's sets
+ * insert together under one referential-integrity toggle.
  *
  * IDs are deterministic: same label → same ID across test runs, enabling cross-batch
  * FK references via `ref(tableName, label)` without insertion-order coupling.
@@ -590,11 +718,11 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
  *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
  *   timestamp tables seed without each fixture row spelling the columns out).
  */
-export async function defineFixtures<T extends BaseClass, K extends string>(
+export async function prepareModelFixtures(
   adapter: DatabaseAdapter,
-  ModelClass: T,
-  fixtures: Record<K, FixtureAttrs>,
-): Promise<{ [P in K]: InstanceType<T> }> {
+  ModelClass: BaseClass,
+  fixtures: Record<string, FixtureAttrs>,
+): Promise<PreparedFixtureSet> {
   await ensureStaticDeclaredIds();
   const tableName = ModelClass.tableName;
   const declaredPk = ModelClass.primaryKey;
@@ -665,7 +793,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     { rows: FixtureAttrs[]; throughModel: BaseClass | undefined }
   >();
 
-  const labels = Object.keys(fixtures) as K[];
+  const labels = Object.keys(fixtures);
 
   // Pre-pass: build this table's label→id map locally, then swap it in atomically
   // so a mid-loop validation failure (e.g. non-integer declared PK) leaves the
@@ -684,12 +812,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   const tableIds = new Map<string, DeclaredKey>();
   if (typeof pkCol === "string") {
     for (const label of labels) {
-      const id = resolveDeclaredPk(
-        tableName,
-        pkCol,
-        label,
-        (fixtures[label] as FixtureAttrs)[pkCol],
-      );
+      const id = resolveDeclaredPk(tableName, pkCol, label, fixtures[label][pkCol]);
       tableIds.set(label, id);
     }
   }
@@ -750,7 +873,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // verbatim (Rails parity); rows without one fall back to fixtureId(label).
   // Inheritance column (mirrors Rails' model_metadata.inheritance_column_name):
   // null when the model isn't STI, so non-STI fixtures skip subclass resolution.
-  const inheritanceCol = (ModelClass as BaseClass).inheritanceColumn;
+  const inheritanceCol = ModelClass.inheritanceColumn;
 
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
@@ -1014,29 +1137,14 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     encryptFixtureRows(ModelClass, rows);
   }
 
-  // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.
-  // On failure, roll back the declared-id registry to its pre-call state so subsequent
-  // ref() calls don't resolve to ids for rows that never made it to the database.
-  try {
-    await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
-      tableName,
-    ]);
-  } catch (err) {
-    if (priorTableIds === undefined) {
-      adapterIds.delete(tableName);
-    } else {
-      adapterIds.set(tableName, priorTableIds);
-    }
-    throw err;
-  }
+  // Assemble the tables this set writes: the model's own rows plus any join rows
+  // materialized from owner through/HABTM association labels. All are inserted
+  // together by insertPreparedFixtureSets under one referential-integrity toggle.
+  const tables: Record<string, FixtureAttrs[]> = { [tableName]: rows };
 
-  // Insert any join rows materialized from owner through/HABTM association labels.
-  // Each join table is delete-before-insert (tablesToDelete) so a reseed replaces
-  // the prior set's rows, exactly like the model-row insert above. These join
-  // models are seeded straight against their FK columns, like the explicit
-  // join-table fixtures (`developers-projects.ts`) loaded via defineJoinTableFixtures.
-  // Rails' `add_join_records` stamps every join row with the fixture set's single
-  // `now`, so compute it once here rather than per join table.
+  // Join rows from through/HABTM association labels. Rails' `add_join_records`
+  // stamps every join row with the fixture set's single `now`, so compute it
+  // once here rather than per join table.
   if (joinTableRows.size > 0) {
     const now = currentTimeFromProperTimezone();
     for (const [joinTable, { rows: jrows, throughModel }] of joinTableRows) {
@@ -1055,81 +1163,65 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         );
         for (const jr of jrows) for (const c of stampCols) if (!(c in jr)) jr[c] = now;
       }
-      await insertFixturesSet.call(adapter as unknown as InsertHost, { [joinTable]: jrows }, [
-        joinTable,
-      ]);
+      // Another set may contribute to the same join table (both declare the
+      // through association); concatenate rather than clobber, mirroring Rails'
+      // table_rows_for_connection merge. Within one set the Map already coalesces.
+      (tables[joinTable] ??= []).push(...jrows);
     }
   }
 
-  // Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
-  // SQLite rowids and MySQL AUTO_INCREMENT, which self-adjust), so a record
-  // created after fixtures load would draw a value the fixtures already used
-  // and hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!`
-  // (postgresql/schema_statements.rb) by syncing the `id` sequence to MAX(id)
-  // once the rows are in. Resolve the sequence first and only `setval` when it
-  // exists — an `id` PK without a serial sequence (UUID / explicit PK) yields a
-  // NULL sequence, and `setval(NULL, …)` would raise and poison the surrounding
-  // per-test transaction (a swallowed JS catch can't un-abort it).
-  // Applies to any single-column serial PK, not just `id`: a custom-named
-  // integer PK (e.g. `movieid`, `pet_id`) is also a serial sequence under
-  // `defineSchema`, so it needs the same MAX-sync to avoid colliding with a
-  // post-fixtures `create`. Composite (`string[]`) and id-less (`null`) PKs are
-  // skipped, and the `if (sequence)` guard no-ops for non-serial PKs.
-  if (adapter.adapterName === "postgres" && serialResetCol !== null) {
-    // pg_get_serial_sequence takes the column as a bound text value and matches
-    // it verbatim (case-sensitive, no quote-stripping); defineSchema stores
-    // every identifier with its exact case, so passing the column as-is matches
-    // both lowercase (`id`, `pet_id`) and mixed-case (`monkeyID`) PKs. For a
-    // composite MODEL PK over a single serial DB `id` (CpkOrder), this syncs that
-    // `id` sequence past the explicit composite-generated ids just inserted.
-    const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
-      tableName,
-      serialResetCol,
-    ]);
-    const sequence = seqRows[0]?.seq as string | null | undefined;
-    if (sequence) {
-      const qt = adapter.quoteTableName(tableName);
-      const qc = adapter.quoteColumnName(serialResetCol);
-      await adapter.executeMutation(
-        `SELECT setval($1, GREATEST(COALESCE(MAX(${qc}), 0), 1), COALESCE(MAX(${qc}), 0) <> 0) FROM ${qt}`,
-        [sequence],
-      );
+  // On insert failure, restore the declared-id registry to its pre-prepare state
+  // (the swap happened above) so a subsequent ref() doesn't resolve to ids for
+  // rows that never made it to the database.
+  const rollback = () => {
+    if (priorTableIds === undefined) {
+      adapterIds.delete(tableName);
+    } else {
+      adapterIds.set(tableName, priorTableIds);
     }
-  }
+  };
 
   // Reload persisted instances so AR attribute casting is applied. Reload runs
   // `unscoped` so a model default_scope (e.g. Bulb's `where(name: "defaulty")`)
   // can't hide a just-seeded row — fixtures bypass default scopes in Rails too.
   // Id-less tables (pkCol === null) have no PK to look up by, so match the full
   // inserted row instead.
-  const result = {} as { [P in K]: InstanceType<T> };
-  for (let i = 0; i < labels.length; i++) {
-    const label = labels[i];
-    const row = rows[i];
-    // Single PK → match by the one column; composite PK → match by every key
-    // column; id-less (pkCol === null) → match the full inserted row.
-    let criteria: FixtureAttrs;
-    if (pkCol === null) {
-      criteria = row;
-    } else if (typeof pkCol === "string") {
-      criteria = { [pkCol]: row[pkCol] };
-    } else {
-      criteria = {};
-      for (const keyCol of pkCol) criteria[keyCol] = row[keyCol];
+  const finalize = async (): Promise<Record<string, unknown>> => {
+    const result: Record<string, unknown> = {};
+    for (let i = 0; i < labels.length; i++) {
+      const label = labels[i];
+      const row = rows[i];
+      // Single PK → match by the one column; composite PK → match by every key
+      // column; id-less (pkCol === null) → match the full inserted row.
+      let criteria: FixtureAttrs;
+      if (pkCol === null) {
+        criteria = row;
+      } else if (typeof pkCol === "string") {
+        criteria = { [pkCol]: row[pkCol] };
+      } else {
+        criteria = {};
+        for (const keyCol of pkCol) criteria[keyCol] = row[keyCol];
+      }
+      const find = () => (ModelClass as any).findBy(criteria);
+      const record =
+        typeof (ModelClass as any).unscoped === "function"
+          ? await (ModelClass as any).unscoped(find)
+          : await find();
+      if (!record) {
+        throw new Error(
+          `defineFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, criteria: ${JSON.stringify(criteria)})`,
+        );
+      }
+      result[label] = record;
     }
-    const find = () => (ModelClass as any).findBy(criteria);
-    const record =
-      typeof (ModelClass as any).unscoped === "function"
-        ? await (ModelClass as any).unscoped(find)
-        : await find();
-    if (!record) {
-      throw new Error(
-        `defineFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, criteria: ${JSON.stringify(criteria)})`,
-      );
-    }
-    result[label] = record as InstanceType<T>;
-  }
-  return result;
+    return result;
+  };
+
+  // Composite (`string[]`) and id-less (`null`) PKs are skipped; the sequence
+  // resync (Postgres only) applies to any single-column serial PK.
+  const serialReset = serialResetCol !== null ? { table: tableName, column: serialResetCol } : null;
+
+  return { tables, serialReset, rollback, finalize };
 }
 
 /**
@@ -1152,6 +1244,22 @@ export async function defineJoinTableFixtures(
   tableName: string,
   fixtures: Record<string, FixtureAttrs>,
 ): Promise<Record<string, FixtureAttrs>> {
+  const prepared = await prepareJoinTableFixtures(adapter, tableName, fixtures);
+  const [result] = await insertPreparedFixtureSets(adapter, [prepared]);
+  return result as Record<string, FixtureAttrs>;
+}
+
+/**
+ * Builds (but does not insert) the rows for a tableless HABTM join fixture set,
+ * returning a {@link PreparedFixtureSet}. The tableless analogue of
+ * {@link prepareModelFixtures}: no declared-id registration or reload, since a
+ * join table has no model to cast through or single PK to look rows up by.
+ */
+export async function prepareJoinTableFixtures(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  fixtures: Record<string, FixtureAttrs>,
+): Promise<PreparedFixtureSet> {
   await ensureStaticDeclaredIds();
   // Read the live schema columns so a fixture row referencing a column the join
   // table doesn't have fails loudly here, not as an opaque INSERT error.
@@ -1186,9 +1294,10 @@ export async function defineJoinTableFixtures(
     resolved[label] = row;
   }
 
-  // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.
-  await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
-    tableName,
-  ]);
-  return resolved;
+  return {
+    tables: { [tableName]: rows },
+    serialReset: null,
+    rollback: () => {},
+    finalize: async () => resolved,
+  };
 }

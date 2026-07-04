@@ -1,8 +1,10 @@
 import { afterEach, beforeAll, beforeEach } from "vitest";
 import {
-  defineFixtures,
-  defineJoinTableFixtures,
+  prepareModelFixtures,
+  prepareJoinTableFixtures,
+  insertPreparedFixtureSets,
   throughJoinTableNames,
+  type PreparedFixtureSet,
 } from "./define-fixtures.js";
 import { defineSchema, type Schema } from "./define-schema.js";
 import {
@@ -279,9 +281,18 @@ function useTablelessFixtures(
 
   beforeEach(async () => {
     const adapter = getAdapter();
+    // Prepare every entry then insert through one insertFixturesSet — one
+    // referential-integrity toggle per load (see the by-name loader above).
+    const prepared: PreparedFixtureSet[] = [];
+    const tables: string[] = [];
     for (const { table, data } of entries) {
-      store[table] = await defineJoinTableFixtures(adapter, table, data);
+      prepared.push(await prepareJoinTableFixtures(adapter, table, data));
+      tables.push(table);
     }
+    const results = await insertPreparedFixtureSets(adapter, prepared);
+    results.forEach((result, i) => {
+      store[tables[i]] = result;
+    });
   });
 
   afterEach(async () => {
@@ -489,6 +500,12 @@ export function useFixtures(
     // different set than the accessors built below from `keys`.
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
     const adapter = getAdapter();
+    // Prepare every set (in declaration order, so a later set's ref() resolves
+    // ids a prior set registered), then insert them all through ONE
+    // insertFixturesSet — one referential-integrity toggle per load, mirroring
+    // Rails' fixtures.rb `insert` merging table_rows into one insert_fixtures_set.
+    const prepared: PreparedFixtureSet[] = [];
+    const preparedKeys: string[] = [];
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
       // Auto-register the (object-map) model, mirroring the by-name path's
       // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
@@ -500,12 +517,17 @@ export function useFixtures(
       if (model !== null && "_modelsByName" in model) {
         registerModel(model);
       }
-      const result =
+      prepared.push(
         model === null
-          ? await defineJoinTableFixtures(adapter, table, data)
-          : await defineFixtures(adapter, model, data);
-      store[key] = result as Record<string, unknown>;
+          ? await prepareJoinTableFixtures(adapter, table, data)
+          : await prepareModelFixtures(adapter, model, data),
+      );
+      preparedKeys.push(key);
     }
+    const results = await insertPreparedFixtureSets(adapter, prepared);
+    results.forEach((result, i) => {
+      store[preparedKeys[i]] = result;
+    });
   });
 
   afterEach(async () => {
