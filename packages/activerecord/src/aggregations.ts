@@ -1,5 +1,4 @@
 import type { Base } from "./base.js";
-import { reload as persistenceReload } from "./persistence.js";
 import { AggregateReflection } from "./reflection.js";
 
 /**
@@ -219,22 +218,26 @@ export function initializeDup(this: Base, other: unknown): void {
   if (src) (this as { _aggregationCache?: Map<string, unknown> })._aggregationCache = new Map(src);
 }
 
+type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
+type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
+
 /**
- * Clear the aggregation cache before reloading from the database.
+ * Clear the aggregation cache before reloading from the database, then delegate
+ * to the inherited `reload` (Ruby `super`). `inheritedReload` is the reload
+ * method that sat on the prototype when Aggregations was mixed in, captured at
+ * include time so the delegation walks the real ancestry
+ * (Aggregations → AutosaveAssociation → Persistence) rather than hardcoding a
+ * jump straight to Persistence#reload. This keeps the autosave hop live for
+ * when AutosaveAssociation#reload is ported (it resets marked-for-destruction /
+ * loaded association targets before its own `super`).
  *
  * Mirrors: ActiveRecord::Aggregations#reload
  */
-export async function reload<T extends Base>(
-  this: T,
-  options?: { lock?: boolean | string; unscoped?: boolean },
-): Promise<T> {
-  clearAggregationCache(this);
-  return (
-    persistenceReload as unknown as (
-      this: T,
-      options?: { lock?: boolean | string; unscoped?: boolean },
-    ) => Promise<T>
-  ).call(this, options);
+export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
+  return function (this: T, options?: ReloadOptions): Promise<T> {
+    clearAggregationCache(this);
+    return inheritedReload.call(this, options);
+  };
 }
 
 /**
@@ -270,10 +273,15 @@ export function includeAggregations(modelClass: typeof Base): void {
     enumerable: false,
   });
 
-  // Aggregations#reload clears the aggregation cache then calls super
-  // (Persistence#reload, which this export delegates to explicitly).
+  // Aggregations#reload clears the aggregation cache then calls super. Capture
+  // the inherited reload (Ruby `super`) at include time so the delegation walks
+  // the real ancestry (Aggregations → AutosaveAssociation → Persistence) rather
+  // than hardcoding a jump straight to Persistence#reload — mirroring the
+  // inheritedInitializeDup capture below. Keeps the autosave hop live for when
+  // AutosaveAssociation#reload is ported.
+  const inheritedReload = proto.reload as ReloadFn<Base>;
   Object.defineProperty(proto, "reload", {
-    value: reload,
+    value: reload(inheritedReload),
     writable: true,
     configurable: true,
     enumerable: false,
