@@ -328,8 +328,8 @@ export abstract class Migration {
   async up(): Promise<void> {
     const legacy = this._legacyClassDirection("up");
     if (legacy) return legacy();
-    // Default: run change() in forward direction
-    await this._runChange("up");
+    // Default: run change() in the forward direction.
+    await this.change();
   }
 
   /**
@@ -341,7 +341,8 @@ export abstract class Migration {
   async down(): Promise<void> {
     const legacy = this._legacyClassDirection("down");
     if (legacy) return legacy();
-    await this._runChange("down");
+    // Mirrors Rails exec_migration: `down` == `revert { change }`.
+    await this.revert(() => this.change());
   }
 
   /**
@@ -377,265 +378,6 @@ export abstract class Migration {
     // Subclasses override
   }
 
-  private async _runChange(direction: "up" | "down"): Promise<void> {
-    if (direction === "up") {
-      await this.change();
-    } else {
-      // Record operations from change(), then replay in reverse
-      this._recording = true;
-      // Pass the connection as delegate so the change_table recorder proxy can
-      // surface adapter-specific column-type shorthands (t.hstore, t.jsonb, ...).
-      this._recorder = new CommandRecorder(this.connection);
-      try {
-        await this.change();
-      } finally {
-        this._recording = false;
-      }
-
-      // If no operations were recorded, migration is irreversible
-      if (this._recorder.commands.length === 0) {
-        throw new IrreversibleMigration(
-          `${this.constructor.name}#down is not implemented. This migration is irreversible.`,
-        );
-      }
-
-      // Replay in reverse using CommandRecorder
-      for (const { cmd, args } of this._recorder.commands.slice().reverse()) {
-        await this._reverseOperation(cmd, args);
-      }
-    }
-  }
-
-  private async _reverseOperation(cmd: string, args: unknown[]): Promise<void> {
-    switch (cmd) {
-      case "createTable":
-        await this.dropTable(args[0] as string);
-        break;
-      case "dropTable":
-        throw new IrreversibleMigration("Cannot reverse dropTable without table definition");
-      case "addColumn":
-        await this.removeColumn(args[0] as string, args[1] as string);
-        break;
-      case "removeColumn": {
-        const [rcTable, rcCol, rcType] = args as [string, string, ColumnType?];
-        if (!rcType) {
-          throw new IrreversibleMigration("Cannot reverse removeColumn without type info");
-        }
-        await this.addColumn(rcTable, rcCol, rcType);
-        break;
-      }
-      case "addIndex": {
-        // Rails inverts add_index to remove_index with the original positional
-        // args, so a String expression column (e.g. "remind_at, place_id") routes
-        // through the expression-aware index-name derivation rather than being
-        // wrapped in a `column:` option and matched as a literal identifier list.
-        const column = args[1] as string | string[];
-        const origOpts = args[2] as { name?: string } | undefined;
-        if (origOpts?.name) {
-          await this.removeIndex(args[0] as string, column, { name: origOpts.name });
-        } else {
-          await this.removeIndex(args[0] as string, column);
-        }
-        break;
-      }
-      case "removeIndex": {
-        const riOpts = args[1] as { column?: string | string[]; name?: string } | undefined;
-        if (!riOpts?.column) {
-          throw new IrreversibleMigration("Cannot reverse removeIndex without column info");
-        }
-        if (riOpts.name) {
-          await this.addIndex(args[0] as string, riOpts.column, { name: riOpts.name });
-        } else {
-          await this.addIndex(args[0] as string, riOpts.column);
-        }
-        break;
-      }
-      case "renameColumn":
-        await this.renameColumn(args[0] as string, args[2] as string, args[1] as string);
-        break;
-      case "renameTable":
-        await this.renameTable(args[1] as string, args[0] as string);
-        break;
-      case "renameIndex":
-        await this.renameIndex(args[0] as string, args[2] as string, args[1] as string);
-        break;
-      case "changeColumnDefault": {
-        const [cdTable, cdCol, cdOpts] = args as [string, string, { from?: unknown; to: unknown }];
-        if (cdOpts && typeof cdOpts === "object" && "from" in cdOpts) {
-          await this.changeColumnDefault(cdTable, cdCol, { from: cdOpts.to, to: cdOpts.from });
-        } else {
-          throw new IrreversibleMigration("Cannot reverse changeColumnDefault without from/to");
-        }
-        break;
-      }
-      case "changeColumnNull": {
-        const [cnTable, cnCol, cnAllow, cnDefault] = args as [string, string, boolean, unknown?];
-        await this.changeColumnNull(cnTable, cnCol, !cnAllow, cnDefault);
-        break;
-      }
-      case "changeColumn":
-        throw new IrreversibleMigration("Cannot reverse changeColumn without previous type info");
-      case "addForeignKey": {
-        const fkOpts = args[2] as { column?: string; name?: string } | undefined;
-        await this.removeForeignKey(args[0] as string, fkOpts ?? (args[1] as string));
-        break;
-      }
-      case "addReference":
-        await this.removeReference(
-          args[0] as string,
-          args[1] as string,
-          args[2] as { polymorphic?: boolean } | undefined,
-        );
-        break;
-      case "removeReference":
-        await this.addReference(
-          args[0] as string,
-          args[1] as string,
-          args[2] as { polymorphic?: boolean; foreignKey?: boolean } | undefined,
-        );
-        break;
-      case "createJoinTable":
-        await this.dropJoinTable(
-          args[0] as string,
-          args[1] as string,
-          args[2] as { tableName?: string } | undefined,
-        );
-        break;
-      case "dropJoinTable":
-        throw new IrreversibleMigration("Cannot reverse dropJoinTable without table definition");
-      case "addCheckConstraint": {
-        const [table, expr, opts] = args as [string, string, { name?: string }?];
-        const constraintName = opts?.name ?? this.schema._checkConstraintName(table, expr);
-        await this.removeCheckConstraint(table, { name: constraintName });
-        break;
-      }
-      case "removeCheckConstraint": {
-        const [rmTable, rmArg] = args as [string, string | { name?: string } | undefined];
-        if (typeof rmArg === "string") {
-          await this.addCheckConstraint(rmTable, rmArg);
-        } else {
-          throw new IrreversibleMigration(
-            "Cannot reverse removeCheckConstraint without expression",
-          );
-        }
-        break;
-      }
-      case "changeColumnComment": {
-        const [ccTable, ccCol, ccOpts] = args as [string, string, { from?: unknown; to?: unknown }];
-        if (
-          !ccOpts ||
-          typeof ccOpts !== "object" ||
-          !("from" in ccOpts) ||
-          ccOpts.from === undefined ||
-          !("to" in ccOpts) ||
-          ccOpts.to === undefined
-        ) {
-          throw new IrreversibleMigration(
-            "change_column_comment is only reversible if given a :from and :to option.",
-          );
-        }
-        await this.changeColumnComment(ccTable, ccCol, { from: ccOpts.to, to: ccOpts.from });
-        break;
-      }
-      case "changeTableComment": {
-        const [ctTable, ctOpts] = args as [string, { from?: unknown; to?: unknown }];
-        if (
-          !ctOpts ||
-          typeof ctOpts !== "object" ||
-          !("from" in ctOpts) ||
-          ctOpts.from === undefined ||
-          !("to" in ctOpts) ||
-          ctOpts.to === undefined
-        ) {
-          throw new IrreversibleMigration(
-            "change_table_comment is only reversible if given a :from and :to option.",
-          );
-        }
-        await this.changeTableComment(ctTable, { from: ctOpts.to, to: ctOpts.from });
-        break;
-      }
-      case "enableExtension": {
-        const [extName, extOpts] = args as [string, Record<string, unknown>?];
-        await this.disableExtension(extName, extOpts);
-        break;
-      }
-      case "disableExtension": {
-        const [dextName, dextOpts] = args as [string, Record<string, unknown>?];
-        await this.enableExtension(dextName, dextOpts);
-        break;
-      }
-      case "createEnum": {
-        const [enumName, enumValues, enumOpts] = args as [
-          string,
-          string[],
-          Record<string, unknown>?,
-        ];
-        await this.dropEnum(enumName, enumValues, enumOpts);
-        break;
-      }
-      case "dropEnum": {
-        const [deEnumName, deValues, deOpts] = args as [
-          string,
-          string[] | undefined,
-          Record<string, unknown>?,
-        ];
-        if (!deValues) {
-          throw new IrreversibleMigration("Cannot reverse dropEnum without a list of enum values");
-        }
-        await this.createEnum(deEnumName, deValues, deOpts);
-        break;
-      }
-      case "renameEnumValue": {
-        const [revName, revOpts] = args as [string, { from: string; to: string }];
-        await this.renameEnumValue(revName, { from: revOpts.to, to: revOpts.from });
-        break;
-      }
-      case "addUniqueConstraint": {
-        const [ucTable, ucColumn, ucOpts] = args as [
-          string,
-          string | string[] | undefined,
-          Record<string, unknown>?,
-        ];
-        if (ucOpts?.["usingIndex"]) {
-          throw new IrreversibleMigration(
-            "add_unique_constraint is not reversible if given a using_index.",
-          );
-        }
-        await this.removeUniqueConstraint(ucTable, ucColumn, ucOpts);
-        break;
-      }
-      case "removeUniqueConstraint": {
-        const [rucTable, rucColumn, rucOpts] = args as [
-          string,
-          string | string[] | undefined,
-          Record<string, unknown>?,
-        ];
-        if (!rucColumn) {
-          throw new IrreversibleMigration(
-            "remove_unique_constraint is only reversible if given a column_name.",
-          );
-        }
-        await this.addUniqueConstraint(rucTable, rucColumn, rucOpts);
-        break;
-      }
-      default: {
-        // Delegate unknown commands to CommandRecorder's invert dispatch so
-        // Rails-shape ops like removeColumns/addColumns/changeTable round-
-        // trip. Mirrors Rails: revert { } -> recorder.replay(self) where
-        // replayed cmds are the inverted ones.
-        const { cmd: iCmd, args: iArgs } = this._recorder.inverseOf(cmd, args);
-        const method = (this as unknown as Record<string, (...a: unknown[]) => Promise<void>>)[
-          iCmd
-        ];
-        if (typeof method !== "function") {
-          throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
-        }
-        await method.apply(this, iArgs);
-        break;
-      }
-    }
-  }
-
   // -- Schema operations (delegated to SchemaStatements) --
   // Migration records operations for reversibility, then delegates
   // actual SQL execution to this.schema (a SchemaStatements instance).
@@ -666,7 +408,17 @@ export abstract class Migration {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("createTable", [name, optionsOrFn, fn]);
+      // Record `[name, options?, block?]` without trailing `undefined`, so the
+      // inversion to drop_table (which keeps every arg, including the block, for
+      // reversibility) doesn't carry a stray arg into the executed statement.
+      const recordArgs: unknown[] = [name];
+      if (typeof optionsOrFn === "function") {
+        recordArgs.push(optionsOrFn);
+      } else {
+        if (optionsOrFn !== undefined) recordArgs.push(optionsOrFn);
+        if (fn !== undefined) recordArgs.push(fn);
+      }
+      this._recorder.record("createTable", recordArgs);
       return;
     }
     const tname = this._pt(name);
@@ -674,20 +426,29 @@ export abstract class Migration {
   }
 
   async dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+    ...args: Array<
+      | string
+      | { ifExists?: boolean; force?: "cascade"; temporary?: boolean }
+      | ((t: TableDefinition) => void)
+    >
   ): Promise<void> {
-    const last = args[args.length - 1];
+    const rest = [...args] as unknown[];
+    // Rails drop_table(*table_names, **options, &block): the trailing block is
+    // the table definition, kept only so the recorder can recreate on reversal.
+    const block = typeof rest[rest.length - 1] === "function" ? rest.pop() : undefined;
+    const last = rest[rest.length - 1];
     const hasOptions = last !== null && typeof last === "object";
     const options = hasOptions
       ? (last as { ifExists?: boolean; force?: "cascade"; temporary?: boolean })
       : undefined;
-    const names = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const names = (hasOptions ? rest.slice(0, -1) : rest) as string[];
     if (this._recording) {
       // Record the raw (un-prefixed) names — invert replays through createTable,
       // which re-applies the table-name prefix. The recorder accepts the splat.
-      this._recorder.record("dropTable", options ? [...names, options] : names);
+      const recordArgs: unknown[] = [...names];
+      if (options) recordArgs.push(options);
+      if (block) recordArgs.push(block);
+      this._recorder.record("dropTable", recordArgs);
       return;
     }
     const tnames = names.map((n) => this._pt(n)) as [string, ...string[]];
@@ -902,14 +663,20 @@ export abstract class Migration {
     toTableOrOptions?:
       | string
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    options?: { column?: string; name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("removeForeignKey", [fromTable, toTableOrOptions]);
+      // Rails records `remove_foreign_key(from_table, to_table, **options)`;
+      // preserve the trailing options so invert_add_foreign_key's column/name
+      // survive the round-trip and resolve the real constraint on replay.
+      const recordArgs: unknown[] = [fromTable, toTableOrOptions];
+      if (options !== undefined) recordArgs.push(options);
+      this._recorder.record("removeForeignKey", recordArgs);
       return;
     }
     fromTable = this._pt(fromTable);
     if (typeof toTableOrOptions === "string") toTableOrOptions = this._pt(toTableOrOptions);
-    await this.schema.removeForeignKey(fromTable, toTableOrOptions);
+    await this.schema.removeForeignKey(fromTable, toTableOrOptions, options);
   }
 
   async addCheckConstraint(
@@ -935,13 +702,19 @@ export abstract class Migration {
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("removeCheckConstraint", [tableName, expressionOrOptions]);
+      // Rails records `remove_check_constraint(table, expression, **options)`;
+      // preserve the trailing options so invert_add_check_constraint's :name
+      // survives the round-trip and resolves the real constraint on replay.
+      const recordArgs: unknown[] = [tableName, expressionOrOptions];
+      if (options !== undefined) recordArgs.push(options);
+      this._recorder.record("removeCheckConstraint", recordArgs);
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
+    await this.schema.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
   async validateCheckConstraint(
     tableName: string,
@@ -1273,24 +1046,77 @@ export abstract class Migration {
   async revert(migrationOrFn?: Migration | (() => Promise<void>)): Promise<void> {
     if (migrationOrFn === undefined) return;
     if (migrationOrFn instanceof Migration) {
-      (migrationOrFn as any).connection = this.connection;
-      await migrationOrFn.down();
-    } else {
-      // Record operations and reverse them, preserving outer recorder state
-      const outerRecording = this._recording;
-      const outerRecorder = this._recorder;
-      const innerRecorder = new CommandRecorder();
-      this._recording = true;
-      this._recorder = innerRecorder;
+      // Mirrors Rails `revert(*migration_classes)` -> `run(..., revert: true)`.
+      await this._run(migrationOrFn, { revert: true });
+      return;
+    }
+    const fn = migrationOrFn;
+    if (this._recording) {
+      // Nested: reuse the active recorder and just toggle its direction, so a
+      // `revert` inside a reverting migration cancels by double-negation
+      // (mirrors Rails `connection.revert(&block)` when connection is already a
+      // CommandRecorder — no fresh recorder, no replay, and no suppress_messages:
+      // Rails only suppresses in the outer branch).
+      await this._recorder.revert(async () => {
+        await fn();
+      });
+      return;
+    }
+    // Outermost: swap in a CommandRecorder as the active delegate, record the
+    // block in reverting mode (commands invert at record time), restore, then
+    // replay the recorded inverses for real.
+    const previousRecorder = this._recorder;
+    const recorder = new CommandRecorder(this.connection);
+    this._recorder = recorder;
+    this._recording = true;
+    try {
+      await recorder.revert(async () => {
+        await this.suppressMessages(async () => {
+          await fn();
+        });
+      });
+    } finally {
+      this._recorder = previousRecorder;
+      this._recording = false;
+    }
+    await recorder.replay(this as unknown as Record<string, (...a: unknown[]) => Promise<void>>);
+  }
+
+  /**
+   * Run another migration in a direction, flipping it under `revert`.
+   *
+   * Mirrors: ActiveRecord::Migration#run — when the current migration is itself
+   * reverting, running a sub-migration `:up` means executing it `:down` without
+   * reverting, so it wraps the call in a nested `revert`.
+   */
+  private async _run(
+    migration: Migration,
+    opts: { direction?: "up" | "down"; revert?: boolean } = {},
+  ): Promise<void> {
+    let dir = opts.direction ?? "up";
+    if (opts.revert) dir = dir === "down" ? "up" : "down";
+    if (this.isReverting()) {
+      await this.revert(async () => {
+        await this._run(migration, { direction: dir, revert: true });
+      });
+    } else if (this._recording) {
+      // Recording (but not reverting): route the sub-migration's ops into the
+      // active recorder by sharing our recorder state with it.
+      const prevRecorder = migration._recorder;
+      const prevRecording = migration._recording;
+      const prevConn = migration._connectionOverride;
+      migration._recorder = this._recorder;
+      migration._recording = true;
+      migration._connectionOverride = this.connection;
       try {
-        await migrationOrFn();
+        await (dir === "up" ? migration.up() : migration.down());
       } finally {
-        this._recording = outerRecording;
-        this._recorder = outerRecorder;
+        migration._recorder = prevRecorder;
+        migration._recording = prevRecording;
+        migration._connectionOverride = prevConn;
       }
-      for (const { cmd, args } of innerRecorder.commands.slice().reverse()) {
-        await this._reverseOperation(cmd, args);
-      }
+    } else {
+      await migration.execMigration(this.connection, dir);
     }
   }
 
@@ -1312,7 +1138,7 @@ export abstract class Migration {
       up: (f) => upFns.push(f),
       down: (f) => downFns.push(f),
     });
-    if (this._recording) {
+    if (this.isReverting()) {
       // During reversal recording, run the down fns
       for (const f of downFns) await f();
     } else {
@@ -1327,7 +1153,7 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#up_only
    */
   async upOnly(fn?: () => Promise<void>): Promise<void> {
-    if (!this._recording && fn) {
+    if (!this.isReverting() && fn) {
       await fn();
     }
   }
@@ -1353,7 +1179,7 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#reverting?
    */
   isReverting(): boolean {
-    return this._recording;
+    return this._recording && this._recorder.reverting;
   }
 
   async isViewExists(viewName: string): Promise<boolean> {

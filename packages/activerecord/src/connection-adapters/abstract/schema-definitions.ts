@@ -1,6 +1,6 @@
 import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
-import { singularize, pluralize } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
@@ -312,9 +312,13 @@ export class CheckConstraintDefinition {
   }
 
   isDefinedFor(options: { name: string; expression?: string; validate?: boolean }): boolean {
+    // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
+    // ...): it matches on name (and validate) only — the expression is accepted
+    // but never compared (it is used upstream to derive the name). A raw-string
+    // expression compare would spuriously fail against the adapter's normalized
+    // form (e.g. PostgreSQL's `pg_get_constraintdef`).
     return (
       this.name === options.name.toString() &&
-      (options.expression === undefined || this.expression === options.expression) &&
       (options.validate === undefined || options.validate === this.validate)
     );
   }
@@ -1012,12 +1016,13 @@ export class TableDefinition {
     return this;
   }
 
+  // Mirrors Rails' check_constraint_name: sha256 of `<table>_<expression>_chk`,
+  // first 10 hex, prefixed `chk_rails_`. The schema dumper's chkIgnorePattern
+  // (`^chk_rails_[0-9a-f]{10}$`) omits names matching this default, matching Rails.
   private _checkConstraintName(expression: string): string {
-    let hash = 0;
-    for (let i = 0; i < expression.length; i++) {
-      hash = ((hash << 5) - hash + expression.charCodeAt(i)) | 0;
-    }
-    return `chk_${this.tableName}_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+    const identifier = `${this.tableName}_${expression}_chk`;
+    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `chk_rails_${hex}`;
   }
 
   foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): this {

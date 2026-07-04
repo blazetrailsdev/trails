@@ -318,14 +318,33 @@ export class SchemaStatements {
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
-    if (
-      options.comment != null &&
-      options.comment.length > 0 &&
-      this.adapter.supportsComments?.() &&
-      !this.adapter.supportsCommentsInCreate?.() &&
-      typeof this.adapter.changeTableComment === "function"
-    ) {
-      await this.adapter.changeTableComment(name, options.comment);
+    if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
+      if (
+        options.comment != null &&
+        options.comment.length > 0 &&
+        typeof this.adapter.changeTableComment === "function"
+      ) {
+        await this.adapter.changeTableComment(name, options.comment);
+      }
+      // Mirrors Rails: adapters that can't inline column comments in CREATE
+      // emit a COMMENT ON COLUMN per column so inline `comment:` options
+      // round-trip through columns().
+      const commentAdapter = this.adapter as {
+        changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
+      };
+      if (typeof commentAdapter.changeColumnComment === "function") {
+        // ColumnDefinition keeps the comment under `.options.comment` (Rails'
+        // `column.comment` reads through to the options hash).
+        for (const column of td.columns as Array<{
+          name: string;
+          options?: { comment?: string | null };
+        }>) {
+          const columnComment = column.options?.comment;
+          if (columnComment != null && String(columnComment).length > 0) {
+            await commentAdapter.changeColumnComment(name, column.name, columnComment);
+          }
+        }
+      }
     }
 
     if (!this.adapter.supportsIndexesInCreate?.()) {
@@ -401,6 +420,16 @@ export class SchemaStatements {
   ): Promise<void> {
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
+    }
+    // SQLite rebuilds the table (alter_table) to drop a column so indexes that
+    // reference it are dropped instead of left dangling; delegate when the
+    // adapter supplies its own removeColumn (mirrors renameColumn's gate).
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.removeColumn === "function" &&
+      adapter.removeColumn !== SchemaStatements.prototype.removeColumn
+    ) {
+      return adapter.removeColumn(tableName, columnName, _type, options);
     }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
@@ -693,6 +722,19 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
+    // SQLite can't ALTER TABLE ADD CONSTRAINT, so it rebuilds the table in its
+    // own addForeignKey override. When invoked through a SchemaStatements
+    // wrapper (this !== the adapter), delegate to that override. The
+    // `this !== adapter` guard keeps adapters that call `super` (e.g. PostgreSQL)
+    // from re-entering this gate and recursing.
+    const fkAdapter = this.adapter as any;
+    if (
+      this !== fkAdapter &&
+      typeof fkAdapter.addForeignKey === "function" &&
+      fkAdapter.addForeignKey !== SchemaStatements.prototype.addForeignKey
+    ) {
+      return fkAdapter.addForeignKey(fromTable, toTable, options);
+    }
     // Mirrors Rails' add_foreign_key short-circuit:
     //   return if options[:if_not_exists] == true &&
     //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
@@ -744,32 +786,41 @@ export class SchemaStatements {
     toTableOrOptions?:
       | string
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    options: { column?: string; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
       typeof adapter.removeForeignKey === "function" &&
       adapter.removeForeignKey !== SchemaStatements.prototype.removeForeignKey
     ) {
-      return adapter.removeForeignKey(fromTable, toTableOrOptions);
+      return adapter.removeForeignKey(fromTable, toTableOrOptions, options);
     }
-    const ifExists = typeof toTableOrOptions === "object" && toTableOrOptions?.ifExists === true;
-    let name: string;
-    if (typeof toTableOrOptions === "string") {
-      const column = this.foreignKeyColumnFor(toTableOrOptions);
-      name = `fk_${fromTable}_${column}`;
-    } else if (toTableOrOptions?.name) {
-      name = toTableOrOptions.name;
-    } else if (toTableOrOptions?.column) {
-      name = `fk_${fromTable}_${toTableOrOptions.column}`;
-    } else if (toTableOrOptions?.toTable) {
-      const column = this.foreignKeyColumnFor(toTableOrOptions.toTable);
-      name = `fk_${fromTable}_${column}`;
+    // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
+    // resolve the actual constraint via foreign_key_for! (matching column /
+    // name / to_table against the live foreign keys) rather than deriving a
+    // name, so a hashed `fk_rails_<hex>` name drops correctly.
+    let toTable: string | undefined;
+    let opts: { column?: string; name?: string; toTable?: string; ifExists?: boolean };
+    if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
+      opts = { ...toTableOrOptions };
+      toTable = opts.toTable;
     } else {
-      throw new Error("removeForeignKey requires a target table or options");
+      toTable = toTableOrOptions;
+      opts = { ...options };
     }
-    const ifExistsSql = ifExists ? " IF EXISTS" : "";
+    // Rails checks existence with only the positional to_table
+    // (`foreign_key_exists?(from_table, to_table)`), then resolves the exact
+    // constraint via foreign_key_for! using column/name too.
+    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, { toTable }))) {
+      return;
+    }
+    const fk = await this.foreignKeyForBang(fromTable, {
+      toTable,
+      column: opts.column,
+      name: opts.name,
+    });
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT${ifExistsSql} ${this._qi(name)}`,
+      `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT ${this._qi(fk.name)}`,
     );
   }
 
@@ -792,7 +843,7 @@ export class SchemaStatements {
     ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
-    const name = options.name ?? this._checkConstraintName(tableName, expression);
+    const name = this.checkConstraintName(tableName, { name: options.name, expression });
     const validate = options.validate !== false;
     const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
     await this.adapter.executeMutation(
@@ -803,37 +854,42 @@ export class SchemaStatements {
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    options: { name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
       typeof adapter.removeCheckConstraint === "function" &&
       adapter.removeCheckConstraint !== SchemaStatements.prototype.removeCheckConstraint
     ) {
-      return adapter.removeCheckConstraint(tableName, expressionOrOptions);
+      return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
     }
-    const ifExists =
-      typeof expressionOrOptions === "object" && expressionOrOptions?.ifExists === true;
-    let name: string;
+    // Mirrors Rails remove_check_constraint(table, expression = nil, **options):
+    // resolve the live constraint via check_constraint_for! (by :name, else the
+    // hash of the expression) and drop it by its real name — mirroring how
+    // removeForeignKey resolves via foreignKeyForBang. No name is derived-and-dropped.
+    let expression: string | undefined;
+    let opts: { name?: string; ifExists?: boolean };
     if (typeof expressionOrOptions === "string") {
-      name = this._checkConstraintName(tableName, expressionOrOptions);
-    } else if (expressionOrOptions?.name) {
-      name = expressionOrOptions.name;
+      expression = expressionOrOptions;
+      opts = { ...options };
     } else {
-      throw new Error("removeCheckConstraint requires either an expression or { name } option");
+      expression = undefined;
+      opts = { ...(expressionOrOptions ?? {}), ...options };
     }
-    const ifExistsSql = ifExists ? " IF EXISTS" : "";
+    // Only pass `name` when present: checkConstraintFor derives one from the
+    // expression, and an explicit `name: undefined` would clobber it.
+    const lookup: { name?: string; expression?: string } = { expression };
+    if (opts.name !== undefined) lookup.name = opts.name;
+    const chk = await this.checkConstraintFor(tableName, lookup);
+    if (!chk) {
+      if (opts.ifExists === true) return;
+      throw new ArgumentError(
+        `Table '${tableName}' has no check constraint for ${expression ?? JSON.stringify(opts)}`,
+      );
+    }
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT${ifExistsSql} ${this._qi(name)}`,
+      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT ${this._qi(chk.name)}`,
     );
-  }
-
-  _checkConstraintName(tableName: string, expression: string): string {
-    let hash = 0;
-    for (let i = 0; i < expression.length; i++) {
-      hash = ((hash << 5) - hash + expression.charCodeAt(i)) | 0;
-    }
-    const hex = (hash >>> 0).toString(16).padStart(8, "0");
-    return `chk_${tableName}_${hex}`;
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
