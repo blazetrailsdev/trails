@@ -24,6 +24,7 @@ import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtuali
 import {
   resolveAssociationTarget,
   resolveThroughTarget,
+  isEmittableTargetName,
   stripQuotes,
   type ModelAssociationLookup,
 } from "../src/type-virtualization/resolve-target.js";
@@ -362,24 +363,56 @@ function buildModelAssociationLookup(
  * Resolve every `through:` association on the file's models to its source
  * class, keyed `"<ClassName>#<assocName>"`. Unresolvable chains fall back to
  * `Base` (always in scope) — keeps output green.
+ *
+ * Plain (non-`through`) `belongsTo`/`hasOne`/`hasMany` targets are also
+ * pinned to `Base` when they classify to a name that is neither a registered
+ * model nor lexically visible from the declaring class — otherwise the
+ * synthesizer would emit a dangling class reference (TS2304), e.g.
+ * `hasOne("otherThing")` with no `OtherThing` model → `declare otherThing:
+ * OtherThing | null`. Resolvable targets are left untouched so their real
+ * type (and auto-import) is preserved.
  */
 function buildAssociationTargets(
+  sf: ts.SourceFile,
   modelClasses: readonly ClassInfo[],
   lookup: ModelAssociationLookup,
   aliases: ReadonlyMap<string, string>,
+  registry: ReadonlyMap<string, string>,
 ): Map<string, string> {
   const targets = new Map<string, string>();
+  const moduleScope = collectNamesInScope(sf);
   for (const info of modelClasses) {
     const own = associationCalls(info);
+    // Names a bare target reference spliced into this class can resolve to:
+    // module-scope imports/decls plus lexically-visible in-file classes.
+    // Mirrors the visibility set `resolveAutoImports` uses.
+    const visible = new Set(moduleScope);
+    collectVisibleClassNames(info.classDecl, visible);
     // Resolve `through:` against the class's inheritance-merged association
     // set so a subclass whose `through` target is an INHERITED association
     // (e.g. `SpecialComment.has_one :author, through: :post`, where `post` is
     // `Comment`'s `belongs_to`) finds it instead of degrading to `Base`.
     const defining = lookup(info.name) ?? own;
     for (const call of own) {
-      if (!call.options["through"]) continue;
-      const resolved = resolveThroughTarget(defining, call, lookup, aliases) ?? "Base";
-      targets.set(`${info.name}#${call.name}`, resolved);
+      if (call.options["through"]) {
+        const resolved = resolveThroughTarget(defining, call, lookup, aliases) ?? "Base";
+        targets.set(`${info.name}#${call.name}`, resolved);
+        continue;
+      }
+      // Polymorphic belongsTo is rendered as `Base` by the synthesizer
+      // directly (no single target class), so leave it out of the map.
+      if (call.options["polymorphic"] === "true") continue;
+      const resolved = resolveAssociationTarget(call);
+      const mapped = aliases.get(resolved) ?? resolved;
+      if (
+        isEmittableTargetName(
+          mapped,
+          (n) => registry.has(n),
+          (n) => visible.has(n),
+        )
+      )
+        continue;
+      targets.set(`${info.name}#${call.name}`, "Base");
     }
   }
   return targets;
@@ -743,9 +776,11 @@ async function main(): Promise<void> {
     // Pre-resolve `through:` targets so declares + auto-imports name the real
     // source class, not `classify`-of-the-association-name.
     const associationTargets = buildAssociationTargets(
+      sf,
       walk(sf, { isModelClass }),
       associationLookup,
       classNameAliases,
+      registry,
     );
     const prependImports = resolveAutoImports(
       sf,

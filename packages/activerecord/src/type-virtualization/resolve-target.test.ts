@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { resolveThroughTarget, type ModelAssociationLookup } from "./resolve-target.js";
+import {
+  resolveThroughTarget,
+  isEmittableTargetName,
+  type ModelAssociationLookup,
+} from "./resolve-target.js";
 import type { AssociationCall, AssociationKind, RecordLiteral } from "./walker.js";
 
 function assoc(kind: AssociationKind, name: string, options: RecordLiteral = {}): AssociationCall {
@@ -72,5 +76,28 @@ describe("resolveThroughTarget", () => {
     expect(resolveThroughTarget([plain], plain, () => undefined)).toBeUndefined();
     const orphan = assoc("hasMany", "comments", { through: '"posts"' });
     expect(resolveThroughTarget([orphan], orphan, () => undefined)).toBeUndefined();
+  });
+});
+
+describe("isEmittableTargetName", () => {
+  const none = () => false;
+
+  test("Base is always emittable (in scope everywhere)", () => {
+    expect(isEmittableTargetName("Base", none, none)).toBe(true);
+  });
+
+  test("a registered model is emittable (auto-import will resolve it)", () => {
+    const registered = (n: string) => n === "Comment";
+    expect(isEmittableTargetName("Comment", registered, none)).toBe(true);
+  });
+
+  test("a lexically-visible in-file class is emittable", () => {
+    const visible = (n: string) => n === "Thing";
+    expect(isEmittableTargetName("Thing", none, visible)).toBe(true);
+  });
+
+  test("an unregistered, invisible name is NOT emittable — caller pins it to Base", () => {
+    // classify("otherThing") → "OtherThing" with no backing model: dangling.
+    expect(isEmittableTargetName("OtherThing", none, none)).toBe(false);
   });
 });
