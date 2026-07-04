@@ -10,14 +10,18 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 
 // Mirrors Rails' `retry_flaky_test` (secure_password_test.rb): retry the timing
 // assertion a few times before failing, so a single unlucky preemption spike
-// doesn't fail CI. Re-throws the last assertion error once retries are spent.
+// doesn't fail CI. Rails rescues only `Minitest::Assertion`; we likewise retry
+// only assertion failures (vitest throws `AssertionError`) so a genuine
+// exception surfaces immediately instead of being masked and delayed. Re-throws
+// the last assertion error once retries are spent.
 async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     try {
       await fn();
       return;
     } catch (error) {
-      if (attempt >= retryCount) throw error;
+      const isAssertion = error instanceof Error && error.name === "AssertionError";
+      if (!isAssertion || attempt >= retryCount) throw error;
     }
   }
 }
