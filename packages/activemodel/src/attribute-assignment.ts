@@ -95,18 +95,32 @@ export function sanitizeForMassAssignment(
  * `#update`/`#update!` (which iterate a raw writeAttribute loop) — so all
  * agree on the class and message text for the same input.
  *
- * NOTE: Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct
- * raises here; JS has no each_pair, so we approximate with "plain object"
- * (any non-null, non-array object). A Date passed here duck-types past the
- * guard and no-ops via Object.keys → {}. Tightening to reject non-plain
- * objects is a follow-up (no caller relies on it today).
+ * Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct raises
+ * here; JS has no `each_pair`, so we accept a plain object (prototype is
+ * `Object.prototype` or null) or a params-style wrapper that duck-types
+ * `permitted?`/`to_h` (ActionController::Parameters' analogue). A Date, Map,
+ * Set, or arbitrary class instance has no hash semantics and raises, matching
+ * Rails' rejection of anything not responding to `each_pair`.
  */
 export function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
-  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs) || !isHashLike(attrs)) {
     throw new ArgumentError(
       `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(attrs)} passed.`,
     );
   }
+}
+
+/**
+ * A plain object (literal / `Object.create(null)`) has hash semantics, as does
+ * a params-style wrapper duck-typing `permitted`/`toH` — the trails analogue of
+ * `ActionController::Parameters`, which Rails admits via `respond_to?(:each_pair)`.
+ * Everything else (Date, Map, Set, arbitrary class instances) is rejected.
+ */
+function isHashLike(attrs: object): boolean {
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return true;
+  const wrapper = attrs as PermittedAttributes;
+  return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
 }
 
 function typeNameForError(value: unknown): string {
