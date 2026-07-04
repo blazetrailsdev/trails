@@ -5,13 +5,11 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency extra columns in instantiate", () => {
-  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
-  // hydration rows below track the canonical column order (see the model
-  // comments), so no bespoke schema is declared.
+  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
+  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
-  // Canonical `posts` column order (schema.rb): id, author_id, title — so `title`
-  // hydrates from `t0_r2`, matching the schema `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
@@ -42,27 +40,24 @@ describe("JoinDependency extra columns in instantiate", () => {
 
     const rows = [
       {
-        t0_r0: 1,
-        t0_r2: "First Post",
-        t1_r0: 10,
-        t1_r1: 1,
-        t1_r2: "Nice",
+        ...jd.aliasedRow({
+          "": { id: 1, title: "First Post" },
+          comments: { id: 10, post_id: 1, body: "Nice" },
+        }),
         comment_count: 5,
       },
       {
-        t0_r0: 1,
-        t0_r2: "First Post",
-        t1_r0: 11,
-        t1_r1: 1,
-        t1_r2: "Great",
+        ...jd.aliasedRow({
+          "": { id: 1, title: "First Post" },
+          comments: { id: 11, post_id: 1, body: "Great" },
+        }),
         comment_count: 5,
       },
       {
-        t0_r0: 2,
-        t0_r2: "Second Post",
-        t1_r0: 12,
-        t1_r1: 2,
-        t1_r2: "Cool",
+        ...jd.aliasedRow({
+          "": { id: 2, title: "Second Post" },
+          comments: { id: 12, post_id: 2, body: "Cool" },
+        }),
         comment_count: 1,
       },
     ];
@@ -80,11 +75,10 @@ describe("JoinDependency extra columns in instantiate", () => {
 
     const rows = [
       {
-        t0_r0: 1,
-        t0_r2: "Post",
-        t1_r0: 10,
-        t1_r1: 1,
-        t1_r2: "Hello",
+        ...jd.aliasedRow({
+          "": { id: 1, title: "Post" },
+          comments: { id: 10, post_id: 1, body: "Hello" },
+        }),
         extra_col: "extra_value",
       },
     ];
@@ -103,7 +97,9 @@ describe("JoinDependency extra columns in instantiate", () => {
     const jd = new JoinDependency(Post);
     jd.addAssociation("comments");
 
-    const rows = [{ t0_r0: 1, t0_r2: "Post", t1_r0: 10, t1_r1: 1, t1_r2: "Hi" }];
+    const rows = [
+      jd.aliasedRow({ "": { id: 1, title: "Post" }, comments: { id: 10, post_id: 1, body: "Hi" } }),
+    ];
 
     const { parents } = jd.instantiateFromRows(rows);
 
