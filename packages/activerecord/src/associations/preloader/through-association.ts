@@ -437,6 +437,19 @@ export class ThroughAssociation extends Association {
         const nestedIncludes: any[] = reflScopeVals?._includesAssociations ?? [];
         const nestedJoins: any[] = reflScopeVals?._namedInnerJoins ?? [];
         const nestedLeftOuter: any[] = reflScopeVals?._leftOuterJoinsValues ?? [];
+        // Raw string / Arel-node joins (`.joins("INNER JOIN …")`) and explicit-ON
+        // joins the reflection scope carries in its own join buckets. Rails nests
+        // these under the source reflection alongside the symbol-association joins
+        // (`values[:joins]`, through_association.rb:132-134); a raw join is
+        // self-contained SQL that names its own tables, so carrying it at the top
+        // level of the through query emits the same JOIN (see the carry below).
+        const nestedRawJoinValues: any[] = reflScopeVals?._joinValues ?? [];
+        const nestedRawJoinClauses: any[] = reflScopeVals?._joinClauses ?? [];
+        const rawJoinTables = this._rawJoinTableNames(
+          reflScopeVals,
+          nestedRawJoinValues,
+          nestedRawJoinClauses,
+        );
         const nestedTables = sourceRefl
           ? this._resolveNestedTableNames(sourceRefl, [
               ...nestedIncludes,
@@ -444,7 +457,7 @@ export class ThroughAssociation extends Association {
               ...nestedLeftOuter,
             ])
           : [];
-        const allowed = [throughTable, sourceTable, ...nestedTables].filter(
+        const allowed = [throughTable, sourceTable, ...nestedTables, ...rawJoinTables].filter(
           (t): t is string => t != null,
         );
         const copyable = [...throughPredicates, ...sourcePredicates].filter(
@@ -475,15 +488,24 @@ export class ThroughAssociation extends Association {
             }
             // Rails nests the scope's full `joins_values` under the source
             // reflection (through_association.rb:132-134); `_namedInnerJoins`
-            // holds only symbol-association joins. A raw string / Arel join in
-            // the reflection scope (`.joins("INNER JOIN …")`) is not carried here
-            // — nesting a raw join under an association-name hash isn't
-            // meaningful for the join builder, and no current has_one-through
-            // scope uses one. If one ever does, its predicate's table stays out
-            // of the resolvable set and the predicate defers to the source stage
-            // (no `no such column`), same as the deeper-than-one-level case.
+            // holds only the symbol-association joins.
             if (nestedJoins.length > 0) {
               scope = scope.joins({ [sourceName]: nestedJoins });
+            }
+            // Raw string / Arel-node joins (and explicit-ON joins) can't be
+            // nested under the association-name hash — the join builder resolves
+            // that hash through reflections, not raw SQL. But a raw join names
+            // its own tables in fully-qualified SQL, so appending it to the
+            // through query's own join buckets emits the identical JOIN Rails
+            // produces via the nested form, on top of the source join added
+            // above. Its table is already in `allowed` (see `rawJoinTables`), so
+            // a predicate qualifying it is copyable and rides the through query
+            // instead of deferring to the source stage.
+            if (nestedRawJoinValues.length > 0) {
+              scope._joinValues = [...scope._joinValues, ...nestedRawJoinValues];
+            }
+            if (nestedRawJoinClauses.length > 0) {
+              scope._joinClauses = [...scope._joinClauses, ...nestedRawJoinClauses];
             }
             // Rails also `references!(source_reflection.table_name)` so its
             // `includes!(source)` promotes to a LEFT JOIN. We join the source
@@ -612,6 +634,39 @@ export class ThroughAssociation extends Association {
       } catch {
         /* polymorphic / unresolved association — leave predicate at source stage */
       }
+    }
+    return tables;
+  }
+
+  /**
+   * Table names reached by the reflection scope's raw string / Arel-node joins
+   * and explicit-ON joins. Used to widen the has_one-through query's
+   * resolvable-table set so a predicate qualifying a raw-joined table (e.g.
+   * `.joins("INNER JOIN categories …").where("categories.name = ?")`) rides the
+   * through query instead of deferring to the source-preloader stage. String and
+   * Arel-join values are scanned with the reflection scope's own
+   * `tablesInString` (Rails' `tables_in_string`); explicit-ON clauses expose the
+   * joined table name directly.
+   * @internal
+   */
+  private _rawJoinTableNames(reflScope: any, values: any[], clauses: any[]): string[] {
+    const tables: string[] = [];
+    const scanSql = (sql: string): void => {
+      const found = reflScope?.tablesInString?.(sql);
+      if (Array.isArray(found)) tables.push(...found);
+    };
+    for (const v of values) {
+      if (typeof v === "string") scanSql(v);
+      else if (v?.toSql) {
+        try {
+          scanSql(v.toSql());
+        } catch {
+          /* an Arel node that can't render standalone contributes no table */
+        }
+      }
+    }
+    for (const c of clauses) {
+      if (typeof c?.table === "string") tables.push(c.table.toLowerCase());
     }
     return tables;
   }
