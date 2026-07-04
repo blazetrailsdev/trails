@@ -3,7 +3,6 @@ import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { setupFixtures } from "./fixtures.js";
-import { dropAllTables } from "./drop-all-tables.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -15,9 +14,20 @@ beforeAll(() => {
   adapter = Base.adapter;
 });
 
+// The bespoke `sdh_*` tables each test creates to exercise the dumper. This
+// suite runs under setupFixtures(), which opts out of the global truncation
+// reset, so nothing clears these between tests in-file — one test reuses
+// `sdh_kept` and would hit "table already exists" if left. Dropping only these
+// named bespoke tables (RFC 0060) replaces the old afterAll/afterEach
+// dropAllTables' ~330-table canonical DROP fan-out; any leak past the file is
+// swept by the next non-skip file's `resetTestTables`.
+const SDH_TABLES = ["sdh_kept", "sdh_other", "sdh_a", "sdh_b", "sdh_c", "sdh_keep", "sdh_skip"];
+
 describe("SchemaDumpingHelper", () => {
   afterEach(async () => {
-    await dropAllTables(adapter);
+    for (const t of SDH_TABLES) {
+      await adapter.executeMutation(`DROP TABLE IF EXISTS ${adapter.quoteTableName(t)}`);
+    }
   });
 
   it("dumps only the named table", async () => {
