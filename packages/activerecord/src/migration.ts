@@ -2284,8 +2284,14 @@ export class MigrationContext {
     // bookkeeping the schema dump reads. `indexName` applies the same
     // schema-strip (PostgreSQL) + expression-column reduction + hash fallback
     // as the adapter's own `add_index_options`, so add/remove and the dump agree.
+    // Pass the original `columns` (not the arrayified `cols`): `indexNameOptions`
+    // reduces a single expression column (e.g. "lower(email)" → "lower_email")
+    // only when it sees a bare String — pre-wrapping it in an array fails that
+    // `typeof === "string"` check and leaks the raw parenthesised name into the
+    // dump, desyncing it from the DDL. This composition equals the adapter's
+    // `indexColumnNames(columnName)` → `indexNameOptions(...)` for every shape.
     const indexName =
-      options?.name ?? this.connection.indexName(table, this.connection.indexNameOptions(cols));
+      options?.name ?? this.connection.indexName(table, this.connection.indexNameOptions(columns));
     // Rails gates the sort-order suffix on `supports_index_sort_order?`
     // (abstract/schema_statements.rb#add_options_for_index_columns, via the
     // MySQL adapter's `super` call). PostgreSQL/SQLite always support it; MySQL
