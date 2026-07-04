@@ -16,6 +16,7 @@
 import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { classify, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { metadataTableNames } from "./tasks/database-tasks.js";
 
 /**
  * One table worth of introspection data, sufficient for codegen.
@@ -77,8 +78,6 @@ interface PlannedClass {
   /** Comments (TODO / NOTE / WARNING) prepended at the top of the static block. */
   leadingComments: string[];
 }
-
-const BUILTIN_IGNORE = new Set(["schema_migrations", "ar_internal_metadata"]);
 
 /**
  * Strip a PostgreSQL schema qualifier from a table identifier and drop
@@ -151,6 +150,12 @@ export function generateModels(
   const now = opts.now ?? Temporal.Now.instant();
 
   // Filter: skip built-in bookkeeping tables and tables with no PK (views).
+  // Compose the bookkeeping names from the configurable Base accessors
+  // (schema_migrations / ar_internal_metadata plus table_name_prefix/suffix)
+  // rather than hardcoding the literals, so a renamed schema-migrations or
+  // internal-metadata table is still ignored — matching the runtime read
+  // paths (SchemaMigration/InternalMetadata/SchemaDumper/truncateAll).
+  const builtinIgnore = metadataTableNames();
   // Accept both `null` and `[]` as the "no PK" signal — introspectPrimaryKey()
   // in schema-introspection.ts normalises adapter-level null to [], so the
   // documented pipeline (introspectTables + introspectPrimaryKey + ...) feeds
@@ -161,7 +166,7 @@ export function generateModels(
   const skipped: Array<{ name: string; reason: string }> = [];
   const kept: IntrospectedTable[] = [];
   for (const t of tables) {
-    if (BUILTIN_IGNORE.has(t.name)) continue;
+    if (builtinIgnore.has(t.name)) continue;
     if (hasNoPk(t.primaryKey)) {
       skipped.push({ name: t.name, reason: "no primary key (likely a view)" });
       continue;
