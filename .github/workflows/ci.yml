@@ -728,7 +728,10 @@ jobs:
         if: always()
         run: node scripts/ci/coverage-summary.mjs
       - name: Upload coverage report (lcov + json)
+        # Reporting-only: a transient artifact-service upload timeout must not
+        # turn this non-gating job red (see RFC 0061-ci-failures).
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -798,7 +801,10 @@ jobs:
         if: always()
         run: node scripts/ci/coverage-summary.mjs
       - name: Upload AR coverage report (lcov + json)
+        # Reporting-only: a transient artifact-service upload timeout must not
+        # turn this non-gating job red (see RFC 0061-ci-failures).
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ar-coverage-report
@@ -849,7 +855,10 @@ jobs:
         if: always()
         run: node scripts/ci/coverage-summary.mjs
       - name: Upload AR CLI coverage report (lcov + json)
+        # Reporting-only: a transient artifact-service upload timeout must not
+        # turn this non-gating job red (see RFC 0061-ci-failures).
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ar-cli-coverage-report
@@ -897,7 +906,10 @@ jobs:
         if: always()
         run: node scripts/ci/coverage-summary.mjs
       - name: Upload trails-tsc coverage report (lcov + json)
+        # Reporting-only: a transient artifact-service upload timeout must not
+        # turn this non-gating job red (see RFC 0061-ci-failures).
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: trails-tsc-coverage-report
