@@ -8,9 +8,7 @@
  * Mirrors: ActiveRecord::Calculations
  */
 
-import { Nodes, Table, SelectManager, sql as arelSql } from "@blazetrails/arel";
-import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
-import type { AliasTracker } from "../associations/alias-tracker.js";
+import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
@@ -25,31 +23,6 @@ import {
   buildJoinDependencies,
   QueryMethodBangs,
 } from "./query-methods.js";
-
-/**
- * Seed the eager-load JoinDependency's AliasTracker with the relation's manual
- * join nodes (`_joinValues`), mirroring Rails `build_joins`'
- * `alias_tracker(leading_joins + join_nodes, aliases)` (query_methods.rb:1891).
- * The live count/aggregate eager path emits the JoinDependency separately from
- * the user-supplied joins, so without seeding, a self-referential eager join
- * (e.g. `Person.eager_load(:agents)`) would claim the same `agents_people`
- * alias a user string/arel join already references as `agents_people_2`. Seeding
- * counts those tables up front so the eager join is aliased `agents_people_2`,
- * matching Rails. Returns `undefined` when there are no manual joins, preserving
- * the JoinDependency's own base-table-only tracker for the common case.
- *
- * @internal
- */
-function eagerJoinAliasTracker(rel: any): AliasTracker | undefined {
-  const joinValues: unknown[] = rel._joinValues ?? [];
-  if (joinValues.length === 0) return undefined;
-  const joinNodes: Nodes.Join[] = joinValues.map((v) =>
-    typeof v === "string"
-      ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join)
-      : (v as Nodes.Join),
-  );
-  return buildMergedJoinAliasTracker(rel, joinNodes);
-}
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -112,7 +85,7 @@ interface CalculationRelation {
   _groupColumns: string[];
   _whereClause: { isContradiction(): boolean };
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
-  _applyJoinsToManager(manager: any): void;
+  _applyJoinsToManager(manager: any, eagerJd?: JoinDependency): void;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any, table: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -415,6 +388,22 @@ function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | No
   return table.typeForAttribute?.(column) instanceof BigIntegerType;
 }
 
+/**
+ * The associations Rails' `apply_join_dependency` builds the eager
+ * JoinDependency from: `eager_load_values | includes_values`
+ * (finder_methods.rb:458), where plain `includes` promoted to eager load via a
+ * matching `references` is folded in. De-duplicated, preserving order.
+ * @internal
+ */
+function collectEagerSpecs(rel: CalculationRelation): string[] {
+  const anyRel = rel as any;
+  const eager: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
+  const includes: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
+  const promoted: string[] =
+    (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
+  return [...new Set([...eager, ...includes, ...promoted])];
+}
+
 async function singleAggregate(
   rel: CalculationRelation,
   fn: AggFn,
@@ -430,22 +419,17 @@ async function singleAggregate(
   const manager = table.project(projection);
   // Rails routes sum/average/maximum/minimum through apply_join_dependency when
   // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
-  const anyRelSa = rel as any;
-  const eagerSa: string[] = (anyRelSa._eagerLoadAssociations as string[] | undefined) ?? [];
-  const includesSa: string[] = (anyRelSa._includesAssociations as string[] | undefined) ?? [];
-  const promotedSa: string[] =
-    (anyRelSa._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
-  const allEagerSa = [...new Set([...eagerSa, ...includesSa, ...promotedSa])];
-  if (allEagerSa.length > 0) {
-    const jd = QueryMethodBangs.constructJoinDependency.call(anyRelSa, allEagerSa, Nodes.OuterJoin);
-    for (const node of jd.joinConstraints(
-      [],
-      eagerJoinAliasTracker(anyRelSa),
-      anyRelSa._aliasableReferences(),
-    ))
-      manager.appendJoinNode(node);
-  }
-  rel._applyJoinsToManager(manager);
+  const allEagerSa = collectEagerSpecs(rel);
+  // Fold the eager JoinDependency into the shared `build_joins` port
+  // (`_applyJoinsToManager(manager, eagerJd)`) exactly as Rails
+  // `apply_join_dependency` folds it into `joins_values` — one shared
+  // `AliasTracker` spans the manual joins AND the eager JD, and `walk` dedups a
+  // coinciding association, so no parallel eager tracker is built.
+  const eagerJd =
+    allEagerSa.length > 0
+      ? QueryMethodBangs.constructJoinDependency.call(rel as any, allEagerSa, Nodes.OuterJoin)
+      : undefined;
+  rel._applyJoinsToManager(manager, eagerJd);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
 
@@ -485,7 +469,17 @@ async function groupedAggregate(
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
-  rel._applyJoinsToManager(manager);
+  // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
+  // into `joins_values` via `apply_join_dependency` before dispatching to the
+  // grouped/simple calculation. Fold it into the shared `build_joins` port so
+  // the eager JD and any manual joins share ONE `AliasTracker` and dedup via
+  // `walk`.
+  const allEagerGa = collectEagerSpecs(rel);
+  const eagerJdGa =
+    allEagerGa.length > 0
+      ? QueryMethodBangs.constructJoinDependency.call(rel as any, allEagerGa, Nodes.OuterJoin)
+      : undefined;
+  rel._applyJoinsToManager(manager, eagerJdGa);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   manager.group(groupNode);
@@ -664,31 +658,21 @@ export async function performCount(
   // same as pluck/exists which materialize inside their own inner functions.
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : 0;
 
-  // Mirrors calculations.rb:231: has_include? check precedes the grouped branch.
-  // When eager-loading with a group, Rails recurses into the grouped calculation on the
-  // joined relation (calculations.rb:454) — groupedAggregate has no hasInclude guard.
+  // Mirrors calculations.rb:231: `calculate`'s has_include? check precedes the
+  // group dispatch. When eager-loading with a group, Rails' `calculate`
+  // (calculations.rb:217-238) applies the eager join then dispatches to the
+  // grouped calculation — groupedAggregate has no hasInclude guard.
   if (this._groupColumns.length > 0 && hasInclude(this, column ?? null)) {
-    const anyRel = this as any;
-    const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
-    const includesSpecs: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
-    const promoted: string[] =
-      (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
-    const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
     // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
     if (!Array.isArray(this._modelClass.primaryKey)) {
       const pk = this._modelClass.primaryKey;
-      const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
-      const jdNodes: Nodes.Join[] = jd.joinConstraints(
-        [],
-        undefined,
-        anyRel._aliasableReferences(),
-      );
-      // Mirror calculations.rb:235: only set distinct when the relation isn't already distinct.
-      const joinedRel = (
-        this._isDistinct
-          ? (this as any).joins(...jdNodes)
-          : (this as any).joins(...jdNodes).distinct()
-      ) as CalculationRelation;
+      // Mirror `calculate` (calculations.rb:217-238): apply the eager join then
+      // dispatch to the grouped calculation. The eager associations stay on the
+      // relation so `groupedAggregate` folds them through the shared
+      // `build_joins` port (ONE `AliasTracker`) rather than pre-resolving them
+      // with a parallel tracker. Only set distinct when the relation isn't
+      // already distinct (calculations.rb:233-236).
+      const joinedRel = (this._isDistinct ? this : (this as any).distinct()) as CalculationRelation;
       // count("*") → pk: COUNT(DISTINCT *) is invalid SQL.
       return groupedAggregate(
         joinedRel,
@@ -710,22 +694,21 @@ export async function performCount(
   // per record when a record has multiple associated records.
   if (hasInclude(this, column ?? null)) {
     const anyRel = this as any;
-    const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
-    // Rails apply_join_dependency builds from eager_load_values | includes_values (finder_methods.rb:458)
-    const includesSpecs: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
-    const promoted: string[] =
-      (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
-    const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
+    const allEager = collectEagerSpecs(this);
     if (allEager.length > 0) {
       const pk = this._modelClass.primaryKey;
       if (!Array.isArray(pk)) {
-        // Rails apply_join_dependency always builds the eager LEFT OUTER JOIN for
-        // every eager spec; the shared AliasTracker (seeded with the manual join
-        // nodes via `eagerJoinAliasTracker`) re-aliases a JD join onto a table a
-        // user string/arel join already touches (e.g. a self-referential
-        // `eager_load(:agents)` becomes `agents_people_2`), so there is no
-        // duplicate-table ambiguity to guard against here.
-        const specsForJd: string[] = allEager;
+        // Fold the eager JoinDependency into the shared `build_joins` port
+        // (`_applyJoinsToManager(manager, eagerJd)`) as Rails
+        // `apply_join_dependency` folds it into `joins_values`. One shared
+        // `AliasTracker` spans the manual joins AND the eager JD, so an eager
+        // association coinciding with an explicit join re-aliases at emit-time
+        // (`comments_people_2`) via `walk` rather than colliding — no bespoke
+        // table-name skip filter, no parallel tracker. A fresh JD per manager:
+        // `joinConstraints` aliases nodes in place, so the id and count queries
+        // cannot share one instance.
+        const makeEagerJd = (): JoinDependency =>
+          QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
         const table = this._modelClass.arelTable;
         if (this._limitValue !== null || this._offsetValue !== null) {
           // Rails finder_methods.rb apply_join_dependency: with a limit/offset on an
@@ -739,20 +722,7 @@ export async function performCount(
           // 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction.
           const idSubquery = table.project(table.get(pk));
           idSubquery.distinct();
-          if (specsForJd.length > 0) {
-            const jd = QueryMethodBangs.constructJoinDependency.call(
-              anyRel,
-              specsForJd,
-              Nodes.OuterJoin,
-            );
-            for (const node of jd.joinConstraints(
-              [],
-              eagerJoinAliasTracker(anyRel),
-              anyRel._aliasableReferences(),
-            ))
-              idSubquery.appendJoinNode(node);
-          }
-          this._applyJoinsToManager(idSubquery);
+          this._applyJoinsToManager(idSubquery, makeEagerJd());
           this._applyWheresToManager(idSubquery, table);
           applyFromToManager(this, idSubquery);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
@@ -773,20 +743,7 @@ export async function performCount(
           const countManager = table.project(
             (aggregateColumn(this, colForCount) as any).count(true).as("count"),
           );
-          if (specsForJd.length > 0) {
-            const jdOuter = QueryMethodBangs.constructJoinDependency.call(
-              anyRel,
-              specsForJd,
-              Nodes.OuterJoin,
-            );
-            for (const node of jdOuter.joinConstraints(
-              [],
-              eagerJoinAliasTracker(anyRel),
-              anyRel._aliasableReferences(),
-            ))
-              countManager.appendJoinNode(node);
-          }
-          this._applyJoinsToManager(countManager);
+          this._applyJoinsToManager(countManager, makeEagerJd());
           // Rails `where!(pk => limited_ids)` adds the id filter to the relation that
           // STILL carries the original where + from, only nulling limit/offset. Re-apply
           // them so a collection-level predicate (e.g. `comments.body = 'x'`) keeps
@@ -810,20 +767,7 @@ export async function performCount(
         const manager = table.project(
           (aggregateColumn(this, colForCount) as any).count(true).as("count"),
         );
-        if (specsForJd.length > 0) {
-          const jd = QueryMethodBangs.constructJoinDependency.call(
-            anyRel,
-            specsForJd,
-            Nodes.OuterJoin,
-          );
-          for (const node of jd.joinConstraints(
-            [],
-            eagerJoinAliasTracker(anyRel),
-            anyRel._aliasableReferences(),
-          ))
-            manager.appendJoinNode(node);
-        }
-        this._applyJoinsToManager(manager);
+        this._applyJoinsToManager(manager, makeEagerJd());
         this._applyWheresToManager(manager, table);
         applyFromToManager(this, manager);
         const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
