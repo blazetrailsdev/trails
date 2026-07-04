@@ -459,6 +459,9 @@ interface IntrospectionHost {
   lookupCastType(sqlType: string): Type;
   getFullVersion(): Promise<string>;
   isMariadb(): boolean;
+  // SHOW FULL FIELDS FROM — preserves the declared type name (e.g. bare FLOAT
+  // stays "float"), which information_schema normalizes away on MariaDB.
+  columnDefinitions(tableName: string): Promise<Record<string, unknown>[]>;
 }
 
 /** @internal
@@ -498,6 +501,35 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
   // string, so this is a no-op after the first call.
   await this.getFullVersion();
 
+  // Rails always reads column types via `SHOW FULL FIELDS FROM`
+  // (column_definitions, abstract_mysql_adapter.rb:963) — trails' whole
+  // information_schema-based columns() is the pre-existing divergence. That
+  // divergence is invisible on MySQL but not on MariaDB, which normalizes a
+  // declared bare `FLOAT` to DOUBLE in information_schema.columns (both
+  // DATA_TYPE and COLUMN_TYPE come back "double"), collapsing the 0..24 vs
+  // 25..53 float-precision distinction so lookupCastType would report limit 53
+  // for a FLOAT that should be 24. So on MariaDB, fall back to Rails' source of
+  // truth — SHOW FULL FIELDS, which preserves the declared type name — and
+  // re-key the float-limit lookup off it (below). MySQL's information_schema
+  // already preserves the distinction, so skip the extra round-trip there — and
+  // even on MariaDB only pay for it when a float/double column is actually
+  // present (a masked FLOAT still reports DATA_TYPE "double", so gating on
+  // "float"|"double" catches it without a second query for every other table).
+  const declaredTypes = new Map<string, string>();
+  const hasFloatLike = rows.some((r) => {
+    const t = String((r.type ?? r.TYPE ?? r.DATA_TYPE ?? "") as string).toLowerCase();
+    return t === "float" || t === "double";
+  });
+  if (this.isMariadb() && hasFloatLike) {
+    for (const f of await this.columnDefinitions(tableName)) {
+      const fieldName = f["Field"];
+      const fieldType = f["Type"];
+      if (typeof fieldName === "string" && typeof fieldType === "string") {
+        declaredTypes.set(fieldName, fieldType);
+      }
+    }
+  }
+
   return rows.map((r) => {
     const name = String((r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
     const sqlType = String((r.full_type ?? r.FULL_TYPE ?? r.COLUMN_TYPE ?? "") as string);
@@ -514,12 +546,19 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     // Rails' fetch_type_metadata derives type AND limit from that one
     // lookup_cast_type(sql_type) (abstract/schema_statements.rb:1717), so an
     // emulated tinyint(1) gets type :boolean with limit nil — not the integer
-    // limit 1. The lone divergence is MariaDB, which normalizes a declared
-    // FLOAT's COLUMN_TYPE to "double" in information_schema (limit 53), whereas
-    // Rails reads SHOW FULL FIELDS where it stays "float" (limit 24). For that
-    // one type, re-key the limit on DATA_TYPE to keep Rails' 24; every other
+    // limit 1. The lone divergence is the MariaDB FLOAT→DOUBLE normalization
+    // handled above: re-key the limit on the declared type name — the SHOW FULL
+    // FIELDS type when we fetched it (declaredTypes), else the info_schema
+    // COLUMN_TYPE — so a bare FLOAT keeps Rails' limit 24. Every other
     // registration yields the same fixed limit regardless of which key is used.
-    const limitType = baseType === "float" ? this.lookupCastType(baseType) : castType;
+    const declaredType = declaredTypes.get(name) ?? sqlType;
+    // Grab only the leading type keyword (the identifier before any `(length)`
+    // or ` unsigned`/` zerofill` modifier). Matched positively rather than by
+    // stripping a `(...)` suffix so a type carrying quoted parens in its args
+    // (e.g. enum('a','b)')) can't confuse the extraction — the only key we act
+    // on is "float", but every column's declaredType flows through here.
+    const declaredBase = /^[a-z]+/.exec(declaredType.trim().toLowerCase())?.[0] ?? "";
+    const limitType = declaredBase === "float" ? this.lookupCastType("float") : castType;
     const typeMapLimit = charLimitVal == null ? (limitType.limit ?? null) : null;
     // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
     // The DateTime type's name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
