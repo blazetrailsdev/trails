@@ -21,25 +21,19 @@ import { TEST_SCHEMA } from "./test-schema.js";
 // dumped DDL. The per-adapter transforms (serialIdType, DATETIME(6)) are shared
 // code imported from define-schema.ts, so PG/MySQL cannot diverge independently.
 
-// Reads sqlite_master through both the object-row and `{ columns, rows }`
-// array-row selectAll shapes — the BetterSQLite3Adapter returns the latter, so
-// naive `r.type`/`r.name`/`r.sql` access on the array rows yields undefined and
-// silently collapses every dump line to "undefined undefined: undefined".
+// `selectAll` returns a `Result` whose rows are positional arrays; `toArray()`
+// maps them to hash rows via the column index, so `r.type`/`r.name`/`r.sql`
+// resolve to real values. Reading the raw `{ columns, rows }` array rows
+// directly instead silently collapses every dump line to
+// "undefined undefined: undefined".
 async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
-  const res = (await adapter.selectAll(
+  const res = await adapter.selectAll(
     "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name, type, sql",
-  )) as unknown;
-  let objectRows: { type: unknown; name: unknown; sql: unknown }[];
-  if (Array.isArray(res)) {
-    objectRows = res as { type: unknown; name: unknown; sql: unknown }[];
-  } else {
-    const { columns, rows } = res as { columns: string[]; rows: unknown[][] };
-    const t = columns.indexOf("type");
-    const n = columns.indexOf("name");
-    const s = columns.indexOf("sql");
-    objectRows = rows.map((row) => ({ type: row[t], name: row[n], sql: row[s] }));
-  }
-  return objectRows.map((r) => `${r.type} ${r.name}: ${r.sql}`).join("\n");
+  );
+  return res
+    .toArray()
+    .map((r) => `${r.type} ${r.name}: ${r.sql}`)
+    .join("\n");
 }
 
 describe("loadCanonicalSchema", () => {
