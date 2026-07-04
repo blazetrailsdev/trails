@@ -9,6 +9,7 @@ import {
   deepStringifyKeys,
   reverseMerge,
   assertValidKeys,
+  ArgumentError,
   slice,
   except,
   extractKeys,
@@ -108,9 +109,19 @@ describe("HashExtTest", () => {
   });
 
   it("assert_valid_keys — throws on unknown key", () => {
+    // Rails' assert_valid_keys raises Ruby's ArgumentError (keys.rb:52), so
+    // callers can narrow on the type — assert both the message and the type.
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow(/Unknown key: failore/);
+    let error: unknown;
+    try {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect((error as Error).name).toBe("ArgumentError");
   });
 
   it("assert_valid_keys — includes valid keys in error message", () => {

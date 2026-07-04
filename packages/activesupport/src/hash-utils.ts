@@ -5,6 +5,16 @@
 type AnyObject = Record<string, unknown>;
 
 /**
+ * Mirrors Ruby's `ArgumentError`. Raised by {@link assertValidKeys} so callers
+ * can `catch`/narrow on the Rails-faithful error type (`err.name ===
+ * "ArgumentError"`) the way they would in Ruby.
+ * @internal
+ */
+export class ArgumentError extends Error {
+  override name = "ArgumentError";
+}
+
+/**
  * Deep merge two objects recursively. When both values are objects, they are
  * merged recursively. Otherwise the source value wins.
  */
@@ -182,7 +192,7 @@ export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   const validSet = new Set(validKeys);
   for (const key of Object.keys(obj)) {
     if (!validSet.has(key)) {
-      throw new Error(`Unknown key: ${key}. Valid keys are: ${validKeys.join(", ")}`);
+      throw new ArgumentError(`Unknown key: ${key}. Valid keys are: ${validKeys.join(", ")}`);
     }
   }
 }
