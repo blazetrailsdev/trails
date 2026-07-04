@@ -192,8 +192,11 @@ export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   const validSet = new Set(validKeys);
   // Rails builds the message with Symbol#inspect on each key, so keys carry a
   // leading `:` (keys.rb:52). Our keys are strings, but we mirror the symbol
-  // rendering to match hash_ext_test.rb:254's exact expectation.
-  const inspect = (key: string): string => `:${key}`;
+  // rendering to match hash_ext_test.rb:254's exact expectation. Symbol#inspect
+  // bare-renders identifier-shaped symbols (`:name`) and quotes the rest
+  // (`:"foo bar"`), so we branch on the same identifier shape.
+  const inspect = (key: string): string =>
+    /^[a-zA-Z_][a-zA-Z0-9_]*[?!=]?$/.test(key) ? `:${key}` : `:${JSON.stringify(key)}`;
   for (const key of Object.keys(obj)) {
     if (!validSet.has(key)) {
       throw new ArgumentError(
