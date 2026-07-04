@@ -752,6 +752,35 @@ describe("toXml()", () => {
     expect(xml).toContain('nil="true"');
   });
 
+  it("derives the type attribute from the cast type, not the JS runtime type", () => {
+    // PG/MariaDB materialize a bigint `id` as a JS BigInt/string rather than a
+    // number; the `type="integer"` attribute must still be emitted because it
+    // comes from the attribute's cast type (mirroring Rails XmlMini TYPE_NAMES),
+    // not from `typeof value`.
+    class Widget extends Model {
+      static {
+        this.attribute("id", "big_integer");
+      }
+    }
+    const w = new Widget({});
+    w.writeAttribute("id", "42");
+    const xml = w.toXml();
+    expect(xml).toContain('<id type="integer">42</id>');
+  });
+
+  it("uses the cast type name for a float column that materializes as a JS number", () => {
+    // A float value is a JS `number`, same runtime type as an integer; keying
+    // off the cast type keeps it `type="float"` rather than `type="integer"`.
+    class Widget extends Model {
+      static {
+        this.attribute("rating", "float");
+      }
+    }
+    const w = new Widget({ rating: 4.5 });
+    const xml = w.toXml();
+    expect(xml).toContain('<rating type="float">4.5</rating>');
+  });
+
   it("supports custom root element", () => {
     class User extends Model {
       static {
