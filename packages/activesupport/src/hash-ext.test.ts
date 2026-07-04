@@ -109,12 +109,11 @@ describe("HashExtTest", () => {
   });
 
   it("assert_valid_keys — throws on unknown key", () => {
+    // Rails' assert_valid_keys raises Ruby's ArgumentError (keys.rb:52), so
+    // callers can narrow on the type — assert both the message and the type.
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow(/Unknown key: failore/);
-  });
-
-  it("assert_valid_keys — raises ArgumentError on unknown key", () => {
     let error: unknown;
     try {
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
