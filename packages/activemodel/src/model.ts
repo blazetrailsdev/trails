@@ -141,6 +141,25 @@ function _validationOnToIf<TRecord extends object>(
 }
 
 /**
+ * Maps a cast type's symbolic `type()` name to the Rails `XmlMini` `type=`
+ * attribute name emitted by `to_xml`. Types absent here (strings, unknown
+ * attributes) carry no `type=` attribute, matching Rails.
+ *
+ * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES (by cast-type, not value class).
+ */
+const XML_MINI_TYPE_NAMES: Record<string, string> = {
+  integer: "integer",
+  big_integer: "integer",
+  float: "float",
+  decimal: "decimal",
+  boolean: "boolean",
+  date: "date",
+  datetime: "dateTime",
+  time: "time",
+  binary: "binary",
+};
+
+/**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
  * Dirty tracking, Serialization, and Naming.
  *
@@ -2156,10 +2175,36 @@ export class Model {
   toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string {
     const hash = this.serializableHash(options);
     const root = options?.root ?? (this.constructor as typeof Model).modelName.singular;
-    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false)}</${root}>`;
+    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, this._xmlTypeMap(hash))}</${root}>`;
   }
 
-  private _hashToXml(hash: Record<string, unknown>, indent: string, skipTypes = false): string {
+  /**
+   * Map each top-level serialized key to its Rails `XmlMini` `type=` name,
+   * derived from the attribute's cast/column type rather than the JS runtime
+   * type of the materialized value. This keeps `type="integer"` on a bigint
+   * `id` even when PG/MariaDB hand it back as a JS `BigInt`/string instead of a
+   * `number`. Keys whose cast type has no XmlMini name (strings, unknown
+   * attributes) are omitted so the serializer falls back to runtime inference.
+   *
+   * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES applied to the attribute's type.
+   */
+  private _xmlTypeMap(hash: Record<string, unknown>): Record<string, string> {
+    const ctor = this.constructor as typeof Model;
+    if (typeof ctor.typeForAttribute !== "function") return {};
+    const map: Record<string, string> = {};
+    for (const key of Object.keys(hash)) {
+      const xmlName = XML_MINI_TYPE_NAMES[ctor.typeForAttribute(key).type()];
+      if (xmlName) map[key] = xmlName;
+    }
+    return map;
+  }
+
+  private _hashToXml(
+    hash: Record<string, unknown>,
+    indent: string,
+    skipTypes = false,
+    typeMap: Record<string, string> = {},
+  ): string {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
     // attribute on every tag; the `nil="true"` marker is a separate attribute
     // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
@@ -2167,6 +2212,10 @@ export class Model {
     let xml = "";
     for (const [key, value] of Object.entries(hash)) {
       const tag = dasherize(key);
+      // The cast/column type name (when known) overrides JS-runtime inference so
+      // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
+      // `type="integer"` whether it arrives as a JS number, BigInt, or string).
+      const castTypeName = typeMap[key];
       if (value === null || value === undefined) {
         xml += `${indent}<${tag} nil="true"/>\n`;
       } else if (
@@ -2196,9 +2245,9 @@ export class Model {
         }
         xml += `${indent}</${tag}>\n`;
       } else if (typeof value === "number") {
-        xml += `${indent}<${tag}${typeAttr("integer")}>${value}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "integer")}>${value}</${tag}>\n`;
       } else if (typeof value === "boolean") {
-        xml += `${indent}<${tag}${typeAttr("boolean")}>${value}</${tag}>\n`;
+        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "boolean")}>${value}</${tag}>\n`;
       } else if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
         xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toJSON()}</${tag}>\n`;
       } else if (value instanceof Temporal.ZonedDateTime) {
@@ -2210,6 +2259,10 @@ export class Model {
         xml += `${indent}<${tag}${typeAttr("date")}>${value.toString()}</${tag}>\n`;
       } else if (value instanceof Temporal.PlainTime) {
         xml += `${indent}<${tag}${typeAttr("time")}>${value.toString()}</${tag}>\n`;
+      } else if (castTypeName) {
+        // BigInt/string-materialized numeric columns (bigint ids on PG/MariaDB,
+        // decimals as strings) land here; the cast type restores their `type=`.
+        xml += `${indent}<${tag}${typeAttr(castTypeName)}>${this._escapeXml(String(value))}</${tag}>\n`;
       } else {
         xml += `${indent}<${tag}>${this._escapeXml(String(value))}</${tag}>\n`;
       }
