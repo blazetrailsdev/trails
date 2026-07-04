@@ -329,11 +329,18 @@ export class HashMerger {
   // Rails `HashMerger#other`: build a fresh relation and apply each hash value
   // to it via `public_send("#{k}!", *v)` so where-value interpolation etc.
   // happens on the built relation rather than by directly merging raw values.
-  // `select` dispatches to `_select!` (Rails renames `:select` → `:_select` to
-  // avoid Enumerable#select!); trails mirrors this with `_selectBang`.
   private buildOther(): any {
     const other = this.relation._newRelation();
     for (const [key, value] of Object.entries(this.hash)) {
+      // `select` dispatches to `_select!` (Rails renames `:select` → `:_select`
+      // to avoid Enumerable#select!); trails mirrors this with `_selectBang`.
+      // `reordering` is a VALUE_METHOD Rails writes with `reordering!` (a bare
+      // `@values[:reordering] = value`); trails exposes no such bang, so set the
+      // backing field directly (Merger doesn't propagate it, matching Rails).
+      if (key === "reordering") {
+        other._reordering = value;
+        continue;
+      }
       const method = key === "select" ? "_selectBang" : `${key}Bang`;
       if (Array.isArray(value)) {
         other[method](...value);
