@@ -437,6 +437,13 @@ export class ThroughAssociation extends Association {
         const nestedIncludes: any[] = reflScopeVals?._includesAssociations ?? [];
         const nestedJoins: any[] = reflScopeVals?._namedInnerJoins ?? [];
         const nestedLeftOuter: any[] = reflScopeVals?._leftOuterJoinsValues ?? [];
+        // Raw string / Arel-node joins the reflection scope carries in its own
+        // `_joinValues` bucket (`.joins("INNER JOIN …")` or `.joins(<Arel join>)`).
+        // Rails passes the scope's FULL `joins_values` — symbols AND raw
+        // strings / Arel nodes — to `joins!(source_reflection.name => joins)`
+        // (through_association.rb:132-134). See the nesting below for why a raw
+        // value there is not a silent carry but an error, matching Rails.
+        const nestedRawJoinValues: any[] = reflScopeVals?._joinValues ?? [];
         const nestedTables = sourceRefl
           ? this._resolveNestedTableNames(sourceRefl, [
               ...nestedIncludes,
@@ -447,6 +454,26 @@ export class ThroughAssociation extends Association {
         const allowed = [throughTable, sourceTable, ...nestedTables].filter(
           (t): t is string => t != null,
         );
+        // Rails' through_scope runs `joins!(source_reflection.name => values[:joins])`
+        // whenever the reflection where_clause is non-empty
+        // (through_association.rb:132-134). `values[:joins]` is the scope's FULL
+        // joins array — raw SQL strings and Arel join nodes included, not just
+        // symbol associations. `JoinDependency.walk_tree` symbolizes a raw string
+        // hash-value into a bogus association name and `find_reflection` raises
+        // `ActiveRecord::ConfigurationError` (confirmed against a live Rails
+        // console: a has_one-through whose scope uses `.joins("INNER JOIN …")`
+        // raises on preload). We mirror that verbatim: nest the scope's raw
+        // `_joinValues` under the source reflection name so the through-query
+        // build raises the SAME ConfigurationError our join builder already
+        // throws for `{source => [<raw string>]}` — rather than silently carrying
+        // an SQL join Rails itself rejects (which would be a new deviation, not a
+        // fidelity fix). Symbol-association joins live in `_namedInnerJoins` and
+        // are nested below without error — that is the only `joins` case Rails
+        // actually supports in this branch.
+        const whereNonEmpty = throughPredicates.length > 0 || sourcePredicates.length > 0;
+        if (sourceRefl && whereNonEmpty && nestedRawJoinValues.length > 0) {
+          scope = scope.joins({ [sourceRefl.name]: [...nestedRawJoinValues] });
+        }
         const copyable = [...throughPredicates, ...sourcePredicates].filter(
           (pred) => !predicateReferencesForeignTable(pred, allowed),
         );
@@ -473,15 +500,10 @@ export class ThroughAssociation extends Association {
             } else {
               scope = scope.leftOuterJoins(sourceName);
             }
-            // Rails nests the scope's full `joins_values` under the source
-            // reflection (through_association.rb:132-134); `_namedInnerJoins`
-            // holds only symbol-association joins. A raw string / Arel join in
-            // the reflection scope (`.joins("INNER JOIN …")`) is not carried here
-            // — nesting a raw join under an association-name hash isn't
-            // meaningful for the join builder, and no current has_one-through
-            // scope uses one. If one ever does, its predicate's table stays out
-            // of the resolvable set and the predicate defers to the source stage
-            // (no `no such column`), same as the deeper-than-one-level case.
+            // Rails nests the scope's symbol-association `joins_values` under the
+            // source reflection (through_association.rb:132-134); `_namedInnerJoins`
+            // holds exactly those. Raw string / Arel-node joins are handled above
+            // (they raise, matching Rails).
             if (nestedJoins.length > 0) {
               scope = scope.joins({ [sourceName]: nestedJoins });
             }
