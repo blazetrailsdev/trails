@@ -19,8 +19,6 @@ import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
-import useFixturesSchema from "./eslint/use-fixtures-schema.mjs";
-import requireCanonicalSchema from "./eslint/require-canonical-schema.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
@@ -155,8 +153,6 @@ export default defineConfig(
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
-          "use-fixtures-schema": useFixturesSchema,
-          "require-canonical-schema": requireCanonicalSchema,
           "require-table-teardown": requireTableTeardown,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
@@ -349,30 +345,6 @@ export default defineConfig(
       "blazetrails/test-fixture-parity": "error",
     },
   },
-  {
-    // Exclude test-helpers/ — those tests exercise useFixtures itself and
-    // intentionally omit { schema } as part of the infrastructure test surface.
-    files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: ["packages/activerecord/src/test-helpers/**"],
-    rules: {
-      "blazetrails/use-fixtures-schema": "warn",
-    },
-  },
-
-  // ── require-canonical-schema: tables passed to defineSchema() must
-  //    reference the canonical TEST_SCHEMA rather than being re-declared
-  //    inline. Keeps per-worker tables structurally identical and avoids
-  //    shared-DB shape collisions under parallel forks. ──
-  {
-    // test-helpers/ tests exercise defineSchema itself and intentionally pass
-    // inline schemas as part of the infrastructure test surface.
-    files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: ["packages/activerecord/src/test-helpers/**"],
-    rules: {
-      "blazetrails/require-canonical-schema": "error",
-    },
-  },
-
   // ── require-table-teardown: every createTable("foo") in an AR test must be
   //    balanced by an explicit dropTable("foo") in the same file, and the
   //    carpet-bomb dropAllTables() is forbidden. Leaked tables collide with
