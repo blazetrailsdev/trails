@@ -3535,7 +3535,11 @@ export class Relation<T extends Base> {
     for (const spec of specs) jd.validateEagerLoadSpec(spec);
   }
 
-  private _applyJoinsToManager(manager: SelectManager, eagerJd?: JoinDependency): void {
+  private _applyJoinsToManager(
+    manager: SelectManager,
+    eagerJd?: JoinDependency,
+    aliases?: AliasTracker,
+  ): void {
     // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
     // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
     // `from(relation)` subquery path) also delegates to. When `eagerJd` is
@@ -3606,6 +3610,7 @@ export class Relation<T extends Base> {
       joinNodes,
       stashedJoins,
       namedJoins: [],
+      aliases,
     });
   }
 
@@ -5026,8 +5031,8 @@ export class Relation<T extends Base> {
    * `_toSql` compiles, so the legacy string-assembly path and the Arel-manager
    * path can no longer drift.
    */
-  toArel(): SelectManager {
-    return this._buildArel();
+  toArel(aliases?: AliasTracker): SelectManager {
+    return this._buildArel(aliases);
   }
 
   /**
@@ -5281,8 +5286,8 @@ export class Relation<T extends Base> {
    * project JoinDependency alias columns instead of the single requested
    * column.
    */
-  private _buildArel(): SelectManager {
-    const manager = this._buildSelectManager();
+  private _buildArel(aliases?: AliasTracker): SelectManager {
+    const manager = this._buildSelectManager(aliases);
     this._applyCtesAndAnnotationsToManager(manager);
     return manager;
   }
@@ -5686,7 +5691,7 @@ export class Relation<T extends Base> {
    * compilation and as each side of a set operation (where the arel Union* node
    * composes the two managers).
    */
-  private _buildSelectManager(): SelectManager {
+  private _buildSelectManager(aliases?: AliasTracker): SelectManager {
     // `this.table` is the model's arel_table unless the relation was built on a
     // table alias (Rails `Relation.create(Model, table: arel_table.alias(...))`),
     // in which case projections, FROM, and ORDER BY must all reference the alias
@@ -5705,7 +5710,7 @@ export class Relation<T extends Base> {
             return m;
           })(new SelectManager(table as any));
 
-    this._applyJoinsToManager(manager);
+    this._applyJoinsToManager(manager, undefined, aliases);
 
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
@@ -6536,12 +6541,15 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return the Arel SelectManager.
+   * Return the Arel SelectManager. `aliases` threads an existing AliasTracker
+   * so a join scope built via `arel` re-aliases tables already claimed by the
+   * caller (Rails `def arel(aliases = nil); build_arel(c, aliases); end`,
+   * query_methods.rb:1594).
    *
    * Mirrors: ActiveRecord::Relation#arel (alias for toArel)
    */
-  arel(): SelectManager {
-    return this.toArel();
+  arel(aliases?: AliasTracker): SelectManager {
+    return this.toArel(aliases);
   }
 
   /**

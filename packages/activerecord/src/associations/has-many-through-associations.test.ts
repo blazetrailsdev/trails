@@ -271,12 +271,12 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
   });
 
-  it.skip("through association with through scope and nested where", async () => {
+  it("through association with through scope and nested where", async () => {
     const company = await Company.create({ name: "special" });
     const developer = await SpecialDeveloper.create({});
     await SpecialContract.create({
-      company_id: company.id,
-      special_developer_id: developer.id,
+      company: company,
+      specialDeveloper: developer,
     });
     const result = await (company as any).specialDevelopers
       .whereNot({ "contracts.id": null })
@@ -1561,7 +1561,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(result.map((r: any) => r.id)).toEqual([expectedId]);
   });
 
-  it.skip("has many through with through scope with includes", async () => {
+  it("has many through with through scope with includes", async () => {
     const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
     const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
     const last = await Author.last();
@@ -1569,7 +1569,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(result.map((r: any) => r.id)).toEqual([expectedId]);
   });
 
-  it.skip("has many through with through scope with joins", async () => {
+  it("has many through with through scope with joins", async () => {
     const bobWelcomeReader = await Reader.find(readers("bob_welcome").id);
     const expectedId = (await bobWelcomeReader.becomes(LazyReader)).id;
     const last = await Author.last();
@@ -1992,7 +1992,7 @@ describe("HasManyThroughAssociationsTest", () => {
     ]);
   });
 
-  it.skip("has many through unscope default scope", async () => {
+  it("has many through unscope default scope", async () => {
     const post = await Post.create({ title: "Beaches", body: "I like beaches!" });
     const david = await Person.find(people("david").id);
     const susan = await Person.find(people("susan").id);
@@ -2059,7 +2059,7 @@ describe("HasManyThroughAssociationsTest", () => {
     }
   });
 
-  it.skip("has many through with scope that has joined same table with parent relation", async () => {
+  it("has many through with scope that has joined same table with parent relation", async () => {
     const david = await Author.find(authors("david").id);
     const result = await Author.joins("commentsForFirstAuthor").take();
     expect(result?.id).toBe(david.id);
@@ -2079,7 +2079,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
   });
 
-  it.skip("has many through with scope should accept string and hash join", async () => {
+  it("has many through with scope should accept string and hash join", async () => {
     const david = await Author.find(authors("david").id);
     const result = await Author.joins({
       commentsForFirstAuthor: "post",

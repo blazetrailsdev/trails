@@ -2884,6 +2884,19 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   }
 
   for (const node of plan.joinNodes) manager.appendJoinNode(node);
+
+  // When a tracker was threaded in (Rails passes the alias HASH itself to
+  // `join_scope.arel(alias_tracker.aliases)`, so claims made while building this
+  // manager mutate the caller's tracker), propagate the alias counts this
+  // emission claimed back into it. Without this, a scope's `joins(:post)` join
+  // source and a sibling explicit `:post` join in the SAME outer JoinDependency
+  // would both re-alias `posts` to the same candidate and collide — the outer
+  // tracker must learn what the nested scope build already claimed.
+  if (plan.aliases) {
+    for (const [name, count] of sharedTracker.aliases) {
+      if (count > (plan.aliases.aliases.get(name) ?? 0)) plan.aliases.aliases.set(name, count);
+    }
+  }
 }
 
 /** @internal */

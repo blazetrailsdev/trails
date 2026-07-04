@@ -55347,5 +55347,145 @@
     "rubyName": "select_value",
     "call": "single_value_from_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "compute_cache_version",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update_all",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "delete_all",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "to_sql",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exec_main_query",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exists?",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "pluck",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "execute_simple_calculation",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "execute_grouped_calculation",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_subquery",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_from",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "build_with_expression_from_value",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "in_batches",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "execute_simple_calculation",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "execute_grouped_calculation",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "raise_record_not_found_exception!",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/predicate-builder/relation-handler.ts",
+    "rubyName": "call",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_subquery",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_from",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_with_expression_from_value",
+    "call": "arel",
+    "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
   }
 ]
