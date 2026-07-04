@@ -12,6 +12,7 @@ import type { ColumnJSON } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
+import { poolAbsent } from "./abstract/connection-pool.js";
 
 // ---------------------------------------------------------------------------
 // Helper: run callback inside pool.withConnection if available
@@ -252,7 +253,7 @@ export class SchemaCache {
     // attached) may pass `pool: null` to consult only the warm cache. Don't
     // attempt to acquire a connection in that case — return undefined and
     // let the caller fall back to the schema-less NullColumn shape.
-    if (pool == null) return undefined;
+    if (poolAbsent(pool)) return undefined;
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.columns === "function") {

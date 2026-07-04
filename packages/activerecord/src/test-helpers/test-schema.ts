@@ -247,9 +247,13 @@ export const TEST_SCHEMA: Schema = {
     updated_at: { type: "datetime", null: false },
   },
 
-  // Rails declares `id: :integer`; defineSchema's default bigint PK is
-  // wider but accepts the same integer values fixtures emit.
-  old_cars: {},
+  // Rails: `create_table :old_cars, id: :integer` — an integer (not bigint)
+  // auto-increment PK, kept in sync with the canonical registry so the shared
+  // per-worker DB doesn't drift between the two schema loaders.
+  old_cars: {
+    columns: { id: { type: "integer" } },
+    primaryKey: ["id"],
+  },
 
   carriers: {},
 

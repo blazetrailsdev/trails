@@ -7,20 +7,16 @@
  * probes, the empty-result-set guard, extended timezone re-sync) live in the
  * sibling mysql2-adapter.trails.test.ts.
  *
- * Tracked deviations (RFC 0023 surfaced-deviations,
- * converge-mysql2-adapter-rails-port follow-ups):
- *   - test_connection_error / test_reconnection_error assert
- *     `error.connection_pool` is a NullPool. A standalone trails adapter
- *     carries a ConnectionPool (pool-config.ts `get pool`), never NullPool, so
- *     those two cases are deferred rather than bent.
- *   - The FK type-mismatch tests build their fixture tables via raw DDL with
- *     Rails' own table names (old_cars: int PK, cars: bigint PK,
- *     subscribers: varchar nick PK) instead of `add_reference` /
- *     `add_foreign_key`: trails' `addReference` defaults the ref column to
- *     :integer (Rails defaults to :bigint), and the canonical `old_cars`
- *     widens its PK to bigint, so neither path reproduces the
- *     integer-vs-bigint mismatch the test exercises. The error message,
- *     cause, and MismatchedForeignKey class are asserted faithfully.
+ * connection_error / reconnection_error drive `reconnectBang()` — the method
+ * Rails' `connect!` reaches (verify! → reconnect!) when a fresh adapter has no
+ * live connection — since trails connects lazily and has no eager `connect!`.
+ * A standalone adapter now carries a NullPool by default (matching Rails
+ * `@pool = NullPool.new`), so `error.connection_pool` is asserted faithfully.
+ *
+ * The FK type-mismatch tests ride the canonical `engines` / `old_cars` (int PK)
+ * / `cars` (bigint PK) / `subscribers` (varchar `nick`) tables, adding the
+ * reference column via `add_reference` (which now defaults to `:bigint`, as
+ * Rails does) and the constraint via `add_foreign_key`.
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
@@ -33,11 +29,14 @@ import {
 import { withTimezoneConfig } from "../../test-helper.js";
 import {
   AdapterTimeout,
+  ConnectionNotEstablished,
   MismatchedForeignKey,
   QueryAborted,
   StatementTimeout,
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
+import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
+import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
 import { Result } from "../../result.js";
 import * as Arel from "@blazetrails/arel";
 
@@ -52,6 +51,45 @@ describeIfMysql("Mysql2AdapterTest", () => {
     // into subsequent suites.
     vi.restoreAllMocks();
     await adapter.close();
+  });
+
+  it("connection error", async () => {
+    // Rails: `Mysql2Adapter.new(socket: File::NULL, ...).connect!` raises
+    // ConnectionNotEstablished whose `connection_pool` is a NullPool. trails
+    // connects lazily (there is no eager `connect!`), so the failure to connect
+    // to a dead socket surfaces on the first query — the same rescued
+    // `connect` → `set_pool(@pool)` path, carrying the standalone adapter's
+    // NullPool.
+    const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
+    try {
+      const error = await badAdapter
+        .execute("SELECT 1")
+        .then(() => null)
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(ConnectionNotEstablished);
+      expect(error.connectionPool).toBeInstanceOf(NullPool);
+    } finally {
+      await badAdapter.close();
+    }
+  });
+
+  it("reconnection error", async () => {
+    // Rails reconnects a standalone adapter whose config points at a dead
+    // socket and asserts the raised ConnectionNotEstablished's `connection_pool`
+    // equals the adapter's own pool (a NullPool). trails connects lazily, so
+    // force the connect via a query after a reconnect and assert the same.
+    const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
+    try {
+      await badAdapter.reconnectBang().catch(() => {});
+      const error = await badAdapter
+        .execute("SELECT 1")
+        .then(() => null)
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(ConnectionNotEstablished);
+      expect(error.connectionPool).toBe(badAdapter.pool);
+    } finally {
+      await badAdapter.close();
+    }
   });
 
   it("mysql2 default prepared statements", () => {
@@ -138,45 +176,30 @@ describeIfMysql("Mysql2AdapterTest", () => {
     }
   });
 
-  // FK type-mismatch fixture tables — created/dropped around each test so the
-  // FK tests are self-contained, with Rails' own table names and PK types:
-  //   old_cars    — integer PK  (Rails: `create_table :old_cars, id: :integer`)
-  //   cars        — bigint PK   (Rails: `create_table :cars`)
-  //   subscribers — varchar PK  (Rails: `create_table :subscribers, id: false` w/ nick)
-  //   engines     — bigint PK, used as the referencing table
+  // The FK type-mismatch tests ride the canonical tables (engines, old_cars —
+  // integer PK, cars — bigint PK, subscribers — varchar `nick`, people —
+  // bigint PK). rebuildCanonicalTables restores each to its canonical shape;
+  // FK checks are disabled for the pre-drop so a leftover engines→people FK
+  // (from the multiple-fks test) can't block dropping its parent table.
   beforeEach(async () => {
-    await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
-    await adapter.executeMutation(
-      "CREATE TABLE `old_cars` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
-    );
-    await adapter.executeMutation(
-      "CREATE TABLE `cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
-    );
-    await adapter.executeMutation(
-      "CREATE TABLE `subscribers` (`nick` VARCHAR(255) NOT NULL PRIMARY KEY) ENGINE=InnoDB",
-    );
-    await adapter.executeMutation(
-      "CREATE TABLE `engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `old_car_id` BIGINT) ENGINE=InnoDB",
-    );
+    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS=0");
+    for (const t of ["foos", "engines", "old_cars", "cars", "subscribers", "people"]) {
+      await adapter.executeMutation(`DROP TABLE IF EXISTS \`${t}\``);
+    }
+    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS=1");
+    await rebuildCanonicalTables(adapter, ["people", "cars", "old_cars", "subscribers", "engines"]);
   });
 
   afterEach(async () => {
-    await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
     await adapter.executeMutation("DROP TABLE IF EXISTS `foos`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
-    await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
   });
 
   it("errors for bigint fks on integer pk table in alter table", async () => {
-    // engines.old_car_id is BIGINT but old_cars.id is INT — type mismatch
+    // add_reference defaults old_car_id to :bigint; old_cars.id is INT — the
+    // add_foreign_key then trips the type mismatch.
     const error = await adapter
-      .executeMutation(
-        "ALTER TABLE `engines` ADD CONSTRAINT `fk_test` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
-      )
+      .addReference("engines", "old_car")
+      .then(() => adapter.addForeignKey("engines", "old_cars"))
       .then(() => null)
       .catch((e) => e);
 
@@ -196,16 +219,11 @@ describeIfMysql("Mysql2AdapterTest", () => {
   it.skipIf(isMariaDb)(
     "errors for multiple fks on mismatched types for pk table in alter table",
     async () => {
-      // Add matching FK first (cars.id is BIGINT, engines.id is BIGINT — OK)
-      await adapter.executeMutation(
-        "ALTER TABLE `engines` ADD COLUMN `car_id` BIGINT, ADD CONSTRAINT `fk_car` FOREIGN KEY (`car_id`) REFERENCES `cars` (`id`)",
-      );
-
-      // Then add mismatched FK (old_cars.id is INT but old_car_id is BIGINT)
       const error = await adapter
-        .executeMutation(
-          "ALTER TABLE `engines` ADD CONSTRAINT `fk_old_car` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
-        )
+        // Add a matching FK first (person_id is :bigint, people.id is bigint).
+        .addReference("engines", "person", { foreignKey: true })
+        // Then the mismatched one: old_car_id is :bigint but old_cars.id is INT.
+        .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
         .then(() => null)
         .catch((e) => e);
 

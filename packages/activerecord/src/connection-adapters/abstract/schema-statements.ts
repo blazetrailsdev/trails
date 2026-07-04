@@ -38,7 +38,7 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
-import { singularize, getCrypto } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
@@ -667,12 +667,16 @@ export class SchemaStatements {
     refName: string,
     options: ColumnOptions & {
       polymorphic?: boolean;
-      foreignKey?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
       type?: ColumnType;
       index?: boolean;
     } = {},
   ): Promise<void> {
-    const colType = options.type ?? "integer";
+    // Rails' ReferenceDefinition defaults `type: :bigint`
+    // (schema_definitions.rb:204), matching the default `bigint` primary key a
+    // referenced table gets — so a reference column lines up with the PK it
+    // points at.
+    const colType = options.type ?? "bigint";
     await this.addColumn(tableName, `${refName}_id`, colType, options);
     if (options.polymorphic) {
       await this.addColumn(tableName, `${refName}_type`, "string", options);
@@ -680,6 +684,18 @@ export class SchemaStatements {
     if (options.index !== false) {
       const cols = options.polymorphic ? [`${refName}_id`, `${refName}_type`] : [`${refName}_id`];
       await this.addIndex(tableName, cols);
+    }
+    if (options.foreignKey) {
+      // Mirrors ReferenceDefinition#add: `connection.add_foreign_key(table_name,
+      // foreign_table_name, **foreign_key_options)`. foreign_table_name defaults
+      // to the pluralized reference name; foreign_key_options carries the
+      // `<ref>_id` column and, when `foreign_key:` is a hash, its `to_table`.
+      const fkOptions = typeof options.foreignKey === "object" ? options.foreignKey : {};
+      const toTable = (fkOptions as { toTable?: string }).toTable ?? pluralize(refName);
+      await this.addForeignKey(tableName, toTable, {
+        ...(fkOptions as Record<string, unknown>),
+        column: `${refName}_id`,
+      });
     }
   }
 
@@ -689,7 +705,7 @@ export class SchemaStatements {
     refName: string,
     options: ColumnOptions & {
       polymorphic?: boolean;
-      foreignKey?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
       type?: ColumnType;
       index?: boolean;
     } = {},

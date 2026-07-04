@@ -25,6 +25,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
+import { NullPool, poolAbsent } from "./abstract/connection-pool.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -605,6 +606,11 @@ export class AbstractAdapter implements Quoting {
     ensureAbstractAdapterMixinsApplied();
     // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
     this._visitor = this.arelVisitor();
+    // Mirrors Rails abstract_adapter.rb:153 — @pool = NullPool.new. A standalone
+    // adapter carries a NullPool until a real ConnectionPool claims it (the pool
+    // overwrites `pool` when it owns the connection), so `connection_pool` on a
+    // connect-time error is a NullPool rather than null.
+    this.pool = new NullPool();
   }
 
   protected _visitor!: Visitors.ToSql;
@@ -1548,7 +1554,7 @@ export class AbstractAdapter implements Quoting {
     // so the no-pool branch expires a leased connection and otherwise no-ops
     // (matching NullPool#checkin).
     const pool = this.pool as { checkin?: (conn: unknown) => void } | null;
-    if (pool && typeof pool.checkin === "function") {
+    if (!poolAbsent(pool) && pool && typeof pool.checkin === "function") {
       pool.checkin(this);
     } else if (this._inUse) {
       this.expire();
@@ -2331,7 +2337,7 @@ export class AbstractAdapter implements Quoting {
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
     const tableName = relationName(attribute.relation.name);
     let hash = await (this.schemaCache as any).columnsHash(this.pool, tableName);
-    if (!hash && this.pool == null && typeof (this as any).columns === "function") {
+    if (!hash && poolAbsent(this.pool) && typeof (this as any).columns === "function") {
       // Bare-adapter path (no pool): the null-pool guard in columnsHash blocks the
       // DB fallback. Fetch directly so callers like caseSensitiveComparison can
       // resolve collations even when the schema cache was cleared by model
