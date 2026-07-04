@@ -151,6 +151,16 @@ describe("IntegerTest", () => {
     expect(type.cast(bigVal)).toBe(bigVal);
   });
 
+  it("serializable? checks an 8-byte column bound in BigInt space (2^63 exclusive)", () => {
+    // float64 collapses 2^63 and 2^63-1 to the same value, so the range check
+    // must compare in BigInt space to honor Rails' half-open `min...max`.
+    const int8 = new Types.IntegerType({ limit: 8 });
+    expect(int8.isSerializable(2n ** 63n)).toBe(false);
+    expect(int8.isSerializable(2n ** 63n - 1n)).toBe(true);
+    expect(int8.isSerializable(-(2n ** 63n))).toBe(true);
+    expect(int8.isSerializable(-(2n ** 63n) - 1n)).toBe(false);
+  });
+
   it("serialize_cast_value enforces range", () => {
     const values = [1, "123", 0, -5, null];
     for (const v of values) {

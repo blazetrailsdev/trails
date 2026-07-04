@@ -218,6 +218,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return new Visitors.SQLite(this);
   }
 
+  /**
+   * Mirrors: SQLite3Adapter#bind_params_length (sqlite3_adapter.rb:509-512).
+   * SQLite's default SQLITE_LIMIT_VARIABLE_NUMBER is 999; overrides the abstract
+   * DatabaseLimits default (65535), which exceeds the driver's compiled cap.
+   * @internal Rails-private helper.
+   */
+  bindParamsLength(): number {
+    return 999;
+  }
+
   private driver!: SqliteConnection;
   /**
    * True after construction when the bound driver is async-only and the
@@ -2975,12 +2985,6 @@ const REFERENTIAL_ACTION_MAP: Record<string, string> = {
 
 function normalizeReferentialAction(action: string): string {
   return REFERENTIAL_ACTION_MAP[action.toLowerCase()] ?? action.toUpperCase();
-}
-
-/** @internal */
-function bindParamsLength(): number {
-  // https://www.sqlite.org/limits.html — default SQLITE_LIMIT_VARIABLE_NUMBER
-  return 999;
 }
 
 /** @internal */

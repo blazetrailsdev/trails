@@ -114,25 +114,11 @@ class MysqlBigInteger extends BigIntegerType {
   // reports the same type as IntegerType({limit:8}) would.
   override readonly name: string = "integer";
 
+  // Re-establish the 8-byte signed bound that BigIntegerType drops
+  // (max_value = Infinity). IntegerType's isInRange/isSerializable already
+  // compare in BigInt space, so an exactly-2^63 value is detected out of range.
   protected override maxValue(): number {
     return 2 ** (this._limit() * 8 - 1);
-  }
-
-  protected override isInRange(value: number | null): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") {
-      const bytes = this._limit();
-      const max = (1n << BigInt(bytes * 8 - 1)) - 1n;
-      const min = -(1n << BigInt(bytes * 8 - 1));
-      return value >= min && value <= max;
-    }
-    return super.isInRange(value);
-  }
-
-  override isSerializable(value: unknown): boolean {
-    if (value == null) return true;
-    if (typeof value === "bigint") return this.isInRange(value as unknown as number);
-    return super.isSerializable(value);
   }
 
   override serializeCastValue(value: number | null): number | null {

@@ -441,6 +441,23 @@ describe("FinderTest", () => {
     expect(await existsWhere(id.lt(bind(negBig)))).toBe(false);
     expect(await existsWhere(id.lteq(bind(negBig)))).toBe(false);
   });
+
+  it("all-out-of-range array collapses to IN (NULL)", async () => {
+    // Every value is past the 8-byte signed bound, so HomogeneousIn#castedValues
+    // (via IntegerType#serializable?) drops them all, leaving `id IN (NULL)` —
+    // matching nothing — and `id NOT IN (NULL)` — a NULL predicate that also
+    // matches nothing. Exercised on SQLite/MySQL/PostgreSQL via the CI matrix.
+    const big = 9223372036854775808n; // 2^63
+    const negBig = -9223372036854775809n; // -(2^63) - 1
+
+    const inRel = Topic.where({ id: [big, negBig] });
+    expect(inRel.toSql()).toMatch(/IN \(NULL\)/);
+    expect(await inRel.exists()).toBe(false);
+
+    const notInRel = Topic.whereNot({ id: [big, negBig] });
+    expect(notInRel.toSql()).toMatch(/NOT IN \(NULL\)/);
+    expect(await notInRel.exists()).toBe(false);
+  });
 });
 
 // ==========================================================================
