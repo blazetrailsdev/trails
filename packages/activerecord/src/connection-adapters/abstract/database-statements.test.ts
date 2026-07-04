@@ -284,6 +284,58 @@ describe("DatabaseStatements", () => {
       expect(executed[0]).toMatch(/DELETE FROM/);
       expect(executed[1]).toMatch(/INSERT INTO/);
     });
+
+    it("scopes disableReferentialIntegrity to the fixture tables and delete targets", async () => {
+      const { insertFixturesSet } = await import("./database-statements.js");
+      let scopedTables: string[] | undefined;
+      const host: DatabaseStatementsHost &
+        Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
+        execute: async () => {},
+        transaction: async <T>(fn: (tx?: unknown) => Promise<T> | T) => {
+          await fn();
+          return undefined;
+        },
+        disableReferentialIntegrity: async (fn: () => Promise<void>, tables?: string[]) => {
+          scopedTables = tables;
+          await fn();
+        },
+        quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+        quoteTableName: (n: string) => `"${n}"`,
+        quoteColumnName: (n: string) => `"${n}"`,
+      };
+
+      await insertFixturesSet.call(host, { users: [{ name: "Alice" }], posts: [{ title: "Hi" }] }, [
+        "old_table",
+        "users",
+      ]);
+
+      // Union of fixture keys and delete targets, de-duplicated.
+      expect(scopedTables && [...scopedTables].sort()).toEqual(["old_table", "posts", "users"]);
+    });
+  });
+
+  describe("truncateTables", () => {
+    it("scopes disableReferentialIntegrity to the tables being truncated", async () => {
+      const { truncateTables } = await import("./database-statements.js");
+      const executed: string[] = [];
+      let scopedTables: string[] | undefined;
+      const host: DatabaseStatementsHost & Pick<Quoting, "quoteTableName"> = {
+        execute: async (sql: string) => {
+          executed.push(sql);
+        },
+        disableReferentialIntegrity: async (fn: () => Promise<void>, tables?: string[]) => {
+          scopedTables = tables;
+          await fn();
+        },
+        quoteTableName: (n: string) => `"${n}"`,
+      };
+
+      // schema_migrations / ar_internal_metadata are filtered out before scoping.
+      await truncateTables.call(host, "users", "posts", "schema_migrations");
+
+      expect(scopedTables).toEqual(["users", "posts"]);
+      expect(executed).toEqual(['TRUNCATE TABLE "users"', 'TRUNCATE TABLE "posts"']);
+    });
   });
 
   describe("truncate / insertFixture quoter dispatch", () => {

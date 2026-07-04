@@ -7,7 +7,7 @@
 import { ActiveRecordError, InvalidForeignKey } from "../../errors.js";
 
 export interface ReferentialIntegrity {
-  disableReferentialIntegrity(fn: () => Promise<void>): Promise<void>;
+  disableReferentialIntegrity(fn: () => Promise<void>, tables?: string[]): Promise<void>;
   checkAllForeignKeysValidBang(): Promise<void>;
 }
 
@@ -63,22 +63,39 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
   transaction(fn: () => Promise<void>, options: { requiresNew: boolean }): Promise<unknown>;
 }
 
-// Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables every
-// table's triggers (FK checks) inside a requires_new transaction, yields, then
-// re-enables them. Both ALTER passes are wrapped in `requiresNew` so a
-// missing-superuser failure rolls back to the savepoint and leaves any
-// surrounding transaction usable. Only an InvalidForeignKey raised by the block
-// earns the missing-privileges warning; every other error bubbles up unchanged.
+// Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables the
+// triggers (FK checks) on the affected tables inside a requires_new
+// transaction, yields, then re-enables them. Both ALTER passes are wrapped in
+// `requiresNew` so a missing-superuser failure rolls back to the savepoint and
+// leaves any surrounding transaction usable. Only an InvalidForeignKey raised
+// by the block earns the missing-privileges warning; every other error bubbles
+// up unchanged.
+//
+// Rails toggles over the full `tables` set because its fixture load is a single
+// bulk `insert_fixtures_set` per run. trails fires this wrapper per fixture-load
+// and per truncate event (~84k times under RFC 0060's per-test reset), so an
+// ALTER over every canonical table dominates PG DDL cost. Callers that know the
+// exact tables they touch pass `scopedTables`; disabling triggers on just those
+// tables is sufficient because a table's FK-check triggers only fire when that
+// table is itself inserted/deleted/truncated — and those are the only tables the
+// wrapped block touches. Absent a scope, fall back to the whole catalog to
+// preserve the public `disable_referential_integrity` contract.
+//
+// The `scopedTables` parameter has no Rails counterpart (the method is zero-arg
+// in every adapter); it is a tracked deviation pending convergence — see RFC
+// 0060 story `converge-referential-integrity-zero-arg-shape` (hoist the
+// fixture-load flow to one block per set, matching Rails' insert_fixtures_set,
+// then drop the parameter).
 export async function disableReferentialIntegrity(
   this: ReferentialIntegrityHost,
   fn: () => Promise<void>,
+  scopedTables?: string[],
 ): Promise<void> {
   let originalException: Error | null = null;
 
-  // Enumerate the catalog once and re-enable exactly the set we disabled.
-  // Re-deriving the list after the block ran would both double the catalog
-  // enumeration (hot under RFC 0060's per-test truncate reset) and risk
-  // re-enabling a different set if the block created/dropped tables.
+  // Snapshot the set once and re-enable exactly what we disabled. Re-deriving
+  // the list after the block ran would risk re-enabling a different set if the
+  // block created/dropped tables.
   //
   // Snapshotting before `fn()` means that if the block drops a table, the
   // ENABLE pass issues `ALTER TABLE <dropped> ENABLE TRIGGER ALL` against a
@@ -86,18 +103,24 @@ export async function disableReferentialIntegrity(
   // translates to StatementInvalid (an ActiveRecordError), so the enable-pass
   // catch below swallows it — same as Rails silently rescues enable-pass
   // errors (referential_integrity.rb:28-34).
-  const tables = await this.tables();
+  const tables = scopedTables ?? (await this.tables());
 
-  try {
-    await this.transaction(
-      async () => {
-        await this.execute(disableReferentialIntegritySql.call(this, tables).join(";"));
-      },
-      { requiresNew: true },
-    );
-  } catch (e) {
-    if (e instanceof ActiveRecordError) originalException = e as Error;
-    else throw e;
+  // An empty scope has no triggers to toggle, so skip both ALTER passes — but
+  // still route `fn()` through the shared catch below so an InvalidForeignKey it
+  // raises earns the missing-privileges warning Rails always prints
+  // (referential_integrity.rb:20-30), matching the non-empty path.
+  if (tables.length > 0) {
+    try {
+      await this.transaction(
+        async () => {
+          await this.execute(disableReferentialIntegritySql.call(this, tables).join(";"));
+        },
+        { requiresNew: true },
+      );
+    } catch (e) {
+      if (e instanceof ActiveRecordError) originalException = e as Error;
+      else throw e;
+    }
   }
 
   try {
@@ -113,6 +136,8 @@ export async function disableReferentialIntegrity(
     }
     throw e;
   }
+
+  if (tables.length === 0) return;
 
   try {
     await this.transaction(
