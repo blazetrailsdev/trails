@@ -33,24 +33,25 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 
 describe("InnerJoinAssociationTest", () => {
-  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "essays",
-      "posts",
-      "comments",
-      "categories",
-      "categoriesPosts",
-      "categorizations",
-      "taggings",
-      "tags",
-      "people",
-      "shardedComments",
-      "shardedBlogPosts",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts, shardedComments } =
+    fixtures(
+      [
+        "authors",
+        "authorAddresses",
+        "essays",
+        "posts",
+        "comments",
+        "categories",
+        "categoriesPosts",
+        "categorizations",
+        "taggings",
+        "tags",
+        "people",
+        "shardedComments",
+        "shardedBlogPosts",
+      ],
+      { schema: canonicalSchema },
+    );
 
   enableSti(Category);
   registerModel(Author);
@@ -151,11 +152,7 @@ describe("InnerJoinAssociationTest", () => {
     expect(result.map((p) => p.id)).toEqual([(expected as any).id]);
   });
 
-  // BLOCKED (tracked-pending-convergence): trails does not deduplicate identical
-  // Arel join nodes when merging a relation into itself, so the `posts` self-join
-  // is emitted twice and `posts.type` becomes ambiguous. Rails dedupes the join.
-  // Deviation: inner-join-association-surfaced-deviations (RFC 0023).
-  it.skip("deduplicate joins", async () => {
+  it("deduplicate joins", async () => {
     const postsTable = new Table("posts");
     const constraint = postsTable.get("author_id").eq(Author.arelTable.get("id"));
 
@@ -170,23 +167,14 @@ describe("InnerJoinAssociationTest", () => {
     expect(result.map((a) => a.id)).toEqual([(authors("david") as any).id]);
   });
 
-  // BLOCKED (tracked-pending-convergence): `eager_load(:agents)` on a
-  // self-referential association aliases the `people` self-join differently than
-  // Rails (which seeds the alias_tracker so the user-supplied string/arel join
-  // resolves `agents_people_2`). trails emits a non-matching alias → "no such
-  // column: agents_people_2.id". Deviation: inner-join-association-surfaced-deviations.
-  it.skip("eager load with string joins", async () => {
+  it("eager load with string joins", async () => {
     const stringJoin =
       "LEFT JOIN people agents_people ON agents_people.primary_contact_id = agents_people_2.id AND agents_people.id > agents_people_2.id";
 
     expect(await Person.eagerLoad("agents").joins(stringJoin).count()).toBe(3);
   });
 
-  // BLOCKED (tracked-pending-convergence): same self-referential eager_load
-  // aliasing gap as test_eager_load_with_string_joins — the user-supplied Arel
-  // join references `agents_people` while the eager_load join collides on
-  // `primary_contact_id`. Deviation: inner-join-association-surfaced-deviations.
-  it.skip("eager load with arel joins", async () => {
+  it("eager load with arel joins", async () => {
     const agents = Person.arelTable.alias("agents_people");
     const agents2 = Person.arelTable.alias("agents_people_2");
     const constraint = agents
@@ -360,21 +348,17 @@ describe("InnerJoinAssociationTest", () => {
     );
   });
 
-  // BLOCKED (tracked-pending-convergence): `joins` on a has_many association with
-  // a composite foreign key (ShardedBlogPost#comments, foreignKey [blog_id,
-  // blog_post_id]) is rejected by the join-dependency builder ("Association named
-  // 'comments' was not found"); the belongs_to composite-FK join works. Deviation:
-  // inner-join-association-surfaced-deviations.
-  it.skip("joins a has_many association with a composite foreign key", async () => {
+  it("joins a has_many association with a composite foreign key", async () => {
     const { ShardedBlogPost } = await import("../test-helpers/models/sharded.js");
     const blogPosts = await ShardedBlogPost.joins("comments").where({
       comments: { body: "Your first blog post is great!" },
     });
 
+    const expectedComment = shardedComments("unique_comment_blog_post_one");
     expect(blogPosts.length).toBeGreaterThan(0);
-    const firstComment = (await (blogPosts[0] as any).comments)[0];
-    const itsBlogPost = await firstComment.blogPost;
-    expect(itsBlogPost.id).toEqual((blogPosts[0] as any).id);
+    // Rails: assert_equal(expected_comment.blog_post, blog_posts.first).
+    const itsBlogPost = await (expectedComment as any).blogPost;
+    expect(Number((blogPosts[0] as any).id)).toEqual(Number(itsBlogPost.id));
   });
 
   it("inner joins includes all nested associations", async () => {
