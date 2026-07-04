@@ -17,7 +17,7 @@
 import ts from "typescript";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { classify, camelize } from "@blazetrails/activesupport";
 import { virtualize } from "../src/type-virtualization/virtualize.js";
 import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
@@ -657,7 +657,7 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 // the lookahead pins the identifier to its full extent: without it the greedy
 // `[\w$]*` would backtrack and match the prefix `the` of `then(`, whose next
 // char is `n` (not `(`), re-introducing the bug.
-const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
+export const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
 // AR built-ins, keyed by symbol → the source module relative to MODELS_DIR
 // (the same paths the hand-written model declares under that dir use). The
 // specifier is recomputed relative to each materialized file's directory in
@@ -680,7 +680,7 @@ function builtinSpecifierFor(sym: string, fileDir: string): string | undefined {
   return rel;
 }
 
-function hoistInlineImports(
+export function hoistInlineImports(
   text: string,
   inScope: ReadonlySet<string>,
   fileDir: string,
@@ -849,4 +849,11 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+// Only run the generator when invoked as the CLI entry point — importing the
+// module (e.g. from a unit test) must not rewrite the pilot model files.
+// Compare module URL to argv[1] via `pathToFileURL` so Windows paths and
+// URL-encoded chars don't trip a naive `file://` string compare.
+const entry = process.argv[1];
+if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
+  await main();
+}
