@@ -908,9 +908,13 @@ function unscopeBang(
 }
 
 function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
-  // Rails joins! uses |= (array union), deduplicating by equality/identity.
+  // Rails joins! uses |= (array union), deduplicating by Ruby eql?/hash —
+  // structural for Hash specs, strings, and even Arel nodes (Arel::Nodes::Binary
+  // defines eql?/hash by class + members, arel/nodes/binary.rb:20-29).
+  // structuralUnionEq mirrors that: === first, then deepEqual (which delegates
+  // to a node's own eql for Arel nodes).
   for (const arg of args) {
-    if (!this._joinValues.includes(arg)) this._joinValues.push(arg);
+    if (!this._joinValues.some((seen) => structuralUnionEq(seen, arg))) this._joinValues.push(arg);
   }
   return this;
 }
@@ -918,8 +922,10 @@ function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): an
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   // Mirrors Rails left_outer_joins! which stores into left_outer_joins_values
   // (separate from joins_values / _joinValues which is the inner-join path).
+  // |= dedups by eql?/hash — structural for Hash specs, not JS reference.
   for (const arg of args) {
-    if (!this._leftOuterJoinsValues.includes(arg)) this._leftOuterJoinsValues.push(arg);
+    if (!this._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
+      this._leftOuterJoinsValues.push(arg);
   }
   return this;
 }
@@ -1046,6 +1052,20 @@ function uniqArray(arr: unknown[]): unknown[] {
     if (!out.some((seen) => deepEqual(seen, el))) out.push(el);
   }
   return out;
+}
+
+/**
+ * Ruby `Array#|=` (and `uniq`) dedup by `eql?`/`hash` — structural for Hash
+ * specs, strings, and Arel nodes alike (Arel::Nodes::Binary, which Join extends,
+ * defines eql?/hash by class + members: arel/nodes/binary.rb:20-29). This mirrors
+ * that for the join-value unions (`joins_values`, `left_outer_joins_values`):
+ * {@link deepEqual} tests `===` first, then delegates to a node's own `eql`, and
+ * falls back to per-key structural equality for plain-object specs — so
+ * `leftJoins({ posts: "x" })` called twice folds to one entry as in Rails.
+ * @internal
+ */
+export function structuralUnionEq(a: unknown, b: unknown): boolean {
+  return deepEqual(a, b);
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {

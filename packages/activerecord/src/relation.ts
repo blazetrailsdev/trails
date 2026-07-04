@@ -1884,18 +1884,21 @@ export class Relation<T extends Base> {
     const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     for (const arg of flatArgs) {
       // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
-      // Rails joins! uses |= (array union), deduplicating by object identity for
-      // nodes and string equality for strings. JS === matches both behaviours.
+      // Rails joins! uses |= (array union), deduplicating by eql?/hash —
+      // structural for nodes (Arel::Nodes::Binary#eql?), strings, and hashes
+      // alike. structuralUnionEq (=== first, then eql/structural) matches all.
       if (arg instanceof Nodes.Join) {
-        if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
+        if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, arg))) rel._joinValues.push(arg);
         continue;
       }
       // Nested association hash: joins({ post: "author" }) mirrors Rails
       // joins(post: :author). Route through JoinDependency (InnerJoin) so the
       // full nested chain is resolved — constructJoinDependency already walks
       // AssociationSpec trees via walkAssociationTree/addTreeToJoinDependency.
+      // joins_values |= dedups structurally-equal Hash specs, so fold here too.
       if (_isPlainObject(arg)) {
-        rel._namedInnerJoins.push(arg as AssociationSpec);
+        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
+          rel._namedInnerJoins.push(arg as AssociationSpec);
         continue;
       }
       // Named association joins — both simple `joins(:assoc)` and nested-through
@@ -1905,11 +1908,13 @@ export class Relation<T extends Base> {
       // AliasTracker self-join aliasing and table-klass lookups across simple and
       // through joins; a non-association string falls through to a raw SQL join.
       if (typeof arg === "string" && rel._isAssociationName(arg)) {
-        if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
+        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
+          rel._namedInnerJoins.push(arg);
         continue;
       }
       const joinValue = arg as string | Nodes.Join;
-      if (!rel._joinValues.includes(joinValue)) rel._joinValues.push(joinValue);
+      if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, joinValue)))
+        rel._joinValues.push(joinValue);
     }
     return rel;
   }
@@ -1973,7 +1978,9 @@ export class Relation<T extends Base> {
     // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
     // `buildJoinBuckets` for the raise.
     for (const spec of specs) {
-      if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
+      // Rails' left_outer_joins! unions with `|=` (eql?/hash), so a Hash spec
+      // passed twice folds structurally — not by JS reference identity.
+      if (!rel._leftOuterJoinsValues.some((v) => _qm.structuralUnionEq(v, spec))) {
         rel._leftOuterJoinsValues.push(spec as AssociationSpec);
       }
     }
