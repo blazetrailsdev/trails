@@ -7,7 +7,7 @@ import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
-import { constructJoinDependency } from "../relation/query-methods.js";
+import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -1032,7 +1032,8 @@ export class AssociationScope {
     if (namedLeft.length > 0) {
       if (sameKlass) {
         for (const v of namedLeft)
-          if (!target._leftOuterJoinsValues.includes(v)) target._leftOuterJoinsValues.push(v);
+          if (!target._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+            target._leftOuterJoinsValues.push(v);
       } else {
         target._leftOuterJoinDeps.push(
           constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),

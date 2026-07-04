@@ -1,6 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 
-import { arelColumns, constructJoinDependency } from "./query-methods.js";
+import { arelColumns, constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -151,7 +151,8 @@ export class Merger {
     const sameKlass = this.other._modelClass === rel._modelClass;
     if (sameKlass) {
       for (const v of otherLeft) {
-        if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
+        if (!rel._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+          rel._leftOuterJoinsValues.push(v);
       }
     } else if (otherLeft.length > 0) {
       rel._leftOuterJoinDeps.push(

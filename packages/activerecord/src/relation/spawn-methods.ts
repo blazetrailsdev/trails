@@ -5,7 +5,7 @@
  */
 
 import { Merger, HashMerger } from "./merger.js";
-import { argumentError } from "./query-methods.js";
+import { argumentError, structuralUnionEq } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -123,10 +123,12 @@ export function mergeBang(this: any, other: any): any {
     this._joinClauses.push(...(other._joinClauses ?? []));
     this._joinValues.push(...(other._joinValues ?? []));
     for (const v of other._leftOuterJoinsValues ?? []) {
-      if (!this._leftOuterJoinsValues.includes(v)) this._leftOuterJoinsValues.push(v);
+      if (!this._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+        this._leftOuterJoinsValues.push(v);
     }
     for (const v of other._namedInnerJoins ?? []) {
-      if (!this._namedInnerJoins.includes(v)) this._namedInnerJoins.push(v);
+      if (!this._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
+        this._namedInnerJoins.push(v);
     }
     this._namedInnerJoinDeps.push(...(other._namedInnerJoinDeps ?? []));
     this._leftOuterJoinDeps.push(...(other._leftOuterJoinDeps ?? []));
