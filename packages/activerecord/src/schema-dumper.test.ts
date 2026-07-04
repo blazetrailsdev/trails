@@ -502,7 +502,7 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       const testCtx = new MigrationContext(adapter);
-      await testCtx.createTable("binary_fields", {}, (t) => {
+      await testCtx.createTable("binary_fields", { force: true }, (t) => {
         t.binary("var_binary", { limit: 255 });
         t.binary("var_binary_large", { limit: 4095 });
       });
@@ -516,7 +516,7 @@ describe("SchemaDumperTest", () => {
     async () => {
       const bfAdapter = Base.connection;
       const bfCtx = new MigrationContext(bfAdapter);
-      await bfCtx.createTable("binary_fields", {}, (t) => {
+      await bfCtx.createTable("binary_fields", { force: true }, (t) => {
         t.binary("tiny_blob", { size: "tiny" });
         t.binary("normal_blob");
         t.binary("medium_blob", { size: "medium" });
@@ -587,7 +587,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
     const adapter = Base.connection;
     const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("bigint_array", {}, (t) => {
+    await testCtx.createTable("bigint_array", { force: true }, (t) => {
       (t as any).integer("big_int_data_points", { limit: 8, array: true });
     });
     const output = await dumpTableSchema(adapter as unknown as SchemaSource, "bigint_array");
@@ -598,7 +598,7 @@ describe("SchemaDumperTest", () => {
     async () => {
       const testAdapter = Base.connection;
       const testCtx = new MigrationContext(testAdapter);
-      await testCtx.createTable("bigint_array", {}, (t) => {
+      await testCtx.createTable("bigint_array", { force: true }, (t) => {
         t.integer("big_int_data_points", { limit: 8, array: true });
         t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
       });
