@@ -21,16 +21,19 @@ import { TEST_SCHEMA } from "./test-schema.js";
 // dumped DDL. The per-adapter transforms (serialIdType, DATETIME(6)) are shared
 // code imported from define-schema.ts, so PG/MySQL cannot diverge independently.
 
+// `selectAll` returns a `Result` whose rows are positional arrays; `toArray()`
+// maps them to hash rows via the column index, so `r.type`/`r.name`/`r.sql`
+// resolve to real values. Reading the raw `{ columns, rows }` array rows
+// directly instead silently collapses every dump line to
+// "undefined undefined: undefined".
 async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
-  const res = (await adapter.selectAll(
+  const res = await adapter.selectAll(
     "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name, type, sql",
-  )) as unknown;
-  const rows = (Array.isArray(res) ? res : ((res as { rows?: unknown[] }).rows ?? [])) as {
-    type: string;
-    name: string;
-    sql: string;
-  }[];
-  return rows.map((r) => `${r.type} ${r.name}: ${r.sql}`).join("\n");
+  );
+  return res
+    .toArray()
+    .map((r) => `${r.type} ${r.name}: ${r.sql}`)
+    .join("\n");
 }
 
 describe("loadCanonicalSchema", () => {
@@ -48,6 +51,10 @@ describe("loadCanonicalSchema", () => {
       // Sanity floor: the canonical schema is hundreds of tables + indexes, so a
       // silently-empty dump (both empty ⇒ trivially equal) can't pass this test.
       expect(expected.split("\n").length).toBeGreaterThan(300);
+      // Content floor: the dump must carry real DDL, not placeholder rows — a
+      // shape mismatch collapses every line to "undefined undefined: undefined".
+      expect(expected).not.toContain("undefined undefined: undefined");
+      expect(expected).toMatch(/table topics: CREATE TABLE "?topics"?/);
     } finally {
       await viaDefineSchema.close();
       await viaLoader.close();
