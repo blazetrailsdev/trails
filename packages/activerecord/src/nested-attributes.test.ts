@@ -130,13 +130,10 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(() => Pirate.acceptsNestedAttributesFor("honesty")).toThrow(/No association found/);
   });
 
-  // tracked-pending-convergence (0023-surfaced-deviations): building a nested
-  // record from a hash with an unknown key does not raise UnknownAttributeError
-  // because trails' `Model.new`/build silently drops unknown attributes (a
-  // base-level deviation, not nested-attributes-specific). trails does raise it
-  // on the UPDATE-existing flush path, but Rails raises here on the build path.
-  // See model-new-unknown-attribute convergence story.
-  it.skip("should raise an UnknownAttributeError for non existing nested attributes", async () => {
+  it("should raise an UnknownAttributeError for non existing nested attributes", async () => {
+    // Rails' setup keeps `accepts_nested_attributes_for :ship` configured; the
+    // trails tests configure per-case and restore via resetShipConfig.
+    resetShipConfig();
     await expect(
       (async () => {
         const pirate = new Pirate({ catchphrase: "Arr" });
@@ -182,7 +179,11 @@ describe("TestNestedAttributesInGeneral", () => {
     // `attributes.delete("_reject_me_if_new").present? && !persisted?`
     Pirate.acceptsNestedAttributesFor("ship", {
       rejectIf: (attrs, rec) => {
+        // Rails `attributes.delete("_reject_me_if_new")` removes the control key
+        // from the hash so the subsequent build never assigns it (which would
+        // now raise UnknownAttributeError).
         const v = attrs["_reject_me_if_new"];
+        delete attrs["_reject_me_if_new"];
         return v != null && v !== "" && v !== false && !rec.isPersisted();
       },
     });
@@ -854,10 +855,7 @@ function collectionAssociationTests(
     }).not.toThrow();
   });
 
-  // tracked-pending-convergence (0023-surfaced-deviations): see the singular
-  // counterpart — building a new nested record from an unknown key does not
-  // raise (trails' build drops unknown attributes). model-new-unknown-attribute.
-  it.skip("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
+  it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
     const { pirate } = await buildSetup();
     await expect(
       (async () => {
