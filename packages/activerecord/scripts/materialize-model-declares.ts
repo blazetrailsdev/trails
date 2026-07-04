@@ -615,7 +615,13 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 // AR built-ins are pointed at the same relative paths the hand-written
 // model declares use, to match convention; anything else keeps its
 // original module specifier.
-const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)/g;
+// The negative lookahead `(?!\s*\()` excludes runtime dynamic imports —
+// `import("mod").then((m) => m.Foo)` — where the member access is immediately
+// CALLED. The virtualizer only ever emits `import("mod").Sym` in TYPE position
+// (used as `Sym`, `Sym<…>`, `Sym | null`, …), which is never followed by `(`,
+// so distinguishing a call site keeps a `.then(...)` Promise chain from being
+// misparsed as a named import of a symbol called `then`.
+const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
 // AR built-ins, keyed by symbol → the source module relative to MODELS_DIR
 // (the same paths the hand-written model declares under that dir use). The
 // specifier is recomputed relative to each materialized file's directory in
