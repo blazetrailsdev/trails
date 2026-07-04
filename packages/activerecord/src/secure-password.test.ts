@@ -74,28 +74,42 @@ describe("SecurePasswordTest", () => {
     // take the MINIMUM elapsed time over a handful of samples instead — the
     // min reflects the true CPU cost of the hash and is immune to the
     // GC/preemption spikes that make a single sample flaky (a preempted
-    // wrong-password run measuring ~30ms was the original flake). Both the
-    // not-found path and the found-but-wrong-password path must run the
-    // password hash so a timing attacker can't distinguish them: the not-found
-    // run must not be substantially shorter than the wrong-password run.
+    // wrong-password run measuring ~30ms was the original flake).
+    //
+    // Every path must run one password hash so a timing attacker can't tell
+    // them apart: the found-and-correct path verifies the stored digest, the
+    // found-but-wrong-password path also verifies it, and the not-found path
+    // runs a decoy hash. We measure all three and assert the not-found run is
+    // not substantially shorter than either found run. Including the
+    // found-and-correct path matches the exact invariant Rails bounds (Rails
+    // compares found-correct vs not-found); the wrong-password comparison is an
+    // additional trails check that the two "auth fails" branches also match.
     await retryFlakyTest(async () => {
       const SAMPLES = 8;
+      let foundCorrectMs = Infinity;
       let wrongPasswordMs = Infinity;
       let notFoundMs = Infinity;
       for (let i = 0; i < SAMPLES; i++) {
         const t0 = performance.now();
         expect(
-          await (User as any).authenticateBy({ token: user.token, password: "wrong" }),
-        ).toBeNull();
-        wrongPasswordMs = Math.min(wrongPasswordMs, performance.now() - t0);
+          (await (User as any).authenticateBy({ token: user.token, password: PASSWORD }))?.id,
+        ).toBe(user.id);
+        foundCorrectMs = Math.min(foundCorrectMs, performance.now() - t0);
 
         const t1 = performance.now();
         expect(
+          await (User as any).authenticateBy({ token: user.token, password: "wrong" }),
+        ).toBeNull();
+        wrongPasswordMs = Math.min(wrongPasswordMs, performance.now() - t1);
+
+        const t2 = performance.now();
+        expect(
           await (User as any).authenticateBy({ token: "wrong", password: PASSWORD }),
         ).toBeNull();
-        notFoundMs = Math.min(notFoundMs, performance.now() - t1);
+        notFoundMs = Math.min(notFoundMs, performance.now() - t2);
       }
 
+      expect(notFoundMs).toBeGreaterThan(foundCorrectMs * 0.3);
       expect(notFoundMs).toBeGreaterThan(wrongPasswordMs * 0.3);
     });
   });
