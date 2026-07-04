@@ -21,7 +21,6 @@ import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schem
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { Base } from "./base.js";
-import { Duration } from "@blazetrails/activesupport";
 
 // Lazy-load schema-introspection to break the static cycle
 // (schema-dumper -> schema-introspection -> schema-statements ->
@@ -371,68 +370,6 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
   }
 
   return result;
-}
-
-/**
- * Strip a raw PG catalog default expression to a plain value.
- * E.g. `'happy'::mood` → `"happy"`, `'192.168.1.1'::inet` → `"192.168.1.1"`,
- * `nextval(...)` → kept as-is (expression default).
- *
- * Only call this with raw SQL strings from `column_default` /
- * `pg_attrdef.adbin`. For already-deserialized ORM values (e.g. bit-strings
- * like `"00000011"`) use `cleanDefault` instead.
- */
-export function cleanRawPgExpression(raw: string): unknown {
-  const castMatch = raw.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
-  if (castMatch) {
-    return castMatch[1].replace(/''/g, "'");
-  }
-
-  const numericCastMatch = raw.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
-  if (numericCastMatch) {
-    return Number(numericCastMatch[1]);
-  }
-
-  // Expression defaults like nextval(...) — keep as-is
-  if (raw.includes("(") && !raw.startsWith("'")) {
-    return raw;
-  }
-
-  return raw;
-}
-
-/**
- * Clean up a default value — either a raw PG catalog expression or an
- * already-deserialized ORM scalar — to the JS literal used in schema dumps.
- *
- * Two distinct inputs flow through here:
- *  1. Raw PG catalog expressions (e.g. `'happy'::mood`, `'(12.2,13.3)'::point`)
- *     — dispatched to `cleanRawPgExpression`.
- *  2. Already-deserialized scalar literals — plain strings like `"00000011"`
- *     (bit-string), `"true"`, or `"42"`. The `/^-?0\d/` guard prevents
- *     bit-string patterns from being coerced to `Number`.
- */
-export function cleanDefault(raw: unknown): unknown {
-  if (raw === null || raw === undefined) return raw;
-  // Interval/Duration round-trips through schema dump as its ISO-8601 form.
-  // Without this branch, Duration.toString() yields seconds — e.g. P3Y →
-  // "94670856" — and the numeric coercion below would emit `default: 94670856`.
-  // Mirrors Rails OID::Interval#type_cast_for_schema → serialize(value).inspect.
-  if (raw instanceof Duration) return raw.iso8601();
-  const str = String(raw);
-
-  // Delegate raw PG expressions (contain a type cast or are expression defaults)
-  if (str.includes("::") || (str.includes("(") && !str.startsWith("'"))) {
-    return cleanRawPgExpression(str);
-  }
-
-  if (str === "true") return true;
-  if (str === "false") return false;
-  // Only coerce to number when there are no leading zeros — leading zeros mean
-  // the string is a bit-string pattern ("00000011") or similar, not a decimal.
-  if (/^-?\d+(\.\d+)?$/.test(str) && !/^-?0\d/.test(str)) return Number(str);
-
-  return raw;
 }
 
 /**
@@ -1023,9 +960,9 @@ export class SchemaDumper {
         return { id: "uuid", default: () => fn };
       }
       // Route the literal default through the same `schemaDefault` cast-type
-      // path `columnSpec` uses (Rails `schema_default`) rather than the
-      // trails-invented `cleanDefault` regex. The result is already-formatted
-      // TS-DSL text, so wrap it so `formatOptions` emits it verbatim.
+      // path `columnSpec` uses (Rails `schema_default`). The result is
+      // already-formatted TS-DSL text, so wrap it so `formatOptions` emits it
+      // verbatim.
       const def = this.schemaDefault(column);
       return { id: "uuid", default: def == null ? null : new RawSchemaLiteral(def) };
     }
@@ -1171,9 +1108,8 @@ export class SchemaDumper {
         colspec.default = () => fn;
       } else {
         // Route through the same `schemaDefault` cast-type path `columnSpec`
-        // uses (Rails `schema_default`) instead of the trails-invented
-        // `cleanDefault` regex. The result is already-formatted TS-DSL text,
-        // so wrap it so `formatColspec` emits it verbatim.
+        // uses (Rails `schema_default`). The result is already-formatted
+        // TS-DSL text, so wrap it so `formatColspec` emits it verbatim.
         const def = this.schemaDefault(col);
         if (def !== undefined) {
           colspec.default = new RawSchemaLiteral(def);
