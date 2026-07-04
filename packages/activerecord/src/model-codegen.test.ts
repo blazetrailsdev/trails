@@ -169,21 +169,27 @@ describe("generateModels", () => {
     const origSm = Base.schemaMigrationsTableName;
     const origIm = Base.internalMetadataTableName;
     const origPrefix = Base.tableNamePrefix;
+    const origSuffix = Base.tableNameSuffix;
     Base.schemaMigrationsTableName = "my_migrations";
     Base.internalMetadataTableName = "my_metadata";
     Base.tableNamePrefix = "app_";
+    Base.tableNameSuffix = "_v2";
     try {
       const out = generateModels(
-        [table("books"), table("app_my_migrations"), table("app_my_metadata")],
+        [table("books"), table("app_my_migrations_v2"), table("app_my_metadata_v2")],
         { noHeader: true, now: NOW },
       );
       expect(out).toContain("export class Book extends Base {");
       expect(out).not.toMatch(/export class AppMyMigrations/);
       expect(out).not.toMatch(/export class AppMyMetadata/);
+      // The un-prefixed/un-suffixed literals are no longer what codegen ignores.
+      const bare = generateModels([table("schema_migrations")], { noHeader: true, now: NOW });
+      expect(bare).toContain("export class SchemaMigration extends Base {");
     } finally {
       Base.schemaMigrationsTableName = origSm;
       Base.internalMetadataTableName = origIm;
       Base.tableNamePrefix = origPrefix;
+      Base.tableNameSuffix = origSuffix;
     }
   });
 
