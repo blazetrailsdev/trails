@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf, reflectOnAggregation } from "./index.js";
+import { reload as persistenceReload } from "./persistence.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -286,5 +287,60 @@ describe("OverridingAggregationsTest", () => {
     expect(personRef).not.toBeNull();
     expect(differentRef).not.toBeNull();
     expect(personRef).not.toBe(differentRef);
+  });
+});
+
+// trails-specific invariant (no Rails counterpart — in Ruby the ancestry is
+// implicit): mirror Rails' `include Aggregations unless self < Aggregations`
+// (aggregations.rb:225-230). Aggregations must be mixed in lazily by
+// composed_of, not unconditionally onto Base, and the `self < Aggregations`
+// guard must be inheritance-aware so a subclass of a composed_of model does not
+// re-wrap reload/initialize_dup.
+describe("lazy composed_of inclusion", () => {
+  const own = (klass: typeof Base, key: string): boolean =>
+    Object.prototype.hasOwnProperty.call(klass.prototype, key);
+
+  it("does not mix Aggregations onto models without composed_of", () => {
+    class Plain extends Base {}
+    expect(own(Plain, "reload")).toBe(false);
+    expect(own(Plain, "initializeDup")).toBe(false);
+    // Its reload is Persistence#reload verbatim, not an aggregation-cache wrapper.
+    expect(Plain.prototype.reload).toBe(persistenceReload);
+  });
+
+  it("mixes Aggregations onto a model that declares composed_of", () => {
+    class Money {
+      constructor(public amount: number) {}
+    }
+    class Priced extends Base {
+      static {
+        composedOf(this, "balance", { className: Money, mapping: [["balance", "amount"]] });
+      }
+    }
+    expect(own(Priced, "reload")).toBe(true);
+    expect(own(Priced, "initializeDup")).toBe(true);
+    expect(Priced.prototype.reload).not.toBe(persistenceReload);
+  });
+
+  it("does not re-wrap a subclass whose superclass already declared composed_of", () => {
+    class Money {
+      constructor(public amount: number) {}
+    }
+    class Priced extends Base {
+      static {
+        composedOf(this, "balance", { className: Money, mapping: [["balance", "amount"]] });
+      }
+    }
+    class SubPriced extends Priced {
+      static {
+        composedOf(this, "credit", { className: Money, mapping: [["credit", "amount"]] });
+      }
+    }
+    // `self < Aggregations` is already true via inheritance, so no own override.
+    expect(own(SubPriced, "reload")).toBe(false);
+    expect(own(SubPriced, "initializeDup")).toBe(false);
+    // But it still inherits the composed_of overrides from Priced.
+    expect(SubPriced.prototype.reload).toBe(Priced.prototype.reload);
+    expect(SubPriced.prototype.reload).not.toBe(persistenceReload);
   });
 });

@@ -48,6 +48,7 @@ export function composedOf(
   name: string,
   options: ComposedOfOptions,
 ): void {
+  includeAggregations(modelClass);
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_aggregateReflections")) {
     const parent: Map<string, AggregateReflection> | undefined = (modelClass as any)
       ._aggregateReflections;
@@ -236,10 +237,61 @@ export async function reload<T extends Base>(
   ).call(this, options);
 }
 
-export const InstanceMethods = {
-  initializeDup,
-  reload,
-};
+/**
+ * Symbol marking a model prototype that has already had Aggregations mixed in.
+ * Mirrors Rails' `unless self < Aggregations` guard in `composed_of` — the
+ * module is included at most once per class regardless of how many
+ * `composed_of` declarations it carries.
+ */
+const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsIncluded");
+
+/**
+ * Lazily mix Aggregations' instance methods onto a model that declares
+ * `composed_of`. Mirrors Rails, where `ActiveRecord::Aggregations` is NOT
+ * unconditionally included on `Base` — `composed_of` pulls it in only when a
+ * model actually needs it (aggregations.rb:228-229). Models without a
+ * `composed_of` declaration never carry `reload`/`initialize_dup` overrides.
+ *
+ * The overrides wrap the model's inherited methods (Ruby's `super`): `reload`
+ * clears the aggregation cache first, and `initialize_dup` copies the cache
+ * before running the inherited dup chain (Locking::Optimistic → Timestamp).
+ */
+export function includeAggregations(modelClass: typeof Base): void {
+  const proto = modelClass.prototype as Record<string | symbol, any>;
+  // `unless self < Aggregations`: skip when the module already sits in the
+  // ancestry, whether from a prior composed_of on this class OR inherited from a
+  // superclass that declared one. A prototype-chain read (not hasOwnProperty)
+  // mirrors Ruby's ancestry check and stops a subclass from re-wrapping reload/
+  // initialize_dup (which would run the cache copy twice).
+  if (proto[aggregationsIncluded]) return;
+  Object.defineProperty(proto, aggregationsIncluded, {
+    value: true,
+    configurable: true,
+    enumerable: false,
+  });
+
+  // Aggregations#reload clears the aggregation cache then calls super
+  // (Persistence#reload, which this export delegates to explicitly).
+  Object.defineProperty(proto, "reload", {
+    value: reload,
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+
+  const inheritedInitializeDup = proto.initializeDup as
+    | ((this: Base, other: unknown) => void)
+    | undefined;
+  Object.defineProperty(proto, "initializeDup", {
+    value: function (this: Base, other: unknown): void {
+      initializeDup.call(this, other);
+      if (inheritedInitializeDup) inheritedInitializeDup.call(this, other);
+    },
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+}
 
 /**
  * @internal
